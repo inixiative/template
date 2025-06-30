@@ -1,0 +1,30 @@
+model Account {
+  @@map("accounts")
+  
+  id                String      @id @default(uuid())
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  provider          AccountProvider
+  providerAccountId String?
+  
+  email             String?
+  emailVerified     Boolean     @default(false)
+  
+  passwordHash      String?
+  
+  @@index([userId])
+  @@index([email])
+  @@index([provider, providerAccountId])
+}
+
+enum AccountProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+  DISCORD
+  APPLE
+}

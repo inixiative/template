@@ -1,0 +1,4 @@
+# bunfig.toml
+
+[paths]
+"src/*" = ["./src/*"]

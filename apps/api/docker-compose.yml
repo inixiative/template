@@ -1,0 +1,69 @@
+x-bun: &bun
+  image: ${PROJECT_NAME:-template}-base:latest
+  environment:
+    ENVIRONMENT: ${ENVIRONMENT:-local}
+  env_file:
+    - "env/.env.${ENVIRONMENT}"
+  volumes:
+    - .:/app
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_started
+  working_dir: /app
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    ports:
+      - 5432:5432
+    env_file:
+      - env/.env.local.postgres
+    volumes:
+      - ./scripts/docker/pg-init.sh:/docker-entrypoint-initdb.d/pg-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+
+  base:
+    build:
+      context: .
+    image: ${PROJECT_NAME:-template}-base:latest
+    command: tail -f /dev/null
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+    env_file:
+      - "env/.env.${ENVIRONMENT}"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+
+  api:
+    <<: *bun
+    ports:
+      - "8000:8000"
+    command: bun run --watch src/app/index.ts
+
+  test:
+    <<: *bun
+    environment:
+      ENVIRONMENT: test
+    env_file:
+      - "env/.env.test"
+    command: bun test --watch
+
+  scripts:
+    <<: *bun
+    command: tail -f /dev/null
