@@ -1,6 +1,7 @@
 import { base } from 'src/base.ts'
 import { middleware } from 'src/app/core/middleware';
 import { apiRoutes } from 'src/app/apiRoutes';
+import { openApi } from 'src/app/openApi.ts';
 
 export const app = base
   .use(middleware)
@@ -10,3 +11,4 @@ export const app = base
     // console.log('Context:', context);
     return { status: 'ok', context_keys: Object.keys(context) };
   })
+  .use(openApi)

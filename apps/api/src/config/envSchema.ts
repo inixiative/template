@@ -17,6 +17,10 @@ export const EnvSchema = t.Object({
   // Database
   DATABASE_URL: t.String(),
   
+  // Redis
+  REDIS_CACHE_URL: t.String(),
+  REDIS_QUEUE_URL: t.String(),
+  
   // Auth
   GOOGLE_CLIENT_ID: t.Optional(t.String()),
   GOOGLE_CLIENT_SECRET: t.Optional(t.String()),
