@@ -32,7 +32,14 @@ A production-ready API template built with Elysia, Prisma, and Redis, featuring 
 - **Redis Integration**: Dual Redis connections for cache and queues
 - **Smart Caching**: Automatic user context caching with TTL
 - **Cache Utilities**: Pattern-based cache clearing and management
-- **Bull Queue Ready**: Job queue setup for background processing
+- **BullMQ Integration**: Production-ready job queue with worker processing
+
+### Observability & Monitoring
+- **OpenTelemetry**: Full tracing and metrics support
+- **Job Telemetry**: Automatic job processing metrics and spans
+- **HTTP Telemetry**: Request/response tracking with durations
+- **Custom Metrics**: Business logic metrics support
+- **Queue Dashboard**: Bull Board UI at `/api/admin/queues`
 
 ### Developer Experience
 - **Absolute Imports**: Clean imports from `src/`
@@ -50,24 +57,30 @@ src/
 │   ├── app.ts             # Main app configuration
 │   ├── openapi.ts         # OpenAPI/Scalar documentation
 │   ├── apiRoutes.ts       # API route aggregation
-│   └── core/
-│       ├── middleware/    # Global middleware
-│       │   ├── errorBoundary.ts
-│       │   └── userContext.ts
-│       ├── requestSchemas/  # Reusable OpenAPI schemas
-│       │   ├── create.ts
-│       │   ├── resource.ts
-│       │   ├── resources.ts
-│       │   ├── update.ts
-│       │   ├── delete.ts
-│       │   └── pagination.ts
-│       ├── schemas/       # Type generation utilities
-│       │   ├── prismaToElysia.ts
-│       │   └── jsonTypes/
-│       └── users/         # User module
+│   ├── core/
+│   │   ├── middleware/    # Global middleware
+│   │   │   ├── errorBoundary.ts
+│   │   │   ├── userContext.ts
+│   │   │   └── telemetry.ts      # HTTP telemetry
+│   │   ├── requestSchemas/  # Reusable OpenAPI schemas
+│   │   │   ├── create.ts
+│   │   │   ├── resource.ts
+│   │   │   ├── resources.ts
+│   │   │   ├── update.ts
+│   │   │   ├── delete.ts
+│   │   │   └── pagination.ts
+│   │   ├── schemas/       # Type generation utilities
+│   │   │   ├── prismaToElysia.ts
+│   │   │   └── jsonTypes/
+│   │   └── users/         # User module
+│   │       ├── routes/
+│   │       ├── controllers/
+│   │       └── schemas/
+│   └── admin/            # Admin module
+│       ├── adminRoutes.ts
+│       └── queue/
 │           ├── routes/
-│           ├── controllers/
-│           └── schemas/
+│           └── controllers/
 ├── base.ts                # Base Elysia instance
 ├── config/               # Configuration
 │   ├── envSchema.ts      # Environment validation
@@ -77,7 +90,15 @@ src/
 ├── plugins/             # Elysia plugins
 │   ├── auth.ts          # Better-auth integration
 │   ├── db.ts            # Prisma client
-│   └── redis.ts         # Redis connections
+│   ├── redis.ts         # Redis connections
+│   ├── queue.ts         # BullMQ queue setup
+│   └── telemetry.ts     # OpenTelemetry setup
+├── telemetry/           # Telemetry configuration
+│   └── index.ts         # OTEL SDK and metrics
+├── worker/              # Background job processing
+│   ├── index.ts         # Worker entry point
+│   ├── worker.ts        # Worker Elysia instance
+│   └── processJob.ts    # Job handlers
 └── shared/
     └── cache/           # Caching utilities
 
@@ -100,7 +121,7 @@ src/
 docker-compose up
 
 # Or run specific services
-bun run start         # Start API
+bun run start         # Start API and Worker
 bun run db:push      # Push database schema
 bun run db:migrate   # Run migrations
 bun run db:studio    # Open Prisma Studio
@@ -131,6 +152,8 @@ GOOGLE_CLIENT_SECRET=...
 DB_ENABLED=true
 REDIS_ENABLED=true
 AUTH_ENABLED=true
+QUEUE_ENABLED=true
+OTEL_ENABLED=false
 ```
 
 ## Usage Examples
@@ -184,6 +207,36 @@ const data = await cache(
 );
 ```
 
+### Adding Background Jobs
+
+```typescript
+// Queue a job
+await addJob('email', {
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  template: 'welcome'
+});
+
+// Define job handler in worker/processJob.ts
+const jobHandlers: Record<string, (payload: any) => Promise<void>> = {
+  email: async (payload) => {
+    await sendEmail(payload);
+  }
+};
+```
+
+### Adding Custom Metrics
+
+```typescript
+// In your controller
+const { metrics } = context;
+
+metrics.customMetric?.add(1, {
+  action: 'user_signup',
+  provider: 'google'
+});
+```
+
 ### Custom JSON Types
 
 ```typescript
@@ -216,6 +269,7 @@ bun run test:watch
 Once running, visit:
 - API Documentation: http://localhost:8000/docs
 - Health Check: http://localhost:8000/health
+- Queue Dashboard: http://localhost:8000/api/admin/queues
 
 ## Scripts
 

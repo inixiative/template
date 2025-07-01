@@ -3,9 +3,11 @@ import { errorBoundary } from 'src/app/core/middleware/errorBoundary';
 import { exampleMiddleware } from 'src/app/core/middleware/example';
 import { userContext } from 'src/app/core/middleware/user/userContext';
 import { resourceContext } from 'src/app/core/middleware/resource/resourceContext';
+import { telemetry } from 'src/app/core/middleware/telemetry';
 
 export const middleware = (app: Elysia) => {
   app.use(errorBoundary);
+  app.use(telemetry);
   app.use(userContext);
   app.use(resourceContext);
   

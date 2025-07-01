@@ -64,6 +64,10 @@ services:
       - "env/.env.test"
     command: bun test --watch
 
+  worker:
+    <<: *bun
+    command: bun run --watch src/worker/index.ts
+
   scripts:
     <<: *bun
     command: tail -f /dev/null

@@ -13,6 +13,9 @@ docker cp ${CONTAINER_NAME}:/app/node_modules .tmp_node_modules/ 2>/dev/null || 
 rsync -a --delete .tmp_node_modules/node_modules/ node_modules/
 rm -rf .tmp_node_modules
 
+# Generate Prisma client after node_modules sync
+bun prisma generate --schema=./src/db/prisma
+
 docker cp ${CONTAINER_NAME}:/app/bun.lock . 2>/dev/null || true
 docker cp ${CONTAINER_NAME}:/app/bun.lockb . 2>/dev/null || true
 
