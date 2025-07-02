@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
-import { coreRoutes } from 'src/app/core/coreRoutes';
-import { adminRoutes } from 'src/app/admin/adminRoutes';
+import { coreModuleRoutes } from 'src/app/core/coreModuleRoutes';
+import { adminModuleRoutes } from 'src/app/admin/adminModuleRoutes';
 
 export const apiRoutes = new Elysia({ name: 'apiRoutes', prefix: '/api' })
-  .use(coreRoutes)
-  .use(adminRoutes);
+  .use(coreModuleRoutes)
+  .use(adminModuleRoutes);

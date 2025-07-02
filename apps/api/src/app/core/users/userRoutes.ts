@@ -1,8 +1,8 @@
 import { Elysia, t } from 'elysia';
 import { resource, update } from 'src/app/core/requestSchemas';
-import { usersCurrent } from 'src/app/core/users/controllers/usersCurrent';
-import { usersUpdateCurrent } from 'src/app/core/users/controllers/usersUpdateCurrent';
-import { userWithAccountsSchema } from 'src/app/core/users/schemas/userSchema';
+import { usersCurrent } from 'src/app/core/users/controllers/usersCurrent.ts';
+import { usersUpdateCurrent } from 'src/app/core/users/controllers/usersUpdateCurrent.ts';
+import { userWithAccountsSchema } from 'src/app/core/users/schemas/userSchema.ts';
 
 export const userRoutes = new Elysia({ name: 'userRoutes', prefix: '/users' })
   .get('/current', usersCurrent, resource('user', userWithAccountsSchema, { 

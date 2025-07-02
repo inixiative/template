@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { getBullBoard } from 'src/app/admin/queue/controllers/bullBoardController';
+import { getBullBoard } from 'src/app/admin/queue/controllers/bullBoardController.ts';
 
 export const queueRoutes = new Elysia({ prefix: '/queues' })
   .guard({
