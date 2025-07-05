@@ -7,7 +7,8 @@
     "apps/*"
   ],
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "orval": "^7.10.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
