@@ -12,6 +12,9 @@ docker-compose down
 echo "Removing project-specific volumes..."
 docker volume ls -q -f name=$PROJECT_NAME | xargs -r docker volume rm
 
+echo "Cleaning up unused Docker resources..."
+docker system prune -f --volumes
+
 echo "Running the setup script..."
 bun run setup
 

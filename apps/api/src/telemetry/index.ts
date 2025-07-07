@@ -1,6 +1,5 @@
 import { trace, metrics, context } from '@opentelemetry/api';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { Resource } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
@@ -11,13 +10,6 @@ import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
 const environment = process.env.ENVIRONMENT || 'local';
 const serviceName = 'api';
 const serviceVersion = '1.0.0';
-
-// Configure resource
-const resource = new Resource({
-  [ATTR_SERVICE_NAME]: serviceName,
-  [ATTR_SERVICE_VERSION]: serviceVersion,
-  environment,
-});
 
 // Configure trace exporter
 const traceExporter = new OTLPTraceExporter({
@@ -31,7 +23,13 @@ const metricExporter = new OTLPMetricExporter({
 
 // Create SDK with minimal auto-instrumentation for Bun compatibility
 export const otelSDK = new NodeSDK({
-  resource,
+  resource: {
+    attributes: {
+      [ATTR_SERVICE_NAME]: serviceName,
+      [ATTR_SERVICE_VERSION]: serviceVersion,
+      environment,
+    },
+  },
   spanProcessor: new BatchSpanProcessor(traceExporter),
   metricReader: new PeriodicExportingMetricReader({
     exporter: metricExporter,
