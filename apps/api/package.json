@@ -30,8 +30,10 @@
     "@opentelemetry/semantic-conventions": "^1.34.0",
     "@prisma/client": "^6.10.1",
     "@sentry/node": "^9.33.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/bull": "^4.10.4",
     "@types/ioredis": "^5.0.0",
+    "bcryptjs": "^3.0.2",
     "better-auth": "^1.2.12",
     "bull": "^4.16.5",
     "bullmq": "^5.56.0",
@@ -47,6 +49,7 @@
     "@types/bun": "latest",
     "@types/node": "^24.0.7",
     "bun-types": "latest",
+    "orval": "^7.10.0",
     "prisma": "^6.10.1"
   },
   "peerDependencies": {

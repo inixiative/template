@@ -6,14 +6,13 @@
     "packages/*",
     "apps/*"
   ],
+  "scripts": {
+    "sync": "scripts/sync-template.sh"
+  },
   "devDependencies": {
-    "@types/bun": "latest",
-    "orval": "^7.10.0"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "dayjs": "^1.11.13"
   }
 }
