@@ -23,7 +23,7 @@ for (const [key, value] of Object.entries(rawEnv)) {
     if (schema.type === 'number' || schema.type === 'integer') {
       parsedEnv[key] = value !== undefined && value !== '' ? Number(value) : undefined;
     } else if (schema.type === 'boolean') {
-      parsedEnv[key] = value !== 'false' && value !== '';
+      parsedEnv[key] = value === 'true' || value === '1';
     } else {
       parsedEnv[key] = value;
     }
