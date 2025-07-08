@@ -30,4 +30,7 @@ export const auth = new Elysia({ name: 'auth' })
     });
     
     return { auth: betterAuthInstance };
+  })
+  .all('/api/auth/*', async ({ auth, request }) => {
+    return auth.handler(request);
   });
