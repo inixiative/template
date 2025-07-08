@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { auth } from 'src/plugins/auth';
 import { corsMiddleware } from 'src/app/core/middleware/cors';
 import { errorBoundary } from 'src/app/core/middleware/errorBoundary';
 import { exampleMiddleware } from 'src/app/core/middleware/example';
@@ -10,6 +11,9 @@ export const middleware = (app: Elysia) => {
   app.use(errorBoundary);
   app.use(telemetry);
   app.use(corsMiddleware);
+  
+  if (process.env.AUTH_ENABLED) app.use(auth);
+  
   app.use(userContext);
   app.use(resourceContext);
   
