@@ -1,24 +1,24 @@
 model Account {
   @@map("accounts")
   
-  id                String      @id @default(uuid())
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id                    String      @id @default(uuid())
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
   
-  userId            String
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  provider          AccountProvider
-  providerAccountId String?
-  
-  email             String?
-  emailVerified     Boolean     @default(false)
-  
-  passwordHash      String?
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
   
   @@index([userId])
-  @@index([email])
-  @@index([provider, providerAccountId])
 }
 
 enum AccountProvider {

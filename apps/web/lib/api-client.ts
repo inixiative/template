@@ -1,10 +1,8 @@
-import * as Sentry from "@sentry/nextjs";
-
 interface FetchOptions extends RequestInit {
   includeAuth?: boolean;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export async function apiClient(
   endpoint: string,
@@ -22,15 +20,29 @@ export async function apiClient(
     }
   }
 
-  // Prepare headers with trace context for E2E tracing
-  const sentryTrace = Sentry.getActiveSpan()?.toTraceparent();
-  const baggage = Sentry.getBaggage();
+  // Prepare headers with trace context for E2E tracing if Sentry is enabled
+  let sentryHeaders = {};
+  if (process.env.NEXT_PUBLIC_SENTRY_ENABLED === 'true' && typeof window !== 'undefined') {
+    try {
+      const Sentry = await import("@sentry/nextjs");
+      const sentryTrace = Sentry.getActiveSpan()?.toTraceparent();
+      const baggage = Sentry.getBaggage();
+      
+      if (sentryTrace) {
+        sentryHeaders["sentry-trace"] = sentryTrace;
+      }
+      if (baggage) {
+        sentryHeaders["baggage"] = Sentry.baggageHeaderToDynamicSamplingContext(baggage);
+      }
+    } catch (e) {
+      // Sentry not available
+    }
+  }
   
   const finalHeaders = {
     "Content-Type": "application/json",
     ...authHeader,
-    ...(sentryTrace && { "sentry-trace": sentryTrace }),
-    ...(baggage && { baggage: Sentry.baggageHeaderToDynamicSamplingContext(baggage) }),
+    ...sentryHeaders,
     ...headers,
   };
 
@@ -48,12 +60,16 @@ export async function apiClient(
 
     return response;
   } catch (error) {
-    Sentry.captureException(error, {
-      extra: {
-        endpoint,
-        method: fetchOptions.method || "GET",
-      },
-    });
+    if (process.env.NEXT_PUBLIC_SENTRY_ENABLED === 'true' && typeof window !== 'undefined') {
+      import("@sentry/nextjs").then((Sentry) => {
+        Sentry.captureException(error, {
+          extra: {
+            endpoint,
+            method: fetchOptions.method || "GET",
+          },
+        });
+      });
+    }
     throw error;
   }
 }

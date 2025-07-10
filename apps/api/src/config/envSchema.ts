@@ -27,6 +27,7 @@ export const EnvSchema = t.Object({
   WEB_URL: t.String({ default: 'http://localhost:3000' }),
   ADMIN_URL: t.String({ default: 'http://localhost:3001' }),
   BETTER_AUTH_SECRET: t.String(),
+  REDIRECT_TO_AFTER_LOGIN: t.String({ default: '/profile' }),
   
   // Plugin flags
   DB_ENABLED: t.Boolean({ default: true }),
@@ -40,6 +41,7 @@ export const EnvSchema = t.Object({
   // Monitoring
   SENTRY_ENABLED: t.Boolean({ default: true }),
   SENTRY_DSN: t.Optional(t.String()),
+  OTEL_ENABLED: t.Boolean({ default: false }),
 });
 
 export type Env = typeof EnvSchema.static;

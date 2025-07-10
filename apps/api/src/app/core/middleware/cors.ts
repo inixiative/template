@@ -18,5 +18,5 @@ export const corsMiddleware = new Elysia({ name: 'cors-middleware' })
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Length', 'X-Request-Id']
+    exposeHeaders: ['Content-Length', 'X-Request-Id']
   }));

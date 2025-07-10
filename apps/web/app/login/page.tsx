@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn, useSession } from 'src/lib/auth-client';
+import { authClient, useSession } from 'src/lib/auth-client';
 import { Button } from '@repo/ui';
 import { Input } from '@repo/ui';
 import { Label } from '@repo/ui';
@@ -12,6 +12,7 @@ import { SocialAuthButton } from '@repo/ui';
 import { AuthDivider } from '@repo/ui';
 
 export default function LoginPage() {
+  const redirectTo = process.env.NEXT_PUBLIC_REDIRECT_TO_AFTER_LOGIN || '/profile';
   const router = useRouter();
   const { data: session } = useSession();
   const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   if (session?.user) {
-    router.push('/profile');
+    router.push(redirectTo);
     return null;
   }
 
@@ -30,11 +31,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signIn.email({
+      const result = await authClient.signIn.email({
         email,
         password,
-        callbackURL: '/profile'
+        callbackURL: redirectTo
       });
+      if (result.data) {
+        router.push(redirectTo);
+      }
     } catch (err) {
       setError('Invalid email or password');
     } finally {
@@ -47,9 +51,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signIn.social({
+      await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/profile'
+        callbackURL: redirectTo
       });
     } catch (err) {
       setError('Failed to sign in with Google');

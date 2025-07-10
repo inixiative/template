@@ -1,17 +1,29 @@
-import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+
+const sentryEnabled = process.env.SENTRY_ENABLED === 'true';
 
 const nextConfig: NextConfig = {
   experimental: {
     cssChunking: true,
   },
   transpilePackages: ['@tailwindcss/postcss'],
+  webpack: (config, { isServer }) => {
+    if (!sentryEnabled) {
+      // Ignore Sentry and OpenTelemetry when disabled
+      config.resolve.alias['@sentry/nextjs'] = false;
+      config.resolve.alias['@sentry/node'] = false;
+      config.resolve.alias['@opentelemetry/instrumentation'] = false;
+    }
+    return config;
+  },
 };
 
-const sentryEnabled = process.env.SENTRY_ENABLED === 'true';
+let exportedConfig = nextConfig;
 
-export default sentryEnabled
-  ? withSentryConfig(
+if (sentryEnabled) {
+  try {
+    const { withSentryConfig } = require("@sentry/nextjs");
+    exportedConfig = withSentryConfig(
       nextConfig,
       {
         // For all available options, see:
@@ -52,5 +64,10 @@ export default sentryEnabled
         // https://vercel.com/docs/cron-jobs
         automaticVercelMonitors: true,
       }
-    )
-  : nextConfig;
+    );
+  } catch (e) {
+    console.log('Sentry not available, using default config');
+  }
+}
+
+export default exportedConfig;

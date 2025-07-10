@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signUp, signIn, useSession } from 'src/lib/auth-client';
+import { authClient, useSession } from 'src/lib/auth-client';
 import { Button } from '@repo/ui';
 import { Input } from '@repo/ui';
 import { Label } from '@repo/ui';
@@ -12,6 +12,7 @@ import { SocialAuthButton } from '@repo/ui';
 import { AuthDivider } from '@repo/ui';
 
 export default function SignupPage() {
+  const redirectTo = process.env.NEXT_PUBLIC_REDIRECT_TO_AFTER_LOGIN || '/profile';
   const router = useRouter();
   const { data: session } = useSession();
   const [email, setEmail] = useState('');
@@ -22,12 +23,13 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   if (session?.user) {
-    router.push('/profile');
+    router.push(redirectTo);
     return null;
   }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Signup form submitted');
     setError('');
 
     if (password !== confirmPassword) {
@@ -43,13 +45,28 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      await signUp.email({
+      const result = await authClient.signUp.email({
         email,
         password,
         name,
-        callbackURL: '/profile'
+        callbackURL: redirectTo
       });
+      console.log('Signup result:', result);
+      if (result.data) {
+        // Sign in the user after successful signup
+        const signInResult = await authClient.signIn.email({
+          email,
+          password,
+          callbackURL: redirectTo
+        });
+        if (signInResult.data) {
+          router.push(redirectTo);
+        }
+      } else if (result.error) {
+        setError(result.error.message || 'Failed to create account');
+      }
     } catch (err: any) {
+      console.error('Signup error:', err);
       setError(err.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
@@ -61,9 +78,9 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      await signIn.social({
+      await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/profile'
+        callbackURL: redirectTo
       });
     } catch (err) {
       setError('Failed to sign up with Google');

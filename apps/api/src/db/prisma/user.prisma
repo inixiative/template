@@ -5,10 +5,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
-  name          String?
+  name          String
   username      String?   @unique
+  email         String
+  emailVerified Boolean
   image         String?
   
   accounts      Account[]
   sessions      Session[]
+  
+  @@unique([email])
 }
