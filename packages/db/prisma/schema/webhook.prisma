@@ -1,0 +1,72 @@
+// ============================================================================
+// WEBHOOKS
+// ============================================================================
+
+model WebhookSubscription {
+  id        String           @id @default(uuid()) @db.VarChar(36)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  model     WebhookModel
+  url       String           @db.VarChar(512)
+  secret    String?          @db.VarChar(255) // For HMAC signature verification
+  isActive  Boolean          @default(true)
+
+  // Owner (who created this subscription)
+  ownerType WebhookOwnerType
+  ownerId   String           @db.VarChar(36)
+
+  // Relations
+  events WebhookEvent[]
+
+  @@unique([ownerId, model, url])
+  @@index([ownerType, ownerId])
+  @@index([model])
+}
+
+model WebhookEvent {
+  id        String             @id @default(uuid()) @db.VarChar(36)
+  createdAt DateTime           @default(now())
+  status    WebhookEventStatus
+  action    WebhookEventAction
+  payload   Json?              // The data that was sent
+  error     String?            @db.Text
+
+  // Relations
+  subscriptionId String              @db.VarChar(36)
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  resourceId     String              @db.VarChar(36) // ID of the resource that triggered this
+
+  @@index([subscriptionId])
+  @@index([resourceId])
+  @@index([status])
+}
+
+enum WebhookModel {
+  User
+  Pool
+  Investment
+  Phase
+  Event
+  Payout
+  GovernanceProposal
+  Trade
+}
+
+enum WebhookOwnerType {
+  User   // Individual user subscriptions
+  Pool   // Pool-level subscriptions (for operators)
+  System // Platform-wide (admin)
+}
+
+enum WebhookEventStatus {
+  pending
+  success
+  error
+  unreachable
+}
+
+enum WebhookEventAction {
+  create
+  update
+  delete
+}

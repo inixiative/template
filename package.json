@@ -1,18 +1,23 @@
 {
   "name": "template",
-  "module": "index.ts",
+  "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "sync": "scripts/sync-template.sh"
+    "dev": "bun run --filter=api dev",
+    "build": "bun run --filter=* build",
+    "test": "bun run --filter=* test",
+    "db:generate": "bun run --filter=@template/db db:generate",
+    "db:push": "bun run --filter=@template/db db:push",
+    "db:migrate": "bun run --filter=@template/db db:migrate",
+    "db:studio": "bun run --filter=@template/db db:studio",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
   }
 }

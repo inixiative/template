@@ -1,61 +1,125 @@
-# Template Development Guide
+# Claude Development Guide
 
-## Template-Based Development Workflow
+## Project Overview
 
-This is the template repository that serves as the base for inixiative and other apps.
+**Template** - A monorepo foundation for building full-stack applications with Bun, Hono, Prisma 7, React, and Tailwind.
 
-### Development Principles
+## Tech Stack
 
-1. **Make changes in the appropriate repository**:
-   - Generic improvements that benefit all apps → Make in `template` repository
-   - App-specific features → Make directly in the app repository (e.g., `inixiative`)
+- **Monorepo**: Bun workspaces
+- **Backend**: Bun + Hono + Prisma 7
+- **Frontend**: React + Vite + Tailwind CSS v4 + React Aria
+- **Database**: PostgreSQL
+- **Structure**: `apps/` + `packages/`
 
-2. **Dependency Management**:
-   - NEVER install dependencies at the root level
-   - Install dependencies in the specific app where they're needed:
-     - API dependencies → `apps/api/package.json`
-     - Web dependencies → `apps/web/package.json`
-     - Admin dependencies → `apps/admin/package.json`
-   - Root `package.json` should only contain workspace configuration and minimal devDependencies
+## Path Aliasing
 
-3. **Syncing Changes**:
-   - After making changes to the template, push them to the template repository
-   - In the app repository (e.g., inixiative), run `bun run sync` or `./scripts/sync-template.sh`
-   - This merges template changes directly into the app's main branch
-   - Resolve any conflicts if they occur
+Use `#/` (not `@/`) for internal imports to distinguish from npm packages:
 
-### Quick Commands
+```typescript
+// Correct
+import { Button } from '#/components/ui';
 
-```bash
-# In template repository - make generic improvements
-cd /path/to/template
-# make changes
-git add .
-git commit -m "feat: improvement description"
-git push origin main
-
-# In app repository - sync template changes
-cd /path/to/inixiative
-bun run sync  # or ./scripts/sync-template.sh
-# resolve conflicts if any
-git push origin main
+// Incorrect - don't use @ for internal imports
+import { Button } from '@/components/ui';
 ```
 
-### Example: Adding a Package
+## Prisma 7 Configuration
 
-```bash
-# ❌ WRONG - Don't do this
-cd /path/to/template
-bun add dayjs  # This adds to root package.json
+### Split Schema
+Schema is split across multiple files in `packages/db/prisma/schema/`:
+- `_base.prisma` - Generators and datasource
+- `user.prisma` - User, Session, Wallet
+- `webhook.prisma` - WebhookSubscription, WebhookEvent
+- Add your app-specific models in separate files
 
-# ✅ CORRECT - Add to specific app
-cd /path/to/template/apps/api
-bun add dayjs  # This adds to api/package.json
+### Driver Adapters
+Prisma 7 uses driver adapters instead of the Rust query engine:
+```typescript
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 ```
 
-### Important Notes
+### Config File
+Connection URLs are in `prisma.config.ts`, not the schema:
+```typescript
+export default defineConfig({
+  schema: path.join(__dirname, 'prisma/schema'),
+  migrate: {
+    async url() { return process.env.DATABASE_URL!; },
+  },
+});
+```
 
-- Template changes should be generic and reusable across all apps
-- App-specific business logic should never be added to the template
-- Always test template changes don't break existing apps before pushing
-- The sync process is designed to work directly on the main branch
+## Dependency Management
+
+- NEVER install dependencies at the root level
+- Install dependencies in the specific app where they're needed:
+  - API dependencies → `apps/api/package.json`
+  - Web dependencies → `apps/web/package.json`
+  - DB package → `packages/db/package.json`
+- Root `package.json` should only contain workspace configuration
+
+## Quick Commands
+
+```bash
+# Generate Prisma client
+cd packages/db && bun run db:generate
+
+# Run API
+cd apps/api && bun run dev
+
+# Run Web
+cd apps/web && bun run dev
+
+# Lint
+bun run lint
+
+# Format
+bun run format
+```
+
+## Key Patterns
+
+### Typed Model IDs
+Phantom types for compile-time safety:
+```typescript
+import { userId, UserId } from '@template/db';
+
+const id: UserId = userId('abc-123');
+// Can't pass UserId where SessionId is expected - compile error
+```
+
+### Mutation Lifecycle Hooks
+Register before/after hooks on Prisma mutations:
+```typescript
+registerDbHook(
+  'myHook',
+  'User',
+  HookTiming.after,
+  [DbAction.create, DbAction.update],
+  async ({ model, result }) => { ... }
+);
+```
+
+### Cache Invalidation
+Declarative cache key mapping per model in `cacheReference.ts`:
+```typescript
+User: (record) => [`users:${record.id}`, `users:email:${record.email}`]
+```
+
+### Webhook System
+Automatic webhook delivery on model mutations via `webhookHook.ts`.
+
+## Forking This Template
+
+When creating a new project from this template:
+
+1. Update package names from `@template/*` to `@yourproject/*`
+2. Add your app-specific models to `packages/db/prisma/schema/`
+3. Update typed model IDs in `packages/db/src/typedModelIds.ts`
+4. Update this CLAUDE.md with project-specific context

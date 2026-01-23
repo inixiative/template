@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/client"
+}
+
+generator zod {
+  provider       = "prisma-zod-generator"
+  output         = "../../src/generated/zod"
+  isGenerateSelect = false
+  isGenerateInclude = false
+}
+
+datasource db {
+  provider = "postgresql"
+}

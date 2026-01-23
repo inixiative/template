@@ -1,0 +1,75 @@
+// ============================================================================
+// USERS & AUTH
+// ============================================================================
+
+model User {
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  email         String    @unique @db.VarChar(255)
+  emailVerified Boolean   @default(false)
+  passwordHash  String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  avatarUrl     String?   @db.VarChar(512)
+
+  // KYC
+  kycStatus     KycStatus @default(NONE)
+  kycProvider   String?   @db.VarChar(50)
+  kycExternalId String?   @db.VarChar(255)
+  kycVerifiedAt DateTime?
+
+  // Region (for compliance)
+  region String? @db.VarChar(10)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sessions Session[]
+  wallets  Wallet[]
+
+  @@index([email])
+  @@index([kycStatus])
+}
+
+enum KycStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  userId    String   @db.VarChar(36)
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Wallet {
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  userId         String    @db.VarChar(36)
+  address        String    @db.VarChar(42)
+  chain          Chain     @default(ETHEREUM)
+  isPrimary      Boolean   @default(false)
+  isPayoutWallet Boolean   @default(false)
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([address, chain])
+  @@index([userId])
+}
+
+enum Chain {
+  ETHEREUM
+  ARBITRUM
+}
