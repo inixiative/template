@@ -14,8 +14,9 @@ const makeSchema = () => z.object({
   url: SortOrderSchema.optional(),
   secret: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
   isActive: SortOrderSchema.optional(),
-  ownerType: SortOrderSchema.optional(),
-  ownerId: SortOrderSchema.optional(),
+  ownerModel: SortOrderSchema.optional(),
+  userId: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
+  organizationId: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
   _count: z.lazy(() => WebhookSubscriptionCountOrderByAggregateInputObjectSchema).optional(),
   _max: z.lazy(() => WebhookSubscriptionMaxOrderByAggregateInputObjectSchema).optional(),
   _min: z.lazy(() => WebhookSubscriptionMinOrderByAggregateInputObjectSchema).optional()

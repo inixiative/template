@@ -1,0 +1,12 @@
+import type { Prisma } from '../../src/generated/client/client';
+import * as z from 'zod';
+import { WebhookSubscriptionOrderByWithRelationInputObjectSchema as WebhookSubscriptionOrderByWithRelationInputObjectSchema } from './objects/WebhookSubscriptionOrderByWithRelationInput.schema';
+import { WebhookSubscriptionWhereInputObjectSchema as WebhookSubscriptionWhereInputObjectSchema } from './objects/WebhookSubscriptionWhereInput.schema';
+import { WebhookSubscriptionWhereUniqueInputObjectSchema as WebhookSubscriptionWhereUniqueInputObjectSchema } from './objects/WebhookSubscriptionWhereUniqueInput.schema';
+import { WebhookSubscriptionCountAggregateInputObjectSchema as WebhookSubscriptionCountAggregateInputObjectSchema } from './objects/WebhookSubscriptionCountAggregateInput.schema';
+import { WebhookSubscriptionMinAggregateInputObjectSchema as WebhookSubscriptionMinAggregateInputObjectSchema } from './objects/WebhookSubscriptionMinAggregateInput.schema';
+import { WebhookSubscriptionMaxAggregateInputObjectSchema as WebhookSubscriptionMaxAggregateInputObjectSchema } from './objects/WebhookSubscriptionMaxAggregateInput.schema';
+
+export const WebhookSubscriptionAggregateSchema: z.ZodType<Prisma.WebhookSubscriptionAggregateArgs> = z.object({ orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), _count: z.union([ z.literal(true), WebhookSubscriptionCountAggregateInputObjectSchema ]).optional(), _min: WebhookSubscriptionMinAggregateInputObjectSchema.optional(), _max: WebhookSubscriptionMaxAggregateInputObjectSchema.optional() }).strict() as unknown as z.ZodType<Prisma.WebhookSubscriptionAggregateArgs>;
+
+export const WebhookSubscriptionAggregateZodSchema = z.object({ orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), _count: z.union([ z.literal(true), WebhookSubscriptionCountAggregateInputObjectSchema ]).optional(), _min: WebhookSubscriptionMinAggregateInputObjectSchema.optional(), _max: WebhookSubscriptionMaxAggregateInputObjectSchema.optional() }).strict();

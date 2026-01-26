@@ -8,7 +8,7 @@
  * - STRIPE_WEBHOOK_SECRET (for webhook verification)
  */
 
-import { env } from '@src/config/env';
+import { env } from '#/config/env';
 
 // Lazy-loaded client
 let _stripeClient: Awaited<ReturnType<typeof createStripeClient>> | null = null;

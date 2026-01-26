@@ -9,7 +9,7 @@ const makeSchema = () => z.object({
   action: SortOrderSchema.optional(),
   payload: SortOrderSchema.optional(),
   error: SortOrderSchema.optional(),
-  subscriptionId: SortOrderSchema.optional(),
+  webhookSubscriptionId: SortOrderSchema.optional(),
   resourceId: SortOrderSchema.optional()
 }).strict();
 export const WebhookEventCountOrderByAggregateInputObjectSchema: z.ZodType<Prisma.WebhookEventCountOrderByAggregateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventCountOrderByAggregateInput>;

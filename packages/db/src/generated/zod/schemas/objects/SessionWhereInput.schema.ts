@@ -12,11 +12,12 @@ const sessionwhereinputSchema = z.object({
   NOT: z.union([z.lazy(() => SessionWhereInputObjectSchema), z.lazy(() => SessionWhereInputObjectSchema).array()]).optional(),
   id: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(36)]).optional(),
   userId: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(36)]).optional(),
-  token: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(255)]).optional(),
+  token: z.union([z.lazy(() => StringFilterObjectSchema), z.string()]).optional(),
   expiresAt: z.union([z.lazy(() => DateTimeFilterObjectSchema), z.coerce.date()]).optional(),
-  ipAddress: z.union([z.lazy(() => StringNullableFilterObjectSchema), z.string().max(45)]).optional().nullable(),
-  userAgent: z.union([z.lazy(() => StringNullableFilterObjectSchema), z.string().max(512)]).optional().nullable(),
+  ipAddress: z.union([z.lazy(() => StringNullableFilterObjectSchema), z.string()]).optional().nullable(),
+  userAgent: z.union([z.lazy(() => StringNullableFilterObjectSchema), z.string()]).optional().nullable(),
   createdAt: z.union([z.lazy(() => DateTimeFilterObjectSchema), z.coerce.date()]).optional(),
+  updatedAt: z.union([z.lazy(() => DateTimeFilterObjectSchema), z.coerce.date()]).optional(),
   user: z.union([z.lazy(() => UserScalarRelationFilterObjectSchema), z.lazy(() => UserWhereInputObjectSchema)]).optional()
 }).strict();
 export const SessionWhereInputObjectSchema: z.ZodType<Prisma.SessionWhereInput> = sessionwhereinputSchema as unknown as z.ZodType<Prisma.SessionWhereInput>;

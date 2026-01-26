@@ -1,5 +1,5 @@
-import type { AppEnv } from '@src/types/appEnv';
 import type { Context } from 'hono';
+import type { AppEnv } from '#/types/appEnv';
 
 export function notFoundHandlerMiddleware(c: Context<AppEnv>) {
   c.header('Cache-Control', 'no-store');

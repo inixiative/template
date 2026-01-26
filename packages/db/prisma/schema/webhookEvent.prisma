@@ -1,0 +1,34 @@
+// ============================================================================
+// WEBHOOK EVENT
+// ============================================================================
+
+model WebhookEvent {
+  id        String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime           @default(now())
+  status    WebhookEventStatus
+  action    WebhookEventAction
+  payload   Json?
+  error     String?
+
+  // Relations
+  webhookSubscriptionId String              @db.VarChar(36)
+  webhookSubscription   WebhookSubscription @relation(fields: [webhookSubscriptionId], references: [id], onDelete: Cascade)
+  resourceId            String              @db.VarChar(36)
+
+  @@index([webhookSubscriptionId])
+  @@index([resourceId])
+  @@index([status])
+}
+
+enum WebhookEventStatus {
+  pending
+  success
+  error
+  unreachable
+}
+
+enum WebhookEventAction {
+  create
+  update
+  delete
+}

@@ -8,7 +8,7 @@ const makeSchema = () => z.object({
   status: z.literal(true).optional(),
   action: z.literal(true).optional(),
   error: z.literal(true).optional(),
-  subscriptionId: z.literal(true).optional(),
+  webhookSubscriptionId: z.literal(true).optional(),
   resourceId: z.literal(true).optional()
 }).strict();
 export const WebhookEventMinAggregateInputObjectSchema: z.ZodType<Prisma.WebhookEventMinAggregateInputType> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventMinAggregateInputType>;

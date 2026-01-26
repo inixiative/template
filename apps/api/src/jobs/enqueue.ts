@@ -1,39 +1,53 @@
-import { queue } from './queue';
-import { JobHandlerName, type JobHandlerNameType } from './types';
-import type { JobsOptions } from 'bullmq';
+import { type JobPayloads, isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
+import { queue } from '#/jobs/queue';
+import { type JobData, type JobOptions, JobType } from '#/jobs/types';
+import { log } from '#/lib/logger';
 
-type EnqueueOptions = JobsOptions & {
-  deduplicationKey?: string;
+type EnqueueOptions = JobOptions & {
+  type?: (typeof JobType)[keyof typeof JobType];
+  id?: string;
 };
 
-export const enqueueJob = async (
-  handlerName: JobHandlerNameType,
-  payload: Record<string, unknown>,
+const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
+  const redis = queue.redis;
+  const jobs = await queue.getJobs(['active', 'waiting', 'delayed', 'paused']);
+
+  for (const job of jobs) {
+    if (!job.id) continue;
+    const jobData = job.data as JobData;
+    if (jobData.dedupeKey === dedupeKey) {
+      await redis.set(`job:superseded:${job.id}`, '1', 'EX', 300);
+      log.info(`Signaled job ${job.id} to abort (superseded)`);
+    }
+  }
+};
+
+export const enqueueJob = async <K extends keyof JobPayloads>(
+  handlerName: K,
+  payload: JobPayloads[K],
   options?: EnqueueOptions,
 ) => {
-  // Validate handler exists
-  if (!Object.values(JobHandlerName).includes(handlerName)) {
+  if (!isValidHandlerName(handlerName)) {
     throw new Error(`Unknown job handler: ${handlerName}`);
   }
 
-  const { deduplicationKey, ...jobOptions } = options || {};
+  const { type = JobType.adhoc, id, ...jobOptions } = options || {};
 
-  // Use deduplication key as job ID if provided
-  const jobId = deduplicationKey || undefined;
+  const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
+  const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
+
+  if (dedupeKey) {
+    await signalSupersededJobs(dedupeKey);
+  }
 
   const job = await queue.add(
     handlerName,
-    { payload },
-    {
-      ...jobOptions,
-      jobId,
-    },
+    { type, id, payload, dedupeKey },
+    { ...jobOptions, jobId: dedupeKey || undefined },
   );
 
-  console.log(`Enqueued job ${handlerName} (${job.id})`);
+  log.info(`Enqueued job ${handlerName} (${job.id})`);
 
-  return {
-    jobId: job.id,
-    name: job.name,
-  };
+  return { jobId: job.id, name: job.name };
 };

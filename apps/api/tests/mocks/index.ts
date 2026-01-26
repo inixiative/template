@@ -1,6 +1,3 @@
-// Database
-export { createMockDb, type MockPrismaClient } from './db.mock';
-
 // External services
 export { createMockS3Client, type MockS3Client } from './s3.mock';
 

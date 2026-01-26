@@ -5,11 +5,12 @@ import type { Prisma } from '../../../client/client';
 const makeSchema = () => z.object({
   id: z.string().max(36).optional(),
   userId: z.string().max(36),
-  token: z.string().max(255),
+  token: z.string(),
   expiresAt: z.coerce.date(),
-  ipAddress: z.string().max(45).optional().nullable(),
-  userAgent: z.string().max(512).optional().nullable(),
-  createdAt: z.coerce.date().optional()
+  ipAddress: z.string().optional().nullable(),
+  userAgent: z.string().optional().nullable(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional()
 }).strict();
 export const SessionCreateManyInputObjectSchema: z.ZodType<Prisma.SessionCreateManyInput> = makeSchema() as unknown as z.ZodType<Prisma.SessionCreateManyInput>;
 export const SessionCreateManyInputObjectZodSchema = makeSchema();

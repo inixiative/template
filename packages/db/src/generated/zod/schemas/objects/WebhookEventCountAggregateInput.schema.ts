@@ -9,7 +9,7 @@ const makeSchema = () => z.object({
   action: z.literal(true).optional(),
   payload: z.literal(true).optional(),
   error: z.literal(true).optional(),
-  subscriptionId: z.literal(true).optional(),
+  webhookSubscriptionId: z.literal(true).optional(),
   resourceId: z.literal(true).optional(),
   _all: z.literal(true).optional()
 }).strict();

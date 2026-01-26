@@ -18,7 +18,10 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "#/*": ["./src/*"]
+      "#/*": ["./src/*"],
+      "@template/db": ["../../packages/db/src"],
+      "@template/shared": ["../../packages/shared/src"],
+      "@template/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src"]

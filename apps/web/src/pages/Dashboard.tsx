@@ -38,10 +38,6 @@ export function Dashboard() {
               <span>{user.emailVerified ? 'Yes' : 'No'}</span>
             </div>
             <div style={styles.infoRow}>
-              <span style={styles.infoLabel}>KYC Status:</span>
-              <span style={styles.badge}>{user.kycStatus}</span>
-            </div>
-            <div style={styles.infoRow}>
               <span style={styles.infoLabel}>Member Since:</span>
               <span>{new Date(user.createdAt).toLocaleDateString()}</span>
             </div>

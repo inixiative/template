@@ -1,58 +1,26 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { cors } from 'hono/cors';
-import { errorHandlerMiddleware } from '@src/middleware/error/errorHandlerMiddleware';
-import { notFoundHandlerMiddleware } from '@src/middleware/error/notFoundHandlerMiddleware';
-import { authMiddleware } from '@src/middleware/auth/authMiddleware';
-import { authRoutes } from '@src/modules/auth';
-import type { AppEnv } from '@src/types/appEnv';
-import { db } from '@template/db';
-import { env } from '@src/config/env';
+import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
+import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
+import { Tags } from '#/modules/tags';
+import { routes } from '#/routes';
+import type { AppEnv } from '#/types/appEnv';
 
-// Create the Hono app instance
+import '#/events';
+
 export const app = new OpenAPIHono<AppEnv>();
 
-// CORS
-app.use(
-  '*',
-  cors({
-    origin: env.CORS_ORIGIN,
-    credentials: true,
-    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-  }),
-);
-
-// Inject database into context
-app.use('*', async (c, next) => {
-  c.set('db', db);
-  c.set('requestId', crypto.randomUUID());
-  c.set('user', null);
-  await next();
-});
-
-// Auth middleware (extracts JWT, sets user in context)
-app.use('*', authMiddleware);
-
-// Global error handler
+// Error handling
 app.onError(errorHandlerMiddleware);
 
-// Health check (no auth)
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Mount all routes
+app.route('/', routes);
 
-// Mount auth routes at /auth
-app.route('/auth', authRoutes);
-
-// OpenAPI docs
+// OpenAPI
 app.doc31('/openapi/docs', {
   openapi: '3.1.0',
-  info: {
-    title: 'Inixiative API',
-    version: '0.1.0',
-    description: 'Identity & Payment Platform API',
-  },
+  info: { title: 'API', version: '0.1.0' },
+  tags: Object.values(Tags).map((name) => ({ name })),
 });
 
-// Global not found handler
+// Not found (must be last)
 app.notFound(notFoundHandlerMiddleware);

@@ -13,7 +13,7 @@ const makeSchema = () => z.object({
   action: WebhookEventActionSchema,
   payload: z.union([NullableJsonNullValueInputSchema, jsonSchema]).optional(),
   error: z.string().optional().nullable(),
-  subscriptionId: z.string().max(36),
+  webhookSubscriptionId: z.string().max(36),
   resourceId: z.string().max(36)
 }).strict();
 export const WebhookEventCreateManyInputObjectSchema: z.ZodType<Prisma.WebhookEventCreateManyInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventCreateManyInput>;

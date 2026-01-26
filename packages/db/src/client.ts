@@ -1,49 +1,80 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { mutationLifeCycleExtension } from './extensions/mutationLifeCycle';
-import { PrismaClient } from './generated/client/client';
+import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
+import { PrismaClient } from '@template/db/generated/client/client';
 
-export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+type AfterCommitFn = () => Promise<void> | void;
 
-export interface CreatePrismaClientOptions {
-  enableMutationLogger?: boolean;
-  connectionString?: string;
-}
-
-export const createPrismaClient = (options?: CreatePrismaClientOptions) => {
-  const { enableMutationLogger = false, connectionString } = options || {};
-
-  // Create pg Pool - uses DATABASE_URL from environment if not provided
-  const pool = new Pool({
-    connectionString: connectionString || process.env.DATABASE_URL,
-  });
-
-  // Create Prisma adapter
-  const adapter = new PrismaPg(pool);
-
-  const prisma = new PrismaClient({
-    adapter,
-    log: ['error'],
-  });
-
-  const extendedPrisma = prisma.$extends(
-    mutationLifeCycleExtension({
-      enableLogging: enableMutationLogger,
-    }),
-  );
-
-  return extendedPrisma;
+type StoreData = {
+  txn: ExtendedPrismaClient | null;
+  scopeId: string | null;
+  afterCommitBatches: AfterCommitFn[][];
 };
 
-// Singleton instance for general use
-// Note: Only created when first accessed (lazy initialization)
-let _db: ExtendedPrismaClient | null = null;
+const store = new AsyncLocalStorage<StoreData>();
 
-export const db = new Proxy({} as ExtendedPrismaClient, {
-  get(_target, prop) {
-    if (!_db) {
-      _db = createPrismaClient();
-    }
-    return (_db as Record<string | symbol, unknown>)[prop];
+const createClient = () => {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter, log: ['error'] });
+  return prisma.$extends(mutationLifeCycleExtension());
+};
+
+export type ExtendedPrismaClient = ReturnType<typeof createClient>;
+
+let raw: ExtendedPrismaClient | null = null;
+
+const dbMethods = {
+  get raw() { return raw ??= createClient(); },
+
+  scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>): Promise<T> => {
+    if (store.getStore()) return fn();
+    return store.run({ txn: null, scopeId: scopeId ?? null, afterCommitBatches: [] }, fn);
+  },
+
+  txn: async <T>(fn: () => Promise<T>): Promise<T> => {
+    const existing = store.getStore();
+    if (existing?.txn) return fn();
+
+    const s = existing ?? { txn: null, scopeId: crypto.randomUUID(), afterCommitBatches: [] };
+
+    const run = async () => {
+      try {
+        const result = await db.raw.$transaction(async (t) => {
+          s.txn = t as ExtendedPrismaClient;
+          try { return await fn(); }
+          finally { s.txn = null; }
+        });
+
+        // Only run afterCommit callbacks if transaction succeeded
+        for (const batch of s.afterCommitBatches) await Promise.all(batch.map((cb) => cb()));
+        return result;
+      } finally {
+        // Always clear callbacks (prevents stale callbacks on failed txn)
+        s.afterCommitBatches = [];
+      }
+    };
+
+    return existing ? run() : store.run(s, run);
+  },
+
+  onCommit: (callbacks: AfterCommitFn | AfterCommitFn[]): void => {
+    const s = store.getStore();
+    if (!s) throw new Error('db.onCommit() requires db.scope() or db.txn()');
+    s.afterCommitBatches.push(Array.isArray(callbacks) ? callbacks : [callbacks]);
+  },
+
+  getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
+
+  isInTxn: (): boolean => !!store.getStore()?.txn,
+};
+
+type Db = ExtendedPrismaClient & typeof dbMethods;
+
+export const db: Db = new Proxy({} as Db, {
+  get(_, prop: string) {
+    if (prop in dbMethods) return (dbMethods as Record<string, unknown>)[prop];
+    return ((store.getStore()?.txn ?? db.raw) as Record<string, unknown>)[prop];
   },
 });

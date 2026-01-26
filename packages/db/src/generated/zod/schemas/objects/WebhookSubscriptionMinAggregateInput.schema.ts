@@ -10,8 +10,9 @@ const makeSchema = () => z.object({
   url: z.literal(true).optional(),
   secret: z.literal(true).optional(),
   isActive: z.literal(true).optional(),
-  ownerType: z.literal(true).optional(),
-  ownerId: z.literal(true).optional()
+  ownerModel: z.literal(true).optional(),
+  userId: z.literal(true).optional(),
+  organizationId: z.literal(true).optional()
 }).strict();
 export const WebhookSubscriptionMinAggregateInputObjectSchema: z.ZodType<Prisma.WebhookSubscriptionMinAggregateInputType> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionMinAggregateInputType>;
 export const WebhookSubscriptionMinAggregateInputObjectZodSchema = makeSchema();

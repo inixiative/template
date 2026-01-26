@@ -1,0 +1,29 @@
+{
+  "name": "@template/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./components": "./src/components/index.ts",
+    "./lib": "./src/lib/index.ts",
+    "./hooks": "./src/hooks/index.ts"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lodash-es": "^4.17.21",
+    "tailwind-merge": "^2.5.5"
+  },
+  "devDependencies": {
+    "@types/lodash-es": "^4.17.12",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}

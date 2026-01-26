@@ -1,28 +1,17 @@
 import { Queue } from 'bullmq';
-import Redis from 'ioredis';
-import { env } from '@src/config/env';
+import type { JobsQueue } from '#/jobs/types';
+import { createRedisConnection } from '#/lib/clients/redis';
 
-// Create Redis connection for queue
-const redis = new Redis(env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-});
+const redis = createRedisConnection('Queue');
 
-export const queue = new Queue('jobs', {
+const baseQueue = new Queue('jobs', {
   connection: redis,
   defaultJobOptions: {
     attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    },
-    removeOnComplete: {
-      age: 7 * 24 * 60 * 60, // 7 days
-      count: 100,
-    },
-    removeOnFail: {
-      age: 30 * 24 * 60 * 60, // 30 days
-    },
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: { age: 7 * 24 * 60 * 60, count: 100 },
+    removeOnFail: { age: 30 * 24 * 60 * 60 },
   },
 });
 
-export type JobsQueue = typeof queue;
+export const queue = Object.assign(baseQueue, { redis }) as JobsQueue;

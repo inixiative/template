@@ -21,9 +21,9 @@ const webhookeventwhereinputSchema = z.object({
   action: z.union([z.lazy(() => EnumWebhookEventActionFilterObjectSchema), WebhookEventActionSchema]).optional(),
   payload: z.lazy(() => JsonNullableFilterObjectSchema).optional(),
   error: z.union([z.lazy(() => StringNullableFilterObjectSchema), z.string()]).optional().nullable(),
-  subscriptionId: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(36)]).optional(),
+  webhookSubscriptionId: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(36)]).optional(),
   resourceId: z.union([z.lazy(() => StringFilterObjectSchema), z.string().max(36)]).optional(),
-  subscription: z.union([z.lazy(() => WebhookSubscriptionScalarRelationFilterObjectSchema), z.lazy(() => WebhookSubscriptionWhereInputObjectSchema)]).optional()
+  webhookSubscription: z.union([z.lazy(() => WebhookSubscriptionScalarRelationFilterObjectSchema), z.lazy(() => WebhookSubscriptionWhereInputObjectSchema)]).optional()
 }).strict();
 export const WebhookEventWhereInputObjectSchema: z.ZodType<Prisma.WebhookEventWhereInput> = webhookeventwhereinputSchema as unknown as z.ZodType<Prisma.WebhookEventWhereInput>;
 export const WebhookEventWhereInputObjectZodSchema = webhookeventwhereinputSchema;

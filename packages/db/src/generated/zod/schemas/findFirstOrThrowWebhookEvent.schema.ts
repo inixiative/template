@@ -1,5 +1,6 @@
 import type { Prisma } from '../../client/client';
 import * as z from 'zod';
+import { WebhookEventIncludeObjectSchema as WebhookEventIncludeObjectSchema } from './objects/WebhookEventInclude.schema';
 import { WebhookEventOrderByWithRelationInputObjectSchema as WebhookEventOrderByWithRelationInputObjectSchema } from './objects/WebhookEventOrderByWithRelationInput.schema';
 import { WebhookEventWhereInputObjectSchema as WebhookEventWhereInputObjectSchema } from './objects/WebhookEventWhereInput.schema';
 import { WebhookEventWhereUniqueInputObjectSchema as WebhookEventWhereUniqueInputObjectSchema } from './objects/WebhookEventWhereUniqueInput.schema';
@@ -15,8 +16,8 @@ export const WebhookEventFindFirstOrThrowSelectSchema: z.ZodType<Prisma.WebhookE
     action: z.boolean().optional(),
     payload: z.boolean().optional(),
     error: z.boolean().optional(),
-    subscriptionId: z.boolean().optional(),
-    subscription: z.boolean().optional(),
+    webhookSubscriptionId: z.boolean().optional(),
+    webhookSubscription: z.boolean().optional(),
     resourceId: z.boolean().optional()
   }).strict() as unknown as z.ZodType<Prisma.WebhookEventSelect>;
 
@@ -27,11 +28,11 @@ export const WebhookEventFindFirstOrThrowSelectZodSchema = z.object({
     action: z.boolean().optional(),
     payload: z.boolean().optional(),
     error: z.boolean().optional(),
-    subscriptionId: z.boolean().optional(),
-    subscription: z.boolean().optional(),
+    webhookSubscriptionId: z.boolean().optional(),
+    webhookSubscription: z.boolean().optional(),
     resourceId: z.boolean().optional()
   }).strict();
 
-export const WebhookEventFindFirstOrThrowSchema: z.ZodType<Prisma.WebhookEventFindFirstOrThrowArgs> = z.object({ select: WebhookEventFindFirstOrThrowSelectSchema.optional(),  orderBy: z.union([WebhookEventOrderByWithRelationInputObjectSchema, WebhookEventOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookEventWhereInputObjectSchema.optional(), cursor: WebhookEventWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookEventScalarFieldEnumSchema, WebhookEventScalarFieldEnumSchema.array()]).optional() }).strict() as unknown as z.ZodType<Prisma.WebhookEventFindFirstOrThrowArgs>;
+export const WebhookEventFindFirstOrThrowSchema: z.ZodType<Prisma.WebhookEventFindFirstOrThrowArgs> = z.object({ select: WebhookEventFindFirstOrThrowSelectSchema.optional(), include: z.lazy(() => WebhookEventIncludeObjectSchema.optional()), orderBy: z.union([WebhookEventOrderByWithRelationInputObjectSchema, WebhookEventOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookEventWhereInputObjectSchema.optional(), cursor: WebhookEventWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookEventScalarFieldEnumSchema, WebhookEventScalarFieldEnumSchema.array()]).optional() }).strict() as unknown as z.ZodType<Prisma.WebhookEventFindFirstOrThrowArgs>;
 
-export const WebhookEventFindFirstOrThrowZodSchema = z.object({ select: WebhookEventFindFirstOrThrowSelectSchema.optional(),  orderBy: z.union([WebhookEventOrderByWithRelationInputObjectSchema, WebhookEventOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookEventWhereInputObjectSchema.optional(), cursor: WebhookEventWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookEventScalarFieldEnumSchema, WebhookEventScalarFieldEnumSchema.array()]).optional() }).strict();
+export const WebhookEventFindFirstOrThrowZodSchema = z.object({ select: WebhookEventFindFirstOrThrowSelectSchema.optional(), include: z.lazy(() => WebhookEventIncludeObjectSchema.optional()), orderBy: z.union([WebhookEventOrderByWithRelationInputObjectSchema, WebhookEventOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookEventWhereInputObjectSchema.optional(), cursor: WebhookEventWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookEventScalarFieldEnumSchema, WebhookEventScalarFieldEnumSchema.array()]).optional() }).strict();

@@ -1,57 +1,37 @@
-import { createRoute, z } from '@hono/zod-openapi';
-import { errorResponses } from './errorResponses';
-import { idParamsSchema } from './idParamsSchema';
-import type { DeleteRouteArgs, ZodResponseSchema, ZodSchema } from './types';
+import { createRoute } from '@hono/zod-openapi';
+import { errorResponses } from '#/lib/requestTemplates/errorResponses';
+import type { RouteArgs } from '#/lib/requestTemplates/types';
+import { buildOperationId, buildRequest, prepareMiddleware } from '#/lib/requestTemplates/utils';
 
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
-const buildOperationId = (model: string, submodel?: string) => {
-  const parts = ['delete', capitalize(model)];
-  if (submodel) parts.push(capitalize(submodel));
-  return parts.join('');
-};
-
-export const deleteRoute = <
-  TResponse extends ZodResponseSchema,
-  TParams extends ZodSchema | undefined = undefined,
-  TQuery extends ZodSchema | undefined = undefined,
->(
-  args: DeleteRouteArgs<TResponse, TParams, TQuery>,
-) => {
+export const deleteRoute = <const T extends RouteArgs>(args: T) => {
   const {
     model,
     submodel,
     action,
     description,
     skipId = false,
-    params,
-    query,
     middleware = [],
+    admin = false,
+    tags = [],
     ...routeArgs
   } = args;
 
-  const paramsSchema = params ?? (skipId ? z.object({}) : idParamsSchema);
-  const querySchema = query ?? z.object({});
   const resourceName = submodel || model;
-
-  const routePath = skipId ? (action ? `/${action}` : '/') : (action ? `/:id/${action}` : '/:id');
+  const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/:id/${action}` : '/:id';
+  const routeTags = admin ? ['Admin', ...tags] : tags;
 
   return createRoute({
-    operationId: buildOperationId(model, submodel),
+    ...routeArgs,
+    operationId: buildOperationId({ action: 'delete', model, submodel, admin }),
     method: 'delete',
     path: routePath,
+    tags: routeTags,
     description: description ?? `Deletes an existing ${resourceName}.`,
-    middleware,
-    request: {
-      params: paramsSchema,
-      query: querySchema,
-    },
+    middleware: prepareMiddleware(middleware, skipId),
+    request: buildRequest(args),
     responses: {
-      204: {
-        description: `Successfully deleted the ${resourceName}.`,
-      },
+      204: { description: 'Success' },
       ...errorResponses,
     },
-    ...routeArgs,
   });
 };

@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000';
+const API_URL = 'http://localhost:8000';
 
 type ApiOptions = {
   method?: string;
@@ -51,7 +51,6 @@ export type UserResponse = {
     email: string;
     name: string | null;
     emailVerified: boolean;
-    kycStatus: string;
     createdAt: string;
   };
 };

@@ -1,52 +1,69 @@
-import { Worker, type Job } from 'bullmq';
-import Redis from 'ioredis';
 import { db } from '@template/db';
-import { env } from '@src/config/env';
-import { queue } from './queue';
-import { jobHandlers } from './handlers';
-import type { WorkerContext } from './types';
+import { type Job, Worker } from 'bullmq';
+import type Redis from 'ioredis';
+import { env } from '#/config/env';
+import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { queue } from '#/jobs/queue';
+import { registerCronJobs } from '#/jobs/registerCronJobs';
+import type { WorkerContext } from '#/jobs/types';
+import { createRedisConnection } from '#/lib/clients/redis';
+import { log } from '#/lib/logger';
+import { onShutdown } from '#/lib/shutdown';
 
-// Create separate Redis connection for worker
-const workerRedis = new Redis(env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-});
+let jobsWorker: Worker | null = null;
+let workerRedis: Redis | null = null;
 
-export const jobsWorker = new Worker(
-  'jobs',
-  async (job: Job) => {
-    const handler = jobHandlers[job.name];
+export const initializeWorker = async (): Promise<void> => {
+  if (env.isTest) {
+    log.info('Skipping worker initialization in test environment');
+    return;
+  }
 
-    if (!handler) {
-      console.error(`Unknown job handler: ${job.name}`);
-      throw new Error(`Unknown job handler: ${job.name}`);
-    }
+  workerRedis = createRedisConnection('Worker');
 
-    const ctx: WorkerContext = {
-      db,
-      queue,
-      job,
-    };
+  jobsWorker = new Worker(
+    'jobs',
+    async (job: Job) => {
+      if (!isValidHandlerName(job.name)) {
+        log.error(`Unknown job handler: ${job.name}`);
+        throw new Error(`Unknown job handler: ${job.name}`);
+      }
 
-    console.log(`Processing job ${job.name} (${job.id})`);
+      const handler = jobHandlers[job.name];
 
-    try {
-      await handler(ctx, job.data.payload || {});
-      console.log(`Completed job ${job.name} (${job.id})`);
-    } catch (error) {
-      console.error(`Failed job ${job.name} (${job.id}):`, error);
-      throw error;
-    }
-  },
-  {
-    connection: workerRedis,
-    concurrency: 10,
-    lockDuration: 5 * 60 * 1000, // 5 minutes
-  },
-);
+      await db.scope(`job:${job.name}:${job.id}`, async () => {
+        const ctx: WorkerContext = {
+          db,
+          queue,
+          job,
+        };
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('Shutting down worker...');
-  await jobsWorker.close();
-  process.exit(0);
-});
+        log.info(`Processing job ${job.name} (${job.id})`);
+
+        try {
+          await handler(ctx, job.data.payload || {});
+          log.info(`Completed job ${job.name} (${job.id})`);
+        } catch (error) {
+          log.error(`Failed job ${job.name} (${job.id}):`, error);
+          throw error;
+        }
+      });
+    },
+    {
+      connection: workerRedis,
+      concurrency: 10,
+      lockDuration: 5 * 60 * 1000,
+    },
+  );
+
+  log.info('Job worker initialized');
+
+  await registerCronJobs();
+
+  onShutdown(async () => {
+    log.info('Stopping job worker...');
+    if (jobsWorker) await jobsWorker.close();
+    if (workerRedis) await workerRedis.quit();
+    log.info('Job worker stopped');
+  });
+};

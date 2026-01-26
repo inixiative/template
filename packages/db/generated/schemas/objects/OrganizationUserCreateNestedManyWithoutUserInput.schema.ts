@@ -1,0 +1,16 @@
+import * as z from 'zod';
+import type { Prisma } from '../../../src/generated/client/client';
+import { OrganizationUserCreateWithoutUserInputObjectSchema as OrganizationUserCreateWithoutUserInputObjectSchema } from './OrganizationUserCreateWithoutUserInput.schema';
+import { OrganizationUserUncheckedCreateWithoutUserInputObjectSchema as OrganizationUserUncheckedCreateWithoutUserInputObjectSchema } from './OrganizationUserUncheckedCreateWithoutUserInput.schema';
+import { OrganizationUserCreateOrConnectWithoutUserInputObjectSchema as OrganizationUserCreateOrConnectWithoutUserInputObjectSchema } from './OrganizationUserCreateOrConnectWithoutUserInput.schema';
+import { OrganizationUserCreateManyUserInputEnvelopeObjectSchema as OrganizationUserCreateManyUserInputEnvelopeObjectSchema } from './OrganizationUserCreateManyUserInputEnvelope.schema';
+import { OrganizationUserWhereUniqueInputObjectSchema as OrganizationUserWhereUniqueInputObjectSchema } from './OrganizationUserWhereUniqueInput.schema'
+
+const makeSchema = () => z.object({
+  create: z.union([z.lazy(() => OrganizationUserCreateWithoutUserInputObjectSchema), z.lazy(() => OrganizationUserCreateWithoutUserInputObjectSchema).array(), z.lazy(() => OrganizationUserUncheckedCreateWithoutUserInputObjectSchema), z.lazy(() => OrganizationUserUncheckedCreateWithoutUserInputObjectSchema).array()]).optional(),
+  connectOrCreate: z.union([z.lazy(() => OrganizationUserCreateOrConnectWithoutUserInputObjectSchema), z.lazy(() => OrganizationUserCreateOrConnectWithoutUserInputObjectSchema).array()]).optional(),
+  createMany: z.lazy(() => OrganizationUserCreateManyUserInputEnvelopeObjectSchema).optional(),
+  connect: z.union([z.lazy(() => OrganizationUserWhereUniqueInputObjectSchema), z.lazy(() => OrganizationUserWhereUniqueInputObjectSchema).array()]).optional()
+}).strict();
+export const OrganizationUserCreateNestedManyWithoutUserInputObjectSchema: z.ZodType<Prisma.OrganizationUserCreateNestedManyWithoutUserInput> = makeSchema() as unknown as z.ZodType<Prisma.OrganizationUserCreateNestedManyWithoutUserInput>;
+export const OrganizationUserCreateNestedManyWithoutUserInputObjectZodSchema = makeSchema();

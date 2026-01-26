@@ -1,0 +1,15 @@
+import type { Prisma } from '../../src/generated/client/client';
+import * as z from 'zod';
+import { CronJobWhereInputObjectSchema as CronJobWhereInputObjectSchema } from './objects/CronJobWhereInput.schema';
+import { CronJobOrderByWithAggregationInputObjectSchema as CronJobOrderByWithAggregationInputObjectSchema } from './objects/CronJobOrderByWithAggregationInput.schema';
+import { CronJobScalarWhereWithAggregatesInputObjectSchema as CronJobScalarWhereWithAggregatesInputObjectSchema } from './objects/CronJobScalarWhereWithAggregatesInput.schema';
+import { CronJobScalarFieldEnumSchema } from './enums/CronJobScalarFieldEnum.schema';
+import { CronJobCountAggregateInputObjectSchema as CronJobCountAggregateInputObjectSchema } from './objects/CronJobCountAggregateInput.schema';
+import { CronJobMinAggregateInputObjectSchema as CronJobMinAggregateInputObjectSchema } from './objects/CronJobMinAggregateInput.schema';
+import { CronJobMaxAggregateInputObjectSchema as CronJobMaxAggregateInputObjectSchema } from './objects/CronJobMaxAggregateInput.schema';
+import { CronJobAvgAggregateInputObjectSchema as CronJobAvgAggregateInputObjectSchema } from './objects/CronJobAvgAggregateInput.schema';
+import { CronJobSumAggregateInputObjectSchema as CronJobSumAggregateInputObjectSchema } from './objects/CronJobSumAggregateInput.schema';
+
+export const CronJobGroupBySchema: z.ZodType<Prisma.CronJobGroupByArgs> = z.object({ where: CronJobWhereInputObjectSchema.optional(), orderBy: z.union([CronJobOrderByWithAggregationInputObjectSchema, CronJobOrderByWithAggregationInputObjectSchema.array()]).optional(), having: CronJobScalarWhereWithAggregatesInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), by: z.array(CronJobScalarFieldEnumSchema), _count: z.union([ z.literal(true), CronJobCountAggregateInputObjectSchema ]).optional(), _min: CronJobMinAggregateInputObjectSchema.optional(), _max: CronJobMaxAggregateInputObjectSchema.optional(), _avg: CronJobAvgAggregateInputObjectSchema.optional(), _sum: CronJobSumAggregateInputObjectSchema.optional() }).strict() as unknown as z.ZodType<Prisma.CronJobGroupByArgs>;
+
+export const CronJobGroupByZodSchema = z.object({ where: CronJobWhereInputObjectSchema.optional(), orderBy: z.union([CronJobOrderByWithAggregationInputObjectSchema, CronJobOrderByWithAggregationInputObjectSchema.array()]).optional(), having: CronJobScalarWhereWithAggregatesInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), by: z.array(CronJobScalarFieldEnumSchema), _count: z.union([ z.literal(true), CronJobCountAggregateInputObjectSchema ]).optional(), _min: CronJobMinAggregateInputObjectSchema.optional(), _max: CronJobMaxAggregateInputObjectSchema.optional(), _avg: CronJobAvgAggregateInputObjectSchema.optional(), _sum: CronJobSumAggregateInputObjectSchema.optional() }).strict();

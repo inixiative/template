@@ -1,25 +1,21 @@
-import type { ExtendedPrismaClient, Prisma } from '@template/db';
+import type { ExtendedPrismaClient, OrganizationUser, Prisma, Session, User } from '@template/db';
+import type { Permix } from '@template/permissions';
+import type { TokenWithRelations } from '#/lib/context/getToken';
 
-// Context variables available in all request handlers
 export type AppVars = {
-  // Database
   db: ExtendedPrismaClient;
   txn: Prisma.TransactionClient | undefined;
-
-  // Current user (set by auth middleware)
-  user: {
-    id: string;
-    email: string;
-  } | null;
-
-  // Request metadata
+  user: User | null;
+  organizationUsers: OrganizationUser[] | null;
+  session: Session | null;
+  token: TokenWithRelations | null;
+  spoofedBy: User | null;
+  permix: Permix;
   requestId: string;
+  resource: unknown;
+  resourceType: string | null;
 };
 
-// Extract keys for type-safe context access
-export type AppVarKeys = Extract<keyof AppVars, string>;
-
-// Hono environment type
 export type AppEnv = {
   Variables: AppVars;
 };

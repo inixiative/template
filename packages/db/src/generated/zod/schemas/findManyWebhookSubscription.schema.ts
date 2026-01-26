@@ -1,5 +1,6 @@
 import type { Prisma } from '../../client/client';
 import * as z from 'zod';
+import { WebhookSubscriptionIncludeObjectSchema as WebhookSubscriptionIncludeObjectSchema } from './objects/WebhookSubscriptionInclude.schema';
 import { WebhookSubscriptionOrderByWithRelationInputObjectSchema as WebhookSubscriptionOrderByWithRelationInputObjectSchema } from './objects/WebhookSubscriptionOrderByWithRelationInput.schema';
 import { WebhookSubscriptionWhereInputObjectSchema as WebhookSubscriptionWhereInputObjectSchema } from './objects/WebhookSubscriptionWhereInput.schema';
 import { WebhookSubscriptionWhereUniqueInputObjectSchema as WebhookSubscriptionWhereUniqueInputObjectSchema } from './objects/WebhookSubscriptionWhereUniqueInput.schema';
@@ -16,8 +17,11 @@ export const WebhookSubscriptionFindManySelectSchema: z.ZodType<Prisma.WebhookSu
     url: z.boolean().optional(),
     secret: z.boolean().optional(),
     isActive: z.boolean().optional(),
-    ownerType: z.boolean().optional(),
-    ownerId: z.boolean().optional(),
+    ownerModel: z.boolean().optional(),
+    userId: z.boolean().optional(),
+    organizationId: z.boolean().optional(),
+    user: z.boolean().optional(),
+    organization: z.boolean().optional(),
     events: z.boolean().optional(),
     _count: z.boolean().optional()
   }).strict() as unknown as z.ZodType<Prisma.WebhookSubscriptionSelect>;
@@ -30,12 +34,15 @@ export const WebhookSubscriptionFindManySelectZodSchema = z.object({
     url: z.boolean().optional(),
     secret: z.boolean().optional(),
     isActive: z.boolean().optional(),
-    ownerType: z.boolean().optional(),
-    ownerId: z.boolean().optional(),
+    ownerModel: z.boolean().optional(),
+    userId: z.boolean().optional(),
+    organizationId: z.boolean().optional(),
+    user: z.boolean().optional(),
+    organization: z.boolean().optional(),
     events: z.boolean().optional(),
     _count: z.boolean().optional()
   }).strict();
 
-export const WebhookSubscriptionFindManySchema: z.ZodType<Prisma.WebhookSubscriptionFindManyArgs> = z.object({ select: WebhookSubscriptionFindManySelectSchema.optional(),  orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookSubscriptionScalarFieldEnumSchema, WebhookSubscriptionScalarFieldEnumSchema.array()]).optional() }).strict() as unknown as z.ZodType<Prisma.WebhookSubscriptionFindManyArgs>;
+export const WebhookSubscriptionFindManySchema: z.ZodType<Prisma.WebhookSubscriptionFindManyArgs> = z.object({ select: WebhookSubscriptionFindManySelectSchema.optional(), include: z.lazy(() => WebhookSubscriptionIncludeObjectSchema.optional()), orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookSubscriptionScalarFieldEnumSchema, WebhookSubscriptionScalarFieldEnumSchema.array()]).optional() }).strict() as unknown as z.ZodType<Prisma.WebhookSubscriptionFindManyArgs>;
 
-export const WebhookSubscriptionFindManyZodSchema = z.object({ select: WebhookSubscriptionFindManySelectSchema.optional(),  orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookSubscriptionScalarFieldEnumSchema, WebhookSubscriptionScalarFieldEnumSchema.array()]).optional() }).strict();
+export const WebhookSubscriptionFindManyZodSchema = z.object({ select: WebhookSubscriptionFindManySelectSchema.optional(), include: z.lazy(() => WebhookSubscriptionIncludeObjectSchema.optional()), orderBy: z.union([WebhookSubscriptionOrderByWithRelationInputObjectSchema, WebhookSubscriptionOrderByWithRelationInputObjectSchema.array()]).optional(), where: WebhookSubscriptionWhereInputObjectSchema.optional(), cursor: WebhookSubscriptionWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), distinct: z.union([WebhookSubscriptionScalarFieldEnumSchema, WebhookSubscriptionScalarFieldEnumSchema.array()]).optional() }).strict();

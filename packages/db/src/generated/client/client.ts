@@ -29,8 +29,8 @@ export * from "./enums"
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more Users
- * const users = await prisma.user.findMany()
+ * // Fetch zero or more Accounts
+ * const accounts = await prisma.account.findMany()
  * ```
  * 
  * Read more in our [docs](https://pris.ly/d/client).
@@ -40,27 +40,58 @@ export type PrismaClient<LogOpts extends Prisma.LogLevel = never, OmitOpts exten
 export { Prisma }
 
 /**
+ * Model Account
+ * 
+ */
+export type Account = Prisma.AccountModel
+/**
+ * Model CronJob
+ * 
+ */
+export type CronJob = Prisma.CronJobModel
+/**
+ * Model Inquiry
+ * 
+ */
+export type Inquiry = Prisma.InquiryModel
+/**
+ * Model Organization
+ * 
+ */
+export type Organization = Prisma.OrganizationModel
+/**
+ * Model OrganizationUser
+ * 
+ */
+export type OrganizationUser = Prisma.OrganizationUserModel
+/**
+ * Model Session
+ * BetterAuth Session - required for authentication
+ * Even with JWT/stateless cookies, BetterAuth uses this table
+ */
+export type Session = Prisma.SessionModel
+/**
+ * Model Token
+ * 
+ */
+export type Token = Prisma.TokenModel
+/**
  * Model User
  * 
  */
 export type User = Prisma.UserModel
 /**
- * Model Session
+ * Model Verification
  * 
  */
-export type Session = Prisma.SessionModel
-/**
- * Model Wallet
- * 
- */
-export type Wallet = Prisma.WalletModel
-/**
- * Model WebhookSubscription
- * 
- */
-export type WebhookSubscription = Prisma.WebhookSubscriptionModel
+export type Verification = Prisma.VerificationModel
 /**
  * Model WebhookEvent
  * 
  */
 export type WebhookEvent = Prisma.WebhookEventModel
+/**
+ * Model WebhookSubscription
+ * 
+ */
+export type WebhookSubscription = Prisma.WebhookSubscriptionModel

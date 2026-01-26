@@ -1,4 +1,5 @@
-import { env } from '@src/config/env';
+import { env } from '#/config/env';
+import { log } from '#/lib/logger';
 
 /**
  * Initialize OpenTelemetry for BetterStack (or any OTLP-compatible backend).
@@ -14,17 +15,17 @@ import { env } from '@src/config/env';
 export async function initializeOpenTelemetry() {
   // Skip in local/test environments
   if (env.ENVIRONMENT === 'local' || env.ENVIRONMENT === 'test') {
-    console.log('⏭️  Skipping OpenTelemetry initialization (local/test environment)');
+    log.info('⏭️  Skipping OpenTelemetry initialization (local/test environment)');
     return;
   }
 
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint) {
-    console.log('⚠️  OTEL_EXPORTER_OTLP_ENDPOINT not configured, skipping OpenTelemetry initialization');
+    log.info('⚠️  OTEL_EXPORTER_OTLP_ENDPOINT not configured, skipping OpenTelemetry initialization');
     return;
   }
 
-  console.log(`🔧 Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`);
+  log.info(`🔧 Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`);
 
   try {
     // Dynamic imports to avoid loading OTel in local/test
@@ -55,7 +56,7 @@ export async function initializeOpenTelemetry() {
           // Configure HTTP instrumentation
           '@opentelemetry/instrumentation-http': {
             enabled: true,
-            ignoreIncomingRequestHook: (request) => {
+            ignoreIncomingRequestHook: (request: { url?: string }) => {
               // Ignore health checks from creating spans
               const url = request.url || '';
               return url.includes('/health');
@@ -68,9 +69,9 @@ export async function initializeOpenTelemetry() {
     });
 
     sdk.start();
-    console.log('✅ OpenTelemetry SDK started successfully');
-    console.log(`   Endpoint: ${endpoint}`);
+    log.info('✅ OpenTelemetry SDK started successfully');
+    log.info(`   Endpoint: ${endpoint}`);
   } catch (error) {
-    console.error('❌ Failed to initialize OpenTelemetry:', error);
+    log.error('❌ Failed to initialize OpenTelemetry:', error);
   }
 }

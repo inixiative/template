@@ -1,44 +1,45 @@
-/**
- * Redis Client
- *
- * Used for:
- * - BullMQ job queues
- * - Caching (optional)
- * - Rate limiting (optional)
- *
- * Required environment variables:
- * - REDIS_URL
- */
+import Redis from 'ioredis';
+import RedisMock from 'ioredis-mock';
+import { env } from '#/config/env';
+import { log } from '#/lib/logger';
 
-import { env } from '@src/config/env';
+let _redisClient: Redis | null = null;
+let _redisSub: Redis | null = null;
 
-// Lazy-loaded client
-let _redisClient: Awaited<ReturnType<typeof createRedisClient>> | null = null;
-
-export async function createRedisClient() {
-  // Use ioredis-mock in test environment
+export const createRedisConnection = (name = 'Redis'): Redis => {
   if (env.isTest) {
-    const IORedisMock = (await import('ioredis-mock')).default;
-    return new IORedisMock();
+    log.info(`[${name}] Using in-memory mock`);
+    return new RedisMock() as unknown as Redis;
   }
 
-  const Redis = (await import('ioredis')).default;
-
-  return new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: null, // Required for BullMQ
+  const redis = new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: null,
     enableReadyCheck: false,
   });
-}
 
-export async function getRedisClient() {
+  redis.on('error', (err) => log.error(`[${name}] Error:`, err));
+  redis.on('connect', () => log.info(`[${name}] Connected`));
+
+  return redis;
+};
+
+export const getRedisClient = (): Redis => {
   if (!_redisClient) {
-    _redisClient = await createRedisClient();
-
-    // Log connection events in non-test environments
-    if (!env.isTest) {
-      _redisClient.on('connect', () => console.log('✅ Redis connected'));
-      _redisClient.on('error', (err) => console.error('❌ Redis error:', err));
-    }
+    _redisClient = createRedisConnection('Redis');
   }
   return _redisClient;
-}
+};
+
+export const getRedisPub = (): Redis => getRedisClient();
+
+export const getRedisSub = (): Redis => {
+  if (!_redisSub) {
+    _redisSub = createRedisConnection('RedisSub');
+  }
+  return _redisSub;
+};
+
+export const flushRedis = async (): Promise<void> => {
+  if (!env.isTest) throw new Error('flushRedis() can only be called in test environment');
+  await getRedisClient().flushall();
+};

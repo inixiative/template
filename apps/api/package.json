@@ -13,16 +13,34 @@
     "lint:fix": "biome check --write src"
   },
   "dependencies": {
+    "@bull-board/api": "^6.14.2",
+    "@bull-board/hono": "^6.14.2",
     "@hono/zod-openapi": "^0.18.3",
-    "@template/db": "workspace:*",
+    "@opentelemetry/auto-instrumentations-node": "^0.69.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.211.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
+    "@opentelemetry/sdk-metrics": "^2.5.0",
+    "@opentelemetry/sdk-node": "^0.211.0",
+    "@prisma/instrumentation": "^7.3.0",
     "@sentry/bun": "^8.45.0",
-    "bullmq": "^5.30.0",
+    "@template/db": "workspace:*",
+    "@template/permissions": "workspace:*",
+    "@template/shared": "workspace:*",
+    "better-auth": "^1.4.17",
+    "bullmq": "^5.66.7",
+    "consola": "^3.4.2",
     "hono": "^4.6.14",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.9.2",
+    "lodash-es": "^4.17.21",
+    "pluralize": "^8.0.0",
+    "uuidv7": "^1.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/lodash-es": "^4.17.12",
+    "@types/pluralize": "^0.0.33",
+    "ioredis-mock": "^8.13.1",
     "typescript": "^5.7.0"
   }
 }

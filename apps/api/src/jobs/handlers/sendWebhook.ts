@@ -1,18 +1,16 @@
-import type { JobHandler, WorkerContext } from '../types';
+import type { JobHandler } from '#/jobs/types';
+import { log } from '#/lib/logger';
 
-type SendWebhookPayload = {
+export type SendWebhookPayload = {
   subscriptionId: string;
   event: string;
   data: Record<string, unknown>;
 };
 
-export const sendWebhook: JobHandler<SendWebhookPayload> = async (
-  ctx: WorkerContext,
-  payload: SendWebhookPayload,
-) => {
+export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) => {
   const { subscriptionId, event, data } = payload;
 
-  console.log(`Sending webhook for event ${event} to subscription ${subscriptionId}`);
+  log.info(`Sending webhook for event ${event} to subscription ${subscriptionId}`);
 
   // TODO: Implement webhook delivery
   // 1. Fetch webhook subscription from DB
@@ -20,5 +18,5 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (
   // 3. Send HTTP request to subscription URL
   // 4. Record delivery status
 
-  console.log(`Webhook sent successfully`);
+  log.info(`Webhook sent successfully`);
 };

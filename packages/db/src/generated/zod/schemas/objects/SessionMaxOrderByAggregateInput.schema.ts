@@ -9,7 +9,8 @@ const makeSchema = () => z.object({
   expiresAt: SortOrderSchema.optional(),
   ipAddress: SortOrderSchema.optional(),
   userAgent: SortOrderSchema.optional(),
-  createdAt: SortOrderSchema.optional()
+  createdAt: SortOrderSchema.optional(),
+  updatedAt: SortOrderSchema.optional()
 }).strict();
 export const SessionMaxOrderByAggregateInputObjectSchema: z.ZodType<Prisma.SessionMaxOrderByAggregateInput> = makeSchema() as unknown as z.ZodType<Prisma.SessionMaxOrderByAggregateInput>;
 export const SessionMaxOrderByAggregateInputObjectZodSchema = makeSchema();

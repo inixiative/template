@@ -8,7 +8,7 @@ const makeSchema = () => z.object({
   status: SortOrderSchema.optional(),
   action: SortOrderSchema.optional(),
   error: SortOrderSchema.optional(),
-  subscriptionId: SortOrderSchema.optional(),
+  webhookSubscriptionId: SortOrderSchema.optional(),
   resourceId: SortOrderSchema.optional()
 }).strict();
 export const WebhookEventMaxOrderByAggregateInputObjectSchema: z.ZodType<Prisma.WebhookEventMaxOrderByAggregateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventMaxOrderByAggregateInput>;

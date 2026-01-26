@@ -18,7 +18,7 @@ const makeSchema = () => z.object({
   action: z.union([WebhookEventActionSchema, z.lazy(() => EnumWebhookEventActionFieldUpdateOperationsInputObjectSchema)]).optional(),
   payload: z.union([NullableJsonNullValueInputSchema, jsonSchema]).optional(),
   error: z.union([z.string(), z.lazy(() => NullableStringFieldUpdateOperationsInputObjectSchema)]).optional().nullable(),
-  subscriptionId: z.union([z.string().max(36), z.lazy(() => StringFieldUpdateOperationsInputObjectSchema)]).optional(),
+  webhookSubscriptionId: z.union([z.string().max(36), z.lazy(() => StringFieldUpdateOperationsInputObjectSchema)]).optional(),
   resourceId: z.union([z.string().max(36), z.lazy(() => StringFieldUpdateOperationsInputObjectSchema)]).optional()
 }).strict();
 export const WebhookEventUncheckedUpdateInputObjectSchema: z.ZodType<Prisma.WebhookEventUncheckedUpdateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventUncheckedUpdateInput>;

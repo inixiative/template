@@ -1,20 +1,37 @@
 import * as Sentry from '@sentry/bun';
+import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { Prisma } from '@template/db';
+import { log } from '#/lib/logger';
+import type { AppEnv } from '#/types/appEnv';
 import { formatZodIssues } from './formatZodIssues';
 import { isZodError } from './isZodError';
 import { respond422 } from './respond422';
 import { respond500 } from './respond500';
-import type { AppEnv } from '@src/types/appEnv';
-import type { Context } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 
 export async function errorHandlerMiddleware(err: unknown, c: Context<AppEnv>) {
   if (process.env.NODE_ENV === 'test') {
-    console.error('Error in handler:', err);
+    log.error('Error in handler:', err);
   }
 
   // Handle Zod validation errors
   if (isZodError(err)) {
     return respond422(c, formatZodIssues(err));
+  }
+
+  // Handle Prisma errors
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    // P2002 = unique constraint violation
+    if (err.code === 'P2002') {
+      const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
+      c.header('Cache-Control', 'no-store');
+      return c.json({ error: 'Already exists', constraint: target }, 409);
+    }
+    // P2025 = record not found (delete/update on non-existent)
+    if (err.code === 'P2025') {
+      c.header('Cache-Control', 'no-store');
+      return c.json({ error: 'Not found' }, 404);
+    }
   }
 
   // Handle HTTP exceptions

@@ -1,23 +1,31 @@
 import * as z from 'zod';
 import type { Prisma } from '../../../client/client';
-import { KycStatusSchema } from '../enums/KycStatus.schema';
-import { WalletUncheckedCreateNestedManyWithoutUserInputObjectSchema as WalletUncheckedCreateNestedManyWithoutUserInputObjectSchema } from './WalletUncheckedCreateNestedManyWithoutUserInput.schema'
+import { PlatformRoleSchema } from '../enums/PlatformRole.schema';
+import { AccountUncheckedCreateNestedManyWithoutUserInputObjectSchema as AccountUncheckedCreateNestedManyWithoutUserInputObjectSchema } from './AccountUncheckedCreateNestedManyWithoutUserInput.schema';
+import { OrganizationUserUncheckedCreateNestedManyWithoutUserInputObjectSchema as OrganizationUserUncheckedCreateNestedManyWithoutUserInputObjectSchema } from './OrganizationUserUncheckedCreateNestedManyWithoutUserInput.schema';
+import { TokenUncheckedCreateNestedManyWithoutUserInputObjectSchema as TokenUncheckedCreateNestedManyWithoutUserInputObjectSchema } from './TokenUncheckedCreateNestedManyWithoutUserInput.schema';
+import { CronJobUncheckedCreateNestedManyWithoutCreatedByInputObjectSchema as CronJobUncheckedCreateNestedManyWithoutCreatedByInputObjectSchema } from './CronJobUncheckedCreateNestedManyWithoutCreatedByInput.schema';
+import { WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInputObjectSchema as WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInputObjectSchema } from './WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput.schema';
+import { InquiryUncheckedCreateNestedManyWithoutSourceUserInputObjectSchema as InquiryUncheckedCreateNestedManyWithoutSourceUserInputObjectSchema } from './InquiryUncheckedCreateNestedManyWithoutSourceUserInput.schema';
+import { InquiryUncheckedCreateNestedManyWithoutTargetUserInputObjectSchema as InquiryUncheckedCreateNestedManyWithoutTargetUserInputObjectSchema } from './InquiryUncheckedCreateNestedManyWithoutTargetUserInput.schema'
 
 const makeSchema = () => z.object({
   id: z.string().optional(),
-  email: z.string(),
-  emailVerified: z.boolean().optional(),
-  passwordHash: z.string().optional().nullable(),
-  name: z.string().optional().nullable(),
-  avatarUrl: z.string().optional().nullable(),
-  kycStatus: KycStatusSchema.optional(),
-  kycProvider: z.string().optional().nullable(),
-  kycExternalId: z.string().optional().nullable(),
-  kycVerifiedAt: z.coerce.date().optional().nullable(),
-  region: z.string().optional().nullable(),
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
-  wallets: z.lazy(() => WalletUncheckedCreateNestedManyWithoutUserInputObjectSchema).optional()
+  deletedAt: z.coerce.date().optional().nullable(),
+  email: z.string(),
+  emailVerified: z.boolean().optional(),
+  name: z.string().optional().nullable(),
+  image: z.string().optional().nullable(),
+  platformRole: PlatformRoleSchema.optional(),
+  accounts: z.lazy(() => AccountUncheckedCreateNestedManyWithoutUserInputObjectSchema).optional(),
+  organizations: z.lazy(() => OrganizationUserUncheckedCreateNestedManyWithoutUserInputObjectSchema).optional(),
+  tokens: z.lazy(() => TokenUncheckedCreateNestedManyWithoutUserInputObjectSchema).optional(),
+  cronJobsCreated: z.lazy(() => CronJobUncheckedCreateNestedManyWithoutCreatedByInputObjectSchema).optional(),
+  webhookSubscriptions: z.lazy(() => WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInputObjectSchema).optional(),
+  inquiriesSent: z.lazy(() => InquiryUncheckedCreateNestedManyWithoutSourceUserInputObjectSchema).optional(),
+  inquiriesReceived: z.lazy(() => InquiryUncheckedCreateNestedManyWithoutTargetUserInputObjectSchema).optional()
 }).strict();
 export const UserUncheckedCreateWithoutSessionsInputObjectSchema: z.ZodType<Prisma.UserUncheckedCreateWithoutSessionsInput> = makeSchema() as unknown as z.ZodType<Prisma.UserUncheckedCreateWithoutSessionsInput>;
 export const UserUncheckedCreateWithoutSessionsInputObjectZodSchema = makeSchema();

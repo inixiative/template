@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: template-postgres
     restart: unless-stopped
     environment:
@@ -11,6 +11,8 @@ services:
       POSTGRES_DB: template
     ports:
       - "5432:5432"
+    volumes:
+      - ./scripts/db/pg-init.sh:/docker-entrypoint-initdb.d/pg-init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

@@ -1,0 +1,22 @@
+// ============================================================================
+// ORGANIZATION - Multi-tenant support
+// ============================================================================
+
+model Organization {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  name      String
+  slug      String   @unique
+
+  // Relations
+  organizationUsers    OrganizationUser[]
+  tokens               Token[]
+  webhookSubscriptions WebhookSubscription[]
+  inquiriesSent        Inquiry[]             @relation("InquirySource")
+  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+
+  @@index([slug])
+}

@@ -10,8 +10,9 @@ const makeSchema = () => z.object({
   url: SortOrderSchema.optional(),
   secret: SortOrderSchema.optional(),
   isActive: SortOrderSchema.optional(),
-  ownerType: SortOrderSchema.optional(),
-  ownerId: SortOrderSchema.optional()
+  ownerModel: SortOrderSchema.optional(),
+  userId: SortOrderSchema.optional(),
+  organizationId: SortOrderSchema.optional()
 }).strict();
 export const WebhookSubscriptionMaxOrderByAggregateInputObjectSchema: z.ZodType<Prisma.WebhookSubscriptionMaxOrderByAggregateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionMaxOrderByAggregateInput>;
 export const WebhookSubscriptionMaxOrderByAggregateInputObjectZodSchema = makeSchema();

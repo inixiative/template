@@ -1,39 +1,57 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { errorHandlerMiddleware } from '@src/middleware/error/errorHandlerMiddleware';
-import { notFoundHandlerMiddleware } from '@src/middleware/error/notFoundHandlerMiddleware';
-import type { AppEnv } from '@src/types/appEnv';
-import { createMockDb, type MockPrismaClient } from './mocks/db.mock';
+import { type ExtendedPrismaClient, type OrganizationUser, type User, db } from '@template/db';
+import { registerTestTracker } from '@template/db/test';
+import { auth } from '#/lib/auth';
+import type { TokenWithRelations } from '#/lib/context/getToken';
+import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
+import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
+import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
+import { prepareRequest } from '#/middleware/prepareRequest';
+import type { AppEnv } from '#/types/appEnv';
+
+registerTestTracker();
+
+type MountFn = (app: OpenAPIHono<AppEnv>) => void;
 
 type CreateTestAppOptions = {
-  mockDb?: MockPrismaClient;
-  mockUser?: { id: string; email: string } | null;
+  mockUser?: User | null;
+  mockOrganizationUsers?: OrganizationUser[];
+  mockToken?: TokenWithRelations | null;
+  mount?: MountFn[];
 };
 
 export function createTestApp(options?: CreateTestAppOptions) {
   const app = new OpenAPIHono<AppEnv>();
 
-  // Error handler
   app.onError(errorHandlerMiddleware);
 
-  // Mock database
-  const db = options?.mockDb ?? createMockDb();
+  app.use('*', prepareRequest);
 
-  // Inject context
   app.use('*', async (c, next) => {
-    c.set('db', db as any);
-    c.set('requestId', 'test-request-id');
-    c.set('user', options?.mockUser ?? null);
+    if (options?.mockUser) c.set('user', options.mockUser);
+    if (options?.mockOrganizationUsers) c.set('organizationUsers', options.mockOrganizationUsers);
+    if (options?.mockToken) c.set('token', options.mockToken);
+    await setupOrgPermissions(c);
     await next();
   });
 
-  // Not found handler
+  app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  app.all('/api/auth/*', (c) => auth.handler(c.req.raw));
+
+  if (options?.mount) {
+    for (const mountFn of options.mount) {
+      mountFn(app);
+    }
+  }
+
   app.notFound(notFoundHandlerMiddleware);
 
-  const fetch = (request: Request) => app.fetch(request);
+  const fetch = async (request: Request): Promise<Response> => app.fetch(request);
 
   return {
     app,
     fetch,
-    db,
+    db: db as ExtendedPrismaClient,
   };
 }

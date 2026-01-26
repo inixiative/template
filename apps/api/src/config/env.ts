@@ -14,16 +14,15 @@ const getEnv = () => {
     // Core
     NODE_ENV,
     ENVIRONMENT,
-    PORT: Number(process.env.PORT) || 3000,
+    PORT: Number(process.env.PORT) || 8000,
     DATABASE_URL: process.env.DATABASE_URL || '',
     REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
 
-    // Auth
-    JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-    JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-
-    // CORS
-    CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    // Auth (BetterAuth)
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || 'dev-secret-change-in-production',
+    API_URL: process.env.API_URL || 'http://localhost:8000',
+    GOOGLE_CLIENT_ID: str(process.env.GOOGLE_CLIENT_ID),
+    GOOGLE_CLIENT_SECRET: str(process.env.GOOGLE_CLIENT_SECRET),
 
     // Sentry (optional)
     SENTRY_DSN: str(process.env.SENTRY_DSN),
@@ -38,6 +37,14 @@ const getEnv = () => {
     // Stripe (optional - for fiat payments)
     STRIPE_SECRET_KEY: str(process.env.STRIPE_SECRET_KEY),
     STRIPE_WEBHOOK_SECRET: str(process.env.STRIPE_WEBHOOK_SECRET),
+
+    // BullBoard Admin (optional - basic auth for job queue dashboard)
+    BULL_BOARD_USERNAME: str(process.env.BULL_BOARD_USERNAME),
+    BULL_BOARD_PASSWORD: str(process.env.BULL_BOARD_PASSWORD),
+
+    // Logging (optional - defaults to 'info')
+    // Levels: fatal, error, warn, log, info, success, debug, trace, verbose
+    LOG_LEVEL: str(process.env.LOG_LEVEL) || 'info',
 
     // OpenTelemetry / BetterStack (optional - set via OTEL_* env vars)
     // OTEL_EXPORTER_OTLP_ENDPOINT - set automatically

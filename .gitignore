@@ -141,3 +141,9 @@ dist
 
 # Project-specific Claude instructions
 CLAUDE.local.md
+
+# AI Workspace (ignore tmp contents, but keep README)
+tmp/*
+!tmp/AI_WORKSPACE/
+tmp/AI_WORKSPACE/*
+!tmp/AI_WORKSPACE/README.md

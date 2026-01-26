@@ -26,100 +26,76 @@ export type AggregateUser = {
 
 export type UserMinAggregateOutputType = {
   id: string | null
-  email: string | null
-  emailVerified: boolean | null
-  passwordHash: string | null
-  name: string | null
-  avatarUrl: string | null
-  kycStatus: $Enums.KycStatus | null
-  kycProvider: string | null
-  kycExternalId: string | null
-  kycVerifiedAt: Date | null
-  region: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  deletedAt: Date | null
+  email: string | null
+  emailVerified: boolean | null
+  name: string | null
+  image: string | null
+  platformRole: $Enums.PlatformRole | null
 }
 
 export type UserMaxAggregateOutputType = {
   id: string | null
-  email: string | null
-  emailVerified: boolean | null
-  passwordHash: string | null
-  name: string | null
-  avatarUrl: string | null
-  kycStatus: $Enums.KycStatus | null
-  kycProvider: string | null
-  kycExternalId: string | null
-  kycVerifiedAt: Date | null
-  region: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  deletedAt: Date | null
+  email: string | null
+  emailVerified: boolean | null
+  name: string | null
+  image: string | null
+  platformRole: $Enums.PlatformRole | null
 }
 
 export type UserCountAggregateOutputType = {
   id: number
-  email: number
-  emailVerified: number
-  passwordHash: number
-  name: number
-  avatarUrl: number
-  kycStatus: number
-  kycProvider: number
-  kycExternalId: number
-  kycVerifiedAt: number
-  region: number
   createdAt: number
   updatedAt: number
+  deletedAt: number
+  email: number
+  emailVerified: number
+  name: number
+  image: number
+  platformRole: number
   _all: number
 }
 
 
 export type UserMinAggregateInputType = {
   id?: true
-  email?: true
-  emailVerified?: true
-  passwordHash?: true
-  name?: true
-  avatarUrl?: true
-  kycStatus?: true
-  kycProvider?: true
-  kycExternalId?: true
-  kycVerifiedAt?: true
-  region?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
+  email?: true
+  emailVerified?: true
+  name?: true
+  image?: true
+  platformRole?: true
 }
 
 export type UserMaxAggregateInputType = {
   id?: true
-  email?: true
-  emailVerified?: true
-  passwordHash?: true
-  name?: true
-  avatarUrl?: true
-  kycStatus?: true
-  kycProvider?: true
-  kycExternalId?: true
-  kycVerifiedAt?: true
-  region?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
+  email?: true
+  emailVerified?: true
+  name?: true
+  image?: true
+  platformRole?: true
 }
 
 export type UserCountAggregateInputType = {
   id?: true
-  email?: true
-  emailVerified?: true
-  passwordHash?: true
-  name?: true
-  avatarUrl?: true
-  kycStatus?: true
-  kycProvider?: true
-  kycExternalId?: true
-  kycVerifiedAt?: true
-  region?: true
   createdAt?: true
   updatedAt?: true
+  deletedAt?: true
+  email?: true
+  emailVerified?: true
+  name?: true
+  image?: true
+  platformRole?: true
   _all?: true
 }
 
@@ -197,18 +173,14 @@ export type UserGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 
 export type UserGroupByOutputType = {
   id: string
-  email: string
-  emailVerified: boolean
-  passwordHash: string | null
-  name: string | null
-  avatarUrl: string | null
-  kycStatus: $Enums.KycStatus
-  kycProvider: string | null
-  kycExternalId: string | null
-  kycVerifiedAt: Date | null
-  region: string | null
   createdAt: Date
   updatedAt: Date
+  deletedAt: Date | null
+  email: string
+  emailVerified: boolean
+  name: string | null
+  image: string | null
+  platformRole: $Enums.PlatformRole
   _count: UserCountAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
@@ -234,38 +206,42 @@ export type UserWhereInput = {
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   id?: Prisma.StringFilter<"User"> | string
-  email?: Prisma.StringFilter<"User"> | string
-  emailVerified?: Prisma.BoolFilter<"User"> | boolean
-  passwordHash?: Prisma.StringNullableFilter<"User"> | string | null
-  name?: Prisma.StringNullableFilter<"User"> | string | null
-  avatarUrl?: Prisma.StringNullableFilter<"User"> | string | null
-  kycStatus?: Prisma.EnumKycStatusFilter<"User"> | $Enums.KycStatus
-  kycProvider?: Prisma.StringNullableFilter<"User"> | string | null
-  kycExternalId?: Prisma.StringNullableFilter<"User"> | string | null
-  kycVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
-  region?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  email?: Prisma.StringFilter<"User"> | string
+  emailVerified?: Prisma.BoolFilter<"User"> | boolean
+  name?: Prisma.StringNullableFilter<"User"> | string | null
+  image?: Prisma.StringNullableFilter<"User"> | string | null
+  platformRole?: Prisma.EnumPlatformRoleFilter<"User"> | $Enums.PlatformRole
+  accounts?: Prisma.AccountListRelationFilter
   sessions?: Prisma.SessionListRelationFilter
-  wallets?: Prisma.WalletListRelationFilter
+  organizations?: Prisma.OrganizationUserListRelationFilter
+  tokens?: Prisma.TokenListRelationFilter
+  cronJobsCreated?: Prisma.CronJobListRelationFilter
+  webhookSubscriptions?: Prisma.WebhookSubscriptionListRelationFilter
+  inquiriesSent?: Prisma.InquiryListRelationFilter
+  inquiriesReceived?: Prisma.InquiryListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  email?: Prisma.SortOrder
-  emailVerified?: Prisma.SortOrder
-  passwordHash?: Prisma.SortOrderInput | Prisma.SortOrder
-  name?: Prisma.SortOrderInput | Prisma.SortOrder
-  avatarUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycStatus?: Prisma.SortOrder
-  kycProvider?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycExternalId?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  region?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  name?: Prisma.SortOrderInput | Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
+  accounts?: Prisma.AccountOrderByRelationAggregateInput
   sessions?: Prisma.SessionOrderByRelationAggregateInput
-  wallets?: Prisma.WalletOrderByRelationAggregateInput
+  organizations?: Prisma.OrganizationUserOrderByRelationAggregateInput
+  tokens?: Prisma.TokenOrderByRelationAggregateInput
+  cronJobsCreated?: Prisma.CronJobOrderByRelationAggregateInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionOrderByRelationAggregateInput
+  inquiriesSent?: Prisma.InquiryOrderByRelationAggregateInput
+  inquiriesReceived?: Prisma.InquiryOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -274,35 +250,33 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
-  emailVerified?: Prisma.BoolFilter<"User"> | boolean
-  passwordHash?: Prisma.StringNullableFilter<"User"> | string | null
-  name?: Prisma.StringNullableFilter<"User"> | string | null
-  avatarUrl?: Prisma.StringNullableFilter<"User"> | string | null
-  kycStatus?: Prisma.EnumKycStatusFilter<"User"> | $Enums.KycStatus
-  kycProvider?: Prisma.StringNullableFilter<"User"> | string | null
-  kycExternalId?: Prisma.StringNullableFilter<"User"> | string | null
-  kycVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
-  region?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  emailVerified?: Prisma.BoolFilter<"User"> | boolean
+  name?: Prisma.StringNullableFilter<"User"> | string | null
+  image?: Prisma.StringNullableFilter<"User"> | string | null
+  platformRole?: Prisma.EnumPlatformRoleFilter<"User"> | $Enums.PlatformRole
+  accounts?: Prisma.AccountListRelationFilter
   sessions?: Prisma.SessionListRelationFilter
-  wallets?: Prisma.WalletListRelationFilter
+  organizations?: Prisma.OrganizationUserListRelationFilter
+  tokens?: Prisma.TokenListRelationFilter
+  cronJobsCreated?: Prisma.CronJobListRelationFilter
+  webhookSubscriptions?: Prisma.WebhookSubscriptionListRelationFilter
+  inquiriesSent?: Prisma.InquiryListRelationFilter
+  inquiriesReceived?: Prisma.InquiryListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  email?: Prisma.SortOrder
-  emailVerified?: Prisma.SortOrder
-  passwordHash?: Prisma.SortOrderInput | Prisma.SortOrder
-  name?: Prisma.SortOrderInput | Prisma.SortOrder
-  avatarUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycStatus?: Prisma.SortOrder
-  kycProvider?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycExternalId?: Prisma.SortOrderInput | Prisma.SortOrder
-  kycVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  region?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  name?: Prisma.SortOrderInput | Prisma.SortOrder
+  image?: Prisma.SortOrderInput | Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
@@ -313,186 +287,130 @@ export type UserScalarWhereWithAggregatesInput = {
   OR?: Prisma.UserScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UserScalarWhereWithAggregatesInput | Prisma.UserScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"User"> | string
-  email?: Prisma.StringWithAggregatesFilter<"User"> | string
-  emailVerified?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
-  passwordHash?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  name?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  avatarUrl?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  kycStatus?: Prisma.EnumKycStatusWithAggregatesFilter<"User"> | $Enums.KycStatus
-  kycProvider?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  kycExternalId?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
-  kycVerifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
-  region?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
+  deletedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  email?: Prisma.StringWithAggregatesFilter<"User"> | string
+  emailVerified?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
+  name?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  image?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  platformRole?: Prisma.EnumPlatformRoleWithAggregatesFilter<"User"> | $Enums.PlatformRole
 }
 
 export type UserCreateInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
 }
 
 export type UserUncheckedCreateInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
 }
 
 export type UserUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
 }
 
 export type UserCreateManyInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
 }
 
 export type UserUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
 }
 
 export type UserUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-export type UserCountOrderByAggregateInput = {
-  id?: Prisma.SortOrder
-  email?: Prisma.SortOrder
-  emailVerified?: Prisma.SortOrder
-  passwordHash?: Prisma.SortOrder
-  name?: Prisma.SortOrder
-  avatarUrl?: Prisma.SortOrder
-  kycStatus?: Prisma.SortOrder
-  kycProvider?: Prisma.SortOrder
-  kycExternalId?: Prisma.SortOrder
-  kycVerifiedAt?: Prisma.SortOrder
-  region?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
-  updatedAt?: Prisma.SortOrder
-}
-
-export type UserMaxOrderByAggregateInput = {
-  id?: Prisma.SortOrder
-  email?: Prisma.SortOrder
-  emailVerified?: Prisma.SortOrder
-  passwordHash?: Prisma.SortOrder
-  name?: Prisma.SortOrder
-  avatarUrl?: Prisma.SortOrder
-  kycStatus?: Prisma.SortOrder
-  kycProvider?: Prisma.SortOrder
-  kycExternalId?: Prisma.SortOrder
-  kycVerifiedAt?: Prisma.SortOrder
-  region?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
-  updatedAt?: Prisma.SortOrder
-}
-
-export type UserMinOrderByAggregateInput = {
-  id?: Prisma.SortOrder
-  email?: Prisma.SortOrder
-  emailVerified?: Prisma.SortOrder
-  passwordHash?: Prisma.SortOrder
-  name?: Prisma.SortOrder
-  avatarUrl?: Prisma.SortOrder
-  kycStatus?: Prisma.SortOrder
-  kycProvider?: Prisma.SortOrder
-  kycExternalId?: Prisma.SortOrder
-  kycVerifiedAt?: Prisma.SortOrder
-  region?: Prisma.SortOrder
-  createdAt?: Prisma.SortOrder
-  updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
 }
 
 export type UserScalarRelationFilter = {
@@ -500,28 +418,121 @@ export type UserScalarRelationFilter = {
   isNot?: Prisma.UserWhereInput
 }
 
-export type StringFieldUpdateOperationsInput = {
-  set?: string
+export type UserNullableScalarRelationFilter = {
+  is?: Prisma.UserWhereInput | null
+  isNot?: Prisma.UserWhereInput | null
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
+export type UserCountOrderByAggregateInput = {
+  id?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
+  email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  name?: Prisma.SortOrder
+  image?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
+export type UserMaxOrderByAggregateInput = {
+  id?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
+  email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  name?: Prisma.SortOrder
+  image?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
 }
 
-export type EnumKycStatusFieldUpdateOperationsInput = {
-  set?: $Enums.KycStatus
+export type UserMinOrderByAggregateInput = {
+  id?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
+  updatedAt?: Prisma.SortOrder
+  deletedAt?: Prisma.SortOrder
+  email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  name?: Prisma.SortOrder
+  image?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
+export type UserCreateNestedOneWithoutAccountsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAccountsInput, Prisma.UserUncheckedCreateWithoutAccountsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAccountsInput
+  connect?: Prisma.UserWhereUniqueInput
 }
 
-export type DateTimeFieldUpdateOperationsInput = {
-  set?: Date | string
+export type UserUpdateOneRequiredWithoutAccountsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAccountsInput, Prisma.UserUncheckedCreateWithoutAccountsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAccountsInput
+  upsert?: Prisma.UserUpsertWithoutAccountsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAccountsInput, Prisma.UserUpdateWithoutAccountsInput>, Prisma.UserUncheckedUpdateWithoutAccountsInput>
+}
+
+export type UserCreateNestedOneWithoutCronJobsCreatedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCronJobsCreatedInput, Prisma.UserUncheckedCreateWithoutCronJobsCreatedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCronJobsCreatedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutCronJobsCreatedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCronJobsCreatedInput, Prisma.UserUncheckedCreateWithoutCronJobsCreatedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCronJobsCreatedInput
+  upsert?: Prisma.UserUpsertWithoutCronJobsCreatedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCronJobsCreatedInput, Prisma.UserUpdateWithoutCronJobsCreatedInput>, Prisma.UserUncheckedUpdateWithoutCronJobsCreatedInput>
+}
+
+export type UserCreateNestedOneWithoutInquiriesSentInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiriesSentInput, Prisma.UserUncheckedCreateWithoutInquiriesSentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiriesSentInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutInquiriesReceivedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiriesReceivedInput, Prisma.UserUncheckedCreateWithoutInquiriesReceivedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiriesReceivedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutInquiriesSentNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiriesSentInput, Prisma.UserUncheckedCreateWithoutInquiriesSentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiriesSentInput
+  upsert?: Prisma.UserUpsertWithoutInquiriesSentInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInquiriesSentInput, Prisma.UserUpdateWithoutInquiriesSentInput>, Prisma.UserUncheckedUpdateWithoutInquiriesSentInput>
+}
+
+export type UserUpdateOneWithoutInquiriesReceivedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiriesReceivedInput, Prisma.UserUncheckedCreateWithoutInquiriesReceivedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiriesReceivedInput
+  upsert?: Prisma.UserUpsertWithoutInquiriesReceivedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInquiriesReceivedInput, Prisma.UserUpdateWithoutInquiriesReceivedInput>, Prisma.UserUncheckedUpdateWithoutInquiriesReceivedInput>
+}
+
+export type UserCreateNestedOneWithoutOrganizationsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutOrganizationsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationsInput
+  upsert?: Prisma.UserUpsertWithoutOrganizationsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutOrganizationsInput, Prisma.UserUpdateWithoutOrganizationsInput>, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
 }
 
 export type UserCreateNestedOneWithoutSessionsInput = {
@@ -538,52 +549,538 @@ export type UserUpdateOneRequiredWithoutSessionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSessionsInput, Prisma.UserUpdateWithoutSessionsInput>, Prisma.UserUncheckedUpdateWithoutSessionsInput>
 }
 
-export type UserCreateNestedOneWithoutWalletsInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutWalletsInput, Prisma.UserUncheckedCreateWithoutWalletsInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWalletsInput
+export type UserCreateNestedOneWithoutTokensInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTokensInput, Prisma.UserUncheckedCreateWithoutTokensInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTokensInput
   connect?: Prisma.UserWhereUniqueInput
 }
 
-export type UserUpdateOneRequiredWithoutWalletsNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutWalletsInput, Prisma.UserUncheckedCreateWithoutWalletsInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWalletsInput
-  upsert?: Prisma.UserUpsertWithoutWalletsInput
+export type UserUpdateOneWithoutTokensNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTokensInput, Prisma.UserUncheckedCreateWithoutTokensInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTokensInput
+  upsert?: Prisma.UserUpsertWithoutTokensInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
   connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWalletsInput, Prisma.UserUpdateWithoutWalletsInput>, Prisma.UserUncheckedUpdateWithoutWalletsInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTokensInput, Prisma.UserUpdateWithoutTokensInput>, Prisma.UserUncheckedUpdateWithoutTokensInput>
+}
+
+export type EnumPlatformRoleFieldUpdateOperationsInput = {
+  set?: $Enums.PlatformRole
+}
+
+export type UserCreateNestedOneWithoutWebhookSubscriptionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedCreateWithoutWebhookSubscriptionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWebhookSubscriptionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutWebhookSubscriptionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedCreateWithoutWebhookSubscriptionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWebhookSubscriptionsInput
+  upsert?: Prisma.UserUpsertWithoutWebhookSubscriptionsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWebhookSubscriptionsInput, Prisma.UserUpdateWithoutWebhookSubscriptionsInput>, Prisma.UserUncheckedUpdateWithoutWebhookSubscriptionsInput>
+}
+
+export type UserCreateWithoutAccountsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserUncheckedCreateWithoutAccountsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserCreateOrConnectWithoutAccountsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAccountsInput, Prisma.UserUncheckedCreateWithoutAccountsInput>
+}
+
+export type UserUpsertWithoutAccountsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAccountsInput, Prisma.UserUncheckedUpdateWithoutAccountsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAccountsInput, Prisma.UserUncheckedCreateWithoutAccountsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutAccountsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAccountsInput, Prisma.UserUncheckedUpdateWithoutAccountsInput>
+}
+
+export type UserUpdateWithoutAccountsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAccountsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserCreateWithoutCronJobsCreatedInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserUncheckedCreateWithoutCronJobsCreatedInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserCreateOrConnectWithoutCronJobsCreatedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCronJobsCreatedInput, Prisma.UserUncheckedCreateWithoutCronJobsCreatedInput>
+}
+
+export type UserUpsertWithoutCronJobsCreatedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCronJobsCreatedInput, Prisma.UserUncheckedUpdateWithoutCronJobsCreatedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCronJobsCreatedInput, Prisma.UserUncheckedCreateWithoutCronJobsCreatedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCronJobsCreatedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCronJobsCreatedInput, Prisma.UserUncheckedUpdateWithoutCronJobsCreatedInput>
+}
+
+export type UserUpdateWithoutCronJobsCreatedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCronJobsCreatedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserCreateWithoutInquiriesSentInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserUncheckedCreateWithoutInquiriesSentInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserCreateOrConnectWithoutInquiriesSentInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiriesSentInput, Prisma.UserUncheckedCreateWithoutInquiriesSentInput>
+}
+
+export type UserCreateWithoutInquiriesReceivedInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+}
+
+export type UserUncheckedCreateWithoutInquiriesReceivedInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+}
+
+export type UserCreateOrConnectWithoutInquiriesReceivedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiriesReceivedInput, Prisma.UserUncheckedCreateWithoutInquiriesReceivedInput>
+}
+
+export type UserUpsertWithoutInquiriesSentInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutInquiriesSentInput, Prisma.UserUncheckedUpdateWithoutInquiriesSentInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiriesSentInput, Prisma.UserUncheckedCreateWithoutInquiriesSentInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutInquiriesSentInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutInquiriesSentInput, Prisma.UserUncheckedUpdateWithoutInquiriesSentInput>
+}
+
+export type UserUpdateWithoutInquiriesSentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutInquiriesSentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUpsertWithoutInquiriesReceivedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutInquiriesReceivedInput, Prisma.UserUncheckedUpdateWithoutInquiriesReceivedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiriesReceivedInput, Prisma.UserUncheckedCreateWithoutInquiriesReceivedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutInquiriesReceivedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutInquiriesReceivedInput, Prisma.UserUncheckedUpdateWithoutInquiriesReceivedInput>
+}
+
+export type UserUpdateWithoutInquiriesReceivedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutInquiriesReceivedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+}
+
+export type UserCreateWithoutOrganizationsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserUncheckedCreateWithoutOrganizationsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserCreateOrConnectWithoutOrganizationsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+}
+
+export type UserUpsertWithoutOrganizationsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationsInput, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutOrganizationsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationsInput, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
+}
+
+export type UserUpdateWithoutOrganizationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutOrganizationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
 }
 
 export type UserCreateWithoutSessionsInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -604,120 +1101,224 @@ export type UserUpdateToOneWithWhereWithoutSessionsInput = {
 
 export type UserUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
 }
 
-export type UserCreateWithoutWalletsInput = {
+export type UserCreateWithoutTokensInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
 }
 
-export type UserUncheckedCreateWithoutWalletsInput = {
+export type UserUncheckedCreateWithoutTokensInput = {
   id?: string
-  email: string
-  emailVerified?: boolean
-  passwordHash?: string | null
-  name?: string | null
-  avatarUrl?: string | null
-  kycStatus?: $Enums.KycStatus
-  kycProvider?: string | null
-  kycExternalId?: string | null
-  kycVerifiedAt?: Date | string | null
-  region?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
 }
 
-export type UserCreateOrConnectWithoutWalletsInput = {
+export type UserCreateOrConnectWithoutTokensInput = {
   where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutWalletsInput, Prisma.UserUncheckedCreateWithoutWalletsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTokensInput, Prisma.UserUncheckedCreateWithoutTokensInput>
 }
 
-export type UserUpsertWithoutWalletsInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutWalletsInput, Prisma.UserUncheckedUpdateWithoutWalletsInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutWalletsInput, Prisma.UserUncheckedCreateWithoutWalletsInput>
+export type UserUpsertWithoutTokensInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTokensInput, Prisma.UserUncheckedUpdateWithoutTokensInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTokensInput, Prisma.UserUncheckedCreateWithoutTokensInput>
   where?: Prisma.UserWhereInput
 }
 
-export type UserUpdateToOneWithWhereWithoutWalletsInput = {
+export type UserUpdateToOneWithWhereWithoutTokensInput = {
   where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutWalletsInput, Prisma.UserUncheckedUpdateWithoutWalletsInput>
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTokensInput, Prisma.UserUncheckedUpdateWithoutTokensInput>
 }
 
-export type UserUpdateWithoutWalletsInput = {
+export type UserUpdateWithoutTokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
 }
 
-export type UserUncheckedUpdateWithoutWalletsInput = {
+export type UserUncheckedUpdateWithoutTokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  passwordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  avatarUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycStatus?: Prisma.EnumKycStatusFieldUpdateOperationsInput | $Enums.KycStatus
-  kycProvider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycExternalId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kycVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  region?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserCreateWithoutWebhookSubscriptionsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
+  inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserUncheckedCreateWithoutWebhookSubscriptionsInput = {
+  id?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  platformRole?: $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
+  inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
+  inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
+}
+
+export type UserCreateOrConnectWithoutWebhookSubscriptionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedCreateWithoutWebhookSubscriptionsInput>
+}
+
+export type UserUpsertWithoutWebhookSubscriptionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedUpdateWithoutWebhookSubscriptionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedCreateWithoutWebhookSubscriptionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutWebhookSubscriptionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutWebhookSubscriptionsInput, Prisma.UserUncheckedUpdateWithoutWebhookSubscriptionsInput>
+}
+
+export type UserUpdateWithoutWebhookSubscriptionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
+  inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutWebhookSubscriptionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
+  inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
+  inquiriesReceived?: Prisma.InquiryUncheckedUpdateManyWithoutTargetUserNestedInput
 }
 
 
@@ -726,13 +1327,25 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
  */
 
 export type UserCountOutputType = {
+  accounts: number
   sessions: number
-  wallets: number
+  organizations: number
+  tokens: number
+  cronJobsCreated: number
+  webhookSubscriptions: number
+  inquiriesSent: number
+  inquiriesReceived: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  accounts?: boolean | UserCountOutputTypeCountAccountsArgs
   sessions?: boolean | UserCountOutputTypeCountSessionsArgs
-  wallets?: boolean | UserCountOutputTypeCountWalletsArgs
+  organizations?: boolean | UserCountOutputTypeCountOrganizationsArgs
+  tokens?: boolean | UserCountOutputTypeCountTokensArgs
+  cronJobsCreated?: boolean | UserCountOutputTypeCountCronJobsCreatedArgs
+  webhookSubscriptions?: boolean | UserCountOutputTypeCountWebhookSubscriptionsArgs
+  inquiriesSent?: boolean | UserCountOutputTypeCountInquiriesSentArgs
+  inquiriesReceived?: boolean | UserCountOutputTypeCountInquiriesReceivedArgs
 }
 
 /**
@@ -748,6 +1361,13 @@ export type UserCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountAccountsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AccountWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.SessionWhereInput
 }
@@ -755,82 +1375,113 @@ export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends runtime.Types.E
 /**
  * UserCountOutputType without action
  */
-export type UserCountOutputTypeCountWalletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.WalletWhereInput
+export type UserCountOutputTypeCountOrganizationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrganizationUserWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountTokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TokenWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCronJobsCreatedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CronJobWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountWebhookSubscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WebhookSubscriptionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountInquiriesSentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.InquiryWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountInquiriesReceivedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.InquiryWhereInput
 }
 
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  email?: boolean
-  emailVerified?: boolean
-  passwordHash?: boolean
-  name?: boolean
-  avatarUrl?: boolean
-  kycStatus?: boolean
-  kycProvider?: boolean
-  kycExternalId?: boolean
-  kycVerifiedAt?: boolean
-  region?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
+  email?: boolean
+  emailVerified?: boolean
+  name?: boolean
+  image?: boolean
+  platformRole?: boolean
+  accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
-  wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
+  organizations?: boolean | Prisma.User$organizationsArgs<ExtArgs>
+  tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
+  cronJobsCreated?: boolean | Prisma.User$cronJobsCreatedArgs<ExtArgs>
+  webhookSubscriptions?: boolean | Prisma.User$webhookSubscriptionsArgs<ExtArgs>
+  inquiriesSent?: boolean | Prisma.User$inquiriesSentArgs<ExtArgs>
+  inquiriesReceived?: boolean | Prisma.User$inquiriesReceivedArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  email?: boolean
-  emailVerified?: boolean
-  passwordHash?: boolean
-  name?: boolean
-  avatarUrl?: boolean
-  kycStatus?: boolean
-  kycProvider?: boolean
-  kycExternalId?: boolean
-  kycVerifiedAt?: boolean
-  region?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
+  email?: boolean
+  emailVerified?: boolean
+  name?: boolean
+  image?: boolean
+  platformRole?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  email?: boolean
-  emailVerified?: boolean
-  passwordHash?: boolean
-  name?: boolean
-  avatarUrl?: boolean
-  kycStatus?: boolean
-  kycProvider?: boolean
-  kycExternalId?: boolean
-  kycVerifiedAt?: boolean
-  region?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
+  email?: boolean
+  emailVerified?: boolean
+  name?: boolean
+  image?: boolean
+  platformRole?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
   id?: boolean
-  email?: boolean
-  emailVerified?: boolean
-  passwordHash?: boolean
-  name?: boolean
-  avatarUrl?: boolean
-  kycStatus?: boolean
-  kycProvider?: boolean
-  kycExternalId?: boolean
-  kycVerifiedAt?: boolean
-  region?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  deletedAt?: boolean
+  email?: boolean
+  emailVerified?: boolean
+  name?: boolean
+  image?: boolean
+  platformRole?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "emailVerified" | "passwordHash" | "name" | "avatarUrl" | "kycStatus" | "kycProvider" | "kycExternalId" | "kycVerifiedAt" | "region" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "deletedAt" | "email" | "emailVerified" | "name" | "image" | "platformRole", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
-  wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
+  organizations?: boolean | Prisma.User$organizationsArgs<ExtArgs>
+  tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
+  cronJobsCreated?: boolean | Prisma.User$cronJobsCreatedArgs<ExtArgs>
+  webhookSubscriptions?: boolean | Prisma.User$webhookSubscriptionsArgs<ExtArgs>
+  inquiriesSent?: boolean | Prisma.User$inquiriesSentArgs<ExtArgs>
+  inquiriesReceived?: boolean | Prisma.User$inquiriesReceivedArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -839,23 +1490,25 @@ export type UserIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
 export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "User"
   objects: {
+    accounts: Prisma.$AccountPayload<ExtArgs>[]
     sessions: Prisma.$SessionPayload<ExtArgs>[]
-    wallets: Prisma.$WalletPayload<ExtArgs>[]
+    organizations: Prisma.$OrganizationUserPayload<ExtArgs>[]
+    tokens: Prisma.$TokenPayload<ExtArgs>[]
+    cronJobsCreated: Prisma.$CronJobPayload<ExtArgs>[]
+    webhookSubscriptions: Prisma.$WebhookSubscriptionPayload<ExtArgs>[]
+    inquiriesSent: Prisma.$InquiryPayload<ExtArgs>[]
+    inquiriesReceived: Prisma.$InquiryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    email: string
-    emailVerified: boolean
-    passwordHash: string | null
-    name: string | null
-    avatarUrl: string | null
-    kycStatus: $Enums.KycStatus
-    kycProvider: string | null
-    kycExternalId: string | null
-    kycVerifiedAt: Date | null
-    region: string | null
     createdAt: Date
     updatedAt: Date
+    deletedAt: Date | null
+    email: string
+    emailVerified: boolean
+    name: string | null
+    image: string | null
+    platformRole: $Enums.PlatformRole
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -1250,8 +1903,14 @@ readonly fields: UserFieldRefs;
  */
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  accounts<T extends Prisma.User$accountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sessions<T extends Prisma.User$sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  wallets<T extends Prisma.User$walletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$walletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  organizations<T extends Prisma.User$organizationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$organizationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrganizationUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tokens<T extends Prisma.User$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  cronJobsCreated<T extends Prisma.User$cronJobsCreatedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$cronJobsCreatedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CronJobPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  webhookSubscriptions<T extends Prisma.User$webhookSubscriptionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$webhookSubscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebhookSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  inquiriesSent<T extends Prisma.User$inquiriesSentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$inquiriesSentArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  inquiriesReceived<T extends Prisma.User$inquiriesReceivedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$inquiriesReceivedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1282,18 +1941,14 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
  */
 export interface UserFieldRefs {
   readonly id: Prisma.FieldRef<"User", 'String'>
-  readonly email: Prisma.FieldRef<"User", 'String'>
-  readonly emailVerified: Prisma.FieldRef<"User", 'Boolean'>
-  readonly passwordHash: Prisma.FieldRef<"User", 'String'>
-  readonly name: Prisma.FieldRef<"User", 'String'>
-  readonly avatarUrl: Prisma.FieldRef<"User", 'String'>
-  readonly kycStatus: Prisma.FieldRef<"User", 'KycStatus'>
-  readonly kycProvider: Prisma.FieldRef<"User", 'String'>
-  readonly kycExternalId: Prisma.FieldRef<"User", 'String'>
-  readonly kycVerifiedAt: Prisma.FieldRef<"User", 'DateTime'>
-  readonly region: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly deletedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly email: Prisma.FieldRef<"User", 'String'>
+  readonly emailVerified: Prisma.FieldRef<"User", 'Boolean'>
+  readonly name: Prisma.FieldRef<"User", 'String'>
+  readonly image: Prisma.FieldRef<"User", 'String'>
+  readonly platformRole: Prisma.FieldRef<"User", 'PlatformRole'>
 }
     
 
@@ -1682,6 +2337,30 @@ export type UserDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
 }
 
 /**
+ * User.accounts
+ */
+export type User$accountsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Account
+   */
+  select?: Prisma.AccountSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Account
+   */
+  omit?: Prisma.AccountOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AccountInclude<ExtArgs> | null
+  where?: Prisma.AccountWhereInput
+  orderBy?: Prisma.AccountOrderByWithRelationInput | Prisma.AccountOrderByWithRelationInput[]
+  cursor?: Prisma.AccountWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AccountScalarFieldEnum | Prisma.AccountScalarFieldEnum[]
+}
+
+/**
  * User.sessions
  */
 export type User$sessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1706,27 +2385,147 @@ export type User$sessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalA
 }
 
 /**
- * User.wallets
+ * User.organizations
  */
-export type User$walletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type User$organizationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the Wallet
+   * Select specific fields to fetch from the OrganizationUser
    */
-  select?: Prisma.WalletSelect<ExtArgs> | null
+  select?: Prisma.OrganizationUserSelect<ExtArgs> | null
   /**
-   * Omit specific fields from the Wallet
+   * Omit specific fields from the OrganizationUser
    */
-  omit?: Prisma.WalletOmit<ExtArgs> | null
+  omit?: Prisma.OrganizationUserOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.WalletInclude<ExtArgs> | null
-  where?: Prisma.WalletWhereInput
-  orderBy?: Prisma.WalletOrderByWithRelationInput | Prisma.WalletOrderByWithRelationInput[]
-  cursor?: Prisma.WalletWhereUniqueInput
+  include?: Prisma.OrganizationUserInclude<ExtArgs> | null
+  where?: Prisma.OrganizationUserWhereInput
+  orderBy?: Prisma.OrganizationUserOrderByWithRelationInput | Prisma.OrganizationUserOrderByWithRelationInput[]
+  cursor?: Prisma.OrganizationUserWhereUniqueInput
   take?: number
   skip?: number
-  distinct?: Prisma.WalletScalarFieldEnum | Prisma.WalletScalarFieldEnum[]
+  distinct?: Prisma.OrganizationUserScalarFieldEnum | Prisma.OrganizationUserScalarFieldEnum[]
+}
+
+/**
+ * User.tokens
+ */
+export type User$tokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Token
+   */
+  select?: Prisma.TokenSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Token
+   */
+  omit?: Prisma.TokenOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TokenInclude<ExtArgs> | null
+  where?: Prisma.TokenWhereInput
+  orderBy?: Prisma.TokenOrderByWithRelationInput | Prisma.TokenOrderByWithRelationInput[]
+  cursor?: Prisma.TokenWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TokenScalarFieldEnum | Prisma.TokenScalarFieldEnum[]
+}
+
+/**
+ * User.cronJobsCreated
+ */
+export type User$cronJobsCreatedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CronJob
+   */
+  select?: Prisma.CronJobSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CronJob
+   */
+  omit?: Prisma.CronJobOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CronJobInclude<ExtArgs> | null
+  where?: Prisma.CronJobWhereInput
+  orderBy?: Prisma.CronJobOrderByWithRelationInput | Prisma.CronJobOrderByWithRelationInput[]
+  cursor?: Prisma.CronJobWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CronJobScalarFieldEnum | Prisma.CronJobScalarFieldEnum[]
+}
+
+/**
+ * User.webhookSubscriptions
+ */
+export type User$webhookSubscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WebhookSubscription
+   */
+  select?: Prisma.WebhookSubscriptionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WebhookSubscription
+   */
+  omit?: Prisma.WebhookSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WebhookSubscriptionInclude<ExtArgs> | null
+  where?: Prisma.WebhookSubscriptionWhereInput
+  orderBy?: Prisma.WebhookSubscriptionOrderByWithRelationInput | Prisma.WebhookSubscriptionOrderByWithRelationInput[]
+  cursor?: Prisma.WebhookSubscriptionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WebhookSubscriptionScalarFieldEnum | Prisma.WebhookSubscriptionScalarFieldEnum[]
+}
+
+/**
+ * User.inquiriesSent
+ */
+export type User$inquiriesSentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Inquiry
+   */
+  select?: Prisma.InquirySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Inquiry
+   */
+  omit?: Prisma.InquiryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.InquiryInclude<ExtArgs> | null
+  where?: Prisma.InquiryWhereInput
+  orderBy?: Prisma.InquiryOrderByWithRelationInput | Prisma.InquiryOrderByWithRelationInput[]
+  cursor?: Prisma.InquiryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.InquiryScalarFieldEnum | Prisma.InquiryScalarFieldEnum[]
+}
+
+/**
+ * User.inquiriesReceived
+ */
+export type User$inquiriesReceivedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Inquiry
+   */
+  select?: Prisma.InquirySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Inquiry
+   */
+  omit?: Prisma.InquiryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.InquiryInclude<ExtArgs> | null
+  where?: Prisma.InquiryWhereInput
+  orderBy?: Prisma.InquiryOrderByWithRelationInput | Prisma.InquiryOrderByWithRelationInput[]
+  cursor?: Prisma.InquiryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.InquiryScalarFieldEnum | Prisma.InquiryScalarFieldEnum[]
 }
 
 /**

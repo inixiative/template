@@ -10,6 +10,7 @@ const makeSchema = () => z.object({
   ipAddress: z.literal(true).optional(),
   userAgent: z.literal(true).optional(),
   createdAt: z.literal(true).optional(),
+  updatedAt: z.literal(true).optional(),
   _all: z.literal(true).optional()
 }).strict();
 export const SessionCountAggregateInputObjectSchema: z.ZodType<Prisma.SessionCountAggregateInputType> = makeSchema() as unknown as z.ZodType<Prisma.SessionCountAggregateInputType>;

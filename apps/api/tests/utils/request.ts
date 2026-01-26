@@ -8,7 +8,7 @@ export function createRequest(
     headers?: Record<string, string>;
   },
 ) {
-  const url = `http://localhost${path}`;
+  const url = `http://t${path}`;
   const init: RequestInit = {
     method,
     headers: {

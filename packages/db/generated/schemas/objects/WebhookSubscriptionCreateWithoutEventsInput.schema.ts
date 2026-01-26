@@ -1,0 +1,21 @@
+import * as z from 'zod';
+import type { Prisma } from '../../../src/generated/client/client';
+import { WebhookModelSchema } from '../enums/WebhookModel.schema';
+import { WebhookOwnerModelSchema } from '../enums/WebhookOwnerModel.schema';
+import { UserCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema as UserCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema } from './UserCreateNestedOneWithoutWebhookSubscriptionsInput.schema';
+import { OrganizationCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema as OrganizationCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema } from './OrganizationCreateNestedOneWithoutWebhookSubscriptionsInput.schema'
+
+const makeSchema = () => z.object({
+  id: z.string().max(36).optional(),
+  createdAt: z.coerce.date().optional(),
+  updatedAt: z.coerce.date().optional(),
+  model: WebhookModelSchema,
+  url: z.string(),
+  secret: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+  ownerModel: WebhookOwnerModelSchema,
+  user: z.lazy(() => UserCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema).optional(),
+  organization: z.lazy(() => OrganizationCreateNestedOneWithoutWebhookSubscriptionsInputObjectSchema).optional()
+}).strict();
+export const WebhookSubscriptionCreateWithoutEventsInputObjectSchema: z.ZodType<Prisma.WebhookSubscriptionCreateWithoutEventsInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionCreateWithoutEventsInput>;
+export const WebhookSubscriptionCreateWithoutEventsInputObjectZodSchema = makeSchema();

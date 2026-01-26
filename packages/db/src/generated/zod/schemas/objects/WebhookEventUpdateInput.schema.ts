@@ -20,7 +20,7 @@ const makeSchema = () => z.object({
   payload: z.union([NullableJsonNullValueInputSchema, jsonSchema]).optional(),
   error: z.union([z.string(), z.lazy(() => NullableStringFieldUpdateOperationsInputObjectSchema)]).optional().nullable(),
   resourceId: z.union([z.string().max(36), z.lazy(() => StringFieldUpdateOperationsInputObjectSchema)]).optional(),
-  subscription: z.lazy(() => WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInputObjectSchema).optional()
+  webhookSubscription: z.lazy(() => WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInputObjectSchema).optional()
 }).strict();
 export const WebhookEventUpdateInputObjectSchema: z.ZodType<Prisma.WebhookEventUpdateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventUpdateInput>;
 export const WebhookEventUpdateInputObjectZodSchema = makeSchema();

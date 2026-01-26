@@ -1,14 +1,16 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": ".",
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@src/*": ["./src/*"],
-      "@template/db": ["../../packages/db/src"]
+      "#/*": ["./src/*"],
+      "#tests/*": ["./tests/*"],
+      "@template/db/*": ["../../packages/db/src/*"],
+      "@template/db-test/*": ["../../packages/db/test/*"],
+      "@template/permissions/*": ["../../packages/permissions/src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }

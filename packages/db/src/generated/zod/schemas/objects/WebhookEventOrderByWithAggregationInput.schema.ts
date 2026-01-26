@@ -13,7 +13,7 @@ const makeSchema = () => z.object({
   action: SortOrderSchema.optional(),
   payload: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
   error: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
-  subscriptionId: SortOrderSchema.optional(),
+  webhookSubscriptionId: SortOrderSchema.optional(),
   resourceId: SortOrderSchema.optional(),
   _count: z.lazy(() => WebhookEventCountOrderByAggregateInputObjectSchema).optional(),
   _max: z.lazy(() => WebhookEventMaxOrderByAggregateInputObjectSchema).optional(),

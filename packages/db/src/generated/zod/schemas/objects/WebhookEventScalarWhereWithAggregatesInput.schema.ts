@@ -19,7 +19,7 @@ const webhookeventscalarwherewithaggregatesinputSchema = z.object({
   action: z.union([z.lazy(() => EnumWebhookEventActionWithAggregatesFilterObjectSchema), WebhookEventActionSchema]).optional(),
   payload: z.lazy(() => JsonNullableWithAggregatesFilterObjectSchema).optional(),
   error: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string()]).optional().nullable(),
-  subscriptionId: z.union([z.lazy(() => StringWithAggregatesFilterObjectSchema), z.string().max(36)]).optional(),
+  webhookSubscriptionId: z.union([z.lazy(() => StringWithAggregatesFilterObjectSchema), z.string().max(36)]).optional(),
   resourceId: z.union([z.lazy(() => StringWithAggregatesFilterObjectSchema), z.string().max(36)]).optional()
 }).strict();
 export const WebhookEventScalarWhereWithAggregatesInputObjectSchema: z.ZodType<Prisma.WebhookEventScalarWhereWithAggregatesInput> = webhookeventscalarwherewithaggregatesinputSchema as unknown as z.ZodType<Prisma.WebhookEventScalarWhereWithAggregatesInput>;

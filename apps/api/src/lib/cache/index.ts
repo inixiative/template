@@ -1,2 +1,2 @@
-export { getCache, setCache, deleteCache } from './cache';
+export { cache, cacheKey, deleteCache } from './cache';
 export { clearCacheKey } from './clearCacheKey';

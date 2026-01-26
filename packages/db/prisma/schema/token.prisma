@@ -1,0 +1,42 @@
+// ============================================================================
+// TOKEN - API keys for user or organization
+// ============================================================================
+
+model Token {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name      String
+  keyHash   String   @unique
+  keyPrefix String
+
+  // Polymorphic ownership
+  ownerModel     TokenOwnerModel
+  userId         String?          @db.VarChar(36)
+  organizationId String?          @db.VarChar(36)
+
+  // Relations
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+
+  // Permissions (for org-owned tokens)
+  role         OrganizationRole @default(member)
+  entitlements Json?
+
+  // Lifecycle
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  isActive   Boolean   @default(true)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([keyHash])
+}
+
+enum TokenOwnerModel {
+  User
+  Organization
+  OrganizationUser
+}

@@ -1,0 +1,58 @@
+// ============================================================================
+// INQUIRY - Workflow for applications, invitations, requests
+// ============================================================================
+
+model Inquiry {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sentAt    DateTime?
+
+  type   InquiryType
+  status InquiryStatus @default(draft)
+
+  content    Json @default("{}")
+  resolution Json @default("{}")
+
+  // Source (who creates/sends) - fake polymorphism
+  sourceModel          InquiryResourceModel
+  sourceUserId         String?       @db.VarChar(36)
+  sourceOrganizationId String?       @db.VarChar(36)
+
+  sourceUser         User?         @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
+  sourceOrganization Organization? @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
+
+  // Target (who receives/resolves) - fake polymorphism
+  targetModel          InquiryResourceModel?
+  targetUserId         String?       @db.VarChar(36)
+  targetOrganizationId String?       @db.VarChar(36)
+
+  targetUser         User?         @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetOrganization Organization? @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
+
+  @@index([sourceModel])
+  @@index([sourceUserId])
+  @@index([sourceOrganizationId])
+  @@index([targetModel])
+  @@index([targetUserId])
+  @@index([targetOrganizationId])
+  @@index([type, status])
+}
+
+enum InquiryType {
+  memberInvitation
+  memberApplication
+}
+
+enum InquiryStatus {
+  draft
+  sent
+  acknowledged
+  resolved
+  canceled
+}
+
+enum InquiryResourceModel {
+  User
+  Organization
+}

@@ -1,0 +1,8 @@
+always import z from @hono/zod-openapi not zod directly - otherwise c.req.valid('json') returns undefined
+
+NEVER use raw createRoute() from @hono/zod-openapi - ALWAYS use our templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute)
+
+module names are SINGULAR to match Prisma (organization, inquiry, token, not organizations, inquiries, tokens)
+- use Modules.organization not 'organizations'
+- folder: src/modules/organization/
+- files: organizationCreate.ts, organizationRead.ts

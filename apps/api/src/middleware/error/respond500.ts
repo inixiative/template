@@ -1,6 +1,6 @@
-import { env } from '@src/config/env';
-import type { AppEnv } from '@src/types/appEnv';
 import type { Context } from 'hono';
+import { env } from '#/config/env';
+import type { AppEnv } from '#/types/appEnv';
 
 export function respond500(c: Context<AppEnv>, error?: unknown) {
   c.header('Cache-Control', 'no-store');

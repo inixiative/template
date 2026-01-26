@@ -1,0 +1,91 @@
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import type { z } from '@hono/zod-openapi';
+import { type Organization, TokenOwnerModel, type User } from '@template/db';
+import { cleanupTouchedTables, createOrganization, createToken, createUser } from '@template/db/test';
+import { meRouter } from '#/modules/me';
+import { meReadManyTokenRoute } from '#/modules/me/routes/meReadManyToken';
+import { createTestApp } from '#tests/createTestApp';
+import { get } from '#tests/utils/request';
+
+type ReadManyTokensResponse = {
+  data: z.infer<typeof meReadManyTokenRoute.responseSchema>[];
+  pagination: { total: number; page: number; pageSize: number };
+};
+
+describe('GET /me/tokens', () => {
+  let fetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let user: User;
+  let org: Organization;
+
+  beforeAll(async () => {
+    const { entity: u } = await createUser();
+    user = u;
+
+    const { entity: o } = await createOrganization();
+    org = o;
+
+    const harness = createTestApp({
+      mockUser: user,
+      mount: [(app) => app.route('/api/v1/me', meRouter)],
+    });
+    fetch = harness.fetch;
+    db = harness.db;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('returns empty array when user has no tokens', async () => {
+    const response = await fetch(get('/api/v1/me/tokens'));
+    expect(response.status).toBe(200);
+
+    const { data, pagination } = (await response.json()) as ReadManyTokensResponse;
+    expect(data).toEqual([]);
+    expect(pagination.total).toBe(0);
+  });
+
+  it('returns user-owned tokens', async () => {
+    await createToken(
+      {
+        name: 'User Token',
+        ownerModel: TokenOwnerModel.User,
+      },
+      { User: user },
+    );
+
+    const response = await fetch(get('/api/v1/me/tokens'));
+    expect(response.status).toBe(200);
+
+    const { data } = (await response.json()) as ReadManyTokensResponse;
+    expect(data.length).toBeGreaterThanOrEqual(1);
+    expect(data.some((t) => t.name === 'User Token')).toBe(true);
+  });
+
+  it('excludes org-owned tokens', async () => {
+    await createToken(
+      {
+        name: 'Org Token',
+        ownerModel: TokenOwnerModel.Organization,
+      },
+      { Organization: org },
+    );
+
+    const response = await fetch(get('/api/v1/me/tokens'));
+    expect(response.status).toBe(200);
+
+    const { data } = (await response.json()) as ReadManyTokensResponse;
+    expect(data.every((t) => t.ownerModel === 'User')).toBe(true);
+  });
+
+  it('omits keyHash from response', async () => {
+    const response = await fetch(get('/api/v1/me/tokens'));
+    const { data } = (await response.json()) as ReadManyTokensResponse;
+
+    if (data.length > 0) {
+      expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();
+      expect(data[0].keyPrefix).toBeDefined();
+    }
+  });
+});

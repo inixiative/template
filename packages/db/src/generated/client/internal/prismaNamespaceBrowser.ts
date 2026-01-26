@@ -51,11 +51,17 @@ export const AnyNull = runtime.AnyNull
 
 
 export const ModelName = {
-  User: 'User',
+  Account: 'Account',
+  CronJob: 'CronJob',
+  Inquiry: 'Inquiry',
+  Organization: 'Organization',
+  OrganizationUser: 'OrganizationUser',
   Session: 'Session',
-  Wallet: 'Wallet',
-  WebhookSubscription: 'WebhookSubscription',
-  WebhookEvent: 'WebhookEvent'
+  Token: 'Token',
+  User: 'User',
+  Verification: 'Verification',
+  WebhookEvent: 'WebhookEvent',
+  WebhookSubscription: 'WebhookSubscription'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -74,23 +80,87 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
-export const UserScalarFieldEnum = {
+export const AccountScalarFieldEnum = {
   id: 'id',
-  email: 'email',
-  emailVerified: 'emailVerified',
-  passwordHash: 'passwordHash',
-  name: 'name',
-  avatarUrl: 'avatarUrl',
-  kycStatus: 'kycStatus',
-  kycProvider: 'kycProvider',
-  kycExternalId: 'kycExternalId',
-  kycVerifiedAt: 'kycVerifiedAt',
-  region: 'region',
+  userId: 'userId',
+  accountId: 'accountId',
+  providerId: 'providerId',
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  accessTokenExpiresAt: 'accessTokenExpiresAt',
+  refreshTokenExpiresAt: 'refreshTokenExpiresAt',
+  scope: 'scope',
+  idToken: 'idToken',
+  password: 'password',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
-export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+export type AccountScalarFieldEnum = (typeof AccountScalarFieldEnum)[keyof typeof AccountScalarFieldEnum]
+
+
+export const CronJobScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  name: 'name',
+  jobId: 'jobId',
+  description: 'description',
+  pattern: 'pattern',
+  enabled: 'enabled',
+  handler: 'handler',
+  payload: 'payload',
+  maxAttempts: 'maxAttempts',
+  backoffMs: 'backoffMs',
+  createdById: 'createdById'
+} as const
+
+export type CronJobScalarFieldEnum = (typeof CronJobScalarFieldEnum)[keyof typeof CronJobScalarFieldEnum]
+
+
+export const InquiryScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  sentAt: 'sentAt',
+  type: 'type',
+  status: 'status',
+  content: 'content',
+  resolution: 'resolution',
+  sourceModel: 'sourceModel',
+  sourceUserId: 'sourceUserId',
+  sourceOrganizationId: 'sourceOrganizationId',
+  targetModel: 'targetModel',
+  targetUserId: 'targetUserId',
+  targetOrganizationId: 'targetOrganizationId'
+} as const
+
+export type InquiryScalarFieldEnum = (typeof InquiryScalarFieldEnum)[keyof typeof InquiryScalarFieldEnum]
+
+
+export const OrganizationScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt',
+  name: 'name',
+  slug: 'slug'
+} as const
+
+export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[keyof typeof OrganizationScalarFieldEnum]
+
+
+export const OrganizationUserScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  userId: 'userId',
+  role: 'role',
+  entitlements: 'entitlements',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrganizationUserScalarFieldEnum = (typeof OrganizationUserScalarFieldEnum)[keyof typeof OrganizationUserScalarFieldEnum]
 
 
 export const SessionScalarFieldEnum = {
@@ -100,24 +170,72 @@ export const SessionScalarFieldEnum = {
   expiresAt: 'expiresAt',
   ipAddress: 'ipAddress',
   userAgent: 'userAgent',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 } as const
 
 export type SessionScalarFieldEnum = (typeof SessionScalarFieldEnum)[keyof typeof SessionScalarFieldEnum]
 
 
-export const WalletScalarFieldEnum = {
+export const TokenScalarFieldEnum = {
   id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  name: 'name',
+  keyHash: 'keyHash',
+  keyPrefix: 'keyPrefix',
+  ownerModel: 'ownerModel',
   userId: 'userId',
-  address: 'address',
-  chain: 'chain',
-  isPrimary: 'isPrimary',
-  isPayoutWallet: 'isPayoutWallet',
-  verifiedAt: 'verifiedAt',
-  createdAt: 'createdAt'
+  organizationId: 'organizationId',
+  role: 'role',
+  entitlements: 'entitlements',
+  expiresAt: 'expiresAt',
+  lastUsedAt: 'lastUsedAt',
+  isActive: 'isActive'
 } as const
 
-export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof WalletScalarFieldEnum]
+export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
+
+
+export const UserScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt',
+  email: 'email',
+  emailVerified: 'emailVerified',
+  name: 'name',
+  image: 'image',
+  platformRole: 'platformRole'
+} as const
+
+export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const VerificationScalarFieldEnum = {
+  id: 'id',
+  identifier: 'identifier',
+  value: 'value',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VerificationScalarFieldEnum = (typeof VerificationScalarFieldEnum)[keyof typeof VerificationScalarFieldEnum]
+
+
+export const WebhookEventScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  status: 'status',
+  action: 'action',
+  payload: 'payload',
+  error: 'error',
+  webhookSubscriptionId: 'webhookSubscriptionId',
+  resourceId: 'resourceId'
+} as const
+
+export type WebhookEventScalarFieldEnum = (typeof WebhookEventScalarFieldEnum)[keyof typeof WebhookEventScalarFieldEnum]
 
 
 export const WebhookSubscriptionScalarFieldEnum = {
@@ -128,25 +246,12 @@ export const WebhookSubscriptionScalarFieldEnum = {
   url: 'url',
   secret: 'secret',
   isActive: 'isActive',
-  ownerType: 'ownerType',
-  ownerId: 'ownerId'
+  ownerModel: 'ownerModel',
+  userId: 'userId',
+  organizationId: 'organizationId'
 } as const
 
 export type WebhookSubscriptionScalarFieldEnum = (typeof WebhookSubscriptionScalarFieldEnum)[keyof typeof WebhookSubscriptionScalarFieldEnum]
-
-
-export const WebhookEventScalarFieldEnum = {
-  id: 'id',
-  createdAt: 'createdAt',
-  status: 'status',
-  action: 'action',
-  payload: 'payload',
-  error: 'error',
-  subscriptionId: 'subscriptionId',
-  resourceId: 'resourceId'
-} as const
-
-export type WebhookEventScalarFieldEnum = (typeof WebhookEventScalarFieldEnum)[keyof typeof WebhookEventScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -163,6 +268,13 @@ export const NullableJsonNullValueInput = {
 } as const
 
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {

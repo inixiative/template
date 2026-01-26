@@ -1,0 +1,14 @@
+import type { Prisma } from '../../src/generated/client/client';
+import * as z from 'zod';
+import { CronJobOrderByWithRelationInputObjectSchema as CronJobOrderByWithRelationInputObjectSchema } from './objects/CronJobOrderByWithRelationInput.schema';
+import { CronJobWhereInputObjectSchema as CronJobWhereInputObjectSchema } from './objects/CronJobWhereInput.schema';
+import { CronJobWhereUniqueInputObjectSchema as CronJobWhereUniqueInputObjectSchema } from './objects/CronJobWhereUniqueInput.schema';
+import { CronJobCountAggregateInputObjectSchema as CronJobCountAggregateInputObjectSchema } from './objects/CronJobCountAggregateInput.schema';
+import { CronJobMinAggregateInputObjectSchema as CronJobMinAggregateInputObjectSchema } from './objects/CronJobMinAggregateInput.schema';
+import { CronJobMaxAggregateInputObjectSchema as CronJobMaxAggregateInputObjectSchema } from './objects/CronJobMaxAggregateInput.schema';
+import { CronJobAvgAggregateInputObjectSchema as CronJobAvgAggregateInputObjectSchema } from './objects/CronJobAvgAggregateInput.schema';
+import { CronJobSumAggregateInputObjectSchema as CronJobSumAggregateInputObjectSchema } from './objects/CronJobSumAggregateInput.schema';
+
+export const CronJobAggregateSchema: z.ZodType<Prisma.CronJobAggregateArgs> = z.object({ orderBy: z.union([CronJobOrderByWithRelationInputObjectSchema, CronJobOrderByWithRelationInputObjectSchema.array()]).optional(), where: CronJobWhereInputObjectSchema.optional(), cursor: CronJobWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), _count: z.union([ z.literal(true), CronJobCountAggregateInputObjectSchema ]).optional(), _min: CronJobMinAggregateInputObjectSchema.optional(), _max: CronJobMaxAggregateInputObjectSchema.optional(), _avg: CronJobAvgAggregateInputObjectSchema.optional(), _sum: CronJobSumAggregateInputObjectSchema.optional() }).strict() as unknown as z.ZodType<Prisma.CronJobAggregateArgs>;
+
+export const CronJobAggregateZodSchema = z.object({ orderBy: z.union([CronJobOrderByWithRelationInputObjectSchema, CronJobOrderByWithRelationInputObjectSchema.array()]).optional(), where: CronJobWhereInputObjectSchema.optional(), cursor: CronJobWhereUniqueInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), _count: z.union([ z.literal(true), CronJobCountAggregateInputObjectSchema ]).optional(), _min: CronJobMinAggregateInputObjectSchema.optional(), _max: CronJobMaxAggregateInputObjectSchema.optional(), _avg: CronJobAvgAggregateInputObjectSchema.optional(), _sum: CronJobSumAggregateInputObjectSchema.optional() }).strict();

@@ -1,0 +1,13 @@
+import type { Prisma } from '../../src/generated/client/client';
+import * as z from 'zod';
+import { OrganizationUserWhereInputObjectSchema as OrganizationUserWhereInputObjectSchema } from './objects/OrganizationUserWhereInput.schema';
+import { OrganizationUserOrderByWithAggregationInputObjectSchema as OrganizationUserOrderByWithAggregationInputObjectSchema } from './objects/OrganizationUserOrderByWithAggregationInput.schema';
+import { OrganizationUserScalarWhereWithAggregatesInputObjectSchema as OrganizationUserScalarWhereWithAggregatesInputObjectSchema } from './objects/OrganizationUserScalarWhereWithAggregatesInput.schema';
+import { OrganizationUserScalarFieldEnumSchema } from './enums/OrganizationUserScalarFieldEnum.schema';
+import { OrganizationUserCountAggregateInputObjectSchema as OrganizationUserCountAggregateInputObjectSchema } from './objects/OrganizationUserCountAggregateInput.schema';
+import { OrganizationUserMinAggregateInputObjectSchema as OrganizationUserMinAggregateInputObjectSchema } from './objects/OrganizationUserMinAggregateInput.schema';
+import { OrganizationUserMaxAggregateInputObjectSchema as OrganizationUserMaxAggregateInputObjectSchema } from './objects/OrganizationUserMaxAggregateInput.schema';
+
+export const OrganizationUserGroupBySchema: z.ZodType<Prisma.OrganizationUserGroupByArgs> = z.object({ where: OrganizationUserWhereInputObjectSchema.optional(), orderBy: z.union([OrganizationUserOrderByWithAggregationInputObjectSchema, OrganizationUserOrderByWithAggregationInputObjectSchema.array()]).optional(), having: OrganizationUserScalarWhereWithAggregatesInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), by: z.array(OrganizationUserScalarFieldEnumSchema), _count: z.union([ z.literal(true), OrganizationUserCountAggregateInputObjectSchema ]).optional(), _min: OrganizationUserMinAggregateInputObjectSchema.optional(), _max: OrganizationUserMaxAggregateInputObjectSchema.optional() }).strict() as unknown as z.ZodType<Prisma.OrganizationUserGroupByArgs>;
+
+export const OrganizationUserGroupByZodSchema = z.object({ where: OrganizationUserWhereInputObjectSchema.optional(), orderBy: z.union([OrganizationUserOrderByWithAggregationInputObjectSchema, OrganizationUserOrderByWithAggregationInputObjectSchema.array()]).optional(), having: OrganizationUserScalarWhereWithAggregatesInputObjectSchema.optional(), take: z.number().optional(), skip: z.number().optional(), by: z.array(OrganizationUserScalarFieldEnumSchema), _count: z.union([ z.literal(true), OrganizationUserCountAggregateInputObjectSchema ]).optional(), _min: OrganizationUserMinAggregateInputObjectSchema.optional(), _max: OrganizationUserMaxAggregateInputObjectSchema.optional() }).strict();

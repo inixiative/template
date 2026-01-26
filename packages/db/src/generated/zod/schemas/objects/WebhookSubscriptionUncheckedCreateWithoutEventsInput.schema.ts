@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { Prisma } from '../../../client/client';
 import { WebhookModelSchema } from '../enums/WebhookModel.schema';
-import { WebhookOwnerTypeSchema } from '../enums/WebhookOwnerType.schema'
+import { WebhookOwnerModelSchema } from '../enums/WebhookOwnerModel.schema'
 
 const makeSchema = () => z.object({
   id: z.string().optional(),
@@ -11,8 +11,9 @@ const makeSchema = () => z.object({
   url: z.string(),
   secret: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
-  ownerType: WebhookOwnerTypeSchema,
-  ownerId: z.string()
+  ownerModel: WebhookOwnerModelSchema,
+  userId: z.string().optional().nullable(),
+  organizationId: z.string().optional().nullable()
 }).strict();
 export const WebhookSubscriptionUncheckedCreateWithoutEventsInputObjectSchema: z.ZodType<Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput>;
 export const WebhookSubscriptionUncheckedCreateWithoutEventsInputObjectZodSchema = makeSchema();

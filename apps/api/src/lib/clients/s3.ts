@@ -10,7 +10,7 @@
  * - S3_BUCKET_NAME
  */
 
-import { env } from '@src/config/env';
+import { env } from '#/config/env';
 
 // Lazy-loaded client (only initialize when needed)
 let _s3Client: Awaited<ReturnType<typeof createS3Client>> | null = null;

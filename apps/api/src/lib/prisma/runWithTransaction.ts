@@ -1,6 +1,6 @@
-import type { AppEnv } from '@src/types/appEnv';
 import type { Prisma } from '@template/db';
 import type { Context } from 'hono';
+import type { AppEnv } from '#/types/appEnv';
 
 /**
  * Runs a handler within a database transaction.
@@ -27,10 +27,10 @@ export async function runWithTransaction<T>(
   }
 
   // Create new transaction and store in context
-  return db.$transaction(async (txn: Prisma.TransactionClient) => {
-    c.set('txn', txn);
+  return db.$transaction(async (txn) => {
+    c.set('txn', txn as Prisma.TransactionClient);
     try {
-      return await handler(txn);
+      return await handler(txn as Prisma.TransactionClient);
     } finally {
       c.set('txn', undefined);
     }
