@@ -3,6 +3,7 @@ import { InquiryModelSchema } from '@template/db/zod/models';
 import { readRoute } from '#/lib/requestTemplates';
 import { Modules } from '#/modules/modules';
 
+// TODO: Use InquiryTypeSchema/InquiryStatusSchema enums instead of string
 const querySchema = z.object({
   type: z.string().optional(),
   status: z.string().optional(),

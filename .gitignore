@@ -83,6 +83,9 @@ web_modules/
 
 .idea
 
+# Prisma generated (regenerate with: cd packages/db && bun run db:generate)
+packages/db/src/generated/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

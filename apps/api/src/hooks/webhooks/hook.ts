@@ -1,4 +1,4 @@
-import type { WebhookModel } from '@template/db';
+import type { WebhookModel, WebhookSubscriptionId } from '@template/db';
 import { DbAction, HookTiming, db, registerDbHook } from '@template/db';
 import { getParentWebhookModel, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -24,7 +24,7 @@ const getWebhookCallbacks = async (payload: WebhookPayload) => {
     select: { id: true },
   });
 
-  return subscriptions.map((sub) => async () => {
+  return subscriptions.map((sub: { id: WebhookSubscriptionId }) => async () => {
     await enqueueJob('sendWebhook', {
       subscriptionId: sub.id,
       action: payload.action,
@@ -78,7 +78,7 @@ export function registerWebhookHook() {
       if (db.isInTxn()) {
         db.onCommit(callbacks);
       } else {
-        await Promise.all(callbacks.map((fn) => fn()));
+        await Promise.all(callbacks.map((fn: () => Promise<void>) => fn()));
       }
     },
   );

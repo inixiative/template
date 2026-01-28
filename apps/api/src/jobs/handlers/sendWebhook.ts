@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { WebhookEventAction, WebhookEventStatus } from '@template/db';
+import type { WebhookEventAction, WebhookEventStatus, WebhookEvent } from '@template/db';
 import type { JobHandler } from '#/jobs/types';
 import { log } from '#/lib/logger';
 
@@ -69,7 +69,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     select: { status: true },
   });
 
-  const allFailed = recentEvents.length >= FAILURE_THRESHOLD && recentEvents.every((e) => e.status !== 'success');
+  const allFailed = recentEvents.length >= FAILURE_THRESHOLD && recentEvents.every((e: Pick<WebhookEvent, 'status'>) => e.status !== 'success');
   if (allFailed) {
     await db.webhookSubscription.update({ where: { id: subscriptionId }, data: { isActive: false } });
     log.warn(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);

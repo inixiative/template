@@ -62,7 +62,7 @@ export const auth = betterAuth({
       return value ? JSON.parse(value) : null;
     },
     set: async (key, value, ttl) => {
-      await getRedisClient().set(`${redisNamespace.session}:${key}`, JSON.stringify(value), 'EX', ttl);
+      await getRedisClient().setex(`${redisNamespace.session}:${key}`, ttl ?? 86400, JSON.stringify(value));
     },
     delete: async (key) => {
       await getRedisClient().del(`${redisNamespace.session}:${key}`);

@@ -1,4 +1,4 @@
-import type { ExtendedPrismaClient } from '@template/db';
+import type { ExtendedPrismaClient, OrganizationId } from '@template/db';
 
 export const redactUser = async (db: ExtendedPrismaClient, userId: string) => {
   const now = new Date();
@@ -15,7 +15,7 @@ export const redactUser = async (db: ExtendedPrismaClient, userId: string) => {
 
   if (singleMemberOrgs.length) {
     await db.organization.updateManyAndReturn({
-      where: { id: { in: singleMemberOrgs.map((o) => o.id) } },
+      where: { id: { in: singleMemberOrgs.map((o: { id: OrganizationId }) => o.id) } },
       data: { deletedAt: now },
     });
   }

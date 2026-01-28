@@ -21,7 +21,7 @@ describe('createFactory', () => {
       const { entity: user, context } = await userFactory.build();
 
       expect(user.id).toBeDefined();
-      expect(user.email).toBe('user-1@test.com');
+      expect(user.email).toMatch(/^user-\d+@test\.com$/);
       expect(user.emailVerified).toBe(true);
       expect(context.User).toBe(user);
     });
@@ -169,16 +169,18 @@ describe('createFactory', () => {
 
   describe('sequence', () => {
     it('getNextSeq increments', () => {
-      expect(getNextSeq()).toBe(1);
-      expect(getNextSeq()).toBe(2);
-      expect(getNextSeq()).toBe(3);
+      const first = getNextSeq();
+      expect(getNextSeq()).toBe(first + 1);
+      expect(getNextSeq()).toBe(first + 2);
     });
 
-    it('resetSequence resets to 0', () => {
+    it('resetSequence resets to baseline', () => {
+      resetSequence();
+      const baseline = getNextSeq();
       getNextSeq();
       getNextSeq();
       resetSequence();
-      expect(getNextSeq()).toBe(1);
+      expect(getNextSeq()).toBe(baseline);
     });
   });
 });

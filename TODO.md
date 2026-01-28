@@ -1,67 +1,60 @@
 # TODO
 
-## Immediate Type Errors
+## Tests & Type Errors
 
-- [ ] Missing npm deps - stub or install `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `stripe`
-- [ ] Auth middleware - Better-Auth session typing issues in `authMiddleware.ts`
-- [ ] Inquiry controllers - add user null checks (routes should have auth middleware)
-- [ ] Inquiry module - update to fake polymorphism (sourceId/targetId → sourceUserId/sourceOrganizationId etc)
-- [ ] Inquiry resolution service - update to use fake polymorphism fields
-- [ ] Route templates - fix `createRoute` export in `#/lib/requestTemplates/create`
-- [ ] Test files - delete or fix stale auth tests (reference deleted auth module)
-- [ ] adminInquiriesReadMany - query schema missing type/status fields
-- [ ] cronJobsCreate route - createRoute not exported
+All tests passing (230 total: 151 API + 79 DB).
 
-## Webhooks (apps/api/src/hooks/webhooks/)
+### Type Errors to Fix
+- [x] Implicit `any` types in webhooks/sendWebhook/redactUser
+- [x] Redis `EX` typing in auth.ts (use setex)
+- [x] adminCacheClear route/controller body schema mismatch
+- [ ] packages/db circular type refs (pre-existing, low priority)
 
-- [x] Webhook delivery job - `sendWebhook` handler with RSA-SHA256 signing
-- [x] Webhook hook - `registerWebhookHook` triggers on db mutations
-- [x] `WEBHOOK_SIGNING_PRIVATE_KEY` env var for signing payloads
-- [x] WebhookSubscriptions module - CRUD routes + create via /me and /organization
-- [x] Circuit breaker - disables subscription after 5 consecutive failures
+### Low Priority (not blocking)
+- [ ] Inquiry module - needs fake polymorphism refactor (sourceId/targetId → sourceUserId/etc)
+- [ ] adminInquiryReadMany query type/status enum typing
+
+### Missing Deps (stub or install when needed)
+- [ ] `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` - for S3 file uploads
+- [ ] `stripe` - for payments
+
+## Polish & Documentation
+
+- [ ] Polish CLAUDE.md and AI instructions
+- [ ] Polish CI/CD scripts and tooling
+- [ ] Documentation: architecture.md, database.md, api-patterns.md, auth.md, testing.md, deployment.md
+
+## Features
+
+### Webhooks ✓
+- [x] Webhook delivery job with RSA-SHA256 signing
+- [x] Webhook hook triggers on db mutations
+- [x] WebhookSubscriptions CRUD + create via /me and /organization
+- [x] Circuit breaker (disables after 5 consecutive failures)
 - [x] Tests for sendWebhook handler
 
-## Cache (apps/api/src/hooks/cache/)
+### Cache ✓
+- [x] Cache invalidation hook (`registerClearCacheHook`)
+- [x] Admin routes for clearing caches
 
-- [x] Wire up `registerClearCacheHook` in app startup (via `registerHooks()`)
-- [x] Admin routes for clearing caches (`POST /api/admin/cache/clear`)
+### DB Hooks ✓
+- [x] mutationLifeCycle extension
+- [x] falsePolymorphism hook
+- [x] immutableFields hook
+- [x] rules hook (declarative validation)
 
-## Events (apps/api/src/events/)
+## Future Work
 
-- [ ] Wire up event handlers in app startup (import `#/events/handlers/websocket`)
+### Events
+- [ ] Wire up WebSocket event handlers
 
-## Testing
-
-- [ ] DB mutation lifecycle tests (registerDbHook, executeHooks)
-- [ ] DB transaction tests (db.txn, db.onCommit, db.isInTxn)
-- [ ] DB scope tests (db.scope, db.getScopeId)
-- [x] Webhook handler tests (sendWebhook with circuit breaker)
-- [x] Webhook route tests (CRUD, create via /me and /organization)
-- [ ] Cache hook tests
-- [ ] Add Playwright for E2E testing
-- [ ] Tests for request templates
-- [ ] Tests for middleware
-
-## Architecture
-
-- [ ] Optional modules system (opt-in features like Stripe, S3, Sentry, etc.)
+### Architecture
+- [ ] Optional modules system (opt-in features like Stripe, S3, Sentry)
 - [ ] I18n package (db + frontend)
 
-## Apps
+### Apps
+- [ ] Build out admin app UI
+- [ ] Build out superadmin app UI
 
-- [ ] Create admin app
-- [ ] Create superadmin app
-
-## Cleanup
-
-- [ ] Review and remove `.tmp` files in apps/api/src/
-- [ ] Review untracked files from git status
-
-## Documentation
-
-- [ ] architecture.md
-- [ ] database.md
-- [ ] api-patterns.md
-- [ ] auth.md
-- [ ] testing.md
-- [ ] deployment.md
+### Testing
+- [ ] Add Playwright for E2E testing
