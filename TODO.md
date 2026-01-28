@@ -47,6 +47,25 @@
 - [ ] Optional modules system (opt-in features like Stripe, S3, Sentry, etc.)
 - [ ] I18n package (db + frontend)
 
+## Developer Experience
+
+- [ ] Init script for new forks (`bun run init`)
+  - Rename packages `@template/*` → `@projectname/*`
+  - Generate secrets (BETTER_AUTH_SECRET, WEBHOOK_SIGNING_KEYS)
+  - Create .env files from .env.*.example
+  - Run db migrations and generate Prisma client
+  - Update CLAUDE.md with project-specific context
+
+## Mutation Lifecycle Hooks
+
+- [ ] Transaction timeout estimation for `updateManyAndReturn`
+  - Auto-wrapped in transaction, but large bulk updates may timeout
+  - Calculate record count in before hook, adjust timeout accordingly
+- [ ] Handle Prisma comparative operators in rules validation
+  - `increment`, `decrement`, `multiply`, `set` operators don't merge properly with previous state
+  - Merged data sees `{ count: { increment: 1 } }` instead of resulting value
+  - Document limitation or add special handling for atomic operations
+
 ## Apps
 
 - [ ] Create admin app
