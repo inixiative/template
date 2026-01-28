@@ -1,13 +1,25 @@
 import { getModelRelations, type ModelName } from '@template/db';
+import { FalsePolymorphismRegistry } from '#/hooks/falsePolymorphism/registry';
 
 type ImmutableFieldsOverride = {
   exclude?: string[];
   include?: string[];
 };
 
+// --- Polymorphism → Immutable Fields Transformer ---
+
+const polymorphismOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {};
+for (const [model, configs] of Object.entries(FalsePolymorphismRegistry)) {
+  const typeFields = (configs ?? []).map((c) => c.typeField);
+  if (typeFields.length) polymorphismOverrides[model as ModelName] = { include: typeFields };
+}
+
+// --- Immutable Fields Registry ---
+
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
-  Token: { include: ['ownerModel'] },
-  WebhookSubscription: { include: ['ownerModel'] },
+  ...polymorphismOverrides,
+  // Add additional overrides here:
+  // User: { exclude: ['updatableFkField'] },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

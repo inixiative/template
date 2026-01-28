@@ -1,9 +1,10 @@
 import { describe, it, expect, afterAll } from 'bun:test';
 import { db } from '@template/db';
 import { createUser, createOrganization, createOrganizationUser, getNextSeq, cleanupTouchedTables } from '@template/db/test';
-import { registerFalsePolymorphismHook } from './hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 
-registerFalsePolymorphismHook();
+// Polymorphism validation is now handled via rules (auto-injected from FalsePolymorphismRegistry)
+registerRulesHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
