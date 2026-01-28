@@ -262,7 +262,7 @@ export type OrganizationUserCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   organization: Prisma.OrganizationCreateNestedOneWithoutOrganizationUsersInput
-  user: Prisma.UserCreateNestedOneWithoutOrganizationsInput
+  user: Prisma.UserCreateNestedOneWithoutOrganizationUsersInput
   tokens?: Prisma.TokenCreateNestedManyWithoutOrganizationUserInput
 }
 
@@ -284,7 +284,7 @@ export type OrganizationUserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInput
-  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationUsersNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutOrganizationUserNestedInput
 }
 
@@ -485,7 +485,7 @@ export type OrganizationUserCreateWithoutOrganizationInput = {
   entitlements?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
-  user: Prisma.UserCreateNestedOneWithoutOrganizationsInput
+  user: Prisma.UserCreateNestedOneWithoutOrganizationUsersInput
   tokens?: Prisma.TokenCreateNestedManyWithoutOrganizationUserInput
 }
 
@@ -545,7 +545,7 @@ export type OrganizationUserCreateWithoutTokensInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   organization: Prisma.OrganizationCreateNestedOneWithoutOrganizationUsersInput
-  user: Prisma.UserCreateNestedOneWithoutOrganizationsInput
+  user: Prisma.UserCreateNestedOneWithoutOrganizationUsersInput
 }
 
 export type OrganizationUserUncheckedCreateWithoutTokensInput = {
@@ -581,7 +581,7 @@ export type OrganizationUserUpdateWithoutTokensInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInput
-  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationUsersNestedInput
 }
 
 export type OrganizationUserUncheckedUpdateWithoutTokensInput = {
@@ -655,7 +655,7 @@ export type OrganizationUserUpdateWithoutOrganizationInput = {
   entitlements?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutOrganizationUsersNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutOrganizationUserNestedInput
 }
 

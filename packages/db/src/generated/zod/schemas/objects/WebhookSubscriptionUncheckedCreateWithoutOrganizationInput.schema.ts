@@ -10,11 +10,10 @@ const makeSchema = () => z.object({
   updatedAt: z.coerce.date().optional(),
   model: WebhookModelSchema,
   url: z.string(),
-  secret: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   ownerModel: WebhookOwnerModelSchema,
   userId: z.string().optional().nullable(),
-  events: z.lazy(() => WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInputObjectSchema).optional()
+  webhookEvents: z.lazy(() => WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInputObjectSchema).optional()
 }).strict();
 export const WebhookSubscriptionUncheckedCreateWithoutOrganizationInputObjectSchema: z.ZodType<Prisma.WebhookSubscriptionUncheckedCreateWithoutOrganizationInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionUncheckedCreateWithoutOrganizationInput>;
 export const WebhookSubscriptionUncheckedCreateWithoutOrganizationInputObjectZodSchema = makeSchema();

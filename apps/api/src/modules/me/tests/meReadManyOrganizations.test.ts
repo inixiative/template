@@ -5,12 +5,9 @@ import { cleanupTouchedTables, createOrganization, createOrganizationUser, creat
 import { meRouter } from '#/modules/me';
 import { meReadManyOrganizationRoute } from '#/modules/me/routes/meReadManyOrganization';
 import { createTestApp } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { get, json } from '#tests/utils/request';
 
-type ReadManyOrgsResponse = {
-  data: z.infer<typeof meReadManyOrganizationRoute.responseSchema>[];
-  pagination: { total: number; page: number; pageSize: number };
-};
+type ReadManyOrgsResponse = z.infer<typeof meReadManyOrganizationRoute.responseSchema>[];
 
 describe('GET /me/organizations', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -35,11 +32,11 @@ describe('GET /me/organizations', () => {
 
   it('returns empty array when user has no organizations', async () => {
     const response = await fetch(get('/api/v1/me/organizations'));
-    expect(response.status).toBe(200);
+    const { data, pagination } = await json<ReadManyOrgsResponse>(response);
 
-    const { data, pagination } = (await response.json()) as ReadManyOrgsResponse;
+    expect(response.status).toBe(200);
     expect(data).toEqual([]);
-    expect(pagination.total).toBe(0);
+    expect(pagination!.total).toBe(0);
   });
 
   it('returns user organizations with membership info', async () => {
@@ -53,14 +50,14 @@ describe('GET /me/organizations', () => {
     );
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    expect(response.status).toBe(200);
+    const { data } = await json<ReadManyOrgsResponse>(response);
 
-    const { data } = (await response.json()) as ReadManyOrgsResponse;
+    expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
-    const membership = data.find((m) => m.organizationId === org.id);
-    expect(membership).toBeDefined();
-    expect(membership!.role).toBe('admin');
-    expect(membership!.organization.name).toBe(org.name);
+    const orgWithMembership = data.find((m) => m.id === org.id);
+    expect(orgWithMembership).toBeDefined();
+    expect(orgWithMembership!.organizationUser.role).toBe('admin');
+    expect(orgWithMembership!.name).toBe(org.name);
   });
 
   it('returns multiple organizations', async () => {
@@ -83,10 +80,10 @@ describe('GET /me/organizations', () => {
     );
 
     const response = await fetch(get('/api/v1/me/organizations'));
-    expect(response.status).toBe(200);
+    const { data, pagination } = await json<ReadManyOrgsResponse>(response);
 
-    const { data, pagination } = (await response.json()) as ReadManyOrgsResponse;
+    expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(2);
-    expect(pagination.total).toBeGreaterThanOrEqual(2);
+    expect(pagination!.total).toBeGreaterThanOrEqual(2);
   });
 });

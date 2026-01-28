@@ -1392,6 +1392,7 @@ export const UserScalarFieldEnum = {
   email: 'email',
   emailVerified: 'emailVerified',
   name: 'name',
+  displayName: 'displayName',
   image: 'image',
   platformRole: 'platformRole'
 } as const
@@ -1431,7 +1432,6 @@ export const WebhookSubscriptionScalarFieldEnum = {
   updatedAt: 'updatedAt',
   model: 'model',
   url: 'url',
-  secret: 'secret',
   isActive: 'isActive',
   ownerModel: 'ownerModel',
   userId: 'userId',

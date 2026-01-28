@@ -30,7 +30,6 @@ export type WebhookSubscriptionMinAggregateOutputType = {
   updatedAt: Date | null
   model: $Enums.WebhookModel | null
   url: string | null
-  secret: string | null
   isActive: boolean | null
   ownerModel: $Enums.WebhookOwnerModel | null
   userId: string | null
@@ -43,7 +42,6 @@ export type WebhookSubscriptionMaxAggregateOutputType = {
   updatedAt: Date | null
   model: $Enums.WebhookModel | null
   url: string | null
-  secret: string | null
   isActive: boolean | null
   ownerModel: $Enums.WebhookOwnerModel | null
   userId: string | null
@@ -56,7 +54,6 @@ export type WebhookSubscriptionCountAggregateOutputType = {
   updatedAt: number
   model: number
   url: number
-  secret: number
   isActive: number
   ownerModel: number
   userId: number
@@ -71,7 +68,6 @@ export type WebhookSubscriptionMinAggregateInputType = {
   updatedAt?: true
   model?: true
   url?: true
-  secret?: true
   isActive?: true
   ownerModel?: true
   userId?: true
@@ -84,7 +80,6 @@ export type WebhookSubscriptionMaxAggregateInputType = {
   updatedAt?: true
   model?: true
   url?: true
-  secret?: true
   isActive?: true
   ownerModel?: true
   userId?: true
@@ -97,7 +92,6 @@ export type WebhookSubscriptionCountAggregateInputType = {
   updatedAt?: true
   model?: true
   url?: true
-  secret?: true
   isActive?: true
   ownerModel?: true
   userId?: true
@@ -183,7 +177,6 @@ export type WebhookSubscriptionGroupByOutputType = {
   updatedAt: Date
   model: $Enums.WebhookModel
   url: string
-  secret: string | null
   isActive: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId: string | null
@@ -217,14 +210,13 @@ export type WebhookSubscriptionWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"WebhookSubscription"> | Date | string
   model?: Prisma.EnumWebhookModelFilter<"WebhookSubscription"> | $Enums.WebhookModel
   url?: Prisma.StringFilter<"WebhookSubscription"> | string
-  secret?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   isActive?: Prisma.BoolFilter<"WebhookSubscription"> | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFilter<"WebhookSubscription"> | $Enums.WebhookOwnerModel
   userId?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   organizationId?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
-  events?: Prisma.WebhookEventListRelationFilter
+  webhookEvents?: Prisma.WebhookEventListRelationFilter
 }
 
 export type WebhookSubscriptionOrderByWithRelationInput = {
@@ -233,14 +225,13 @@ export type WebhookSubscriptionOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   model?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  secret?: Prisma.SortOrderInput | Prisma.SortOrder
   isActive?: Prisma.SortOrder
   ownerModel?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
   organization?: Prisma.OrganizationOrderByWithRelationInput
-  events?: Prisma.WebhookEventOrderByRelationAggregateInput
+  webhookEvents?: Prisma.WebhookEventOrderByRelationAggregateInput
 }
 
 export type WebhookSubscriptionWhereUniqueInput = Prisma.AtLeast<{
@@ -254,14 +245,13 @@ export type WebhookSubscriptionWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"WebhookSubscription"> | Date | string
   model?: Prisma.EnumWebhookModelFilter<"WebhookSubscription"> | $Enums.WebhookModel
   url?: Prisma.StringFilter<"WebhookSubscription"> | string
-  secret?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   isActive?: Prisma.BoolFilter<"WebhookSubscription"> | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFilter<"WebhookSubscription"> | $Enums.WebhookOwnerModel
   userId?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   organizationId?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
-  events?: Prisma.WebhookEventListRelationFilter
+  webhookEvents?: Prisma.WebhookEventListRelationFilter
 }, "id" | "userId_model_url" | "organizationId_model_url">
 
 export type WebhookSubscriptionOrderByWithAggregationInput = {
@@ -270,7 +260,6 @@ export type WebhookSubscriptionOrderByWithAggregationInput = {
   updatedAt?: Prisma.SortOrder
   model?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  secret?: Prisma.SortOrderInput | Prisma.SortOrder
   isActive?: Prisma.SortOrder
   ownerModel?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -289,7 +278,6 @@ export type WebhookSubscriptionScalarWhereWithAggregatesInput = {
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"WebhookSubscription"> | Date | string
   model?: Prisma.EnumWebhookModelWithAggregatesFilter<"WebhookSubscription"> | $Enums.WebhookModel
   url?: Prisma.StringWithAggregatesFilter<"WebhookSubscription"> | string
-  secret?: Prisma.StringNullableWithAggregatesFilter<"WebhookSubscription"> | string | null
   isActive?: Prisma.BoolWithAggregatesFilter<"WebhookSubscription"> | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelWithAggregatesFilter<"WebhookSubscription"> | $Enums.WebhookOwnerModel
   userId?: Prisma.StringNullableWithAggregatesFilter<"WebhookSubscription"> | string | null
@@ -302,12 +290,11 @@ export type WebhookSubscriptionCreateInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   user?: Prisma.UserCreateNestedOneWithoutWebhookSubscriptionsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutWebhookSubscriptionsInput
-  events?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionUncheckedCreateInput = {
@@ -316,12 +303,11 @@ export type WebhookSubscriptionUncheckedCreateInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId?: string | null
   organizationId?: string | null
-  events?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionUpdateInput = {
@@ -330,12 +316,11 @@ export type WebhookSubscriptionUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   user?: Prisma.UserUpdateOneWithoutWebhookSubscriptionsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutWebhookSubscriptionsNestedInput
-  events?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionUncheckedUpdateInput = {
@@ -344,12 +329,11 @@ export type WebhookSubscriptionUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  events?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionCreateManyInput = {
@@ -358,7 +342,6 @@ export type WebhookSubscriptionCreateManyInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId?: string | null
@@ -371,7 +354,6 @@ export type WebhookSubscriptionUpdateManyMutationInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
 }
@@ -382,7 +364,6 @@ export type WebhookSubscriptionUncheckedUpdateManyInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -422,7 +403,6 @@ export type WebhookSubscriptionCountOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   model?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  secret?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   ownerModel?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -435,7 +415,6 @@ export type WebhookSubscriptionMaxOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   model?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  secret?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   ownerModel?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -448,7 +427,6 @@ export type WebhookSubscriptionMinOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
   model?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  secret?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   ownerModel?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -539,18 +517,18 @@ export type WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.WebhookSubscriptionScalarWhereInput | Prisma.WebhookSubscriptionScalarWhereInput[]
 }
 
-export type WebhookSubscriptionCreateNestedOneWithoutEventsInput = {
-  create?: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput>
-  connectOrCreate?: Prisma.WebhookSubscriptionCreateOrConnectWithoutEventsInput
+export type WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInput = {
+  create?: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutWebhookEventsInput>
+  connectOrCreate?: Prisma.WebhookSubscriptionCreateOrConnectWithoutWebhookEventsInput
   connect?: Prisma.WebhookSubscriptionWhereUniqueInput
 }
 
-export type WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInput = {
-  create?: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput>
-  connectOrCreate?: Prisma.WebhookSubscriptionCreateOrConnectWithoutEventsInput
-  upsert?: Prisma.WebhookSubscriptionUpsertWithoutEventsInput
+export type WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutWebhookEventsInput>
+  connectOrCreate?: Prisma.WebhookSubscriptionCreateOrConnectWithoutWebhookEventsInput
+  upsert?: Prisma.WebhookSubscriptionUpsertWithoutWebhookEventsInput
   connect?: Prisma.WebhookSubscriptionWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.WebhookSubscriptionUpdateToOneWithWhereWithoutEventsInput, Prisma.WebhookSubscriptionUpdateWithoutEventsInput>, Prisma.WebhookSubscriptionUncheckedUpdateWithoutEventsInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WebhookSubscriptionUpdateToOneWithWhereWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUpdateWithoutWebhookEventsInput>, Prisma.WebhookSubscriptionUncheckedUpdateWithoutWebhookEventsInput>
 }
 
 export type EnumWebhookModelFieldUpdateOperationsInput = {
@@ -567,11 +545,10 @@ export type WebhookSubscriptionCreateWithoutOrganizationInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   user?: Prisma.UserCreateNestedOneWithoutWebhookSubscriptionsInput
-  events?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionUncheckedCreateWithoutOrganizationInput = {
@@ -580,11 +557,10 @@ export type WebhookSubscriptionUncheckedCreateWithoutOrganizationInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId?: string | null
-  events?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionCreateOrConnectWithoutOrganizationInput = {
@@ -622,7 +598,6 @@ export type WebhookSubscriptionScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"WebhookSubscription"> | Date | string
   model?: Prisma.EnumWebhookModelFilter<"WebhookSubscription"> | $Enums.WebhookModel
   url?: Prisma.StringFilter<"WebhookSubscription"> | string
-  secret?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
   isActive?: Prisma.BoolFilter<"WebhookSubscription"> | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFilter<"WebhookSubscription"> | $Enums.WebhookOwnerModel
   userId?: Prisma.StringNullableFilter<"WebhookSubscription"> | string | null
@@ -635,11 +610,10 @@ export type WebhookSubscriptionCreateWithoutUserInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   organization?: Prisma.OrganizationCreateNestedOneWithoutWebhookSubscriptionsInput
-  events?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionUncheckedCreateWithoutUserInput = {
@@ -648,11 +622,10 @@ export type WebhookSubscriptionUncheckedCreateWithoutUserInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   organizationId?: string | null
-  events?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
+  webhookEvents?: Prisma.WebhookEventUncheckedCreateNestedManyWithoutWebhookSubscriptionInput
 }
 
 export type WebhookSubscriptionCreateOrConnectWithoutUserInput = {
@@ -681,68 +654,64 @@ export type WebhookSubscriptionUpdateManyWithWhereWithoutUserInput = {
   data: Prisma.XOR<Prisma.WebhookSubscriptionUpdateManyMutationInput, Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserInput>
 }
 
-export type WebhookSubscriptionCreateWithoutEventsInput = {
+export type WebhookSubscriptionCreateWithoutWebhookEventsInput = {
   id?: string
   createdAt?: Date | string
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   user?: Prisma.UserCreateNestedOneWithoutWebhookSubscriptionsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutWebhookSubscriptionsInput
 }
 
-export type WebhookSubscriptionUncheckedCreateWithoutEventsInput = {
+export type WebhookSubscriptionUncheckedCreateWithoutWebhookEventsInput = {
   id?: string
   createdAt?: Date | string
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId?: string | null
   organizationId?: string | null
 }
 
-export type WebhookSubscriptionCreateOrConnectWithoutEventsInput = {
+export type WebhookSubscriptionCreateOrConnectWithoutWebhookEventsInput = {
   where: Prisma.WebhookSubscriptionWhereUniqueInput
-  create: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput>
+  create: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutWebhookEventsInput>
 }
 
-export type WebhookSubscriptionUpsertWithoutEventsInput = {
-  update: Prisma.XOR<Prisma.WebhookSubscriptionUpdateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedUpdateWithoutEventsInput>
-  create: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutEventsInput>
+export type WebhookSubscriptionUpsertWithoutWebhookEventsInput = {
+  update: Prisma.XOR<Prisma.WebhookSubscriptionUpdateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedUpdateWithoutWebhookEventsInput>
+  create: Prisma.XOR<Prisma.WebhookSubscriptionCreateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedCreateWithoutWebhookEventsInput>
   where?: Prisma.WebhookSubscriptionWhereInput
 }
 
-export type WebhookSubscriptionUpdateToOneWithWhereWithoutEventsInput = {
+export type WebhookSubscriptionUpdateToOneWithWhereWithoutWebhookEventsInput = {
   where?: Prisma.WebhookSubscriptionWhereInput
-  data: Prisma.XOR<Prisma.WebhookSubscriptionUpdateWithoutEventsInput, Prisma.WebhookSubscriptionUncheckedUpdateWithoutEventsInput>
+  data: Prisma.XOR<Prisma.WebhookSubscriptionUpdateWithoutWebhookEventsInput, Prisma.WebhookSubscriptionUncheckedUpdateWithoutWebhookEventsInput>
 }
 
-export type WebhookSubscriptionUpdateWithoutEventsInput = {
+export type WebhookSubscriptionUpdateWithoutWebhookEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   user?: Prisma.UserUpdateOneWithoutWebhookSubscriptionsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutWebhookSubscriptionsNestedInput
 }
 
-export type WebhookSubscriptionUncheckedUpdateWithoutEventsInput = {
+export type WebhookSubscriptionUncheckedUpdateWithoutWebhookEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -755,7 +724,6 @@ export type WebhookSubscriptionCreateManyOrganizationInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   userId?: string | null
@@ -767,11 +735,10 @@ export type WebhookSubscriptionUpdateWithoutOrganizationInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   user?: Prisma.UserUpdateOneWithoutWebhookSubscriptionsNestedInput
-  events?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionUncheckedUpdateWithoutOrganizationInput = {
@@ -780,11 +747,10 @@ export type WebhookSubscriptionUncheckedUpdateWithoutOrganizationInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  events?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionUncheckedUpdateManyWithoutOrganizationInput = {
@@ -793,7 +759,6 @@ export type WebhookSubscriptionUncheckedUpdateManyWithoutOrganizationInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -805,7 +770,6 @@ export type WebhookSubscriptionCreateManyUserInput = {
   updatedAt?: Date | string
   model: $Enums.WebhookModel
   url: string
-  secret?: string | null
   isActive?: boolean
   ownerModel: $Enums.WebhookOwnerModel
   organizationId?: string | null
@@ -817,11 +781,10 @@ export type WebhookSubscriptionUpdateWithoutUserInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   organization?: Prisma.OrganizationUpdateOneWithoutWebhookSubscriptionsNestedInput
-  events?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionUncheckedUpdateWithoutUserInput = {
@@ -830,11 +793,10 @@ export type WebhookSubscriptionUncheckedUpdateWithoutUserInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  events?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
+  webhookEvents?: Prisma.WebhookEventUncheckedUpdateManyWithoutWebhookSubscriptionNestedInput
 }
 
 export type WebhookSubscriptionUncheckedUpdateManyWithoutUserInput = {
@@ -843,7 +805,6 @@ export type WebhookSubscriptionUncheckedUpdateManyWithoutUserInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   model?: Prisma.EnumWebhookModelFieldUpdateOperationsInput | $Enums.WebhookModel
   url?: Prisma.StringFieldUpdateOperationsInput | string
-  secret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ownerModel?: Prisma.EnumWebhookOwnerModelFieldUpdateOperationsInput | $Enums.WebhookOwnerModel
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -855,11 +816,11 @@ export type WebhookSubscriptionUncheckedUpdateManyWithoutUserInput = {
  */
 
 export type WebhookSubscriptionCountOutputType = {
-  events: number
+  webhookEvents: number
 }
 
 export type WebhookSubscriptionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  events?: boolean | WebhookSubscriptionCountOutputTypeCountEventsArgs
+  webhookEvents?: boolean | WebhookSubscriptionCountOutputTypeCountWebhookEventsArgs
 }
 
 /**
@@ -875,7 +836,7 @@ export type WebhookSubscriptionCountOutputTypeDefaultArgs<ExtArgs extends runtim
 /**
  * WebhookSubscriptionCountOutputType without action
  */
-export type WebhookSubscriptionCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type WebhookSubscriptionCountOutputTypeCountWebhookEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.WebhookEventWhereInput
 }
 
@@ -886,14 +847,13 @@ export type WebhookSubscriptionSelect<ExtArgs extends runtime.Types.Extensions.I
   updatedAt?: boolean
   model?: boolean
   url?: boolean
-  secret?: boolean
   isActive?: boolean
   ownerModel?: boolean
   userId?: boolean
   organizationId?: boolean
   user?: boolean | Prisma.WebhookSubscription$userArgs<ExtArgs>
   organization?: boolean | Prisma.WebhookSubscription$organizationArgs<ExtArgs>
-  events?: boolean | Prisma.WebhookSubscription$eventsArgs<ExtArgs>
+  webhookEvents?: boolean | Prisma.WebhookSubscription$webhookEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WebhookSubscriptionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["webhookSubscription"]>
 
@@ -903,7 +863,6 @@ export type WebhookSubscriptionSelectCreateManyAndReturn<ExtArgs extends runtime
   updatedAt?: boolean
   model?: boolean
   url?: boolean
-  secret?: boolean
   isActive?: boolean
   ownerModel?: boolean
   userId?: boolean
@@ -918,7 +877,6 @@ export type WebhookSubscriptionSelectUpdateManyAndReturn<ExtArgs extends runtime
   updatedAt?: boolean
   model?: boolean
   url?: boolean
-  secret?: boolean
   isActive?: boolean
   ownerModel?: boolean
   userId?: boolean
@@ -933,18 +891,17 @@ export type WebhookSubscriptionSelectScalar = {
   updatedAt?: boolean
   model?: boolean
   url?: boolean
-  secret?: boolean
   isActive?: boolean
   ownerModel?: boolean
   userId?: boolean
   organizationId?: boolean
 }
 
-export type WebhookSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "model" | "url" | "secret" | "isActive" | "ownerModel" | "userId" | "organizationId", ExtArgs["result"]["webhookSubscription"]>
+export type WebhookSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "model" | "url" | "isActive" | "ownerModel" | "userId" | "organizationId", ExtArgs["result"]["webhookSubscription"]>
 export type WebhookSubscriptionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.WebhookSubscription$userArgs<ExtArgs>
   organization?: boolean | Prisma.WebhookSubscription$organizationArgs<ExtArgs>
-  events?: boolean | Prisma.WebhookSubscription$eventsArgs<ExtArgs>
+  webhookEvents?: boolean | Prisma.WebhookSubscription$webhookEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WebhookSubscriptionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WebhookSubscriptionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -961,7 +918,7 @@ export type $WebhookSubscriptionPayload<ExtArgs extends runtime.Types.Extensions
   objects: {
     user: Prisma.$UserPayload<ExtArgs> | null
     organization: Prisma.$OrganizationPayload<ExtArgs> | null
-    events: Prisma.$WebhookEventPayload<ExtArgs>[]
+    webhookEvents: Prisma.$WebhookEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -969,7 +926,6 @@ export type $WebhookSubscriptionPayload<ExtArgs extends runtime.Types.Extensions
     updatedAt: Date
     model: $Enums.WebhookModel
     url: string
-    secret: string | null
     isActive: boolean
     ownerModel: $Enums.WebhookOwnerModel
     userId: string | null
@@ -1370,7 +1326,7 @@ export interface Prisma__WebhookSubscriptionClient<T, Null = never, ExtArgs exte
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.WebhookSubscription$userArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WebhookSubscription$userArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   organization<T extends Prisma.WebhookSubscription$organizationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WebhookSubscription$organizationArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-  events<T extends Prisma.WebhookSubscription$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WebhookSubscription$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebhookEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  webhookEvents<T extends Prisma.WebhookSubscription$webhookEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WebhookSubscription$webhookEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebhookEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1405,7 +1361,6 @@ export interface WebhookSubscriptionFieldRefs {
   readonly updatedAt: Prisma.FieldRef<"WebhookSubscription", 'DateTime'>
   readonly model: Prisma.FieldRef<"WebhookSubscription", 'WebhookModel'>
   readonly url: Prisma.FieldRef<"WebhookSubscription", 'String'>
-  readonly secret: Prisma.FieldRef<"WebhookSubscription", 'String'>
   readonly isActive: Prisma.FieldRef<"WebhookSubscription", 'Boolean'>
   readonly ownerModel: Prisma.FieldRef<"WebhookSubscription", 'WebhookOwnerModel'>
   readonly userId: Prisma.FieldRef<"WebhookSubscription", 'String'>
@@ -1844,9 +1799,9 @@ export type WebhookSubscription$organizationArgs<ExtArgs extends runtime.Types.E
 }
 
 /**
- * WebhookSubscription.events
+ * WebhookSubscription.webhookEvents
  */
-export type WebhookSubscription$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type WebhookSubscription$webhookEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the WebhookEvent
    */

@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
-import { env } from '#/config/env';
+import { registerHooks } from '#/hooks';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
@@ -10,16 +10,20 @@ import { createRedisConnection } from '#/lib/clients/redis';
 import { log } from '#/lib/logger';
 import { onShutdown } from '#/lib/shutdown';
 
+// Register database hooks (cache clear, webhooks)
+registerHooks();
+
 let jobsWorker: Worker | null = null;
 let workerRedis: Redis | null = null;
 
 export const initializeWorker = async (): Promise<void> => {
-  if (env.isTest) {
+  if (process.env.ENVIRONMENT === 'test') {
     log.info('Skipping worker initialization in test environment');
     return;
   }
 
-  workerRedis = createRedisConnection('Worker');
+  // BullMQ Worker needs its own connection (separate from Queue)
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker');
 
   jobsWorker = new Worker(
     'jobs',

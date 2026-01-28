@@ -37,9 +37,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
 
-  if (dedupeKey) {
-    await signalSupersededJobs(dedupeKey);
-  }
+  if (dedupeKey) await signalSupersededJobs(dedupeKey);
 
   const job = await queue.add(
     handlerName,

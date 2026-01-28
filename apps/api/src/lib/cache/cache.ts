@@ -1,6 +1,7 @@
 import { compact } from 'lodash-es';
-import { env } from '#/config/env';
+import { isTest } from '#/config/env';
 import { getRedisClient } from '#/lib/clients/redis';
+import { redisNamespace } from '#/lib/clients/redisNamespaces';
 import { log } from '#/lib/logger';
 
 const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
@@ -9,20 +10,20 @@ const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
  * Build a cache key following the standard pattern.
  *
  * @example
- * cacheKey('User', 'abc-123')                              // User:id:abc-123
- * cacheKey('User', 'foo@example.com', 'email')             // User:email:foo@example.com
- * cacheKey('User', 'abc-123', 'id', ['OrganizationUsers']) // User:id:abc-123:OrganizationUsers
- * cacheKey('Session', 'abc-123', 'userId', [], true)       // Session:userId:abc-123:*
+ * cacheKey('User', 'abc-123')                              // cache:User:id:abc-123
+ * cacheKey('User', 'foo@example.com', 'email')             // cache:User:email:foo@example.com
+ * cacheKey('User', 'abc-123', 'id', ['OrganizationUsers']) // cache:User:id:abc-123:OrganizationUsers
+ * cacheKey('Session', 'abc-123', 'userId', [], true)       // cache:Session:userId:abc-123:*
  */
 export function cacheKey(model: string, value: string, field = 'id', tags: string[] = [], wildcard = false): string {
-  return compact([model, field, value, ...tags, wildcard && '*']).join(':');
+  const prefix = isTest ? `${redisNamespace.cache}:test` : redisNamespace.cache;
+  return compact([prefix, model, field, value, ...tags, wildcard && '*']).join(':');
 }
 
-function validateKey(key: string): string {
+function validateKey(key: string): void {
   if (key.includes('undefined')) {
     throw new Error(`Cache key contains 'undefined': ${key}`);
   }
-  return env.isTest ? `test:${key}` : key;
 }
 
 /**
@@ -45,11 +46,11 @@ function validateKey(key: string): string {
  * ```
  */
 export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> {
-  const cacheKey = validateKey(key);
+  validateKey(key);
 
   try {
     const redis = getRedisClient();
-    const cached = await redis.get(cacheKey);
+    const cached = await redis.get(key);
 
     // Cache hit (including cached null)
     if (cached !== null) {
@@ -61,7 +62,7 @@ export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = 
 
     // Cache everything except undefined
     if (value !== undefined) {
-      await redis.setex(cacheKey, ttl, JSON.stringify(value));
+      await redis.setex(key, ttl, JSON.stringify(value));
     }
 
     return value;
@@ -76,11 +77,11 @@ export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = 
  * Delete a key from cache (for invalidation).
  */
 export async function deleteCache(key: string): Promise<void> {
-  const cacheKey = validateKey(key);
+  validateKey(key);
 
   try {
     const redis = getRedisClient();
-    await redis.del(cacheKey);
+    await redis.del(key);
   } catch (error) {
     log.error(`Cache delete failed for key ${key}:`, error);
   }

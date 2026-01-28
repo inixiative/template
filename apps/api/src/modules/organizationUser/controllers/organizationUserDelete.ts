@@ -1,4 +1,4 @@
-import { OrganizationRole } from '@template/db';
+import { organizationId, OrganizationRole } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { getUser } from '#/lib/context/getUser';
 import { canAssignRole } from '#/lib/permissions/canAssignRole';
@@ -9,9 +9,10 @@ import { organizationUserDeleteRoute } from '#/modules/organizationUser/routes/o
 export const organizationUserDeleteController = makeController(organizationUserDeleteRoute, async (c, respond) => {
   const db = c.get('db');
   const orgUser = getResource<'organizationUser'>(c);
+  const orgId = organizationId(orgUser.organizationId);
 
-  if (getUser(c)?.id !== orgUser.userId) canAssignRole(c.get('permix'), orgUser.organizationId, orgUser.role);
-  if (orgUser.role === OrganizationRole.owner) await checkNotLastOwner(db, orgUser.organizationId);
+  if (getUser(c)?.id !== orgUser.userId) canAssignRole(c.get('permix'), orgId, orgUser.role);
+  if (orgUser.role === OrganizationRole.owner) await checkNotLastOwner(db, orgId);
 
   await db.organizationUser.delete({ where: { id: orgUser.id } });
 

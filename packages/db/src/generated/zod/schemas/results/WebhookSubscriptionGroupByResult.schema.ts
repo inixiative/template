@@ -4,7 +4,6 @@ export const WebhookSubscriptionGroupByResultSchema = z.array(z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   url: z.string(),
-  secret: z.string(),
   isActive: z.boolean(),
   userId: z.string(),
   organizationId: z.string(),
@@ -14,21 +13,19 @@ export const WebhookSubscriptionGroupByResultSchema = z.array(z.object({
     updatedAt: z.number(),
     model: z.number(),
     url: z.number(),
-    secret: z.number(),
     isActive: z.number(),
     ownerModel: z.number(),
     userId: z.number(),
     organizationId: z.number(),
     user: z.number(),
     organization: z.number(),
-    events: z.number()
+    webhookEvents: z.number()
   }).optional(),
   _min: z.object({
     id: z.string().nullable(),
     createdAt: z.date().nullable(),
     updatedAt: z.date().nullable(),
     url: z.string().nullable(),
-    secret: z.string().nullable(),
     userId: z.string().nullable(),
     organizationId: z.string().nullable()
   }).nullable().optional(),
@@ -37,7 +34,6 @@ export const WebhookSubscriptionGroupByResultSchema = z.array(z.object({
     createdAt: z.date().nullable(),
     updatedAt: z.date().nullable(),
     url: z.string().nullable(),
-    secret: z.string().nullable(),
     userId: z.string().nullable(),
     organizationId: z.string().nullable()
   }).nullable().optional()

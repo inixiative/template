@@ -7,5 +7,5 @@ export const meReadRoute = readRoute({
   model: Modules.me,
   skipId: true,
   responseSchema: UserScalarSchema,
-  tags: [Tags.User],
+  tags: [Tags.me, Tags.user],
 });

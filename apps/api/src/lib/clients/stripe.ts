@@ -8,29 +8,27 @@
  * - STRIPE_WEBHOOK_SECRET (for webhook verification)
  */
 
-import { env } from '#/config/env';
-
 // Lazy-loaded client
-let _stripeClient: Awaited<ReturnType<typeof createStripeClient>> | null = null;
+let __stripeClient: Awaited<ReturnType<typeof createStripeClient>> | null = null;
 
-export async function createStripeClient() {
+export const createStripeClient = async () => {
   const Stripe = (await import('stripe')).default;
 
-  return new Stripe(env.STRIPE_SECRET_KEY!, {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2024-12-18.acacia',
     typescript: true,
   });
-}
+};
 
-export async function getStripeClient() {
-  if (!_stripeClient) {
-    if (!env.STRIPE_SECRET_KEY) {
+export const getStripeClient = async () => {
+  if (!__stripeClient) {
+    if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error('STRIPE_SECRET_KEY not configured');
     }
-    _stripeClient = await createStripeClient();
+    __stripeClient = await createStripeClient();
   }
-  return _stripeClient;
-}
+  return __stripeClient;
+};
 
 // Re-export types
 export type { Stripe } from 'stripe';

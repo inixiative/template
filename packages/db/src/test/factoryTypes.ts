@@ -19,6 +19,12 @@ export type BuildResult<K extends ModelName> = {
   context: BuildContext;
 };
 
+// Typed result - extends BuildContext with guaranteed dependencies
+export type TypedBuildResult<K extends ModelName, Deps extends ModelName[]> = {
+  entity: ModelOf<K>;
+  context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
+};
+
 export type DependencyConfig = {
   modelName: ModelName;
   foreignKey: string | string[];

@@ -8,14 +8,13 @@ export const WebhookSubscriptionResultSchema = z.object({
     updatedAt: z.date(),
     model: WebhookModelSchema,
     url: z.string(),
-    secret: z.string().nullable(),
     isActive: z.boolean(),
     ownerModel: WebhookOwnerModelSchema,
     userId: z.string().nullable(),
     organizationId: z.string().nullable(),
     user: z.unknown().nullable(),
     organization: z.unknown().nullable(),
-    events: z.array(z.unknown())
+    webhookEvents: z.array(z.unknown())
 }).strict();
 
 export type WebhookSubscriptionResultType = z.infer<typeof WebhookSubscriptionResultSchema>;

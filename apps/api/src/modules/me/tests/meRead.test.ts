@@ -4,9 +4,9 @@ import { buildUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { meReadRoute } from '#/modules/me/routes/meRead';
 import { createTestApp } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { get, json } from '#tests/utils/request';
 
-type MeReadResponse = { data: z.infer<typeof meReadRoute.responseSchema> };
+type MeReadResponse = z.infer<typeof meReadRoute.responseSchema>;
 
 describe('GET /me', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -25,9 +25,9 @@ describe('GET /me', () => {
 
   it('returns current user', async () => {
     const response = await fetch(get('/api/v1/me'));
-    expect(response.status).toBe(200);
+    const { data } = await json<MeReadResponse>(response);
 
-    const { data } = (await response.json()) as MeReadResponse;
+    expect(response.status).toBe(200);
     expect(data.id).toBe(mockUser.id);
     expect(data.email).toBe(mockUser.email);
   });

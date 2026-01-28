@@ -14,9 +14,9 @@ export const registerTestTracker = () => {
 
   const allMutations = [
     DbAction.create,
-    DbAction.createMany,
+    DbAction.createManyAndReturn,
     DbAction.update,
-    DbAction.updateMany,
+    DbAction.updateManyAndReturn,
     DbAction.upsert,
     DbAction.delete,
     DbAction.deleteMany,
@@ -44,7 +44,7 @@ export const getTouchedTables = (): ReadonlySet<string> => touchedTables;
  *
  * @example
  * ```typescript
- * afterEach(async () => {
+ * afterAll(async () => {
  *   await cleanupTouchedTables(db);
  * });
  * ```

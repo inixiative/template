@@ -5,9 +5,9 @@ import { cleanupTouchedTables, createOrganization, createOrganizationUser, creat
 import { organizationRouter } from '#/modules/organization';
 import { organizationReadRoute } from '#/modules/organization/routes/organizationRead';
 import { createTestApp } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { get, json } from '#tests/utils/request';
 
-type ReadOrgResponse = { data: z.infer<typeof organizationReadRoute.responseSchema> };
+type ReadOrgResponse = z.infer<typeof organizationReadRoute.responseSchema>;
 
 describe('GET /api/v1/organization/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -41,9 +41,9 @@ describe('GET /api/v1/organization/:id', () => {
 
   it('returns the organization', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
-    expect(response.status).toBe(200);
+    const { data } = await json<ReadOrgResponse>(response);
 
-    const { data } = (await response.json()) as ReadOrgResponse;
+    expect(response.status).toBe(200);
     expect(data.id).toBe(org.id);
     expect(data.name).toBe(org.name);
   });

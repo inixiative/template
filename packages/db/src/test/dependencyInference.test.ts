@@ -31,35 +31,30 @@ describe('inferDependencies', () => {
       expect(deps.organization.modelName).toBe('Organization');
     });
 
-    it('Token - no dependencies (all optional for fake polymorphism)', () => {
+    it('Token - optional dependencies for fake polymorphism', () => {
       const deps = inferDependencies('Token');
-      // All relations are optional (fake polymorphism pattern)
-      expect(deps.user).toBeUndefined();
-      expect(deps.organization).toBeUndefined();
-      expect(deps.organizationUser).toBeUndefined();
-      expect(Object.keys(deps).length).toBe(0);
+      // user and organization are optional (fake polymorphism pattern)
+      expect(deps.user?.required).toBe(false);
+      expect(deps.organization?.required).toBe(false);
     });
   });
 
   describe('models with optional relations (fake polymorphism)', () => {
-    it('Inquiry - no dependencies (optional fake polymorphism)', () => {
+    it('Inquiry - optional dependencies for fake polymorphism', () => {
       const deps = inferDependencies('Inquiry');
       // All source/target relations are optional
-      expect(deps.sourceUser).toBeUndefined();
-      expect(deps.targetUser).toBeUndefined();
-      expect(deps.sourceOrganization).toBeUndefined();
-      expect(deps.targetOrganization).toBeUndefined();
-      expect(Object.keys(deps).length).toBe(0);
+      expect(deps.sourceUser?.required).toBe(false);
+      expect(deps.targetUser?.required).toBe(false);
+      expect(deps.sourceOrganization?.required).toBe(false);
+      expect(deps.targetOrganization?.required).toBe(false);
     });
 
-    it('WebhookSubscription - no dependencies (optional fake polymorphism)', () => {
+    it('WebhookSubscription - optional dependencies for fake polymorphism', () => {
       const deps = inferDependencies('WebhookSubscription');
       // user and organization are optional
-      expect(deps.user).toBeUndefined();
-      expect(deps.organization).toBeUndefined();
-      expect(Object.keys(deps).length).toBe(0);
+      expect(deps.user?.required).toBe(false);
+      expect(deps.organization?.required).toBe(false);
     });
-
   });
 
   describe('models with required relations', () => {

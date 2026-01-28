@@ -10,32 +10,30 @@
  * - S3_BUCKET_NAME
  */
 
-import { env } from '#/config/env';
-
 // Lazy-loaded client (only initialize when needed)
-let _s3Client: Awaited<ReturnType<typeof createS3Client>> | null = null;
+let __s3Client: Awaited<ReturnType<typeof createS3Client>> | null = null;
 
-export async function createS3Client() {
+export const createS3Client = async () => {
   const { S3Client } = await import('@aws-sdk/client-s3');
 
   return new S3Client({
-    region: env.AWS_REGION,
+    region: process.env.AWS_REGION,
     credentials: {
-      accessKeyId: env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
     },
   });
-}
+};
 
-export async function getS3Client() {
-  if (!_s3Client) {
-    if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
+export const getS3Client = async () => {
+  if (!__s3Client) {
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
       throw new Error('AWS credentials not configured');
     }
-    _s3Client = await createS3Client();
+    __s3Client = await createS3Client();
   }
-  return _s3Client;
-}
+  return __s3Client;
+};
 
 // Re-export types for convenience
 export type { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';

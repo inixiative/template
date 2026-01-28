@@ -1,33 +1,18 @@
 import type { Context } from 'hono';
-import { env } from '#/config/env';
 import type { AppEnv } from '#/types/appEnv';
 
-export function respond500(c: Context<AppEnv>, error?: unknown) {
+export const respond500 = (c: Context<AppEnv>, error?: unknown) => {
   c.header('Cache-Control', 'no-store');
 
-  // Show full error details in non-production environments for debugging
-  const showDetails = env.ENVIRONMENT !== 'production';
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
 
-  if (showDetails && error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: errorMessage,
-        stack: errorStack,
-      },
-      500,
-    );
-  }
-
-  // Production: hide error details
   return c.json(
     {
       error: 'Internal Server Error',
-      message: 'Something went wrong',
+      message: errorMessage,
+      stack: errorStack,
     },
     500,
   );
-}
+};

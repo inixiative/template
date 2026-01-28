@@ -8,14 +8,13 @@ export const WebhookSubscriptionInputSchema = z.object({
     updatedAt: z.date(),
     model: WebhookModelSchema,
     url: z.string(),
-    secret: z.string().optional().nullable(),
     isActive: z.boolean(),
     ownerModel: WebhookOwnerModelSchema,
     userId: z.string().optional().nullable(),
     organizationId: z.string().optional().nullable(),
     user: z.unknown().optional().nullable(),
     organization: z.unknown().optional().nullable(),
-    events: z.array(z.unknown())
+    webhookEvents: z.array(z.unknown())
 }).strict();
 
 export type WebhookSubscriptionInputType = z.infer<typeof WebhookSubscriptionInputSchema>;

@@ -5,12 +5,9 @@ import { cleanupTouchedTables, createOrganization, createToken, createUser } fro
 import { meRouter } from '#/modules/me';
 import { meReadManyTokenRoute } from '#/modules/me/routes/meReadManyToken';
 import { createTestApp } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { get, json } from '#tests/utils/request';
 
-type ReadManyTokensResponse = {
-  data: z.infer<typeof meReadManyTokenRoute.responseSchema>[];
-  pagination: { total: number; page: number; pageSize: number };
-};
+type ReadManyTokensResponse = z.infer<typeof meReadManyTokenRoute.responseSchema>[];
 
 describe('GET /me/tokens', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -39,11 +36,11 @@ describe('GET /me/tokens', () => {
 
   it('returns empty array when user has no tokens', async () => {
     const response = await fetch(get('/api/v1/me/tokens'));
-    expect(response.status).toBe(200);
+    const { data, pagination } = await json<ReadManyTokensResponse>(response);
 
-    const { data, pagination } = (await response.json()) as ReadManyTokensResponse;
+    expect(response.status).toBe(200);
     expect(data).toEqual([]);
-    expect(pagination.total).toBe(0);
+    expect(pagination!.total).toBe(0);
   });
 
   it('returns user-owned tokens', async () => {
@@ -56,9 +53,9 @@ describe('GET /me/tokens', () => {
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    expect(response.status).toBe(200);
+    const { data } = await json<ReadManyTokensResponse>(response);
 
-    const { data } = (await response.json()) as ReadManyTokensResponse;
+    expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThanOrEqual(1);
     expect(data.some((t) => t.name === 'User Token')).toBe(true);
   });
@@ -73,15 +70,15 @@ describe('GET /me/tokens', () => {
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
-    expect(response.status).toBe(200);
+    const { data } = await json<ReadManyTokensResponse>(response);
 
-    const { data } = (await response.json()) as ReadManyTokensResponse;
+    expect(response.status).toBe(200);
     expect(data.every((t) => t.ownerModel === 'User')).toBe(true);
   });
 
   it('omits keyHash from response', async () => {
     const response = await fetch(get('/api/v1/me/tokens'));
-    const { data } = (await response.json()) as ReadManyTokensResponse;
+    const { data } = await json<ReadManyTokensResponse>(response);
 
     if (data.length > 0) {
       expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();

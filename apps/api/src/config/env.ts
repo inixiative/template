@@ -1,61 +1,73 @@
-/**
- * Environment configuration with validation.
- *
- * Note: Empty strings from Docker/CI are treated as undefined.
- */
-const getEnv = () => {
-  // Helper to convert empty strings to undefined
-  const str = (val: string | undefined) => (val === '' ? undefined : val);
+import { z } from 'zod';
 
-  const NODE_ENV = process.env.NODE_ENV || 'development';
-  const ENVIRONMENT = process.env.ENVIRONMENT || 'local';
+// Helpers (evaluated before validation for use in skip logic)
+export const isTest = process.env.ENVIRONMENT === 'test';
+export const isLocal = process.env.ENVIRONMENT === 'local';
+export const isDev = process.env.ENVIRONMENT === 'develop';
+export const isProd = process.env.ENVIRONMENT === 'production';
 
-  return {
-    // Core
-    NODE_ENV,
-    ENVIRONMENT,
-    PORT: Number(process.env.PORT) || 8000,
-    DATABASE_URL: process.env.DATABASE_URL || '',
-    REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-
-    // Auth (BetterAuth)
-    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || 'dev-secret-change-in-production',
-    API_URL: process.env.API_URL || 'http://localhost:8000',
-    GOOGLE_CLIENT_ID: str(process.env.GOOGLE_CLIENT_ID),
-    GOOGLE_CLIENT_SECRET: str(process.env.GOOGLE_CLIENT_SECRET),
-
-    // Sentry (optional)
-    SENTRY_DSN: str(process.env.SENTRY_DSN),
-
-    // AWS S3 (optional - for document storage)
-    AWS_REGION: str(process.env.AWS_REGION),
-    AWS_ACCESS_KEY_ID: str(process.env.AWS_ACCESS_KEY_ID),
-    AWS_SECRET_ACCESS_KEY: str(process.env.AWS_SECRET_ACCESS_KEY),
-    S3_BUCKET_NAME: str(process.env.S3_BUCKET_NAME),
-    CLOUDFRONT_URL: str(process.env.CLOUDFRONT_URL), // CDN for uploaded files
-
-    // Stripe (optional - for fiat payments)
-    STRIPE_SECRET_KEY: str(process.env.STRIPE_SECRET_KEY),
-    STRIPE_WEBHOOK_SECRET: str(process.env.STRIPE_WEBHOOK_SECRET),
-
-    // BullBoard Admin (optional - basic auth for job queue dashboard)
-    BULL_BOARD_USERNAME: str(process.env.BULL_BOARD_USERNAME),
-    BULL_BOARD_PASSWORD: str(process.env.BULL_BOARD_PASSWORD),
-
-    // Logging (optional - defaults to 'info')
-    // Levels: fatal, error, warn, log, info, success, debug, trace, verbose
-    LOG_LEVEL: str(process.env.LOG_LEVEL) || 'info',
-
-    // OpenTelemetry / BetterStack (optional - set via OTEL_* env vars)
-    // OTEL_EXPORTER_OTLP_ENDPOINT - set automatically
-    // OTEL_EXPORTER_OTLP_HEADERS - set automatically
-    // OTEL_SERVICE_NAME - defaults to 'inixiative-api'
-
-    // Helpers
-    isDev: NODE_ENV === 'development',
-    isProd: NODE_ENV === 'production',
-    isTest: NODE_ENV === 'test',
-  };
+const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
+  return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
 };
 
-export const env = getEnv();
+const envSchema = z.object({
+  // Core (required)
+  ENVIRONMENT: z.enum(['local', 'develop', 'staging', 'production', 'test']),
+  DATABASE_URL: z.string(),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  REDIS_URL: z.string(),
+
+  // Core (defaults)
+  PORT: z.coerce.number().default(8000),
+  LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']).optional(),
+
+  // URLs
+  API_URL: z.string(),
+  WEB_URL: z.string(),
+  ADMIN_URL: z.string().optional(),
+  SUPERADMIN_URL: z.string().optional(),
+
+  // Auth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // Webhooks (required)
+  WEBHOOK_SIGNING_PRIVATE_KEY: z.string(),
+  WEBHOOK_SIGNING_PUBLIC_KEY: z.string(),
+
+  // Sentry (optional integration)
+  SENTRY_ENABLED: z.coerce.boolean().default(false),
+  SENTRY_DSN: z.string().optional(),
+
+  // OTEL (optional integration)
+  OTEL_ENABLED: z.coerce.boolean().default(false),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().optional(),
+
+  // BullBoard
+  BULL_BOARD_USERNAME: z.string().optional(),
+  BULL_BOARD_PASSWORD: z.string().optional(),
+
+  // AWS S3 (optional integration)
+  AWS_REGION: z.string().optional(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_BUCKET_NAME: z.string().optional(),
+  CLOUDFRONT_URL: z.string().optional(),
+
+  // Stripe (optional integration)
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+});
+
+// Extend ProcessEnv with our schema types
+export type Env = z.infer<typeof envSchema>;
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv extends Env {}
+  }
+}
+
+// Validate and assign - throws if invalid (skip in test mode)
+if (!isTest) process.env = envSchema.parse(preprocessEnv(process.env)) as unknown as NodeJS.ProcessEnv;

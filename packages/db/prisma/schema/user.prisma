@@ -11,6 +11,7 @@ model User {
   email         String   @unique
   emailVerified Boolean  @default(false)
   name          String?
+  displayName   String?
   image         String?
 
   // Platform-level role (for superadmin access)
@@ -19,7 +20,7 @@ model User {
   // Relations
   accounts             Account[]
   sessions             Session[]
-  organizations        OrganizationUser[]
+  organizationUsers    OrganizationUser[]
   tokens               Token[]
   cronJobsCreated      CronJob[]
   webhookSubscriptions WebhookSubscription[]
@@ -27,6 +28,10 @@ model User {
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
 
   @@index([email])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum PlatformRole {

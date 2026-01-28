@@ -27,5 +27,14 @@ sync_env() {
   done < "$example_file"
 }
 
-sync_env ".env.local" ".env.example"
+# Root env files
+sync_env ".env.local" ".env.local.example"
 sync_env ".env.test" ".env.test.example"
+
+# App env files
+for app in api web admin superadmin; do
+  app_dir="apps/$app"
+  [ -d "$app_dir" ] || continue
+  sync_env "$app_dir/.env.local" "$app_dir/.env.local.example"
+  sync_env "$app_dir/.env.test" "$app_dir/.env.test.example"
+done

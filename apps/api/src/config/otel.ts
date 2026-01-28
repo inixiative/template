@@ -1,4 +1,4 @@
-import { env } from '#/config/env';
+import { isLocal, isTest } from '#/config/env';
 import { log } from '#/lib/logger';
 
 /**
@@ -14,7 +14,7 @@ import { log } from '#/lib/logger';
  */
 export async function initializeOpenTelemetry() {
   // Skip in local/test environments
-  if (env.ENVIRONMENT === 'local' || env.ENVIRONMENT === 'test') {
+  if (isLocal || isTest) {
     log.info('⏭️  Skipping OpenTelemetry initialization (local/test environment)');
     return;
   }

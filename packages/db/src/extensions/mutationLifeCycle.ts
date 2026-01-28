@@ -1,11 +1,12 @@
+import { lowerFirst } from 'lodash-es';
 import { Prisma } from '@template/db/generated/client/client';
 import { db } from '@template/db/client';
 
 export enum DbAction {
   create = 'create',
-  createMany = 'createMany',
+  createManyAndReturn = 'createManyAndReturn',
   update = 'update',
-  updateMany = 'updateMany',
+  updateManyAndReturn = 'updateManyAndReturn',
   delete = 'delete',
   deleteMany = 'deleteMany',
   upsert = 'upsert',
@@ -22,9 +23,8 @@ export type HookOptions = {
   action: DbAction;
   args: unknown;
   result?: unknown;
-  before?: Record<string, unknown>;
+  previous?: Record<string, unknown>;
   requestId?: string | null;
-  inTransaction?: boolean;
 };
 
 export type HookFunction = (options: HookOptions) => Promise<void>;
@@ -41,13 +41,11 @@ const hookRegistry = new Set<string>();
 
 const validateHookRegistration = (timing: HookTiming, actions: DbAction[]) => {
   if (timing === HookTiming.after) {
-    const manyOperations = [DbAction.createMany, DbAction.updateMany, DbAction.deleteMany];
-    const invalidActions = actions.filter((action) => manyOperations.includes(action));
-
-    if (invalidActions.length) {
+    // deleteMany is the only "many" operation that doesn't return records
+    // createManyAndReturn and updateManyAndReturn return records, so after hooks work
+    if (actions.includes(DbAction.deleteMany)) {
       throw new Error(
-        `After hooks are not supported for Many operations (${invalidActions.join(', ')}). ` +
-          'Many operations only return counts, not the actual records. Use Before hooks instead.',
+        'After hooks are not supported for deleteMany (only returns count). Use Before hooks instead.',
       );
     }
   }
@@ -92,48 +90,27 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
   }
 };
 
-const logMutation = (hookOptions: HookOptions, enableLogging: boolean) => {
-  if (!enableLogging) return;
-
-  console.log(
-    JSON.stringify(
-      {
-        level: 'info',
-        msg: 'Prisma mutation',
-        mutation: {
-          model: hookOptions.model,
-          operation: hookOptions.operation,
-          action: hookOptions.action,
-          args: hookOptions.args,
-          requestId: hookOptions.requestId,
-          inTransaction: hookOptions.inTransaction,
-        },
-      },
-      (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
-    ),
-  );
-};
-
 const enrichHookOptions = (options: HookOptions): HookOptions => ({
   ...options,
   requestId: db.getScopeId(),
-  inTransaction: db.isInTxn(),
 });
 
-type MutationLifeCycleOptions = {
-  enableLogging?: boolean;
+const fetchExistingRecord = async (
+  model: Prisma.ModelName,
+  where: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> => {
+  const accessor = lowerFirst(model) as keyof typeof db.raw;
+  const delegate = db.raw[accessor] as { findUnique: Function };
+  return delegate.findUnique({ where });
 };
 
-export const mutationLifeCycleExtension = (options?: MutationLifeCycleOptions) => {
-  const { enableLogging = false } = options || {};
-
-  return Prisma.defineExtension({
+export const mutationLifeCycleExtension = () =>
+  Prisma.defineExtension({
     name: 'mutationLifeCycle',
     query: {
       $allModels: {
         async create({ model, operation, args, query }) {
           const hookOptions = enrichHookOptions({ model, operation, action: DbAction.create, args });
-          logMutation(hookOptions, enableLogging);
           await executeHooks(HookTiming.before, hookOptions);
           const result = await query(args);
           hookOptions.result = result;
@@ -141,16 +118,26 @@ export const mutationLifeCycleExtension = (options?: MutationLifeCycleOptions) =
           return result;
         },
 
-        async createMany({ model, operation, args, query }) {
-          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.createMany, args });
-          logMutation(hookOptions, enableLogging);
+        async createMany({ model }) {
+          throw new Error(
+            `createMany is not supported - use createManyAndReturn instead for ${model}. ` +
+              'This ensures hooks (webhooks, cache, validation) work correctly.',
+          );
+        },
+
+        async createManyAndReturn({ model, operation, args, query }) {
+          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.createManyAndReturn, args });
           await executeHooks(HookTiming.before, hookOptions);
-          return query(args);
+          const result = await query(args);
+          hookOptions.result = result;
+          await executeHooks(HookTiming.after, hookOptions);
+          return result;
         },
 
         async update({ model, operation, args, query }) {
-          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.update, args });
-          logMutation(hookOptions, enableLogging);
+          const { where } = args as { where: Record<string, unknown> };
+          const previous = (await fetchExistingRecord(model, where)) ?? undefined;
+          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.update, args, previous });
           await executeHooks(HookTiming.before, hookOptions);
           const result = await query(args);
           hookOptions.result = result;
@@ -158,16 +145,30 @@ export const mutationLifeCycleExtension = (options?: MutationLifeCycleOptions) =
           return result;
         },
 
-        async updateMany({ model, operation, args, query }) {
-          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.updateMany, args });
-          logMutation(hookOptions, enableLogging);
-          await executeHooks(HookTiming.before, hookOptions);
-          return query(args);
+        async updateMany({ model }) {
+          throw new Error(
+            `updateMany is not supported - use updateManyAndReturn instead for ${model}. ` +
+              'This ensures hooks (webhooks, cache, validation) work correctly.',
+          );
+        },
+
+        async updateManyAndReturn({ model, operation, args, query }) {
+          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.updateManyAndReturn, args });
+
+          // Wrap in transaction so after-hook validation failures can rollback
+          return db.txn(async () => {
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async upsert({ model, operation, args, query }) {
-          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.upsert, args });
-          logMutation(hookOptions, enableLogging);
+          const { where } = args as { where: Record<string, unknown> };
+          const previous = (await fetchExistingRecord(model, where)) ?? undefined;
+          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.upsert, args, previous });
           await executeHooks(HookTiming.before, hookOptions);
           const result = await query(args);
           hookOptions.result = result;
@@ -176,8 +177,9 @@ export const mutationLifeCycleExtension = (options?: MutationLifeCycleOptions) =
         },
 
         async delete({ model, operation, args, query }) {
-          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.delete, args });
-          logMutation(hookOptions, enableLogging);
+          const { where } = args as { where: Record<string, unknown> };
+          const previous = (await fetchExistingRecord(model, where)) ?? undefined;
+          const hookOptions = enrichHookOptions({ model, operation, action: DbAction.delete, args, previous });
           await executeHooks(HookTiming.before, hookOptions);
           const result = await query(args);
           hookOptions.result = result;
@@ -187,11 +189,9 @@ export const mutationLifeCycleExtension = (options?: MutationLifeCycleOptions) =
 
         async deleteMany({ model, operation, args, query }) {
           const hookOptions = enrichHookOptions({ model, operation, action: DbAction.deleteMany, args });
-          logMutation(hookOptions, enableLogging);
           await executeHooks(HookTiming.before, hookOptions);
           return query(args);
         },
       },
     },
   });
-};

@@ -29,7 +29,7 @@ export async function findUserWithOrganizationUsers(
 ): Promise<UserWithOrganizationUsers | null> {
   return cache<UserWithOrganizationUsers | null>(
     cacheKey('User', userId, 'id', ['OrganizationUsers']),
-    () =>
+    async () =>
       db.user.findUnique({
         where: { id: userId },
         include: {
@@ -37,7 +37,7 @@ export async function findUserWithOrganizationUsers(
             where: { organization: { deletedAt: null } },
           },
         },
-      }),
+      }) as Promise<UserWithOrganizationUsers | null>,
     USER_CACHE_TTL,
   );
 }

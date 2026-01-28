@@ -1,13 +1,10 @@
+import { Modules } from '#/modules/modules';
+
 export const Tags = {
-  Account: 'Account',
-  CronJob: 'CronJob',
-  Inquiry: 'Inquiry',
-  Organization: 'Organization',
-  OrganizationUser: 'OrganizationUser',
-  Session: 'Session',
-  Token: 'Token',
-  User: 'User',
-  Verification: 'Verification',
-  WebhookEvent: 'WebhookEvent',
-  WebhookSubscription: 'WebhookSubscription',
+  ...Modules,
+  // Integrations
+  // s3: 's3',
+  // stripe: 'stripe',
 } as const;
+
+export type Tag = (typeof Tags)[keyof typeof Tags];

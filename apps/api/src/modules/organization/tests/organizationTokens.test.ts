@@ -12,13 +12,10 @@ import { organizationRouter } from '#/modules/organization';
 import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
 import { organizationReadManyTokenRoute } from '#/modules/organization/routes/organizationReadManyToken';
 import { createTestApp } from '#tests/createTestApp';
-import { get, post } from '#tests/utils/request';
+import { get, json, post } from '#tests/utils/request';
 
-type CreateTokenResponse = { data: z.infer<typeof organizationCreateTokenRoute.responseSchema> };
-type ReadManyTokensResponse = {
-  data: z.infer<typeof organizationReadManyTokenRoute.responseSchema>[];
-  pagination: { total: number; page: number; pageSize: number };
-};
+type CreateTokenResponse = z.infer<typeof organizationCreateTokenRoute.responseSchema>;
+type ReadManyTokensResponse = z.infer<typeof organizationReadManyTokenRoute.responseSchema>[];
 
 describe('Organizations Tokens', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -53,9 +50,9 @@ describe('Organizations Tokens', () => {
   describe('POST /api/v1/organization/:id/tokens', () => {
     it('creates a token and returns raw key', async () => {
       const response = await fetch(post(`/api/v1/organization/${org.id}/tokens`, { name: 'Org API Key', role: 'admin' }));
-      expect(response.status).toBe(201);
+      const { data } = await json<CreateTokenResponse>(response);
 
-      const { data } = (await response.json()) as CreateTokenResponse;
+      expect(response.status).toBe(201);
       expect(data.name).toBe('Org API Key');
       expect(data.ownerModel).toBe('Organization');
       expect(data.organizationId).toBe(org.id);
@@ -69,9 +66,9 @@ describe('Organizations Tokens', () => {
       await createToken({ name: 'Listed Token', ownerModel: TokenOwnerModel.Organization }, { Organization: org });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/tokens`));
-      expect(response.status).toBe(200);
+      const { data } = await json<ReadManyTokensResponse>(response);
 
-      const { data } = (await response.json()) as ReadManyTokensResponse;
+      expect(response.status).toBe(200);
       expect(data.length).toBeGreaterThanOrEqual(1);
       expect((data[0] as Record<string, unknown>).keyHash).toBeUndefined();
       expect(data[0].keyPrefix).toBeDefined();

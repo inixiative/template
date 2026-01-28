@@ -2,7 +2,8 @@ import { Queue } from 'bullmq';
 import type { JobsQueue } from '#/jobs/types';
 import { createRedisConnection } from '#/lib/clients/redis';
 
-const redis = createRedisConnection('Queue');
+// BullMQ Queue needs its own connection (separate from Worker)
+const redis = createRedisConnection('Redis:BullMQ:Queue');
 
 const baseQueue = new Queue('jobs', {
   connection: redis,

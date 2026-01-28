@@ -1,45 +1,52 @@
+import type { WebhookModel } from '@template/db';
 import { isEqual, omit } from 'lodash-es';
-import { WEBHOOK_ENABLED_MODELS } from '#/hooks/webhooks/constants/enabledModels';
-import { IGNORED_TRACKING_FIELDS } from '#/hooks/webhooks/constants/ignoredFields';
-import { WEBHOOK_RELATED_MODELS } from '#/hooks/webhooks/constants/relatedModels';
-import { WEBHOOK_SUBSCRIBERS } from '#/hooks/webhooks/constants/subscribers';
+import { webhookEnabledModels } from '#/hooks/webhooks/constants/enabledModels';
+import { webhookIgnoredFields } from '#/hooks/webhooks/constants/ignoredFields';
+import { webhookModelSubscribers } from '#/hooks/webhooks/constants/ownerAllowedModels';
+import { webhookRelatedModels } from '#/hooks/webhooks/constants/relatedModels';
 
-const enabledModelsSet = new Set(WEBHOOK_ENABLED_MODELS);
+let __enabledModelsSet = new Set<WebhookModel>(webhookEnabledModels);
 
-export function isWebhookEnabled(model: string): boolean {
-  return enabledModelsSet.has(model);
-}
+export const isWebhookEnabled = (model: string): boolean => {
+  return __enabledModelsSet.has(model as WebhookModel);
+};
 
-export function getParentWebhookModel(model: string): string | null {
-  return WEBHOOK_RELATED_MODELS[model] ?? null;
-}
+// Testing helpers
+export const setWebhookEnabledModels = (models: WebhookModel[]): void => {
+  __enabledModelsSet = new Set(models);
+};
 
-export function getIgnoredFields(model: string): string[] {
-  const global = IGNORED_TRACKING_FIELDS._global ?? [];
-  const modelSpecific = IGNORED_TRACKING_FIELDS[model] ?? [];
+export const resetWebhookEnabledModels = (): void => {
+  __enabledModelsSet = new Set(webhookEnabledModels);
+};
+
+export const getParentWebhookModel = (model: string): string | null => {
+  return webhookRelatedModels[model] ?? null;
+};
+
+export const getIgnoredFields = (model: string): string[] => {
+  const global = webhookIgnoredFields._global ?? [];
+  const modelSpecific = webhookIgnoredFields[model] ?? [];
   return [...global, ...modelSpecific];
-}
+};
 
-export function getSubscribers(model: string): Record<string, (data: Record<string, unknown>) => string | null> {
-  return (
-    (WEBHOOK_SUBSCRIBERS as Record<string, Record<string, (data: Record<string, unknown>) => string | null>>)[model] ??
-    {}
-  );
-}
+export const getModelSubscribers = (model: string): string[] => {
+  return webhookModelSubscribers[model as keyof typeof webhookModelSubscribers] ?? [];
+};
 
-export function selectRelevantFields<T extends Record<string, unknown>>(model: string, data: T): Partial<T> {
+export const selectRelevantFields = <T extends Record<string, unknown>>(model: string, data: T): Partial<T> => {
   return omit(data, getIgnoredFields(model)) as Partial<T>;
-}
+};
 
-export function isNoOpUpdate<T extends Record<string, unknown>>(
+export const isNoOpUpdate = <T extends Record<string, unknown>>(
   model: string,
   currentData: T,
   previousData: T | undefined,
-): boolean {
+): boolean => {
   if (!previousData) return false;
 
   const current = selectRelevantFields(model, currentData);
   const previous = selectRelevantFields(model, previousData);
 
   return isEqual(current, previous);
-}
+};

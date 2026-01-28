@@ -25,6 +25,10 @@ model Token {
   role         OrganizationRole @default(member)
   entitlements Json?
 
+  // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)
+  // For now, simple per-second limit. Null = use default (10/s).
+  rateLimitPerSecond Int?
+
   // Lifecycle
   expiresAt  DateTime?
   lastUsedAt DateTime?
@@ -33,6 +37,10 @@ model Token {
   @@index([userId])
   @@index([organizationId])
   @@index([keyHash])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum TokenOwnerModel {

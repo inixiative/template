@@ -1,6 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import type { RouteArgs } from '#/lib/requestTemplates/types';
-import { buildOperationId, buildRequest, buildResponses, prepareMiddleware } from '#/lib/requestTemplates/utils';
+import { buildOperationId, buildRequest, buildResponses, buildTags, prepareMiddleware } from '#/lib/requestTemplates/utils';
 
 export const updateRoute = <const T extends RouteArgs>(args: T) => {
   const {
@@ -11,13 +11,13 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
     skipId = false,
     middleware = [],
     admin = false,
-    tags = [],
+    tags,
     ...routeArgs
   } = args;
 
   const resourceName = submodel || model;
   const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/:id/${action}` : '/:id';
-  const routeTags = admin ? ['Admin', ...tags] : tags;
+  const routeTags = buildTags({ model, submodel, tags, admin });
 
   return createRoute({
     ...routeArgs,

@@ -11,14 +11,13 @@ const makeSchema = () => z.object({
   updatedAt: z.boolean().optional(),
   model: z.boolean().optional(),
   url: z.boolean().optional(),
-  secret: z.boolean().optional(),
   isActive: z.boolean().optional(),
   ownerModel: z.boolean().optional(),
   userId: z.boolean().optional(),
   organizationId: z.boolean().optional(),
   user: z.union([z.boolean(), z.lazy(() => UserArgsObjectSchema)]).optional(),
   organization: z.union([z.boolean(), z.lazy(() => OrganizationArgsObjectSchema)]).optional(),
-  events: z.union([z.boolean(), z.lazy(() => WebhookEventFindManySchema)]).optional(),
+  webhookEvents: z.union([z.boolean(), z.lazy(() => WebhookEventFindManySchema)]).optional(),
   _count: z.union([z.boolean(), z.lazy(() => WebhookSubscriptionCountOutputTypeArgsObjectSchema)]).optional()
 }).strict();
 export const WebhookSubscriptionSelectObjectSchema: z.ZodType<Prisma.WebhookSubscriptionSelect> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionSelect>;

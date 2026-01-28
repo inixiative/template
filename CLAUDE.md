@@ -343,6 +343,20 @@ When in doubt, pause and discuss with the user before implementing.
 - **Scripts should be quiet** - only output errors or final result
 - Avoid over-logging in application code
 
+### Variable Prefixes
+
+- `_` prefix = unused parameter (e.g., `_req` when you only need `res`)
+- `__` prefix = module-private variable (not exported, internal state)
+
+```typescript
+// Unused parameter
+app.get('/', (_req, res) => res.send('ok'));
+
+// Module-private state
+let __cache: Map<string, unknown> | null = null;
+export const getCache = () => { ... };
+```
+
 ### TypeScript Rules
 
 - Prefer `type` over `interface`

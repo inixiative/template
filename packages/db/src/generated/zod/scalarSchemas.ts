@@ -11,9 +11,9 @@ import { AccountModelSchema } from './schemas/variants/pure/Account.pure';
 import { WebhookEventModelSchema } from './schemas/variants/pure/WebhookEvent.pure';
 import { SessionModelSchema } from './schemas/variants/pure/Session.pure';
 
-export const UserScalarSchema = UserModelSchema.omit({ accounts: true, sessions: true, organizations: true, tokens: true, cronJobsCreated: true, webhookSubscriptions: true, inquiriesSent: true, inquiriesReceived: true });
+export const UserScalarSchema = UserModelSchema.omit({ accounts: true, sessions: true, organizationUsers: true, tokens: true, cronJobsCreated: true, webhookSubscriptions: true, inquiriesSent: true, inquiriesReceived: true });
 export const VerificationScalarSchema = VerificationModelSchema;
-export const WebhookSubscriptionScalarSchema = WebhookSubscriptionModelSchema.omit({ user: true, organization: true, events: true });
+export const WebhookSubscriptionScalarSchema = WebhookSubscriptionModelSchema.omit({ user: true, organization: true, webhookEvents: true });
 export const OrganizationUserScalarSchema = OrganizationUserModelSchema.omit({ organization: true, user: true, tokens: true });
 export const CronJobScalarSchema = CronJobModelSchema.omit({ createdBy: true });
 export const OrganizationScalarSchema = OrganizationModelSchema.omit({ organizationUsers: true, tokens: true, webhookSubscriptions: true, inquiriesSent: true, inquiriesReceived: true });

@@ -1,5 +1,22 @@
 // Test request helpers
 
+import type { PaginationMetadata } from '#/lib/requestTemplates';
+
+type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
+type ErrorResponse = { error: string; message: string; stack?: string; guidance?: string };
+
+export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
+
+export async function json<T = unknown>(response: Response): Promise<SuccessResponse<T>> {
+  const body = await response.json();
+  if (!response.ok) console.error(`[${response.status}]`, body);
+  return body as SuccessResponse<T>;
+}
+
+export async function jsonError(response: Response): Promise<ErrorResponse> {
+  return response.json() as Promise<ErrorResponse>;
+}
+
 export function createRequest(
   method: string,
   path: string,

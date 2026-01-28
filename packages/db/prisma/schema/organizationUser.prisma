@@ -19,6 +19,10 @@ model OrganizationUser {
   @@unique([organizationId, userId])
   @@index([userId])
   @@index([organizationId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum OrganizationRole {

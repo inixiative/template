@@ -1,4 +1,4 @@
-import { OrganizationRole } from '@template/db';
+import { organizationId, OrganizationRole } from '@template/db';
 import { greaterRole } from '@template/permissions';
 import { getResource } from '#/lib/context/getResource';
 import { canAssignRole } from '#/lib/permissions/canAssignRole';
@@ -10,12 +10,13 @@ export const organizationUserUpdateController = makeController(organizationUserU
   const db = c.get('db');
   const orgUser = getResource<'organizationUser'>(c);
   const body = c.req.valid('json');
+  const orgId = organizationId(orgUser.organizationId);
 
   const targetRole = greaterRole(orgUser.role, body.role);
-  canAssignRole(c.get('permix'), orgUser.organizationId, targetRole);
+  canAssignRole(c.get('permix'), orgId, targetRole);
 
   if (orgUser.role === OrganizationRole.owner && body.role !== OrganizationRole.owner) {
-    await checkNotLastOwner(db, orgUser.organizationId);
+    await checkNotLastOwner(db, orgId);
   }
 
   const updated = await db.organizationUser.update({

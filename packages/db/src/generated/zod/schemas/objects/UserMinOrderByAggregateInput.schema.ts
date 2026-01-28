@@ -10,6 +10,7 @@ const makeSchema = () => z.object({
   email: SortOrderSchema.optional(),
   emailVerified: SortOrderSchema.optional(),
   name: SortOrderSchema.optional(),
+  displayName: SortOrderSchema.optional(),
   image: SortOrderSchema.optional(),
   platformRole: SortOrderSchema.optional()
 }).strict();

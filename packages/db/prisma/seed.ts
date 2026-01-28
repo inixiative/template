@@ -1,9 +1,9 @@
 import { omit } from 'lodash-es';
-import { db } from '#/index';
+import { db, type ModelDelegate } from '#/index';
 import seeds from './seeds';
 
 export type SeedFile = {
-  model: string;
+  model: ModelDelegate;
   records: Record<string, unknown>[];
   updateOmits?: string[];
   // TODO: Add order nullification for models with unique [parentId, order] constraints
@@ -19,7 +19,8 @@ async function seed() {
       if (testData && isProduction) continue;
 
       try {
-        await (db[model as keyof typeof db] as any).upsert({
+        const delegate = db[model] as { upsert: Function };
+        await delegate.upsert({
           where: { id: data.id },
           create: data,
           update: omit(data, ['id', ...updateOmits]),

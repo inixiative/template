@@ -14,4 +14,8 @@ model Session {
 
   @@index([userId])
   @@index([token])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }

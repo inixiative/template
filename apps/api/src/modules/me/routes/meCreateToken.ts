@@ -11,5 +11,5 @@ export const meCreateTokenRoute = createRoute({
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
   middleware: [validateNotToken],
-  tags: [Tags.Token],
+  tags: [Tags.me, Tags.token],
 });

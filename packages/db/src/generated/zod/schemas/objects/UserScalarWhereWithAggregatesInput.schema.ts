@@ -19,6 +19,7 @@ const userscalarwherewithaggregatesinputSchema = z.object({
   email: z.union([z.lazy(() => StringWithAggregatesFilterObjectSchema), z.string()]).optional(),
   emailVerified: z.union([z.lazy(() => BoolWithAggregatesFilterObjectSchema), z.boolean()]).optional(),
   name: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string()]).optional().nullable(),
+  displayName: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string()]).optional().nullable(),
   image: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string()]).optional().nullable(),
   platformRole: z.union([z.lazy(() => EnumPlatformRoleWithAggregatesFilterObjectSchema), PlatformRoleSchema]).optional()
 }).strict();

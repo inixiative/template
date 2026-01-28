@@ -15,11 +15,11 @@ import { cronJobReadManyController } from '#/modules/admin/cronJob/controllers/c
 import { cronJobTriggerController } from '#/modules/admin/cronJob/controllers/cronJobTrigger';
 import { cronJobUpdateController } from '#/modules/admin/cronJob/controllers/cronJobUpdate';
 
-export const cronJobRouter = new OpenAPIHono<AppEnv>();
+export const adminCronJobRouter = new OpenAPIHono<AppEnv>();
 
-cronJobRouter.openapi(cronJobReadManyRoute, cronJobReadManyController);
-cronJobRouter.openapi(cronJobCreateRoute, cronJobCreateController);
-cronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
-cronJobRouter.openapi(cronJobUpdateRoute, cronJobUpdateController);
-cronJobRouter.openapi(cronJobDeleteRoute, cronJobDeleteController);
-cronJobRouter.openapi(cronJobTriggerRoute, cronJobTriggerController);
+adminCronJobRouter.openapi(cronJobReadManyRoute, cronJobReadManyController);
+adminCronJobRouter.openapi(cronJobCreateRoute, cronJobCreateController);
+adminCronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
+adminCronJobRouter.openapi(cronJobUpdateRoute, cronJobUpdateController);
+adminCronJobRouter.openapi(cronJobDeleteRoute, cronJobDeleteController);
+adminCronJobRouter.openapi(cronJobTriggerRoute, cronJobTriggerController);

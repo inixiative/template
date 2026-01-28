@@ -1,4 +1,3 @@
-import { env } from '#/config/env';
 import { getRedisClient } from '#/lib/clients/redis';
 import { log } from '#/lib/logger';
 
@@ -7,31 +6,29 @@ import { log } from '#/lib/logger';
  * Supports wildcards (*) for pattern matching.
  * Uses SCAN instead of KEYS to avoid blocking Redis.
  *
+ * Note: Keys should already include the cache: prefix (use cacheKey() to build them).
+ *
  * @example
- * await clearCacheKey('users:123');           // Exact key
- * await clearCacheKey('users:123:*');         // Pattern with wildcard
- * await clearCacheKey('pools:slug:ranch-*');  // Pattern matching
+ * await clearCacheKey('cache:User:id:123');        // Exact key
+ * await clearCacheKey('cache:User:*');             // Pattern with wildcard
+ * await clearCacheKey('cache:*');                  // All cache entries
  */
-export async function clearCacheKey(pattern: string): Promise<number> {
-  if (env.isTest) {
-    pattern = `test:${pattern}`;
-  }
+export const clearCacheKey = async (pattern: string): Promise<number> => {
+  const key = pattern;
 
   try {
-    const redis = await getRedisClient();
+    const redis = getRedisClient();
 
     // No wildcard = exact key, just delete directly
-    if (!pattern.includes('*')) {
-      const deleted = await redis.del(pattern);
-      if (deleted && !env.isTest) {
-        log.info(`Cleared cache key: ${pattern}`);
-      }
+    if (!key.includes('*')) {
+      const deleted = await redis.del(key);
+      if (deleted) log.debug(`Cleared cache key: ${key}`);
       return deleted;
     }
 
     // Use SCAN for patterns (non-blocking, unlike KEYS)
     let deleted = 0;
-    const stream = redis.scanStream({ match: pattern, count: 100 });
+    const stream = redis.scanStream({ match: key, count: 100 });
 
     for await (const keys of stream) {
       if (keys.length > 0) {
@@ -40,13 +37,10 @@ export async function clearCacheKey(pattern: string): Promise<number> {
       }
     }
 
-    if (deleted > 0 && !env.isTest) {
-      log.info(`Cleared ${deleted} cache entries for pattern: ${pattern}`);
-    }
-
+    if (deleted > 0) log.debug(`Cleared ${deleted} cache entries for pattern: ${key}`);
     return deleted;
   } catch (error) {
-    log.error(`Failed to clear cache for pattern ${pattern}:`, error);
+    log.error(`Failed to clear cache for pattern ${key}:`, error);
     return 0;
   }
-}
+};

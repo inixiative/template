@@ -8,14 +8,22 @@ export const meReadManyOrganizationController = makeController(meReadManyOrganiz
   const db = c.get('db');
   const { page, pageSize } = c.req.valid('query');
 
-  const { data, pagination } = await paginate(
-    db.organizationUser,
+  const { data: orgs, pagination } = await paginate(
+    db.organization,
     {
-      where: { userId: user.id },
-      include: { organization: true },
+      where: {
+        deletedAt: null,
+        organizationUsers: { some: { userId: user.id } },
+      },
+      include: { organizationUsers: { where: { userId: user.id } } },
     },
     { page, pageSize },
   );
+
+  const data = orgs.map(({ organizationUsers, ...org }) => ({
+    ...org,
+    organizationUser: organizationUsers[0],
+  }));
 
   return respond.ok(data, { pagination });
 });

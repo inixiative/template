@@ -1,16 +1,11 @@
 import type { OrganizationId } from '@template/db';
 import type { Action } from '@template/permissions/client';
-import type { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { AppEnv } from '#/types/appEnv';
+import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
 type Resource = { id?: string; organizationId?: string } | null;
 
-/**
- * Validate org permission for a given action.
- * Assumes setupOrgPermissions was called during auth.
- */
-export const validateOrgPermission = (action: Action) => async (c: Context<AppEnv>, next: Next) => {
+export const validateOrgPermission = makeMiddleware<Action>((action) => async (c, next) => {
   const resource = c.get('resource') as Resource;
   const resourceType = c.get('resourceType');
 
@@ -26,4 +21,4 @@ export const validateOrgPermission = (action: Action) => async (c: Context<AppEn
   }
 
   await next();
-};
+});

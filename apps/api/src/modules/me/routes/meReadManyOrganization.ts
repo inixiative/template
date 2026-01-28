@@ -3,8 +3,8 @@ import { readRoute } from '#/lib/requestTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
-const responseSchema = OrganizationUserScalarSchema.extend({
-  organization: OrganizationScalarSchema,
+const responseSchema = OrganizationScalarSchema.extend({
+  organizationUser: OrganizationUserScalarSchema,
 });
 
 export const meReadManyOrganizationRoute = readRoute({
@@ -14,5 +14,5 @@ export const meReadManyOrganizationRoute = readRoute({
   skipId: true,
   paginate: true,
   responseSchema,
-  tags: [Tags.Organization],
+  tags: [Tags.me, Tags.organization, Tags.organizationUser],
 });

@@ -12,7 +12,7 @@ import { UserCountOutputTypeArgsObjectSchema as UserCountOutputTypeArgsObjectSch
 const makeSchema = () => z.object({
   accounts: z.union([z.boolean(), z.lazy(() => AccountFindManySchema)]).optional(),
   sessions: z.union([z.boolean(), z.lazy(() => SessionFindManySchema)]).optional(),
-  organizations: z.union([z.boolean(), z.lazy(() => OrganizationUserFindManySchema)]).optional(),
+  organizationUsers: z.union([z.boolean(), z.lazy(() => OrganizationUserFindManySchema)]).optional(),
   tokens: z.union([z.boolean(), z.lazy(() => TokenFindManySchema)]).optional(),
   cronJobsCreated: z.union([z.boolean(), z.lazy(() => CronJobFindManySchema)]).optional(),
   webhookSubscriptions: z.union([z.boolean(), z.lazy(() => WebhookSubscriptionFindManySchema)]).optional(),

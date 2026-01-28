@@ -6,7 +6,9 @@
 // Client
 export {
   createPermissions,
+  StandardAction,
   OrganizationAction,
+  UserAction,
   type Permix,
   type PermissionEntry,
   type ActionState,
@@ -15,17 +17,29 @@ export {
   type Entitlements,
 } from './client';
 
-// Roles (RBAC)
+// Shared role utilities
 export {
   isSuperadmin,
-  organizationRoles,
   roleHierarchy,
   lesserRole,
   greaterRole,
   intersectEntitlements,
-  roleToOrgAction,
+  allTrue,
+} from './roles/shared';
+
+// Organization permissions
+export {
+  organizationRoles,
   getOrgPermissions,
   setupOrgContext,
-} from './roles';
+  roleToOrgAction,
+} from './roles/organization';
+
+// User permissions
+export {
+  userRoles,
+  getUserPermissions,
+  setupUserContext,
+} from './roles/user';
 
 export { OrganizationRole } from '@template/db';

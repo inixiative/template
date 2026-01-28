@@ -3,7 +3,8 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
-import { env } from '#/config/env';
+import { getRedisClient } from '#/lib/clients/redis';
+import { redisNamespace } from '#/lib/clients/redisNamespaces';
 import { getAllowedOrigins } from '#/middleware/cors';
 
 export const auth = betterAuth({
@@ -11,8 +12,8 @@ export const auth = betterAuth({
     provider: 'postgresql',
   }),
 
-  secret: env.BETTER_AUTH_SECRET,
-  baseURL: env.API_URL,
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: process.env.API_URL,
   basePath: '/auth',
 
   emailAndPassword: {
@@ -22,10 +23,10 @@ export const auth = betterAuth({
 
   socialProviders: {
     google:
-      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
         ? {
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
           }
         : undefined,
   },
@@ -54,6 +55,19 @@ export const auth = betterAuth({
   plugins: [bearer()],
 
   trustedOrigins: getAllowedOrigins(),
+
+  secondaryStorage: {
+    get: async (key) => {
+      const value = await getRedisClient().get(`${redisNamespace.session}:${key}`);
+      return value ? JSON.parse(value) : null;
+    },
+    set: async (key, value, ttl) => {
+      await getRedisClient().set(`${redisNamespace.session}:${key}`, JSON.stringify(value), 'EX', ttl);
+    },
+    delete: async (key) => {
+      await getRedisClient().del(`${redisNamespace.session}:${key}`);
+    },
+  },
 });
 
 export type Auth = typeof auth;

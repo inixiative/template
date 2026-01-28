@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db';
-import { cleanupTouchedTables, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 import { createTestApp } from '#tests/createTestApp';
-import { post } from '#tests/utils/request';
+import { json, jsonError, post } from '#tests/utils/request';
 
-type CreateOrgResponse = { data: z.infer<typeof organizationCreateRoute.responseSchema> };
+type CreateOrgResponse = z.infer<typeof organizationCreateRoute.responseSchema>;
 
 describe('POST /api/v1/organization', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -31,17 +31,18 @@ describe('POST /api/v1/organization', () => {
   });
 
   it('creates an organization with creator as owner', async () => {
+    const seq = getNextSeq();
     const response = await fetch(
       post('/api/v1/organization', {
-        name: 'Test Org',
-        slug: 'test-org',
+        name: `Test Org ${seq}`,
+        slug: `test-org-${seq}`,
       }),
     );
-    expect(response.status).toBe(201);
+    const { data } = await json<CreateOrgResponse>(response);
 
-    const { data } = (await response.json()) as CreateOrgResponse;
-    expect(data.name).toBe('Test Org');
-    expect(data.slug).toBe('test-org');
+    expect(response.status).toBe(201);
+    expect(data.name).toBe(`Test Org ${seq}`);
+    expect(data.slug).toBe(`test-org-${seq}`);
 
     const orgUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: data.id, userId: user.id } },
@@ -51,9 +52,13 @@ describe('POST /api/v1/organization', () => {
   });
 
   it('rejects duplicate slug', async () => {
-    await fetch(post('/api/v1/organization', { name: 'First', slug: 'duplicate-slug' }));
+    const seq = getNextSeq();
+    await fetch(post('/api/v1/organization', { name: 'First', slug: `dup-slug-${seq}` }));
 
-    const response = await fetch(post('/api/v1/organization', { name: 'Second', slug: 'duplicate-slug' }));
+    const response = await fetch(post('/api/v1/organization', { name: 'Second', slug: `dup-slug-${seq}` }));
+    const body = await jsonError(response);
+
     expect(response.status).toBe(409);
+    expect(body.error).toBeDefined();
   });
 });

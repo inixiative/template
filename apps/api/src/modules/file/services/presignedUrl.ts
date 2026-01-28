@@ -2,7 +2,6 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { env } from '#/config/env';
 import { getS3Client } from '#/lib/clients/s3';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -90,7 +89,7 @@ export const generatePresignedUrl = async (
   keyParts.push(`${timestamp}-${safeFileName}`);
   const key = keyParts.join('/');
 
-  const bucket = env.S3_BUCKET_NAME;
+  const bucket = process.env.S3_BUCKET_NAME;
   if (!bucket) {
     throw new HTTPException(500, { message: 'S3 not configured' });
   }
@@ -114,7 +113,7 @@ export const generatePresignedUrl = async (
   });
 
   // Build final CDN URL (or direct S3 URL if no CDN)
-  const cdnUrl = env.CLOUDFRONT_URL;
+  const cdnUrl = process.env.CLOUDFRONT_URL;
   const fileUrl = cdnUrl ? `${cdnUrl}/${key}` : `https://${bucket}.s3.amazonaws.com/${key}`;
 
   return {

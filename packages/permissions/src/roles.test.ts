@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { greaterRole, intersectEntitlements, isSuperadmin, lesserRole, roleHierarchy } from './roles';
+import { greaterRole, intersectEntitlements, isSuperadmin, lesserRole, roleHierarchy } from './roles/shared';
 
 describe('isSuperadmin', () => {
   it('returns true for superadmin', () => {
@@ -17,21 +17,25 @@ describe('isSuperadmin', () => {
 });
 
 describe('lesserRole', () => {
-  it('returns viewer when both null/undefined', () => {
+  it('returns viewer when all null/undefined', () => {
     expect(lesserRole(null, null)).toBe('viewer');
     expect(lesserRole(undefined, undefined)).toBe('viewer');
+    expect(lesserRole()).toBe('viewer');
   });
 
-  it('returns the defined role when one is null', () => {
+  it('returns the defined role when others are null', () => {
     expect(lesserRole('admin', null)).toBe('admin');
     expect(lesserRole(null, 'member')).toBe('member');
+    expect(lesserRole(null, 'admin', undefined)).toBe('admin');
   });
 
-  it('returns lesser of two roles', () => {
+  it('returns lesser of N roles', () => {
     expect(lesserRole('owner', 'admin')).toBe('admin');
     expect(lesserRole('admin', 'member')).toBe('member');
     expect(lesserRole('member', 'viewer')).toBe('viewer');
     expect(lesserRole('owner', 'viewer')).toBe('viewer');
+    expect(lesserRole('owner', 'admin', 'member')).toBe('member');
+    expect(lesserRole('owner', 'admin', 'viewer')).toBe('viewer');
   });
 
   it('returns same role when equal', () => {
@@ -42,21 +46,25 @@ describe('lesserRole', () => {
 });
 
 describe('greaterRole', () => {
-  it('returns viewer when both null/undefined', () => {
+  it('returns viewer when all null/undefined', () => {
     expect(greaterRole(null, null)).toBe('viewer');
     expect(greaterRole(undefined, undefined)).toBe('viewer');
+    expect(greaterRole()).toBe('viewer');
   });
 
-  it('returns the defined role when one is null', () => {
+  it('returns the defined role when others are null', () => {
     expect(greaterRole('admin', null)).toBe('admin');
     expect(greaterRole(null, 'member')).toBe('member');
+    expect(greaterRole(null, 'viewer', undefined)).toBe('viewer');
   });
 
-  it('returns greater of two roles', () => {
+  it('returns greater of N roles', () => {
     expect(greaterRole('owner', 'admin')).toBe('owner');
     expect(greaterRole('admin', 'member')).toBe('admin');
     expect(greaterRole('member', 'viewer')).toBe('member');
     expect(greaterRole('viewer', 'owner')).toBe('owner');
+    expect(greaterRole('viewer', 'member', 'admin')).toBe('admin');
+    expect(greaterRole('viewer', 'member', 'owner')).toBe('owner');
   });
 
   it('returns same role when equal', () => {
@@ -67,21 +75,25 @@ describe('greaterRole', () => {
 });
 
 describe('intersectEntitlements', () => {
-  it('returns null when both null/undefined', () => {
+  it('returns null when all null/undefined', () => {
     expect(intersectEntitlements(null, null)).toBe(null);
     expect(intersectEntitlements(undefined, undefined)).toBe(null);
+    expect(intersectEntitlements()).toBe(null);
   });
 
-  it('returns the defined entitlements when one is null', () => {
+  it('returns the defined entitlements when others are null', () => {
     const ent = { canExport: true };
     expect(intersectEntitlements(ent, null)).toEqual(ent);
     expect(intersectEntitlements(null, ent)).toEqual(ent);
+    expect(intersectEntitlements(null, ent, undefined)).toEqual(ent);
   });
 
-  it('returns intersection of entitlements', () => {
+  it('returns intersection of N entitlements', () => {
     const a = { canExport: true, canImport: true };
     const b = { canExport: true, canDelete: true };
+    const c = { canExport: true, canView: true };
     expect(intersectEntitlements(a, b)).toEqual({ canExport: true });
+    expect(intersectEntitlements(a, b, c)).toEqual({ canExport: true });
   });
 
   it('returns null when no overlap', () => {

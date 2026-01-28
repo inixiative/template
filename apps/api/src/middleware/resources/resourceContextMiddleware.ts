@@ -1,44 +1,37 @@
-import { toModelName } from '@template/db';
-import type { Context, MiddlewareHandler, Next } from 'hono';
+import { toModelName, type ExtendedPrismaClient, type ModelDelegate } from '@template/db';
+import type { MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';
 
-export function resourceContextMiddleware(): MiddlewareHandler {
-  return async (c: Context, next: Next) => {
-    const id = c.req.param('id');
-    if (!id) return next();
+export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next) => {
+  const id = c.req.param('id');
+  if (!id) return next();
 
-    const db = c.get('db');
-    const lookup = c.req.query('lookup') || 'id';
+  const db = c.get('db');
+  const lookup = c.req.query('lookup') || 'id';
 
-    // Get model accessor from route path (e.g., /api/v1/organization/:id → organization)
-    const pathParts = c.req.path.split('/');
-    const modelAccessor = pathParts[3];
-    if (!modelAccessor) return next();
+  // Get delegate from route path (e.g., /api/v1/organization/:id → 'organization')
+  const pathParts = c.req.path.split('/');
+  const delegate = pathParts[3] as ModelDelegate | undefined;
+  if (!delegate || !toModelName(delegate)) return next();
 
-    // Validate it's a known Prisma model
-    const modelName = toModelName(modelAccessor);
-    if (!modelName) return next();
+  const resources = await findResources(db, delegate, lookup, id);
 
-    // Check if model exists on prisma client
-    const model = (db as Record<string, unknown>)[modelAccessor];
-    if (!model || typeof model !== 'object') return next();
+  if (!resources.length) throw new HTTPException(404, { message: 'Resource not found' });
+  if (resources.length > 1) throw new HTTPException(409, { message: 'Multiple resources found' });
 
-    const findMany = (model as Record<string, unknown>).findMany;
-    if (typeof findMany !== 'function') return next();
+  c.set('resource', resources[0]);
+  c.set('resourceType', delegate);
 
-    const resources = await findMany({ where: { [lookup]: id } });
+  return next();
+};
 
-    if (!resources.length) {
-      throw new HTTPException(404, { message: 'Resource not found' });
-    }
+const findResources = async (db: ExtendedPrismaClient, delegate: ModelDelegate, lookup: string, id: string) => {
+  const model = db[delegate] as { findMany: Function } | undefined;
+  if (!model?.findMany) return [];
 
-    if (resources.length > 1) {
-      throw new HTTPException(400, { message: 'Multiple resources found for lookup field' });
-    }
-
-    c.set('resource', resources[0]);
-    c.set('resourceType', modelAccessor);
-
-    return next();
-  };
-}
+  return model.findMany({
+    where: { [lookup]: id },
+    ...resourceContextArgs[delegate],
+  });
+};

@@ -5,12 +5,11 @@ export const WebhookSubscriptionFindFirstResultSchema = z.nullable(z.object({
   updatedAt: z.date(),
   model: z.unknown(),
   url: z.string(),
-  secret: z.string().optional(),
   isActive: z.boolean(),
   ownerModel: z.unknown(),
   userId: z.string().optional(),
   organizationId: z.string().optional(),
   user: z.unknown().optional(),
   organization: z.unknown().optional(),
-  events: z.array(z.unknown())
+  webhookEvents: z.array(z.unknown())
 }));

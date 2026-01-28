@@ -59,7 +59,7 @@ describe('createFactory', () => {
 
       expect(session.userId).toBeDefined();
       expect(context.User).toBeDefined();
-      expect(session.userId).toBe(context.User?.id);
+      expect(session.userId).toBe(context.User!.id);
     });
 
     it('Session - uses existing User from context', async () => {
@@ -109,8 +109,8 @@ describe('createFactory', () => {
 
       const { entity: orgUser, context } = await orgUserFactory.build();
 
-      expect(orgUser.userId).toBe(context.User?.id);
-      expect(orgUser.organizationId).toBe(context.Organization?.id);
+      expect(orgUser.userId).toBe(context.User!.id);
+      expect(orgUser.organizationId).toBe(context.Organization!.id);
     });
 
     it('Token with OrganizationUser - composite FK via ref override', async () => {
@@ -159,8 +159,8 @@ describe('createFactory', () => {
 
       // Token should have both FKs from the created OrganizationUser
       expect(context.OrganizationUser).toBeDefined();
-      expect(token.userId).toBe(context.OrganizationUser?.userId);
-      expect(token.organizationId).toBe(context.OrganizationUser?.organizationId);
+      expect(token.userId).toBe(context.OrganizationUser!.userId);
+      expect(token.organizationId).toBe(context.OrganizationUser!.organizationId);
       // OrganizationUser should have created User and Organization
       expect(context.User).toBeDefined();
       expect(context.Organization).toBeDefined();

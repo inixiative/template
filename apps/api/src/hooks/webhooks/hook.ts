@@ -1,5 +1,7 @@
+import type { WebhookModel } from '@template/db';
 import { DbAction, HookTiming, db, registerDbHook } from '@template/db';
 import { getParentWebhookModel, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
+import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
   create = 'create',
@@ -16,9 +18,23 @@ export type WebhookPayload = {
   timestamp: string;
 };
 
-export type WebhookDeliveryFn = (payload: WebhookPayload) => Promise<void>;
+const getWebhookCallbacks = async (payload: WebhookPayload) => {
+  const subscriptions = await db.webhookSubscription.findMany({
+    where: { model: payload.model as WebhookModel, isActive: true },
+    select: { id: true },
+  });
 
-export function registerWebhookHook(deliverWebhookFn: WebhookDeliveryFn) {
+  return subscriptions.map((sub) => async () => {
+    await enqueueJob('sendWebhook', {
+      subscriptionId: sub.id,
+      action: payload.action,
+      resourceId: payload.resourceId,
+      data: payload.data,
+    });
+  });
+};
+
+export function registerWebhookHook() {
   const actions = [DbAction.create, DbAction.update, DbAction.delete, DbAction.upsert];
 
   registerDbHook(
@@ -26,7 +42,7 @@ export function registerWebhookHook(deliverWebhookFn: WebhookDeliveryFn) {
     '*',
     HookTiming.after,
     actions,
-    async ({ model, action: dbAction, result, before }) => {
+    async ({ model, action: dbAction, result, previous }) => {
       const parentModel = getParentWebhookModel(model);
       const webhookModel = parentModel ?? model;
 
@@ -34,13 +50,14 @@ export function registerWebhookHook(deliverWebhookFn: WebhookDeliveryFn) {
 
       let webhookAction: WebhookAction;
       if (dbAction === DbAction.upsert) {
-        webhookAction = WebhookAction.update;
+        // Upsert is create if no previous record existed, update otherwise
+        webhookAction = previous ? WebhookAction.update : WebhookAction.create;
       } else {
         webhookAction = dbAction as unknown as WebhookAction;
       }
 
       const resultData = result as Record<string, unknown> & { id: string };
-      const previousData = before as Record<string, unknown> | undefined;
+      const previousData = previous as Record<string, unknown> | undefined;
 
       if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData)) {
         return;
@@ -55,10 +72,13 @@ export function registerWebhookHook(deliverWebhookFn: WebhookDeliveryFn) {
         timestamp: new Date().toISOString(),
       };
 
+      const callbacks = await getWebhookCallbacks(payload);
+      if (callbacks.length === 0) return;
+
       if (db.isInTxn()) {
-        db.onCommit(() => deliverWebhookFn(payload));
+        db.onCommit(callbacks);
       } else {
-        await deliverWebhookFn(payload);
+        await Promise.all(callbacks.map((fn) => fn()));
       }
     },
   );

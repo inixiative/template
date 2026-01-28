@@ -8,7 +8,7 @@ import { WebhookEventActionSchema } from '../enums/WebhookEventAction.schema';
 import { EnumWebhookEventActionFieldUpdateOperationsInputObjectSchema as EnumWebhookEventActionFieldUpdateOperationsInputObjectSchema } from './EnumWebhookEventActionFieldUpdateOperationsInput.schema';
 import { NullableJsonNullValueInputSchema } from '../enums/NullableJsonNullValueInput.schema';
 import { NullableStringFieldUpdateOperationsInputObjectSchema as NullableStringFieldUpdateOperationsInputObjectSchema } from './NullableStringFieldUpdateOperationsInput.schema';
-import { WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInputObjectSchema as WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInputObjectSchema } from './WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInput.schema'
+import { WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInputObjectSchema as WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInputObjectSchema } from './WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInput.schema'
 
 import { JsonValueSchema as jsonSchema } from '../../helpers/json-helpers';
 
@@ -20,7 +20,7 @@ const makeSchema = () => z.object({
   payload: z.union([NullableJsonNullValueInputSchema, jsonSchema]).optional(),
   error: z.union([z.string(), z.lazy(() => NullableStringFieldUpdateOperationsInputObjectSchema)]).optional().nullable(),
   resourceId: z.union([z.string().max(36), z.lazy(() => StringFieldUpdateOperationsInputObjectSchema)]).optional(),
-  webhookSubscription: z.lazy(() => WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInputObjectSchema).optional()
+  webhookSubscription: z.lazy(() => WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInputObjectSchema).optional()
 }).strict();
 export const WebhookEventUpdateInputObjectSchema: z.ZodType<Prisma.WebhookEventUpdateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventUpdateInput>;
 export const WebhookEventUpdateInputObjectZodSchema = makeSchema();

@@ -21,4 +21,8 @@ model CronJob {
 
   @@index([enabled])
   @@index([handler])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }

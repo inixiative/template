@@ -13,6 +13,7 @@
     "./zod/*": "./src/generated/zod/schemas/*.ts"
   },
   "scripts": {
+    "test": "bun test src/test/",
     "db:generate": "prisma generate && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma-generated",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",

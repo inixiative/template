@@ -8,7 +8,6 @@ const makeSchema = () => z.object({
   updatedAt: SortOrderSchema.optional(),
   model: SortOrderSchema.optional(),
   url: SortOrderSchema.optional(),
-  secret: SortOrderSchema.optional(),
   isActive: SortOrderSchema.optional(),
   ownerModel: SortOrderSchema.optional(),
   userId: SortOrderSchema.optional(),

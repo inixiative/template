@@ -58,10 +58,13 @@ const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
   return injected;
 };
 
-let globalSeq = 0;
+// Random offset ensures uniqueness across test runs even if cleanup fails
+const sessionOffset = Math.floor(Math.random() * 1_000_000);
+let globalSeq = sessionOffset;
+
 export const getNextSeq = () => ++globalSeq;
 export const resetSequence = () => {
-  globalSeq = 0;
+  globalSeq = sessionOffset;
 };
 
 type RegisteredFactory = {

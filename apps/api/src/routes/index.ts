@@ -1,6 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { isTest } from '#/config/env';
 import { auth } from '#/lib/auth';
 import { corsMiddleware } from '#/middleware/cors';
+import { testRouter } from '#/modules/test';
 import type { AppEnv } from '#/types/appEnv';
 
 import { apiRouter } from '#/routes/api';
@@ -21,3 +23,6 @@ routes.route('/api', apiRouter);
 
 // BullBoard (basic auth configured in bullBoard.ts)
 routes.route('/bullBoard', bullBoardRouter);
+
+// Test routes (only in test environment)
+if (isTest) routes.route('/test', testRouter);

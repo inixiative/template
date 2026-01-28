@@ -3,11 +3,12 @@ import { HTTPException } from 'hono/http-exception';
 import { getUser } from '#/lib/context/getUser';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
+import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const inquiryCreateController = makeController(inquiryCreateRoute, async (c, respond) => {
   const user = getUser(c)!;
   const db = c.get('db');
-  const body = c.req.valid('json');
+  const { targetEmail, ...body } = c.req.valid('json');
 
   const sourceModel: InquiryResourceModel = body.type === 'memberApplication' ? 'User' : 'Organization';
   const sourceOrgId =
@@ -25,12 +26,15 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
     }
   }
 
+  const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
+
   const inquiry = await db.inquiry.create({
     data: {
       ...body,
       sourceModel,
       sourceUserId: sourceModel === 'User' ? user.id : null,
       sourceOrganizationId: sourceModel === 'Organization' ? sourceOrgId : null,
+      targetUserId,
       sentAt: body.status === 'sent' ? new Date() : null,
     },
   });

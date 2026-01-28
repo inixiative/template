@@ -3,7 +3,7 @@ import type { Prisma } from '../../../client/client';
 import { WebhookEventStatusSchema } from '../enums/WebhookEventStatus.schema';
 import { WebhookEventActionSchema } from '../enums/WebhookEventAction.schema';
 import { NullableJsonNullValueInputSchema } from '../enums/NullableJsonNullValueInput.schema';
-import { WebhookSubscriptionCreateNestedOneWithoutEventsInputObjectSchema as WebhookSubscriptionCreateNestedOneWithoutEventsInputObjectSchema } from './WebhookSubscriptionCreateNestedOneWithoutEventsInput.schema'
+import { WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInputObjectSchema as WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInputObjectSchema } from './WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInput.schema'
 
 import { JsonValueSchema as jsonSchema } from '../../helpers/json-helpers';
 
@@ -15,7 +15,7 @@ const makeSchema = () => z.object({
   payload: z.union([NullableJsonNullValueInputSchema, jsonSchema]).optional(),
   error: z.string().optional().nullable(),
   resourceId: z.string().max(36),
-  webhookSubscription: z.lazy(() => WebhookSubscriptionCreateNestedOneWithoutEventsInputObjectSchema)
+  webhookSubscription: z.lazy(() => WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInputObjectSchema)
 }).strict();
 export const WebhookEventCreateInputObjectSchema: z.ZodType<Prisma.WebhookEventCreateInput> = makeSchema() as unknown as z.ZodType<Prisma.WebhookEventCreateInput>;
 export const WebhookEventCreateInputObjectZodSchema = makeSchema();

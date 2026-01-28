@@ -1,11 +1,10 @@
 import { createHash, randomBytes } from 'crypto';
 import type { ExtendedPrismaClient, OrganizationRole, TokenOwnerModel } from '@template/db';
-import { env } from '#/config/env';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
-  User: 'usr',
+  User: 'user',
   Organization: 'org',
-  OrganizationUser: 'ous',
+  OrganizationUser: 'orgUser',
 };
 
 type CreateTokenParams = {
@@ -20,9 +19,9 @@ type CreateTokenParams = {
 export const createToken = async (db: ExtendedPrismaClient, params: CreateTokenParams) => {
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
-  const rawKey = `${env.ENVIRONMENT}_${modelPrefix}_${hex}`;
+  const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
-  const keyPrefix = `${env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
+  const keyPrefix = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
 
   const token = await db.token.create({
     data: {

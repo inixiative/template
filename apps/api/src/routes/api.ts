@@ -10,6 +10,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
+import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
 
 export const apiRouter = new OpenAPIHono<AppEnv>();
@@ -29,3 +30,4 @@ apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);
 apiRouter.route('/v1/token', tokenRouter);
 apiRouter.route('/v1/inquiry', inquiryRouter);
+apiRouter.route('/v1/webhookSubscription', webhookSubscriptionRouter);

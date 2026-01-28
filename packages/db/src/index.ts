@@ -30,7 +30,19 @@ export {
   toPrismaAccessor,
   toModelName,
   type ModelName,
+  type ModelTypeMap,
+  type ModelDelegate,
+  type ModelOperation,
+  type ModelArgs,
+  type ModelResult,
 } from './utils/modelNames';
+
+// SQL utilities
+export { aliasColumns } from './utils/aliasColumns';
+
+// Runtime schema introspection (Prisma 7)
+export { getRuntimeDataModel, getModelRelations } from './utils/runtimeDataModel';
+export type { RuntimeDataModel, RuntimeModel, RuntimeField } from './utils/runtimeDataModel';
 
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas';

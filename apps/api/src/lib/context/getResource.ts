@@ -1,19 +1,17 @@
-import type { ExtendedPrismaClient } from '@template/db';
+import type { ExtendedPrismaClient, ModelDelegate } from '@template/db';
 import type { Context } from 'hono';
-import type { ResourcePayloadMap } from '#/middleware/resources/resourceContextInclusions';
+import type { ResourcePayloadMap } from '#/middleware/resources/resourceContextArgs';
 
-type PrismaModelName = Exclude<keyof ExtendedPrismaClient, symbol | `$${string}`>;
-
-type ResourceType<T extends PrismaModelName> = T extends keyof ResourcePayloadMap
+type ResourceType<T extends ModelDelegate> = T extends keyof ResourcePayloadMap
   ? ResourcePayloadMap[T]
-  : ExtendedPrismaClient[T] extends { findUnique: (args: any) => Promise<infer R> }
+  : ExtendedPrismaClient[T] extends { findUnique: (args: object) => Promise<infer R> }
     ? NonNullable<R>
     : never;
 
-export const getResource = <T extends PrismaModelName>(c: Context): ResourceType<T> => {
+export const getResource = <T extends ModelDelegate>(c: Context): ResourceType<T> => {
   return c.get('resource') as ResourceType<T>;
 };
 
-export const getResourceType = (c: Context): PrismaModelName | null => {
-  return c.get('resourceType') as PrismaModelName | null;
+export const getResourceType = (c: Context): ModelDelegate | null => {
+  return c.get('resourceType') as ModelDelegate | null;
 };

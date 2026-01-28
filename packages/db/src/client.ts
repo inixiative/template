@@ -61,7 +61,7 @@ const dbMethods = {
 
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[]): void => {
     const s = store.getStore();
-    if (!s) throw new Error('db.onCommit() requires db.scope() or db.txn()');
+    if (!s?.txn) throw new Error('db.onCommit() requires db.txn()');
     s.afterCommitBatches.push(Array.isArray(callbacks) ? callbacks : [callbacks]);
   },
 

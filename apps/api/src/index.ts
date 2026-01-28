@@ -1,9 +1,12 @@
+import { registerHooks } from '#/hooks';
 import { getRedisClient } from '#/lib/clients/redis';
 import { log } from '#/lib/logger';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
 import { app } from './app';
-import { env } from './config/env';
+
+// Register database hooks (cache clear, webhooks)
+registerHooks();
 
 // Initialize graceful shutdown (must be first)
 initGracefulShutdown({ timeout: 30_000 });
@@ -12,7 +15,7 @@ initGracefulShutdown({ timeout: 30_000 });
 initWebSocketPubSub();
 
 const server = Bun.serve({
-  port: env.PORT,
+  port: process.env.PORT,
   fetch(req, server) {
     // Handle WebSocket upgrade requests
     if (req.headers.get('upgrade') === 'websocket') {

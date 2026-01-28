@@ -14,18 +14,13 @@ type SanitizedSchema<T extends ZodSchema> = z.ZodObject<Omit<T['shape'], BaseSan
  * Sanitizes a Zod object schema by:
  * 1. Removing system-managed fields (id, createdAt, updatedAt, etc.)
  * 2. Transforming z.unknown() JSON fields to Prisma-compatible InputJsonValue
- *
- * @param schema - The ZodObject schema to sanitize
- * @param additionalSanitizeKeys - Additional keys to remove beyond the base system fields
- * @returns A new ZodObject schema with fields omitted and JSON fields transformed
  */
 export const sanitizeRequestSchema = <T extends ZodSchema>(
   schema: T,
   additionalSanitizeKeys: string[] = [],
 ): SanitizedSchema<T> => {
   const allSanitizeKeys = [...BASE_SANITIZE_KEYS, ...additionalSanitizeKeys];
-  const shape = schema.shape;
-  const sanitizedShape = omit(shape, allSanitizeKeys);
+  const sanitizedShape = omit(schema.shape, allSanitizeKeys);
   const transformedShape = transformJsonFields(sanitizedShape);
   return z.object(transformedShape) as SanitizedSchema<T>;
 };

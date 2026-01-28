@@ -32,6 +32,7 @@ export type UserMinAggregateOutputType = {
   email: string | null
   emailVerified: boolean | null
   name: string | null
+  displayName: string | null
   image: string | null
   platformRole: $Enums.PlatformRole | null
 }
@@ -44,6 +45,7 @@ export type UserMaxAggregateOutputType = {
   email: string | null
   emailVerified: boolean | null
   name: string | null
+  displayName: string | null
   image: string | null
   platformRole: $Enums.PlatformRole | null
 }
@@ -56,6 +58,7 @@ export type UserCountAggregateOutputType = {
   email: number
   emailVerified: number
   name: number
+  displayName: number
   image: number
   platformRole: number
   _all: number
@@ -70,6 +73,7 @@ export type UserMinAggregateInputType = {
   email?: true
   emailVerified?: true
   name?: true
+  displayName?: true
   image?: true
   platformRole?: true
 }
@@ -82,6 +86,7 @@ export type UserMaxAggregateInputType = {
   email?: true
   emailVerified?: true
   name?: true
+  displayName?: true
   image?: true
   platformRole?: true
 }
@@ -94,6 +99,7 @@ export type UserCountAggregateInputType = {
   email?: true
   emailVerified?: true
   name?: true
+  displayName?: true
   image?: true
   platformRole?: true
   _all?: true
@@ -179,6 +185,7 @@ export type UserGroupByOutputType = {
   email: string
   emailVerified: boolean
   name: string | null
+  displayName: string | null
   image: string | null
   platformRole: $Enums.PlatformRole
   _count: UserCountAggregateOutputType | null
@@ -212,11 +219,12 @@ export type UserWhereInput = {
   email?: Prisma.StringFilter<"User"> | string
   emailVerified?: Prisma.BoolFilter<"User"> | boolean
   name?: Prisma.StringNullableFilter<"User"> | string | null
+  displayName?: Prisma.StringNullableFilter<"User"> | string | null
   image?: Prisma.StringNullableFilter<"User"> | string | null
   platformRole?: Prisma.EnumPlatformRoleFilter<"User"> | $Enums.PlatformRole
   accounts?: Prisma.AccountListRelationFilter
   sessions?: Prisma.SessionListRelationFilter
-  organizations?: Prisma.OrganizationUserListRelationFilter
+  organizationUsers?: Prisma.OrganizationUserListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   cronJobsCreated?: Prisma.CronJobListRelationFilter
   webhookSubscriptions?: Prisma.WebhookSubscriptionListRelationFilter
@@ -232,11 +240,12 @@ export type UserOrderByWithRelationInput = {
   email?: Prisma.SortOrder
   emailVerified?: Prisma.SortOrder
   name?: Prisma.SortOrderInput | Prisma.SortOrder
+  displayName?: Prisma.SortOrderInput | Prisma.SortOrder
   image?: Prisma.SortOrderInput | Prisma.SortOrder
   platformRole?: Prisma.SortOrder
   accounts?: Prisma.AccountOrderByRelationAggregateInput
   sessions?: Prisma.SessionOrderByRelationAggregateInput
-  organizations?: Prisma.OrganizationUserOrderByRelationAggregateInput
+  organizationUsers?: Prisma.OrganizationUserOrderByRelationAggregateInput
   tokens?: Prisma.TokenOrderByRelationAggregateInput
   cronJobsCreated?: Prisma.CronJobOrderByRelationAggregateInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionOrderByRelationAggregateInput
@@ -255,11 +264,12 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   deletedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   emailVerified?: Prisma.BoolFilter<"User"> | boolean
   name?: Prisma.StringNullableFilter<"User"> | string | null
+  displayName?: Prisma.StringNullableFilter<"User"> | string | null
   image?: Prisma.StringNullableFilter<"User"> | string | null
   platformRole?: Prisma.EnumPlatformRoleFilter<"User"> | $Enums.PlatformRole
   accounts?: Prisma.AccountListRelationFilter
   sessions?: Prisma.SessionListRelationFilter
-  organizations?: Prisma.OrganizationUserListRelationFilter
+  organizationUsers?: Prisma.OrganizationUserListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   cronJobsCreated?: Prisma.CronJobListRelationFilter
   webhookSubscriptions?: Prisma.WebhookSubscriptionListRelationFilter
@@ -275,6 +285,7 @@ export type UserOrderByWithAggregationInput = {
   email?: Prisma.SortOrder
   emailVerified?: Prisma.SortOrder
   name?: Prisma.SortOrderInput | Prisma.SortOrder
+  displayName?: Prisma.SortOrderInput | Prisma.SortOrder
   image?: Prisma.SortOrderInput | Prisma.SortOrder
   platformRole?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
@@ -293,6 +304,7 @@ export type UserScalarWhereWithAggregatesInput = {
   email?: Prisma.StringWithAggregatesFilter<"User"> | string
   emailVerified?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
   name?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  displayName?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   image?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   platformRole?: Prisma.EnumPlatformRoleWithAggregatesFilter<"User"> | $Enums.PlatformRole
 }
@@ -305,11 +317,12 @@ export type UserCreateInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
@@ -325,11 +338,12 @@ export type UserUncheckedCreateInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -345,11 +359,12 @@ export type UserUpdateInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
@@ -365,11 +380,12 @@ export type UserUncheckedUpdateInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
@@ -385,6 +401,7 @@ export type UserCreateManyInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
 }
@@ -397,6 +414,7 @@ export type UserUpdateManyMutationInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
 }
@@ -409,6 +427,7 @@ export type UserUncheckedUpdateManyInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
 }
@@ -431,6 +450,7 @@ export type UserCountOrderByAggregateInput = {
   email?: Prisma.SortOrder
   emailVerified?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  displayName?: Prisma.SortOrder
   image?: Prisma.SortOrder
   platformRole?: Prisma.SortOrder
 }
@@ -443,6 +463,7 @@ export type UserMaxOrderByAggregateInput = {
   email?: Prisma.SortOrder
   emailVerified?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  displayName?: Prisma.SortOrder
   image?: Prisma.SortOrder
   platformRole?: Prisma.SortOrder
 }
@@ -455,6 +476,7 @@ export type UserMinOrderByAggregateInput = {
   email?: Prisma.SortOrder
   emailVerified?: Prisma.SortOrder
   name?: Prisma.SortOrder
+  displayName?: Prisma.SortOrder
   image?: Prisma.SortOrder
   platformRole?: Prisma.SortOrder
 }
@@ -521,18 +543,18 @@ export type UserUpdateOneWithoutInquiriesReceivedNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInquiriesReceivedInput, Prisma.UserUpdateWithoutInquiriesReceivedInput>, Prisma.UserUncheckedUpdateWithoutInquiriesReceivedInput>
 }
 
-export type UserCreateNestedOneWithoutOrganizationsInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationsInput
+export type UserCreateNestedOneWithoutOrganizationUsersInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationUsersInput, Prisma.UserUncheckedCreateWithoutOrganizationUsersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationUsersInput
   connect?: Prisma.UserWhereUniqueInput
 }
 
-export type UserUpdateOneRequiredWithoutOrganizationsNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationsInput
-  upsert?: Prisma.UserUpsertWithoutOrganizationsInput
+export type UserUpdateOneRequiredWithoutOrganizationUsersNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOrganizationUsersInput, Prisma.UserUncheckedCreateWithoutOrganizationUsersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOrganizationUsersInput
+  upsert?: Prisma.UserUpsertWithoutOrganizationUsersInput
   connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutOrganizationsInput, Prisma.UserUpdateWithoutOrganizationsInput>, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutOrganizationUsersInput, Prisma.UserUpdateWithoutOrganizationUsersInput>, Prisma.UserUncheckedUpdateWithoutOrganizationUsersInput>
 }
 
 export type UserCreateNestedOneWithoutSessionsInput = {
@@ -593,10 +615,11 @@ export type UserCreateWithoutAccountsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
@@ -612,10 +635,11 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -647,10 +671,11 @@ export type UserUpdateWithoutAccountsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
@@ -666,10 +691,11 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
@@ -685,11 +711,12 @@ export type UserCreateWithoutCronJobsCreatedInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
   inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
@@ -704,11 +731,12 @@ export type UserUncheckedCreateWithoutCronJobsCreatedInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
   inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
@@ -739,11 +767,12 @@ export type UserUpdateWithoutCronJobsCreatedInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
   inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
@@ -758,11 +787,12 @@ export type UserUncheckedUpdateWithoutCronJobsCreatedInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
   inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
@@ -777,11 +807,12 @@ export type UserCreateWithoutInquiriesSentInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
@@ -796,11 +827,12 @@ export type UserUncheckedCreateWithoutInquiriesSentInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -820,11 +852,12 @@ export type UserCreateWithoutInquiriesReceivedInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
@@ -839,11 +872,12 @@ export type UserUncheckedCreateWithoutInquiriesReceivedInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -874,11 +908,12 @@ export type UserUpdateWithoutInquiriesSentInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
@@ -893,11 +928,12 @@ export type UserUncheckedUpdateWithoutInquiriesSentInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
@@ -923,11 +959,12 @@ export type UserUpdateWithoutInquiriesReceivedInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
@@ -942,18 +979,19 @@ export type UserUncheckedUpdateWithoutInquiriesReceivedInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
   inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
 }
 
-export type UserCreateWithoutOrganizationsInput = {
+export type UserCreateWithoutOrganizationUsersInput = {
   id?: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -961,6 +999,7 @@ export type UserCreateWithoutOrganizationsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
@@ -972,7 +1011,7 @@ export type UserCreateWithoutOrganizationsInput = {
   inquiriesReceived?: Prisma.InquiryCreateNestedManyWithoutTargetUserInput
 }
 
-export type UserUncheckedCreateWithoutOrganizationsInput = {
+export type UserUncheckedCreateWithoutOrganizationUsersInput = {
   id?: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -980,6 +1019,7 @@ export type UserUncheckedCreateWithoutOrganizationsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
@@ -991,23 +1031,23 @@ export type UserUncheckedCreateWithoutOrganizationsInput = {
   inquiriesReceived?: Prisma.InquiryUncheckedCreateNestedManyWithoutTargetUserInput
 }
 
-export type UserCreateOrConnectWithoutOrganizationsInput = {
+export type UserCreateOrConnectWithoutOrganizationUsersInput = {
   where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationUsersInput, Prisma.UserUncheckedCreateWithoutOrganizationUsersInput>
 }
 
-export type UserUpsertWithoutOrganizationsInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationsInput, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationsInput, Prisma.UserUncheckedCreateWithoutOrganizationsInput>
+export type UserUpsertWithoutOrganizationUsersInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationUsersInput, Prisma.UserUncheckedUpdateWithoutOrganizationUsersInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutOrganizationUsersInput, Prisma.UserUncheckedCreateWithoutOrganizationUsersInput>
   where?: Prisma.UserWhereInput
 }
 
-export type UserUpdateToOneWithWhereWithoutOrganizationsInput = {
+export type UserUpdateToOneWithWhereWithoutOrganizationUsersInput = {
   where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationsInput, Prisma.UserUncheckedUpdateWithoutOrganizationsInput>
+  data: Prisma.XOR<Prisma.UserUpdateWithoutOrganizationUsersInput, Prisma.UserUncheckedUpdateWithoutOrganizationUsersInput>
 }
 
-export type UserUpdateWithoutOrganizationsInput = {
+export type UserUpdateWithoutOrganizationUsersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1015,6 +1055,7 @@ export type UserUpdateWithoutOrganizationsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
@@ -1026,7 +1067,7 @@ export type UserUpdateWithoutOrganizationsInput = {
   inquiriesReceived?: Prisma.InquiryUpdateManyWithoutTargetUserNestedInput
 }
 
-export type UserUncheckedUpdateWithoutOrganizationsInput = {
+export type UserUncheckedUpdateWithoutOrganizationUsersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1034,6 +1075,7 @@ export type UserUncheckedUpdateWithoutOrganizationsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
@@ -1053,10 +1095,11 @@ export type UserCreateWithoutSessionsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
@@ -1072,10 +1115,11 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -1107,10 +1151,11 @@ export type UserUpdateWithoutSessionsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
@@ -1126,10 +1171,11 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
@@ -1145,11 +1191,12 @@ export type UserCreateWithoutTokensInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionCreateNestedManyWithoutUserInput
   inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
@@ -1164,11 +1211,12 @@ export type UserUncheckedCreateWithoutTokensInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedCreateNestedManyWithoutUserInput
   inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
@@ -1199,11 +1247,12 @@ export type UserUpdateWithoutTokensInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUpdateManyWithoutUserNestedInput
   inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
@@ -1218,11 +1267,12 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   webhookSubscriptions?: Prisma.WebhookSubscriptionUncheckedUpdateManyWithoutUserNestedInput
   inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
@@ -1237,11 +1287,12 @@ export type UserCreateWithoutWebhookSubscriptionsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobCreateNestedManyWithoutCreatedByInput
   inquiriesSent?: Prisma.InquiryCreateNestedManyWithoutSourceUserInput
@@ -1256,11 +1307,12 @@ export type UserUncheckedCreateWithoutWebhookSubscriptionsInput = {
   email: string
   emailVerified?: boolean
   name?: string | null
+  displayName?: string | null
   image?: string | null
   platformRole?: $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  organizations?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   cronJobsCreated?: Prisma.CronJobUncheckedCreateNestedManyWithoutCreatedByInput
   inquiriesSent?: Prisma.InquiryUncheckedCreateNestedManyWithoutSourceUserInput
@@ -1291,11 +1343,12 @@ export type UserUpdateWithoutWebhookSubscriptionsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUpdateManyWithoutCreatedByNestedInput
   inquiriesSent?: Prisma.InquiryUpdateManyWithoutSourceUserNestedInput
@@ -1310,11 +1363,12 @@ export type UserUncheckedUpdateWithoutWebhookSubscriptionsInput = {
   email?: Prisma.StringFieldUpdateOperationsInput | string
   emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   platformRole?: Prisma.EnumPlatformRoleFieldUpdateOperationsInput | $Enums.PlatformRole
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  organizations?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
+  organizationUsers?: Prisma.OrganizationUserUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   cronJobsCreated?: Prisma.CronJobUncheckedUpdateManyWithoutCreatedByNestedInput
   inquiriesSent?: Prisma.InquiryUncheckedUpdateManyWithoutSourceUserNestedInput
@@ -1329,7 +1383,7 @@ export type UserUncheckedUpdateWithoutWebhookSubscriptionsInput = {
 export type UserCountOutputType = {
   accounts: number
   sessions: number
-  organizations: number
+  organizationUsers: number
   tokens: number
   cronJobsCreated: number
   webhookSubscriptions: number
@@ -1340,7 +1394,7 @@ export type UserCountOutputType = {
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   accounts?: boolean | UserCountOutputTypeCountAccountsArgs
   sessions?: boolean | UserCountOutputTypeCountSessionsArgs
-  organizations?: boolean | UserCountOutputTypeCountOrganizationsArgs
+  organizationUsers?: boolean | UserCountOutputTypeCountOrganizationUsersArgs
   tokens?: boolean | UserCountOutputTypeCountTokensArgs
   cronJobsCreated?: boolean | UserCountOutputTypeCountCronJobsCreatedArgs
   webhookSubscriptions?: boolean | UserCountOutputTypeCountWebhookSubscriptionsArgs
@@ -1375,7 +1429,7 @@ export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends runtime.Types.E
 /**
  * UserCountOutputType without action
  */
-export type UserCountOutputTypeCountOrganizationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type UserCountOutputTypeCountOrganizationUsersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.OrganizationUserWhereInput
 }
 
@@ -1423,11 +1477,12 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   email?: boolean
   emailVerified?: boolean
   name?: boolean
+  displayName?: boolean
   image?: boolean
   platformRole?: boolean
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
-  organizations?: boolean | Prisma.User$organizationsArgs<ExtArgs>
+  organizationUsers?: boolean | Prisma.User$organizationUsersArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   cronJobsCreated?: boolean | Prisma.User$cronJobsCreatedArgs<ExtArgs>
   webhookSubscriptions?: boolean | Prisma.User$webhookSubscriptionsArgs<ExtArgs>
@@ -1444,6 +1499,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   email?: boolean
   emailVerified?: boolean
   name?: boolean
+  displayName?: boolean
   image?: boolean
   platformRole?: boolean
 }, ExtArgs["result"]["user"]>
@@ -1456,6 +1512,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   email?: boolean
   emailVerified?: boolean
   name?: boolean
+  displayName?: boolean
   image?: boolean
   platformRole?: boolean
 }, ExtArgs["result"]["user"]>
@@ -1468,15 +1525,16 @@ export type UserSelectScalar = {
   email?: boolean
   emailVerified?: boolean
   name?: boolean
+  displayName?: boolean
   image?: boolean
   platformRole?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "deletedAt" | "email" | "emailVerified" | "name" | "image" | "platformRole", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "deletedAt" | "email" | "emailVerified" | "name" | "displayName" | "image" | "platformRole", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
-  organizations?: boolean | Prisma.User$organizationsArgs<ExtArgs>
+  organizationUsers?: boolean | Prisma.User$organizationUsersArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   cronJobsCreated?: boolean | Prisma.User$cronJobsCreatedArgs<ExtArgs>
   webhookSubscriptions?: boolean | Prisma.User$webhookSubscriptionsArgs<ExtArgs>
@@ -1492,7 +1550,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     accounts: Prisma.$AccountPayload<ExtArgs>[]
     sessions: Prisma.$SessionPayload<ExtArgs>[]
-    organizations: Prisma.$OrganizationUserPayload<ExtArgs>[]
+    organizationUsers: Prisma.$OrganizationUserPayload<ExtArgs>[]
     tokens: Prisma.$TokenPayload<ExtArgs>[]
     cronJobsCreated: Prisma.$CronJobPayload<ExtArgs>[]
     webhookSubscriptions: Prisma.$WebhookSubscriptionPayload<ExtArgs>[]
@@ -1507,6 +1565,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     email: string
     emailVerified: boolean
     name: string | null
+    displayName: string | null
     image: string | null
     platformRole: $Enums.PlatformRole
   }, ExtArgs["result"]["user"]>
@@ -1905,7 +1964,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   accounts<T extends Prisma.User$accountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sessions<T extends Prisma.User$sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  organizations<T extends Prisma.User$organizationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$organizationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrganizationUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  organizationUsers<T extends Prisma.User$organizationUsersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$organizationUsersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrganizationUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tokens<T extends Prisma.User$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   cronJobsCreated<T extends Prisma.User$cronJobsCreatedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$cronJobsCreatedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CronJobPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   webhookSubscriptions<T extends Prisma.User$webhookSubscriptionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$webhookSubscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebhookSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -1947,6 +2006,7 @@ export interface UserFieldRefs {
   readonly email: Prisma.FieldRef<"User", 'String'>
   readonly emailVerified: Prisma.FieldRef<"User", 'Boolean'>
   readonly name: Prisma.FieldRef<"User", 'String'>
+  readonly displayName: Prisma.FieldRef<"User", 'String'>
   readonly image: Prisma.FieldRef<"User", 'String'>
   readonly platformRole: Prisma.FieldRef<"User", 'PlatformRole'>
 }
@@ -2385,9 +2445,9 @@ export type User$sessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalA
 }
 
 /**
- * User.organizations
+ * User.organizationUsers
  */
-export type User$organizationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type User$organizationUsersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the OrganizationUser
    */

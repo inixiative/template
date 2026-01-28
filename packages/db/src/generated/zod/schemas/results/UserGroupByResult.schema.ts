@@ -7,6 +7,7 @@ export const UserGroupByResultSchema = z.array(z.object({
   email: z.string(),
   emailVerified: z.boolean(),
   name: z.string(),
+  displayName: z.string(),
   image: z.string(),
   _count: z.object({
     id: z.number(),
@@ -16,11 +17,12 @@ export const UserGroupByResultSchema = z.array(z.object({
     email: z.number(),
     emailVerified: z.number(),
     name: z.number(),
+    displayName: z.number(),
     image: z.number(),
     platformRole: z.number(),
     accounts: z.number(),
     sessions: z.number(),
-    organizations: z.number(),
+    organizationUsers: z.number(),
     tokens: z.number(),
     cronJobsCreated: z.number(),
     webhookSubscriptions: z.number(),
@@ -34,6 +36,7 @@ export const UserGroupByResultSchema = z.array(z.object({
     deletedAt: z.date().nullable(),
     email: z.string().nullable(),
     name: z.string().nullable(),
+    displayName: z.string().nullable(),
     image: z.string().nullable()
   }).nullable().optional(),
   _max: z.object({
@@ -43,6 +46,7 @@ export const UserGroupByResultSchema = z.array(z.object({
     deletedAt: z.date().nullable(),
     email: z.string().nullable(),
     name: z.string().nullable(),
+    displayName: z.string().nullable(),
     image: z.string().nullable()
   }).nullable().optional()
 }));

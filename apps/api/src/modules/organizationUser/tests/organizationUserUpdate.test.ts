@@ -1,9 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
+import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
-import { patch } from '#tests/utils/request';
+import { json, patch } from '#tests/utils/request';
+
+type UpdateOrgUserResponse = z.infer<typeof organizationUserUpdateRoute.responseSchema>;
 
 describe('PATCH /api/v1/organizationUser/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -35,9 +39,9 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     const { entity: member } = await createOrganizationUser({ role: 'member' }, { Organization: org });
 
     const response = await fetch(patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }));
-    expect(response.status).toBe(200);
+    const { data } = await json<UpdateOrgUserResponse>(response);
 
-    const { data } = await response.json();
+    expect(response.status).toBe(200);
     expect(data.role).toBe('viewer');
   });
 });

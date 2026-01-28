@@ -7,20 +7,24 @@ import { adminOrganizationReadManyRoute } from '#/modules/organization/routes/ad
 
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
-import { organizationCreateUserRoute } from '#/modules/organization/routes/organizationCreateUser';
+import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
+import { organizationCreateWebhookSubscriptionRoute } from '#/modules/organization/routes/organizationCreateWebhookSubscription';
 import { organizationDeleteRoute } from '#/modules/organization/routes/organizationDelete';
 import { organizationReadRoute } from '#/modules/organization/routes/organizationRead';
-import { organizationReadManyOrganizationUserRoute } from '#/modules/organization/routes/organizationReadManyOrganizationUser';
+import { organizationReadManyUsersRoute } from '#/modules/organization/routes/organizationReadManyUsers';
 import { organizationReadManyTokenRoute } from '#/modules/organization/routes/organizationReadManyToken';
+import { organizationReadManyWebhookSubscriptionRoute } from '#/modules/organization/routes/organizationReadManyWebhookSubscription';
 import { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
 
 import { organizationCreateController } from '#/modules/organization/controllers/organizationCreate';
 import { organizationCreateTokenController } from '#/modules/organization/controllers/organizationCreateToken';
-import { organizationCreateUserController } from '#/modules/organization/controllers/organizationCreateUser';
+import { organizationCreateOrganizationUserController } from '#/modules/organization/controllers/organizationCreateOrganizationUser';
+import { organizationCreateWebhookSubscriptionController } from '#/modules/organization/controllers/organizationCreateWebhookSubscription';
 import { organizationDeleteController } from '#/modules/organization/controllers/organizationDelete';
 import { organizationReadController } from '#/modules/organization/controllers/organizationRead';
-import { organizationReadManyOrganizationUserController } from '#/modules/organization/controllers/organizationReadManyOrganizationUser';
+import { organizationReadManyUsersController } from '#/modules/organization/controllers/organizationReadManyUsers';
 import { organizationReadManyTokenController } from '#/modules/organization/controllers/organizationReadManyToken';
+import { organizationReadManyWebhookSubscriptionController } from '#/modules/organization/controllers/organizationReadManyWebhookSubscription';
 import { organizationUpdateController } from '#/modules/organization/controllers/organizationUpdate';
 
 export const organizationRouter = new OpenAPIHono<AppEnv>();
@@ -33,8 +37,10 @@ organizationRouter.openapi(organizationUpdateRoute, organizationUpdateController
 organizationRouter.openapi(organizationDeleteRoute, organizationDeleteController);
 organizationRouter.openapi(organizationCreateTokenRoute, organizationCreateTokenController);
 organizationRouter.openapi(organizationReadManyTokenRoute, organizationReadManyTokenController);
-organizationRouter.openapi(organizationCreateUserRoute, organizationCreateUserController);
-organizationRouter.openapi(organizationReadManyOrganizationUserRoute, organizationReadManyOrganizationUserController);
+organizationRouter.openapi(organizationCreateWebhookSubscriptionRoute, organizationCreateWebhookSubscriptionController);
+organizationRouter.openapi(organizationReadManyWebhookSubscriptionRoute, organizationReadManyWebhookSubscriptionController);
+organizationRouter.openapi(organizationCreateOrganizationUserRoute, organizationCreateOrganizationUserController);
+organizationRouter.openapi(organizationReadManyUsersRoute, organizationReadManyUsersController);
 
 export const adminOrganizationRouter = new OpenAPIHono<AppEnv>();
 

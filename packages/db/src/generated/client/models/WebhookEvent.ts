@@ -268,7 +268,7 @@ export type WebhookEventCreateInput = {
   payload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   error?: string | null
   resourceId: string
-  webhookSubscription: Prisma.WebhookSubscriptionCreateNestedOneWithoutEventsInput
+  webhookSubscription: Prisma.WebhookSubscriptionCreateNestedOneWithoutWebhookEventsInput
 }
 
 export type WebhookEventUncheckedCreateInput = {
@@ -290,7 +290,7 @@ export type WebhookEventUpdateInput = {
   payload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resourceId?: Prisma.StringFieldUpdateOperationsInput | string
-  webhookSubscription?: Prisma.WebhookSubscriptionUpdateOneRequiredWithoutEventsNestedInput
+  webhookSubscription?: Prisma.WebhookSubscriptionUpdateOneRequiredWithoutWebhookEventsNestedInput
 }
 
 export type WebhookEventUncheckedUpdateInput = {

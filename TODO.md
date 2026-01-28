@@ -14,17 +14,17 @@
 
 ## Webhooks (apps/api/src/hooks/webhooks/)
 
-Structure complete, needs implementation:
-
-- [ ] Webhook delivery job - implement `sendWebhook` job handler (see Carde `runDeliverWebhookEvent.ts`)
-- [ ] Webhook subscription matching - implement `checkForWebhookSubscriptions` using `WEBHOOK_SUBSCRIBERS`
-- [ ] Add `WEBHOOKS_PRIVATE_KEY` env var for signing payloads
-- [ ] WebhookSubscriptions module - CRUD routes for managing subscriptions (see Carde `/manage/webhooks/`)
+- [x] Webhook delivery job - `sendWebhook` handler with RSA-SHA256 signing
+- [x] Webhook hook - `registerWebhookHook` triggers on db mutations
+- [x] `WEBHOOK_SIGNING_PRIVATE_KEY` env var for signing payloads
+- [x] WebhookSubscriptions module - CRUD routes + create via /me and /organization
+- [x] Circuit breaker - disables subscription after 5 consecutive failures
+- [x] Tests for sendWebhook handler
 
 ## Cache (apps/api/src/hooks/cache/)
 
-- [ ] Admin routes for clearing caches (pattern-based cache invalidation)
-- [ ] Wire up `registerClearCacheHook` in app startup
+- [x] Wire up `registerClearCacheHook` in app startup (via `registerHooks()`)
+- [x] Admin routes for clearing caches (`POST /api/admin/cache/clear`)
 
 ## Events (apps/api/src/events/)
 
@@ -35,7 +35,8 @@ Structure complete, needs implementation:
 - [ ] DB mutation lifecycle tests (registerDbHook, executeHooks)
 - [ ] DB transaction tests (db.txn, db.onCommit, db.isInTxn)
 - [ ] DB scope tests (db.scope, db.getScopeId)
-- [ ] Webhook hook tests
+- [x] Webhook handler tests (sendWebhook with circuit breaker)
+- [x] Webhook route tests (CRUD, create via /me and /organization)
 - [ ] Cache hook tests
 - [ ] Add Playwright for E2E testing
 - [ ] Tests for request templates

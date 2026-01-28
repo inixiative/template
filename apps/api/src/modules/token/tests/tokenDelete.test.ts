@@ -20,6 +20,7 @@ describe('DELETE /token/:id', () => {
 
     const harness = createTestApp({
       mockUser: user,
+      mockOrganizationUsers: [orgUser],
       mount: [(app) => app.route('/api/v1/token', tokenRouter)],
     });
     fetch = harness.fetch;

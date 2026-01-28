@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { Prisma } from '../../../client/client';
 import { UserCountOutputTypeCountAccountsArgsObjectSchema as UserCountOutputTypeCountAccountsArgsObjectSchema } from './UserCountOutputTypeCountAccountsArgs.schema';
 import { UserCountOutputTypeCountSessionsArgsObjectSchema as UserCountOutputTypeCountSessionsArgsObjectSchema } from './UserCountOutputTypeCountSessionsArgs.schema';
-import { UserCountOutputTypeCountOrganizationsArgsObjectSchema as UserCountOutputTypeCountOrganizationsArgsObjectSchema } from './UserCountOutputTypeCountOrganizationsArgs.schema';
+import { UserCountOutputTypeCountOrganizationUsersArgsObjectSchema as UserCountOutputTypeCountOrganizationUsersArgsObjectSchema } from './UserCountOutputTypeCountOrganizationUsersArgs.schema';
 import { UserCountOutputTypeCountTokensArgsObjectSchema as UserCountOutputTypeCountTokensArgsObjectSchema } from './UserCountOutputTypeCountTokensArgs.schema';
 import { UserCountOutputTypeCountCronJobsCreatedArgsObjectSchema as UserCountOutputTypeCountCronJobsCreatedArgsObjectSchema } from './UserCountOutputTypeCountCronJobsCreatedArgs.schema';
 import { UserCountOutputTypeCountWebhookSubscriptionsArgsObjectSchema as UserCountOutputTypeCountWebhookSubscriptionsArgsObjectSchema } from './UserCountOutputTypeCountWebhookSubscriptionsArgs.schema';
@@ -12,7 +12,7 @@ import { UserCountOutputTypeCountInquiriesReceivedArgsObjectSchema as UserCountO
 const makeSchema = () => z.object({
   accounts: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountAccountsArgsObjectSchema)]).optional(),
   sessions: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountSessionsArgsObjectSchema)]).optional(),
-  organizations: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountOrganizationsArgsObjectSchema)]).optional(),
+  organizationUsers: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountOrganizationUsersArgsObjectSchema)]).optional(),
   tokens: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountTokensArgsObjectSchema)]).optional(),
   cronJobsCreated: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountCronJobsCreatedArgsObjectSchema)]).optional(),
   webhookSubscriptions: z.union([z.boolean(), z.lazy(() => UserCountOutputTypeCountWebhookSubscriptionsArgsObjectSchema)]).optional(),

@@ -16,5 +16,5 @@ export const meReadManyTokenRoute = readRoute({
   skipId: true,
   paginate: true,
   responseSchema,
-  tags: [Tags.Token],
+  tags: [Tags.me, Tags.token],
 });

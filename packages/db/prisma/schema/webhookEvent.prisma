@@ -18,6 +18,10 @@ model WebhookEvent {
   @@index([webhookSubscriptionId])
   @@index([resourceId])
   @@index([status])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum WebhookEventStatus {

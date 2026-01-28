@@ -1,4 +1,4 @@
-import type { Prisma } from '@template/db';
+import type { ExtendedPrismaClient, ModelArgs, ModelDelegate, ModelResult } from '@template/db';
 
 type PaginationParams = {
   page?: number;
@@ -17,21 +17,20 @@ type PaginatedResult<T> = {
   pagination: PaginationResult;
 };
 
-export const paginate = async <T, W>(
-  model: {
-    findMany(...args: unknown[]): Prisma.PrismaPromise<T[]>;
-    count(...args: unknown[]): Prisma.PrismaPromise<number>;
-  },
-  args: { where?: W; orderBy?: unknown; include?: unknown; select?: unknown; omit?: unknown },
+export const paginate = async <M extends ModelDelegate, A extends ModelArgs<M, 'findMany'>>(
+  model: ExtendedPrismaClient[M],
+  args: A,
   { page = 1, pageSize = 20 }: PaginationParams,
-): Promise<PaginatedResult<T>> => {
+): Promise<PaginatedResult<ModelResult<M, A, 'findMany'>[number]>> => {
+  const delegate = model as { findMany: Function; count: Function };
+
   const [data, total] = await Promise.all([
-    model.findMany({
+    delegate.findMany({
       ...args,
       take: pageSize,
       skip: (page - 1) * pageSize,
     }),
-    model.count({ where: args.where }),
+    delegate.count({ where: (args as { where?: object }).where }),
   ]);
 
   return {

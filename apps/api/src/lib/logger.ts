@@ -1,13 +1,18 @@
 import { db } from '@template/db';
 import { LogLevels, createConsola } from 'consola';
-import { env } from '#/config/env';
+import { isLocal, isProd, isTest } from '#/config/env';
+
+const getLogLevel = (): number => {
+  if (process.env.LOG_LEVEL) return LogLevels[process.env.LOG_LEVEL];
+  return LogLevels.info;
+};
 
 const baseLog = createConsola({
-  level: env.LOG_LEVEL ? LogLevels[env.LOG_LEVEL as keyof typeof LogLevels] : LogLevels.info,
+  level: getLogLevel(),
   formatOptions: {
     date: true,
-    colors: env.ENVIRONMENT !== 'production',
-    compact: env.ENVIRONMENT === 'production',
+    colors: isLocal || isTest,
+    compact: isProd,
   },
 });
 

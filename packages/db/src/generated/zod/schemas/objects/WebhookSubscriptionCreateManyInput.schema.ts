@@ -9,7 +9,6 @@ const makeSchema = () => z.object({
   updatedAt: z.coerce.date().optional(),
   model: WebhookModelSchema,
   url: z.string(),
-  secret: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
   ownerModel: WebhookOwnerModelSchema,
   userId: z.string().max(36).optional().nullable(),

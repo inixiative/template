@@ -1,9 +1,11 @@
+import '#tests/mocks/queue';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type ExtendedPrismaClient, type OrganizationUser, type User, db } from '@template/db';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/getToken';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
+import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -32,6 +34,7 @@ export function createTestApp(options?: CreateTestAppOptions) {
     if (options?.mockOrganizationUsers) c.set('organizationUsers', options.mockOrganizationUsers);
     if (options?.mockToken) c.set('token', options.mockToken);
     await setupOrgPermissions(c);
+    await setupUserPermissions(c);
     await next();
   });
 

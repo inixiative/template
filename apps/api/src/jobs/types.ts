@@ -40,7 +40,7 @@ export type JobOptions = {
   delay?: number;
   attempts?: number;
   backoff?: number | { type: string; delay: number };
-  removeOnComplete?: boolean | number | { age?: number; count?: number };
-  removeOnFail?: boolean | number | { age?: number; count?: number };
+  removeOnComplete?: boolean | number | { age: number; count?: number };
+  removeOnFail?: boolean | number | { age: number; count?: number };
   jobId?: string;
 };

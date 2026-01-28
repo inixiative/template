@@ -6,7 +6,7 @@ import { EnumOrganizationRoleFieldUpdateOperationsInputObjectSchema as EnumOrgan
 import { NullableJsonNullValueInputSchema } from '../enums/NullableJsonNullValueInput.schema';
 import { DateTimeFieldUpdateOperationsInputObjectSchema as DateTimeFieldUpdateOperationsInputObjectSchema } from './DateTimeFieldUpdateOperationsInput.schema';
 import { OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema as OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema } from './OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInput.schema';
-import { UserUpdateOneRequiredWithoutOrganizationsNestedInputObjectSchema as UserUpdateOneRequiredWithoutOrganizationsNestedInputObjectSchema } from './UserUpdateOneRequiredWithoutOrganizationsNestedInput.schema';
+import { UserUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema as UserUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema } from './UserUpdateOneRequiredWithoutOrganizationUsersNestedInput.schema';
 import { TokenUpdateManyWithoutOrganizationUserNestedInputObjectSchema as TokenUpdateManyWithoutOrganizationUserNestedInputObjectSchema } from './TokenUpdateManyWithoutOrganizationUserNestedInput.schema'
 
 import { JsonValueSchema as jsonSchema } from '../../helpers/json-helpers';
@@ -18,7 +18,7 @@ const makeSchema = () => z.object({
   createdAt: z.union([z.coerce.date(), z.lazy(() => DateTimeFieldUpdateOperationsInputObjectSchema)]).optional(),
   updatedAt: z.union([z.coerce.date(), z.lazy(() => DateTimeFieldUpdateOperationsInputObjectSchema)]).optional(),
   organization: z.lazy(() => OrganizationUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema).optional(),
-  user: z.lazy(() => UserUpdateOneRequiredWithoutOrganizationsNestedInputObjectSchema).optional(),
+  user: z.lazy(() => UserUpdateOneRequiredWithoutOrganizationUsersNestedInputObjectSchema).optional(),
   tokens: z.lazy(() => TokenUpdateManyWithoutOrganizationUserNestedInputObjectSchema).optional()
 }).strict();
 export const OrganizationUserUpdateInputObjectSchema: z.ZodType<Prisma.OrganizationUserUpdateInput> = makeSchema() as unknown as z.ZodType<Prisma.OrganizationUserUpdateInput>;

@@ -37,6 +37,10 @@ model Inquiry {
   @@index([targetUserId])
   @@index([targetOrganizationId])
   @@index([type, status])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum InquiryType {

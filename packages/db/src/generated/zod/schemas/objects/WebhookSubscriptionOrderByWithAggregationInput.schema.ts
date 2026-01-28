@@ -12,7 +12,6 @@ const makeSchema = () => z.object({
   updatedAt: SortOrderSchema.optional(),
   model: SortOrderSchema.optional(),
   url: SortOrderSchema.optional(),
-  secret: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),
   isActive: SortOrderSchema.optional(),
   ownerModel: SortOrderSchema.optional(),
   userId: z.union([SortOrderSchema, z.lazy(() => SortOrderInputObjectSchema)]).optional(),

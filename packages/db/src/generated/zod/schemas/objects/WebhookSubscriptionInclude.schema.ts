@@ -8,7 +8,7 @@ import { WebhookSubscriptionCountOutputTypeArgsObjectSchema as WebhookSubscripti
 const makeSchema = () => z.object({
   user: z.union([z.boolean(), z.lazy(() => UserArgsObjectSchema)]).optional(),
   organization: z.union([z.boolean(), z.lazy(() => OrganizationArgsObjectSchema)]).optional(),
-  events: z.union([z.boolean(), z.lazy(() => WebhookEventFindManySchema)]).optional(),
+  webhookEvents: z.union([z.boolean(), z.lazy(() => WebhookEventFindManySchema)]).optional(),
   _count: z.union([z.boolean(), z.lazy(() => WebhookSubscriptionCountOutputTypeArgsObjectSchema)]).optional()
 }).strict();
 export const WebhookSubscriptionIncludeObjectSchema: z.ZodType<Prisma.WebhookSubscriptionInclude> = makeSchema() as unknown as z.ZodType<Prisma.WebhookSubscriptionInclude>;

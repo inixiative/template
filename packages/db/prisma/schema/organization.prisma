@@ -19,4 +19,8 @@ model Organization {
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
 
   @@index([slug])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }

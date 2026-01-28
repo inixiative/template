@@ -1,10 +1,10 @@
-import { InquiryModelSchema } from '@template/db/zod/models';
+import { InquiryScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/requestTemplates';
 import { Modules } from '#/modules/modules';
 
 export const inquiryUpdateRoute = updateRoute({
   model: Modules.inquiry,
-  bodySchema: InquiryModelSchema,
-  responseSchema: InquiryModelSchema,
+  bodySchema: InquiryScalarSchema,
+  responseSchema: InquiryScalarSchema,
   tags: ['Inquiries'],
 });

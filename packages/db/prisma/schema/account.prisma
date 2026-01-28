@@ -21,4 +21,8 @@ model Account {
 
   @@index([userId])
   @@index([providerId, accountId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }

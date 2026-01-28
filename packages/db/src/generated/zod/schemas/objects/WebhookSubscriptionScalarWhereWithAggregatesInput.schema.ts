@@ -4,10 +4,10 @@ import { StringWithAggregatesFilterObjectSchema as StringWithAggregatesFilterObj
 import { DateTimeWithAggregatesFilterObjectSchema as DateTimeWithAggregatesFilterObjectSchema } from './DateTimeWithAggregatesFilter.schema';
 import { EnumWebhookModelWithAggregatesFilterObjectSchema as EnumWebhookModelWithAggregatesFilterObjectSchema } from './EnumWebhookModelWithAggregatesFilter.schema';
 import { WebhookModelSchema } from '../enums/WebhookModel.schema';
-import { StringNullableWithAggregatesFilterObjectSchema as StringNullableWithAggregatesFilterObjectSchema } from './StringNullableWithAggregatesFilter.schema';
 import { BoolWithAggregatesFilterObjectSchema as BoolWithAggregatesFilterObjectSchema } from './BoolWithAggregatesFilter.schema';
 import { EnumWebhookOwnerModelWithAggregatesFilterObjectSchema as EnumWebhookOwnerModelWithAggregatesFilterObjectSchema } from './EnumWebhookOwnerModelWithAggregatesFilter.schema';
-import { WebhookOwnerModelSchema } from '../enums/WebhookOwnerModel.schema'
+import { WebhookOwnerModelSchema } from '../enums/WebhookOwnerModel.schema';
+import { StringNullableWithAggregatesFilterObjectSchema as StringNullableWithAggregatesFilterObjectSchema } from './StringNullableWithAggregatesFilter.schema'
 
 const webhooksubscriptionscalarwherewithaggregatesinputSchema = z.object({
   AND: z.union([z.lazy(() => WebhookSubscriptionScalarWhereWithAggregatesInputObjectSchema), z.lazy(() => WebhookSubscriptionScalarWhereWithAggregatesInputObjectSchema).array()]).optional(),
@@ -18,7 +18,6 @@ const webhooksubscriptionscalarwherewithaggregatesinputSchema = z.object({
   updatedAt: z.union([z.lazy(() => DateTimeWithAggregatesFilterObjectSchema), z.coerce.date()]).optional(),
   model: z.union([z.lazy(() => EnumWebhookModelWithAggregatesFilterObjectSchema), WebhookModelSchema]).optional(),
   url: z.union([z.lazy(() => StringWithAggregatesFilterObjectSchema), z.string()]).optional(),
-  secret: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string()]).optional().nullable(),
   isActive: z.union([z.lazy(() => BoolWithAggregatesFilterObjectSchema), z.boolean()]).optional(),
   ownerModel: z.union([z.lazy(() => EnumWebhookOwnerModelWithAggregatesFilterObjectSchema), WebhookOwnerModelSchema]).optional(),
   userId: z.union([z.lazy(() => StringNullableWithAggregatesFilterObjectSchema), z.string().max(36)]).optional().nullable(),

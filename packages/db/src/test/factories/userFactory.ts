@@ -7,6 +7,7 @@ const userFactory = createFactory('User', {
     email: `user-${getNextSeq()}@${faker.internet.domainName()}`,
     emailVerified: true,
     name: faker.person.fullName(),
+    displayName: null,
     image: faker.image.avatar(),
     platformRole: PlatformRole.user,
   }),

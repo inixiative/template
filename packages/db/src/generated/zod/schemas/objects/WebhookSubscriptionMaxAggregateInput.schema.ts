@@ -8,7 +8,6 @@ const makeSchema = () => z.object({
   updatedAt: z.literal(true).optional(),
   model: z.literal(true).optional(),
   url: z.literal(true).optional(),
-  secret: z.literal(true).optional(),
   isActive: z.literal(true).optional(),
   ownerModel: z.literal(true).optional(),
   userId: z.literal(true).optional(),

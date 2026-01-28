@@ -15,14 +15,13 @@ export const WebhookSubscriptionFindFirstSelectSchema: z.ZodType<Prisma.WebhookS
     updatedAt: z.boolean().optional(),
     model: z.boolean().optional(),
     url: z.boolean().optional(),
-    secret: z.boolean().optional(),
     isActive: z.boolean().optional(),
     ownerModel: z.boolean().optional(),
     userId: z.boolean().optional(),
     organizationId: z.boolean().optional(),
     user: z.boolean().optional(),
     organization: z.boolean().optional(),
-    events: z.boolean().optional(),
+    webhookEvents: z.boolean().optional(),
     _count: z.boolean().optional()
   }).strict() as unknown as z.ZodType<Prisma.WebhookSubscriptionSelect>;
 
@@ -32,14 +31,13 @@ export const WebhookSubscriptionFindFirstSelectZodSchema = z.object({
     updatedAt: z.boolean().optional(),
     model: z.boolean().optional(),
     url: z.boolean().optional(),
-    secret: z.boolean().optional(),
     isActive: z.boolean().optional(),
     ownerModel: z.boolean().optional(),
     userId: z.boolean().optional(),
     organizationId: z.boolean().optional(),
     user: z.boolean().optional(),
     organization: z.boolean().optional(),
-    events: z.boolean().optional(),
+    webhookEvents: z.boolean().optional(),
     _count: z.boolean().optional()
   }).strict();
 

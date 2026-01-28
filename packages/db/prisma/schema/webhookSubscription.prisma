@@ -8,7 +8,6 @@ model WebhookSubscription {
   updatedAt DateTime         @updatedAt
   model     WebhookModel
   url       String
-  secret    String?
   isActive  Boolean          @default(true)
 
   // Owner (fake polymorphism)
@@ -20,7 +19,7 @@ model WebhookSubscription {
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Relations
-  events WebhookEvent[]
+  webhookEvents WebhookEvent[]
 
   @@unique([userId, model, url])
   @@unique([organizationId, model, url])
@@ -28,6 +27,10 @@ model WebhookSubscription {
   @@index([userId])
   @@index([organizationId])
   @@index([model])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
 
 enum WebhookModel {

@@ -76,6 +76,10 @@ constants, controllers, schemas, services, routes, transformers, tests
 - is* for boolean checks
 - txn not transaction
 
+**Variable prefixes:**
+- `_` = unused parameter (e.g., `_req`)
+- `__` = module-private variable (not exported)
+
 ---
 
 ## Index Files
@@ -275,21 +279,27 @@ This keeps admin logic co-located with its module while cleanly separating user 
 
 ## Redis Clients (apps/api/src/lib/clients/redis.ts)
 
-Unified Redis with ioredis + ioredis-mock for tests:
+Two app-managed connections + BullMQ manages its own:
 
 ```typescript
-createRedisConnection(name)  // New connection (queue, worker)
-getRedisClient()             // Shared singleton (cache, rate limit)
-getRedisPub()                // Alias for getRedisClient
-getRedisSub()                // Separate singleton (pub/sub needs own conn)
+getRedisClient()             // Main client (cache, otp, session, flags, rate limit)
+getRedisPub()                // Alias for main client (pub doesn't block)
+getRedisSub()                // Dedicated subscriber (subscribe is blocking)
+createRedisConnection(name)  // Factory for new connections (BullMQ uses this)
 ```
 
-All route through `createRedisConnection()` which uses `ioredis-mock` when `env.isTest`.
+Connection naming: `Redis:Main`, `Redis:Subscriber`, `Redis:BullMQ:Queue`, `Redis:BullMQ:Worker`
 
-Used by:
-- Queue (`jobs/queue.ts`) - `createRedisConnection('Queue')`
-- Cache (`lib/cache/`) - `getRedisClient()`
-- PubSub (`ws/pubsub.ts`) - `getRedisPub()` + `getRedisSub()`
+In test mode, all connections share a single `ioredis-mock` instance.
+
+Namespaces (`lib/clients/redisNamespaces.ts`):
+- `bull:*` - BullMQ queues (managed by BullMQ)
+- `cache:*` - Application cache
+- `job:*` - Job coordination (supersede flags, singleton locks)
+- `ws:*` - WebSocket pub/sub channels
+- `otp:*` - One-time passwords
+- `session:*` - User sessions
+- `limit:*` - Rate limiting
 
 ---
 
@@ -358,6 +368,26 @@ modules/organizations/
 
 ---
 
+## Database Migration Strategy
+
+**Current:** Using `prisma db push` for development speed during initial build phase.
+
+**TODO: Switch to `prisma migrate` before production:**
+- `db push` is fine for dev + test (quick schema sync)
+- Migrations needed for production (data migration scripts, rollbacks)
+- Tests can always use `db push` even after switching
+- Some migrations need data queries (e.g., backfilling columns)
+
+```bash
+# Development (current)
+cd packages/db && bunx prisma db push
+
+# Production (future)
+cd packages/db && bunx prisma migrate dev
+```
+
+---
+
 ## Prisma Schema Conventions
 
 **Database:** PostgreSQL 18 (docker-compose.yml)
@@ -400,6 +430,16 @@ enum InquiryStatus {
   resolved
 }
 ```
+
+**Template dividers:**
+Each model file has a divider comment before the closing brace:
+```prisma
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}
+```
+Forks add their custom fields below the divider to reduce merge conflicts when syncing template updates.
 
 **Fake polymorphism pattern:**
 Instead of true polymorphism (type + id), use type enum + optional FKs:
@@ -507,5 +547,159 @@ The FK naming convention `{modelName}Id` (e.g., `webhookSubscriptionId`) is what
 - `subscriptionId` → ??? ✗ (ambiguous, needs manual config)
 
 The factory system uses `Prisma.${ModelName}ScalarFieldEnum` to get field names, then matches `fooId` to model `Foo`.
+
+---
+
+## Schema Collocation
+
+Keep schemas in route files unless shared across multiple routes:
+
+```typescript
+// routes/organizationCreateUser.ts
+const bodySchema = z.object({
+  userId: z.string().uuid().optional(),
+  email: z.string().email().optional(),
+  role: z.enum(['viewer', 'member', 'admin', 'owner']).default('member'),
+});
+
+export const organizationCreateUserRoute = createRoute({
+  model: Modules.organization,
+  bodySchema,
+  responseSchema: OrganizationUserScalarSchema,
+});
+```
+
+Only extract to shared when actually reused.
+
+---
+
+## Cross-Field Validations
+
+Don't use `.refine()` on route schemas - causes type issues with ZodEffects.
+
+Instead, create a validation file in the module and call `.parse()` manually:
+
+```typescript
+// validations/organizationCreateUserBody.ts
+const schema = z.object({
+  userId: z.string().uuid().optional(),
+  email: z.string().email().optional(),
+}).refine((data) => data.userId || data.email, {
+  message: 'Either userId or email is required',
+});
+
+export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
+
+// controllers/organizationCreateUser.ts
+const body = c.req.valid('json');
+validateOrganizationCreateUserBody(body);  // Throws ZodError on failure
+```
+
+This keeps validation logic colocated with schema definition while avoiding type gymnastics.
+
+---
+
+## Permissions Model
+
+**Current state:**
+- Organizations have four actions: `read`, `operate`, `manage`, `own`
+- These map to roles: viewer → read, member → operate, admin → manage, owner → own
+- Token roles restrict via `lesserRole` (already handled in `setupOrgPermissions`)
+
+**Route permission mapping:**
+- `GET` → `validateOrgPermission('read')`
+- `POST/PATCH` → `validateOrgPermission('operate')`
+- `DELETE` → ownership check OR `validateOrgPermission('manage')`
+
+**TODO: User-level permissions + User Groups (template feature, big lift)**
+User tokens have roles but no corresponding user-level actions. Add same four actions (`read`, `operate`, `manage`, `own`) to User resource:
+- Enables meaningful permissions on user-owned resources
+- Paves the way for **User Groups** - like organizations but for personal resources
+- Template-level feature: generic platform capability, not app-specific
+
+---
+
+## Mutation Validation Hooks
+
+Registry-based mutation hooks using Prisma 7's `runtimeDataModel` introspection.
+
+### immutableFields
+
+Auto-infers FK fields from schema, silently strips them from update/upsert data.
+
+```typescript
+// Registry with overrides (apps/api/src/hooks/immutableFields/registry.ts)
+ImmutableFieldsOverrides: {
+  SomeModel: { exclude: ['categoryId'], include: ['status'] }
+}
+
+// Hook auto-infers FKs via getModelRelations()
+// Supports dot notation for JSON paths: 'entitlements.canInvite'
+// Uses lodash unset() for path deletion
+```
+
+Features:
+- Zero config for FK immutability (inferred from relations)
+- Recursive - handles nested writes (`user.organizationUsers.update.data`)
+- Transient overrides via `setImmutableFieldsCache()` for testing
+- JSON path support via lodash `unset()`
+
+### falsePolymorphism
+
+Validates type enum doesn't have forbidden extra FKs on create/createManyAndReturn/upsert.
+
+```typescript
+// Registry (apps/api/src/hooks/falsePolymorphism/registry.ts)
+FalsePolymorphismRegistry: {
+  Token: [{
+    typeField: 'ownerModel',
+    fkMap: {
+      User: ['userId'],
+      Organization: ['organizationId'],
+      OrganizationUser: ['organizationId', 'userId'],
+    },
+  }],
+  WebhookSubscription: [{ ... }],
+}
+```
+
+Features:
+- Throws if extra FK present for type (e.g., `User` owner with `organizationId`)
+- Missing FKs caught by Prisma FK constraints (handles relation connects correctly)
+- Also validates nested creates inside update/updateManyAndReturn operations
+- Recursive - handles deeply nested writes
+- Type fields should also be in immutableFields (use include override)
+
+### rules
+
+JSON-rules-based validation on create/update. Uses `@inixiative/json-rules` package.
+
+```typescript
+// Registry (apps/api/src/hooks/rules/registry.ts)
+RulesRegistry: {
+  Token: { field: 'ownerModel', operator: 'in', value: ['User', 'Organization', 'OrganizationUser'], error: 'Invalid ownerModel' },
+  Setting: {
+    all: [
+      { field: 'resourceType', operator: 'in', value: ['User', 'Organization'], error: 'Invalid resourceType' },
+      { field: 'key', operator: 'notEmpty', value: true, error: 'key is required' },
+    ],
+  },
+}
+```
+
+Features:
+- Validates on create/createMany/update/upsert
+- Update merges `previous` + `data` before validation (cross-field rules work)
+- Logs warning on nested update (can't fetch previous for nested records)
+- Logs warning on updateMany (can't validate without fetching each record)
+- Supports: boolean rules (`true`/`false`), `all: []`, `any: []`, `if/then/else`
+- Transient overrides via `setRulesCache()`/`clearRulesCache()` for testing
+
+---
+
+## Reference: Prisma CRUD Operations
+
+Full reference for all Prisma CRUD operations (create, read, update, delete, nested writes, filters, relations):
+https://www.prisma.io/docs/orm/prisma-client/queries/crud
 
 ---

@@ -4,7 +4,7 @@
  *
  * _global applies to all models.
  */
-export const IGNORED_TRACKING_FIELDS: Record<string, string[]> = {
+export const webhookIgnoredFields: Record<string, string[]> = {
   _global: ['updatedAt'],
   Token: ['lastUsedAt'],
   User: ['lastLoginAt'],
