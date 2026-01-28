@@ -15,8 +15,8 @@ describe('organization/webhookSubscriptions', () => {
   beforeAll(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'member' });
     orgUser = entity;
-    user = context.User;
-    org = context.Organization;
+    user = context.user;
+    org = context.organization;
 
     const harness = createTestApp({
       mockUser: user,
@@ -51,8 +51,8 @@ describe('organization/webhookSubscriptions', () => {
 
     it('rejects viewer creating webhook', async () => {
       const { entity: viewerOrgUser, context } = await createOrganizationUser({ role: 'viewer' });
-      const viewer = context.User;
-      const viewerOrg = context.Organization;
+      const viewer = context.user;
+      const viewerOrg = context.organization;
 
       const viewerHarness = createTestApp({
         mockUser: viewer,
@@ -91,7 +91,7 @@ describe('organization/webhookSubscriptions', () => {
 
     it('excludes other org webhooks', async () => {
       const { context: otherContext } = await createOrganizationUser();
-      const otherOrg = otherContext.Organization;
+      const otherOrg = otherContext.organization;
       const seq = getNextSeq();
       await createWebhookSubscription({
         ownerModel: 'Organization',

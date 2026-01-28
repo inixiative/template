@@ -49,7 +49,7 @@ describe('GET /me/tokens', () => {
         name: 'User Token',
         ownerModel: TokenOwnerModel.User,
       },
-      { User: user },
+      { user },
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));
@@ -66,7 +66,7 @@ describe('GET /me/tokens', () => {
         name: 'Org Token',
         ownerModel: TokenOwnerModel.Organization,
       },
-      { Organization: org },
+      { organization: org },
     );
 
     const response = await fetch(get('/api/v1/me/tokens'));

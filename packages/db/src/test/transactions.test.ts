@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { faker } from '@faker-js/faker';
 import { db } from '@template/db';
+import { getNextSeq } from './factory';
 import { cleanupTouchedTables, registerTestTracker } from './testTracker';
 
 describe('transactions', () => {
@@ -13,17 +15,18 @@ describe('transactions', () => {
 
   describe('db.txn', () => {
     it('executes function within a transaction', async () => {
+      const email = `txn-${getNextSeq()}@test.com`;
       const result = await db.txn(async () => {
         const user = await db.user.create({
           data: {
-            email: 'txn-test@example.com',
-            name: 'Txn User',
+            email,
+            name: faker.person.fullName(),
           },
         });
         return user;
       });
 
-      expect(result.email).toBe('txn-test@example.com');
+      expect(result.email).toBe(email);
       expect(result.id).toBeDefined();
 
       const found = await db.user.findUnique({

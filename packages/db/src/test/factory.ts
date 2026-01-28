@@ -28,7 +28,7 @@
 
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db/client';
-import { toPrismaAccessor } from '@template/db/utils/modelNames';
+import { toAccessor, toDelegate } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
@@ -119,20 +119,22 @@ export const createFactory = <K extends ModelName>(
         throw new Error(`Dependency factory not registered: ${dep.modelName}. Import it before using.`);
       }
 
+      const depAccessor = toAccessor(dep.modelName);
+
       if (relationValue !== undefined) {
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
         await (persist ? depFactory.create(relationValue as never, ctx) : depFactory.build(relationValue as never, ctx));
-      } else if (!ctx[dep.modelName] && dep.required) {
+      } else if (!ctx[depAccessor] && dep.required) {
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
         await (persist ? depFactory.create(undefined, ctx) : depFactory.build(undefined, ctx));
       }
 
-      if (dep.foreignKey && ctx[dep.modelName]) {
-        const depEntity = ctx[dep.modelName] as Record<string, unknown>;
+      if (dep.foreignKey && ctx[depAccessor]) {
+        const depEntity = ctx[depAccessor] as Record<string, unknown>;
         const fkFields = Array.isArray(dep.foreignKey) ? dep.foreignKey : [dep.foreignKey];
 
         for (const fk of fkFields) {
@@ -143,13 +145,11 @@ export const createFactory = <K extends ModelName>(
       }
     }
 
-    const prismaModelName = toPrismaAccessor(modelName);
-    // biome-ignore lint/suspicious/noExplicitAny: Dynamic Prisma model access
     const entity: ModelOf<K> = persist
-      ? await (db as any)[prismaModelName].create({ data: merged })
+      ? await toDelegate(db, modelName).create({ data: merged })
       : (merged as ModelOf<K>);
 
-    (ctx as Record<string, unknown>)[modelName] = entity;
+    (ctx as Record<string, unknown>)[toAccessor(modelName)] = entity;
 
     return { entity, context: ctx };
   };

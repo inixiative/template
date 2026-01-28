@@ -23,7 +23,7 @@ describe('POST /api/v1/organization/:id/organizationUsers', () => {
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { User: admin, Organization: org });
+    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
     adminOrgUser = ou;
 
     const harness = createTestApp({
@@ -58,7 +58,7 @@ describe('POST /api/v1/organization/:id/organizationUsers', () => {
 
   it('rejects duplicate membership', async () => {
     const { entity: existingMember } = await createUser();
-    await createOrganizationUser({ role: 'member' }, { User: existingMember, Organization: org });
+    await createOrganizationUser({ role: 'member' }, { user: existingMember, organization: org });
 
     const response = await fetch(
       post(`/api/v1/organization/${org.id}/organizationUsers`, {

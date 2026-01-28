@@ -20,8 +20,8 @@ describe('WebhookSubscription CRUD', () => {
   beforeAll(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
-    user = context.User;
-    org = context.Organization;
+    user = context.user;
+    org = context.organization;
 
     const harness = createTestApp({
       mockUser: user,

@@ -18,7 +18,7 @@ describe('POST /api/v1/organizationUser/:id/token', () => {
   beforeAll(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
-    user = context.User;
+    user = context.user;
 
     const harness = createTestApp({
       mockUser: user,

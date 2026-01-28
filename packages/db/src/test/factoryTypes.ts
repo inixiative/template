@@ -11,7 +11,7 @@ export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection
 export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 
 export type BuildContext = {
-  [K in ModelName]?: ModelOf<K>;
+  [K in ModelName as Uncapitalize<K>]?: ModelOf<K>;
 };
 
 export type BuildResult<K extends ModelName> = {

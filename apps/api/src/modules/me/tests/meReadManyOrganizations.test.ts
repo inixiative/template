@@ -44,8 +44,8 @@ describe('GET /me/organizations', () => {
     await createOrganizationUser(
       { role: OrganizationRole.admin },
       {
-        User: user,
-        Organization: org,
+        user,
+        organization: org,
       },
     );
 
@@ -66,17 +66,11 @@ describe('GET /me/organizations', () => {
 
     await createOrganizationUser(
       { role: OrganizationRole.owner },
-      {
-        User: user,
-        Organization: org1,
-      },
+      { user, organization: org1 },
     );
     await createOrganizationUser(
       { role: OrganizationRole.member },
-      {
-        User: user,
-        Organization: org2,
-      },
+      { user, organization: org2 },
     );
 
     const response = await fetch(get('/api/v1/me/organizations'));

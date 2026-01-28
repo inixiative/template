@@ -32,12 +32,12 @@ describe('webhook hook', () => {
     beforeAll(async () => {
       setWebhookEnabledModels([WebhookModel.User]);
 
-      const { entity: user } = await createUser();
+      const { entity: user, context } = await createUser();
       userId = user.id;
 
       const { entity: subscription } = await createWebhookSubscription(
         { model: WebhookModel.User, url: 'https://example.com/webhook' },
-        { user },
+        context,
       );
       subscriptionId = subscription.id;
     });

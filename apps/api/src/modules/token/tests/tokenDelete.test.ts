@@ -15,8 +15,8 @@ describe('DELETE /token/:id', () => {
   beforeAll(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
-    user = context.User;
-    org = context.Organization;
+    user = context.user;
+    org = context.organization;
 
     const harness = createTestApp({
       mockUser: user,
@@ -32,7 +32,7 @@ describe('DELETE /token/:id', () => {
   });
 
   it('deletes a User token', async () => {
-    const { entity: token } = await createToken({ ownerModel: 'User' }, { User: user });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
     const response = await fetch(del(`/api/v1/token/${token.id}`));
     expect(response.status).toBe(204);
@@ -42,7 +42,7 @@ describe('DELETE /token/:id', () => {
   });
 
   it('deletes an Organization token', async () => {
-    const { entity: token } = await createToken({ ownerModel: 'Organization' }, { Organization: org });
+    const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization: org });
 
     const response = await fetch(del(`/api/v1/token/${token.id}`));
     expect(response.status).toBe(204);
@@ -52,7 +52,7 @@ describe('DELETE /token/:id', () => {
   });
 
   it('deletes an OrganizationUser token', async () => {
-    const { entity: token } = await createToken({ ownerModel: 'OrganizationUser' }, { OrganizationUser: orgUser });
+    const { entity: token } = await createToken({ ownerModel: 'OrganizationUser' }, { organizationUser: orgUser });
 
     const response = await fetch(del(`/api/v1/token/${token.id}`));
     expect(response.status).toBe(204);

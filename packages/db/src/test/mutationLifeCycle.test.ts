@@ -139,25 +139,13 @@ describe('mutationLifeCycle', () => {
       }).toThrow('Hook registration requires at least one action');
     });
 
-    it('throws error for after hooks on deleteMany (no return value)', () => {
+    it('allows after hooks on all Many operations', () => {
       expect(() => {
         registerDbHook(
-          'test-hook-after-deleteMany',
+          'test-hook-after-many',
           'User',
           HookTiming.after,
-          [DbAction.deleteMany],
-          async () => {},
-        );
-      }).toThrow('After hooks are not supported for deleteMany');
-    });
-
-    it('allows after hooks on createManyAndReturn and updateManyAndReturn', () => {
-      expect(() => {
-        registerDbHook(
-          'test-hook-after-manyAndReturn',
-          'User',
-          HookTiming.after,
-          [DbAction.createManyAndReturn, DbAction.updateManyAndReturn],
+          [DbAction.createManyAndReturn, DbAction.updateManyAndReturn, DbAction.deleteMany],
           async () => {},
         );
       }).not.toThrow();

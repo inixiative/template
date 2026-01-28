@@ -31,7 +31,7 @@ describe('Organizations Tokens', () => {
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { User: user, Organization: org });
+    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user, organization: org });
     orgUser = ou;
 
     const harness = createTestApp({
@@ -63,7 +63,7 @@ describe('Organizations Tokens', () => {
 
   describe('GET /api/v1/organization/:id/tokens', () => {
     it('returns organization tokens without keyHash', async () => {
-      await createToken({ name: 'Listed Token', ownerModel: TokenOwnerModel.Organization }, { Organization: org });
+      await createToken({ name: 'Listed Token', ownerModel: TokenOwnerModel.Organization }, { organization: org });
 
       const response = await fetch(get(`/api/v1/organization/${org.id}/tokens`));
       const { data } = await json<ReadManyTokensResponse>(response);

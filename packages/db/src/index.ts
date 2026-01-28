@@ -11,8 +11,12 @@ export {
   DbAction,
   HookTiming,
   registerDbHook,
+  executeHooks,
+  clearHookRegistry,
   type HookFunction,
   type HookOptions,
+  type SingleAction,
+  type ManyAction,
 } from './extensions/mutationLifeCycle';
 
 // Typed model IDs (phantom types for compile-time safety)
@@ -24,12 +28,16 @@ export { addCheckConstraint, addUniqueWhereNotNull, addGistIndex } from './const
 // Model name utilities
 export {
   ModelNames,
-  ModelAccessors,
   modelNames,
   isModelName,
-  toPrismaAccessor,
   toModelName,
+  AccessorNames,
+  accessorNames,
+  isAccessorName,
+  toAccessor,
+  toDelegate,
   type ModelName,
+  type AccessorName,
   type ModelTypeMap,
   type ModelDelegate,
   type ModelOperation,

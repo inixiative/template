@@ -58,8 +58,8 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   it('soft deletes orgs where user is only member', async () => {
     const { entity: orgUser, context } = await createOrganizationUser();
-    const org = context.Organization;
-    const targetUser = context.User;
+    const org = context.organization;
+    const targetUser = context.user;
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 
@@ -69,8 +69,8 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   it('keeps org if other members exist', async () => {
     const { context } = await createOrganizationUser();
-    const org = context.Organization;
-    const targetUser = context.User;
+    const org = context.organization;
+    const targetUser = context.user;
 
     // Add another member
     const { entity: otherUser } = await createUser();

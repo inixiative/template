@@ -23,7 +23,7 @@ describe('createFactory', () => {
       expect(user.id).toBeDefined();
       expect(user.email).toMatch(/^user-\d+@test\.com$/);
       expect(user.emailVerified).toBe(true);
-      expect(context.User).toBe(user);
+      expect(context.user).toBe(user);
     });
 
     it('User - builds with overrides', async () => {
@@ -58,8 +58,8 @@ describe('createFactory', () => {
       const { entity: session, context } = await sessionFactory.build();
 
       expect(session.userId).toBeDefined();
-      expect(context.User).toBeDefined();
-      expect(session.userId).toBe(context.User!.id);
+      expect(context.user).toBeDefined();
+      expect(session.userId).toBe(context.user!.id);
     });
 
     it('Session - uses existing User from context', async () => {
@@ -109,8 +109,8 @@ describe('createFactory', () => {
 
       const { entity: orgUser, context } = await orgUserFactory.build();
 
-      expect(orgUser.userId).toBe(context.User!.id);
-      expect(orgUser.organizationId).toBe(context.Organization!.id);
+      expect(orgUser.userId).toBe(context.user!.id);
+      expect(orgUser.organizationId).toBe(context.organization!.id);
     });
 
     it('Token with OrganizationUser - composite FK via ref override', async () => {
@@ -158,12 +158,12 @@ describe('createFactory', () => {
       });
 
       // Token should have both FKs from the created OrganizationUser
-      expect(context.OrganizationUser).toBeDefined();
-      expect(token.userId).toBe(context.OrganizationUser!.userId);
-      expect(token.organizationId).toBe(context.OrganizationUser!.organizationId);
+      expect(context.organizationUser).toBeDefined();
+      expect(token.userId).toBe(context.organizationUser!.userId);
+      expect(token.organizationId).toBe(context.organizationUser!.organizationId);
       // OrganizationUser should have created User and Organization
-      expect(context.User).toBeDefined();
-      expect(context.Organization).toBeDefined();
+      expect(context.user).toBeDefined();
+      expect(context.organization).toBeDefined();
     });
   });
 

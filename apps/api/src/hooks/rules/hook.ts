@@ -99,7 +99,7 @@ export function registerRulesHook() {
     async ({ model, args }) => processCreateArgs(args, model as ModelName),
   );
 
-  // Upsert hook - validate both create and update paths
+  // Upsert hook - validate create path always, update path only if record exists
   registerDbHook(
     'rules:upsert',
     '*',
@@ -107,7 +107,10 @@ export function registerRulesHook() {
     [DbAction.upsert],
     async ({ model, args, previous }) => {
       processCreateArgs(args, model as ModelName);
-      processUpdateArgs(args, model as ModelName, previous);
+      // Only validate update path if previous record exists (otherwise it's a create)
+      if (previous) {
+        processUpdateArgs(args, model as ModelName, previous);
+      }
     },
   );
 

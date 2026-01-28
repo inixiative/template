@@ -1,7 +1,7 @@
-import { ModelAccessors } from '@template/db';
+import { AccessorNames } from '@template/db';
 
 export const Modules = {
-  ...ModelAccessors,
+  ...AccessorNames,
   me: 'me',
   job: 'job',
   cache: 'cache',

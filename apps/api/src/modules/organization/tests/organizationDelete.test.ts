@@ -19,7 +19,7 @@ describe('DELETE /api/v1/organization/:id', () => {
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { User: user, Organization: org });
+    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user, organization: org });
     orgUser = ou;
 
     const harness = createTestApp({

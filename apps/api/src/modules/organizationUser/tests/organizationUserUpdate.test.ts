@@ -19,8 +19,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   beforeAll(async () => {
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     adminOrgUser = entity;
-    user = context.User;
-    org = context.Organization;
+    user = context.user;
+    org = context.organization;
 
     const harness = createTestApp({
       mockUser: user,
@@ -36,7 +36,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   it('updates the role', async () => {
-    const { entity: member } = await createOrganizationUser({ role: 'member' }, { Organization: org });
+    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization: org });
 
     const response = await fetch(patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }));
     const { data } = await json<UpdateOrgUserResponse>(response);
