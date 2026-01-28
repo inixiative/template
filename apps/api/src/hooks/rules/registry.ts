@@ -1,17 +1,11 @@
 import type { ModelName } from '@template/db';
 import type { Condition } from '@inixiative/json-rules';
+import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
 
 export const RulesRegistry: Partial<Record<ModelName, Condition>> = {
-  // Example - single rule:
-  // Token: { field: 'ownerModel', operator: 'in', value: ['User', 'Organization', 'OrganizationUser'], error: 'Invalid ownerModel' },
-  //
-  // Example - multiple rules:
-  // Setting: {
-  //   all: [
-  //     { field: 'resourceType', operator: 'in', value: ['User', 'Organization'], error: 'Invalid resourceType' },
-  //     { field: 'key', operator: 'notEmpty', value: true, error: 'key is required' },
-  //   ],
-  // },
+  ...polymorphismRules,
+  // Add additional rules here:
+  // User: { field: 'name', operator: 'notEmpty', value: true, error: 'name required' },
 };
 
 const rulesCache = new Map<ModelName, Condition>();

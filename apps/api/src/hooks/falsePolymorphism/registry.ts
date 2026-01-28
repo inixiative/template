@@ -1,6 +1,6 @@
 import type { ModelName } from '@template/db';
 
-type FalsePolymorphismRelation = {
+export type FalsePolymorphismRelation = {
   typeField: string;
   fkMap: Record<string, string[]>; // typeValue -> required FK fields
 };
