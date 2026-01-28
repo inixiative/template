@@ -1,23 +1,13 @@
 import { getModelRelations, type ModelName } from '@template/db';
-import { FalsePolymorphismRegistry } from '#/hooks/falsePolymorphism/registry';
+import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 
 type ImmutableFieldsOverride = {
   exclude?: string[];
   include?: string[];
 };
 
-// --- Polymorphism → Immutable Fields Transformer ---
-
-const polymorphismOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {};
-for (const [model, configs] of Object.entries(FalsePolymorphismRegistry)) {
-  const typeFields = (configs ?? []).map((c) => c.typeField);
-  if (typeFields.length) polymorphismOverrides[model as ModelName] = { include: typeFields };
-}
-
-// --- Immutable Fields Registry ---
-
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
-  ...polymorphismOverrides,
+  ...polymorphismImmutableFields,
   // Add additional overrides here:
   // User: { exclude: ['updatableFkField'] },
 };
