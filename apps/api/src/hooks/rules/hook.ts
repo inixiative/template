@@ -3,6 +3,7 @@ import { check } from '@inixiative/json-rules';
 import { isEmpty } from 'lodash-es';
 import { log } from '#/lib/logger';
 import { getRule } from './registry';
+import { shadowMerge } from './shadowMerge';
 
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);
@@ -60,14 +61,14 @@ const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<st
 
   // Merge previous with update data and validate
   if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const merged = previous ? { ...previous, ...data } : data;
+    const merged = shadowMerge(previous, data);
     validateData(merged, model);
   }
 
   // For upsert, also validate the update path
   if (record.update && typeof record.update === 'object' && !Array.isArray(record.update)) {
-    const merged = previous ? { ...previous, ...(record.update as Record<string, unknown>) } : record.update;
-    validateData(merged as Record<string, unknown>, model);
+    const merged = shadowMerge(previous, record.update as Record<string, unknown>);
+    validateData(merged, model);
   }
 
   // Warn if nested updates detected - can't merge without fetching previous for each nested record

@@ -5,10 +5,6 @@ import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 import { isNoOpUpdate } from '#/hooks/webhooks/utils';
 import { clearCacheKey } from '#/lib/cache/clearCacheKey';
 
-declare global {
-  var inSeed: boolean | undefined;
-}
-
 const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.createManyAndReturn ||
   action === DbAction.updateManyAndReturn ||
@@ -29,8 +25,6 @@ export function registerClearCacheHook() {
   ];
 
   registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (global.inSeed === true) return;
-
     const { model, action } = options;
     let allKeys: string[] = [];
 
