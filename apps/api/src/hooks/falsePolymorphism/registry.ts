@@ -25,6 +25,24 @@ export const FalsePolymorphismRegistry: Partial<Record<ModelName, FalsePolymorph
       },
     },
   ],
+  Inquiry: [
+    {
+      typeField: 'sourceModel',
+      fkMap: {
+        User: ['sourceUserId'],
+        Organization: ['sourceOrganizationId'],
+        Admin: [],
+      },
+    },
+    {
+      typeField: 'targetModel',
+      fkMap: {
+        User: ['targetUserId'],
+        Organization: ['targetOrganizationId'],
+        Admin: [],
+      },
+    },
+  ],
 };
 
 export const getPolymorphismConfigs = (model: ModelName): FalsePolymorphismRelation[] =>

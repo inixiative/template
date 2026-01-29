@@ -59,4 +59,5 @@ enum InquiryStatus {
 enum InquiryResourceModel {
   User
   Organization
+  Admin
 }
