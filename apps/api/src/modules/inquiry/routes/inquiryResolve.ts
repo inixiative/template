@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { InquiryModelSchema } from '@template/db/zod/models';
-import { actionRoute } from '#/lib/requestTemplates';
+import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({

@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { actionRoute } from '#/lib/requestTemplates/action';
+import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';
 
 const cacheKeySchema = z.object({

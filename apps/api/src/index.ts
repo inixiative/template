@@ -1,6 +1,6 @@
 import { registerHooks } from '#/hooks';
 import { getRedisClient } from '#/lib/clients/redis';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
 import { app } from './app';

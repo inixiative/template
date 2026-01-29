@@ -1,5 +1,5 @@
 import { CronJobModelSchema } from '@template/db/zod/models';
-import { readRoute } from '#/lib/requestTemplates/read';
+import { readRoute } from '#/lib/routeTemplates/read';
 import { Modules } from '#/modules/modules';
 
 export const cronJobReadRoute = readRoute({

@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
-import { errorResponses } from '#/lib/requestTemplates/errorResponses';
-import { paginateResponseSchema } from '#/lib/requestTemplates/paginationSchemas';
-import type { RouteArgs, ZodResponseSchema } from '#/lib/requestTemplates/types';
+import { errorResponses } from '#/lib/routeTemplates/errorResponses';
+import { paginateResponseSchema } from '#/lib/routeTemplates/paginationSchemas';
+import type { RouteArgs, ZodResponseSchema } from '#/lib/routeTemplates/types';
 
 type SuccessResponse<T extends ZodResponseSchema> = {
   content: { 'application/json': { schema: z.ZodObject<{ data: T }> } };

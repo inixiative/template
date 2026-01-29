@@ -1,5 +1,5 @@
 import type { Server } from 'bun';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;

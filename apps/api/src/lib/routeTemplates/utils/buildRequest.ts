@@ -1,9 +1,9 @@
 import type { Prisma } from '@template/db';
 import { z } from '@hono/zod-openapi';
-import { idParamsSchema } from '#/lib/requestTemplates/idParamsSchema';
-import { paginateRequestSchema } from '#/lib/requestTemplates/paginationSchemas';
-import type { RouteArgs, ZodSchema } from '#/lib/requestTemplates/types';
-import { sanitizeRequestSchema } from '#/lib/requestTemplates/utils/sanitizeRequestSchema';
+import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
+import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
+import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
+import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
 
 // Base system fields that get sanitized from body schemas
 type BaseSanitizeKey = 'id' | 'uuid' | 'createdAt' | 'updatedAt' | 'deletedAt';

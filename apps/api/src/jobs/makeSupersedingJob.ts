@@ -1,3 +1,4 @@
+import { redisNamespace } from '#/lib/clients/redisNamespaces';
 import { type JobHandler, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = unknown> = JobHandler<TPayload> & {
@@ -11,7 +12,7 @@ export const makeSupersedingJob = <TPayload = unknown>(
   const h: SupersedingJobHandler<TPayload> = async (ctx, payload) => {
     const { queue, job } = ctx;
     const redis = queue.redis;
-    const supersededKey = `job:superseded:${job.id}`;
+    const supersededKey = `${redisNamespace.job}:superseded:${job.id}`;
     const abortController = new AbortController();
 
     const abortPromise = new Promise<never>((_, reject) => {

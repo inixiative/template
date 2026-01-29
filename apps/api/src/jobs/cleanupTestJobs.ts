@@ -1,5 +1,5 @@
 import { queue } from '#/jobs/queue';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 
 export const cleanupTestJobs = async (): Promise<number> => {
   const jobStates = ['completed', 'failed', 'wait', 'active', 'delayed'] as const;

@@ -1,5 +1,5 @@
 import { OrganizationUserScalarSchema, UserScalarSchema } from '@template/db';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';

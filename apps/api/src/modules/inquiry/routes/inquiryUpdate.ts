@@ -1,5 +1,5 @@
 import { InquiryScalarSchema } from '@template/db';
-import { updateRoute } from '#/lib/requestTemplates';
+import { updateRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 export const inquiryUpdateRoute = updateRoute({

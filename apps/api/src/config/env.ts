@@ -1,10 +1,5 @@
+import { isTest } from '@template/shared/utils';
 import { z } from 'zod';
-
-// Helpers (evaluated before validation for use in skip logic)
-export const isTest = process.env.ENVIRONMENT === 'test';
-export const isLocal = process.env.ENVIRONMENT === 'local';
-export const isDev = process.env.ENVIRONMENT === 'develop';
-export const isProd = process.env.ENVIRONMENT === 'production';
 
 const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
   return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));

@@ -1,3 +1,5 @@
+import { log } from '@template/shared/logger';
+
 export enum DbAction {
   create = 'create',
   createManyAndReturn = 'createManyAndReturn',
@@ -56,7 +58,7 @@ export const registerDbHook = (
   hook: HookFunction,
 ) => {
   if (hookRegistry.has(name)) {
-    console.warn(`Hook '${name}' already registered - skipping duplicate`);
+    log.warn(`Hook '${name}' already registered - skipping duplicate`);
     return;
   }
 

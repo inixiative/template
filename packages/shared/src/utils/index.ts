@@ -1,3 +1,4 @@
 export { cn } from './cn';
 export { resolveAll } from './resolveAll';
-export { concurrencyLimits, getConcurrency, type ConcurrencyType } from './concurrency';
+export { ConcurrencyType, concurrencyLimits, getConcurrency } from './concurrency';
+export { isTest, isLocal, isDev, isProd } from './env';

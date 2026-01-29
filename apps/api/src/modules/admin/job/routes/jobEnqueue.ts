@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { JobHandlerName } from '#/jobs/handlers';
-import { createRoute } from '#/lib/requestTemplates';
+import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 const handlerNames = Object.values(JobHandlerName) as [string, ...string[]];

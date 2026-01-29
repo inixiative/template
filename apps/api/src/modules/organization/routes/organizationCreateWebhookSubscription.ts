@@ -1,4 +1,4 @@
-import { createRoute } from '#/lib/requestTemplates';
+import { createRoute } from '#/lib/routeTemplates';
 import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
 import { Modules } from '#/modules/modules';
 import {

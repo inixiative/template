@@ -10,10 +10,12 @@
     "./utils": "./src/utils/index.ts",
     "./components": "./src/components/index.ts",
     "./lib": "./src/lib/index.ts",
-    "./hooks": "./src/hooks/index.ts"
+    "./hooks": "./src/hooks/index.ts",
+    "./logger": "./src/logger/index.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "consola": "^3.4.0",
     "lodash-es": "^4.17.21",
     "tailwind-merge": "^2.5.5"
   },

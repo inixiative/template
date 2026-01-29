@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import type { Context, Next } from 'hono';
-import { cache } from '#/lib/cache/cache';
+import { cache, cacheKey } from '#/lib/cache/cache';
 import type { TokenWithRelations } from '#/lib/context/getToken';
 import { getUser } from '#/lib/context/getUser';
 import { setUserContext } from '#/lib/context/setUserContext';
@@ -20,7 +20,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     const apiKey = authorization.slice(7);
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-    const token = await cache<TokenWithRelations | null>(`tokens:keyHash:${keyHash}`, () =>
+    const token = await cache<TokenWithRelations | null>(cacheKey('Token', keyHash, 'keyHash'), () =>
       db.token.findUnique({
         where: {
           keyHash,
@@ -52,10 +52,17 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
     c.set('token', token);
 
-    // User or OrgUser token → load user with org memberships
-    if ((token.ownerModel === 'User' || token.ownerModel === 'OrganizationUser') && token.user) {
+    if (token.ownerModel === 'User' && token.user) {
+      // User token → load user with all org memberships
       const userWithOrgs = await findUserWithOrganizationUsers(db, token.user.id);
       if (userWithOrgs) await setUserContext(c, userWithOrgs);
+    } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
+      // OrgUser token → use token data directly (scoped to single org)
+      const { user: orgUserUser, organization: _, ...orgUserFields } = token.organizationUser;
+      await setUserContext(c, {
+        ...orgUserUser,
+        organizationUsers: [orgUserFields],
+      });
     } else {
       // Org token → just set up permissions (no user context)
       await setupOrgPermissions(c);

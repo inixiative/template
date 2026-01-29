@@ -1,7 +1,7 @@
 import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';
 import { ZodError, type ZodSchema } from 'zod';
-import { type ResponseMetadata, ResponseMetadataSchema } from '#/lib/requestTemplates/responseMetadata';
+import { type ResponseMetadata, ResponseMetadataSchema } from '#/lib/routeTemplates/responseMetadata';
 import type { AppEnv } from '#/types/appEnv';
 
 type StatusCodesFromRoute<TRoute extends RouteConfig> = TRoute extends { responses: infer R }

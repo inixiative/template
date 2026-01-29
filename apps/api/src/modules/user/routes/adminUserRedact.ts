@@ -1,4 +1,4 @@
-import { actionRoute } from '#/lib/requestTemplates';
+import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 export const adminUserRedactRoute = actionRoute({

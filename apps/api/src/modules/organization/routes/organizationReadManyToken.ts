@@ -1,4 +1,4 @@
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
 import { Modules } from '#/modules/modules';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';

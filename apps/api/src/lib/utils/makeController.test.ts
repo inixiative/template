@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { OpenAPIHono, z } from '@hono/zod-openapi';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
 

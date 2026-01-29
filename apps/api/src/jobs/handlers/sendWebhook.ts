@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { WebhookEventAction, WebhookEventStatus, WebhookEvent } from '@template/db';
 import type { JobHandler } from '#/jobs/types';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 
 export type SendWebhookPayload = {
   subscriptionId: string;

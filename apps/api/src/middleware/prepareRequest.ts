@@ -1,5 +1,6 @@
 import { db } from '@template/db';
 import { createPermissions } from '@template/permissions';
+import { logScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -15,5 +16,5 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('resource', null);
   c.set('resourceType', null);
   c.header('request-id', requestId);
-  await db.scope(requestId, next);
+  await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
 };

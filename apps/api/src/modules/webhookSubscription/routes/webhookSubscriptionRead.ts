@@ -1,5 +1,5 @@
 import { WebhookEventScalarSchema, WebhookSubscriptionScalarSchema } from '@template/db';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
 import { Modules } from '#/modules/modules';
 

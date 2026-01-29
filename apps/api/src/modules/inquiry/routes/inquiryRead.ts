@@ -1,5 +1,5 @@
 import { InquiryModelSchema } from '@template/db/zod/models';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 export const inquiryReadRoute = readRoute({

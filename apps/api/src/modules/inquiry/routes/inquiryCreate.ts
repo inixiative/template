@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { InquiryScalarSchema } from '@template/db';
-import { createRoute } from '#/lib/requestTemplates';
+import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = InquiryScalarSchema.omit({

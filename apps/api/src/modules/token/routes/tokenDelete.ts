@@ -1,4 +1,4 @@
-import { deleteRoute } from '#/lib/requestTemplates';
+import { deleteRoute } from '#/lib/routeTemplates';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
 import { Modules } from '#/modules/modules';

@@ -1,5 +1,5 @@
 import { getRedisClient } from '#/lib/clients/redis';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 
 /**
  * Clear cache entries matching a pattern.

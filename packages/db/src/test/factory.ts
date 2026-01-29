@@ -146,7 +146,7 @@ export const createFactory = <K extends ModelName>(
     }
 
     const entity: ModelOf<K> = persist
-      ? await toDelegate(db, modelName).create({ data: merged })
+      ? await (toDelegate(db, modelName) as unknown as { create: (args: { data: typeof merged }) => Promise<ModelOf<K>> }).create({ data: merged })
       : (merged as ModelOf<K>);
 
     (ctx as Record<string, unknown>)[toAccessor(modelName)] = entity;

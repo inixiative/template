@@ -1,4 +1,5 @@
 import { db } from '@template/db';
+import { log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
@@ -7,7 +8,6 @@ import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
 import { createRedisConnection } from '#/lib/clients/redis';
-import { log } from '#/lib/logger';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -35,23 +35,26 @@ export const initializeWorker = async (): Promise<void> => {
 
       const handler = jobHandlers[job.name];
 
-      await db.scope(`job:${job.name}:${job.id}`, async () => {
-        const ctx: WorkerContext = {
-          db,
-          queue,
-          job,
-        };
+      const scopeId = `${job.name}:${job.id}`;
+      await logScope('worker', () => logScope(scopeId, () =>
+        db.scope(scopeId, async () => {
+          const ctx: WorkerContext = {
+            db,
+            queue,
+            job,
+          };
 
-        log.info(`Processing job ${job.name} (${job.id})`);
+          log.info(`Processing job ${job.name} (${job.id})`);
 
-        try {
-          await handler(ctx, job.data.payload || {});
-          log.info(`Completed job ${job.name} (${job.id})`);
-        } catch (error) {
-          log.error(`Failed job ${job.name} (${job.id}):`, error);
-          throw error;
-        }
-      });
+          try {
+            await handler(ctx, job.data.payload || {});
+            log.info(`Completed job ${job.name} (${job.id})`);
+          } catch (error) {
+            log.error(`Failed job ${job.name} (${job.id}):`, error);
+            throw error;
+          }
+        }),
+      ));
     },
     {
       connection: workerRedis,

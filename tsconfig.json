@@ -17,5 +17,5 @@
     "types": ["bun-types"],
     "noFallthroughCasesInSwitch": true
   },
-  "exclude": ["node_modules", "dist", "_old"]
+  "exclude": ["node_modules", "dist", "_old", "tmp"]
 }

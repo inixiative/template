@@ -1,5 +1,5 @@
 import { CronJobScalarSchema } from '@template/db';
-import { createRoute } from '#/lib/requestTemplates/create';
+import { createRoute } from '#/lib/routeTemplates/create';
 import { Modules } from '#/modules/modules';
 
 export const cronJobCreateRoute = createRoute({

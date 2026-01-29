@@ -1,5 +1,5 @@
-import { isLocal, isTest } from '#/config/env';
-import { log } from '#/lib/logger';
+import { isLocal, isTest } from '@template/shared/utils';
+import { log } from '@template/shared/logger';
 
 /**
  * Initialize OpenTelemetry for BetterStack (or any OTLP-compatible backend).

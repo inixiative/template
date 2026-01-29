@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { WebhookModel, WebhookOwnerModel } from '@template/db';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 const responseSchema = z.object({

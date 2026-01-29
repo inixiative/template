@@ -1,4 +1,5 @@
 import { type JobHandler, JobType } from '#/jobs/types';
+import { redisNamespace } from '#/lib/clients/redisNamespaces';
 
 export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayload>): JobHandler<TPayload> => {
   return async (ctx, payload) => {
@@ -10,7 +11,7 @@ export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayloa
     if (!isCronJob) return handler(ctx, payload);
     if (!jobData.id) throw new Error('Cron job missing id');
 
-    const lockKey = `lock:${jobData.id}`;
+    const lockKey = `${redisNamespace.job}:lock:${jobData.id}`;
     const lockTTL = 300;
 
     const acquired = await redis.set(lockKey, '1', 'EX', lockTTL, 'NX');

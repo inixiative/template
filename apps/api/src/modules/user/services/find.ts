@@ -1,5 +1,5 @@
 import type { ExtendedPrismaClient, OrganizationUser, User } from '@template/db';
-import { cache, cacheKey } from '#/lib/cache';
+import { cache, cacheKey } from '#/lib/cache/cache';
 
 const USER_CACHE_TTL = 60 * 10; // 10 minutes
 

@@ -1,4 +1,4 @@
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 /**
  * WebSocket Pub/Sub Layer
  *

@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { InquiryModelSchema } from '@template/db/zod/models';
-import { readRoute } from '#/lib/requestTemplates';
+import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 // TODO: Use InquiryTypeSchema/InquiryStatusSchema enums instead of string

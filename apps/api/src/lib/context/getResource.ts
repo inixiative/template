@@ -1,11 +1,11 @@
-import type { ExtendedPrismaClient, ModelDelegate } from '@template/db';
+import type { ModelDelegate, ModelName, ModelTypeMap } from '@template/db';
 import type { Context } from 'hono';
 import type { ResourcePayloadMap } from '#/middleware/resources/resourceContextArgs';
 
 type ResourceType<T extends ModelDelegate> = T extends keyof ResourcePayloadMap
   ? ResourcePayloadMap[T]
-  : ExtendedPrismaClient[T] extends { findUnique: (args: object) => Promise<infer R> }
-    ? NonNullable<R>
+  : Capitalize<T> extends ModelName
+    ? ModelTypeMap[Capitalize<T>]
     : never;
 
 export const getResource = <T extends ModelDelegate>(c: Context): ResourceType<T> => {

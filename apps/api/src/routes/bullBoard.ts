@@ -3,9 +3,9 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { serveStatic } from 'hono/bun';
-import { isLocal } from '#/config/env';
+import { isLocal } from '@template/shared/utils';
 import { queue } from '#/jobs/queue';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 import { basicAuthMiddleware } from '#/middleware/auth/basicAuthMiddleware';
 import type { AppEnv } from '#/types/appEnv';
 

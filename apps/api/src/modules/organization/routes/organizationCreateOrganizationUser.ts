@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { OrganizationUserScalarSchema, UserScalarSchema } from '@template/db';
-import { createRoute } from '#/lib/requestTemplates';
+import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 

@@ -1,4 +1,4 @@
-import type { HookOptions, ManyAction, SingleAction, WebhookModel } from '@template/db';
+import type { HookOptions, ManyAction, SingleAction, WebhookModel, WebhookSubscription } from '@template/db';
 import { DbAction, HookTiming, db, registerDbHook } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { getParentWebhookModel, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
@@ -22,10 +22,9 @@ export type WebhookPayload = {
 const getWebhookCallbacks = async (payload: WebhookPayload) => {
   const subscriptions = await db.webhookSubscription.findMany({
     where: { model: payload.model as WebhookModel, isActive: true },
-    select: { id: true },
   });
 
-  return subscriptions.map((sub) => async () => {
+  return subscriptions.map((sub: WebhookSubscription) => async () => {
     await enqueueJob('sendWebhook', {
       subscriptionId: sub.id,
       action: payload.action,

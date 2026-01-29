@@ -3,8 +3,6 @@ import type { AppEnv } from '#/types/appEnv';
 import type { PublicZodIssue } from './types';
 
 export function respond422(c: Context<AppEnv>, issues: PublicZodIssue[]) {
-  c.header('Cache-Control', 'no-store');
-
   return c.json(
     {
       error: 'Unprocessable Entity',

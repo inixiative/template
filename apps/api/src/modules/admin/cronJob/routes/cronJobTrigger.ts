@@ -1,4 +1,4 @@
-import { actionRoute } from '#/lib/requestTemplates/action';
+import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';
 
 export const cronJobTriggerRoute = actionRoute({

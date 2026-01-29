@@ -2,7 +2,8 @@ import { type JobPayloads, isValidHandlerName, jobHandlers } from '#/jobs/handle
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
-import { log } from '#/lib/logger';
+import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { log } from '@template/shared/logger';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];
@@ -17,7 +18,7 @@ const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
     if (!job.id) continue;
     const jobData = job.data as JobData;
     if (jobData.dedupeKey === dedupeKey) {
-      await redis.set(`job:superseded:${job.id}`, '1', 'EX', 300);
+      await redis.set(`${redisNamespace.job}:superseded:${job.id}`, '1', 'EX', 300);
       log.info(`Signaled job ${job.id} to abort (superseded)`);
     }
   }

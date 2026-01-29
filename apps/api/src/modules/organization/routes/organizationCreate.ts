@@ -1,5 +1,5 @@
 import { OrganizationScalarSchema } from '@template/db';
-import { createRoute } from '#/lib/requestTemplates';
+import { createRoute } from '#/lib/routeTemplates';
 import { validateUser } from '#/middleware/validations/validateUser';
 import { Modules } from '#/modules/modules';
 

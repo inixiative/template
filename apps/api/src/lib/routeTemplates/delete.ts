@@ -1,7 +1,7 @@
 import { createRoute } from '@hono/zod-openapi';
-import { errorResponses } from '#/lib/requestTemplates/errorResponses';
-import type { RouteArgs } from '#/lib/requestTemplates/types';
-import { buildOperationId, buildRequest, buildTags, prepareMiddleware } from '#/lib/requestTemplates/utils';
+import { errorResponses } from '#/lib/routeTemplates/errorResponses';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
+import { buildOperationId, buildRequest, buildTags, prepareMiddleware } from '#/lib/routeTemplates/utils';
 
 export const deleteRoute = <const T extends RouteArgs>(args: T) => {
   const {

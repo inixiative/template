@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { omit } from 'lodash';
-import type { ZodSchema } from '#/lib/requestTemplates/types';
-import { transformJsonFields } from '#/lib/requestTemplates/utils/transformJsonFields';
+import type { ZodSchema } from '#/lib/routeTemplates/types';
+import { transformJsonFields } from '#/lib/routeTemplates/utils/transformJsonFields';
 
 // Base system fields that are always sanitized
 const BASE_SANITIZE_KEYS = ['id', 'uuid', 'createdAt', 'updatedAt', 'deletedAt'] as const;

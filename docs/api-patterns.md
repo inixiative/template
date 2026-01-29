@@ -9,7 +9,7 @@
 ## Route Templates
 
 ```typescript
-import { readRoute, createRouteTemplate, updateRoute, deleteRoute, actionRoute } from '#/lib/requestTemplates';
+import { readRoute, createRouteTemplate, updateRoute, deleteRoute, actionRoute } from '#/lib/routeTemplates';
 ```
 
 | Template | Method | Status | Path |

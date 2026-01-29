@@ -1,6 +1,9 @@
 import { getModelRelations, type ModelName } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 
+// Fields that should never be modified on any model
+const GLOBAL_IMMUTABLE_FIELDS = ['id', 'createdAt'] as const;
+
 type ImmutableFieldsOverride = {
   exclude?: string[];
   include?: string[];
@@ -34,7 +37,7 @@ export const getImmutableFields = (model: ModelName): readonly string[] => {
   const inferred = inferForeignKeyFields(model);
   const overrides = ImmutableFieldsOverrides[model];
 
-  let fields = inferred;
+  let fields = [...GLOBAL_IMMUTABLE_FIELDS, ...inferred];
   if (overrides?.exclude?.length) fields = fields.filter((f) => !overrides.exclude!.includes(f));
   if (overrides?.include?.length) fields = [...fields, ...overrides.include];
 

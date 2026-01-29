@@ -1,7 +1,7 @@
-import { DbAction, HookTiming, registerDbHook, getModelRelations, type ModelName } from '@template/db';
+import { DbAction, HookTiming, registerDbHook, getModelRelations, type ModelName, type SingleAction, type HookOptions } from '@template/db';
 import { check } from '@inixiative/json-rules';
 import { isEmpty } from 'lodash-es';
-import { log } from '#/lib/logger';
+import { log } from '@template/shared/logger';
 import { getRule } from './registry';
 import { shadowMerge } from './shadowMerge';
 
@@ -106,7 +106,8 @@ export function registerRulesHook() {
     '*',
     HookTiming.before,
     [DbAction.upsert],
-    async ({ model, args, previous }) => {
+    async (options) => {
+      const { model, args, previous } = options as HookOptions & { action: SingleAction };
       processCreateArgs(args, model as ModelName);
       // Only validate update path if previous record exists (otherwise it's a create)
       if (previous) {
@@ -121,7 +122,10 @@ export function registerRulesHook() {
     '*',
     HookTiming.before,
     [DbAction.update],
-    async ({ model, args, previous }) => processUpdateArgs(args, model as ModelName, previous),
+    async (options) => {
+      const { model, args, previous } = options as HookOptions & { action: SingleAction };
+      processUpdateArgs(args, model as ModelName, previous);
+    },
   );
 
   // UpdateManyAndReturn - validate results (runs in transaction for rollback on failure)

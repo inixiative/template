@@ -1,5 +1,5 @@
 import type { ModelTypeMap, Prisma } from '@template/db';
-import { cacheKey } from '#/lib/cache';
+import { cacheKey } from '#/lib/cache/cache';
 
 /**
  * Cache Key Pattern (use cacheKey helper)

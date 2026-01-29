@@ -1,5 +1,5 @@
 import { WebhookSubscriptionScalarSchema } from '@template/db';
-import { updateRoute } from '#/lib/requestTemplates';
+import { updateRoute } from '#/lib/routeTemplates';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
 import { Modules } from '#/modules/modules';
 

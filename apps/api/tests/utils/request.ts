@@ -1,6 +1,6 @@
 // Test request helpers
 
-import type { PaginationMetadata } from '#/lib/requestTemplates';
+import type { PaginationMetadata } from '#/lib/routeTemplates';
 
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
 type ErrorResponse = { error: string; message: string; stack?: string; guidance?: string };
