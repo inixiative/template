@@ -97,7 +97,10 @@ export const webhookEnabledModels: WebhookModel[] = [
 {
   model: 'User',
   action: 'create' | 'update' | 'delete',
-  payload: { id, ...fields }
+  resourceId: '...',
+  data: { ...fields },
+  previousData: { ...fields },  // For updates only
+  timestamp: '2024-01-15T12:00:00.000Z'
 }
 ```
 
@@ -185,11 +188,13 @@ cacheKey('Session', userId, 'userId', [], true)  // → cache:Session:userId:abc
 
 ### Registry
 
-Define which FK fields are required for each type value:
+Single source of truth in `@template/db` - used by both validation hooks and DB constraints:
 
 ```typescript
-// hooks/falsePolymorphism/registry.ts
-export const FalsePolymorphismRegistry = {
+import { FalsePolymorphismRegistry } from '@template/db';
+
+// packages/db/src/registries/falsePolymorphism.ts
+FalsePolymorphismRegistry = {
   Token: [{
     typeField: 'ownerModel',
     fkMap: {
@@ -198,13 +203,8 @@ export const FalsePolymorphismRegistry = {
       OrganizationUser: ['organizationId', 'userId'],  // Requires both
     },
   }],
-  WebhookSubscription: [{
-    typeField: 'ownerModel',
-    fkMap: {
-      User: ['userId'],
-      Organization: ['organizationId'],
-    },
-  }],
+  WebhookSubscription: [{ ... }],
+  Inquiry: [{ ... }],  // sourceModel + targetModel
 };
 ```
 

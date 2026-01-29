@@ -116,11 +116,13 @@ Located in `apps/api/src/middleware/auth/tokenAuth.ts`. API key authentication.
 
 ### How It Works
 
-1. Extract Bearer token from `Authorization` header
+1. Extract token from `Authorization: Bearer <token>` header OR `?token=<token>` URL param
 2. Hash token with SHA-256
 3. Look up token by hash (cached in Redis)
 4. Validate: `isActive`, not expired
 5. Set context based on token type
+
+URL token is useful for WebSocket connections, email links, file downloads (where headers can't be set).
 
 ### tokenAuthMiddleware
 

@@ -80,6 +80,10 @@ await notify(user.id, 'inquiry.received', {
 ```
 
 ---
+## SMS
+TODO: twilio?
+
+---
 
 ## Webhooks
 
@@ -89,3 +93,8 @@ Existing webhook system. See [HOOKS.md](HOOKS.md) for webhook delivery.
 // Current: webhooks sent via sendWebhook job
 db.onCommit(() => enqueue('sendWebhook', { ... }));
 ```
+
+---
+## Communication Preferences
+TODO: Should be granular and manageable
+

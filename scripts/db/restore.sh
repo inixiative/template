@@ -2,7 +2,7 @@
 set -e
 
 ENV=${1:-prod}
-DUMP_FILE="./temp/db_dump/${ENV}.dump"
+DUMP_FILE="./tmp/db_dump/${ENV}.dump"
 
 if [ ! -f "$DUMP_FILE" ]; then
   echo "Not found: $DUMP_FILE"

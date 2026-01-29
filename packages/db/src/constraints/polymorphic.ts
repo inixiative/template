@@ -1,69 +1,26 @@
 import { db } from '@template/db/client';
-import type { ModelName, PolymorphicConstraint, TableConstraints } from './types';
+import {
+  FalsePolymorphismRegistry,
+  type FalsePolymorphismRelation,
+} from '@template/db/registries/falsePolymorphism';
+import type { ModelName } from '@template/db/utils/modelNames';
 
-export const POLYMORPHIC_CONSTRAINTS: TableConstraints[] = [
-  {
-    model: 'Token',
-    constraints: [
-      {
-        typeColumn: 'ownerModel',
-        rules: [
-          { type: 'User', required: ['userId'] },
-          { type: 'Organization', required: ['organizationId'] },
-          { type: 'OrganizationUser', required: ['userId', 'organizationId'] },
-        ],
-      },
-    ],
-  },
-  {
-    model: 'WebhookSubscription',
-    constraints: [
-      {
-        typeColumn: 'ownerModel',
-        rules: [
-          { type: 'User', required: ['userId'] },
-          { type: 'Organization', required: ['organizationId'] },
-        ],
-      },
-    ],
-  },
-  {
-    model: 'Inquiry',
-    constraints: [
-      {
-        typeColumn: 'sourceModel',
-        rules: [
-          { type: 'User', required: ['sourceUserId'] },
-          { type: 'Organization', required: ['sourceOrganizationId'] },
-        ],
-      },
-      {
-        typeColumn: 'targetModel',
-        rules: [
-          { type: 'User', required: ['targetUserId'] },
-          { type: 'Organization', required: ['targetOrganizationId'] },
-        ],
-      },
-    ],
-  },
-];
+const generateCheckSql = (relation: FalsePolymorphismRelation): string => {
+  const { typeField, fkMap } = relation;
+  const allFks = [...new Set(Object.values(fkMap).flat())];
+  const fkList = allFks.map((fk) => `"${fk}"`).join(', ');
 
-export const generatePolymorphicCheckSql = (constraint: PolymorphicConstraint): string => {
-  const { typeColumn, rules } = constraint;
-  const fkColumns = [...new Set(rules.flatMap((r) => r.required))];
-  const fkList = fkColumns.join(', ');
-
-  const conditions = rules.map(({ type, required }) => {
+  const conditions = Object.entries(fkMap).map(([type, required]) => {
     const checks = required.map((fk) => `"${fk}" IS NOT NULL`).join(' AND ');
-    return `("${typeColumn}" = '${type}' AND num_nonnulls(${fkList}) = ${required.length} AND ${checks})`;
+    return `("${typeField}" = '${type}' AND num_nonnulls(${fkList}) = ${required.length} AND ${checks})`;
   });
 
   return `CHECK (${conditions.join(' OR ')})`;
 };
 
-export async function addPolymorphicConstraint(model: ModelName, constraint: PolymorphicConstraint) {
-  const name = `${model}_${constraint.typeColumn}_polymorphic`;
-  const check = generatePolymorphicCheckSql(constraint);
+export async function addPolymorphicConstraint(model: ModelName, relation: FalsePolymorphismRelation) {
+  const name = `${model}_${relation.typeField}_polymorphic`;
+  const check = generateCheckSql(relation);
 
   await db.$executeRawUnsafe(`
     DO $$ BEGIN
@@ -79,9 +36,9 @@ export async function addPolymorphicConstraint(model: ModelName, constraint: Pol
 }
 
 export async function addAllPolymorphicConstraints() {
-  for (const { model, constraints } of POLYMORPHIC_CONSTRAINTS) {
-    for (const constraint of constraints) {
-      await addPolymorphicConstraint(model, constraint);
+  for (const [model, relations] of Object.entries(FalsePolymorphismRegistry)) {
+    for (const relation of relations ?? []) {
+      await addPolymorphicConstraint(model as ModelName, relation);
     }
   }
 }

@@ -4,11 +4,12 @@
 
 ## Before Starting Any Task
 
-**Read the relevant doc first.** The docs contain patterns, conventions, and utilities that prevent reinventing the wheel or breaking established patterns.
+**Identify what you're touching and read the relevant docs.** Most tasks touch multiple areas - read all that apply.
 
-1. Identify which category your task falls into
-2. Read the relevant doc(s) from the table below
-3. Then proceed with implementation
+Examples:
+- Adding an endpoint → API_ROUTES + DATABASE + possibly HOOKS, PERMISSIONS
+- Schema change → DATABASE + HOOKS + TESTING
+- Background job → JOBS + possibly REDIS, LOGGING
 
 ## Categories
 
@@ -32,6 +33,7 @@
 
 | Category | Doc | When to Read |
 |----------|-----|--------------|
+| **Architecture** | [ARCHITECTURE.md](docs/claude/ARCHITECTURE.md) | High-level overview, request/data flow |
 | **Monorepo** | [MONOREPO.md](docs/claude/MONOREPO.md) | Workspaces, where to find things |
 | **Naming** | [NAMING.md](docs/claude/NAMING.md) | File/function naming, FE/BE conventions |
 | **Style** | [STYLE.md](docs/claude/STYLE.md) | Code conventions, imports |
@@ -41,8 +43,8 @@
 
 | Category | Doc | When to Read |
 |----------|-----|--------------|
-| **Setup** | [SETUP.md](docs/claude/SETUP.md) | Initial project setup (stub) |
-| **Developer** | [DEVELOPER.md](docs/claude/DEVELOPER.md) | Daily workflow, debugging (stub) |
+| **Setup** | [SETUP.md](docs/claude/SETUP.md) | Prerequisites, initial setup, forking |
+| **Developer** | [DEVELOPER.md](docs/claude/DEVELOPER.md) | Daily workflow, commands, debugging |
 | **Docker** | [DOCKER.md](docs/claude/DOCKER.md) | Local Postgres/Redis, docker-compose |
 | **Scripts** | [SCRIPTS.md](docs/claude/SCRIPTS.md) | Commands, script locations |
 | **Environments** | [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md) | Env vars, Doppler, with-env composition |
@@ -67,6 +69,19 @@ cd apps/api && bun test                 # Run tests
 
 - `#/` - Internal imports (same app/package)
 - `@template/*` - Cross-package imports
+
+## AI Workspace
+
+Write detailed investigation outputs, reports, and analysis to `/tmp/AI_WORKSPACE/`. This keeps verbose outputs out of the conversation while preserving them for review.
+
+Structure:
+- Single report → `/tmp/AI_WORKSPACE/REPORT_NAME.md`
+- Multiple related reports → `/tmp/AI_WORKSPACE/task-name/REPORT_1.md`
+
+Examples:
+- Doc alignment → `/tmp/AI_WORKSPACE/doc-review/CONTEXT.md`, `/tmp/AI_WORKSPACE/doc-review/HOOKS.md`
+- Codebase analysis → `/tmp/AI_WORKSPACE/AUTH_FLOW_ANALYSIS.md`
+- Migration plans → `/tmp/AI_WORKSPACE/MIGRATION_PLAN.md`
 
 ## Reference Repos
 

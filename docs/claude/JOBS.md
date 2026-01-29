@@ -42,7 +42,7 @@ jobs/
 | Superseding job | Uses `dedupeKey` as `jobId` (prevents duplicates) |
 | Cron job | Uses `cronJob.jobId` from DB (idempotency key) |
 
-Scope ID format for logging: `job:{handlerName}:{jobId}`
+Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
 
 ---
 
@@ -76,7 +76,7 @@ await enqueueJob('sendWebhook', {
 
 ```typescript
 // handlers/myJob.ts
-import { makeJob } from '#/jobs/utils/makeJob';
+import { makeJob } from '#/jobs/makeJob';
 
 export type MyJobPayload = {
   userId: string;

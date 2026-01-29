@@ -86,10 +86,10 @@ Located in `apps/api/src/ws/`. Redis pub/sub for multi-instance support.
 ### Connection
 
 ```
-ws://localhost:8000/ws
+ws://localhost:8000?token=<bearer_token>
 ```
 
-Authentication via session cookie (optional - anonymous allowed).
+Authentication via bearer token in query param (WebSockets can't set headers from browser). Anonymous connections allowed (omit token).
 
 ### Client Messages
 

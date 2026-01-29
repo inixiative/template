@@ -1,57 +1,103 @@
 # Developer Guide
 
-> Stub - to be expanded
-
 ## Contents
 
-- [Getting Started](#getting-started)
+- [Development](#development)
+- [Common Commands](#common-commands)
 - [Daily Workflow](#daily-workflow)
-- [Code Review](#code-review)
+- [Architectural Reviews](#architectural-reviews)
 - [Debugging](#debugging)
-- [Common Tasks](#common-tasks)
 
 ---
 
-## Getting Started
+## Development
 
-See [SETUP.md](SETUP.md) for initial setup.
+```bash
+# Start everything
+bun run local
+
+# Individual services
+bun run local:api     # API on :8000
+bun run local:web     # Web on :3000
+bun run local:worker  # Background jobs
+```
+
+---
+
+## Common Commands
+
+### Database
+
+```bash
+bun run db:studio     # Prisma Studio
+bun run db:generate   # Generate client
+bun run db:push       # Push schema
+bun run db:migrate    # Create migration
+bun run reset:db      # Reset and reseed
+```
+
+### Code Quality
+
+```bash
+bun run lint          # Check
+bun run lint:fix      # Fix
+bun run format        # Format
+bun run test          # Run tests
+```
+
+### Environment
+
+```bash
+bun run sync-env      # Sync .env files
+```
 
 ---
 
 ## Daily Workflow
 
-TODO: Document typical development flow
-- Pull latest
-- Run local services
-- Make changes
-- Test
-- Commit
+1. Pull latest changes
+2. Run `bun run setup` if deps changed
+3. Start services: `bun run local`
+4. Make changes
+5. Run tests: `bun test`
+6. Commit and push
 
 ---
 
-## Code Review
+## Architectural Reviews
 
-TODO: Document PR process
-- Branch naming
-- PR template
-- Review checklist
+Periodically stop and review architectural decisions before moving forward. Ask:
+
+- Does this pattern match the rest of the codebase?
+- Are we over-engineering or under-engineering?
+- Will this be maintainable in 6 months?
+- Are there simpler alternatives?
+
+When in doubt, pause and discuss before implementing.
 
 ---
 
 ## Debugging
 
-TODO: Document debugging techniques
-- Log levels
-- Prisma Studio
-- Redis inspection
-- Network debugging
+### Logs
 
----
+See [LOGGING.md](LOGGING.md) for log configuration and scopes.
 
-## Common Tasks
+### Database
 
-TODO: Quick reference for common operations
-- Adding a new endpoint
-- Adding a new model
-- Adding a new job
-- Adding a new hook
+```bash
+bun run db:studio     # Visual database browser
+```
+
+### Redis
+
+```bash
+docker exec -it template-redis redis-cli
+> KEYS *              # List all keys
+> GET key             # Get value
+> FLUSHALL            # Clear all (careful!)
+```
+
+### Network
+
+BullBoard UI at `http://localhost:8000/bullBoard` for job inspection.

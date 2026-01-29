@@ -1,7 +1,5 @@
 # Monorepo Structure
 
-> Stub - to be expanded
-
 ## Contents
 
 - [Overview](#overview)
@@ -28,6 +26,9 @@ template/
 │   ├── shared/        # Shared utilities, logger
 │   ├── permissions/   # RBAC system
 │   └── ui/            # Shared UI components
+├── tests/             # Cross-app testing (E2E, load)
+│   ├── e2e/           # Playwright tests
+│   └── load/          # Artillery load tests
 ├── scripts/           # Shell scripts
 ├── docs/              # Documentation
 └── tmp/               # Temporary files (gitignored)
@@ -55,6 +56,8 @@ Defined in root `package.json`:
 | `packages/ui` | `@template/ui` |
 | `apps/api` | `api` |
 | `apps/web` | `web` |
+| `apps/admin` | `admin` |
+| `apps/superadmin` | `superadmin` |
 
 ---
 
@@ -145,8 +148,10 @@ bun add -d <package>
 | Request context | `apps/api/src/lib/context/` |
 | Middleware | `apps/api/src/middleware/` |
 | Type definitions | `apps/api/src/types/` |
-| Test factories | `packages/db/src/factories/` |
+| Test factories | `packages/db/src/test/factories/` |
 | Test utilities | `apps/api/tests/utils/` |
+| E2E tests | `tests/e2e/` |
+| Load tests | `tests/load/` |
 
 ### Avoid Barrel Files
 

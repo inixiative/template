@@ -6,6 +6,8 @@
 - [Before Starting Work](#before-starting-work)
 - [Writing Notes](#writing-notes)
 - [Doc Structure](#doc-structure)
+- [Doc Maintenance](#doc-maintenance)
+- [Doc Alignment Review](#doc-alignment-review)
 
 ---
 
@@ -80,6 +82,10 @@ Periodically (or when RAW_NOTES gets long):
 
 ## Doc Structure
 
+### TOC Required
+
+Every doc must have a `## Contents` section at the top with links to all major sections. This helps Claude (and humans) quickly navigate.
+
 ### Standard Sections
 
 ```markdown
@@ -145,9 +151,56 @@ Update docs when you:
 - Change existing conventions
 - Add new utilities or helpers
 - Discover gotchas worth documenting
+- **Keep TOC updated** when adding/removing sections
 
 ### Keep Docs Honest
 
 - Remove outdated information
 - Mark incomplete sections as stubs
 - Don't document aspirational features as if they exist
+
+---
+
+## Doc Alignment Review
+
+Periodically verify docs match the actual codebase.
+
+### Process
+
+1. **Spawn review agents** - For each doc, have an agent read the doc then explore the corresponding code
+2. **Identify discrepancies** - Types of issues:
+   - **Dead code** - Code exists but isn't used (delete it)
+   - **Orphaned docs** - Doc describes non-existent feature (remove or mark as TODO)
+   - **Outdated docs** - Code changed but doc wasn't updated (fix doc)
+   - **Missing docs** - Feature exists but isn't documented (add to doc)
+   - **Unwired code** - Code exists but isn't connected (wire it up or delete)
+3. **Fix one by one** - Go through each issue, decide action, implement
+
+### Example Review Findings
+
+| Finding | Type | Action |
+|---------|------|--------|
+| `entitlements.ts` defines type but nothing imports it | Dead code | Delete file |
+| Two OpenTelemetry implementations, neither called | Unwired code | Keep one, wire it up, delete other |
+| Doc says pg-init.sh creates extension, code doesn't | Outdated docs | Fix doc to match code |
+| Doc shows flat type, code uses nested type | Outdated docs | Verify which is correct, align |
+| Validation middleware exists but not in docs | Missing docs | Add to doc |
+
+### Review Prompt Template
+
+```
+Review the <TOPIC> documentation against actual code.
+
+1. Read docs/claude/<TOPIC>.md
+2. Explore the corresponding code in <PATHS>
+3. Verify: Does the doc accurately describe how the feature works?
+
+Report: What's accurate, what's missing, what's outdated.
+```
+
+### When to Run
+
+- Before major releases
+- After large refactors
+- When onboarding (fresh eyes catch staleness)
+- Quarterly maintenance

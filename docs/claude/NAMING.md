@@ -1,13 +1,24 @@
 # Naming Conventions
 
-> Stub - to be expanded
-
 ## Contents
 
 - [Backend](#backend)
 - [Frontend](#frontend)
 - [Database](#database)
 - [Files & Directories](#files--directories)
+
+---
+
+## Terminology
+
+| Use | Avoid | Context |
+|-----|-------|---------|
+| `util` | helper | |
+| `services` | handlers | Backend business logic |
+| `handlers` | | Jobs, frontend event handlers |
+| `make` | create | Factories/currying |
+| `validate` | require | Middleware guards |
+| `aToB` | | Integration transformers (e.g., `stripeToUser`) |
 
 ---
 

@@ -10,6 +10,7 @@
 - [Setup Scripts](#setup-scripts)
 - [Deployment Scripts](#deployment-scripts)
 - [Docker](#docker)
+- [AI Workspace](#ai-workspace)
 
 ---
 
@@ -208,3 +209,26 @@ bun run reset:db        # down + up + push + seed
 **TypeScript scripts**: Can use `bun run scripts/path/to/script.ts` directly.
 
 **Temporary/experimental**: Use `tmp/` directory (gitignored).
+
+---
+
+## AI Workspace
+
+`tmp/AI_WORKSPACE/` is a gitignored staging area for async/overnight AI work.
+
+```
+AI_WORKSPACE/
+├── {task-name}/
+│   ├── TASK.md          # Task description, status, notes
+│   ├── files/           # Files mirroring repo structure
+│   └── notes/           # Research, drafts, experiments
+```
+
+### Workflow
+
+1. Create task folder with TASK.md describing the work
+2. AI works on files in `files/` directory (mirrors repo structure)
+3. User reviews and copies approved files to repo
+4. Delete task folder when done
+
+Use this for larger changes, experiments, or work that needs review before committing.

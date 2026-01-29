@@ -257,12 +257,16 @@ const requestId = getRequestId(c);  // string (UUID)
 
 ### isSuperadmin
 
-```typescript
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
+Two versions exist:
 
-if (isSuperadmin(c)) {
-  // Platform admin access
-}
+```typescript
+// Context getter - extracts user from context, checks platformRole
+import { isSuperadmin } from '#/lib/context/isSuperadmin';
+if (isSuperadmin(c)) { /* ... */ }
+
+// Permissions check - use when you have a User object directly
+import { isSuperadmin } from '@template/permissions';
+if (isSuperadmin(user)) { /* ... */ }
 ```
 
 ---

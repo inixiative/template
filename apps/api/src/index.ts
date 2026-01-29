@@ -3,7 +3,11 @@ import { getRedisClient } from '#/lib/clients/redis';
 import { log } from '@template/shared/logger';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
+import { initializeOpenTelemetry } from '#/config/otel';
 import { app } from './app';
+
+// Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
+await initializeOpenTelemetry();
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();

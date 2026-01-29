@@ -1,27 +1,68 @@
 # Setup
 
-> Stub - to be expanded
-
 ## Contents
 
 - [Prerequisites](#prerequisites)
+- [Init vs Setup](#init-vs-setup)
 - [Quick Start](#quick-start)
+- [What Setup Does](#what-setup-does)
 - [Environment Variables](#environment-variables)
 - [Database Setup](#database-setup)
-- [IDE Configuration](#ide-configuration)
+- [Forking This Template](#forking-this-template)
 
 ---
 
 ## Prerequisites
 
-- Bun (latest)
-- Docker & Docker Compose
-- Node.js 20+ (for some tooling)
+### Required
+
+- **Bun** - [Install](https://bun.sh)
+- **Docker Desktop** - [Download](https://www.docker.com/products/docker-desktop/)
+
+### CLI Tools
 
 ```bash
-# Check prerequisites
-./scripts/setup/check-prereqs.sh
+# Homebrew (macOS)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# GitHub CLI
+brew install gh
+
+# Doppler CLI (secrets management)
+brew install dopplerhq/cli/doppler
+
+# fswatch (for HMR watch scripts)
+brew install fswatch
 ```
+
+### Authentication
+
+```bash
+gh auth login
+doppler login
+```
+
+### Verification
+
+```bash
+bun --version
+docker --version
+gh --version
+doppler --version
+```
+
+---
+
+## Init vs Setup
+
+| Command | When | Who |
+|---------|------|-----|
+| `bun run init` | Once per project lifecycle | Person forking the template |
+| `bun run setup` | Each new developer + periodically | Everyone |
+
+**Init** (TODO): Renames packages, updates configs, prepares the template for a new project. Run once when forking.
+
+**Setup**: Installs deps, starts Docker, generates Prisma, seeds DB. Run by each developer and whenever the repo needs to be brought up to date.
 
 ---
 
@@ -39,14 +80,32 @@ bun run local
 
 ---
 
+## What Setup Does
+
+`bun run setup` runs:
+
+1. Check prerequisites
+2. Sync environment files
+3. Install dependencies
+4. Start Docker (Postgres, Redis)
+5. Generate Prisma client
+6. Push database schema
+7. Seed database
+
+---
+
 ## Environment Variables
 
-TODO: Document env var setup
-- `.env.local`, `.env.test`, `.env.example`
-- Doppler integration
-- Required vs optional vars
+Local files (not committed):
+- `.env.local` - local development
+- `.env.test` - test runner
 
-See also: [ENVIRONMENTS.md](ENVIRONMENTS.md)
+Create from examples:
+```bash
+bun run sync-env
+```
+
+See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 ---
 
@@ -65,9 +124,12 @@ bun run db:seed
 
 ---
 
-## IDE Configuration
+## Forking This Template
 
-TODO: Document IDE setup
-- VS Code extensions
-- Biome config
-- TypeScript settings
+When creating a new project from this template:
+
+1. Update package names from `@template/*` to `@yourproject/*`
+2. Add your app-specific models to `packages/db/prisma/schema/`
+3. Update typed model IDs in `packages/db/src/typedModelIds.ts`
+4. Update CLAUDE.md with project-specific context
+5. Update reference repos if you have similar production codebases

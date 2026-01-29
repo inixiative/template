@@ -42,5 +42,6 @@
     "@types/bun": "latest",
     "concurrently": "^9.2.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "overrides": {}
 }

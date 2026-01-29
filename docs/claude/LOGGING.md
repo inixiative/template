@@ -96,29 +96,29 @@ Located in `apps/api/src/config/otel.ts`. OTLP-compatible tracing and metrics.
 ### Environment Variables
 
 ```env
-OTEL_ENABLED=true
 OTEL_EXPORTER_OTLP_ENDPOINT=https://in-otel.logs.betterstack.com
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <token>
-OTEL_SERVICE_NAME=my-api
+OTEL_SERVICE_NAME=inixiative-api  # defaults to 'inixiative-api'
 ```
 
 ### Auto-Instrumentation
 
-When enabled, automatically traces:
+When endpoint is configured, automatically traces:
 - HTTP requests (excluding `/health`)
-- Redis (ioredis)
 - Prisma queries
+
+Skipped in local/test environments.
 
 ### Initialization
 
-Must be called before other imports in entry point:
+Called at startup in `index.ts`:
 
 ```typescript
-// index.ts
 import { initializeOpenTelemetry } from '#/config/otel';
 await initializeOpenTelemetry();
-// ... rest of imports
 ```
+
+Uses dynamic imports to avoid loading OTel packages in local/test.
 
 ---
 

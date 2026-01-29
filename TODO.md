@@ -34,8 +34,14 @@
 - [ ] Optional modules system (opt-in features)
 - [ ] I18n package
 
+### Database
+
+- [ ] Wire constraint helpers into db lifecycle (local setup + CI/CD) if using them
+
 ### Developer Experience
 
-- [ ] Init script for new forks (`bun run init`)
+- [ ] Init script for new forks (`bun run init`) - should configure Doppler
+- [ ] Localtunnel helper for webhook testing (ref: Carde)
 - [ ] Build out admin/superadmin app UIs
-- [ ] Add Playwright for E2E testing
+- [ ] Add Playwright for E2E testing (`tests/e2e/`)
+- [ ] Add Artillery for load testing (`tests/load/`)

@@ -96,8 +96,8 @@ docker-compose restart postgres
 
 ```bash
 #!/bin/bash
-# Enable UUIDv7 extension
-psql -U postgres -d template -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+# Create test database for running tests
+psql -U postgres -d template -c 'CREATE DATABASE "template_test";'
 ```
 
 ### Volume Persistence
@@ -126,21 +126,23 @@ bun run db:clone
 
 Dumps remote database and restores to local Docker Postgres.
 
-### Dump Local Database
+### Dump Database
 
 ```bash
-bun run db:dump
+bun run db:dump         # Dumps prod (default)
+bun run db:dump dev     # Dumps dev environment
 ```
 
-Creates `dump.sql` in project root.
+Creates `./tmp/db_dump/{env}.dump`.
 
 ### Restore from Dump
 
 ```bash
-bun run db:restore
+bun run db:restore      # Restores from prod dump
+bun run db:restore dev  # Restores from dev dump
 ```
 
-Restores from `dump.sql` to local Docker Postgres.
+Restores to local Docker Postgres using `.env.local` credentials.
 
 ### Wait Scripts
 

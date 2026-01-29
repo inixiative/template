@@ -11,16 +11,46 @@
 
 ---
 
-## Overview
+## Environment Names
 
-| Environment | Purpose | Secrets Source |
-|-------------|---------|----------------|
-| `local` | Development | `.env.local` files |
+Canonical environment names used across all scripts, Doppler configs, and code:
+
+```typescript
+import { Environment } from '@template/shared/utils';
+
+type Environment = 'local' | 'test' | 'dev' | 'staging' | 'sandbox' | 'prod';
+```
+
+| Env | Purpose | Secrets Source |
+|-----|---------|----------------|
+| `local` | Local development | Doppler `dev_*` + `.env.local` overrides |
 | `test` | Automated tests | `.env.test` files |
 | `dev` | Shared development | Doppler `dev_*` |
 | `staging` | Pre-production | Doppler `staging_*` |
 | `sandbox` | Isolated testing | Doppler `sandbox_*` |
 | `prod` | Production | Doppler `prod_*` |
+
+**Always use these abbreviations** in scripts, commands, and config names. Never use `production`, `development`, or other variations.
+
+### NODE_ENV Mapping
+
+| Environment | NODE_ENV | Notes |
+|-------------|----------|-------|
+| `local` | development | No Doppler |
+| `test` | test | No Doppler |
+| `dev` | development | |
+| `staging` | development | |
+| `sandbox` | production | Prod-like, safe to test |
+| `prod` | production | |
+
+### Branch Deployments
+
+| Branch | Auto-deploys to |
+|--------|-----------------|
+| `develop` | dev |
+| `main` | prod |
+
+Staging and sandbox are manually triggered or PR-based.
 
 ---
 
@@ -84,34 +114,30 @@ bun run sync-env  # Copies .env.*.example → .env.* (won't overwrite)
 
 For `dev`, `staging`, `sandbox`, `prod` - secrets managed in Doppler.
 
-### Config Naming
+### Config Structure
 
-Doppler configs follow pattern: `{env}_{app}`
-
-| Environment | API Config | Web Config |
-|-------------|------------|------------|
-| dev | `dev_api` | `dev_web` |
-| staging | `staging_api` | `staging_web` |
-| prod | `prod_api` | `prod_web` |
-
-### Inheritance in Doppler
-
-Doppler supports config inheritance:
+Doppler uses inheritance with three levels:
 
 ```
-root (base secrets)
-├── dev (inherits root, overrides for dev)
-│   ├── dev_api (inherits dev, API-specific)
-│   └── dev_web (inherits dev, web-specific)
-├── staging (inherits root)
-│   ├── staging_api
-│   └── staging_web
-└── prod (inherits root)
-    ├── prod_api
-    └── prod_web
+root (base secrets - everything inherits)
+├── Apps (inherit root)
+│   ├── api
+│   ├── web
+│   ├── admin
+│   └── super
+├── Environments (inherit root)
+│   ├── dev
+│   ├── staging
+│   ├── sandbox
+│   └── prod
+└── Intersections (inherit both app + env)
+    ├── dev_api, dev_web, dev_admin, dev_super
+    ├── staging_api, staging_web, ...
+    ├── sandbox_api, sandbox_web, ...
+    └── prod_api, prod_web, ...
 ```
 
-Secrets cascade: `root` → `{env}` → `{env}_{app}`
+Secrets cascade: `root` → `{app}` + `{env}` → `{env}_{app}`
 
 ### Setup
 
@@ -161,8 +187,8 @@ bun run with prod api bun run start
 For `bun run with local api bun run dev`:
 
 ```
-1. [Skip Doppler - local env]
-2. Load /.env.local
+1. Load Doppler config: dev_api (base secrets)
+2. Load /.env.local (overrides Doppler)
 3. Load /apps/api/.env.local (overrides)
 4. Run: bun run dev
 ```

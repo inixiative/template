@@ -1,7 +1,6 @@
-import type { ModelName } from '@template/db';
+import { FalsePolymorphismRegistry, type FalsePolymorphismRelation, type ModelName } from '@template/db';
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
-import { FalsePolymorphismRegistry, type FalsePolymorphismRelation } from './registry';
 
 const buildPolymorphismRule = (model: ModelName, config: FalsePolymorphismRelation): Condition => {
   const allFks = [...new Set(Object.values(config.fkMap).flat())];

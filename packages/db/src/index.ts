@@ -25,6 +25,13 @@ export * from './typedModelIds';
 // Constraint helpers (CHECK, partial unique indexes)
 export { addCheckConstraint, addUniqueWhereNotNull, addGistIndex } from './constraints';
 
+// Registries (schema-level configuration)
+export {
+  FalsePolymorphismRegistry,
+  getPolymorphismConfigs,
+  type FalsePolymorphismRelation,
+} from './registries';
+
 // Model name utilities
 export {
   ModelNames,

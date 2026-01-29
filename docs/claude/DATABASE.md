@@ -182,10 +182,13 @@ getOrg(organizationId('abc'));  // ✓
 | `UserId` | `userId(id)` |
 | `OrganizationId` | `organizationId(id)` |
 | `OrganizationUserId` | `organizationUserId(id)` |
+| `AccountId` | `accountId(id)` |
 | `SessionId` | `sessionId(id)` |
+| `VerificationId` | `verificationId(id)` |
 | `TokenId` | `tokenId(id)` |
 | `InquiryId` | `inquiryId(id)` |
 | `WebhookSubscriptionId` | `webhookSubscriptionId(id)` |
+| `WebhookEventId` | `webhookEventId(id)` |
 | `CronJobId` | `cronJobId(id)` |
 
 Located in `packages/db/src/typedModelIds.ts`.
@@ -278,3 +281,40 @@ organization Organization? @relation(...)
 Benefits: FK constraints, type-safe includes, proper cascading.
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
+
+---
+
+## Constraint Helpers
+
+DB-level constraints for protection when connecting directly (psql, migrations). App-level validation is handled by the [rules hook](HOOKS.md#rules-registry).
+
+Located in `packages/db/src/constraints/`.
+
+| Helper | Use Case |
+|--------|----------|
+| `addCheckConstraint` | CHECK constraints |
+| `addUniqueWhereNotNull` | Partial unique indexes |
+| `addGistIndex` | GIST indexes (range queries, exclusion) |
+| `addPolymorphicConstraint` | Ensures exactly one FK is set (uses `FalsePolymorphismRegistry`) |
+
+**Note**: If using these, wire them into db lifecycle (local setup + CI/CD). See TODO.md.
+
+---
+
+## Registries
+
+Schema-level configuration in `packages/db/src/registries/`:
+
+| Registry | Purpose | Used By |
+|----------|---------|---------|
+| `FalsePolymorphismRegistry` | Type field → FK mappings | Constraints, validation hooks, immutable fields |
+
+```typescript
+import { FalsePolymorphismRegistry, getPolymorphismConfigs } from '@template/db';
+
+// Get configs for a model
+const configs = getPolymorphismConfigs('Token');
+// [{ typeField: 'ownerModel', fkMap: { User: ['userId'], ... } }]
+```
+
+See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.

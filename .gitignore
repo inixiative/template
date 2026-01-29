@@ -151,3 +151,4 @@ tmp/*
 tmp/AI_WORKSPACE/*
 !tmp/AI_WORKSPACE/README.md
 /packages/db/generated/
+apps/web/app.config.timestamp_*.js

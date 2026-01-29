@@ -5,6 +5,9 @@
 - [Naming Conventions](#naming-conventions)
 - [Route Templates](#route-templates)
 - [Controllers](#controllers)
+- [Response Format](#response-format)
+- [Error Responses](#error-responses)
+- [Middleware](#middleware)
 - [Schemas](#schemas)
 - [Router Exports](#router-exports)
 - [File Organization](#file-organization)
@@ -117,6 +120,107 @@ export const userReadController = makeController(userReadRoute, async (c, respon
 
 ---
 
+## Response Format
+
+All responses are wrapped in `{ data }`:
+
+```typescript
+// Single item
+{ "data": { "id": "...", "name": "..." } }
+
+// List
+{ "data": [{ "id": "..." }, { "id": "..." }] }
+```
+
+### Pagination
+
+For paginated endpoints (`paginate: true`), pass metadata as second arg:
+
+```typescript
+return respond.ok(data, { pagination });
+```
+
+Response includes pagination metadata:
+
+```typescript
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "total": 100,
+    "totalPages": 10
+  }
+}
+```
+
+Query params: `?page=1&pageSize=10` (defaults: page=1, pageSize=10, max=10000)
+
+Other metadata (totals, aggregates, etc.) can be added the same way via the second argument to `respond.ok()`.
+
+---
+
+## Error Responses
+
+All routes automatically include error responses (400, 401, 403, 404, 409, 422, 500):
+
+```typescript
+{
+  "error": "NotFound",
+  "message": "User not found",
+  "guidance": "Check the ID is correct",  // optional
+  "stack": "..."  // included until project stable
+}
+```
+
+Throw `HTTPException` to return errors:
+
+```typescript
+import { HTTPException } from 'hono/http-exception';
+
+throw new HTTPException(404, { message: 'User not found' });
+throw new HTTPException(403, { message: 'Not authorized' });
+```
+
+---
+
+## Middleware
+
+Add route-level middleware via the `middleware` option:
+
+```typescript
+import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
+import { validateNotToken } from '#/middleware/validations/validateNotToken';
+
+// Require org permission
+readRoute({
+  model: 'organizationUser',
+  middleware: [validateOrgPermission('read')],
+  responseSchema,
+});
+
+// Polymorphic resource permission
+updateRoute({
+  model: 'webhookSubscription',
+  middleware: [validateOwnerPermission({ action: 'operate' })],
+  bodySchema,
+  responseSchema,
+});
+
+// Forbid token auth (session only)
+createRoute({
+  model: 'token',
+  middleware: [validateNotToken],
+  bodySchema,
+  responseSchema,
+});
+```
+
+See [AUTH.md](AUTH.md#validation-middleware) for all available validation middlewares.
+
+---
+
 ## Schemas
 
 ### Default: Use ScalarSchema
@@ -143,6 +247,30 @@ export const userCreateRoute = createRoute({ model: 'user', bodySchema, ... });
 
 // Shared → validations/userBody.ts
 export const userBodySchema = z.object({ ... });
+```
+
+### Cross-Field Validations
+
+**Don't use `.refine()` on route schemas** - it creates `ZodEffects` types that break hono-zod-openapi.
+
+Instead, create validation files and call `.parse()` manually in controller:
+
+```typescript
+// validations/organizationCreateUserBody.ts
+const schema = z.object({
+  userId: z.string().uuid().optional(),
+  email: z.string().email().optional(),
+}).refine((data) => data.userId || data.email, {
+  message: 'Either userId or email is required',
+});
+
+export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
+```
+
+```typescript
+// In controller
+const body = c.req.valid('json');
+validateOrganizationCreateUserBody(body);  // Throws ZodError if invalid
 ```
 
 ---

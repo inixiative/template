@@ -14,10 +14,15 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (getUser(c)) return next();
 
   try {
+    // Check header first, then URL query param (for WebSocket, email links, etc.)
     const authorization = c.req.header('authorization');
-    if (!authorization?.startsWith('Bearer ')) return next();
+    const urlToken = new URL(c.req.url).searchParams.get('token');
 
-    const apiKey = authorization.slice(7);
+    const apiKey = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : urlToken;
+
+    if (!apiKey) return next();
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
     const token = await cache<TokenWithRelations | null>(cacheKey('Token', keyHash, 'keyHash'), () =>

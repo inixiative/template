@@ -71,7 +71,23 @@ describe('userRead', () => {
 
 ## Factories
 
-Located in `packages/db/src/test/factories/`:
+Located in `packages/db/src/test/factories/`.
+
+### build vs create
+
+```typescript
+import { buildUser, createUser } from '@template/db/test';
+
+// build - in-memory only, no database write (fast, for unit tests)
+const { entity: user } = await buildUser();
+
+// create - persists to database (for integration tests)
+const { entity: user } = await createUser();
+```
+
+Both have same signature: `(overrides?, context?) => Promise<{ entity, context }>`
+
+### Basic Usage
 
 ```typescript
 import { createUser, createOrganization, createOrganizationUser } from '@template/db/test';
@@ -83,11 +99,31 @@ const { entity: user } = await createUser();
 const { entity: user } = await createUser({ name: 'Test' });
 
 // With context (reuse related entities)
-const { entity: org } = await createOrganization();
-const { entity: orgUser } = await createOrganizationUser(
+const { entity: organization } = await createOrganization();
+const { entity: organizationUser } = await createOrganizationUser(
   { role: 'admin' },
-  { organization: org }
+  { organization }
 );
+```
+
+### Triggering Optional Dependencies
+
+Some models have optional FKs. Pass an empty object `{}` to trigger creation:
+
+```typescript
+import { createToken } from '@template/db/test';
+
+// Token has optional organizationUser FK
+// By default, it won't create one
+
+// Pass {} to trigger creation of the optional dependency
+const { entity: token, context } = await createToken({
+  organizationUser: {}  // Creates OrganizationUser (and its User + Organization)
+});
+
+context.organizationUser  // Now exists
+context.user              // Also created
+context.organization      // Also created
 ```
 
 ### Context Keys
@@ -100,26 +136,62 @@ context.user          // The user (auto-created dependency)
 context.organization  // The organization (auto-created dependency)
 ```
 
-Factories auto-infer required dependencies from the schema. Pass existing entities via context to reuse them:
+### Reusing Entities
+
+Pass existing entities or entire context to reuse them:
 
 ```typescript
-import { AccessorNames } from '@template/db';
+// Pass individual entities
+const { entity: organization } = await createOrganization();
+const { entity: organizationUser } = await createOrganizationUser({}, { organization });
 
-// AccessorNames = { user: 'user', organization: 'organization', ... }
-
-// Create org first, reuse in orgUser
-const { entity: org } = await createOrganization();
-const { entity: orgUser } = await createOrganizationUser(
-  { role: 'admin' },                    // Overrides
-  { [AccessorNames.organization]: org } // Context - reuse existing org
-);
-
-// Or use string keys directly
-const { entity: orgUser2 } = await createOrganizationUser(
-  {},
-  { organization: org, user: existingUser }
-);
+// Or pass entire context from previous factory
+const { context } = await createOrganizationUser();
+const { entity: session } = await createSession({}, context);
+// Session reuses the user from context
 ```
+
+### Unique Data with getNextSeq
+
+Use `getNextSeq()` for unique values in tests:
+
+```typescript
+import { getNextSeq } from '@template/db/test';
+
+const seq = getNextSeq();  // Returns incrementing number
+const email = `user-${seq}@test.com`;  // Guaranteed unique
+
+// Factories use this internally for default values
+```
+
+### TypedBuildResult (Type Safety)
+
+When writing custom factories, use `TypedBuildResult` for type-safe context:
+
+```typescript
+import type { TypedBuildResult } from '@template/db/test';
+
+// Declares that OrganizationUser factory always creates User and Organization
+type Result = TypedBuildResult<'OrganizationUser', ['User', 'Organization']>;
+
+// Now context.user and context.organization are guaranteed non-null
+const { entity, context }: Result = await createOrganizationUser();
+context.user;         // User (not User | undefined)
+context.organization; // Organization (not Organization | undefined)
+```
+
+### FK Auto-Inference
+
+Factories auto-infer dependencies from FK field names using `{modelName}Id` pattern:
+
+| FK Field | Inferred Model | Works? |
+|----------|----------------|--------|
+| `userId` | `User` | ✓ |
+| `organizationId` | `Organization` | ✓ |
+| `createdById` | `CreatedBy` | ✗ (no model) |
+| `subscriptionId` | `Subscription` | ✗ (ambiguous) |
+
+For non-standard FKs, add manual factory logic or use context.
 
 ### Cleanup
 
