@@ -186,6 +186,26 @@ cacheKey('Session', userId, 'userId', [], true)  // → cache:Session:userId:abc
 
 "False polymorphism" uses a type enum + separate FK fields instead of a single polymorphic `ownerId`. This enables real FK constraints and type-safe relations. See [DATABASE.md](DATABASE.md#false-polymorphism) for schema conventions.
 
+### Naming Conventions
+
+Standardized naming for polymorphic relationships:
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| `ownerModel` | Single ownership (who owns this resource) | Token, WebhookSubscription |
+| `subjectModel` | The entity that IS something | Customer (who is the customer) |
+| `sourceModel` / `targetModel` | Directional relationships | Inquiry (who sends → who receives) |
+
+**Field naming pattern:**
+- Type field: `{prefix}Model` (e.g., `ownerModel`, `subjectModel`)
+- FK fields: `{prefix}{ModelName}Id` (e.g., `subjectUserId`, `subjectOrganizationId`)
+- Or unprefixed for simple ownership: `userId`, `organizationId`
+
+**When to use which:**
+- **owner** - Resource belongs to exactly one entity (tokens, subscriptions)
+- **subject** - The entity performing a role (customer, subscriber, participant)
+- **source/target** - Directional flow between entities (inquiries, messages, transfers)
+
 ### Registry
 
 Single source of truth in `@template/db` - used by both validation hooks and DB constraints:
@@ -201,10 +221,16 @@ FalsePolymorphismRegistry = {
       User: ['userId'],                          // Requires userId only
       Organization: ['organizationId'],          // Requires organizationId only
       OrganizationUser: ['organizationId', 'userId'],  // Requires both
+      Space: ['spaceId'],                        // Space-level token
+      SpaceUser: ['spaceId', 'userId'],          // User's space membership token
     },
   }],
   WebhookSubscription: [{ ... }],
-  Inquiry: [{ ... }],  // sourceModel + targetModel
+  Inquiry: [{ ... }],           // sourceModel + targetModel
+  Customer: [{                  // subjectModel (who is the customer)
+    typeField: 'subjectModel',
+    fkMap: { User: ['subjectUserId'], Organization: ['subjectOrganizationId'] },
+  }],
 };
 ```
 

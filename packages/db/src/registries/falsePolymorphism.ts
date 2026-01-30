@@ -20,6 +20,8 @@ export const FalsePolymorphismRegistry: Partial<Record<ModelName, FalsePolymorph
         User: ['userId'],
         Organization: ['organizationId'],
         OrganizationUser: ['organizationId', 'userId'],
+        Space: ['spaceId'],
+        SpaceUser: ['spaceId', 'userId'],
       },
     },
   ],
@@ -45,6 +47,15 @@ export const FalsePolymorphismRegistry: Partial<Record<ModelName, FalsePolymorph
       fkMap: {
         User: ['targetUserId'],
         Organization: ['targetOrganizationId'],
+      },
+    },
+  ],
+  Customer: [
+    {
+      typeField: 'subjectModel',
+      fkMap: {
+        User: ['subjectUserId'],
+        Organization: ['subjectOrganizationId'],
       },
     },
   ],

@@ -1,0 +1,56 @@
+// ============================================================================
+// SPACE - Flexible container within an organization
+// ============================================================================
+// Examples of what a Space might represent:
+// - Trading card game platform: a game store, a game/format, a tournament series
+// - Initiative platform: a vertical/product that consumes the platform
+// - SaaS platform: a project, workspace, or environment
+
+model Space {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  name           String
+  slug           String
+
+  // Parent organization (required)
+  organizationId String       @db.VarChar(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  spaceUsers SpaceUser[]
+  tokens     Token[]
+  customers  Customer[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([slug])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  // Example: Uncomment and customize for your app
+  // type        SpaceType?
+  // category    SpaceCategory?
+  // description String?
+  // metadata    Json?
+}
+
+// Example enums - uncomment and customize for your app:
+// enum SpaceType {
+//   store
+//   game
+//   tournament
+//   vertical
+//   project
+// }
+//
+// enum SpaceCategory {
+//   retail
+//   competitive
+//   casual
+//   enterprise
+// }

@@ -1,0 +1,36 @@
+// ============================================================================
+// SPACE USER - Join table for space membership
+// ============================================================================
+// Permission inheritance:
+// - Org owners have implicit access to all spaces in their org
+// - Otherwise, explicit SpaceUser record required for access
+
+model SpaceUser {
+  id           String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  spaceId      String    @db.VarChar(36)
+  userId       String    @db.VarChar(36)
+  role         SpaceRole @default(member)
+  entitlements Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  space  Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokens Token[]
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@index([spaceId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}
+
+enum SpaceRole {
+  owner
+  admin
+  member
+  viewer
+}

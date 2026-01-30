@@ -1,6 +1,6 @@
 import { createPermix } from 'permix';
 
-export type ResourceType = 'organization' | 'user';
+export type ResourceType = 'organization' | 'space' | 'user';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -15,10 +15,13 @@ export type StandardAction = (typeof StandardAction)[keyof typeof StandardAction
 export const OrganizationAction = { ...StandardAction } as const;
 export type OrganizationAction = (typeof OrganizationAction)[keyof typeof OrganizationAction];
 
+export const SpaceAction = { ...StandardAction } as const;
+export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
+
 export const UserAction = { ...StandardAction } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 
-export type Action = UserAction | OrganizationAction;
+export type Action = UserAction | OrganizationAction | SpaceAction;
 
 export type Entitlements = Record<string, boolean> | null;
 

@@ -1,0 +1,68 @@
+// ============================================================================
+// CUSTOMER - Relationship between entities and spaces
+// ============================================================================
+// Connects a subject (User or Organization) to a Space as a "customer".
+//
+// Examples:
+// - Trading card game: a player (User) is a customer of a game store (Space)
+// - Trading card game: a store (Org) is a client of a game/publisher (Space)
+// - Initiative platform: an organization is a customer of a vertical (Space)
+//
+// Polymorphism naming convention:
+// - "subject" = the entity that IS something (here: the customer)
+// - The space is a direct FK since it's always a Space
+// - If the parent side needs to be polymorphic later, use "target" naming
+
+model Customer {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Subject: who is the customer (polymorphic: User or Organization)
+  subjectModel          CustomerSubjectModel
+  subjectUserId         String?       @db.VarChar(36)
+  subjectOrganizationId String?       @db.VarChar(36)
+
+  subjectUser         User?         @relation(fields: [subjectUserId], references: [id], onDelete: Cascade)
+  subjectOrganization Organization? @relation(fields: [subjectOrganizationId], references: [id], onDelete: Cascade)
+
+  // Space: which space they are a customer of
+  spaceId String @db.VarChar(36)
+  space   Space  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectModel, subjectUserId, subjectOrganizationId, spaceId])
+  @@index([subjectModel])
+  @@index([subjectUserId])
+  @@index([subjectOrganizationId])
+  @@index([spaceId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  // Example: Uncomment and customize for your app
+  // status      CustomerStatus?
+  // tier        CustomerTier?
+  // metadata    Json?
+  // startedAt   DateTime?
+  // endedAt     DateTime?
+}
+
+enum CustomerSubjectModel {
+  User
+  Organization
+}
+
+// Example enums - uncomment and customize for your app:
+// enum CustomerStatus {
+//   active
+//   inactive
+//   suspended
+// }
+//
+// enum CustomerTier {
+//   free
+//   basic
+//   premium
+//   enterprise
+// }

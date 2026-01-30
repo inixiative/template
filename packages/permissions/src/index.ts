@@ -8,6 +8,7 @@ export {
   createPermissions,
   StandardAction,
   OrganizationAction,
+  SpaceAction,
   UserAction,
   type Permix,
   type PermissionEntry,
@@ -35,6 +36,14 @@ export {
   roleToOrgAction,
 } from './roles/organization';
 
+// Space permissions
+export {
+  spaceRoles,
+  getSpacePermissions,
+  setupSpaceContext,
+  roleToSpaceAction,
+} from './roles/space';
+
 // User permissions
 export {
   userRoles,
@@ -42,4 +51,4 @@ export {
   setupUserContext,
 } from './roles/user';
 
-export { OrganizationRole } from '@template/db';
+export { OrganizationRole, SpaceRole } from '@template/db';

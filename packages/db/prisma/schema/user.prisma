@@ -21,11 +21,13 @@ model User {
   accounts             Account[]
   sessions             Session[]
   organizationUsers    OrganizationUser[]
+  spaceUsers           SpaceUser[]
   tokens               Token[]
   cronJobsCreated      CronJob[]
   webhookSubscriptions WebhookSubscription[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  customerRecords      Customer[]
 
   @@index([email])
 

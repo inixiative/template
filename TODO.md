@@ -33,6 +33,7 @@
 - [ ] Wire up WebSocket event handlers
 - [ ] Optional modules system (opt-in features)
 - [ ] I18n package
+- [ ] Private note system (internal notes on entities, not visible to subjects)
 
 ### Database
 

@@ -27,8 +27,15 @@ export const ModelIdType = {
   Organization: 'Organization',
   OrganizationUser: 'OrganizationUser',
 
+  // Spaces
+  Space: 'Space',
+  SpaceUser: 'SpaceUser',
+
   // Inquiries
   Inquiry: 'Inquiry',
+
+  // Customers
+  Customer: 'Customer',
 
   // Webhooks
   WebhookSubscription: 'WebhookSubscription',
@@ -53,8 +60,15 @@ export type TokenId = Id<typeof ModelIdType.Token>;
 export type OrganizationId = Id<typeof ModelIdType.Organization>;
 export type OrganizationUserId = Id<typeof ModelIdType.OrganizationUser>;
 
+// Spaces
+export type SpaceId = Id<typeof ModelIdType.Space>;
+export type SpaceUserId = Id<typeof ModelIdType.SpaceUser>;
+
 // Inquiries
 export type InquiryId = Id<typeof ModelIdType.Inquiry>;
+
+// Customers
+export type CustomerId = Id<typeof ModelIdType.Customer>;
 
 // Webhooks
 export type WebhookSubscriptionId = Id<typeof ModelIdType.WebhookSubscription>;
@@ -78,8 +92,15 @@ export const tokenId = (id: string): TokenId => id as TokenId;
 export const organizationId = (id: string): OrganizationId => id as OrganizationId;
 export const organizationUserId = (id: string): OrganizationUserId => id as OrganizationUserId;
 
+// Spaces
+export const spaceId = (id: string): SpaceId => id as SpaceId;
+export const spaceUserId = (id: string): SpaceUserId => id as SpaceUserId;
+
 // Inquiries
 export const inquiryId = (id: string): InquiryId => id as InquiryId;
+
+// Customers
+export const customerId = (id: string): CustomerId => id as CustomerId;
 
 // Webhooks
 export const webhookSubscriptionId = (id: string): WebhookSubscriptionId => id as WebhookSubscriptionId;

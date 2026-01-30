@@ -13,10 +13,12 @@ model Organization {
 
   // Relations
   organizationUsers    OrganizationUser[]
+  spaces               Space[]
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  customerRecords      Customer[]
 
   @@index([slug])
 
