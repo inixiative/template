@@ -1,4 +1,4 @@
-import { SpaceRole, type SpaceId, type User } from '@template/db';
+import { SpaceRole, type OrganizationId, type SpaceId, type User } from '@template/db';
 import { SpaceAction, type Entitlements, type PermissionEntry, type Permix } from '@template/permissions/client';
 import { allTrue, isSuperadmin } from './shared';
 
@@ -13,12 +13,14 @@ export function getSpacePermissions(
   role: SpaceRole,
   spaceId: SpaceId,
   entitlements?: Entitlements,
+  organizationId?: OrganizationId,
 ): PermissionEntry {
   const baseActions = spaceRoles[role].space;
   return {
     resource: 'space',
     id: spaceId,
     actions: { ...baseActions, ...entitlements },
+    context: organizationId ? { organizationId } : undefined,
   };
 }
 
@@ -27,6 +29,7 @@ type SpaceContextParams = {
   role: SpaceRole;
   spaceId: SpaceId;
   entitlements?: Entitlements;
+  organizationId?: OrganizationId;
 };
 
 export async function setupSpaceContext(
@@ -38,7 +41,9 @@ export async function setupSpaceContext(
     return;
   }
 
-  await permix.setup(getSpacePermissions(params.role, params.spaceId, params.entitlements));
+  await permix.setup(
+    getSpacePermissions(params.role, params.spaceId, params.entitlements, params.organizationId),
+  );
 }
 
 const roleActionMap: Record<SpaceRole, SpaceAction> = {

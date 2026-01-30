@@ -12,6 +12,7 @@ export {
   UserAction,
   type Permix,
   type PermissionEntry,
+  type PermissionContext,
   type ActionState,
   type ResourceType,
   type Action,

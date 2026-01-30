@@ -1,11 +1,16 @@
-import type { ExtendedPrismaClient, OrganizationUser, SpaceUser, User } from '@template/db';
+import type { ExtendedPrismaClient, OrganizationUser, Space, SpaceUser, User } from '@template/db';
 import { cache, cacheKey } from '#/lib/cache/cache';
 
 const USER_CACHE_TTL = 60 * 10; // 10 minutes
 
+// SpaceUser with organizationId for permission context
+export type SpaceUserWithOrg = SpaceUser & {
+  space: Pick<Space, 'organizationId'>;
+};
+
 export type UserWithMemberships = User & {
   organizationUsers: OrganizationUser[];
-  spaceUsers: SpaceUser[];
+  spaceUsers: SpaceUserWithOrg[];
 };
 
 /** @deprecated Use UserWithMemberships instead */
@@ -44,6 +49,7 @@ export async function findUserWithOrganizationUsers(
           },
           spaceUsers: {
             where: { space: { deletedAt: null } },
+            include: { space: { select: { organizationId: true } } },
           },
         },
       }) as Promise<UserWithMemberships | null>,
