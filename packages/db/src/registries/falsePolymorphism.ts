@@ -48,6 +48,26 @@ export const FalsePolymorphismRegistry: Partial<Record<ModelName, FalsePolymorph
       },
     },
   ],
+  EmailComponent: [
+    {
+      typeField: 'ownerModel',
+      fkMap: {
+        default: [],      // No FK required
+        admin: [],        // No FK required
+        Organization: ['organizationId'],
+      },
+    },
+  ],
+  EmailTemplate: [
+    {
+      typeField: 'ownerModel',
+      fkMap: {
+        default: [],      // No FK required
+        admin: [],        // No FK required
+        Organization: ['organizationId'],
+      },
+    },
+  ],
 };
 
 export const getPolymorphismConfigs = (model: ModelName): FalsePolymorphismRelation[] =>

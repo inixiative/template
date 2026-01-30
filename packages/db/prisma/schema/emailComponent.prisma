@@ -1,0 +1,41 @@
+// ============================================================================
+// EMAIL COMPONENT
+// ============================================================================
+// Reusable MJML components for composing email templates.
+// Supports polymorphic ownership: default (all tenants), admin (platform), Organization (tenant-branded)
+
+model EmailComponent {
+  id        String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  name   String                // "Default Header"
+  slug   String                // "default-header"
+  type   EmailComponentType
+  mjml   String               @db.Text // MJML with {{variable}} placeholders
+  locale String               @default("en")
+
+  // Owner (false polymorphism - default/admin have no FK)
+  ownerModel     EmailOwnerModel @default(default)
+  organizationId String?         @db.VarChar(36)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([slug, locale, ownerModel, organizationId])
+  @@index([type])
+  @@index([ownerModel])
+  @@index([organizationId])
+}
+
+enum EmailComponentType {
+  header
+  footer
+  content
+  block // reusable content blocks (cta, code display, etc.)
+}
+
+enum EmailOwnerModel {
+  default      // Base resources - read: all, write: super admin
+  admin        // Platform internal - super admin only
+  Organization // Tenant-branded - org admins
+}

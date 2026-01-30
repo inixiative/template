@@ -280,6 +280,37 @@ organization Organization? @relation(...)
 
 Benefits: FK constraints, type-safe includes, proper cascading.
 
+### Special Owner Values (No FK)
+
+Some owner enums include special values that don't map to FKs:
+
+| Owner | FK | Purpose | Permissions |
+|-------|-----|---------|-------------|
+| `default` | none | Base resources available to all tenants | Read: all, Write: super admin |
+| `admin` | none | Platform internal resources | Super admin only |
+| `User` | `userId` | User-owned resources | User managed |
+| `Organization` | `organizationId` | Tenant-branded resources | Org admin managed |
+
+```prisma
+enum EmailOwnerModel {
+  default       // Base resources - no FK
+  admin         // Platform internal - no FK
+  Organization  // Has organizationId FK
+}
+```
+
+**When to use:**
+- `default` - Base templates/resources available to all tenants. Super admins can edit. Everyone can read. Typically seeded with initial data.
+- `admin` - Platform's internal resources (e.g., system communications). Only visible/editable by super admins.
+- `Organization` - Tenant customizations. Org admins can create/edit their own versions.
+
+**Optional: Immutable defaults** - If you want `default` resources to be seed-only (never edited via UI), enforce this at the API layer by rejecting writes to `default` owner resources. This is a stricter pattern for resources that should never change after deployment.
+
+**Resolution priority example** (email templates):
+1. Org-specific component (if sending on behalf of org)
+2. Admin override (if super admin has customized)
+3. Default (seeded baseline)
+
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---

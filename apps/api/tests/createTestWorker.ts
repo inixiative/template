@@ -27,4 +27,5 @@ export const createTestWorker = (jobOverrides?: Partial<Job>): WorkerContext => 
   db,
   queue,
   job: createMockJob(jobOverrides),
+  log: () => {},
 });

@@ -17,6 +17,8 @@ model Organization {
   webhookSubscriptions WebhookSubscription[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  emailComponents      EmailComponent[]
+  emailTemplates       EmailTemplate[]
 
   @@index([slug])
 

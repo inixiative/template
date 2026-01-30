@@ -27,6 +27,9 @@ describe('sendWebhook handler', () => {
   // Generate unique URL per test to avoid unique constraint
   const getUniqueUrl = (suffix = '') => `http://test-webhook.local/${++testCounter}${suffix}`;
 
+  // Mock log function for worker context
+  const mockLog = () => {};
+
   beforeAll(async () => {
     process.env.WEBHOOK_SIGNING_PRIVATE_KEY = privateKey;
 
@@ -82,7 +85,7 @@ describe('sendWebhook handler', () => {
       });
 
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -123,7 +126,7 @@ describe('sendWebhook handler', () => {
       });
 
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'update',
@@ -161,7 +164,7 @@ describe('sendWebhook handler', () => {
       });
 
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -191,7 +194,7 @@ describe('sendWebhook handler', () => {
       });
 
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -219,7 +222,7 @@ describe('sendWebhook handler', () => {
       });
 
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -238,7 +241,7 @@ describe('sendWebhook handler', () => {
 
     it('skips non-existent subscription', async () => {
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: 'non-existent-id',
           action: 'create',
@@ -281,7 +284,7 @@ describe('sendWebhook handler', () => {
 
       // Trigger the 5th failure
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -331,7 +334,7 @@ describe('sendWebhook handler', () => {
 
       // Trigger another failure (this is only the 4th failure total, with 1 success in the middle)
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',
@@ -373,7 +376,7 @@ describe('sendWebhook handler', () => {
 
       // Trigger the 3rd failure
       await sendWebhook(
-        { db },
+        { db, log: mockLog },
         {
           subscriptionId: sub.id,
           action: 'create',

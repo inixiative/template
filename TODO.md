@@ -45,3 +45,16 @@
 - [ ] Build out admin/superadmin app UIs
 - [ ] Add Playwright for E2E testing (`tests/e2e/`)
 - [ ] Add Artillery for load testing (`tests/load/`)
+
+
+
+NOTES w/ Hernan
+audit/activity logs
+mermaid for markdown
+pen test? - autonoma
+lets set default orderby in paginate
+both auths are token (JWT) -docs (session is cookies?)
+look into turbo repo (w/ bun) to skip unchanged tests
+optimisitic updates in tanstack query
+- when you change data, change the cache of the data before the real trigger/invalidate
+- 

@@ -9,6 +9,8 @@ export type WorkerContext = {
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;
+  /** Log to both stdout AND BullBoard job logs */
+  log: (message: string) => void;
 };
 
 export class SupersededError extends Error {

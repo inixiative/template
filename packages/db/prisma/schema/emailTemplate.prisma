@@ -1,0 +1,35 @@
+// ============================================================================
+// EMAIL TEMPLATE
+// ============================================================================
+// Email templates with MJML content that can reference EmailComponents via {{component:slug}}.
+// Supports polymorphic ownership: default (all tenants), admin (platform), Organization (tenant-branded)
+
+model EmailTemplate {
+  id        String              @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  name     String               // "OTP Verification"
+  slug     String               // "otp"
+  locale   String               @default("en")
+  category CommunicationCategory
+
+  subject String                // "Your verification code: {{code}}"
+  mjml    String  @db.Text      // Full MJML with {{component:slug}} and {{var}} placeholders
+
+  // Owner (false polymorphism - default/admin have no FK)
+  ownerModel     EmailOwnerModel @default(default)
+  organizationId String?         @db.VarChar(36)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([slug, locale, ownerModel, organizationId])
+  @@index([category])
+  @@index([ownerModel])
+  @@index([organizationId])
+}
+
+enum CommunicationCategory {
+  system      // OTP, password reset, security alerts - cannot unsubscribe
+  promotional // Marketing, newsletters - can unsubscribe
+}

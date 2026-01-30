@@ -140,6 +140,35 @@ const user = await cache('user', userId, () => db.user.findUnique(...));
 cache(prefix: string, key: string, fn: () => Promise<T>): Promise<T>
 ```
 
+### Diagrams with Mermaid
+
+Use [Mermaid](https://mermaid.js.org/) for flowcharts, sequence diagrams, and architecture diagrams. Mermaid is installed at the project root.
+
+```markdown
+```mermaid
+flowchart TD
+    A[Request] --> B{Auth?}
+    B -->|Yes| C[Handler]
+    B -->|No| D[401]
+    C --> E[Response]
+`` `
+
+```mermaid
+sequenceDiagram
+    Client->>API: POST /inquiry
+    API->>DB: Create inquiry
+    API->>Queue: Enqueue webhook
+    API-->>Client: 201 Created
+    Queue->>Webhook: POST to subscriber
+`` `
+```
+
+Common diagram types:
+- `flowchart` - Process flows, decision trees
+- `sequenceDiagram` - API flows, async operations
+- `erDiagram` - Data relationships
+- `classDiagram` - Type hierarchies
+
 ---
 
 ## Doc Maintenance

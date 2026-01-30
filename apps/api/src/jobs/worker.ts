@@ -38,19 +38,27 @@ export const initializeWorker = async (): Promise<void> => {
       const scopeId = `${job.name}:${job.id}`;
       await logScope('worker', () => logScope(scopeId, () =>
         db.scope(scopeId, async () => {
+          // Helper that logs to both stdout and BullBoard
+          const jobLog = (message: string) => {
+            log.info(message);
+            job.log(message);
+          };
+
           const ctx: WorkerContext = {
             db,
             queue,
             job,
+            log: jobLog,
           };
 
-          log.info(`Processing job ${job.name} (${job.id})`);
+          jobLog(`Processing job ${job.name} (${job.id})`);
 
           try {
             await handler(ctx, job.data.payload || {});
-            log.info(`Completed job ${job.name} (${job.id})`);
+            jobLog(`Completed job ${job.name} (${job.id})`);
           } catch (error) {
             log.error(`Failed job ${job.name} (${job.id}):`, error);
+            job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
           }
         }),
