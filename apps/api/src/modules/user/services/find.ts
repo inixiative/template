@@ -1,9 +1,15 @@
-import type { ExtendedPrismaClient, OrganizationUser, User } from '@template/db';
+import type { ExtendedPrismaClient, OrganizationUser, SpaceUser, User } from '@template/db';
 import { cache, cacheKey } from '#/lib/cache/cache';
 
 const USER_CACHE_TTL = 60 * 10; // 10 minutes
 
-export type UserWithOrganizationUsers = User & { organizationUsers: OrganizationUser[] };
+export type UserWithMemberships = User & {
+  organizationUsers: OrganizationUser[];
+  spaceUsers: SpaceUser[];
+};
+
+/** @deprecated Use UserWithMemberships instead */
+export type UserWithOrganizationUsers = UserWithMemberships;
 
 /**
  * Find user by email (cached)
@@ -20,15 +26,15 @@ export async function findUserByEmail(
 }
 
 /**
- * Find user by ID with organization memberships (cached)
- * Only includes orgs that aren't soft-deleted
+ * Find user by ID with organization and space memberships (cached)
+ * Only includes orgs/spaces that aren't soft-deleted
  */
 export async function findUserWithOrganizationUsers(
   db: ExtendedPrismaClient,
   userId: string,
-): Promise<UserWithOrganizationUsers | null> {
-  return cache<UserWithOrganizationUsers | null>(
-    cacheKey('User', userId, 'id', ['OrganizationUsers']),
+): Promise<UserWithMemberships | null> {
+  return cache<UserWithMemberships | null>(
+    cacheKey('User', userId, 'id', ['OrganizationUsers', 'SpaceUsers']),
     async () =>
       db.user.findUnique({
         where: { id: userId },
@@ -36,8 +42,11 @@ export async function findUserWithOrganizationUsers(
           organizationUsers: {
             where: { organization: { deletedAt: null } },
           },
+          spaceUsers: {
+            where: { space: { deletedAt: null } },
+          },
         },
-      }) as Promise<UserWithOrganizationUsers | null>,
+      }) as Promise<UserWithMemberships | null>,
     USER_CACHE_TTL,
   );
 }

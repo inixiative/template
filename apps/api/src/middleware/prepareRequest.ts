@@ -10,6 +10,8 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('requestId', requestId);
   c.set('permix', createPermissions());
   c.set('user', null);
+  c.set('organizationUsers', null);
+  c.set('spaceUsers', null);
   c.set('session', null);
   c.set('token', null);
   c.set('spoofedBy', null);

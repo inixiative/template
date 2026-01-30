@@ -41,6 +41,8 @@ model Token {
   @@index([organizationId])
   @@index([spaceId])
   @@index([keyHash])
+  @@index([organizationId, userId])
+  @@index([spaceId, userId])
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

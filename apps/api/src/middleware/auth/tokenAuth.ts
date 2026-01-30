@@ -5,6 +5,7 @@ import type { TokenWithRelations } from '#/lib/context/getToken';
 import { getUser } from '#/lib/context/getUser';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
+import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { findUserWithOrganizationUsers } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -41,6 +42,21 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
               organization: true,
             },
           },
+          space: {
+            include: {
+              organization: true,
+            },
+          },
+          spaceUser: {
+            include: {
+              user: true,
+              space: {
+                include: {
+                  organization: true,
+                },
+              },
+            },
+          },
         },
       }),
     );
@@ -58,19 +74,31 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     c.set('token', token);
 
     if (token.ownerModel === 'User' && token.user) {
-      // User token → load user with all org memberships
-      const userWithOrgs = await findUserWithOrganizationUsers(db, token.user.id);
-      if (userWithOrgs) await setUserContext(c, userWithOrgs);
+      // User token → load user with all org/space memberships
+      const userWithMemberships = await findUserWithOrganizationUsers(db, token.user.id);
+      if (userWithMemberships) await setUserContext(c, userWithMemberships);
     } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
       // OrgUser token → use token data directly (scoped to single org)
       const { user: orgUserUser, organization: _, ...orgUserFields } = token.organizationUser;
       await setUserContext(c, {
         ...orgUserUser,
         organizationUsers: [orgUserFields],
+        spaceUsers: [],
       });
-    } else {
-      // Org token → just set up permissions (no user context)
+    } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
+      // SpaceUser token → use token data directly (scoped to single space)
+      const { user: spaceUserUser, space: _, ...spaceUserFields } = token.spaceUser;
+      await setUserContext(c, {
+        ...spaceUserUser,
+        organizationUsers: [],
+        spaceUsers: [spaceUserFields],
+      });
+    } else if (token.ownerModel === 'Organization') {
+      // Org token → just set up org permissions (no user context)
       await setupOrgPermissions(c);
+    } else if (token.ownerModel === 'Space') {
+      // Space token → just set up space permissions (no user context)
+      await setupSpacePermissions(c);
     }
   } catch {
     // Invalid token

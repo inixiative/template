@@ -1,4 +1,4 @@
-import type { ExtendedPrismaClient, OrganizationUser, Prisma, Session, User } from '@template/db';
+import type { ExtendedPrismaClient, OrganizationUser, Prisma, Session, SpaceUser, User } from '@template/db';
 import type { Permix } from '@template/permissions';
 import type { TokenWithRelations } from '#/lib/context/getToken';
 
@@ -7,6 +7,7 @@ export type AppVars = {
   txn: Prisma.TransactionClient | undefined;
   user: User | null;
   organizationUsers: OrganizationUser[] | null;
+  spaceUsers: SpaceUser[] | null;
   session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
