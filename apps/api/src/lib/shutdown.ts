@@ -1,4 +1,4 @@
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 /**
  * Graceful Shutdown Handler
  *
@@ -38,12 +38,12 @@ export function initGracefulShutdown(
     if (isShuttingDown) return;
     isShuttingDown = true;
 
-    log.info(`\n⏳ ${signal} received, starting graceful shutdown...`);
+    log.info(`${signal} received, starting graceful shutdown...`, LogScope.api);
     onStart?.();
 
     // Force exit after timeout
     const forceExit = setTimeout(() => {
-      log.error('❌ Shutdown timeout - forcing exit');
+      log.error('Shutdown timeout - forcing exit', LogScope.api);
       process.exit(1);
     }, timeout);
 
@@ -54,11 +54,11 @@ export function initGracefulShutdown(
       }
 
       clearTimeout(forceExit);
-      log.info('✅ Graceful shutdown complete');
+      log.info('Graceful shutdown complete', LogScope.api);
       onComplete?.();
       process.exit(0);
     } catch (error) {
-      log.error('❌ Shutdown error:', error);
+      log.error(`Shutdown error: ${error}`, LogScope.api);
       clearTimeout(forceExit);
       process.exit(1);
     }

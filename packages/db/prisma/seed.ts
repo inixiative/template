@@ -1,5 +1,6 @@
 import { omit } from 'lodash-es';
-import { db, type ModelDelegate } from '#/index';
+import { log, LogScope } from '@template/shared/logger';
+import { db, type ModelDelegate } from '#/index'
 import seeds from './seeds';
 
 export type SeedFile = {
@@ -26,7 +27,7 @@ async function seed() {
           update: omit(data, ['id', ...updateOmits]),
         });
       } catch (e) {
-        console.error(`Failed to seed ${model}:`, data.id, e);
+        log.error(`Failed to seed ${model}: ${data.id}`, LogScope.seed);
         throw e;
       }
     }
@@ -35,10 +36,10 @@ async function seed() {
 
 seed()
   .then(() => {
-    console.log('Seed completed');
+    log.success('Seed completed', LogScope.seed);
     process.exit(0);
   })
   .catch((e) => {
-    console.error('Seed failed:', e);
+    log.error('Seed failed', LogScope.seed);
     process.exit(1);
   });

@@ -1,5 +1,5 @@
 import { queue } from '#/jobs/queue';
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 
 export const cleanupTestJobs = async (): Promise<number> => {
   const jobStates = ['completed', 'failed', 'wait', 'active', 'delayed'] as const;
@@ -14,13 +14,13 @@ export const cleanupTestJobs = async (): Promise<number> => {
         await job.remove();
         totalCleaned++;
       } catch {
-        log.warn(`Failed to remove test job ${job.id}`);
+        log.warn(`Failed to remove test job ${job.id}`, LogScope.test);
       }
     }
   }
 
   if (totalCleaned > 0) {
-    log.info(`Cleaned up ${totalCleaned} test jobs`);
+    log.info(`Cleaned up ${totalCleaned} test jobs`, LogScope.test);
   }
 
   return totalCleaned;

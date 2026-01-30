@@ -2,7 +2,7 @@ import { db } from '@template/db';
 import { isValidHandlerName } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { JobType } from '#/jobs/types';
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 
 export const registerCronJobs = async (): Promise<void> => {
   const cronJobs = await db.cronJob.findMany({
@@ -10,15 +10,15 @@ export const registerCronJobs = async (): Promise<void> => {
   });
 
   if (cronJobs.length === 0) {
-    log.info('No enabled cron jobs to register');
+    log.info('No enabled cron jobs to register', LogScope.job);
     return;
   }
 
-  log.info(`Registering ${cronJobs.length} enabled cron jobs...`);
+  log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
 
   for (const cronJob of cronJobs) {
     if (!isValidHandlerName(cronJob.handler)) {
-      log.warn(`Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`);
+      log.warn(`Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`, LogScope.job);
       continue;
     }
 
@@ -36,9 +36,9 @@ export const registerCronJobs = async (): Promise<void> => {
           backoff: { type: 'exponential', delay: cronJob.backoffMs },
         },
       );
-      log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`);
+      log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`, LogScope.job);
     } catch (error) {
-      log.error(`Failed to register cron "${cronJob.name}":`, error);
+      log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
     }
   }
 };

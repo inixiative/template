@@ -1,5 +1,5 @@
 import { db } from '@template/db';
-import { log, logScope } from '@template/shared/logger';
+import { log, logScope, LogScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
@@ -18,7 +18,7 @@ let workerRedis: Redis | null = null;
 
 export const initializeWorker = async (): Promise<void> => {
   if (process.env.ENVIRONMENT === 'test') {
-    log.info('Skipping worker initialization in test environment');
+    log.info('Skipping worker initialization in test environment', LogScope.worker);
     return;
   }
 
@@ -29,7 +29,7 @@ export const initializeWorker = async (): Promise<void> => {
     'jobs',
     async (job: Job) => {
       if (!isValidHandlerName(job.name)) {
-        log.error(`Unknown job handler: ${job.name}`);
+        log.error(`Unknown job handler: ${job.name}`, LogScope.worker);
         throw new Error(`Unknown job handler: ${job.name}`);
       }
 
@@ -63,14 +63,14 @@ export const initializeWorker = async (): Promise<void> => {
     },
   );
 
-  log.info('Job worker initialized');
+  log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
 
   onShutdown(async () => {
-    log.info('Stopping job worker...');
+    log.info('Stopping job worker...', LogScope.worker);
     if (jobsWorker) await jobsWorker.close();
     if (workerRedis) await workerRedis.quit();
-    log.info('Job worker stopped');
+    log.info('Job worker stopped', LogScope.worker);
   });
 };

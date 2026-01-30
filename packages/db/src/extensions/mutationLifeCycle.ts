@@ -1,7 +1,7 @@
 import { Prisma } from '@template/db/generated/client/client';
 import type { Db } from '@template/db/clientTypes';
 import { toDelegate } from '@template/db/utils/modelNames';
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 import { DbAction, HookTiming, executeHooks, type HookOptions } from './hookRegistry';
 
 export { DbAction, HookTiming, registerDbHook, executeHooks, clearHookRegistry } from './hookRegistry';
@@ -29,7 +29,7 @@ export const mutationLifeCycleExtension = () => {
     const duration = performance.now() - start;
 
     if (duration > SLOW_MUTATION_THRESHOLD) {
-      log.warn(`slow mutation: ${model}.${operation} took ${(duration / 1000).toFixed(2)}s`);
+      log.warn(`slow mutation: ${model}.${operation} took ${(duration / 1000).toFixed(2)}s`, LogScope.db);
     }
 
     return result;

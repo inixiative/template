@@ -1,5 +1,5 @@
 import { isLocal, isTest } from '@template/shared/utils';
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 
 /**
  * Initialize OpenTelemetry for BetterStack (or any OTLP-compatible backend).
@@ -15,17 +15,17 @@ import { log } from '@template/shared/logger';
 export async function initializeOpenTelemetry() {
   // Skip in local/test environments
   if (isLocal || isTest) {
-    log.info('⏭️  Skipping OpenTelemetry initialization (local/test environment)');
+    log.info('Skipping OpenTelemetry initialization (local/test environment)', LogScope.api);
     return;
   }
 
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint) {
-    log.info('⚠️  OTEL_EXPORTER_OTLP_ENDPOINT not configured, skipping OpenTelemetry initialization');
+    log.info('OTEL_EXPORTER_OTLP_ENDPOINT not configured, skipping OpenTelemetry initialization', LogScope.api);
     return;
   }
 
-  log.info(`🔧 Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`);
+  log.info(`Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`, LogScope.api);
 
   try {
     // Dynamic imports to avoid loading OTel in local/test
@@ -69,9 +69,9 @@ export async function initializeOpenTelemetry() {
     });
 
     sdk.start();
-    log.info('✅ OpenTelemetry SDK started successfully');
-    log.info(`   Endpoint: ${endpoint}`);
+    log.info('OpenTelemetry SDK started successfully', LogScope.api);
+    log.info(`Endpoint: ${endpoint}`, LogScope.api);
   } catch (error) {
-    log.error('❌ Failed to initialize OpenTelemetry:', error);
+    log.error(`Failed to initialize OpenTelemetry: ${error}`, LogScope.api);
   }
 }

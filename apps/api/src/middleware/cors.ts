@@ -4,9 +4,10 @@ import type { Env } from '#/config/env';
 const allowedOrigins: Record<Env['ENVIRONMENT'], string[]> = {
   local: ['*'],
   test: ['*'],
-  develop: ['*localhost:*', '*.vercel.app'],
+  dev: ['*localhost:*', '*.vercel.app'],
   staging: ['*.vercel.app'],
-  production: [],
+  sandbox: ['*.vercel.app'],
+  prod: [],
 };
 
 export const getAllowedOrigins = (): string[] => {

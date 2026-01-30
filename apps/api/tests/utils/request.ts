@@ -1,5 +1,6 @@
 // Test request helpers
 
+import { log, LogScope } from '@template/shared/logger';
 import type { PaginationMetadata } from '#/lib/routeTemplates';
 
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
@@ -9,7 +10,7 @@ export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
 export async function json<T = unknown>(response: Response): Promise<SuccessResponse<T>> {
   const body = await response.json();
-  if (!response.ok) console.error(`[${response.status}]`, body);
+  if (!response.ok) log.error(`[${response.status}] ${JSON.stringify(body)}`, LogScope.test);
   return body as SuccessResponse<T>;
 }
 

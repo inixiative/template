@@ -16,11 +16,14 @@ Located in `@template/shared/logger`. Uses [consola](https://github.com/unjs/con
 ### Usage
 
 ```typescript
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 
-log.info('User created', { userId: user.id });
+log.info('User created');
 log.warn('Rate limit approaching');
-log.error('Failed to process webhook', error);
+log.error('Failed to process webhook');
+
+// With manual scope (overrides automatic scopes)
+log.info('Database connected', LogScope.db);
 ```
 
 ### Log Levels
@@ -49,43 +52,86 @@ Set via `LOG_LEVEL` env var (default: `info`):
 
 Scopes tag log output with context. They stack automatically.
 
-### Entry Points Set Base Scope
+### LogScope Enum
+
+```typescript
+import { LogScope } from '@template/shared/logger';
+
+LogScope.api      // 'api'
+LogScope.db       // 'db'
+LogScope.worker   // 'worker'
+LogScope.seed     // 'seed'
+LogScope.ws       // 'ws'
+LogScope.test     // 'test'
+LogScope.auth     // 'auth'
+LogScope.cache    // 'cache'
+LogScope.hook     // 'hook'
+LogScope.job      // 'job'
+```
+
+### Usage
+
+```typescript
+import { log, logScope, LogScope } from '@template/shared/logger';
+
+// Normal logging (uses automatic scope from logScope if any)
+log.info('message');
+
+// Manual scope as last argument - OVERRIDES automatic scopes
+log.info('message', LogScope.worker);
+log.error('failed', LogScope.seed);
+```
+
+**Note**: Manual scope completely replaces any automatic scopes from `logScope()`. Use for logging outside wrappers or when you need a specific context.
+
+### Automatic Scopes with logScope()
+
+Wrap execution to automatically tag all logs within:
+
+```typescript
+await logScope(LogScope.api, async () => {
+  log.info('outer');  // [api] outer
+
+  await logScope(requestId, async () => {
+    log.info('inner');  // [api][req123] inner
+  });
+});
+```
+
+### Entry Points
 
 ```typescript
 // prepareRequest.ts
-await logScope('api', () => logScope(requestId, () => ...));
+await logScope(LogScope.api, () => logScope(requestId, () => ...));
 
 // worker.ts
-await logScope('worker', () => logScope(jobId, () => ...));
+await logScope(LogScope.worker, () => logScope(jobId, () => ...));
 ```
 
 ### Output
 
 ```
 [2024-01-29T14:32:45.123Z][api][abc12345] handling request
-[2024-01-29T14:32:45.456Z][api][abc12345] User created { userId: 'usr_xyz' }
 [2024-01-29T14:33:01.789Z][worker][send:def] processing webhook
-[2024-01-29T14:33:07.012Z][worker][send:def] slow mutation: Token.update took 6.23s
+[2024-01-29T14:33:07.012Z][seed] Seed completed
 ```
 
-### How It Works
+### Frontend Apps
+
+The main `log` uses `AsyncLocalStorage` (Node-only). For frontend apps, use `createFrontendLogger`:
 
 ```typescript
-import { log, logScope } from '@template/shared/logger';
+import { createFrontendLogger, FrontendScope } from '@template/shared/logger';
 
-// Scopes stack - inner code sees all outer scopes
-await logScope('api', async () => {
-  log.info('outer');  // [api] outer
+// Create once per app (e.g., in lib/logger.ts)
+export const log = createFrontendLogger(FrontendScope.web);     // 'web'
+export const log = createFrontendLogger(FrontendScope.admin);   // 'admin'
+export const log = createFrontendLogger(FrontendScope.superadmin); // 'super'
 
-  await logScope('req123', async () => {
-    log.info('inner');  // [api][req123] inner
-  });
-});
+// Usage
+log.info('Page loaded');   // [web] Page loaded
+log.error('API failed');   // [web] API failed
 ```
-
-### Scope Exits Automatically
-
-`logScope` uses `AsyncLocalStorage.run()` - scope clears when the function returns.
 
 ---
 

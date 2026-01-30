@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "moduleDetection": "force",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedSideEffectImports": true,
+    "types": [],
+    "paths": {
+      "@template/db": ["packages/db/src"],
+      "@template/shared": ["packages/shared/src"],
+      "@template/shared/*": ["packages/shared/src/*"],
+      "@template/ui": ["packages/ui/src"],
+      "@template/ui/*": ["packages/ui/src/*"]
+    }
+  }
+}

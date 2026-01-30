@@ -1,4 +1,4 @@
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 import type { AppEventPayload, WSSocket } from '#/ws/types';
 
 // Primary index: connectionId → socket

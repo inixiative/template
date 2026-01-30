@@ -1,6 +1,6 @@
 import { registerHooks } from '#/hooks';
 import { getRedisClient } from '#/lib/clients/redis';
-import { log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
 import { initializeOpenTelemetry } from '#/config/otel';
@@ -34,7 +34,7 @@ const server = Bun.serve({
 onShutdown(async () => {
   // 1. Stop accepting new connections
   server.stop();
-  log.info('Stopped accepting new connections');
+  log.info('Stopped accepting new connections', LogScope.api);
 });
 
 onShutdown(async () => {
@@ -47,13 +47,13 @@ onShutdown(async () => {
   try {
     const redis = getRedisClient();
     await redis.quit();
-    log.success('Redis connections closed');
+    log.success('Redis connections closed', LogScope.api);
   } catch {
     // Redis might not be initialized
   }
 });
 
-log.box(`API running at http://localhost:${server.port}`);
-log.info('OpenAPI docs', { url: `http://localhost:${server.port}/openapi/docs` });
-log.info('Health check', { url: `http://localhost:${server.port}/health` });
-log.info('WebSocket', { url: `ws://localhost:${server.port}` });
+log.box(`API running at http://localhost:${server.port}`, LogScope.api);
+log.info(`OpenAPI docs: http://localhost:${server.port}/openapi/docs`, LogScope.api);
+log.info(`Health check: http://localhost:${server.port}/health`, LogScope.api);
+log.info(`WebSocket: ws://localhost:${server.port}`, LogScope.api);

@@ -7,6 +7,13 @@ import {
   type HookOptions,
 } from '../extensions/mutationLifeCycle';
 
+// Mock logger - the proxy makes direct spying difficult
+const mockWarn = mock(() => {});
+mock.module('@template/shared/logger', () => ({
+  log: { warn: mockWarn, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
+  LogScope: { hook: 'hook', db: 'db' },
+}));
+
 describe('mutationLifeCycle', () => {
   describe('registerDbHook', () => {
     it('registers a hook for a specific model and action', async () => {
@@ -92,7 +99,7 @@ describe('mutationLifeCycle', () => {
     it('skips duplicate hook registration with same name', async () => {
       const hookFn1 = mock(() => Promise.resolve());
       const hookFn2 = mock(() => Promise.resolve());
-      const consoleSpy = spyOn(console, 'warn').mockImplementation(() => {});
+      mockWarn.mockClear();
 
       registerDbHook(
         'test-hook-duplicate',
@@ -110,8 +117,9 @@ describe('mutationLifeCycle', () => {
         hookFn2,
       );
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockWarn).toHaveBeenCalledWith(
         "Hook 'test-hook-duplicate' already registered - skipping duplicate",
+        'hook',
       );
 
       await executeHooks(HookTiming.before, {
@@ -123,8 +131,6 @@ describe('mutationLifeCycle', () => {
 
       expect(hookFn1).toHaveBeenCalledTimes(1);
       expect(hookFn2).not.toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
     });
 
     it('throws error when registering with empty actions array', () => {

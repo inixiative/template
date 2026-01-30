@@ -1,2 +1,3 @@
 export { log } from './logger';
-export { logScope } from './scope';
+export { logScope, LogScope } from './scope';
+export { createFrontendLogger, FrontendScope } from './frontend';
