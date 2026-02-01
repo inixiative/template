@@ -78,12 +78,25 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
       const userWithMemberships = await findUserWithOrganizationUsers(db, token.user.id);
       if (userWithMemberships) await setUserContext(c, userWithMemberships);
     } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
-      // OrgUser token → use token data directly (scoped to single org)
+      // OrgUser token → scoped to single org + user's spaces in that org
       const { user: orgUserUser, organization: _, ...orgUserFields } = token.organizationUser;
+
+      // Load user's space memberships for spaces in this org
+      const spaceUsersInOrg = await db.spaceUser.findMany({
+        where: {
+          userId: orgUserUser.id,
+          space: {
+            organizationId: token.organizationId!,
+            deletedAt: null,
+          },
+        },
+        include: { space: { select: { organizationId: true } } },
+      });
+
       await setUserContext(c, {
         ...orgUserUser,
         organizationUsers: [orgUserFields],
-        spaceUsers: [],
+        spaceUsers: spaceUsersInOrg,
       });
     } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
       // SpaceUser token → use token data directly (scoped to single space)
