@@ -24,7 +24,7 @@ export const validatePermission = makeMiddleware<Action>((action) => async (c, n
   if (!resource || !resourceType) return next();
 
   // Hydrate with relations for ReBAC traversal (org → space, etc.)
-  const hydrated = await hydrate(db, resourceType, resource);
+  const hydrated = await hydrate(db, resourceType, resource as { id: string });
 
   if (!check(permix, rebacSchema, resourceType, hydrated, action)) {
     throw new HTTPException(403, { message: 'Access denied' });
