@@ -1,5 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
-import { WebhookModel, db } from '@template/db';
+import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { db } from '@template/db';
+import { WebhookModel } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
 import * as enqueueModule from '#/jobs/enqueue';
 import { registerWebhookHook } from './hook';
@@ -11,8 +12,8 @@ registerWebhookHook();
  * NOTE: Requires NODE_ENV=test to load .env.test (for REDIS_URL and webhook signing keys).
  * Run with: NODE_ENV=test bun test src/hooks/webhooks/hook.test.ts
  *
- * Upsert behavior: action is 'create' if previous is null, 'update' otherwise.
- * This is determined by checking if mutationLifeCycle found an existing record.
+ * Webhook routing: When a User changes, webhooks are sent to CustomerRef subscribers
+ * (via the relatedModels mapping: User -> CustomerRef via customerModel axis).
  */
 
 afterAll(async () => {
@@ -26,20 +27,17 @@ afterEach(() => {
 describe('webhook hook', () => {
   describe('with enabled models', () => {
     let userId: string;
-    let subscriptionId: string;
     let enqueueSpy: ReturnType<typeof spyOn>;
 
     beforeAll(async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
-
       const { entity: user, context } = await createUser();
       userId = user.id;
 
-      const { entity: subscription } = await createWebhookSubscription(
-        { model: WebhookModel.User, url: 'https://example.com/webhook' },
+      // Subscribe to CustomerRef - User changes route here via relatedModels
+      await createWebhookSubscription(
+        { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' },
         context,
       );
-      subscriptionId = subscription.id;
     });
 
     afterEach(() => {
@@ -47,7 +45,6 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on create', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-1', name: 'sendWebhook' });
 
       const user = await db.user.create({
@@ -64,7 +61,6 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on update with relevant changes', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-2', name: 'sendWebhook' });
 
       await db.user.update({
@@ -82,10 +78,8 @@ describe('webhook hook', () => {
     });
 
     it('skips webhook for no-op updates (only updatedAt changed)', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-3', name: 'sendWebhook' });
 
-      // Touch the record without changing relevant fields
       const user = await db.user.findUnique({ where: { id: userId } });
       await db.user.update({
         where: { id: userId },
@@ -96,12 +90,9 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on delete', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-4', name: 'sendWebhook' });
 
       const { entity: tempUser } = await createUser();
-
-      // Clear spy from create
       enqueueSpy.mockClear();
 
       await db.user.delete({ where: { id: tempUser.id } });
@@ -116,7 +107,6 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on upsert (update path)', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-5', name: 'sendWebhook' });
 
       await db.user.upsert({
@@ -135,7 +125,6 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on upsert (create path)', async () => {
-      setWebhookEnabledModels([WebhookModel.User]);
       enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-6', name: 'sendWebhook' });
 
       const newEmail = `upsert-new-${Date.now()}@example.com`;
@@ -157,8 +146,8 @@ describe('webhook hook', () => {
 
   describe('with disabled models', () => {
     it('does not enqueue jobs for disabled models', async () => {
-      resetWebhookEnabledModels(); // Ensure empty
-      const enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-5', name: 'sendWebhook' });
+      setWebhookEnabledModels([]);
+      const enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-7', name: 'sendWebhook' });
 
       await db.user.create({
         data: { email: `webhook-disabled-${Date.now()}@example.com` },

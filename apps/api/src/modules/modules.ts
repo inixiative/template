@@ -5,6 +5,8 @@ export const Modules = {
   me: 'me',
   job: 'job',
   cache: 'cache',
+  provider: 'provider', // CustomerRefs where actor is customer
+  customer: 'customer', // CustomerRefs where actor is provider
   // files: 'files', // TODO: may be an integration
 } as const;
 

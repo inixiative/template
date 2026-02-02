@@ -8,14 +8,19 @@ export {
   createPermissions,
   StandardAction,
   OrganizationAction,
+  SpaceAction,
   UserAction,
   type Permix,
   type PermissionEntry,
   type ActionState,
-  type ResourceType,
   type Action,
   type Entitlements,
 } from './client';
+
+// ReBAC
+export { check as rebacCheck } from './rebac/check';
+export { rebacSchema } from './rebac/schema';
+export type { ActionRule, ModelPermission, RebacSchema, RelationCheck, RuleCheck } from './rebac/types';
 
 // Shared role utilities
 export {
@@ -25,6 +30,7 @@ export {
   greaterRole,
   intersectEntitlements,
   allTrue,
+  roleToStandardAction,
 } from './roles/shared';
 
 // Organization permissions
@@ -32,7 +38,6 @@ export {
   organizationRoles,
   getOrgPermissions,
   setupOrgContext,
-  roleToOrgAction,
 } from './roles/organization';
 
 // User permissions
@@ -42,4 +47,11 @@ export {
   setupUserContext,
 } from './roles/user';
 
-export { OrganizationRole } from '@template/db';
+// Space permissions
+export {
+  spaceRoles,
+  getSpacePermissions,
+  setupSpaceContext,
+} from './roles/space';
+
+export { Role, SpaceRole } from '@template/db/generated/client/enums';

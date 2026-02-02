@@ -9,7 +9,7 @@ import { log, LogScope } from '@template/shared/logger';
  * Falls back to local-only when Redis is unavailable (dev mode).
  */
 
-import { getRedisPub, getRedisSub } from '#/lib/clients/redis';
+import { getRedisPub, getRedisSub } from '@template/db';
 import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/connections';
 import type { AppEventPayload } from '#/ws/types';
 

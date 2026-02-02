@@ -18,8 +18,6 @@ APP_DIR="$ROOT_DIR/apps/$APP"
 
 export ROOT_DIR APP_DIR ENV APP
 
-cd "$APP_DIR"
-
 exec "$SCRIPT_DIR/doppler-env.sh" "$ENV" "$APP" \
     bash -c '
         [ -f "$ROOT_DIR/.env.$ENV" ] && { set -a; source "$ROOT_DIR/.env.$ENV"; set +a; }

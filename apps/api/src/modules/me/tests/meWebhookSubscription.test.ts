@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { User, WebhookSubscription } from '@template/db';
+import type { User, WebhookSubscription } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, createWebhookSubscription, getNextSeq } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -31,14 +31,14 @@ describe('me/webhookSubscriptions', () => {
       const seq = getNextSeq();
       const response = await fetch(
         post('/api/v1/me/webhookSubscriptions', {
-          model: 'User',
+          model: 'CustomerRef',
           url: `https://example.com/webhook-${seq}`,
         }),
       );
       const { data } = await json<WebhookSubscription>(response);
 
       expect(response.status).toBe(201);
-      expect(data.model).toBe('User');
+      expect(data.model).toBe('CustomerRef');
       expect(data.ownerModel).toBe('User');
       expect(data.userId).toBe(user.id);
       expect(data.isActive).toBe(true);
@@ -47,9 +47,9 @@ describe('me/webhookSubscriptions', () => {
     it('rejects duplicate url for same model', async () => {
       const seq = getNextSeq();
       const url = `https://example.com/duplicate-${seq}`;
-      await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'User', url }));
+      await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
 
-      const response = await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'User', url }));
+      const response = await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
       expect(response.status).toBe(409);
     });
   });

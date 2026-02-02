@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
+import { ResponseValidationError } from '#/lib/utils/makeController';
 import type { AppEnv } from '#/types/appEnv';
 import { formatZodIssues } from './formatZodIssues';
 import { isZodError } from './isZodError';
@@ -19,6 +20,12 @@ export async function errorHandlerMiddleware(err: unknown, c: Context<AppEnv>) {
   // Handle Zod validation errors
   if (isZodError(err)) {
     return respond422(c, formatZodIssues(err));
+  }
+
+  // Handle response validation errors (controller returned invalid data)
+  if (err instanceof ResponseValidationError) {
+    log.error('Response validation failed:', err.zodError);
+    return respond500(c, err);
   }
 
   // Handle Prisma errors

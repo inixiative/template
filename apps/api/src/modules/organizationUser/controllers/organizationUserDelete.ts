@@ -1,18 +1,20 @@
-import { organizationId, OrganizationRole } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
+import { check, rebacSchema } from '@template/permissions/rebac';
+import { HTTPException } from 'hono/http-exception';
 import { getResource } from '#/lib/context/getResource';
-import { getUser } from '#/lib/context/getUser';
-import { canAssignRole } from '#/lib/permissions/canAssignRole';
 import { makeController } from '#/lib/utils/makeController';
-import { checkNotLastOwner } from '#/modules/organization/services/isLastOwner';
+import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserDeleteRoute } from '#/modules/organizationUser/routes/organizationUserDelete';
 
 export const organizationUserDeleteController = makeController(organizationUserDeleteRoute, async (c, respond) => {
   const db = c.get('db');
   const orgUser = getResource<'organizationUser'>(c);
-  const orgId = organizationId(orgUser.organizationId);
+  const permix = c.get('permix');
 
-  if (getUser(c)?.id !== orgUser.userId) canAssignRole(c.get('permix'), orgId, orgUser.role);
-  if (orgUser.role === OrganizationRole.owner) await checkNotLastOwner(db, orgId);
+  const canLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
+  const canAssign = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: orgUser.role }, 'assign');
+  if (!canLeave && !canAssign) throw new HTTPException(403, { message: 'Access denied' });
+  if (orgUser.role === Role.owner) await validateNotLastOwner(db, orgUser.organizationId);
 
   await db.organizationUser.delete({ where: { id: orgUser.id } });
 

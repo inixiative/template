@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { WebhookEventAction, WebhookEventStatus, WebhookEvent } from '@template/db';
+import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import type { JobHandler } from '#/jobs/types';
 
 export type SendWebhookPayload = {

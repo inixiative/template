@@ -1,10 +1,12 @@
 import '#tests/mocks/queue';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type ExtendedPrismaClient, type OrganizationUser, type User, db } from '@template/db';
+import { db, type Db } from '@template/db';
+import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/getToken';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
+import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
@@ -18,6 +20,7 @@ type MountFn = (app: OpenAPIHono<AppEnv>) => void;
 type CreateTestAppOptions = {
   mockUser?: User | null;
   mockOrganizationUsers?: OrganizationUser[];
+  mockSpaceUsers?: SpaceUser[];
   mockToken?: TokenWithRelations | null;
   mount?: MountFn[];
 };
@@ -30,10 +33,15 @@ export function createTestApp(options?: CreateTestAppOptions) {
   app.use('*', prepareRequest);
 
   app.use('*', async (c, next) => {
-    if (options?.mockUser) c.set('user', options.mockUser);
+    if (options?.mockUser) {
+      c.set('user', options.mockUser);
+      c.get('permix').setUserId(options.mockUser.id);
+    }
     if (options?.mockOrganizationUsers) c.set('organizationUsers', options.mockOrganizationUsers);
+    if (options?.mockSpaceUsers) c.set('spaceUsers', options.mockSpaceUsers);
     if (options?.mockToken) c.set('token', options.mockToken);
     await setupOrgPermissions(c);
+    await setupSpacePermissions(c);
     await setupUserPermissions(c);
     await next();
   });
@@ -55,6 +63,6 @@ export function createTestApp(options?: CreateTestAppOptions) {
   return {
     app,
     fetch,
-    db: db as ExtendedPrismaClient,
+    db: db as Db,
   };
 }

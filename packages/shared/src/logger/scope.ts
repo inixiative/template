@@ -15,6 +15,7 @@ export enum LogScope {
   cache = 'cache',
   hook = 'hook',
   job = 'job',
+  email = 'email',
 }
 
 const store = new AsyncLocalStorage<string[]>();

@@ -22,9 +22,10 @@ template/
 │   ├── admin/         # Admin dashboard
 │   └── superadmin/    # Superadmin tools
 ├── packages/
-│   ├── db/            # Prisma client, hooks, extensions
+│   ├── db/            # Prisma client, hooks, extensions, Redis
 │   ├── shared/        # Shared utilities, logger
 │   ├── permissions/   # RBAC system
+│   ├── email/         # Email templates, MJML rendering
 │   └── ui/            # Shared UI components
 ├── tests/             # Cross-app testing (E2E, load)
 │   ├── e2e/           # Playwright tests
@@ -53,6 +54,7 @@ Defined in root `package.json`:
 | `packages/db` | `@template/db` |
 | `packages/shared` | `@template/shared` |
 | `packages/permissions` | `@template/permissions` |
+| `packages/email` | `@template/email` |
 | `packages/ui` | `@template/ui` |
 | `apps/api` | `api` |
 | `apps/web` | `web` |
@@ -114,6 +116,9 @@ apps/api
   └── @template/db
   └── @template/shared
   └── @template/permissions
+  │     └── @template/db
+  │     └── @template/shared
+  └── @template/email
         └── @template/db
         └── @template/shared
 
@@ -145,6 +150,8 @@ bun add -d <package>
 | Database client | `packages/db/src/client.ts` |
 | Logger | `packages/shared/src/logger/` |
 | Permissions | `packages/permissions/src/` |
+| Email templates | `packages/email/src/` |
+| Redis/cache | `packages/db/src/redis/` |
 | Request context | `apps/api/src/lib/context/` |
 | Middleware | `apps/api/src/middleware/` |
 | Type definitions | `apps/api/src/types/` |

@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { PlatformRole } from '@template/db/generated/client/client';
+import { PlatformRole } from '@template/db/generated/client/enums';
 import { createFactory, getNextSeq } from '../factory';
 
 const userFactory = createFactory('User', {

@@ -9,6 +9,8 @@
 - [Permission Setup](#permission-setup)
 - [Permission Checks](#permission-checks)
 - [Entitlements](#entitlements)
+- [REBAC](#rebac)
+- [Space Permissions](#space-permissions)
 - [Validation Middleware](#validation-middleware)
 - [Role Assignment](#role-assignment)
 - [Future Work](#future-work)
@@ -22,7 +24,7 @@ Three-layer permission system:
 | Layer | Scope | Storage | Example |
 |-------|-------|---------|---------|
 | PlatformRole | System-wide | `User.platformRole` | superadmin bypasses all |
-| OrganizationRole | Per-org RBAC | `OrganizationUser.role` | owner, admin, member, viewer |
+| Role | Per-org RBAC | `OrganizationUser.role` | owner, admin, member, viewer |
 | Entitlements | Custom ABAC | JSON on OrganizationUser/Token | `{ "canExport": true }` |
 
 ---
@@ -45,12 +47,12 @@ Superadmins:
 - Can access admin routes
 - Can spoof other users
 
-### OrganizationRole
+### Role
 
 Per-organization role on OrganizationUser:
 
 ```prisma
-enum OrganizationRole {
+enum Role {
   owner   // Full control, can delete org, assign any role
   admin   // Can manage settings and users (except owners)
   member  // Can operate (create, edit own resources)
@@ -98,19 +100,19 @@ export const organizationRoles = {
 };
 ```
 
-### roleToOrgAction
+### roleToStandardAction
 
 Maps role to the highest action it permits:
 
 ```typescript
-const roleActionMap: Record<OrganizationRole, OrganizationAction> = {
+const roleActionMap: Record<Role, OrganizationAction> = {
   owner: 'own',
   admin: 'manage',
   member: 'operate',
   viewer: 'read',
 };
 
-roleToOrgAction('admin');  // 'manage'
+roleToStandardAction('admin');  // 'manage'
 ```
 
 ---
@@ -168,7 +170,7 @@ Called by auth middleware to set org permissions.
 // packages/permissions/src/roles/organization.ts
 export async function setupOrgContext(permix: Permix, params: {
   user?: { platformRole: string } | null;
-  role: OrganizationRole;
+  role: Role;
   orgId: OrganizationId;
   entitlements?: Entitlements;
 }): Promise<void> {
@@ -189,7 +191,7 @@ Called by auth middleware to set user permissions. Mirrors org pattern exactly.
 // packages/permissions/src/roles/user.ts
 export async function setupUserContext(permix: Permix, params: {
   user: { id: string; platformRole: string };
-  role?: OrganizationRole;  // Defaults to 'owner'
+  role?: Role;  // Defaults to 'owner'
   entitlements?: Entitlements;
 }): Promise<void> {
   if (isSuperadmin(params.user)) {
@@ -201,7 +203,44 @@ export async function setupUserContext(permix: Permix, params: {
 }
 ```
 
-**Note**: User context uses the same `OrganizationRole` enum - a user is effectively "owner" of themselves by default, but tokens can restrict this.
+**Note**: User context uses the same `Role` enum - a user is effectively "owner" of themselves by default, but tokens can restrict this.
+
+### setupSpacePermissions
+
+Called by auth middleware to set space permissions. Located in `apps/api/src/lib/permissions/setupSpacePermissions.ts`.
+
+```typescript
+export const setupSpacePermissions = async (c: Context<AppEnv>) => {
+  const permix = c.get('permix');
+  const token = c.get('token');
+  const spaceUsers = c.get('spaceUsers');
+
+  // Space token → single space, token permissions only
+  if (token?.ownerModel === 'Space' && token.spaceId) {
+    await setupSpaceContext(permix, { role, spaceId, entitlements });
+    return;
+  }
+
+  // SpaceUser token → single space, lesser of spaceUser + token
+  if (token?.ownerModel === 'SpaceUser' && token.spaceId) {
+    const spaceUser = spaceUsers?.find((su) => su.spaceId === token.spaceId);
+    if (spaceUser) {
+      await setupSpaceContext(permix, {
+        role: lesserRole(spaceUser.role, token.role),
+        spaceId,
+        entitlements: intersectEntitlements(spaceUser.entitlements, token.entitlements),
+      });
+    }
+    return;
+  }
+
+  // Session or User token → all spaces the user belongs to
+  for (const spaceUser of spaceUsers ?? []) {
+    const role = token ? lesserRole(spaceUser.role, token.role) : spaceUser.role;
+    await setupSpaceContext(permix, { role, spaceId: spaceUser.spaceId, entitlements });
+  }
+};
+```
 
 ### Token Permission Restriction
 
@@ -210,7 +249,7 @@ Tokens have their own `role` field that restricts permissions below the user's a
 ```typescript
 // Token schema (simplified)
 {
-  role: OrganizationRole,    // 'owner' | 'admin' | 'member' | 'viewer'
+  role: Role,    // 'owner' | 'admin' | 'member' | 'viewer'
   entitlements: Entitlements // Optional custom grants
 }
 ```
@@ -261,12 +300,14 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
+The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
+
 ```typescript
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 
 router.patch('/:id',
   resourceContextMiddleware(),
-  validateOrgPermission('manage'),  // Checks org permission
+  validatePermission('manage'),  // Checks permission via ReBAC
   handler
 );
 ```
@@ -326,69 +367,174 @@ intersectEntitlements(
 
 ---
 
+## REBAC
+
+Relationship-Based Access Control allows permissions to delegate through relationships.
+
+Located in `packages/permissions/src/rebac/`.
+
+### Schema
+
+Defines how actions can delegate to other actions or related resources:
+
+```typescript
+// packages/permissions/src/rebac/schema.ts
+const highRoles = ['owner', 'admin'];
+
+export const rebacSchema: RebacSchema = {
+  organization: {
+    actions: {
+      own: null,           // Terminal - no delegation
+      manage: 'own',       // manage → check own on same resource
+      operate: 'manage',   // operate → check manage
+      read: 'operate',     // read → check operate
+      // Role assignment: high roles need own, others need manage
+      assign: {
+        any: [
+          { all: [{ rule: { field: 'role', operator: 'in', value: highRoles } }, 'own'] },
+          { all: [{ rule: { field: 'role', operator: 'notIn', value: highRoles } }, 'manage'] },
+        ],
+      },
+    },
+  },
+  space: {
+    actions: {
+      own: { rel: 'organization', action: 'own' },  // Delegate to org
+      manage: 'own',
+      operate: 'manage',
+      read: 'operate',
+      assign: { /* same as organization */ },
+    },
+  },
+  organizationUser: {
+    actions: {
+      read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
+      leave: { self: 'userId' },  // Users can leave orgs themselves
+      manage: { rel: 'organization', action: 'manage' },
+      own: { rel: 'organization', action: 'own' },
+    },
+  },
+  spaceUser: {
+    actions: {
+      read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
+      leave: { self: 'userId' },  // Users can leave spaces themselves
+      manage: { rel: 'space', action: 'manage' },
+      own: { rel: 'space', action: 'own' },
+    },
+  },
+  token: {
+    actions: {
+      leave: { self: 'userId' },  // Users can delete their own tokens
+    },
+  },
+};
+```
+
+### ActionRule Types
+
+| Rule | Meaning | Example |
+|------|---------|---------|
+| `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
+| `{ rel, action }` | Delegate to related resource | `{ rel: 'organization', action: 'own' }` |
+| `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
+| `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
+| `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
+| `null` | Always false (terminal) | `own: null` |
+
+### How It Works
+
+1. **Same-resource inheritance**: `manage: 'own'` means "to manage, check if user can own"
+2. **Relation delegation**: `own: { rel: 'organization', action: 'own' }` means "to own a Space, check if user owns its Organization"
+3. **Chain resolution**: Rules can chain (read → operate → manage → own)
+4. **Cycle detection**: Prevents infinite loops
+
+### Example: Space Permission Check
+
+```typescript
+// To check space.read:
+// 1. read → operate (same resource)
+// 2. operate → manage (same resource)
+// 3. manage → own (same resource)
+// 4. own → { rel: 'organization', action: 'own' } (delegate to org)
+// 5. Check organization.own
+```
+
+---
+
+## Space Permissions
+
+Spaces are containers within organizations. Space permissions delegate to the parent organization via REBAC.
+
+### SpaceRole
+
+```prisma
+enum SpaceRole {
+  owner   // Full control of space
+  admin   // Manage space settings and members
+  member  // Operate within space
+  viewer  // Read-only access
+}
+```
+
+### SpaceUser Model
+
+```prisma
+model SpaceUser {
+  role            SpaceRole
+  organizationId  String
+  spaceId         String
+  userId          String
+
+  // Must be OrganizationUser first
+  @@unique([organizationId, spaceId, userId])
+}
+```
+
+### Permission Flow
+
+```
+Space Permission Request
+    ↓
+Check SpaceUser.role for direct permission
+    ↓
+If not found, delegate via REBAC to Organization
+    ↓
+Organization permission grants Space permission
+```
+
+### Key Points
+
+1. **Prerequisite**: User must be OrganizationUser before SpaceUser
+2. **Delegation**: Space `own` delegates to Organization `own`
+3. **Inheritance**: Org owners automatically have Space permissions
+4. **Tokens**: Can be scoped to Space via `spaceId` field
+
+---
+
 ## Validation Middleware
 
 Located in `apps/api/src/middleware/validations/`.
 
-### validateOrgPermission
+### validatePermission
 
-Checks org-level permission on loaded resource:
-
-```typescript
-export const validateOrgPermission = makeMiddleware<Action>((action) => async (c, next) => {
-  const resource = c.get('resource');
-  const resourceType = c.get('resourceType');
-
-  // Get orgId from resource.organizationId or resource.id if it's an org
-  const orgId = resourceType === 'organization'
-    ? resource?.id
-    : resource?.organizationId;
-
-  if (!orgId) return next();  // No org → skip check
-
-  if (!c.get('permix').check('organization', action, orgId)) {
-    throw new HTTPException(403, { message: 'Access denied' });
-  }
-
-  await next();
-});
-```
-
-Usage:
+Unified permission middleware using ReBAC. Hydrates the resource with relations needed for permission traversal, then checks via ReBAC schema (handles superadmin, direct perms, delegation):
 
 ```typescript
-router.patch('/:id', validateOrgPermission('manage'), handler);
-router.delete('/:id', validateOrgPermission('own'), handler);
+import { validatePermission } from '#/middleware/validations/validatePermission';
+
+// Check 'read' on loaded resource
+router.get('/:id', validatePermission('read'), handler);
+
+// Check 'manage' on loaded resource
+router.patch('/:id', validatePermission('manage'), handler);
 ```
 
-### validateUserPermission
-
-Checks user-level permission (for user-owned resources):
-
-```typescript
-export const validateUserPermission = makeMiddleware<{ action: Action; field?: string }>(
-  ({ action, field = 'userId' }) => async (c, next) => {
-    const resource = c.get('resource');
-    const resourceType = c.get('resourceType');
-
-    const userId = resourceType === 'user' ? resource?.id : resource?.[field];
-    if (!userId) return next();
-
-    if (!c.get('permix').check('user', action, userId)) {
-      throw new HTTPException(403, { message: 'Access denied' });
-    }
-
-    await next();
-  }
-);
-```
-
-Usage:
-
-```typescript
-router.patch('/:id', validateUserPermission({ action: 'manage' }), handler);
-router.patch('/:id', validateUserPermission({ action: 'manage', field: 'ownerId' }), handler);
-```
+How it works:
+1. Gets the loaded `resource` and `resourceType` from context
+2. Hydrates the resource with relations for ReBAC traversal (org -> space, etc.)
+3. Checks permission via `check(permix, rebacSchema, resourceType, hydrated, action)`
+4. Throws 403 if check fails
 
 ### validateOwnerPermission
 
@@ -448,30 +594,26 @@ middleware: [validateNotToken, validateOwnerPermission({ action: 'manage' })]
 middleware: [validateNotToken]
 
 // organizationDelete.ts - destructive action requires session
-middleware: [validateNotToken, validateOrgPermission('own')]
+middleware: [validateNotToken, validatePermission('own')]
 ```
 
 ---
 
 ## Role Assignment
 
-### canAssignRole
-
-Validates that the current user can assign a role to another user:
+Role assignment uses the `assign` action defined in the ReBAC schema. The schema checks:
+- Assigning owner/admin (high roles) requires `own` permission
+- Assigning member/viewer requires `manage` permission
 
 ```typescript
-// apps/api/src/lib/permissions/canAssignRole.ts
-export const canAssignRole = (permix: Permix, orgId: OrganizationId, targetRole: OrganizationRole) => {
-  // Assigning owner/admin requires 'own' permission
-  // Assigning member/viewer requires 'manage' permission
-  const action = [OrganizationRole.owner, OrganizationRole.admin].includes(targetRole)
-    ? 'own'
-    : 'manage';
+// ReBAC handles this automatically via the assign action
+check(permix, rebacSchema, 'organization', { id: orgId, role: targetRole }, 'assign');
 
-  if (!permix.check('organization', action, orgId)) {
-    throw new HTTPException(403, { message: `Cannot assign ${targetRole} role` });
-  }
-};
+// Or inline in controller:
+const action = ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage';
+if (!permix.check('organization', action, orgId)) {
+  throw new HTTPException(403, { message: `Cannot assign ${targetRole} role` });
+}
 ```
 
 ### Role Assignment Rules
@@ -483,11 +625,38 @@ export const canAssignRole = (permix: Permix, orgId: OrganizationId, targetRole:
 | member | - |
 | viewer | - |
 
-Usage:
+---
+
+## Token Permissions
+
+Tokens use the `leave` action for self-deletion and the `assign` action (via parent) for creation.
+
+### Token Creation
+
+Token creation checks if the user can assign the token's role:
+- Creating an owner-role token requires `own` permission
+- Creating a member-role token requires `manage` permission
 
 ```typescript
-canAssignRole(c.get('permix'), orgId, input.role);  // Throws 403 if not allowed
+// Check via parent resource (orgUser, spaceUser, etc.)
+check(permix, rebacSchema, 'organization', { id: orgId, role: tokenRole }, 'assign');
 ```
+
+### Token Deletion
+
+The ReBAC schema allows users to delete their own tokens via `leave`:
+
+```typescript
+token: {
+  actions: {
+    leave: { self: 'userId' },  // User can delete if token.userId === user.id
+  },
+},
+```
+
+Additionally, org/space admins can delete tokens within their scope via delegation:
+- Org admins can delete OrgUser tokens (via `manage` on organization)
+- Space admins can delete SpaceUser tokens (via `manage` on space)
 
 ---
 
@@ -502,7 +671,7 @@ model Group {
   id              String           @id
   organizationId  String
   name            String           // "Engineering", "Sales"
-  role            OrganizationRole // Base role for group members
+  role            Role // Base role for group members
   entitlements    Json?            // Additional grants for group
   members         GroupMember[]
 }

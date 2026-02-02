@@ -1,6 +1,4 @@
-import { cacheKey } from '#/lib/cache/cache';
-import { clearCacheKey } from '#/lib/cache/clearCacheKey';
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { cacheKey, clearKey, redisNamespace } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { adminCacheClearRoute } from '#/modules/admin/cache/routes/adminCacheClear';
 
@@ -12,10 +10,12 @@ export const adminCacheClearController = makeController(adminCacheClearRoute, as
   if (!model) {
     pattern = `${redisNamespace.cache}:*`;
   } else {
-    pattern = cacheKey(model, value ?? '', field, tags, wildcard);
+    // Build identifier from field/value for backwards compatibility
+    const identifier = field === 'id' ? (value ?? '') : { [field]: value ?? '' };
+    pattern = cacheKey(model, identifier, tags, wildcard);
   }
 
-  const deleted = await clearCacheKey(pattern);
+  const deleted = await clearKey(pattern);
 
   return respond.ok({ pattern, deleted });
 });

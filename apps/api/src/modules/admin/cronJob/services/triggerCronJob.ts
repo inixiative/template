@@ -1,4 +1,4 @@
-import type { CronJob } from '@template/db';
+import type { CronJob } from '@template/db/generated/client/client';
 import { queue } from '#/jobs/queue';
 import { JobType } from '#/jobs/types';
 

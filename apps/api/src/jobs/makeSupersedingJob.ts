@@ -1,4 +1,4 @@
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { redisNamespace } from '@template/db';
 import { type JobHandler, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = unknown> = JobHandler<TPayload> & {

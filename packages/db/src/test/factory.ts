@@ -28,7 +28,8 @@
 
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db/client';
-import { toAccessor, toDelegate } from '@template/db/utils/modelNames';
+import { toAccessor } from '@template/db/utils/modelNames';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
@@ -122,10 +123,15 @@ export const createFactory = <K extends ModelName>(
       const depAccessor = toAccessor(dep.modelName);
 
       if (relationValue !== undefined) {
-        const depFactory = createFactory(dep.modelName, {
-          defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
-        });
-        await (persist ? depFactory.create(relationValue as never, ctx) : depFactory.build(relationValue as never, ctx));
+        // If passing an existing entity (has .id), use it directly
+        if (typeof relationValue === 'object' && relationValue !== null && 'id' in relationValue) {
+          (ctx as Record<string, unknown>)[depAccessor] = relationValue;
+        } else {
+          const depFactory = createFactory(dep.modelName, {
+            defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
+          });
+          await (persist ? depFactory.create(relationValue as never, ctx) : depFactory.build(relationValue as never, ctx));
+        }
       } else if (!ctx[depAccessor] && dep.required) {
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
@@ -135,18 +141,22 @@ export const createFactory = <K extends ModelName>(
 
       if (dep.foreignKey && ctx[depAccessor]) {
         const depEntity = ctx[depAccessor] as Record<string, unknown>;
-        const fkFields = Array.isArray(dep.foreignKey) ? dep.foreignKey : [dep.foreignKey];
 
-        for (const fk of fkFields) {
-          // For composite FKs, copy matching field from dependent entity
-          // For single FK (e.g., userId), use .id
-          merged[fk] = fkFields.length > 1 ? depEntity[fk] : depEntity.id;
+        if (typeof dep.foreignKey === 'string') {
+          // Simple: source = target (e.g., "organizationId")
+          merged[dep.foreignKey] = depEntity[dep.foreignKey];
+        } else {
+          // Mapped: { targetField: sourceField }
+          // e.g., { id: "userId" } means set merged.userId = depEntity.id
+          for (const [targetField, sourceField] of Object.entries(dep.foreignKey)) {
+            merged[sourceField] = depEntity[targetField];
+          }
         }
       }
     }
 
     const entity: ModelOf<K> = persist
-      ? await (toDelegate(db, modelName) as unknown as { create: (args: { data: typeof merged }) => Promise<ModelOf<K>> }).create({ data: merged })
+      ? await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged }) as ModelOf<K>
       : (merged as ModelOf<K>);
 
     (ctx as Record<string, unknown>)[toAccessor(modelName)] = entity;

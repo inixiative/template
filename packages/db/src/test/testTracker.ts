@@ -1,5 +1,5 @@
 import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mutationLifeCycle';
-import type { ExtendedPrismaClient } from '@template/db/client';
+import type { Db } from '@template/db/clientTypes';
 
 const touchedTables = new Set<string>();
 
@@ -49,7 +49,7 @@ export const getTouchedTables = (): ReadonlySet<string> => touchedTables;
  * });
  * ```
  */
-export const cleanupTouchedTables = async (db: ExtendedPrismaClient) => {
+export const cleanupTouchedTables = async (db: Db) => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
   if (touchedTables.size === 0) return;
 
@@ -62,7 +62,12 @@ export const cleanupTouchedTables = async (db: ExtendedPrismaClient) => {
   try {
     for (const table of tables) {
       // Use CASCADE to handle any remaining FK relationships
-      await db.$executeRawUnsafe(`TRUNCATE TABLE "${table}" CASCADE`);
+      // Wrap in try-catch to handle non-existent tables (e.g., from mock model tests)
+      try {
+        await db.$executeRawUnsafe(`TRUNCATE TABLE "${table}" CASCADE`);
+      } catch {
+        // Table doesn't exist - likely a test model like 'NonExistentModel'
+      }
     }
   } finally {
     await db.$executeRawUnsafe(`SET session_replication_role = 'origin'`);

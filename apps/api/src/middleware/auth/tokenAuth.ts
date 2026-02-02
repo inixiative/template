@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import type { Context, Next } from 'hono';
-import { cache, cacheKey } from '#/lib/cache/cache';
+import { cache, cacheKey, upsertCache } from '@template/db';
 import type { TokenWithRelations } from '#/lib/context/getToken';
 import { getUser } from '#/lib/context/getUser';
 import { setUserContext } from '#/lib/context/setUserContext';
@@ -25,7 +25,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     if (!apiKey) return next();
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-    const token = await cache<TokenWithRelations | null>(cacheKey('Token', keyHash, 'keyHash'), () =>
+    const token = await cache<TokenWithRelations | null>(cacheKey('Token', { keyHash }), () =>
       db.token.findUnique({
         where: {
           keyHash,
@@ -41,11 +41,26 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
               organization: true,
             },
           },
+          space: true,
+          spaceUser: {
+            include: {
+              user: true,
+              organization: true,
+              organizationUser: true,
+              space: true,
+            },
+          },
         },
       }),
     );
 
     if (!token) return next();
+
+    if (token.user) upsertCache(cacheKey('user', token.user.id), token.user);
+    if (token.organization) upsertCache(cacheKey('organization', token.organization.id), token.organization);
+    if (token.organizationUser) upsertCache(cacheKey('organizationUser', { organizationId: token.organizationUser.organizationId, userId: token.organizationUser.userId }), token.organizationUser);
+    if (token.space) upsertCache(cacheKey('space', token.space.id), token.space);
+    if (token.spaceUser) upsertCache(cacheKey('spaceUser', { organizationId: token.spaceUser.organizationId, spaceId: token.spaceUser.spaceId, userId: token.spaceUser.userId }), token.spaceUser);
 
     // Update lastUsedAt (fire and forget, don't block request)
     db.token
@@ -66,10 +81,17 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
       const { user: orgUserUser, organization: _, ...orgUserFields } = token.organizationUser;
       await setUserContext(c, {
         ...orgUserUser,
-        organizationUsers: [orgUserFields],
+        organizationUsers: [{ ...orgUserFields, spaceUsers: [] }],
+      });
+    } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
+      // SpaceUser token → use token data directly (scoped to single space)
+      const { user: spaceUserUser, organization: _, organizationUser, space: __, ...spaceUserFields } = token.spaceUser;
+      await setUserContext(c, {
+        ...spaceUserUser,
+        organizationUsers: organizationUser ? [{ ...organizationUser, spaceUsers: [spaceUserFields] }] : [],
       });
     } else {
-      // Org token → just set up permissions (no user context)
+      // Org/Space token → just set up permissions (no user context)
       await setupOrgPermissions(c);
     }
   } catch {

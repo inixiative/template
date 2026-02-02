@@ -1,10 +1,13 @@
 import { createHash, randomBytes } from 'crypto';
-import type { ExtendedPrismaClient, OrganizationRole, TokenOwnerModel } from '@template/db';
+import type { Db } from '@template/db';
+import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   User: 'user',
   Organization: 'org',
   OrganizationUser: 'orgUser',
+  Space: 'space',
+  SpaceUser: 'spaceUser',
 };
 
 type CreateTokenParams = {
@@ -12,11 +15,12 @@ type CreateTokenParams = {
   ownerModel: TokenOwnerModel;
   userId?: string;
   organizationId?: string;
-  role: OrganizationRole;
+  spaceId?: string;
+  role: Role;
   expiresAt?: Date;
 };
 
-export const createToken = async (db: ExtendedPrismaClient, params: CreateTokenParams) => {
+export const createToken = async (db: Db, params: CreateTokenParams) => {
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;
@@ -31,6 +35,7 @@ export const createToken = async (db: ExtendedPrismaClient, params: CreateTokenP
       ownerModel: params.ownerModel,
       userId: params.userId,
       organizationId: params.organizationId,
+      spaceId: params.spaceId,
       role: params.role,
       expiresAt: params.expiresAt,
     },

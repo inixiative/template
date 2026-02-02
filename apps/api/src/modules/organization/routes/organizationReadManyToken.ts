@@ -1,5 +1,5 @@
 import { readRoute } from '#/lib/routeTemplates';
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
 
@@ -9,5 +9,5 @@ export const organizationReadManyTokenRoute = readRoute({
   many: true,
   paginate: true,
   responseSchema: tokenReadResponseSchema,
-  middleware: [validateOrgPermission('read')],
+  middleware: [validatePermission('read')],
 });

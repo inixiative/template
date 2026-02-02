@@ -1,0 +1,40 @@
+// ============================================================================
+// SPACE - Flexible container within an organization
+// ============================================================================
+// Examples of what a Space might represent:
+// - Initiative platform: a vertical/product (e.g., Livestock, Real Estate)
+// - SaaS platform: a project, workspace, or environment
+// - Marketplace: a storefront or seller account
+
+model Space {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  name           String
+  slug           String
+
+  // Parent organization (required - Spaces must be owned by Orgs)
+  organizationId String       @db.VarChar(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  spaceUsers           SpaceUser[]
+  tokens               Token[]
+  webhookSubscriptions WebhookSubscription[]
+  emailComponents      EmailComponent[]
+  emailTemplates       EmailTemplate[]
+  customerRefs         CustomerRef[]         @relation("customerRefs")
+  providerRefs         CustomerRef[]         @relation("providerRefs")
+  inquiriesSent        Inquiry[]             @relation("InquirySource")
+  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
+  @@index([slug])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}

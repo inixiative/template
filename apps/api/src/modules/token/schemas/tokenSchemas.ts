@@ -1,9 +1,10 @@
 import { z } from '@hono/zod-openapi';
-import { OrganizationRole, TokenScalarSchema } from '@template/db';
+import { TokenScalarSchema } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 
 export const tokenCreateBodySchema = z.object({
   name: z.string().min(1).max(100),
-  role: z.nativeEnum(OrganizationRole),
+  role: z.nativeEnum(Role),
   expiresAt: z.coerce.date().optional(),
 });
 

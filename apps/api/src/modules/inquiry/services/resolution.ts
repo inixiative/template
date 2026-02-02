@@ -1,11 +1,12 @@
-import type { ExtendedPrismaClient, OrganizationRole, Prisma } from '@template/db';
+import type { Db, Prisma } from '@template/db';
+import type { Role } from '@template/db/generated/client/enums';
 
 type Inquiry = Prisma.InquiryGetPayload<{}>;
 
 type ResolutionOutcome = 'approved' | 'denied' | 'canceled';
 
 export const resolveInquiry = async (
-  db: ExtendedPrismaClient,
+  db: Db,
   inquiry: Inquiry,
   outcome: ResolutionOutcome,
   explanation: string | undefined,
@@ -28,7 +29,7 @@ export const resolveInquiry = async (
   });
 };
 
-const executeResolution = async (db: ExtendedPrismaClient, inquiry: Inquiry): Promise<void> => {
+const executeResolution = async (db: Db, inquiry: Inquiry): Promise<void> => {
   const content = inquiry.content as Record<string, unknown>;
 
   if (inquiry.type === 'memberInvitation') {
@@ -36,7 +37,7 @@ const executeResolution = async (db: ExtendedPrismaClient, inquiry: Inquiry): Pr
       throw new Error('Invalid invitation: target must be a user');
     }
     const orgId = (content.organizationId as string) ?? inquiry.sourceOrganizationId;
-    const role = (content.role as OrganizationRole) ?? 'member';
+    const role = (content.role as Role) ?? 'member';
 
     const existing = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: orgId!, userId: inquiry.targetUserId } },
@@ -52,7 +53,7 @@ const executeResolution = async (db: ExtendedPrismaClient, inquiry: Inquiry): Pr
     if (!inquiry.targetOrganizationId || inquiry.targetModel !== 'Organization') {
       throw new Error('Invalid application: target must be an organization');
     }
-    const role = (content.role as OrganizationRole) ?? 'member';
+    const role = (content.role as Role) ?? 'member';
 
     const existing = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: inquiry.targetOrganizationId, userId: inquiry.sourceUserId! } },

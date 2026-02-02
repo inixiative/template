@@ -1,4 +1,5 @@
-import { OrganizationRole, type UserId, type User } from '@template/db';
+import type { UserId } from '@template/db';
+import type { Role, User } from '@template/db/generated/client/client';
 import { UserAction, type Entitlements, type PermissionEntry, type Permix } from '@template/permissions/client';
 import { allTrue, isSuperadmin } from './shared';
 
@@ -11,7 +12,7 @@ export const userRoles = {
 
 export function getUserPermissions(
   userId: UserId,
-  role: OrganizationRole = 'owner',
+  role: Role = 'owner',
   entitlements?: Entitlements,
 ): PermissionEntry {
   const baseActions = userRoles[role].user;
@@ -24,7 +25,7 @@ export function getUserPermissions(
 
 type UserContextParams = {
   user: Pick<User, 'id' | 'platformRole'>;
-  role?: OrganizationRole;
+  role?: Role;
   entitlements?: Entitlements;
 };
 

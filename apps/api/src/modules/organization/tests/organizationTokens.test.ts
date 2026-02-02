@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { type Organization, type OrganizationUser, TokenOwnerModel, type User } from '@template/db';
+import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
+import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -31,7 +32,7 @@ describe('Organizations Tokens', () => {
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user, organization: org });
+    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user, organization: org });
     orgUser = ou;
 
     const harness = createTestApp({

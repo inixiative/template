@@ -1,9 +1,8 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, HookTiming, type Prisma, db, registerDbHook } from '@template/db';
+import { DbAction, HookTiming, type Prisma, db, registerDbHook, clearKey } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 import { isNoOpUpdate } from '#/hooks/webhooks/utils';
-import { clearCacheKey } from '#/lib/cache/clearCacheKey';
 
 const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.createManyAndReturn ||
@@ -69,7 +68,7 @@ export function registerClearCacheHook() {
     const uniqueKeys = [...new Set(allKeys)];
 
     const clearKeys = uniqueKeys.map((key) => async () => {
-      await clearCacheKey(key);
+      await clearKey(key);
     });
 
     db.onCommit(clearKeys, ConcurrencyType.redis);

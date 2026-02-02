@@ -1,22 +1,24 @@
-import { organizationId, OrganizationRole } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 import { greaterRole } from '@template/permissions';
+import { check, rebacSchema } from '@template/permissions/rebac';
+import { HTTPException } from 'hono/http-exception';
 import { getResource } from '#/lib/context/getResource';
-import { canAssignRole } from '#/lib/permissions/canAssignRole';
 import { makeController } from '#/lib/utils/makeController';
-import { checkNotLastOwner } from '#/modules/organization/services/isLastOwner';
+import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 
 export const organizationUserUpdateController = makeController(organizationUserUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const orgUser = getResource<'organizationUser'>(c);
   const body = c.req.valid('json');
-  const orgId = organizationId(orgUser.organizationId);
+  const permix = c.get('permix');
 
-  const targetRole = greaterRole(orgUser.role, body.role);
-  canAssignRole(c.get('permix'), orgId, targetRole);
+  const role = greaterRole(orgUser.role, body.role);
+  if (!check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role }, 'assign'))
+    throw new HTTPException(403, { message: 'Access denied' });
 
-  if (orgUser.role === OrganizationRole.owner && body.role !== OrganizationRole.owner) {
-    await checkNotLastOwner(db, orgId);
+  if (orgUser.role === Role.owner && body.role !== Role.owner) {
+    await validateNotLastOwner(db, orgUser.organizationId);
   }
 
   const updated = await db.organizationUser.update({

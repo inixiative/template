@@ -1,0 +1,43 @@
+// ============================================================================
+// SPACE USER - Staff with role-based access to a Space
+// ============================================================================
+// Requirement: Must be OrgUser of the operator Org before SpaceUser
+// This ensures:
+// - Clean cascade (remove from Org → lose Space access)
+// - Waterfall permissions (Org owner sees all Spaces)
+// - Audit trail (all Space access traces to Org membership)
+
+model SpaceUser {
+    id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    role         SpaceRole @default(member)
+    entitlements Json?
+
+    // Relations
+    organizationId   String           @db.VarChar(36)
+    spaceId          String           @db.VarChar(36)
+    userId           String           @db.VarChar(36)
+    organizationUser OrganizationUser @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+    organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    space            Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    tokens           Token[]
+
+    @@unique([organizationId, spaceId, userId])
+    @@index([userId])
+    @@index([spaceId])
+    @@index([organizationId, userId])
+
+    // ==========================================================================
+    // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+    // ==========================================================================
+}
+
+enum SpaceRole {
+    owner
+    admin
+    member
+    viewer
+}

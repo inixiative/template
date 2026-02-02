@@ -1,4 +1,5 @@
-import type { ExtendedPrismaClient, User } from '@template/db';
+import type { Db } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 
 type GuestParams = {
@@ -11,7 +12,7 @@ type GuestParams = {
  * Guest users have emailVerified=false and no linked accounts.
  */
 export async function findUserOrCreateGuest(
-  db: ExtendedPrismaClient,
+  db: Db,
   { email, name }: GuestParams,
 ): Promise<User> {
   const normalized = normalizeEmail(email);

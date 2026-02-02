@@ -1,8 +1,8 @@
-import { Prisma, type ModelDelegate } from '@template/db';
+import { Prisma, type AccessorName } from '@template/db';
 
 // Custom args for specific models (inclusions, selects, etc.)
 // Other models use default findMany with no extra args
-export const resourceContextArgs: Partial<Record<ModelDelegate, object>> = {
+export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
   webhookSubscription: {
     include: {
       webhookEvents: { take: 10, orderBy: { createdAt: Prisma.SortOrder.desc } },

@@ -18,24 +18,30 @@ model Inquiry {
   sourceModel          InquiryResourceModel
   sourceUserId         String?       @db.VarChar(36)
   sourceOrganizationId String?       @db.VarChar(36)
+  sourceSpaceId        String?       @db.VarChar(36)
 
   sourceUser         User?         @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
   sourceOrganization Organization? @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
+  sourceSpace        Space?        @relation("InquirySource", fields: [sourceSpaceId], references: [id], onDelete: Cascade)
 
   // Target (who receives/resolves) - fake polymorphism
   targetModel          InquiryResourceModel?
   targetUserId         String?       @db.VarChar(36)
   targetOrganizationId String?       @db.VarChar(36)
+  targetSpaceId        String?       @db.VarChar(36)
 
   targetUser         User?         @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetOrganization Organization? @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
+  targetSpace        Space?        @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
 
   @@index([sourceModel])
   @@index([sourceUserId])
   @@index([sourceOrganizationId])
+  @@index([sourceSpaceId])
   @@index([targetModel])
   @@index([targetUserId])
   @@index([targetOrganizationId])
+  @@index([targetSpaceId])
   @@index([type, status])
 
   // ==========================================================================
@@ -44,8 +50,10 @@ model Inquiry {
 }
 
 enum InquiryType {
-  memberInvitation
-  memberApplication
+  inviteOrganizationUser
+  createSpace
+  updateSpace
+  transferSpace
 }
 
 enum InquiryStatus {
@@ -57,6 +65,8 @@ enum InquiryStatus {
 }
 
 enum InquiryResourceModel {
+  admin
   User
   Organization
+  Space
 }

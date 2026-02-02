@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { createHash, randomBytes } from 'crypto';
-import { OrganizationRole, TokenOwnerModel } from '@template/db/generated/client/client';
+import { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
 import { createFactory } from '../factory';
 
 const tokenFactory = createFactory('Token', {
@@ -12,15 +12,36 @@ const tokenFactory = createFactory('Token', {
       keyHash,
       keyPrefix: rawKey.slice(0, 16),
       ownerModel: TokenOwnerModel.User,
-      role: OrganizationRole.member,
+      role: Role.member,
       isActive: true,
     };
   },
   dependencies: {
-    // OrganizationUser uses composite FK - pass organizationUser: {} in overrides to create
+    // Composite FK dependencies - pass empty object in overrides to trigger creation
+    // Format: { targetField: sourceField } - read targetField from dep, set sourceField on Token
+    user: {
+      modelName: 'User',
+      foreignKey: { id: 'userId' },
+      required: false,
+    },
+    organization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'organizationId' },
+      required: false,
+    },
     organizationUser: {
       modelName: 'OrganizationUser',
-      foreignKey: ['organizationId', 'userId'],
+      foreignKey: { organizationId: 'organizationId', userId: 'userId' },
+      required: false,
+    },
+    space: {
+      modelName: 'Space',
+      foreignKey: { organizationId: 'organizationId', id: 'spaceId' },
+      required: false,
+    },
+    spaceUser: {
+      modelName: 'SpaceUser',
+      foreignKey: { organizationId: 'organizationId', spaceId: 'spaceId', userId: 'userId' },
       required: false,
     },
   },

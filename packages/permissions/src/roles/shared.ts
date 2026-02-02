@@ -1,6 +1,7 @@
 import { compact } from 'lodash-es';
-import { OrganizationRole, PlatformRole, type User } from '@template/db';
-import type { Entitlements } from '@template/permissions/client';
+import { PlatformRole, Role } from '@template/db/generated/client/enums';
+import type { User } from '@template/db/generated/client/client';
+import { type Action, type Entitlements } from '@template/permissions/client';
 
 export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
   user?.platformRole === PlatformRole.superadmin;
@@ -14,7 +15,7 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 /**
  * Return the lesser of N roles (lower in hierarchy = fewer permissions).
  */
-export const lesserRole = (...roles: (OrganizationRole | null | undefined)[]): OrganizationRole => {
+export const lesserRole = (...roles: (Role | null | undefined)[]): Role => {
   const valid = compact(roles);
   if (!valid.length) return 'viewer';
   return valid.reduce((min, role) =>
@@ -25,7 +26,7 @@ export const lesserRole = (...roles: (OrganizationRole | null | undefined)[]): O
 /**
  * Return the greater of N roles (higher in hierarchy = more permissions).
  */
-export const greaterRole = (...roles: (OrganizationRole | null | undefined)[]): OrganizationRole => {
+export const greaterRole = (...roles: (Role | null | undefined)[]): Role => {
   const valid = compact(roles);
   if (!valid.length) return 'viewer';
   return valid.reduce((max, role) =>
@@ -51,3 +52,12 @@ export const intersectEntitlements = (...entitlements: (Entitlements | undefined
 /** Map all keys of an action object to true (self-expanding) */
 export const allTrue = <T extends Record<string, string>>(actions: T): Record<keyof T, boolean> =>
   Object.fromEntries(Object.keys(actions).map((k) => [k, true])) as Record<keyof T, boolean>;
+
+const roleActionMap: Record<Role, Action> = {
+  [Role.owner]: 'own',
+  [Role.admin]: 'manage',
+  [Role.member]: 'operate',
+  [Role.viewer]: 'read',
+};
+
+export const roleToStandardAction = (role: Role): Action => roleActionMap[role];

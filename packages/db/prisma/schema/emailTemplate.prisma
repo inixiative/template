@@ -15,15 +15,23 @@ model EmailTemplate {
   category CommunicationCategory
 
   subject String                // "Your verification code: {{code}}"
-  mjml    String  @db.Text      // Full MJML with {{component:slug}} and {{var}} placeholders
+  mjml    String  @db.Text      // Full MJML with {{component:slug}} and {{variable.*}} placeholders
+
+  // Pre-computed component refs (populated on save)
+  componentRefs String[]        // Slugs of nested {{component:slug}} references
 
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)
+  spaceId        String?         @db.VarChar(36)
+
+  // For org-owned: should spaces inherit this template?
+  inheritToSpaces Boolean @default(true)
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-  @@unique([slug, locale, ownerModel, organizationId])
+  @@unique([slug, locale, ownerModel, organizationId, spaceId])
   @@index([category])
   @@index([ownerModel])
   @@index([organizationId])

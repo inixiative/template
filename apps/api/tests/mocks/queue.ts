@@ -1,5 +1,5 @@
 import { mock } from 'bun:test';
-import { getRedisClient } from '#/lib/clients/redis';
+import { getRedisClient } from '@template/db';
 
 let jobCounter = 0;
 

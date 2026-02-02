@@ -51,7 +51,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validateUser, validateOrgPermission, etc.)
+Validation middleware (validatePermission, validateNotToken, etc.)
     ↓
 Route handler
   - Access context via getters
@@ -65,10 +65,11 @@ Defined in `apps/api/src/types/appEnv.ts`:
 
 ```typescript
 type AppVars = {
-  db: ExtendedPrismaClient;
+  db: Db;
   txn: Prisma.TransactionClient | undefined;
   user: User | null;
   organizationUsers: OrganizationUser[] | null;
+  spaceUsers: SpaceUser[] | null;
   session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
@@ -83,10 +84,11 @@ type AppEnv = { Variables: AppVars };
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `db` | `ExtendedPrismaClient` | Prisma client for database access |
+| `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
 | `user` | `User \| null` | Authenticated user (session or token) |
 | `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
+| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships (flattened from all orgs) |
 | `session` | `Session \| null` | BetterAuth session |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
@@ -121,12 +123,16 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('token', null);
   c.set('spoofedBy', null);
 
+  // Initialize org/space context to null
+  c.set('organizationUsers', null);
+  c.set('spaceUsers', null);
+
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
 
   // Wrap in database scope for logging/tracing
-  await db.scope(requestId, next);
+  await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
 };
 ```
 
@@ -134,8 +140,8 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
-3. **Nulls all auth vars** - Ensures clean slate for auth middleware
-4. **Wraps in db.scope** - Enables `db.getScopeId()` throughout request
+3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, session, token, spoofedBy, organizationUsers, spaceUsers)
+4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
 
 ---
 
@@ -154,18 +160,23 @@ export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithO
   c.set('organizationUsers', organizationUsers);
 
   // Set up permissions
-  if (isSuperadmin(user)) c.get('permix').setSuperadmin(true);
+  const permix = c.get('permix');
+  permix.setUserId(user.id);
+  if (isSuperadmin(user)) permix.setSuperadmin(true);
   await setupUserPermissions(c);
   await setupOrgPermissions(c);
 };
 ```
 
+**Note**: Space users are nested within `organizationUsers` (as `OrganizationUserWithSpaceUsers`). The `spaceUsers` context variable is set separately when needed for permission checks.
+
 ### What It Does
 
 1. **Splits user from org memberships** - Separates for individual access
-2. **Sets superadmin flag** - Bypasses all permission checks
-3. **Sets up user permissions** - For user-owned resources
-4. **Sets up org permissions** - For each org the user belongs to
+2. **Sets user ID on permix** - Links permissions to the authenticated user
+3. **Sets superadmin flag** - Bypasses all permission checks
+4. **Sets up user permissions** - For user-owned resources
+5. **Sets up org permissions** - For each org the user belongs to
 
 ### Direct Setters
 
@@ -210,6 +221,10 @@ type TokenWithRelations = Prisma.TokenGetPayload<{
     organizationUser: {
       include: { user: true; organization: true };
     };
+    space: true;
+    spaceUser: {
+      include: { user: true; organization: true; organizationUser: true; space: true };
+    };
   };
 }>;
 ```
@@ -219,14 +234,16 @@ type TokenWithRelations = Prisma.TokenGetPayload<{
 ```typescript
 import { getActor } from '#/lib/context/getActor';
 
-const { user, organization, organizationUser, token } = getActor(c);
+const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
 ```
 
 Unified accessor that resolves the current actor from any auth method:
 - **Session auth**: user only
 - **User token**: user from token
 - **OrgUser token**: user + org from token's organizationUser
+- **SpaceUser token**: user + org + space from token's spaceUser
 - **Org token**: org only (no user)
+- **Space token**: space + org (no user)
 
 ### getOrgUser
 
@@ -384,10 +401,12 @@ Jobs have their own context, separate from HTTP request context.
 ```typescript
 // apps/api/src/jobs/types.ts
 type WorkerContext = {
-  db: ExtendedPrismaClient;
+  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;  // For superseding jobs
+  /** Logs to both stdout AND BullBoard job logs */
+  log: (message: string) => void;
 };
 ```
 
@@ -411,6 +430,11 @@ export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
   // ctx.queue - for enqueueing follow-up jobs
   // ctx.job - BullMQ job instance (id, attemptsMade, etc.)
   // ctx.signal - abort signal (if using makeSupersedingJob)
+  // ctx.log - dual-write to stdout AND BullBoard
+
+  ctx.log('Starting processing');  // Visible in console AND BullBoard UI
+  // ... job logic ...
+  ctx.log('Completed');
 });
 ```
 
@@ -421,4 +445,5 @@ export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
 | Auth | User/token/permissions | None (system-level) |
 | Scope ID | `{requestId}` | `job:{name}:{id}` |
 | Context type | `'api'` | `'worker'` |
+| Logging | Use `log` from `@template/shared` | Use `ctx.log()` for BullBoard visibility |
 | Available in | Controllers/middleware | Job handlers |

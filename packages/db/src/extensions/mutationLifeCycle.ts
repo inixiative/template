@@ -1,6 +1,7 @@
 import { Prisma } from '@template/db/generated/client/client';
 import type { Db } from '@template/db/clientTypes';
-import { toDelegate } from '@template/db/utils/modelNames';
+import { toAccessor } from '@template/db/utils/modelNames';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { log, LogScope } from '@template/shared/logger';
 import { DbAction, HookTiming, executeHooks, type HookOptions } from './hookRegistry';
 
@@ -12,16 +13,15 @@ const SLOW_MUTATION_THRESHOLD = 5000;
 // Lazy import to avoid circular dependency at module load time
 const getDb = (): Db => require('@template/db/client').db;
 
-export const mutationLifeCycleExtension = () => {
-  // Cast needed: model is a runtime union, so TypeScript can't narrow the delegate type
-  type Delegate = { findUnique: (args: { where: Record<string, unknown> }) => Promise<Record<string, unknown> | null> };
-  type DelegateMany = { findMany: (args: { where: Record<string, unknown> }) => Promise<Record<string, unknown>[]> };
+const runtimeDelegate = (db: Db, model: Prisma.ModelName): RuntimeDelegate =>
+  db[toAccessor(model)] as unknown as RuntimeDelegate;
 
+export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = (model: Prisma.ModelName, where: Record<string, unknown>) =>
-    (toDelegate(getDb(), model) as unknown as Delegate).findUnique({ where });
+    runtimeDelegate(getDb(), model).findUnique({ where });
 
   const fetchExistingRecords = (model: Prisma.ModelName, where: Record<string, unknown>) =>
-    (toDelegate(getDb(), model) as unknown as DelegateMany).findMany({ where });
+    runtimeDelegate(getDb(), model).findMany({ where });
 
   const timed = async <T>(model: Prisma.ModelName, operation: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();

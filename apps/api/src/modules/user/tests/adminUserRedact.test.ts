@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { PlatformRole, type User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
+import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 import { adminUserRouter } from '#/modules/user';
 import { createTestApp } from '#tests/createTestApp';

@@ -10,11 +10,12 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const db = c.get('db');
   const { targetEmail, ...body } = c.req.valid('json');
 
-  const sourceModel: InquiryResourceModel = body.type === 'memberApplication' ? 'User' : 'Organization';
+  // TODO: Refactor for new inquiry types (inviteOrganizationUser, createSpace, updateSpace, transferSpace)
+  const sourceModel: InquiryResourceModel = 'Organization';
   const sourceOrgId =
-    body.type === 'memberInvitation' ? (body.content as { organizationId?: string })?.organizationId : null;
+    body.type === 'inviteOrganizationUser' ? (body.content as { organizationId?: string })?.organizationId : null;
 
-  if (body.type === 'memberInvitation') {
+  if (body.type === 'inviteOrganizationUser') {
     if (!sourceOrgId) {
       throw new HTTPException(400, { message: 'Organization ID required in content' });
     }

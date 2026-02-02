@@ -12,7 +12,7 @@
 
 ## Connection Management
 
-Located in `apps/api/src/lib/clients/redis.ts`.
+Located in `packages/db/src/redis/`.
 
 ### Connection Strategy
 
@@ -24,7 +24,7 @@ Located in `apps/api/src/lib/clients/redis.ts`.
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
 
 ```typescript
-import { getRedisClient, getRedisPub, getRedisSub, createRedisConnection } from '#/lib/clients/redis';
+import { getRedisClient, getRedisPub, getRedisSub, createRedisConnection } from '@template/db';
 
 // Regular operations
 const redis = getRedisClient();
@@ -48,10 +48,10 @@ const bullConnection = createRedisConnection('Redis:BullMQ:Worker');
 
 ## Namespaces
 
-All Redis keys must use namespaces from `apps/api/src/lib/clients/redisNamespaces.ts`:
+All Redis keys must use namespaces from `packages/db/src/redis/namespaces.ts`:
 
 ```typescript
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { redisNamespace } from '@template/db';
 
 // Good
 const key = `${redisNamespace.cache}:User:${id}`;
@@ -82,11 +82,11 @@ const key = `cache:User:${id}`;  // Don't do this
 Application data caching with TTL. See [Cache Utilities](#cache-utilities).
 
 ```typescript
-// Token lookup by hash
-cacheKey('Token', keyHash, 'keyHash')  // → cache:Token:keyHash:abc123
+// Token lookup by hash (use object for non-ID fields)
+cacheKey('token', { keyHash })         // → cache:token:keyHash:abc123
 
 // User by email
-cacheKey('User', email, 'email')       // → cache:User:email:foo@example.com
+cacheKey('user', { email })            // → cache:user:email:foo@example.com
 ```
 
 ### Sessions (`session:*`)
@@ -156,25 +156,36 @@ Managed by BullMQ internally. Queue name is `jobs`:
 
 ## Cache Utilities
 
-Located in `apps/api/src/lib/cache/`.
+Located in `packages/db/src/redis/cache.ts`.
 
 ### cacheKey() Builder
 
-Standard key format: `cache:{Model}:{field}:{value}[:{tags}][:{*}]`
+Standard key format: `cache:{accessor}:{field}:{value}[:{tags}][:{*}]`
 
 ```typescript
-import { cacheKey } from '#/lib/cache/cache';
+import { cacheKey } from '@template/db';
 
-cacheKey('User', 'abc-123')                    // cache:User:id:abc-123
-cacheKey('User', 'foo@example.com', 'email')   // cache:User:email:foo@example.com
-cacheKey('User', 'abc', 'id', ['WithOrgs'])    // cache:User:id:abc:WithOrgs
-cacheKey('Session', 'uid', 'userId', [], true) // cache:Session:userId:uid:*  (wildcard)
+// String identifier = lookup by id
+cacheKey('user', 'abc-123')                              // cache:user:id:abc-123
+
+// Object identifier = lookup by specified field(s)
+cacheKey('user', { email: 'foo@example.com' })           // cache:user:email:foo@example.com
+
+// Composite key (sorted alphabetically)
+cacheKey('organizationUser', { userId: 'u1', organizationId: 'o1' })
+  // → cache:organizationUser:organizationId:o1:userId:u1
+
+// With tags
+cacheKey('user', 'abc-123', ['WithOrgs'])                // cache:user:id:abc-123:WithOrgs
+
+// With wildcard
+cacheKey('session', { userId: 'abc-123' }, [], true)     // cache:session:userId:abc-123:*
 ```
 
 ### cache() Get-or-Set
 
 ```typescript
-import { cache } from '#/lib/cache/cache';
+import { cache } from '@template/db';
 
 const user = await cache(
   cacheKey('User', id),
@@ -189,17 +200,19 @@ Behavior:
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
 - Real values cached with provided TTL (default 24 hours)
 
-### clearCacheKey()
+### clearKey()
+
+Clear cache entries - supports exact keys and wildcard patterns:
 
 ```typescript
-import { clearCacheKey } from '#/lib/cache/clearCacheKey';
+import { clearKey } from '@template/db';
 
 // Exact key
-await clearCacheKey('cache:User:id:123');
+await clearKey('cache:User:id:123');
 
 // Wildcard pattern (uses SCAN, non-blocking)
-await clearCacheKey('cache:User:*');
-await clearCacheKey('cache:Session:userId:abc:*');
+await clearKey('cache:User:*');
+await clearKey('cache:Session:userId:abc:*');
 ```
 
 ### Automatic Invalidation
@@ -215,7 +228,7 @@ Cache keys defined in `CACHE_REFERENCE` are auto-cleared on mutations. See [HOOK
 In test environment, all Redis operations use a shared in-memory mock:
 
 ```typescript
-// In redis.ts
+// In packages/db/src/redis/client.ts
 if (isTest) {
   if (!__mock) __mock = new RedisMock() as unknown as Redis;
   return __mock;
@@ -227,7 +240,7 @@ All connections (`getRedisClient`, `getRedisSub`, `createRedisConnection`) retur
 ### Test Isolation
 
 ```typescript
-import { flushRedis } from '#/lib/clients/redis';
+import { flushRedis } from '@template/db';
 
 beforeEach(async () => {
   await flushRedis();  // Clear all keys between tests

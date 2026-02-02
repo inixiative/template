@@ -3,8 +3,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
-import { getRedisClient } from '#/lib/clients/redis';
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { getRedisClient, redisNamespace } from '@template/db';
 import { getAllowedOrigins } from '#/middleware/cors';
 
 export const auth = betterAuth({
@@ -33,6 +32,12 @@ export const auth = betterAuth({
 
   session: {
     expiresIn: 7 * 24 * 60 * 60,
+    // Stateless JWT sessions - no DB session lookups
+    cookieCache: {
+      enabled: true,
+      maxAge: 7 * 24 * 60 * 60,
+      strategy: 'jwe', // Encrypted JWT - use 'jwt' if you need external verification
+    },
   },
 
   user: {

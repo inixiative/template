@@ -22,7 +22,7 @@
     "reset:db": "docker-compose down && docker-compose up -d --wait && bun run db:push && bun run db:seed",
     "dev": "bun run --filter=api dev",
     "build": "bun run '--filter=*' build",
-    "test": "bun run '--filter=*' test",
+    "test": "bun run --filter=@template/permissions test && bun run --filter=@template/db test && bun run --filter=@template/email test && bun run --filter=api test",
     "typecheck": "bun run '--filter=*' typecheck",
     "tsc": "bun run '--filter=*' typecheck",
     "db:generate": "bun run --filter=@template/db db:generate",

@@ -27,8 +27,19 @@ export const ModelIdType = {
   Organization: 'Organization',
   OrganizationUser: 'OrganizationUser',
 
+  // Spaces
+  Space: 'Space',
+  SpaceUser: 'SpaceUser',
+
+  // Customers
+  CustomerRef: 'CustomerRef',
+
   // Inquiries
   Inquiry: 'Inquiry',
+
+  // Email
+  EmailTemplate: 'EmailTemplate',
+  EmailComponent: 'EmailComponent',
 
   // Webhooks
   WebhookSubscription: 'WebhookSubscription',
@@ -53,8 +64,19 @@ export type TokenId = Id<typeof ModelIdType.Token>;
 export type OrganizationId = Id<typeof ModelIdType.Organization>;
 export type OrganizationUserId = Id<typeof ModelIdType.OrganizationUser>;
 
+// Spaces
+export type SpaceId = Id<typeof ModelIdType.Space>;
+export type SpaceUserId = Id<typeof ModelIdType.SpaceUser>;
+
+// Customers
+export type CustomerRefId = Id<typeof ModelIdType.CustomerRef>;
+
 // Inquiries
 export type InquiryId = Id<typeof ModelIdType.Inquiry>;
+
+// Email
+export type EmailTemplateId = Id<typeof ModelIdType.EmailTemplate>;
+export type EmailComponentId = Id<typeof ModelIdType.EmailComponent>;
 
 // Webhooks
 export type WebhookSubscriptionId = Id<typeof ModelIdType.WebhookSubscription>;
@@ -78,8 +100,19 @@ export const tokenId = (id: string): TokenId => id as TokenId;
 export const organizationId = (id: string): OrganizationId => id as OrganizationId;
 export const organizationUserId = (id: string): OrganizationUserId => id as OrganizationUserId;
 
+// Spaces
+export const spaceId = (id: string): SpaceId => id as SpaceId;
+export const spaceUserId = (id: string): SpaceUserId => id as SpaceUserId;
+
+// Customers
+export const customerRefId = (id: string): CustomerRefId => id as CustomerRefId;
+
 // Inquiries
 export const inquiryId = (id: string): InquiryId => id as InquiryId;
+
+// Email
+export const emailTemplateId = (id: string): EmailTemplateId => id as EmailTemplateId;
+export const emailComponentId = (id: string): EmailComponentId => id as EmailComponentId;
 
 // Webhooks
 export const webhookSubscriptionId = (id: string): WebhookSubscriptionId => id as WebhookSubscriptionId;

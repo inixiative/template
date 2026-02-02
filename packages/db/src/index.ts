@@ -4,7 +4,8 @@
  */
 
 // Database client with scope/transaction methods
-export { db, type ExtendedPrismaClient } from './client';
+export { db } from './client';
+export type { Db } from './clientTypes';
 
 // Mutation lifecycle hooks
 export {
@@ -26,11 +27,7 @@ export * from './typedModelIds';
 export { addCheckConstraint, addUniqueWhereNotNull, addGistIndex } from './constraints';
 
 // Registries (schema-level configuration)
-export {
-  FalsePolymorphismRegistry,
-  getPolymorphismConfigs,
-  type FalsePolymorphismRelation,
-} from './registries';
+export * from './registries';
 
 // Model name utilities
 export {
@@ -42,15 +39,27 @@ export {
   accessorNames,
   isAccessorName,
   toAccessor,
-  toDelegate,
   type ModelName,
   type AccessorName,
   type ModelTypeMap,
-  type ModelDelegate,
-  type ModelOperation,
-  type ModelArgs,
-  type ModelResult,
 } from './utils/modelNames';
+
+// Type-safe delegate helpers (pass-the-delegate pattern)
+export {
+  query,
+  findFirst,
+  findUnique,
+  findMany,
+  create,
+  update,
+  del,
+  count,
+  type Args,
+  type Result,
+  type AnyDelegate,
+  type AnyCrudDelegate,
+  type RuntimeDelegate,
+} from './utils/delegates';
 
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
@@ -62,6 +71,30 @@ export type { RuntimeDataModel, RuntimeModel, RuntimeField } from './utils/runti
 // Scalar schemas (model schemas without relations)
 export * from './generated/zod/scalarSchemas';
 
-// Re-export Prisma types (will work after prisma generate)
-export * from './generated/client/client';
+// Enum schemas and other zod types (from prisma-zod-generator)
+export * from './generated/zod/schemas';
+
+// Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
+
+// Redis client and cache utilities
+export {
+  createRedisConnection,
+  getRedisClient,
+  getRedisPub,
+  getRedisSub,
+  flushRedis,
+  redisNamespace,
+  type RedisNamespace,
+  cache,
+  cacheKey,
+  clearKey,
+  upsertCache,
+} from './redis';
+
+// Hydration
+export { hydrate, fetchOne } from './hydrate';
+export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
+
+// For model types: import from @template/db/client or @template/db/models
+// For runtime enum values: import from @template/db/enums

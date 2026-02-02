@@ -1,39 +1,67 @@
 import type { ModelTypeMap, Prisma } from '@template/db';
-import { cacheKey } from '#/lib/cache/cache';
+import { cacheKey } from '@template/db';
 
 /**
  * Cache Key Pattern (use cacheKey helper)
  *
- * Format: <Model>:<field>:<value>[:<tags>][:*]
+ * Format: cache:<accessor>:<field>:<value>[:<field>:<value>...][:<tags>][:*]
+ * Composite keys are sorted alphabetically for consistency.
  *
  * Examples:
- *   cacheKey('User', id)                                   → User:id:abc-123
- *   cacheKey('User', email, 'email')                       → User:email:foo@example.com
- *   cacheKey('User', id, 'id', ['OrganizationUsers'])      → User:id:abc-123:OrganizationUsers
- *   cacheKey('Session', userId, 'userId', [], true)        → Session:userId:abc-123:*
+ *   cacheKey('user', id)                                              → cache:user:id:abc-123
+ *   cacheKey('user', { email })                                       → cache:user:email:foo@example.com
+ *   cacheKey('user', id, ['organizationUsers'])                       → cache:user:id:abc-123:organizationUsers
+ *   cacheKey('session', { userId }, [], true)                         → cache:session:userId:abc-123:*
+ *   cacheKey('organizationUser', { userId, organizationId })          → cache:organizationUser:organizationId:o1:userId:u1
  */
 
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const CACHE_REFERENCE: CacheReference = {
   User: (r) => [
-    cacheKey('User', r.id),
-    cacheKey('User', r.email, 'email'),
+    cacheKey('user', r.id),
+    cacheKey('user', { email: r.email }),
   ],
 
   Session: (r) => [
-    cacheKey('Session', r.id),
-    cacheKey('Session', r.userId, 'userId', [], true),
+    cacheKey('session', r.id),
+    cacheKey('session', { userId: r.userId }, [], true),
   ],
 
   Token: (r) => [
-    cacheKey('Token', r.keyHash, 'keyHash'),
+    cacheKey('token', { keyHash: r.keyHash }),
+  ],
+
+  Organization: (r) => [
+    cacheKey('organization', r.id),
+    cacheKey('organization', { slug: r.slug }),
   ],
 
   OrganizationUser: (r) => [
-    cacheKey('OrganizationUser', r.id),
-    cacheKey('User', r.userId, 'id', ['OrganizationUsers']),
+    cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
+    cacheKey('user', r.userId, ['organizationUsers']),
   ],
+
+  Space: (r) => [
+    cacheKey('space', r.id),
+    cacheKey('space', { organizationId: r.organizationId, slug: r.slug }),
+    cacheKey('organization', r.organizationId, ['spaces']),
+  ],
+
+  SpaceUser: (r) => [
+    cacheKey('spaceUser', { spaceId: r.spaceId, userId: r.userId }),
+    cacheKey('user', r.userId, ['spaceUsers']),
+    cacheKey('space', r.spaceId, ['spaceUsers']),
+  ],
+
+  CustomerRef: (r) => {
+    const keys: string[] = [cacheKey('customerRef', r.id)];
+    if (r.customerUserId) keys.push(cacheKey('user', r.customerUserId, ['customerRefs']));
+    if (r.customerOrganizationId) keys.push(cacheKey('organization', r.customerOrganizationId, ['customerRefs']));
+    if (r.customerSpaceId) keys.push(cacheKey('space', r.customerSpaceId, ['customerRefs']));
+    if (r.providerSpaceId) keys.push(cacheKey('space', r.providerSpaceId, ['providerRefs']));
+    return keys;
+  },
 
   WebhookSubscription: (r) => {
     const ownerId = (() => {
@@ -43,7 +71,7 @@ export const CACHE_REFERENCE: CacheReference = {
       }
     })();
     if (!ownerId) return [];
-    return [cacheKey('WebhookSubscription', ownerId, r.ownerModel, [r.model])];
+    return [cacheKey('webhookSubscription', { [r.ownerModel]: ownerId }, [r.model])];
   },
 };
 

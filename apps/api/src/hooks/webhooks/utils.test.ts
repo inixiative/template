@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import {
   isWebhookEnabled,
-  getParentWebhookModel,
+  getRelatedWebhookRefs,
   getIgnoredFields,
   selectRelevantFields,
   isNoOpUpdate,
@@ -17,10 +17,24 @@ describe('webhook utils', () => {
     });
   });
 
-  describe('getParentWebhookModel', () => {
-    it('returns null for models without parent mapping', () => {
-      expect(getParentWebhookModel('User')).toBe(null);
-      expect(getParentWebhookModel('Organization')).toBe(null);
+  describe('getRelatedWebhookRefs', () => {
+    it('returns FlexibleRef[] for models with related mappings', () => {
+      const userRefs = getRelatedWebhookRefs('User');
+      expect(userRefs).toEqual([{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }]);
+
+      const orgRefs = getRelatedWebhookRefs('Organization');
+      expect(orgRefs).toEqual([{ model: 'CustomerRef', axis: 'customerModel', value: 'Organization' }]);
+
+      const spaceRefs = getRelatedWebhookRefs('Space');
+      expect(spaceRefs).toEqual([
+        { model: 'CustomerRef', axis: 'customerModel', value: 'Space' },
+        { model: 'CustomerRef', axis: 'providerModel', value: 'Space' },
+      ]);
+    });
+
+    it('returns null for models without related mappings', () => {
+      expect(getRelatedWebhookRefs('NonExistent')).toBe(null);
+      expect(getRelatedWebhookRefs('Session')).toBe(null);
     });
   });
 

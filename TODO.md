@@ -2,7 +2,8 @@
 
 ## In Progress
 
-- [ ] Fix failing tests (16 failing, 3 errors in last run)
+- [x] Token permission tests - comprehensive tests for OrganizationUser and SpaceUser tokens
+- [x] setupSpacePermissions - space-level permission setup mirroring org pattern
 
 ## Type Errors
 
@@ -21,6 +22,43 @@
 - [ ] `stripe` - payments
 
 ## Future Work
+
+### Audit/Activity Logs
+
+Schema design for tracking all mutations:
+
+```prisma
+model AuditLog {
+  id          String   @id @default(dbgenerated("uuidv7()"))
+  createdAt   DateTime @default(now())
+
+  // Who
+  userId      String?
+  tokenId     String?
+  ipAddress   String?
+  userAgent   String?
+
+  // What
+  action      String   // 'create' | 'update' | 'delete'
+  model       String   // 'User', 'Organization', etc.
+  recordId    String
+
+  // Changes
+  before      Json?    // Previous state (for update/delete)
+  after       Json?    // New state (for create/update)
+  changes     Json?    // Diff of changed fields
+
+  @@index([userId])
+  @@index([model, recordId])
+  @@index([createdAt])
+}
+```
+
+Implementation:
+- Hook into mutation lifecycle (after hook)
+- Filter sensitive fields from logs
+- Consider async write to avoid latency
+- Retention policy (30/90 days?)
 
 ### Mutation Lifecycle
 
@@ -58,3 +96,5 @@ look into turbo repo (w/ bun) to skip unchanged tests
 optimisitic updates in tanstack query
 - when you change data, change the cache of the data before the real trigger/invalidate
 - 
+DionyzRex was referencing Django Admin - Django's automatic admin interface that generates CRUD UI directly from your model definitions. You define a Python model class, and
+Django automatically creates forms, lists, filters, and search based on field types. It's the same concept: schema → generated UI.

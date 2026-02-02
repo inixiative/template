@@ -1,6 +1,6 @@
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 export const organizationReadManyWebhookSubscriptionRoute = readRoute({
@@ -9,5 +9,5 @@ export const organizationReadManyWebhookSubscriptionRoute = readRoute({
   many: true,
   paginate: true,
   responseSchema: WebhookSubscriptionScalarSchema,
-  middleware: [validateOrgPermission('read')],
+  middleware: [validatePermission('read')],
 });

@@ -2,7 +2,7 @@ import { type JobPayloads, isValidHandlerName, jobHandlers } from '#/jobs/handle
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { redisNamespace } from '@template/db';
 import { log } from '@template/shared/logger';
 
 type EnqueueOptions = JobOptions & {

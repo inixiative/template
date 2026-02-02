@@ -1,4 +1,4 @@
-import type { ExtendedPrismaClient, ModelArgs, ModelDelegate, ModelResult } from '@template/db';
+import { Prisma, type AnyDelegate, type Args, type Result } from '@template/db';
 
 type PaginationParams = {
   page?: number;
@@ -17,16 +17,22 @@ type PaginatedResult<T> = {
   pagination: PaginationResult;
 };
 
-export const paginate = async <M extends ModelDelegate, A extends ModelArgs<M, 'findMany'>>(
-  model: ExtendedPrismaClient[M],
+export const paginate = async <T extends AnyDelegate, A extends Args<T, 'findMany'> & object>(
+  delegate: T,
   args: A,
   { page = 1, pageSize = 20 }: PaginationParams,
-): Promise<PaginatedResult<ModelResult<M, A, 'findMany'>[number]>> => {
-  const delegate = model as { findMany: Function; count: Function };
+): Promise<PaginatedResult<Result<T, A, 'findMany'>[number]>> => {
+  const orderBy = Array.isArray((args as { orderBy?: unknown }).orderBy)
+    ? [...(args as { orderBy: object[] }).orderBy]
+    : (args as { orderBy?: object }).orderBy
+      ? [(args as { orderBy: object }).orderBy]
+      : [];
+  if (!orderBy.some((o) => 'id' in o)) orderBy.push({ id: Prisma.SortOrder.desc });
 
   const [data, total] = await Promise.all([
     delegate.findMany({
       ...args,
+      orderBy,
       take: pageSize,
       skip: (page - 1) * pageSize,
     }),

@@ -85,7 +85,10 @@ export type MyJobPayload = {
 
 export const myJob = makeJob<MyJobPayload>(async (ctx, payload) => {
   const { userId, action } = payload;
-  // Job logic
+
+  ctx.log(`Processing ${action} for user ${userId}`);
+  // Job logic here
+  ctx.log('Completed');
 });
 ```
 
@@ -119,6 +122,28 @@ export const jobHandlers = {
 | `makeSingletonJob` | Redis lock prevents concurrent runs |
 | `makeSupersedingJob` | Newer job cancels older with same key |
 
+### ctx.log() - Dual-Write Logging
+
+Job handlers have access to `ctx.log()` which writes to **both** stdout AND BullBoard:
+
+```typescript
+export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
+  ctx.log('Starting processing');  // → stdout + BullBoard job logs
+
+  // ... process ...
+
+  ctx.log(`Processed ${count} items`);
+  ctx.log('Completed successfully');
+});
+```
+
+Benefits:
+- **Console visibility**: Standard stdout for local development and log aggregation
+- **BullBoard history**: Stored with job in Redis, viewable in BullBoard UI
+- **Correlation**: Both outputs share the same scope ID (`[worker][jobName:jobId]`)
+
+**Note**: Use `ctx.log()` in job handlers instead of importing `log` directly from `@template/shared/logger`.
+
 ### Singleton Job
 
 ```typescript
@@ -132,7 +157,7 @@ export const dailyCleanup = makeSingletonJob(async (ctx, payload) => {
 Newer jobs with the same dedupe key cancel older running jobs.
 
 ```typescript
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { redisNamespace } from '@template/db';
 
 export const syncData = makeSupersedingJob(
   async (ctx, payload) => {
@@ -193,13 +218,15 @@ All cron patterns run in **UTC timezone**. Examples:
 | Field | Description |
 |-------|-------------|
 | `jobId` | BullMQ idempotency key (prevents duplicate registrations) |
-| `name` | Human readable name |
+| `name` | Human readable name (unique) |
+| `description` | Optional description of what the job does |
 | `pattern` | Cron expression (UTC) |
 | `handler` | Handler name from registry |
 | `payload` | JSON data for handler |
 | `enabled` | Toggle on/off |
 | `maxAttempts` | Retry attempts on failure |
 | `backoffMs` | Exponential backoff base delay |
+| `createdById` | Optional FK to User who created the job |
 
 ### Admin Routes
 

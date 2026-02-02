@@ -7,7 +7,7 @@ import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
-import { createRedisConnection } from '#/lib/clients/redis';
+import { createRedisConnection } from '@template/db';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -36,7 +36,7 @@ export const initializeWorker = async (): Promise<void> => {
       const handler = jobHandlers[job.name];
 
       const scopeId = `${job.name}:${job.id}`;
-      await logScope('worker', () => logScope(scopeId, () =>
+      await logScope(LogScope.worker, () => logScope(scopeId, () =>
         db.scope(scopeId, async () => {
           // Helper that logs to both stdout and BullBoard
           const jobLog = (message: string) => {

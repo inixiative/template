@@ -17,7 +17,20 @@ export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFields
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {
   const relations = getModelRelations(modelName);
-  return relations.map((r) => r.foreignKey).filter((fk): fk is string => fk !== null);
+  const fields: string[] = [];
+
+  for (const r of relations) {
+    if (!r.foreignKey) continue;
+    if (typeof r.foreignKey === 'string') {
+      // Simple FK: the string is the field name
+      fields.push(r.foreignKey);
+    } else {
+      // Object FK: values are the source field names (e.g., { id: 'userId' } → 'userId')
+      fields.push(...Object.values(r.foreignKey));
+    }
+  }
+
+  return fields;
 };
 
 const immutableFieldsCache = new Map<ModelName, readonly string[]>();

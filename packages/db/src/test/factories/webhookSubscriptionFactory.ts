@@ -1,10 +1,10 @@
 import { faker } from '@faker-js/faker';
-import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/client';
+import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 import { createFactory } from '../factory';
 
 const webhookSubscriptionFactory = createFactory('WebhookSubscription', {
   defaults: () => ({
-    model: WebhookModel.User,
+    model: WebhookModel.CustomerRef,
     url: faker.internet.url(),
     ownerModel: WebhookOwnerModel.User,
     isActive: true,

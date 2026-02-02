@@ -1,4 +1,6 @@
-import { OrganizationRole, type OrganizationId, type User } from '@template/db';
+import type { OrganizationId } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
+import type { User } from '@template/db/generated/client/client';
 import { OrganizationAction, type Entitlements, type PermissionEntry, type Permix } from '@template/permissions/client';
 import { allTrue, isSuperadmin } from './shared';
 
@@ -10,7 +12,7 @@ export const organizationRoles = {
 } as const;
 
 export function getOrgPermissions(
-  role: OrganizationRole,
+  role: Role,
   orgId: OrganizationId,
   entitlements?: Entitlements,
 ): PermissionEntry {
@@ -24,7 +26,7 @@ export function getOrgPermissions(
 
 type OrgContextParams = {
   user?: Pick<User, 'platformRole'> | null;
-  role: OrganizationRole;
+  role: Role;
   orgId: OrganizationId;
   entitlements?: Entitlements;
 };
@@ -41,11 +43,3 @@ export async function setupOrgContext(
   await permix.setup(getOrgPermissions(params.role, params.orgId, params.entitlements));
 }
 
-const roleActionMap: Record<OrganizationRole, OrganizationAction> = {
-  [OrganizationRole.owner]: 'own',
-  [OrganizationRole.admin]: 'manage',
-  [OrganizationRole.member]: 'operate',
-  [OrganizationRole.viewer]: 'read',
-};
-
-export const roleToOrgAction = (role: OrganizationRole): OrganizationAction => roleActionMap[role];

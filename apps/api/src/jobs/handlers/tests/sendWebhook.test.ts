@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
@@ -81,7 +81,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
       });
 
       await sendWebhook(
@@ -107,7 +107,7 @@ describe('sendWebhook handler', () => {
       expect(receivedWebhooks.length).toBe(1);
       expect(receivedWebhooks[0].url).toBe(testUrl);
       expect(receivedWebhooks[0].body).toEqual({
-        model: 'User',
+        model: 'CustomerRef',
         action: 'create',
         payload: { id: user.id, name: user.name },
       });
@@ -122,7 +122,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
       });
 
       await sendWebhook(
@@ -160,7 +160,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
       });
 
       await sendWebhook(
@@ -190,7 +190,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
       });
 
       await sendWebhook(
@@ -217,7 +217,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
         isActive: false,
       });
 
@@ -265,7 +265,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
         isActive: true,
       });
 
@@ -307,7 +307,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
         isActive: true,
       });
 
@@ -357,7 +357,7 @@ describe('sendWebhook handler', () => {
         ownerModel: 'User',
         userId: user.id,
         url: testUrl,
-        model: 'User',
+        model: 'CustomerRef',
         isActive: true,
       });
 

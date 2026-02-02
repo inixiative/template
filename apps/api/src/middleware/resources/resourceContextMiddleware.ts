@@ -1,4 +1,4 @@
-import { toModelName, type ExtendedPrismaClient, type ModelDelegate } from '@template/db';
+import { toModelName, type AccessorName, type Db } from '@template/db';
 import type { MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';
@@ -10,28 +10,28 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   const db = c.get('db');
   const lookup = c.req.query('lookup') || 'id';
 
-  // Get delegate from route path (e.g., /api/v1/organization/:id → 'organization')
+  // Get accessor from route path (e.g., /api/v1/organization/:id → 'organization')
   const pathParts = c.req.path.split('/');
-  const delegate = pathParts[3] as ModelDelegate | undefined;
-  if (!delegate || !toModelName(delegate)) return next();
+  const accessor = pathParts[3] as AccessorName | undefined;
+  if (!accessor || !toModelName(accessor)) return next();
 
-  const resources = await findResources(db, delegate, lookup, id);
+  const resources = await findResources(db, accessor, lookup, id);
 
   if (!resources.length) throw new HTTPException(404, { message: 'Resource not found' });
   if (resources.length > 1) throw new HTTPException(409, { message: 'Multiple resources found' });
 
   c.set('resource', resources[0]);
-  c.set('resourceType', delegate);
+  c.set('resourceType', accessor);
 
   return next();
 };
 
-const findResources = async (db: ExtendedPrismaClient, delegate: ModelDelegate, lookup: string, id: string) => {
-  const model = db[delegate] as { findMany: Function } | undefined;
-  if (!model?.findMany) return [];
+const findResources = async (db: Db, accessor: AccessorName, lookup: string, id: string) => {
+  const delegate = db[accessor] as { findMany: Function } | undefined;
+  if (!delegate?.findMany) return [];
 
-  return model.findMany({
+  return delegate.findMany({
     where: { [lookup]: id },
-    ...resourceContextArgs[delegate],
+    ...resourceContextArgs[accessor],
   });
 };

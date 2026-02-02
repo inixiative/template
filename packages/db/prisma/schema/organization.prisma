@@ -13,14 +13,15 @@ model Organization {
 
   // Relations
   organizationUsers    OrganizationUser[]
+  spaceUsers           SpaceUser[]
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
-
-  @@index([slug])
+  spaces               Space[]
+  providerRefs         CustomerRef[]         @relation("providerRefs")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

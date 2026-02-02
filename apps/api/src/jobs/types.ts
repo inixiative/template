@@ -1,11 +1,11 @@
-import type { ExtendedPrismaClient } from '@template/db';
+import type { Db } from '@template/db';
 import type { Job, Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 export type JobsQueue = Queue & { redis: Redis };
 
 export type WorkerContext = {
-  db: ExtendedPrismaClient;
+  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;

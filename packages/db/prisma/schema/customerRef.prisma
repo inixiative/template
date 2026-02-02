@@ -1,0 +1,48 @@
+// ============================================================================
+// CUSTOMER REF - Polymorphic customer relationship (false polymorphism)
+// ============================================================================
+// Links a customer (User, Org, or Space) to a provider (Space, etc.)
+
+model CustomerRef {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Customer (false polymorphism: User, Organization, or Space)
+  customerModel        CustomerModel
+  customerUserId       String?       @db.VarChar(36)
+  customerOrganizationId String?     @db.VarChar(36)
+  customerSpaceId      String?       @db.VarChar(36)
+
+  customerUser         User?         @relation("providerRefs", fields: [customerUserId], references: [id], onDelete: Cascade)
+  customerOrganization Organization? @relation("providerRefs", fields: [customerOrganizationId], references: [id], onDelete: Cascade)
+  customerSpace        Space?        @relation("providerRefs", fields: [customerSpaceId], references: [id], onDelete: Cascade)
+
+  // Provider (false polymorphism: Space, etc.)
+  providerModel        ProviderModel
+  providerSpaceId      String?       @db.VarChar(36)
+
+  providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+
+  @@index([customerModel])
+  @@index([customerUserId])
+  @@index([customerOrganizationId])
+  @@index([customerSpaceId])
+  @@index([providerModel])
+  @@index([providerSpaceId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}
+
+enum CustomerModel {
+  User
+  Organization
+  Space
+}
+
+enum ProviderModel {
+  Space
+  // App-specific: extend as needed
+}

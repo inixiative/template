@@ -1,6 +1,6 @@
 import { OrganizationUserScalarSchema, UserScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -14,6 +14,6 @@ export const organizationReadManyUsersRoute = readRoute({
   many: true,
   paginate: true,
   responseSchema,
-  middleware: [validateOrgPermission('read')],
+  middleware: [validatePermission('read')],
   tags: [Tags.user, Tags.organizationUser],
 });

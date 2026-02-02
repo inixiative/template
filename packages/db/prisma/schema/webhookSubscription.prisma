@@ -10,22 +10,23 @@ model WebhookSubscription {
   url       String
   isActive  Boolean          @default(true)
 
-  // Owner (fake polymorphism)
+  // Owner (fake polymorphism: User, Organization, or Space)
   ownerModel     WebhookOwnerModel
   userId         String?       @db.VarChar(36)
   organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
   // Relations
   webhookEvents WebhookEvent[]
 
   @@unique([userId, model, url])
   @@unique([organizationId, model, url])
+  @@unique([spaceId, model, url])
   @@index([ownerModel])
-  @@index([userId])
-  @@index([organizationId])
   @@index([model])
 
   // ==========================================================================
@@ -34,11 +35,11 @@ model WebhookSubscription {
 }
 
 enum WebhookModel {
-  User
-  Organization
+  CustomerRef
 }
 
 enum WebhookOwnerModel {
   User
   Organization
+  Space
 }

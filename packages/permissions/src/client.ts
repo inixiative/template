@@ -1,6 +1,5 @@
+import type { AccessorName, UserId } from '@template/db';
 import { createPermix } from 'permix';
-
-export type ResourceType = 'organization' | 'user';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -15,27 +14,34 @@ export type StandardAction = (typeof StandardAction)[keyof typeof StandardAction
 export const OrganizationAction = { ...StandardAction } as const;
 export type OrganizationAction = (typeof OrganizationAction)[keyof typeof OrganizationAction];
 
+export const SpaceAction = { ...StandardAction } as const;
+export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
+
 export const UserAction = { ...StandardAction } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 
-export type Action = UserAction | OrganizationAction;
+export type Action = UserAction | OrganizationAction | SpaceAction;
 
 export type Entitlements = Record<string, boolean> | null;
 
 export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
-export type PermissionEntry = { resource: ResourceType; id?: string; actions: ActionState };
+export type PermissionEntry = { resource: AccessorName; id?: string; actions: ActionState };
 type PermissionState = Record<string, ActionState>;
 
 export type Permix = {
-  check: (resource: ResourceType, action: Action, id?: string, data?: unknown) => boolean;
+  check: (resource: AccessorName, action: Action, id?: string, data?: unknown) => boolean;
   setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
   setSuperadmin: (value: boolean) => void;
+  isSuperadmin: () => boolean;
+  setUserId: (id: UserId) => void;
+  getUserId: () => UserId | null;
   getJSON: () => Record<string, Record<string, boolean>> | null;
 };
 
 export const createPermissions = (): Permix => {
   const permix = createPermix<Record<string, { action: Action }>>();
   let isSuperadmin = false;
+  let userId: UserId | null = null;
   let accumulated: PermissionState = {};
 
   return {
@@ -57,6 +63,11 @@ export const createPermissions = (): Permix => {
     setSuperadmin: (value) => {
       isSuperadmin = value;
     },
+    isSuperadmin: () => isSuperadmin,
+    setUserId: (id) => {
+      userId = id;
+    },
+    getUserId: () => userId,
     getJSON: () => permix.getJSON() as Record<string, Record<string, boolean>> | null,
   };
 };

@@ -193,6 +193,38 @@ Factories auto-infer dependencies from FK field names using `{modelName}Id` patt
 
 For non-standard FKs, add manual factory logic or use context.
 
+### Composite Foreign Keys
+
+For models with composite FKs (multiple fields pointing to one dependency), use an object format:
+
+```typescript
+// In factory definition
+dependencies: {
+  organizationUser: {
+    modelName: 'OrganizationUser',
+    foreignKey: { organizationId: 'organizationId', userId: 'userId' },
+    required: true,
+  },
+}
+```
+
+Format: `{ targetField: sourceField }` means:
+- Read `targetField` FROM the dependency
+- Set `sourceField` ON the model being created
+
+Example: SpaceUser requires OrganizationUser via composite FK:
+
+```typescript
+// Factory copies organizationId and userId from OrganizationUser to SpaceUser
+foreignKey: { organizationId: 'organizationId', userId: 'userId' }
+```
+
+Compare to simple FK:
+```typescript
+// Simple: just sets webhookSubscriptionId from dependency's id
+foreignKey: 'webhookSubscriptionId'
+```
+
 ### Cleanup
 
 ```typescript

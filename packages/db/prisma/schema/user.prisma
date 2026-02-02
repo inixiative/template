@@ -21,13 +21,13 @@ model User {
   accounts             Account[]
   sessions             Session[]
   organizationUsers    OrganizationUser[]
+  spaceUsers           SpaceUser[]
   tokens               Token[]
   cronJobsCreated      CronJob[]
   webhookSubscriptions WebhookSubscription[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
-
-  @@index([email])
+  providerRefs         CustomerRef[]         @relation("providerRefs")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -37,4 +37,11 @@ model User {
 enum PlatformRole {
   user
   superadmin
+}
+
+enum Role {
+  owner
+  admin
+  member
+  viewer
 }

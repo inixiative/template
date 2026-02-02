@@ -1,6 +1,6 @@
-import { organizationId } from '@template/db';
+import { check, rebacSchema } from '@template/permissions/rebac';
+import { HTTPException } from 'hono/http-exception';
 import { getResource } from '#/lib/context/getResource';
-import { canAssignRole } from '#/lib/permissions/canAssignRole';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
 import { validateOrganizationCreateOrganizationUserBody } from '#/modules/organization/validations/organizationCreateOrganizationUserBody';
@@ -10,9 +10,11 @@ export const organizationCreateOrganizationUserController = makeController(organ
   const db = c.get('db');
   const org = getResource<'organization'>(c);
   const body = c.req.valid('json');
+  const permix = c.get('permix');
 
   validateOrganizationCreateOrganizationUserBody(body);
-  canAssignRole(c.get('permix'), organizationId(org.id), body.role);
+  if (!check(permix, rebacSchema, 'organization', { id: org.id, role: body.role }, 'assign'))
+    throw new HTTPException(403, { message: 'Access denied' });
 
   const userId = body.userId ?? (await findUserOrCreateGuest(db, { email: body.email!, name: body.name })).id;
 

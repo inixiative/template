@@ -11,3 +11,4 @@ export {
   type EmbedAuthCompleteMessage,
   type EmbedMessage,
 } from './useAuthStrategy';
+export { useOptimisticMutation, useOptimisticListMutation } from './useOptimisticMutation';

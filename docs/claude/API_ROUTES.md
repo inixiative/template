@@ -158,6 +158,24 @@ Query params: `?page=1&pageSize=10` (defaults: page=1, pageSize=10, max=10000)
 
 Other metadata (totals, aggregates, etc.) can be added the same way via the second argument to `respond.ok()`.
 
+### paginate() Utility
+
+Use `paginate()` for list endpoints:
+
+```typescript
+import { paginate } from '#/lib/prisma/paginate';
+
+const { data, pagination } = await paginate(
+  db.user,
+  { where: { isActive: true }, orderBy: { name: 'asc' } },
+  { page, pageSize },
+);
+
+return respond.ok(data, { pagination });
+```
+
+**Stable pagination**: `paginate()` automatically appends `{ id: desc }` as a tiebreaker if no `id` ordering is specified. This ensures consistent results across pages when sorting by non-unique fields (e.g., `name`). Since IDs are UUIDv7 (time-sortable), this also provides chronological ordering as a fallback.
+
 ---
 
 ## Error Responses
@@ -189,18 +207,18 @@ throw new HTTPException(403, { message: 'Not authorized' });
 Add route-level middleware via the `middleware` option:
 
 ```typescript
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
 
-// Require org permission
+// ReBAC permission check on loaded resource
 readRoute({
   model: 'organizationUser',
-  middleware: [validateOrgPermission('read')],
+  middleware: [validatePermission('read')],
   responseSchema,
 });
 
-// Polymorphic resource permission
+// Polymorphic resource permission (User or Organization owner)
 updateRoute({
   model: 'webhookSubscription',
   middleware: [validateOwnerPermission({ action: 'operate' })],

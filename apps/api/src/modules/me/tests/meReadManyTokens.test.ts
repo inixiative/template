@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { type Organization, TokenOwnerModel, type User } from '@template/db';
+import type { Organization, User } from '@template/db/generated/client/client';
+import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createToken, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { meReadManyTokenRoute } from '#/modules/me/routes/meReadManyToken';

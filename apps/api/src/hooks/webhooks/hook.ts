@@ -1,7 +1,8 @@
-import type { HookOptions, ManyAction, SingleAction, WebhookModel, WebhookSubscription } from '@template/db';
-import { DbAction, HookTiming, db, registerDbHook } from '@template/db';
+import type { HookOptions, ManyAction, SingleAction, FlexibleRef } from '@template/db';
+import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
+import { DbAction, HookTiming, db, registerDbHook, isFalsePolymorphismRef } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
-import { getParentWebhookModel, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
+import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -85,36 +86,46 @@ export function registerWebhookHook() {
 
   registerDbHook('webhookDelivery', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action: dbAction } = options;
-    const parentModel = getParentWebhookModel(model);
-    const webhookModel = parentModel ?? model;
 
-    if (!isWebhookEnabled(webhookModel)) return;
+    // Get webhook targets: either related refs (via false polymorphism) or the model itself
+    const relatedRefs = getRelatedWebhookRefs(model);
+    const webhookTargets: string[] = relatedRefs
+      ? relatedRefs.map((ref) => (isFalsePolymorphismRef(ref) ? ref.model : ref))
+      : [model];
+
+    // Filter to enabled targets
+    const enabledTargets = webhookTargets.filter(isWebhookEnabled);
+    if (enabledTargets.length === 0) return;
 
     let allCallbacks: (() => Promise<void>)[] = [];
 
-    if (isManyAction(dbAction)) {
-      const { result, previous } = options as HookOptions & { action: ManyAction };
-      const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-      const previouses = (previous ?? []) as Record<string, unknown>[];
+    // Process for each enabled target model
+    for (const webhookModel of enabledTargets) {
+      if (isManyAction(dbAction)) {
+        const { result, previous } = options as HookOptions & { action: ManyAction };
+        const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
+        const previouses = (previous ?? []) as Record<string, unknown>[];
 
-      // Build a map of previous records by id for efficient lookup
-      const previousById = new Map<string, Record<string, unknown>>();
-      for (const prev of previouses) {
-        if (prev.id) previousById.set(prev.id as string, prev);
-      }
+        // Build a map of previous records by id for efficient lookup
+        const previousById = new Map<string, Record<string, unknown>>();
+        for (const prev of previouses) {
+          if (prev.id) previousById.set(prev.id as string, prev);
+        }
 
-      for (const resultData of results) {
-        const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));
-        const previousData = previousById.get(resultData.id);
+        for (const resultData of results) {
+          const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));
+          const previousData = previousById.get(resultData.id);
+          const callbacks = await processSingleRecord(webhookModel, model, webhookAction, resultData, previousData);
+          allCallbacks = allCallbacks.concat(callbacks);
+        }
+      } else {
+        const { result, previous } = options as HookOptions & { action: SingleAction };
+        const resultData = result as Record<string, unknown> & { id: string };
+        const previousData = previous as Record<string, unknown> | undefined;
+        const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
         const callbacks = await processSingleRecord(webhookModel, model, webhookAction, resultData, previousData);
         allCallbacks = allCallbacks.concat(callbacks);
       }
-    } else {
-      const { result, previous } = options as HookOptions & { action: SingleAction };
-      const resultData = result as Record<string, unknown> & { id: string };
-      const previousData = previous as Record<string, unknown> | undefined;
-      const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
-      allCallbacks = await processSingleRecord(webhookModel, model, webhookAction, resultData, previousData);
     }
 
     if (allCallbacks.length === 0) return;

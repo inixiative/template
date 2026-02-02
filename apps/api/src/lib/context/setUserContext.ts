@@ -10,7 +10,9 @@ export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithO
   c.set('user', user);
   c.set('organizationUsers', organizationUsers);
 
-  if (isSuperadmin(user)) c.get('permix').setSuperadmin(true);
+  const permix = c.get('permix');
+  permix.setUserId(user.id);
+  if (isSuperadmin(user)) permix.setSuperadmin(true);
   await setupUserPermissions(c);
   await setupOrgPermissions(c);
 };

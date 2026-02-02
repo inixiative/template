@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { OrganizationRole, type User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
+import { Role } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { meReadManyOrganizationRoute } from '#/modules/me/routes/meReadManyOrganization';
@@ -42,7 +43,7 @@ describe('GET /me/organizations', () => {
   it('returns user organizations with membership info', async () => {
     const { entity: org } = await createOrganization();
     await createOrganizationUser(
-      { role: OrganizationRole.admin },
+      { role: Role.admin },
       {
         user,
         organization: org,
@@ -65,11 +66,11 @@ describe('GET /me/organizations', () => {
     const { entity: org2 } = await createOrganization({ name: 'Org Two' });
 
     await createOrganizationUser(
-      { role: OrganizationRole.owner },
+      { role: Role.owner },
       { user, organization: org1 },
     );
     await createOrganizationUser(
-      { role: OrganizationRole.member },
+      { role: Role.member },
       { user, organization: org2 },
     );
 

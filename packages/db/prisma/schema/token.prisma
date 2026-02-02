@@ -15,14 +15,17 @@ model Token {
   ownerModel     TokenOwnerModel
   userId         String?          @db.VarChar(36)
   organizationId String?          @db.VarChar(36)
+  spaceId        String?          @db.VarChar(36)
 
   // Relations
   user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
   // Permissions (for org-owned tokens)
-  role         OrganizationRole @default(member)
+  role         Role @default(member)
   entitlements Json?
 
   // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)
@@ -36,7 +39,7 @@ model Token {
 
   @@index([userId])
   @@index([organizationId])
-  @@index([keyHash])
+  @@index([spaceId])
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -47,4 +50,6 @@ enum TokenOwnerModel {
   User
   Organization
   OrganizationUser
+  Space
+  SpaceUser
 }

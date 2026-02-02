@@ -13,11 +13,13 @@ export const meReadManyTokenController = makeController(meReadManyTokenRoute, as
     {
       where: {
         userId: user.id,
-        ownerModel: { in: ['User', 'OrganizationUser'] },
+        ownerModel: { in: ['User', 'OrganizationUser', 'SpaceUser'] },
       },
       include: {
         organization: true,
         organizationUser: true,
+        space: true,
+        spaceUser: true,
       },
       omit: { keyHash: true },
     },

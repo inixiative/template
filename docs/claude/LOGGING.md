@@ -67,6 +67,7 @@ LogScope.auth     // 'auth'
 LogScope.cache    // 'cache'
 LogScope.hook     // 'hook'
 LogScope.job      // 'job'
+LogScope.email    // 'email'
 ```
 
 ### Usage
@@ -86,26 +87,28 @@ log.error('failed', LogScope.seed);
 
 ### Automatic Scopes with logScope()
 
-Wrap execution to automatically tag all logs within:
+Wrap execution to automatically tag all logs within. Scopes nest automatically:
 
 ```typescript
+// Simple usage
 await logScope(LogScope.api, async () => {
-  log.info('outer');  // [api] outer
-
-  await logScope(requestId, async () => {
-    log.info('inner');  // [api][req123] inner
-  });
+  log.info('processing');  // [api] processing
 });
+
+// Nested scopes (chain without await inside)
+await logScope(LogScope.api, () => logScope(requestId, async () => {
+  log.info('handling request');  // [api][abc123] handling request
+}));
 ```
 
 ### Entry Points
 
 ```typescript
-// prepareRequest.ts
-await logScope(LogScope.api, () => logScope(requestId, () => ...));
+// prepareRequest.ts - chains scopes without intermediate await
+await logScope(LogScope.api, () => logScope(requestId, () => db.scope(requestId, next)));
 
 // worker.ts
-await logScope(LogScope.worker, () => logScope(jobId, () => ...));
+await logScope(LogScope.worker, () => logScope(scopeId, () => handler(ctx, payload)));
 ```
 
 ### Output

@@ -1,5 +1,5 @@
 import { registerHooks } from '#/hooks';
-import { getRedisClient } from '#/lib/clients/redis';
+import { getRedisClient } from '@template/db';
 import { log, LogScope } from '@template/shared/logger';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';

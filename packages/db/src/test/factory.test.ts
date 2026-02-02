@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { faker } from '@faker-js/faker';
-import { OrganizationRole } from '@template/db/generated/client/client';
+import { Role } from '@template/db/generated/client/client';
 import { createFactory, getNextSeq, resetSequence } from './factory';
 
 beforeEach(() => {
@@ -103,7 +103,7 @@ describe('createFactory', () => {
 
       const orgUserFactory = createFactory('OrganizationUser', {
         defaults: () => ({
-          role: OrganizationRole.member,
+          role: Role.member,
         }),
       });
 
@@ -111,6 +111,31 @@ describe('createFactory', () => {
 
       expect(orgUser.userId).toBe(context.user!.id);
       expect(orgUser.organizationId).toBe(context.organization!.id);
+    });
+
+    it('Session - uses existing User passed directly in overrides', async () => {
+      const userFactory = createFactory('User', {
+        defaults: () => ({
+          email: `user-${getNextSeq()}@test.com`,
+          emailVerified: true,
+        }),
+      });
+
+      const sessionFactory = createFactory('Session', {
+        defaults: () => ({
+          token: faker.string.alphanumeric(32),
+          expiresAt: new Date(Date.now() + 86400000),
+        }),
+      });
+
+      // Build user first
+      const { entity: user } = await userFactory.build();
+
+      // Pass existing user directly in overrides (not context)
+      const { entity: session, context } = await sessionFactory.build({ user });
+
+      expect(session.userId).toBe(user.id);
+      expect(context.user).toBe(user);
     });
 
     it('Token with OrganizationUser - composite FK via ref override', async () => {
@@ -130,7 +155,7 @@ describe('createFactory', () => {
 
       createFactory('OrganizationUser', {
         defaults: () => ({
-          role: OrganizationRole.member,
+          role: Role.member,
         }),
       });
 
@@ -140,15 +165,17 @@ describe('createFactory', () => {
           keyHash: faker.string.alphanumeric(64),
           keyPrefix: faker.string.alphanumeric(16),
           ownerModel: 'OrganizationUser' as const,
-          role: OrganizationRole.member,
+          role: Role.member,
           isActive: true,
         }),
         dependencies: {
           organizationUser: {
             modelName: 'OrganizationUser',
-            foreignKey: ['organizationId', 'userId'],
+            foreignKey: { organizationId: 'organizationId', userId: 'userId' },
             required: false,
           },
+          space: null,
+          spaceUser: null,
         },
       });
 

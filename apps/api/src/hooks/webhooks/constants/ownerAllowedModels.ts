@@ -1,12 +1,13 @@
-import { WebhookModel, WebhookOwnerModel } from '@template/db';
+import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 
 /**
  * What models can each owner type subscribe to?
  * This is the source of truth - modelSubscribers is derived from this.
  */
 export const webhookOwnerAllowedModels: Record<WebhookOwnerModel, WebhookModel[]> = {
-  [WebhookOwnerModel.User]: [WebhookModel.User],
-  [WebhookOwnerModel.Organization]: [WebhookModel.User, WebhookModel.Organization],
+  [WebhookOwnerModel.User]: [WebhookModel.CustomerRef],
+  [WebhookOwnerModel.Organization]: [WebhookModel.CustomerRef],
+  [WebhookOwnerModel.Space]: [WebhookModel.CustomerRef],
 };
 
 /**

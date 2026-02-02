@@ -1,10 +1,10 @@
 import { omit } from 'lodash-es';
 import { log, LogScope } from '@template/shared/logger';
-import { db, type ModelDelegate } from '#/index'
+import { db, type AccessorName } from '#/index';
 import seeds from './seeds';
 
 export type SeedFile = {
-  model: ModelDelegate;
+  model: AccessorName;
   records: Record<string, unknown>[];
   updateOmits?: string[];
   // TODO: Add order nullification for models with unique [parentId, order] constraints

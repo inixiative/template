@@ -28,8 +28,6 @@ const createClient = (): Db => {
   return prisma.$extends(mutationLifeCycleExtension()) as unknown as Db;
 };
 
-export type ExtendedPrismaClient = Db;
-
 const dbMethods = {
   get raw() { return __raw ??= createClient(); },
 

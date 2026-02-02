@@ -1,5 +1,5 @@
 import { createRoute } from '#/lib/routeTemplates';
-import { validateOrgPermission } from '#/middleware/validations/validateOrgPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import {
   webhookSubscriptionCreateBodySchema,
@@ -11,5 +11,5 @@ export const organizationCreateWebhookSubscriptionRoute = createRoute({
   submodel: Modules.webhookSubscription,
   bodySchema: webhookSubscriptionCreateBodySchema,
   responseSchema: webhookSubscriptionReadResponseSchema,
-  middleware: [validateOrgPermission('operate')],
+  middleware: [validatePermission('operate')],
 });

@@ -8,6 +8,7 @@
 - [Auth & Permissions](#auth--permissions)
 - [Validation](#validation)
 - [Logging & Telemetry](#logging--telemetry)
+- [Email](#email)
 - [Utilities](#utilities)
 - [Frontend](#frontend)
 - [Planned](#planned)
@@ -90,6 +91,17 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
 
 ---
 
+## Email
+
+| Package | Purpose | Notes |
+|---------|---------|-------|
+| `resend` | Email provider | Transactional email API |
+| `mjml` | Email templates | Responsive email markup, renders to HTML |
+
+Part of `@template/email` package. See [COMMUNICATIONS.md](COMMUNICATIONS.md) for usage.
+
+---
+
 ## Utilities
 
 | Package | Purpose | Notes |
@@ -116,7 +128,6 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
 | Package | Purpose | When to Add |
 |---------|---------|-------------|
 | `date-fns` | Date formatting | User-facing relative times, timezone display |
-| `resend` / `sendgrid` | Email | Transactional emails, notifications |
 | `stripe` | Payments | Billing, subscriptions |
 | `@aws-sdk/client-s3` | File storage | User uploads, assets |
 | `sharp` | Image processing | Thumbnails, optimization |

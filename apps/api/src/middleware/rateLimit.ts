@@ -1,6 +1,5 @@
 import type { Context, Next } from 'hono';
-import { getRedisClient } from '#/lib/clients/redis';
-import { redisNamespace } from '#/lib/clients/redisNamespaces';
+import { getRedisClient, redisNamespace } from '@template/db';
 import { getToken } from '#/lib/context/getToken';
 import type { AppEnv } from '#/types/appEnv';
 

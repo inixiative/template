@@ -11,6 +11,7 @@
 - [Client Methods](#client-methods)
 - [Transactions](#transactions)
 - [False Polymorphism](#false-polymorphism)
+- [Additional Models](#additional-models)
 
 ---
 
@@ -190,6 +191,11 @@ getOrg(organizationId('abc'));  // ✓
 | `WebhookSubscriptionId` | `webhookSubscriptionId(id)` |
 | `WebhookEventId` | `webhookEventId(id)` |
 | `CronJobId` | `cronJobId(id)` |
+| `SpaceId` | `spaceId(id)` |
+| `SpaceUserId` | `spaceUserId(id)` |
+| `CustomerRefId` | `customerRefId(id)` |
+| `EmailTemplateId` | `emailTemplateId(id)` |
+| `EmailComponentId` | `emailComponentId(id)` |
 
 Located in `packages/db/src/typedModelIds.ts`.
 
@@ -219,8 +225,80 @@ toAccessor       // 'User' → 'user'
 
 ### Delegate Access
 
+See [Delegate Typing](#delegate-typing) for comprehensive type-safe patterns.
+
+---
+
+## Delegate Typing
+
+Dynamic delegate access in Prisma has TypeScript limitations. This section documents the patterns and when to use each.
+
+### The Problem
+
+When accessing delegates dynamically, TypeScript sees a union of ALL delegate types:
+
 ```typescript
-toDelegate(db, 'User')  // → db.user
+function find(model: ModelName) {
+  // db[toAccessor(model)] → union of ALL delegates
+  // Each has different arg types → "signatures not compatible" error
+  db[toAccessor(model)].findMany({ where: { email: 'x' } }); // ❌ TS error
+}
+```
+
+**Root cause**: Even with generics like `<M extends ModelName>`, TypeScript can't narrow `db[accessor]` because the accessor is computed at runtime.
+
+**References**:
+- [prisma/prisma#6980](https://github.com/prisma/prisma/issues/6980) - Generic model access
+- [prisma/prisma#18322](https://github.com/prisma/prisma/discussions/18322) - TypeMap limitations
+- [bursteways.tech](https://bursteways.tech/posts/fixing-prisma-createmany-typescript-error/) - Infer pattern
+
+### Pass the Delegate (Type-Safe)
+
+Pass the delegate directly and TypeScript infers the exact type:
+
+```typescript
+import { Prisma } from '@template/db';
+
+// Generic function - T is inferred from the delegate passed
+function findMany<T extends { findMany: Function }>(
+  delegate: T,
+  args: Prisma.Args<T, 'findMany'>
+): Promise<Prisma.Result<T, typeof args, 'findMany'>> {
+  return delegate.findMany(args);
+}
+
+// Usage - full type safety!
+const users = await findMany(db.user, { where: { email: 'test@example.com' } });
+//    ^? User[]
+
+const orgs = await findMany(db.organization, { where: { name: 'Acme' } });
+//    ^? Organization[]
+```
+
+**Why it works**: When you pass `db.user` directly, TypeScript knows its exact type. No union, no ambiguity.
+
+**Use when**:
+- Caller knows which model at the call site
+- You want full autocomplete on args and result
+- Extensions that wrap Prisma operations
+
+### Mutation Lifecycle Pattern
+
+The `mutationLifeCycle` extension receives `{ model, args, query }` from Prisma. The `query` function is already typed correctly - just call it:
+
+```typescript
+async create({ model, operation, args, query }) {
+  // query is typed - Prisma handles this internally
+  const result = await query(args);  // ✓ Type-safe
+  return result;
+}
+```
+
+For fetching existing records (before hooks), use `delegateFor`:
+
+```typescript
+const previous = await delegateFor(db, model).findUnique({ where });
+// previous: Record<string, unknown> | null
 ```
 
 ---
@@ -341,11 +419,140 @@ Schema-level configuration in `packages/db/src/registries/`:
 | `FalsePolymorphismRegistry` | Type field → FK mappings | Constraints, validation hooks, immutable fields |
 
 ```typescript
-import { FalsePolymorphismRegistry, getPolymorphismConfigs } from '@template/db';
+import { PolymorphismRegistry, getPolymorphismConfig } from '@template/db';
 
-// Get configs for a model
-const configs = getPolymorphismConfigs('Token');
-// [{ typeField: 'ownerModel', fkMap: { User: ['userId'], ... } }]
+// Get config for a model
+const config = getPolymorphismConfig('Token');
+// { typeField: 'ownerModel', fkMap: { User: ['userId'], ... } } | null
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
+
+---
+
+## Additional Models
+
+### Space
+
+Flexible container within organizations (e.g., initiatives, projects, storefronts).
+
+```prisma
+model Space {
+  id              String   @id
+  createdAt       DateTime
+  updatedAt       DateTime
+  deletedAt       DateTime?
+
+  name            String
+  slug            String
+
+  organizationId  String
+  organization    Organization @relation(...)
+
+  // Relations
+  spaceUsers      SpaceUser[]
+  tokens          Token[]
+  webhookSubscriptions WebhookSubscription[]
+  emailComponents EmailComponent[]
+  emailTemplates  EmailTemplate[]
+  customerRefs    CustomerRef[]   // As provider
+  providerRefs    CustomerRef[]   // As customer
+  inquiriesSent   Inquiry[]
+  inquiriesReceived Inquiry[]
+
+  @@unique([organizationId, slug])
+}
+```
+
+### SpaceUser
+
+Staff with role-based access to a Space. Requires user to be an OrganizationUser first.
+
+```prisma
+model SpaceUser {
+  id              String   @id
+  createdAt       DateTime
+  updatedAt       DateTime
+
+  role            SpaceRole   // owner, admin, member, viewer
+  entitlements    Json?       // Fine-grained permission overrides at space level
+
+  organizationId  String
+  spaceId         String
+  userId          String
+
+  // Composite FK ensures user is OrganizationUser first
+  organizationUser OrganizationUser @relation(fields: [organizationId, userId], ...)
+  organization    Organization
+  space           Space
+  user            User
+  tokens          Token[]
+
+  @@unique([organizationId, spaceId, userId])
+}
+
+enum SpaceRole {
+  owner
+  admin
+  member
+  viewer
+}
+```
+
+### CustomerRef
+
+Polymorphic customer relationship using false polymorphism. Links customers (User, Org, or Space) to providers (Space).
+
+```prisma
+model CustomerRef {
+  id              String   @id
+  createdAt       DateTime
+  updatedAt       DateTime
+
+  // Customer side (who is the customer)
+  customerModel   CustomerModel   // User, Organization, Space
+  customerUserId          String?
+  customerOrganizationId  String?
+  customerSpaceId         String?
+
+  // Provider side (who is the provider)
+  providerModel   ProviderModel   // Space
+  providerSpaceId String?
+
+  // Relations
+  customerUser         User?
+  customerOrganization Organization?
+  customerSpace        Space?
+  providerSpace        Space?
+}
+
+enum CustomerModel {
+  User
+  Organization
+  Space
+}
+
+enum ProviderModel {
+  Space
+}
+```
+
+### EmailTemplate & EmailComponent
+
+See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for full documentation.
+
+Key enums:
+
+```prisma
+enum CommunicationCategory {
+  system        // OTP, password reset - cannot unsubscribe
+  promotional   // Marketing - can unsubscribe
+}
+
+enum EmailOwnerModel {
+  default       // Base templates - read: all, write: super admin
+  admin         // Platform internal - super admin only
+  Organization  // Tenant-branded
+  Space         // Space-specific overrides
+}
+```

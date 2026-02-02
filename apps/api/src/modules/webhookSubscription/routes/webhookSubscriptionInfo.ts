@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { WebhookModel, WebhookOwnerModel } from '@template/db';
+import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 

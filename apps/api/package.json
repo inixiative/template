@@ -9,7 +9,7 @@
     "dev:worker": "../../scripts/watch/worker.sh",
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun",
-    "test": "bun run --cwd ../.. with test api bun test",
+    "test": "bun run --cwd ../.. with test api bun test --concurrency=1",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "typecheck": "tsc --noEmit"

@@ -47,4 +47,17 @@ describe('GET /api/v1/organization/:id', () => {
     expect(data.id).toBe(org.id);
     expect(data.name).toBe(org.name);
   });
+
+  it('is accessible without org membership (public)', async () => {
+    const { entity: otherUser } = await createUser();
+
+    const otherHarness = createTestApp({
+      mockUser: otherUser,
+      mockOrganizationUsers: [],
+      mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
+    });
+
+    const response = await otherHarness.fetch(get(`/api/v1/organization/${org.id}`));
+    expect(response.status).toBe(200);
+  });
 });

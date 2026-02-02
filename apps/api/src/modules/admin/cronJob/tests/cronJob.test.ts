@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { type CronJob, PlatformRole, type User } from '@template/db';
+import type { CronJob, User } from '@template/db/generated/client/client';
+import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createCronJob, createUser, getNextSeq } from '@template/db/test';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { createTestApp } from '#tests/createTestApp';

@@ -25,9 +25,16 @@ export type TypedBuildResult<K extends ModelName, Deps extends ModelName[]> = {
   context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
 };
 
+import type { Identifier } from '@template/db/utils/runtimeDataModel';
+
+/**
+ * FK format: { targetField: sourceField }
+ * - string: source = target (e.g., "organizationId")
+ * - Record: mapped (e.g., { id: "userId" } means set sourceField from targetField)
+ */
 export type DependencyConfig = {
   modelName: ModelName;
-  foreignKey: string | string[];
+  foreignKey: Identifier;
   required: boolean;
 };
 

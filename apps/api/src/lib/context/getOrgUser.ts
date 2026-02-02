@@ -1,4 +1,5 @@
-import type { OrganizationId, OrganizationUser } from '@template/db';
+import type { OrganizationId } from '@template/db';
+import type { OrganizationUser } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 

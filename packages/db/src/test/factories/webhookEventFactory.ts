@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
+import { WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/enums';
 import { createFactory } from '../factory';
 
 const webhookEventFactory = createFactory('WebhookEvent', {
@@ -10,13 +10,6 @@ const webhookEventFactory = createFactory('WebhookEvent', {
     error: null,
     resourceId: faker.string.uuid(),
   }),
-  dependencies: {
-    webhookSubscription: {
-      modelName: 'WebhookSubscription',
-      foreignKey: 'webhookSubscriptionId',
-      required: true,
-    },
-  },
 });
 
 export const buildWebhookEvent = webhookEventFactory.build;

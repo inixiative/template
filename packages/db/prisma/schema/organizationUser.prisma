@@ -3,31 +3,25 @@
 // ============================================================================
 
 model OrganizationUser {
-  id             String           @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  organizationId String           @db.VarChar(36)
-  userId         String           @db.VarChar(36)
-  role           OrganizationRole @default(member)
-  entitlements   Json?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+    id           String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
-  // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokens       Token[]
+    role         Role     @default(member)
+    entitlements Json?
 
-  @@unique([organizationId, userId])
-  @@index([userId])
-  @@index([organizationId])
+    // Relations
+    organizationId String       @db.VarChar(36)
+    userId         String       @db.VarChar(36)
+    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    spaceUsers     SpaceUser[]
+    tokens         Token[]
 
-  // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-  // ==========================================================================
-}
+    @@unique([organizationId, userId])
+    @@index([userId])
 
-enum OrganizationRole {
-  owner
-  admin
-  member
-  viewer
+    // ==========================================================================
+    // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+    // ==========================================================================
 }

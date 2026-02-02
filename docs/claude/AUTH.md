@@ -223,6 +223,34 @@ organizationId: set
 - Permissions are intersection of user's role AND token's role
 - Used for scoped access to a single org
 
+### Space Token
+
+```
+ownerModel: 'Space'
+userId: null
+organizationId: set
+spaceId: set
+```
+
+- No user context, space-level only
+- Has access to the specific space within an org
+- Permissions set by token's role/entitlements
+- Used for space-level integrations
+
+### SpaceUser Token
+
+```
+ownerModel: 'SpaceUser'
+userId: set
+organizationId: set
+spaceId: set
+```
+
+- Tied to a user's membership in a specific space
+- Has access only to that space
+- Permissions are intersection of user's space role AND token's role
+- Used for scoped access to a single space
+
 ### Token Schema
 
 ```prisma
@@ -236,14 +264,17 @@ model Token {
   ownerModel     TokenOwnerModel
   userId         String?
   organizationId String?
+  spaceId        String?
 
   // Relations
   user             User?
   organization     Organization?
   organizationUser OrganizationUser?
+  space            Space?
+  spaceUser        SpaceUser?
 
   // Permissions
-  role         OrganizationRole @default(member)
+  role         Role @default(member)
   entitlements Json?
 
   // Rate limiting
@@ -259,6 +290,8 @@ enum TokenOwnerModel {
   User
   Organization
   OrganizationUser
+  Space
+  SpaceUser
 }
 ```
 

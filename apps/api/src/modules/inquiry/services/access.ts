@@ -1,4 +1,5 @@
-import type { ExtendedPrismaClient, InquiryResourceModel, OrganizationRole } from '@template/db';
+import type { Db } from '@template/db';
+import type { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 
 type InquiryLike = {
   sourceModel: InquiryResourceModel;
@@ -10,9 +11,9 @@ type InquiryLike = {
 };
 
 export const getUserOrganizationIds = async (
-  db: ExtendedPrismaClient,
+  db: Db,
   userId: string,
-  roles: OrganizationRole[],
+  roles: Role[],
 ): Promise<string[]> => {
   const memberships = await db.organizationUser.findMany({
     where: { userId, role: { in: roles } },
@@ -22,7 +23,7 @@ export const getUserOrganizationIds = async (
 };
 
 export const checkInquiryAccess = async (
-  db: ExtendedPrismaClient,
+  db: Db,
   inquiry: InquiryLike,
   userId: string,
 ): Promise<boolean> => {
@@ -30,7 +31,7 @@ export const checkInquiryAccess = async (
 };
 
 export const checkIsSource = async (
-  db: ExtendedPrismaClient,
+  db: Db,
   inquiry: InquiryLike,
   userId: string,
 ): Promise<boolean> => {
@@ -45,7 +46,7 @@ export const checkIsSource = async (
 };
 
 export const checkIsTarget = async (
-  db: ExtendedPrismaClient,
+  db: Db,
   inquiry: InquiryLike,
   userId: string,
 ): Promise<boolean> => {

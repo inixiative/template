@@ -11,10 +11,14 @@
     "./render": "./src/render/index.ts"
   },
   "scripts": {
+    "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --concurrency=1 --cwd packages/email src/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inixiative/json-rules": "^1.0.2",
     "@template/db": "workspace:*",
+    "@template/shared": "workspace:*",
+    "lodash-es": "^4.17.23",
     "mjml": "^4.18.0",
     "resend": "^6.9.1"
   },

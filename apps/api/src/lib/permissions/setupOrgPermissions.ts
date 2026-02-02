@@ -1,7 +1,7 @@
 import type { OrganizationId } from '@template/db';
 import {
   type Entitlements,
-  type OrganizationRole,
+  type Role,
   intersectEntitlements,
   lesserRole,
   setupOrgContext,
@@ -21,7 +21,7 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   // Org token → single org, token permissions only
   if (token?.ownerModel === 'Organization' && token.organizationId) {
     await setupOrgContext(permix, {
-      role: token.role as OrganizationRole,
+      role: token.role as Role,
       orgId: token.organizationId as OrganizationId,
       entitlements: token.entitlements as Entitlements,
     });
@@ -33,7 +33,7 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
     const orgUser = orgUsers?.find((ou) => ou.organizationId === token.organizationId);
     if (orgUser) {
       await setupOrgContext(permix, {
-        role: lesserRole(orgUser.role as OrganizationRole, token.role as OrganizationRole),
+        role: lesserRole(orgUser.role as Role, token.role as Role),
         orgId: token.organizationId as OrganizationId,
         entitlements: intersectEntitlements(
           orgUser.entitlements as Entitlements,
@@ -51,8 +51,8 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   for (const orgUser of orgUsers) {
     const orgId = orgUser.organizationId as OrganizationId;
     const role = token
-      ? lesserRole(orgUser.role as OrganizationRole, token.role as OrganizationRole)
-      : (orgUser.role as OrganizationRole);
+      ? lesserRole(orgUser.role as Role, token.role as Role)
+      : (orgUser.role as Role);
     const entitlements = token
       ? intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements)
       : (orgUser.entitlements as Entitlements);

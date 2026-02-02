@@ -1,4 +1,4 @@
-import { type Entitlements, OrganizationRole, setupUserContext } from '@template/permissions';
+import { type Entitlements, Role, setupUserContext } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -25,7 +25,7 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
   if (token?.ownerModel === 'User') {
     await setupUserContext(permix, {
       user,
-      role: (token.role as OrganizationRole) ?? OrganizationRole.owner,
+      role: (token.role as Role) ?? Role.owner,
       entitlements: token.entitlements as Entitlements,
     });
     return;

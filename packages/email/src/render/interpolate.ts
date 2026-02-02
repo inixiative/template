@@ -1,47 +1,45 @@
+import { escape, isNil } from 'lodash-es';
+import { evaluateConditions } from './evaluateConditions';
+
 /**
  * Variable prefixes for email templates.
  * - sender.* - Auto-resolved from sender (platform or org)
  * - recipient.* - Auto-resolved from recipient user
- * - variable.* - Explicit values from send call
+ * - data.* - Explicit values from send call
  * - component:slug - Component inclusion (handled separately)
  */
 export enum VariablePrefix {
   sender = 'sender',
   recipient = 'recipient',
-  variable = 'variable',
+  data = 'data',
 }
 
-const VARIABLE_PATTERN = /\{\{(sender|recipient|variable)\.(\w+)\}\}/g;
+const VARIABLE_PATTERN = /\{\{(sender|recipient|data)\.([a-zA-Z0-9_-]+)\}\}/g;
 
-type Variables = {
+export type Variables = {
   sender?: Record<string, unknown>;
   recipient?: Record<string, unknown>;
-  variable?: Record<string, unknown>;
+  data?: Record<string, unknown>;
 };
 
 /**
  * Interpolate variables in template string.
- * Supports: {{sender.name}}, {{recipient.email}}, {{variable.code}}
+ * 1. Evaluates {{#if rule={...}}}...{{/if}} conditionals
+ * 2. Substitutes {{sender.*}}, {{recipient.*}}, {{variable.*}}
  */
 export const interpolate = (template: string, variables: Variables): string => {
-  return template.replace(VARIABLE_PATTERN, (match, prefix, key) => {
+  // 1. Evaluate conditionals
+  const evaluated = evaluateConditions(template, variables);
+
+  // 2. Substitute variables
+  return evaluated.replace(VARIABLE_PATTERN, (match, prefix, key) => {
     const source = variables[prefix as keyof Variables];
     const value = source?.[key];
 
-    if (value === undefined || value === null) {
-      return match; // Keep placeholder if value not found
+    if (isNil(value)) {
+      return match;
     }
 
-    // HTML escape to prevent XSS
-    return escapeHtml(String(value));
+    return escape(String(value));
   });
-};
-
-const escapeHtml = (str: string): string => {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 };

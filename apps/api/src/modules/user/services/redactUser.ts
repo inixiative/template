@@ -1,6 +1,6 @@
-import type { ExtendedPrismaClient } from '@template/db';
+import type { Db } from '@template/db';
 
-export const redactUser = async (db: ExtendedPrismaClient, userId: string) => {
+export const redactUser = async (db: Db, userId: string) => {
   const now = new Date();
 
   // Soft delete orgs where this user is the only member

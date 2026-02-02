@@ -1,4 +1,4 @@
-import type { WebhookModel } from '@template/db';
+import type { WebhookModel, FlexibleRef } from '@template/db';
 import { isEqual, omit } from 'lodash-es';
 import { webhookEnabledModels } from '#/hooks/webhooks/constants/enabledModels';
 import { webhookIgnoredFields } from '#/hooks/webhooks/constants/ignoredFields';
@@ -20,8 +20,9 @@ export const resetWebhookEnabledModels = (): void => {
   __enabledModelsSet = new Set(webhookEnabledModels);
 };
 
-export const getParentWebhookModel = (model: string): string | null => {
-  return webhookRelatedModels[model] ?? null;
+export const getRelatedWebhookRefs = (model: string): FlexibleRef[] | null => {
+  const refs = webhookRelatedModels[model];
+  return refs?.length ? refs : null;
 };
 
 export const getIgnoredFields = (model: string): string[] => {

@@ -12,6 +12,15 @@ export type TokenWithRelations = Prisma.TokenGetPayload<{
         organization: true;
       };
     };
+    space: true;
+    spaceUser: {
+      include: {
+        user: true;
+        organization: true;
+        organizationUser: true;
+        space: true;
+      };
+    };
   };
 }>;
 
