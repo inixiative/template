@@ -1,10 +1,10 @@
-import { getUser } from '#/lib/context/getUser';
+
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';
 import { createToken } from '#/modules/me/services/createToken';
 
 export const meCreateTokenController = makeController(meCreateTokenRoute, async (c, respond) => {
-  const user = getUser(c)!;
+  const user = c.get('user')!;
   const db = c.get('db');
   const body = c.req.valid('json');
 

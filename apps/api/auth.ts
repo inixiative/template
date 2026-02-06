@@ -40,5 +40,6 @@ export const auth = betterAuth({
   trustedOrigins: [
     process.env.WEB_URL,
     process.env.ADMIN_URL,
+    process.env.SUPERADMIN_URL,
   ].filter(Boolean)
 });

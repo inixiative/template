@@ -8,11 +8,6 @@ export const organizationUpdateController = makeController(organizationUpdateRou
   const org = getResource<'organization'>(c);
   const body = c.req.valid('json');
 
-  if (body.slug && body.slug !== org.slug) {
-    const existing = await db.organization.findUnique({ where: { slug: body.slug } });
-    if (existing) throw new HTTPException(409, { message: 'Slug already exists' });
-  }
-
   const organization = await db.organization.update({
     where: { id: org.id },
     data: body,

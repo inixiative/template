@@ -4,14 +4,32 @@
  */
 
 // Base components
-export * from './components/button';
-export * from './components/input';
-export * from './components/label';
-export * from './components/card';
+export * from './components/Button';
+export * from './components/Input';
+export * from './components/Label';
+export * from './components/Card';
+export * from './components/Avatar';
+export * from './components/DropdownMenu';
+export * from './components/Table';
+export * from './components/EmptyState';
+export * from './components/ErrorBoundary';
+
+// Layout components
+export * from './components/layout/ContextSelector';
+export * from './components/layout/Sidebar';
+export * from './components/layout/Header';
+export * from './components/layout/UserMenu';
+export * from './components/layout/MasterDetailLayout';
+export * from './components/layout/DetailPanel';
+export * from './components/layout/DrawerOverlay';
+export * from './components/layout/Modal';
+export * from './components/layout/AppShell';
 
 // Auth components
-export * from './components/auth/social-auth-button';
-export * from './components/auth/auth-divider';
+export * from './components/auth/LoginForm';
+export * from './components/auth/SignupForm';
+export * from './components/auth/SocialAuthButton';
+export * from './components/auth/AuthDivider';
 
 // Utils
 export * from './lib/utils';

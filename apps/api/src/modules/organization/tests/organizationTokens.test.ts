@@ -11,12 +11,12 @@ import {
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
-import { organizationReadManyTokenRoute } from '#/modules/organization/routes/organizationReadManyToken';
+import { organizationReadManyTokensRoute } from '#/modules/organization/routes/organizationReadManyTokens';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
 type CreateTokenResponse = z.infer<typeof organizationCreateTokenRoute.responseSchema>;
-type ReadManyTokensResponse = z.infer<typeof organizationReadManyTokenRoute.responseSchema>[];
+type ReadManyTokensResponse = z.infer<typeof organizationReadManyTokensRoute.responseSchema>[];
 
 describe('Organizations Tokens', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

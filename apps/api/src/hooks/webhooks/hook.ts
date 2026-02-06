@@ -20,11 +20,7 @@ export type WebhookPayload = {
   timestamp: string;
 };
 
-const getWebhookCallbacks = async (payload: WebhookPayload) => {
-  const subscriptions = await db.webhookSubscription.findMany({
-    where: { model: payload.model as WebhookModel, isActive: true },
-  });
-
+const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: WebhookPayload) => {
   return subscriptions.map((sub: WebhookSubscription) => async () => {
     await enqueueJob('sendWebhook', {
       subscriptionId: sub.id,
@@ -50,7 +46,8 @@ const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): Webh
   return dbAction as unknown as WebhookAction;
 };
 
-const processSingleRecord = async (
+const processSingleRecord = (
+  subscriptions: WebhookSubscription[],
   webhookModel: string,
   model: string,
   webhookAction: WebhookAction,
@@ -70,7 +67,7 @@ const processSingleRecord = async (
     timestamp: new Date().toISOString(),
   };
 
-  return getWebhookCallbacks(payload);
+  return getWebhookCallbacks(subscriptions, payload);
 };
 
 export function registerWebhookHook() {
@@ -99,8 +96,20 @@ export function registerWebhookHook() {
 
     let allCallbacks: (() => Promise<void>)[] = [];
 
+    // Prefetch all subscriptions for enabled models (prevents N+1 in batch operations)
+    const subscriptionsByModel = new Map<string, WebhookSubscription[]>();
+    for (const webhookModel of enabledTargets) {
+      const subscriptions = await db.webhookSubscription.findMany({
+        where: { model: webhookModel as WebhookModel, isActive: true },
+      });
+      subscriptionsByModel.set(webhookModel, subscriptions);
+    }
+
     // Process for each enabled target model
     for (const webhookModel of enabledTargets) {
+      const subscriptions = subscriptionsByModel.get(webhookModel) ?? [];
+      if (subscriptions.length === 0) continue;
+
       if (isManyAction(dbAction)) {
         const { result, previous } = options as HookOptions & { action: ManyAction };
         const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
@@ -115,7 +124,7 @@ export function registerWebhookHook() {
         for (const resultData of results) {
           const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));
           const previousData = previousById.get(resultData.id);
-          const callbacks = await processSingleRecord(webhookModel, model, webhookAction, resultData, previousData);
+          const callbacks = processSingleRecord(subscriptions, webhookModel, model, webhookAction, resultData, previousData);
           allCallbacks = allCallbacks.concat(callbacks);
         }
       } else {
@@ -123,7 +132,7 @@ export function registerWebhookHook() {
         const resultData = result as Record<string, unknown> & { id: string };
         const previousData = previous as Record<string, unknown> | undefined;
         const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
-        const callbacks = await processSingleRecord(webhookModel, model, webhookAction, resultData, previousData);
+        const callbacks = processSingleRecord(subscriptions, webhookModel, model, webhookAction, resultData, previousData);
         allCallbacks = allCallbacks.concat(callbacks);
       }
     }

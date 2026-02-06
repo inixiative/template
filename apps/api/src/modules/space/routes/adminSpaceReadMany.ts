@@ -9,9 +9,9 @@ export const adminSpaceReadManyRoute = readRoute({
   paginate: true,
   admin: true,
   query: z.object({
-    search: z.string().optional(),
     deleted: z.enum(['true', 'false', 'all']).default('false'),
     organizationId: z.string().optional(),
   }),
   responseSchema: SpaceScalarSchema,
+  searchableFields: ['name', 'slug'],
 });

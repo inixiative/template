@@ -1,0 +1,18 @@
+model User {
+  @@map("users")
+  
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  name          String
+  username      String?   @unique
+  email         String
+  emailVerified Boolean
+  image         String?
+  
+  accounts      Account[]
+  sessions      Session[]
+  
+  @@unique([email])
+}

@@ -1,10 +1,10 @@
-import { getUser } from '#/lib/context/getUser';
+
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryReceivedRoute } from '#/modules/inquiry/routes/inquiryReceived';
 import { getUserOrganizationIds } from '#/modules/inquiry/services/access';
 
 export const inquiryReceivedController = makeController(inquiryReceivedRoute, async (c, respond) => {
-  const user = getUser(c)!;
+  const user = c.get('user')!;
   const db = c.get('db');
   const { page = 1, pageSize = 20 } = c.req.valid('query');
 

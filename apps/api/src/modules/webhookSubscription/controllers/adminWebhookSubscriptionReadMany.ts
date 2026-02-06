@@ -6,21 +6,18 @@ export const adminWebhookSubscriptionReadManyController = makeController(
   adminWebhookSubscriptionReadManyRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const { page, pageSize, ownerModel, userId, organizationId, model, isActive } = c.req.valid('query');
+    const { ownerModel, userId, organizationId, model, isActive } = c.req.valid('query');
 
-    const where = {
-      ...(ownerModel && { ownerModel }),
-      ...(userId && { userId }),
-      ...(organizationId && { organizationId }),
-      ...(model && { model }),
-      ...(isActive !== undefined && { isActive }),
-    };
-
-    const { data, pagination } = await paginate(
-      db.webhookSubscription,
-      { where, orderBy: { createdAt: 'desc' } },
-      { page, pageSize },
-    );
+    const { data, pagination } = await paginate(c, db.webhookSubscription, {
+      searchableFields: ['url', 'model'],
+      where: {
+        ...(ownerModel && { ownerModel }),
+        ...(userId && { userId }),
+        ...(organizationId && { organizationId }),
+        ...(model && { model }),
+        ...(isActive !== undefined && { isActive }),
+      },
+    });
 
     return respond.ok(data, { pagination });
   },

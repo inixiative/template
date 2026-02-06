@@ -4,10 +4,10 @@ import { UserAction, type Entitlements, type PermissionEntry, type Permix } from
 import { allTrue, isSuperadmin } from './shared';
 
 export const userRoles = {
-  owner: { user: allTrue(UserAction) },
-  admin: { user: { read: true, operate: true, manage: true, own: false } },
-  member: { user: { read: true, operate: true, manage: false, own: false } },
-  viewer: { user: { read: true, operate: false, manage: false, own: false } },
+  owner: { user: { own: true } },
+  admin: { user: { manage: true } },
+  member: { user: { operate: true } },
+  viewer: { user: { read: true } },
 } as const;
 
 export function getUserPermissions(

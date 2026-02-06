@@ -9,6 +9,12 @@ import '#/events';
 
 export const app = new OpenAPIHono<AppEnv>();
 
+// Make app available in context
+app.use('*', (c, next) => {
+  c.set('app', app);
+  return next();
+});
+
 // Error handling
 app.onError(errorHandlerMiddleware);
 

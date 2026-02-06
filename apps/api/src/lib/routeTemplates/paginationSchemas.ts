@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { orderByRequestSchema } from '#/lib/routeTemplates/orderBySchema';
 
 export const paginateRequestSchema = z
   .object({
@@ -19,6 +20,7 @@ export const paginateRequestSchema = z
         param: { in: 'query' },
         example: 10,
       }),
+    orderBy: orderByRequestSchema,
   })
   .openapi('PaginateRequest');
 

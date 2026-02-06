@@ -67,9 +67,12 @@ Defined in `apps/api/src/types/appEnv.ts`:
 type AppVars = {
   db: Db;
   txn: Prisma.TransactionClient | undefined;
+  app: Hono<AppEnv>;
   user: User | null;
   organizationUsers: OrganizationUser[] | null;
+  organizations: Organization[] | null;
   spaceUsers: SpaceUser[] | null;
+  spaces: Space[] | null;
   session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
@@ -86,9 +89,12 @@ type AppEnv = { Variables: AppVars };
 |----------|------|-------------|
 | `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
+| `app` | `Hono<AppEnv>` | App instance (for internal routing in batch API) |
 | `user` | `User \| null` | Authenticated user (session or token) |
 | `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
-| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships (flattened from all orgs) |
+| `organizations` | `Organization[] \| null` | All orgs user belongs to (flattened) |
+| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships |
+| `spaces` | `Space[] \| null` | All spaces user has access to (membership + org owner) |
 | `session` | `Session \| null` | BetterAuth session |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
@@ -125,7 +131,9 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   // Initialize org/space context to null
   c.set('organizationUsers', null);
+  c.set('organizations', null);
   c.set('spaceUsers', null);
+  c.set('spaces', null);
 
   // Initialize resource context to null
   c.set('resource', null);
@@ -140,7 +148,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
-3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, session, token, spoofedBy, organizationUsers, spaceUsers)
+3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, session, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
 4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
 
 ---
@@ -191,45 +199,59 @@ c.set('resourceType', 'organization'); // resourceContextMiddleware
 
 ---
 
-## Context Getters
+## Context Access
 
-Located in `apps/api/src/lib/context/`. Use these instead of raw `c.get()` for type safety.
+### Direct Access for Simple Values
 
-### getUser
-
-```typescript
-import { getUser } from '#/lib/context/getUser';
-
-const user = getUser(c);  // User | null
-```
-
-### getToken
+Most context values can be accessed directly via `c.get()`:
 
 ```typescript
-import { getToken } from '#/lib/context/getToken';
-
-const token = getToken(c);  // TokenWithRelations | null
+const user = c.get('user');                    // User | null
+const token = c.get('token');                  // TokenWithRelations | null
+const session = c.get('session');              // Session | null
+const organizationUsers = c.get('organizationUsers');  // OrganizationUser[] | null
+const organizations = c.get('organizations');  // Organization[] | null
+const spaceUsers = c.get('spaceUsers');        // SpaceUser[] | null
+const spaces = c.get('spaces');                // Space[] | null
+const requestId = c.get('requestId');          // string
+const db = c.get('db');                        // Db
 ```
 
-Includes relations:
+**Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
+
+### Context Types
+
+Located in `apps/api/src/lib/context/types.ts`.
+
+#### TokenWithRelations
+
+Tokens include all possible relations for permission setup:
 
 ```typescript
-type TokenWithRelations = Prisma.TokenGetPayload<{
-  include: {
-    user: true;
-    organization: true;
-    organizationUser: {
-      include: { user: true; organization: true };
-    };
-    space: true;
-    spaceUser: {
-      include: { user: true; organization: true; organizationUser: true; space: true };
-    };
-  };
-}>;
+type TokenWithRelations = Token & {
+  user: User | null;
+  organization: Organization | null;
+  organizationUser: (OrganizationUser & {
+    organization: Organization;
+    user: User
+  }) | null;
+  space: Space | null;
+  spaceUser: (SpaceUser & {
+    organization: Organization;
+    organizationUser: OrganizationUser;
+    space: Space;
+    user: User
+  }) | null;
+};
 ```
 
-### getActor
+Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
+
+### Complex Getters
+
+Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
+
+#### getActor
 
 ```typescript
 import { getActor } from '#/lib/context/getActor';
@@ -245,17 +267,13 @@ Unified accessor that resolves the current actor from any auth method:
 - **Org token**: org only (no user)
 - **Space token**: space + org (no user)
 
-### getOrgUser
-
+**Returns stripped objects** (relations removed to prevent circular refs):
 ```typescript
-import { getOrgUser } from '#/lib/context/getOrgUser';
-
-const orgUser = getOrgUser(c, orgId);  // OrganizationUser | null
+type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
+type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
 ```
 
-Finds the user's membership for a specific organization.
-
-### getResource / getResourceType
+#### getResource / getResourceType
 
 ```typescript
 import { getResource, getResourceType } from '#/lib/context/getResource';
@@ -264,15 +282,9 @@ const org = getResource<'organization'>(c);  // Typed based on generic
 const modelName = getResourceType(c);        // ModelDelegate | null
 ```
 
-### getRequestId
+Accesses resources loaded by middleware for routes with `:id` parameter.
 
-```typescript
-import { getRequestId } from '#/lib/context/getRequestId';
-
-const requestId = getRequestId(c);  // string (UUID)
-```
-
-### isSuperadmin
+#### isSuperadmin
 
 Two versions exist:
 
@@ -285,6 +297,57 @@ if (isSuperadmin(c)) { /* ... */ }
 import { isSuperadmin } from '@template/permissions';
 if (isSuperadmin(user)) { /* ... */ }
 ```
+
+---
+
+## Refreshing Context
+
+### refreshUserContext
+
+Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memberships and permissions mid-request.
+
+```typescript
+import { refreshUserContext } from '#/lib/context/refreshUserContext';
+
+await refreshUserContext(c, db);
+```
+
+**What it does:**
+1. Clears existing permissions (prevents stale permission data)
+2. Reloads user with all relations via cached `findUserWithRelations`
+3. Updates context using `setUserContext` (user, orgs, spaces, permissions)
+
+**When to use:**
+- After adding/removing user from org or space
+- After changing user's role in org or space
+- When you need fresh membership data mid-request
+- In batch operations between rounds (data may have changed)
+
+**Implementation:**
+```typescript
+export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {
+  const user = c.get('user');
+  if (!user) return;
+
+  // Clear stale permissions
+  const permix = c.get('permix');
+  await permix.setup([], { replace: true });
+
+  // Reload user with all relations (uses cache, optimized queries)
+  const userWithRelations = await findUserWithRelations(db, user.id);
+  if (!userWithRelations) return;
+
+  // Set up fresh context and permissions
+  await setUserContext(c, userWithRelations);
+};
+```
+
+**Performance:**
+- Uses cached `findUserWithRelations` (10-minute TTL)
+- Optimized queries: 1 query with include + 3 parallel queries
+- Much faster than sequential queries
+
+**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after membership changes.
 
 ---
 

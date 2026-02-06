@@ -1,6 +1,6 @@
 import type { Context, Next } from 'hono';
 import { getRedisClient, redisNamespace } from '@template/db';
-import { getToken } from '#/lib/context/getToken';
+
 import type { AppEnv } from '#/types/appEnv';
 
 const DEFAULT_RATE_LIMIT = 10; // requests per second
@@ -14,7 +14,7 @@ const DEFAULT_RATE_LIMIT = 10; // requests per second
  */
 export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
   const redis = getRedisClient();
-  const token = getToken(c);
+  const token = c.get('token');
 
   const limit = token?.rateLimitPerSecond ?? DEFAULT_RATE_LIMIT;
   const identifier = token ? `token:${token.id}` : `ip:${getClientIp(c)}`;

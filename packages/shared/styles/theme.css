@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+:root {
+  /* Base */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  /* Primary (1-4 shades) */
+  --primary-1: 222.2 47.4% 91%;
+  --primary-2: 222.2 47.4% 71%;
+  --primary-3: 222.2 47.4% 51%;
+  --primary-4: 222.2 47.4% 11.2%;
+  --primary: var(--primary-4);
+  --primary-foreground: 210 40% 98%;
+
+  /* Secondary (1-4 shades) */
+  --secondary-1: 210 40% 98%;
+  --secondary-2: 210 40% 92%;
+  --secondary-3: 210 40% 82%;
+  --secondary-4: 210 40% 66%;
+  --secondary: var(--secondary-1);
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  /* Tertiary (1-4 shades) */
+  --tertiary-1: 262 80% 96%;
+  --tertiary-2: 262 80% 86%;
+  --tertiary-3: 262 80% 66%;
+  --tertiary-4: 262 80% 46%;
+  --tertiary: var(--tertiary-3);
+  --tertiary-foreground: 0 0% 100%;
+
+  /* Quaternary (1-4 shades) */
+  --quaternary-1: 174 72% 94%;
+  --quaternary-2: 174 72% 80%;
+  --quaternary-3: 174 72% 56%;
+  --quaternary-4: 174 72% 36%;
+  --quaternary: var(--quaternary-3);
+  --quaternary-foreground: 0 0% 100%;
+
+  /* Status: Success (1-4 shades) */
+  --success-1: 142 76% 94%;
+  --success-2: 142 76% 80%;
+  --success-3: 142 76% 46%;
+  --success-4: 142 76% 26%;
+  --success: var(--success-3);
+  --success-foreground: 0 0% 100%;
+
+  /* Status: Error (1-4 shades) */
+  --error-1: 0 84% 95%;
+  --error-2: 0 84% 80%;
+  --error-3: 0 84% 60%;
+  --error-4: 0 84% 40%;
+  --error: var(--error-3);
+  --error-foreground: 0 0% 100%;
+
+  /* Status: Warning (1-4 shades) */
+  --warning-1: 38 92% 95%;
+  --warning-2: 38 92% 80%;
+  --warning-3: 38 92% 50%;
+  --warning-4: 38 92% 35%;
+  --warning: var(--warning-3);
+  --warning-foreground: 0 0% 0%;
+
+  /* Status: Info (1-4 shades) */
+  --info-1: 199 89% 94%;
+  --info-2: 199 89% 78%;
+  --info-3: 199 89% 48%;
+  --info-4: 199 89% 28%;
+  --info: var(--info-3);
+  --info-foreground: 0 0% 100%;
+
+  /* UI */
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  /* Base */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+
+  /* Primary (1-4 shades) */
+  --primary-1: 222.2 47.4% 21%;
+  --primary-2: 222.2 47.4% 41%;
+  --primary-3: 222.2 47.4% 61%;
+  --primary-4: 210 40% 98%;
+  --primary: var(--primary-4);
+  --primary-foreground: 222.2 47.4% 11.2%;
+
+  /* Secondary (1-4 shades) */
+  --secondary-1: 217.2 32.6% 12%;
+  --secondary-2: 217.2 32.6% 17.5%;
+  --secondary-3: 217.2 32.6% 27%;
+  --secondary-4: 217.2 32.6% 37%;
+  --secondary: var(--secondary-2);
+  --secondary-foreground: 210 40% 98%;
+
+  /* Tertiary (1-4 shades) */
+  --tertiary-1: 262 60% 16%;
+  --tertiary-2: 262 60% 26%;
+  --tertiary-3: 262 60% 46%;
+  --tertiary-4: 262 60% 66%;
+  --tertiary: var(--tertiary-3);
+  --tertiary-foreground: 0 0% 100%;
+
+  /* Quaternary (1-4 shades) */
+  --quaternary-1: 174 52% 16%;
+  --quaternary-2: 174 52% 26%;
+  --quaternary-3: 174 52% 46%;
+  --quaternary-4: 174 52% 66%;
+  --quaternary: var(--quaternary-3);
+  --quaternary-foreground: 0 0% 100%;
+
+  /* Status: Success (1-4 shades) */
+  --success-1: 142 56% 16%;
+  --success-2: 142 56% 26%;
+  --success-3: 142 56% 46%;
+  --success-4: 142 56% 66%;
+  --success: var(--success-3);
+  --success-foreground: 0 0% 100%;
+
+  /* Status: Error (1-4 shades) */
+  --error-1: 0 62% 20%;
+  --error-2: 0 62% 30%;
+  --error-3: 0 62% 50%;
+  --error-4: 0 62% 70%;
+  --error: var(--error-3);
+  --error-foreground: 0 0% 100%;
+
+  /* Status: Warning (1-4 shades) */
+  --warning-1: 38 72% 20%;
+  --warning-2: 38 72% 30%;
+  --warning-3: 38 72% 50%;
+  --warning-4: 38 72% 70%;
+  --warning: var(--warning-3);
+  --warning-foreground: 0 0% 0%;
+
+  /* Status: Info (1-4 shades) */
+  --info-1: 199 69% 18%;
+  --info-2: 199 69% 28%;
+  --info-3: 199 69% 48%;
+  --info-4: 199 69% 68%;
+  --info: var(--info-3);
+  --info-foreground: 0 0% 100%;
+
+  /* UI */
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}

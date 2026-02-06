@@ -8,8 +8,10 @@
 
 Examples:
 - Adding an endpoint → API_ROUTES + DATABASE + possibly HOOKS, PERMISSIONS
+- Batch operations → BATCH + API_ROUTES + CONTEXT
 - Schema change → DATABASE + HOOKS + TESTING
 - Background job → JOBS + possibly REDIS, LOGGING
+- Building a data table → FRONTEND (DataTables) + API_ROUTES
 
 ## Categories
 
@@ -18,6 +20,7 @@ Examples:
 | Category | Doc | When to Read |
 |----------|-----|--------------|
 | **API Routes** | [API_ROUTES.md](docs/claude/API_ROUTES.md) | Adding endpoints, controllers, route templates |
+| **Batch API** | [BATCH.md](docs/claude/BATCH.md) | Multi-request operations, transactions, interpolation |
 | **Auth** | [AUTH.md](docs/claude/AUTH.md) | BetterAuth, tokens, session vs token auth |
 | **Communications** | [COMMUNICATIONS.md](docs/claude/COMMUNICATIONS.md) | Email, notifications (stub) |
 | **Context** | [CONTEXT.md](docs/claude/CONTEXT.md) | Request context, AppEnv, getters, scopes |
@@ -34,6 +37,8 @@ Examples:
 | Category | Doc | When to Read |
 |----------|-----|--------------|
 | **Architecture** | [ARCHITECTURE.md](docs/claude/ARCHITECTURE.md) | High-level overview, request/data flow |
+| **Apps** | [APPS.md](docs/claude/APPS.md) | Web vs Admin vs Superadmin - when to use each |
+| **Frontend** | [FRONTEND.md](docs/claude/FRONTEND.md) | React apps, routing, state, DataTables, components, hooks |
 | **Monorepo** | [MONOREPO.md](docs/claude/MONOREPO.md) | Workspaces, where to find things |
 | **Naming** | [NAMING.md](docs/claude/NAMING.md) | File/function naming, FE/BE conventions |
 | **Style** | [STYLE.md](docs/claude/STYLE.md) | Code conventions, imports |
@@ -69,6 +74,14 @@ cd apps/api && bun test                 # Run tests
 
 - `#/` - Internal imports (same app/package)
 - `@template/*` - Cross-package imports
+
+## Tickets
+
+Task tracking with Mermaid kanban boards and markdown tickets. See [tickets/README.md](tickets/README.md) for:
+- Creating and managing tickets
+- Kanban board workflow
+- Ticket templates and categories
+- Individual assignee boards
 
 ## AI Workspace
 

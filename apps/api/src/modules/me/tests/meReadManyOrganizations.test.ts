@@ -4,11 +4,11 @@ import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManyOrganizationRoute } from '#/modules/me/routes/meReadManyOrganization';
+import { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
-type ReadManyOrgsResponse = z.infer<typeof meReadManyOrganizationRoute.responseSchema>[];
+type ReadManyOrgsResponse = z.infer<typeof meReadManyOrganizationsRoute.responseSchema>[];
 
 describe('GET /me/organizations', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

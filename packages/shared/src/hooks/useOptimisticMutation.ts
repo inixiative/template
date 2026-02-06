@@ -78,7 +78,8 @@ export function useOptimisticMutation<
 
 /**
  * Simplified optimistic mutation for list operations.
- * Handles common patterns: add, update, remove items from a list.
+ * Handles common patterns: create, update, delete items from a list.
+ * Operation names match controller/route naming conventions.
  */
 export function useOptimisticListMutation<
   TItem extends { id: string },
@@ -87,8 +88,8 @@ export function useOptimisticListMutation<
 >(options: {
   mutationFn: (variables: TVariables) => Promise<TItem>;
   queryKey: QueryKey;
-  /** 'add' | 'update' | 'remove' */
-  operation: 'add' | 'update' | 'remove';
+  /** 'create' | 'update' | 'delete' - matches controller naming */
+  operation: 'create' | 'update' | 'delete';
   mutationOptions?: Omit<
     UseMutationOptions<TItem, TError, TVariables, { previousData: TItem[] | undefined }>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
@@ -102,11 +103,11 @@ export function useOptimisticListMutation<
       const list = currentData ?? [];
 
       switch (operation) {
-        case 'add':
+        case 'create':
           return [...list, variables as unknown as TItem];
         case 'update':
           return list.map((item) => (item.id === variables.id ? { ...item, ...variables } : item));
-        case 'remove':
+        case 'delete':
           return list.filter((item) => item.id !== variables.id);
         default:
           return list;

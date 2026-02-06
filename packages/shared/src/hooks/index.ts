@@ -12,3 +12,4 @@ export {
   type EmbedMessage,
 } from './useAuthStrategy';
 export { useOptimisticMutation, useOptimisticListMutation } from './useOptimisticMutation';
+export { useLogout } from './useLogout';

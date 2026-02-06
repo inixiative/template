@@ -1,0 +1,3 @@
+src/apiClient/
+.sdk-generated
+openapi.json

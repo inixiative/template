@@ -1,18 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { HomePage } from '@template/shared';
 
 export const Route = createFileRoute('/')(
   {
-    component: AdminDashboard,
+    component: () => <HomePage title="Admin" subtitle="Organization management dashboard" />,
   },
 );
-
-function AdminDashboard() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Admin</h1>
-        <p className="text-muted-foreground">Organization management dashboard</p>
-      </div>
-    </div>
-  );
-}

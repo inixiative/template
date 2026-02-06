@@ -4,9 +4,11 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "#/*": ["./src/*"]
+      "#/*": ["./src/*"],
+      "@template/db/*": ["../db/src/*"]
     },
-    "lib": ["ES2022", "DOM"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

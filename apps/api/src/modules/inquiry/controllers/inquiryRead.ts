@@ -1,11 +1,11 @@
 import { HTTPException } from 'hono/http-exception';
-import { getUser } from '#/lib/context/getUser';
+
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryReadRoute } from '#/modules/inquiry/routes/inquiryRead';
 import { checkInquiryAccess } from '#/modules/inquiry/services/access';
 
 export const inquiryReadController = makeController(inquiryReadRoute, async (c, respond) => {
-  const user = getUser(c)!;
+  const user = c.get('user')!;
   const db = c.get('db');
   const { id } = c.req.valid('param');
 

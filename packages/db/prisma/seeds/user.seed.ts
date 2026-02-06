@@ -1,32 +1,46 @@
 import type { SeedFile } from '../seed';
 
 /**
- * Test users for development and testing.
- * All marked with testData: true so they're skipped in production.
+ * Prime development users - the foundation of the dev environment.
+ * All marked with prime: true (only seed with --prime flag).
+ *
+ * Credentials (all use password: "asd123!"):
+ * - super@inixiative.com (Platform Superadmin)
+ * - owner@inixiative.com (Org/Space Owner)
+ * - customer@inixiative.com (End User/Customer)
+ *
+ * Passwords are automatically seeded via account.seed.ts
  */
 export const userSeeds: SeedFile = {
-  model: 'User',
+  model: 'user',
+  updateOmitFields: ['createdAt'],
   records: [
     {
-      id: 'test-user-1',
-      email: 'test@example.com',
-      name: 'Test User',
+      id: '01936d42-8c4a-7000-8000-000000000001',
+      email: 'super@inixiative.com',
+      name: 'Super Admin',
+      displayName: 'Platform Admin',
       emailVerified: true,
-      testData: true,
+      platformRole: 'superadmin',
+      prime: true,
     },
     {
-      id: 'admin-user-1',
-      email: 'admin@example.com',
-      name: 'Admin User',
+      id: '01936d42-8c4a-7000-8000-000000000002',
+      email: 'owner@inixiative.com',
+      name: 'Organization Owner',
+      displayName: 'Org Owner',
       emailVerified: true,
-      testData: true,
+      platformRole: 'user',
+      prime: true,
     },
     {
-      id: 'unverified-user-1',
-      email: 'unverified@example.com',
-      name: 'Unverified User',
-      emailVerified: false,
-      testData: true,
+      id: '01936d42-8c4a-7000-8000-000000000003',
+      email: 'customer@inixiative.com',
+      name: 'Test Customer',
+      displayName: 'Customer User',
+      emailVerified: true,
+      platformRole: 'user',
+      prime: true,
     },
   ],
 };

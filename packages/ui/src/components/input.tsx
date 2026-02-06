@@ -2,10 +2,19 @@ import * as React from 'react';
 import { cn } from '@ui/lib/utils';
 
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+  extends React.InputHTMLAttributes<HTMLInputElement> {
+  show?: boolean | (() => boolean);
+  disabledText?: string;
+}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, show = true, disabledText, disabled, placeholder, ...props }, ref) => {
+    const shouldShow = typeof show === 'function' ? show() : show;
+    if (!shouldShow) return null;
+
+    const isDisabled = disabled || !!disabledText;
+    const displayPlaceholder = isDisabled && disabledText ? disabledText : placeholder;
+
     return (
       <input
         type={type}
@@ -14,6 +23,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
+        disabled={isDisabled}
+        placeholder={displayPlaceholder}
         {...props}
       />
     );

@@ -15,6 +15,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
     many = false,
     admin = false,
     tags,
+    searchableFields,
   } = args;
 
   if (!responseSchema) throw new Error('responseSchema is required for read routes');
@@ -25,7 +26,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
   const routeTags = buildTags({ model, submodel, tags, admin });
   const skipResource = skipId || (many && !submodel);
 
-  return createRoute({
+  const route = createRoute({
     ...args,
     operationId: buildOperationId({ action: action || 'read', model, submodel, many, admin }),
     method: 'get',
@@ -36,8 +37,15 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource),
+    middleware: prepareMiddleware(middleware, skipResource, searchableFields),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });
+
+  // Add OpenAPI extensions for frontend metadata
+  if (searchableFields?.length) {
+    (route as any)['x-searchable-fields'] = searchableFields;
+  }
+
+  return route;
 };

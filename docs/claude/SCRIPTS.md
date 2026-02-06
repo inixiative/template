@@ -37,7 +37,7 @@ scripts/
 ├── db/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
-│   ├── clone.sh            # Clone remote → local
+│   ├── clone.sh            # Clone remote → local (with webhook cleanup)
 │   ├── pg-init.sh          # Postgres initialization
 │   ├── wait-postgres.sh    # Wait for postgres ready
 │   └── wait-redis.sh       # Wait for redis ready
@@ -46,6 +46,10 @@ scripts/
     ├── with-env.sh         # Run command with env vars
     ├── doppler-env.sh      # Load from Doppler
     └── wait-for-api.sh     # Health check wait
+
+Database utilities (packages/db/prisma/):
+├── seed.ts                       # Seed script with UUID validation
+└── truncateWebhookSubscriptions.ts  # Clear webhooks (local/test only)
 ```
 
 ---
@@ -87,17 +91,19 @@ bun run build           # Build to dist/
 
 ```bash
 # Schema operations (proxied to @template/db)
-bun run db:generate     # Generate Prisma client
-bun run db:push         # Push schema (dev only)
-bun run db:migrate      # Create migration
-bun run db:deploy       # Run migrations (production)
-bun run db:studio       # Open Prisma Studio
-bun run db:seed         # Seed database
+bun run db:generate          # Generate Prisma client
+bun run db:push              # Push schema (dev only)
+bun run db:migrate           # Create migration
+bun run db:deploy            # Run migrations (production)
+bun run db:studio            # Open Prisma Studio
+bun run db:seed              # Seed database
+bun run db:seed --prime      # Include prime dev data
 
 # Database operations (scripts/db/)
-bun run db:dump         # Export to file
-bun run db:restore      # Import from file
-bun run db:clone        # Clone remote → local
+bun run db:dump              # Export to file
+bun run db:restore           # Import from file
+bun run db:clone [env]       # Clone remote → local (auto-truncates webhooks)
+bun run db:truncate:webhooks # Clear webhook subscriptions (local/test only)
 
 # Reset (down + up + push + seed)
 bun run reset:db

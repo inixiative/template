@@ -4,10 +4,10 @@ import { SpaceAction, type Entitlements, type PermissionEntry, type Permix } fro
 import { allTrue } from './shared';
 
 export const spaceRoles = {
-  owner: { space: allTrue(SpaceAction) },
-  admin: { space: { read: true, operate: true, manage: true, own: false } },
-  member: { space: { read: true, operate: true, manage: false, own: false } },
-  viewer: { space: { read: true, operate: false, manage: false, own: false } },
+  owner: { space: { own: true } },
+  admin: { space: { manage: true } },
+  member: { space: { operate: true } },
+  viewer: { space: { read: true } },
 } as const;
 
 export function getSpacePermissions(

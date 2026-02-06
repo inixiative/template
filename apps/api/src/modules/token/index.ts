@@ -1,12 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { validateActor } from '#/middleware/validations/validateActor';
+import { autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import type { AppEnv } from '#/types/appEnv';
-
-import { tokenDeleteRoute } from '#/modules/token/routes/tokenDelete';
-import { tokenDeleteController } from '#/modules/token/controllers/tokenDelete';
 
 export const tokenRouter = new OpenAPIHono<AppEnv>();
 
 tokenRouter.use('*', validateActor);
 
-tokenRouter.openapi(tokenDeleteRoute, tokenDeleteController);
+await autoRegisterRoutes(tokenRouter, import.meta.dirname);

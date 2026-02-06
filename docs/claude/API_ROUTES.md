@@ -24,13 +24,15 @@ Pattern: `resourceActionSubresource`
 | CreateMany | `userCreateMany` |
 | Read | `userRead` |
 | ReadMany | `userReadMany` |
-| Subresource (plural) | `organizationReadManyUsers` |
-| Subresource (singular) | `organizationCreateToken` |
+| Subresource (plural) | `organizationReadManySpaces` |
+| Subresource (singular) | `organizationCreateSpace` |
 | Action | `userActivate` |
 | Admin | `adminOrganizationReadMany` |
 
+**Naming rules:**
 - Resources are **singular**: `user`, `organization`, `inquiry`
-- Subresources are plural or singular based on operation
+- ReadMany subresources use **plural** form: `Spaces`, `Tokens`, `WebhookSubscriptions`
+- Single operations use **singular**: `Space`, `Token`
 
 ---
 
@@ -58,6 +60,7 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
 | `sanitizeKeys` | string[] | Keys to strip from body before Prisma |
+| `searchableFields` | string[] | Fields that can be searched (auto-injects search schemas) |
 
 ### Examples
 
@@ -160,21 +163,330 @@ Other metadata (totals, aggregates, etc.) can be added the same way via the seco
 
 ### paginate() Utility
 
-Use `paginate()` for list endpoints:
+Use `paginate()` for list endpoints. It automatically handles search, filters, orderBy, and pagination from context.
 
+**New signature** (context-based):
 ```typescript
 import { paginate } from '#/lib/prisma/paginate';
 
-const { data, pagination } = await paginate(
-  db.user,
-  { where: { isActive: true }, orderBy: { name: 'asc' } },
-  { page, pageSize },
-);
+// Simple - just context and delegate
+const { data, pagination } = await paginate(c, db.user);
+
+// With filters
+const { data, pagination } = await paginate(c, db.user, {
+  where: { isActive: true },
+});
+
+// With includes/omits
+const { data, pagination } = await paginate(c, db.token, {
+  where: { spaceId: space.id },
+  omit: { keyHash: true },
+});
 
 return respond.ok(data, { pagination });
 ```
 
+**What paginate() handles automatically:**
+- Reads `page`, `pageSize` from query params
+- Reads `search`, `searchFields` from bracket notation (parsed in prepareRequest)
+- Reads `searchableFields` from route context (set by middleware)
+- Reads `orderBy` from query and parses it
+- Appends `{ id: desc }` as stable pagination tiebreaker
+- Calls `buildWhereClause` to combine search + filters
+
 **Stable pagination**: `paginate()` automatically appends `{ id: desc }` as a tiebreaker if no `id` ordering is specified. This ensures consistent results across pages when sorting by non-unique fields (e.g., `name`). Since IDs are UUIDv7 (time-sortable), this also provides chronological ordering as a fallback.
+
+### Search & Filtering
+
+List endpoints support search via query parameters. Define `searchableFields` in the route, and search schemas are auto-injected.
+
+**Simple search** - searches across all searchable fields:
+```
+GET /api/v1/organizations?search=acme
+```
+
+**Advanced search** - search specific fields using bracket notation:
+```
+GET /api/v1/organizations?searchFields[name]=acme&searchFields[slug]=corp
+```
+
+**Prisma operators** - use nested brackets for advanced filtering:
+```
+# Text operators
+GET /api/v1/users?searchFields[email][contains]=@example.com
+GET /api/v1/users?searchFields[name][startsWith]=John
+
+# Comparison operators
+GET /api/v1/products?searchFields[price][gte]=100&searchFields[price][lte]=500
+GET /api/v1/users?searchFields[age][gt]=18
+
+# Relation filters
+GET /api/v1/users?searchFields[posts][some][status]=published
+GET /api/v1/orgs?searchFields[members][every][role]=admin
+GET /api/v1/items?searchFields[comments][none][flagged]=true
+```
+
+**Supported operators:**
+- `contains`, `startsWith`, `endsWith` - String matching
+- `equals` - Exact match
+- `gt`, `gte`, `lt`, `lte` - Comparison
+- `in`, `notIn` - Array membership
+- `some`, `every`, `none` - Relation filters
+- `is`, `isNot` - Relation equality
+
+**Route definition** (new way):
+```typescript
+readRoute({
+  model: Modules.organization,
+  many: true,
+  paginate: true,
+  responseSchema: OrganizationSchema,
+  searchableFields: ['name', 'slug', 'description'],  // Auto-injects search & searchFields
+});
+```
+
+**Controller** (simplified):
+```typescript
+export const organizationReadManyController = makeController(route, async (c, respond) => {
+  const db = c.get('db');
+
+  // paginate() handles search automatically!
+  const { data, pagination } = await paginate(c, db.organization);
+
+  return respond.ok(data, { pagination });
+});
+```
+
+**With additional filters:**
+```typescript
+const { deleted } = c.req.valid('query');
+
+const { data, pagination } = await paginate(c, db.organization, {
+  where: {
+    deletedAt: deleted === 'true' ? { not: null } : null,
+  },
+});
+```
+
+**How it works:**
+1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into objects
+2. `searchableFieldsMiddleware` sets searchableFields on context
+3. `paginate()` reads searchFields from bracket query + searchableFields from context
+4. `buildWhereClause()` combines search + filters with validation
+
+**Bracket notation parsing:**
+- **Automatic**: All bracket notation is parsed into nested objects (arbitrary depth)
+- **Generic**: Works for any query param, not just searchFields
+- **Validated**: `buildWhereClause` only allows fields in the `searchableFields` whitelist
+- **Values trimmed**: All values automatically trimmed of whitespace
+
+**Security:**
+- Only fields in `searchableFields` can be searched (whitelist validation with full paths)
+- Path notation is validated to prevent injection
+- Supports nested relation fields (e.g., `posts.status`, `posts.author.name`)
+- Relation fields must be explicitly whitelisted to prevent unauthorized access
+
+### Bracket Notation Query Parsing
+
+The API automatically parses bracket notation in query strings into nested objects. Supports arbitrary nesting levels for complex Prisma queries. This happens in `prepareRequest` middleware before Zod validation.
+
+**Single level**: `?filters[status]=active&filters[tier]=premium`
+```typescript
+{ filters: { status: 'active', tier: 'premium' } }
+```
+
+**Multiple levels (operators)**: `?searchFields[price][gte]=100&searchFields[price][lte]=500`
+```typescript
+{ searchFields: { price: { gte: 100, lte: 500 } } }
+```
+
+**Deep nesting (relation filters)**: `?searchFields[posts][some][status]=published`
+```typescript
+{ searchFields: { posts: { some: { status: 'published' } } } }
+```
+
+**How it works:**
+1. `prepareRequest` calls `parseBracketNotation(url)`
+2. Result stored in context as `c.get('bracketQuery')`
+3. Controllers read from context (e.g., `paginate` reads `bracketQuery.searchFields`)
+4. Zod validates the final query object
+
+**Implementation:**
+```typescript
+// apps/api/src/lib/utils/parseBracketNotation.ts
+export function parseBracketNotation(url: string): Record<string, any> {
+  const matches = url.matchAll(/([^?&=]+)\[([^\]]+)\]=([^&]*)/g);
+  const result: Record<string, any> = {};
+
+  for (const [, param, key, value] of matches) {
+    if (!result[param]) result[param] = {};
+    result[param][key] = decodeURIComponent(value.replace(/\+/g, ' '));
+  }
+
+  return result;
+}
+```
+
+**Use cases:**
+- `searchFields[name]=value` for field-specific search
+- `filters[status]=active` for complex filtering (future)
+- Any custom bracket notation your API needs
+
+**Note**: This is a generic utility - it parses ALL bracket notation, not just search-related params. Specific handling (like search validation) happens in downstream utilities like `buildWhereClause`.
+
+### Relation Field Security
+
+When using relation filters, explicitly whitelist nested fields:
+
+```typescript
+// Route definition
+searchableFields: [
+  'name',                    // Direct field
+  'slug',                    // Direct field
+  'posts.status',            // Relation field (explicit)
+  'posts.title',             // Relation field (explicit)
+  'posts.author.name',       // Nested relation (explicit)
+  'members.role'             // Relation field
+]
+
+// Allowed queries:
+?searchFields[posts][some][status]=published        // ✓ posts.status whitelisted
+?searchFields[posts][some][title]=test              // ✓ posts.title whitelisted
+?searchFields[posts][some][author][name]=John       // ✓ posts.author.name whitelisted
+
+// Rejected queries:
+?searchFields[posts][some][secretField]=hack        // ✗ posts.secretField not whitelisted
+?searchFields[posts][some][author][email]=test      // ✗ posts.author.email not whitelisted
+```
+
+**Validation:**
+- Full path must be in `searchableFields` array
+- Use dot notation: `posts.status`, not hierarchical objects
+- Relation operators (`some`, `every`, `none`) are automatically supported
+- Error thrown for non-whitelisted fields (not silently ignored)
+
+### OrderBy
+
+List endpoints support dynamic sorting via query parameters.
+
+**Format**: `?orderBy[]=field:direction`
+
+**Examples**:
+```
+GET /api/v1/users?orderBy[]=name:asc
+GET /api/v1/users?orderBy[]=createdAt:desc&orderBy[]=name:asc
+GET /api/v1/users?orderBy[]=organization.name:asc  // Nested fields supported
+```
+
+**In route definition**:
+```typescript
+import { orderByRequestSchema } from '#/lib/routeTemplates/orderBySchema';
+
+readRoute({
+  model: Modules.user,
+  many: true,
+  query: z.object({
+    orderBy: orderByRequestSchema,
+  }),
+  responseSchema,
+});
+```
+
+**In controller**:
+```typescript
+import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
+
+const { orderBy } = c.req.valid('query');
+const parsedOrderBy = orderBy ? parseOrderBy(orderBy) : [{ createdAt: 'desc' }];
+
+const { data, pagination } = await paginate(
+  db.user,
+  { where, orderBy: parsedOrderBy },
+  { page, pageSize }
+);
+```
+
+**Path notation** - Supports nested fields up to 5 levels deep:
+- `name:asc` - Direct field
+- `user.email:desc` - Nested relation
+- `organization.user.email:asc` - Deep nested
+
+**Security:** Uses `validatePathNotation()` to prevent injection attacks.
+
+---
+
+## Frontend Metadata
+
+Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables.
+
+### OpenAPI Extensions
+
+Routes with `searchableFields` automatically include OpenAPI extensions:
+
+```typescript
+// Route definition
+readRoute({
+  model: Modules.space,
+  many: true,
+  paginate: true,
+  responseSchema: SpaceScalarSchema,
+  searchableFields: ['name', 'slug'],
+});
+
+// Generated OpenAPI spec includes:
+// "x-searchable-fields": ["name", "slug"]
+```
+
+### Extracting Metadata
+
+Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
+
+```typescript
+import { getQueryMetadata, useQueryMetadata } from '@template/shared';
+
+// By path
+const meta = getQueryMetadata('/api/admin/space', 'get');
+// => { searchableFields: ['name', 'slug'] }
+
+// By operation ID (recommended)
+const meta = getQueryMetadataByOperation('adminSpaceReadMany');
+
+// In React component
+function SpacesTable() {
+  const meta = useQueryMetadata('adminSpaceReadMany');
+  // Use meta.searchableFields
+}
+```
+
+### DataTable Configuration
+
+Use `makeDataTableConfig()` to create table configurations:
+
+```typescript
+import { makeDataTableConfig, useDataTableConfig } from '@template/shared';
+
+// Standalone
+const config = makeDataTableConfig('adminSpaceReadMany', {
+  defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
+});
+
+// In React component
+function SpacesTable() {
+  const config = useDataTableConfig('adminSpaceReadMany');
+
+  return (
+    <DataTable
+      searchableFields={config.searchableFields}
+      defaultOrderBy={config.defaultOrderBy}
+    />
+  );
+}
+```
+
+**Benefits:**
+- Single source of truth for searchable fields
+- Frontend automatically stays in sync with API changes
+- OrderBy works generically with any response field
 
 ---
 
@@ -199,6 +511,52 @@ import { HTTPException } from 'hono/http-exception';
 throw new HTTPException(404, { message: 'User not found' });
 throw new HTTPException(403, { message: 'Not authorized' });
 ```
+
+---
+
+## Complex Operations & HTTP Status
+
+### Batch Operations
+
+For operations that execute multiple sub-requests (like batch APIs), use consistent HTTP status semantics.
+
+**Pattern:** Always return `200 OK` with detailed status in payload
+
+**Rationale:**
+- Complex multi-request operations have mixed outcomes
+- Single HTTP status code cannot represent partial success/failure
+- Clients must inspect detailed results anyway
+- Clear separation: HTTP status (operation succeeded) vs payload status (outcome)
+
+**Example - Batch API:**
+```typescript
+// Always returns 200 with detailed results
+{
+  data: {
+    batch: [[...]], // Detailed request results
+    summary: {
+      status: 'success' | 'partialSuccess' | 'failed',
+      successfulRequests: 5,
+      failedRequests: 2,
+      ...
+    }
+  }
+}
+```
+
+**When to use 200 for operations:**
+- Batch/bulk operations
+- Multi-step workflows
+- Operations with partial success scenarios
+- Any operation where detailed inspection is required
+
+**When to use 4xx/5xx:**
+- Request validation failure (400, 422)
+- Authentication/authorization failure (401, 403)
+- Single-resource operations that fail (404, 500)
+- Security violations (400)
+
+See [BATCH.md](./BATCH.md) for comprehensive batch API documentation.
 
 ---
 

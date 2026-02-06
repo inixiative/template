@@ -8,6 +8,16 @@ const NEGATIVE_TTL = 60; // 1 minute for null/undefined results
 
 type Identifier = string | Record<string, string>;
 
+// ISO 8601 date regex for reviver
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+
+function dateReviver(_key: string, value: any): any {
+  if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
+    return new Date(value);
+  }
+  return value;
+}
+
 /**
  * Build a cache key. Composite keys are sorted alphabetically for consistency.
  *
@@ -68,7 +78,7 @@ export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = 
   // Try to get from cache
   try {
     const cached = await redis.get(key);
-    if (cached !== null) return JSON.parse(cached) as T;
+    if (cached !== null) return JSON.parse(cached, dateReviver) as T;
   } catch (error) {
     log.error(`Cache read error for key ${key}:`, error);
     // Redis down - fall through to compute without cache

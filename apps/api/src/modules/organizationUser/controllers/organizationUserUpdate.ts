@@ -14,11 +14,11 @@ export const organizationUserUpdateController = makeController(organizationUserU
   const permix = c.get('permix');
 
   const role = greaterRole(orgUser.role, body.role);
-  if (!check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role }, 'assign'))
+  if (!check(permix, rebacSchema, 'organization', { id: orgUser.organizationId as any, role }, 'assign'))
     throw new HTTPException(403, { message: 'Access denied' });
 
   if (orgUser.role === Role.owner && body.role !== Role.owner) {
-    await validateNotLastOwner(db, orgUser.organizationId);
+    await validateNotLastOwner(db, orgUser.organizationId as any);
   }
 
   const updated = await db.organizationUser.update({

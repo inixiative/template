@@ -12,9 +12,9 @@ export const organizationUserDeleteController = makeController(organizationUserD
   const permix = c.get('permix');
 
   const canLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
-  const canAssign = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: orgUser.role }, 'assign');
+  const canAssign = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId as any, role: orgUser.role }, 'assign');
   if (!canLeave && !canAssign) throw new HTTPException(403, { message: 'Access denied' });
-  if (orgUser.role === Role.owner) await validateNotLastOwner(db, orgUser.organizationId);
+  if (orgUser.role === Role.owner) await validateNotLastOwner(db, orgUser.organizationId as any);
 
   await db.organizationUser.delete({ where: { id: orgUser.id } });
 

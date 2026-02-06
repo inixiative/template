@@ -1,12 +1,12 @@
 import type { InquiryResourceModel } from '@template/db';
 import { HTTPException } from 'hono/http-exception';
-import { getUser } from '#/lib/context/getUser';
+
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const inquiryCreateController = makeController(inquiryCreateRoute, async (c, respond) => {
-  const user = getUser(c)!;
+  const user = c.get('user')!;
   const db = c.get('db');
   const { targetEmail, ...body } = c.req.valid('json');
 

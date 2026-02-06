@@ -9,8 +9,8 @@ export const adminOrganizationReadManyRoute = readRoute({
   paginate: true,
   admin: true,
   query: z.object({
-    search: z.string().optional(),
     deleted: z.enum(['true', 'false', 'all']).default('false'),
   }),
   responseSchema: OrganizationScalarSchema,
+  searchableFields: ['name', 'slug'],
 });

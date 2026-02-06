@@ -28,11 +28,16 @@
 
 | Type | Convention | Example |
 |------|------------|---------|
-| Route handler | `<model><Action>.ts` | `userCreate.ts`, `organizationReadMany.ts` |
+| Route handler | `<model><Action><Submodel?>`.ts | `userCreate.ts`, `organizationReadManySpaces.ts` |
 | Hook | `<model><Timing><Purpose>.ts` | `userAfterCreate.ts` |
 | Job | `<verb><Noun>.ts` | `sendWebhook.ts`, `processInquiry.ts` |
 | Middleware | `<purpose>Middleware.ts` | `authMiddleware.ts` |
 | Utility | `<verb><Noun>.ts` or `<noun>.ts` | `makeController.ts`, `cache.ts` |
+
+**ReadMany subresources use plural form:**
+- `meReadManyOrganizations.ts` (not `meReadManyOrganization.ts`)
+- `organizationReadManySpaces.ts` (not `organizationReadManySpace.ts`)
+- Single operations remain singular: `organizationCreateSpace.ts`
 
 ### Functions
 
@@ -49,7 +54,9 @@
 |------|------------|---------|
 | ID types | `<Model>Id` | `UserId`, `OrganizationId` |
 | Context values | camelCase | `user`, `organization`, `permix` |
-| Constants | SCREAMING_SNAKE | `DEFAULT_PAGE_SIZE`, `MAX_RETRIES` |
+| Primitive constants | SCREAMING_SNAKE | `DEFAULT_PAGE_SIZE`, `MAX_RETRIES` |
+| Object constants (enums/registries) | PascalCase | `Modules`, `JobType`, `BatchStatus` |
+| Derived helpers (Zod enums, etc) | camelCase | `batchStatusEnum`, `moduleKeys` |
 
 ### Imports
 
@@ -79,6 +86,55 @@ import { getLogScopes } from '@template/shared/logger/scope';  // Use alias, not
 **Why relative only for top-level barrels?** Top-level `index.ts` files are the public API that makes exports accessible outside the package. They just re-export from siblings. Actual code files use aliases for consistency.
 
 **Avoid barrel files otherwise.** Import directly from the source file, not through intermediate barrels. Direct imports are clearer and tree-shake better.
+
+### Constants Pattern: `keyof typeof`
+
+Use `keyof typeof` to derive types from const objects for single source of truth.
+
+```typescript
+// ✅ Good - Type derived from object
+export const BatchStatus = {
+  success: 'success',
+  partialSuccess: 'partialSuccess',
+  failed: 'failed',
+} as const;
+
+export type BatchStatus = keyof typeof BatchStatus;
+// Type: 'success' | 'partialSuccess' | 'failed'
+
+// ❌ Bad - Manual duplication
+type BatchStatus = 'success' | 'partialSuccess' | 'failed';
+const BatchStatus = { success: 'success', ... };
+```
+
+**Benefits:**
+- Add new value in one place
+- Types automatically update
+- Impossible to desync
+- Works with Zod schemas
+
+### Zod Enum from Const Object
+
+Convert const object to Zod enum tuple format:
+
+```typescript
+const BatchStatus = { success: 'success', failed: 'failed' } as const;
+
+// Create Zod enum helper
+export const batchStatusEnum = Object.keys(BatchStatus) as [
+  keyof typeof BatchStatus,
+  ...Array<keyof typeof BatchStatus>
+];
+
+// Use in schema
+const schema = z.object({
+  status: z.enum(batchStatusEnum) // Type-safe, synced with BatchStatus
+});
+```
+
+**Why needed:** Zod's `z.enum()` requires tuple type `[string, ...string[]]`, not plain array.
+
+**Real example:** See `apps/api/src/modules/batch/constants.ts`
 
 ---
 

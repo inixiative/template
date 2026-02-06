@@ -5,10 +5,10 @@ import { OrganizationAction, type Entitlements, type PermissionEntry, type Permi
 import { allTrue, isSuperadmin } from './shared';
 
 export const organizationRoles = {
-  owner: { organization: allTrue(OrganizationAction) },
-  admin: { organization: { read: true, operate: true, manage: true, own: false } },
-  member: { organization: { read: true, operate: true, manage: false, own: false } },
-  viewer: { organization: { read: true, operate: false, manage: false, own: false } },
+  owner: { organization: { own: true} },
+  admin: { organization: { manage: true } },
+  member: { organization: { operate: true} },
+  viewer: { organization: { read: true } },
 } as const;
 
 export function getOrgPermissions(

@@ -1,19 +1,27 @@
 import * as React from 'react';
 import { cn } from '@ui/lib/utils';
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'rounded-lg border bg-card text-card-foreground shadow-sm',
-      className
-    )}
-    {...props}
-  />
-));
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  show?: boolean | (() => boolean);
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, show = true, ...props }, ref) => {
+    const shouldShow = typeof show === 'function' ? show() : show;
+    if (!shouldShow) return null;
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'rounded-lg border bg-card text-card-foreground shadow-sm',
+          className
+        )}
+        {...props}
+      />
+    );
+  }
+);
 Card.displayName = 'Card';
 
 const CardHeader = React.forwardRef<

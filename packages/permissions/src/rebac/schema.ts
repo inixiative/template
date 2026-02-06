@@ -4,6 +4,15 @@ import type { RebacSchema } from './types';
 const highRoles = ['owner', 'admin'];
 
 export const rebacSchema: RebacSchema = {
+  user: {
+    actions: {
+      own: null,
+      manage: 'own',
+      operate: 'manage',
+      read: 'operate',
+    },
+  },
+
   organization: {
     actions: {
       own: null,

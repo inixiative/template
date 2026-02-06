@@ -23,22 +23,28 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "NODE_ENV=development bun run prisma/seed.ts",
+    "db:truncate:webhooks": "bun run prisma/truncateWebhookSubscriptions.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@supercharge/promise-pool": "^3.2.0",
     "@template/shared": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "ioredis": "^5.6.1",
     "ioredis-mock": "^8.9.0",
     "lodash-es": "^4.17.23",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/lodash-es": "^4.17.12",
     "@types/pg": "^8.11.0",
+    "@types/uuid": "^10.0.0",
     "prisma": "^7.2.0",
     "prisma-zod-generator": "^2.0.0",
     "zod": "^3.24.0"

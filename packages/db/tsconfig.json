@@ -5,8 +5,10 @@
     "baseUrl": ".",
     "paths": {
       "@template/db/*": ["./src/*"],
-      "@template/db-test/*": ["./test/*"]
-    }
+      "@template/db-test/*": ["./test/*"],
+      "@template/shared/*": ["../shared/src/*"]
+    },
+    "skipLibCheck": true
   },
   "include": ["src/**/*", "test/**/*", "prisma/**/*"],
   "exclude": ["node_modules", "dist"]

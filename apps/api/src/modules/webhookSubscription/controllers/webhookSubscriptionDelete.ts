@@ -6,8 +6,6 @@ export const webhookSubscriptionDeleteController = makeController(webhookSubscri
   const db = c.get('db');
   const subscription = getResource<'webhookSubscription'>(c);
 
-  // TODO: Add permix permission checks
-
   await db.webhookSubscription.delete({
     where: { id: subscription.id },
   });

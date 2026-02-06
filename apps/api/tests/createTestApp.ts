@@ -4,7 +4,7 @@ import { db, type Db } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
-import type { TokenWithRelations } from '#/lib/context/getToken';
+import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
@@ -30,15 +30,34 @@ export function createTestApp(options?: CreateTestAppOptions) {
 
   app.onError(errorHandlerMiddleware);
 
+  app.use('*', (c, next) => {
+    c.set('app', app);
+    return next();
+  });
+
   app.use('*', prepareRequest);
 
   app.use('*', async (c, next) => {
     if (options?.mockUser) {
       c.set('user', options.mockUser);
-      c.get('permix').setUserId(options.mockUser.id);
+      c.get('permix').setUserId(options.mockUser.id as any);
     }
-    if (options?.mockOrganizationUsers) c.set('organizationUsers', options.mockOrganizationUsers);
-    if (options?.mockSpaceUsers) c.set('spaceUsers', options.mockSpaceUsers);
+    if (options?.mockOrganizationUsers) {
+      c.set('organizationUsers', options.mockOrganizationUsers);
+      const orgIds = options.mockOrganizationUsers.map((ou) => ou.organizationId);
+      const organizations = await db.organization.findMany({
+        where: { id: { in: orgIds } },
+      });
+      c.set('organizations', organizations);
+    }
+    if (options?.mockSpaceUsers) {
+      c.set('spaceUsers', options.mockSpaceUsers);
+      const spaceIds = options.mockSpaceUsers.map((su) => su.spaceId);
+      const spaces = await db.space.findMany({
+        where: { id: { in: spaceIds } },
+      });
+      c.set('spaces', spaces);
+    }
     if (options?.mockToken) c.set('token', options.mockToken);
     await setupOrgPermissions(c);
     await setupSpacePermissions(c);

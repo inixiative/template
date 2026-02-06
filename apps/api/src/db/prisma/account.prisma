@@ -1,0 +1,30 @@
+model Account {
+  @@map("accounts")
+  
+  id                    String      @id @default(uuid())
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  
+  @@index([userId])
+}
+
+enum AccountProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+  DISCORD
+  APPLE
+}

@@ -1,7 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { isTest } from '@template/shared/utils';
 import { auth } from '#/lib/auth';
-import { corsMiddleware } from '#/middleware/cors';
+import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { testRouter } from '#/modules/test';
 import type { AppEnv } from '#/types/appEnv';
 

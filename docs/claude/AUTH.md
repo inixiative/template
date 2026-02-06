@@ -118,18 +118,20 @@ Located in `apps/api/src/middleware/auth/tokenAuth.ts`. API key authentication.
 
 1. Extract token from `Authorization: Bearer <token>` header OR `?token=<token>` URL param
 2. Hash token with SHA-256
-3. Look up token by hash (cached in Redis)
+3. Look up token by hash (cached in Redis with 10-minute TTL)
 4. Validate: `isActive`, not expired
 5. Set context based on token type
 
 URL token is useful for WebSocket connections, email links, file downloads (where headers can't be set).
+
+**Security:** Token lookups are cached for 10 minutes. Revoked tokens (isActive = false) are re-validated every 10 minutes to prevent indefinite caching of compromised tokens.
 
 ### tokenAuthMiddleware
 
 ```typescript
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   // Skip if already authenticated via session
-  if (getUser(c)) return next();
+  if (c.get('user')) return next();
 
   const authorization = c.req.header('authorization');
   if (!authorization?.startsWith('Bearer ')) return next();
@@ -137,9 +139,9 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const apiKey = authorization.slice(7);
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-  // Cached lookup (uses cacheKey helper for consistent key format)
+  // Cached lookup with 10-minute TTL (balances performance with security)
   const token = await cache<TokenWithRelations | null>(
-    cacheKey('Token', keyHash, 'keyHash'),
+    cacheKey('Token', { keyHash }),
     () => db.token.findUnique({
       where: {
         keyHash,
@@ -150,8 +152,11 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         user: true,
         organization: true,
         organizationUser: { include: { user: true, organization: true } },
+        space: true,
+        spaceUser: { include: { user: true, organization: true, organizationUser: true, space: true } },
       },
     }),
+    60 * 10, // 10-minute TTL to ensure revoked tokens are re-checked
   );
 
   if (!token) return next();
@@ -164,14 +169,30 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   // Set up context based on token type
   if (token.ownerModel === 'User' && token.user) {
     // User token → load user with all org memberships
-    const userWithOrgs = await findUserWithOrganizationUsers(db, token.user.id);
+    const userWithOrgs = await findUserWithRelations(db, token.user.id);
     if (userWithOrgs) await setUserContext(c, userWithOrgs);
   } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
     // OrgUser token → use token data directly (scoped to single org)
-    const { user, organization: _, ...orgUserFields } = token.organizationUser;
-    await setUserContext(c, { ...user, organizationUsers: [orgUserFields] });
+    const { user, organization, ...orgUserFields } = token.organizationUser;
+    await setUserContext(c, {
+      ...user,
+      organizationUsers: [orgUserFields],
+      organizations: organization ? [organization] : [],
+      spaceUsers: [],
+      spaces: [],
+    });
+  } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
+    // SpaceUser token → scoped to single space
+    const { user, organization, organizationUser, space, ...spaceUserFields } = token.spaceUser;
+    await setUserContext(c, {
+      ...user,
+      organizationUsers: organizationUser ? [organizationUser] : [],
+      organizations: organization ? [organization] : [],
+      spaceUsers: [spaceUserFields],
+      spaces: space ? [space] : [],
+    });
   } else {
-    // Org token → just set up org permissions (no user)
+    // Org/Space token → just set up permissions (no user)
     await setupOrgPermissions(c);
   }
 
@@ -338,7 +359,7 @@ Located in `apps/api/src/middleware/auth/spoofMiddleware.ts`. Allows superadmins
 
 ```typescript
 export async function spoofMiddleware(c: Context<AppEnv>, next: Next) {
-  const user = getUser(c);
+  const user = c.get('user');
   if (!user || !isSuperadmin(c)) return next();
 
   const rawEmail = c.req.header('spoof-user-email');
@@ -392,13 +413,19 @@ router.get('/me', validateUser, handler);  // 401 if no user
 
 ### validateActor
 
-Requires any actor (user OR org token):
+Requires any actor (user OR org/space token):
 
 ```typescript
 import { validateActor } from '#/middleware/validations/validateActor';
 
 router.get('/resource', validateActor, handler);  // 401 if no user from getActor()
 ```
+
+**Difference from validateUser:**
+- `validateUser` requires `c.get('user')` to be set (session or user token only)
+- `validateActor` requires `getActor(c).user` to be set (works with org/space tokens that have user relations)
+
+Use `validateActor` for endpoints that should work with both session and token auth, including org/space tokens.
 
 ### validateNotToken
 
@@ -418,4 +445,66 @@ Requires superadmin:
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 
 router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadmin
+```
+
+---
+
+## Choosing Between validateUser and validateActor
+
+Use this decision tree:
+
+```
+Does the endpoint need to work with org/space tokens (no user context)?
+├─ YES → Use validateActor
+│   ├─ Examples: Batch API, org-level operations
+│   └─ Checks: getActor(c).user is set (works with delegated tokens)
+└─ NO → Use validateUser
+    ├─ Examples: /me endpoints, user-specific operations
+    └─ Checks: c.get('user') is set (requires JWT or user token)
+```
+
+### validateUser - Requires User Context
+
+Requires `c.get('user')` to be set:
+
+**Works with:**
+- ✅ JWT auth (authMiddleware via BetterAuth)
+- ✅ User tokens (`token.ownerModel === 'User'`)
+- ✅ OrganizationUser tokens (`token.ownerModel === 'OrganizationUser'`)
+- ✅ SpaceUser tokens (`token.ownerModel === 'SpaceUser'`)
+
+**Does NOT work with:**
+- ❌ Organization tokens (`token.ownerModel === 'Organization'`)
+- ❌ Space tokens (`token.ownerModel === 'Space'`)
+
+### validateActor - More Permissive
+
+Requires `getActor(c).user` to be set:
+
+**Works with:**
+- ✅ All of the above validateUser cases
+- ✅ Organization tokens with organizationUser relation
+- ✅ Space tokens with spaceUser relation
+
+More permissive - works with all token types that have user relations.
+
+### When to Use Each
+
+| Endpoint Type | Middleware | Reason |
+|--------------|------------|---------|
+| `/me/*` | `validateUser` | Always requires actual user context |
+| `/organization/:id/users` | `validateActor` | Org tokens need to list org users |
+| `/organization/:id/spaces` | `validateActor` | Org tokens need to access org resources |
+| `/batch` | `validateActor` | Should work with all token types |
+| User profile update | `validateUser` | Modifying user requires user session |
+| `/me/tokens` (create) | `validateUser` | Token creation requires user |
+
+### Example
+
+```typescript
+// ❌ Wrong - org tokens can't access org resources
+router.get('/organization/:id/users', validateUser, handler);
+
+// ✅ Correct - org tokens can access org resources
+router.get('/organization/:id/users', validateActor, handler);
 ```

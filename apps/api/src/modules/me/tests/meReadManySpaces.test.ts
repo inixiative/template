@@ -4,11 +4,11 @@ import type { User } from '@template/db/generated/client/client';
 import { SpaceRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createSpaceUser, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManySpaceRoute } from '#/modules/me/routes/meReadManySpace';
+import { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
-type ReadManySpacesResponse = z.infer<typeof meReadManySpaceRoute.responseSchema>[];
+type ReadManySpacesResponse = z.infer<typeof meReadManySpacesRoute.responseSchema>[];
 
 describe('GET /me/spaces', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

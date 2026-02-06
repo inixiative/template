@@ -92,9 +92,164 @@ bun run db:deploy     # Run pending migrations
 ### Database Operations
 
 ```bash
-bun run db:dump       # Export database to file
-bun run db:restore    # Import from file
-bun run db:clone      # Clone remote DB to local
+bun run db:dump                 # Export database to file
+bun run db:restore              # Import from file
+bun run db:clone                # Clone remote DB to local (auto-truncates webhooks)
+bun run db:truncate:webhooks    # Clear webhook subscriptions (local/test only)
+```
+
+**Note:** `db:clone` automatically truncates webhook subscriptions after restore to prevent production webhooks from firing in local environment.
+
+---
+
+## Seeding
+
+### Prime Development Data
+
+The template includes a **prime seed** - foundational development data with pre-configured users, org, space, and tokens.
+
+**Usage:**
+
+```bash
+# Seed without prime data (production-safe data only)
+bun run db:seed
+
+# Include prime development data
+bun run db:seed --prime
+
+# Seed specific table
+bun run db:seed --prime user
+```
+
+**Prime includes:**
+- 3 Users with hashed passwords (password: `asd123!`)
+  - `super@inixiative.com` - Platform superadmin
+  - `owner@inixiative.com` - Org/space owner
+  - `customer@inixiative.com` - Org/space member
+- 1 Organization (Acme Corporation)
+- 1 Space (Main Space)
+- 3 API Tokens:
+  - `local_user_owner_personal` - Personal token (User scope)
+  - `local_orgUser_acme_main` - Organization token (Org scope)
+  - `local_spaceUser_acme_main` - Space token (Space scope)
+
+**Production behavior:**
+- Prime data automatically skipped in `NODE_ENV=production`
+- `bun run db:seed` automatically sets `NODE_ENV=development` for local use
+- Only production-safe seed data is applied in production
+
+### Seed Architecture
+
+**Location:** `packages/db/prisma/seeds/`
+
+```typescript
+// Each seed file exports a SeedFile
+export const userSeeds: SeedFile = {
+  model: 'user',                                    // Prisma model name
+  updateOmitFields: ['createdAt'],                  // Don't overwrite these on update
+  createOnly: false,                                // Optional: only create, never update
+  records: [
+    {
+      id: '01936d42-8c4a-7000-8000-000000000001',  // Required: valid UUIDv7 for upsert
+      email: 'user@example.com',
+      prime: true,                                  // Prime flag: only seed with --prime
+      // ... other fields
+    },
+  ],
+};
+```
+
+**Features:**
+- **ID-based upsert** - Always upserts by `id` field (create or update)
+- **Concurrent processing** - Uses `resolveAll` with concurrency: 10
+- **UUIDv7 validation** - Validates all IDs are valid UUIDv7 format
+- **UUID uniqueness check** - Ensures no duplicate IDs across all seed files
+- **FK-safe ordering** - Tables seeded sequentially, records concurrently
+- **Prime flag** - Mark records as prime (dev-only, requires `--prime`)
+
+### Adding Seed Data
+
+1. **Create seed file** in `packages/db/prisma/seeds/`
+2. **Define records** with unique UUIDv7 `id` fields
+3. **Add to index** in correct FK order
+4. **Mark prime data** with `prime: true`
+
+**Important:** All `id` fields must be valid UUIDv7 format. The seed script validates version 7 specifically to ensure time-sortability and consistency.
+
+**Example:**
+
+```typescript
+// packages/db/prisma/seeds/product.seed.ts
+import type { SeedFile } from '../seed';
+
+export const productSeeds: SeedFile = {
+  model: 'product',
+  updateOmitFields: ['createdAt'],
+  records: [
+    {
+      id: '01936d42-8c4a-7000-8000-000000000101',
+      name: 'Widget',
+      price: 9.99,
+      // No prime flag = always seed (production-safe)
+    },
+    {
+      id: '01936d42-8c4a-7000-8000-000000000102',
+      name: 'Test Product',
+      price: 0.01,
+      prime: true,  // Only seed with --prime flag
+    },
+  ],
+};
+
+// packages/db/prisma/seeds/index.ts
+import { productSeeds } from './product.seed';
+
+const seeds = [
+  // ... other seeds
+  productSeeds,  // Add in FK-safe order
+];
+```
+
+### Seed Order (FK Constraints)
+
+Seeds run **sequentially by table** (respects FK constraints), **concurrently by record** (performance):
+
+```typescript
+const seeds = [
+  userSeeds,              // 1. Users (no dependencies)
+  accountSeeds,           // 2. Accounts + passwords (→ users)
+  organizationSeeds,      // 3. Organizations (no dependencies)
+  organizationUserSeeds,  // 4. Org memberships (→ users, orgs)
+  spaceSeeds,             // 5. Spaces (→ orgs)
+  spaceUserSeeds,         // 6. Space memberships (→ users, spaces)
+  tokenSeeds,             // 7. Tokens (→ users, orgs, spaces)
+];
+```
+
+### Password Seeding
+
+Prime users include pre-hashed passwords (bcrypt):
+
+```typescript
+// packages/db/prisma/seeds/account.seed.ts
+import { hashSync } from 'bcryptjs';
+
+const HASHED_PASSWORD = hashSync('asd123!', 10);
+
+export const accountSeeds: SeedFile = {
+  model: 'account',
+  updateOmitFields: ['createdAt'],
+  records: [
+    {
+      id: '01936d42-8c4a-7000-8000-000000000011',
+      userId: '01936d42-8c4a-7000-8000-000000000001',
+      accountId: 'user@example.com',
+      providerId: 'credential',
+      password: HASHED_PASSWORD,
+      prime: true,
+    },
+  ],
+};
 ```
 
 ---
@@ -339,6 +494,103 @@ db.onCommit(async () => {
   // Runs after transaction commits
   await sendEmail();
 });
+```
+
+---
+
+## Query Building Utilities
+
+Located in `apps/api/src/lib/prisma/`.
+
+### buildWhereClause
+
+Constructs Prisma `where` clauses with search support:
+
+```typescript
+import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+
+const where = buildWhereClause({
+  search: 'john',                        // Simple search string
+  searchFields: { email: 'example.com' }, // Field-specific search
+  searchableFields: ['name', 'email', 'user.email'],
+  filters: { deletedAt: null },          // Additional filters
+});
+
+const users = await db.user.findMany({ where });
+```
+
+**What it does:**
+1. Applies `search` across all `searchableFields` (case-insensitive `contains`, OR logic)
+2. Applies `searchFields` to individual fields (case-insensitive `contains`, AND logic with search)
+3. Merges with `filters` object
+4. Returns combined `where` clause
+
+**Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
+
+**Example output:**
+```typescript
+buildWhereClause({
+  search: 'test',
+  searchableFields: ['name', 'email'],
+  filters: { deletedAt: null }
+});
+// Returns:
+// {
+//   AND: [
+//     { deletedAt: null },
+//     { OR: [
+//       { name: { contains: 'test', mode: 'insensitive' } },
+//       { email: { contains: 'test', mode: 'insensitive' } }
+//     ]}
+//   ]
+// }
+```
+
+### Path Notation Utilities
+
+Support for dot-notation field access in queries:
+
+```typescript
+import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+
+// Build nested query structure
+buildNestedPath('user.email', { contains: 'example.com' });
+// Returns: { user: { email: { contains: 'example.com' } } }
+
+buildNestedPath('organization.user.email', { contains: 'test' });
+// Returns: { organization: { user: { email: { contains: 'test' } } } }
+
+// Validate path safety
+validatePathNotation('user.email');        // true
+validatePathNotation('user..email');       // false (double dots)
+validatePathNotation('user;email');        // false (invalid chars)
+validatePathNotation('a.b.c.d.e.f');       // false (exceeds max depth of 5)
+validatePathNotation('_private.field');    // false (starts with underscore)
+```
+
+**Use cases:**
+- Dynamic orderBy from query params
+- Dynamic search fields from user input
+- Nested filtering without SQL injection risk
+
+**Security limits:**
+- Max depth: 5 levels (configurable via `MAX_PATH_DEPTH`)
+- Allowed chars: `a-zA-Z0-9.` only
+- No consecutive dots
+- No leading/trailing dots
+- No underscore prefixes (prevents access to internal fields)
+
+**Integration with buildWhereClause:**
+```typescript
+// Safe nested field search
+const where = buildWhereClause({
+  searchFields: {
+    'user.email': 'example.com',
+    'organization.name': 'acme'
+  },
+  searchableFields: ['name', 'user.email', 'organization.name']
+});
+// Automatically uses buildNestedPath internally
 ```
 
 ---

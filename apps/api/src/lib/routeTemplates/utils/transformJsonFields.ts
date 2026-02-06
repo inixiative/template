@@ -10,7 +10,11 @@ const InputJsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
     z.record(z.string(), z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
     z.array(z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
   ]),
-);
+).openapi({
+  type: 'object',
+  description: 'JSON value (string, number, boolean, object, or array)',
+  example: { key: 'value' },
+});
 
 /**
  * Transforms z.unknown() fields to InputJsonValueSchema for Prisma JSON compatibility.

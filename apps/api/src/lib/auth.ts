@@ -4,7 +4,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
 import { getRedisClient, redisNamespace } from '@template/db';
-import { getAllowedOrigins } from '#/middleware/cors';
+import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
   database: prismaAdapter(db, {

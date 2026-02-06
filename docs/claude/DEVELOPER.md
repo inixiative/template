@@ -29,12 +29,28 @@ bun run local:worker  # Background jobs
 ### Database
 
 ```bash
-bun run db:studio     # Prisma Studio
-bun run db:generate   # Generate client
-bun run db:push       # Push schema
-bun run db:migrate    # Create migration
-bun run reset:db      # Reset and reseed
+bun run db:studio            # Prisma Studio
+bun run db:generate          # Generate client
+bun run db:push              # Push schema
+bun run db:migrate           # Create migration
+bun run db:seed              # Seed production-safe data
+bun run db:seed --prime      # Include prime dev data (3 users, org, space, tokens)
+bun run db:clone [env]       # Clone remote DB to local (default: prod)
+bun run db:truncate:webhooks # Clear webhook subscriptions (local/test only)
+bun run reset:db             # Reset and reseed with prime
 ```
+
+**Prime Development Data:**
+- **Users** (password: `asd123!`):
+  - `super@inixiative.com` - Platform superadmin
+  - `owner@inixiative.com` - Org/space owner
+  - `customer@inixiative.com` - Org/space member
+- **API Tokens:**
+  - `local_user_owner_personal` - Personal
+  - `local_orgUser_acme_main` - Organization
+  - `local_spaceUser_acme_main` - Space
+
+See [DATABASE.md](DATABASE.md#seeding) for full seed documentation.
 
 ### Code Quality
 

@@ -1,11 +1,12 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuth';
-import { corsMiddleware } from '#/middleware/cors';
+import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
+import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import type { AppEnv } from '#/types/appEnv';
 
+import { batchRouter } from '#/modules/batch';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -29,6 +30,7 @@ apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.route('/admin', adminRouter);
 
 // v1 Routes
+apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);

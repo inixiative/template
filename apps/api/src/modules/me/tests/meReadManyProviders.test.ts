@@ -3,11 +3,11 @@ import type { z } from '@hono/zod-openapi';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createCustomerRef, createOrganizationUser, createSpace, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManyProviderRoute } from '#/modules/me/routes/meReadManyProvider';
+import { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
-type ReadManyProvidersResponse = z.infer<typeof meReadManyProviderRoute.responseSchema>[];
+type ReadManyProvidersResponse = z.infer<typeof meReadManyProvidersRoute.responseSchema>[];
 
 describe('GET /me/providers', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

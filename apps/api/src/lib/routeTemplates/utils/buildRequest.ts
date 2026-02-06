@@ -2,6 +2,7 @@ import type { Prisma } from '@template/db';
 import { z } from '@hono/zod-openapi';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
+import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
 
@@ -72,14 +73,23 @@ type RequestWithoutBody<T extends RouteArgs> = {
 export function buildRequest<const T extends RouteArgs>(
   args: T,
 ): T['bodySchema'] extends ZodSchema ? RequestWithBody<T> : RequestWithoutBody<T> {
-  const { params, query, bodySchema, sanitizeKeys = [], skipId = false, paginate = false, many = false } = args;
+  const { params, query, bodySchema, sanitizeKeys = [], skipId = false, paginate = false, many = false, searchableFields } = args;
 
   // Need ID when: not skipId AND (has submodel OR not many)
   // With submodel + many: getting all submodels for a parent, so need parent ID
   const needsId = !skipId && (args.submodel || !many);
   const paramsSchema = params ?? (needsId ? idParamsSchema : z.object({}));
-  const baseQuerySchema = query ?? z.object({});
-  const querySchema = many && paginate ? baseQuerySchema.merge(paginateRequestSchema) : baseQuerySchema;
+
+  let querySchema = query ?? z.object({});
+  if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
+  if (searchableFields?.length) {
+    const searchSchema = z.object({
+      search: simpleSearchSchema,
+      searchFields: createAdvancedSearchSchema(searchableFields),
+    });
+    querySchema = querySchema.merge(searchSchema);
+  }
+
   const sanitizedBodySchema = bodySchema ? sanitizeRequestSchema(bodySchema, sanitizeKeys) : undefined;
   const finalBodySchema = sanitizedBodySchema ? (many ? z.array(sanitizedBodySchema) : sanitizedBodySchema) : undefined;
 

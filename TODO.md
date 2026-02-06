@@ -68,9 +68,69 @@ Implementation:
 
 ### Features
 
+- [ ] Feature flags system
+  - [ ] Backend: Feature flag model with polymorphic ownership
+    - Uses `ownerModel` pattern: 'Platform' | 'Organization' | 'Space'
+    - Polymorphic fields: `organizationId`, `spaceId` (set based on ownerModel)
+    - Evaluation hierarchy: Space → Organization → Platform (most specific wins)
+    - JSON rule targeting (evaluate rules against context)
+    - Manual segmentation (allowlist/blocklist of IDs)
+    - Rollout percentage (gradual rollouts)
+    - Permissions: Platform (superadmin) | Organization (org admin) | Space (space admin)
+  - [ ] Backend: Feature flag API endpoints (CRUD + evaluation)
+  - [ ] Backend: Redis caching for flag evaluation
+    - Cache evaluated flags per context (user+org+space)
+    - Invalidate on flag changes
+    - TTL for gradual rollout consistency
+  - [ ] Frontend: Feature flag context/hooks (`useFeatureFlag`, `isEnabled`)
+  - [ ] Frontend: Real-time updates via WebSocket
+    - Subscribe to flag changes on mount
+    - Update flag state when flags change (no page refresh needed)
+    - Broadcast flag changes from admin UI to all connected clients
+  - [ ] Admin UI: Feature flag management with rule builder
+    - Org admins manage organization-scoped flags
+    - Space admins manage space-scoped flags
+    - A/B testing and pilot group templates
+  - [ ] Superadmin UI: Platform-wide feature flags + analytics
+  - [ ] Integration with conditional component props
+  - [ ] Flag change webhooks/events (external systems)
 - [ ] Wire up WebSocket event handlers
 - [ ] Optional modules system (opt-in features)
 - [ ] I18n package
+- [ ] Mermaid diagram support in markdown
+
+### Frontend
+
+- [ ] Component library
+  - [ ] Test coverage for conditional props (`show`, `disabled`, `disabledText`)
+  - [ ] Storybook or similar component documentation
+  - [ ] Additional UI primitives (Badge, Tabs, Select, Checkbox, Radio, Switch, Slider, etc.)
+  - [ ] Form components (FormField, FormError, FormLabel with validation)
+  - [ ] Responsive Drawer component - should become Dialog on small screens
+- [ ] Admin app UI
+  - [ ] Organization management pages
+  - [ ] Space management pages
+  - [ ] User management pages
+  - [ ] Analytics/metrics dashboards
+  - [ ] Feature flag management UI
+- [ ] Superadmin app UI
+  - [ ] Platform overview dashboard
+  - [ ] All organizations view
+  - [ ] System metrics and health
+  - [ ] Platform-wide feature flags
+  - [ ] Support/inquiry queue
+- [ ] White-label/theming
+  - [ ] Per-space theme configuration (colors, logo, fonts)
+  - [ ] Theme preview in admin
+  - [ ] CSS variables for dynamic theming
+  - [ ] Custom domain mapping
+- [ ] E2E testing
+  - [ ] Playwright setup (`tests/e2e/`)
+  - [ ] Critical user flows (signup, login, org creation, context switching)
+  - [ ] Permission-gated UI tests
+- [ ] State management
+  - [ ] Query params for FE state (pagination, filters, search)
+  - [ ] URL state sync for shareable links
 
 ### Database
 
@@ -78,23 +138,201 @@ Implementation:
 
 ### Developer Experience
 
+- [x] Password seeding script for test users (hash "asd123!" and insert into Account table)
 - [ ] Init script for new forks (`bun run init`) - should configure Doppler
 - [ ] Localtunnel helper for webhook testing (ref: Carde)
-- [ ] Build out admin/superadmin app UIs
-- [ ] Add Playwright for E2E testing (`tests/e2e/`)
 - [ ] Add Artillery for load testing (`tests/load/`)
+- [ ] Turborepo (with Bun) - skip unchanged tests
+- [ ] Default orderBy in paginate utility
+- [ ] Pen testing setup (consider Autonoma)
+
+### Infrastructure
+
+- [ ] Auto-generated admin UI (Django Admin style)
+  - Schema → generated CRUD UI
+  - Based on Prisma model definitions
+  - Auto forms, lists, filters, search
+
+### Modules to Port
+
+- [ ] Inquiry system - needs polymorphism refactor
+- [ ] Notes system
+- [ ] Properly implement remaining inquiry features
+
+---
+
+## Notes
+
+### Auth Documentation
+- Both BetterAuth strategies use JWT tokens
+- "Session" auth = JWT in httpOnly cookies
+- "Token" auth = JWT in Authorization header
+- Update docs to clarify this
+
+### Optimistic Updates
+- ✅ Already implemented in `@template/shared`
+- Pattern: Update cache before API call, rollback on error
+- Used with TanStack Query invalidation
+
+### Feature Flag Design Concept
+
+```typescript
+// Schema - uses polymorphic ownership pattern
+model FeatureFlag {
+  id              String    @id @default(dbgenerated("uuidv7()"))
+  key             String    // 'beta-analytics'
+  name            String
+  enabled         Boolean   @default(false)
+
+  // Polymorphic ownership (determines who manages + where it applies)
+  ownerModel      String    // 'Platform' | 'Organization' | 'Space'
+  userId          String?   // Not used for flags (reserved)
+  organizationId  String?   // Set if ownerModel='Organization'
+  spaceId         String?   // Set if ownerModel='Space'
+
+  // Targeting strategies (all must pass if defined)
+  rules       Json?    // JSON Rules Engine expression
+  allowlist   Json?    // { orgIds: [], spaceIds: [], userIds: [] }
+  blocklist   Json?    // Same structure
+  rollout     Int?     // 0-100 percentage
+
+  // Metadata
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key, ownerModel, organizationId, spaceId])
+  @@index([organizationId])
+  @@index([spaceId])
+}
+
+// ==========================================
+// Backend: Redis Caching Strategy
+// ==========================================
+
+// Cache key pattern: flag:{ownerModel}:{ownerId}:{key} -> evaluated result
+// Examples:
+//   flag:Platform:null:beta-analytics -> true/false
+//   flag:Organization:org_123:new-dashboard -> true/false
+//   flag:Space:space_456:new-leaderboard -> true/false
+
+// On flag evaluation (checks hierarchy: Space -> Org -> Platform):
+async function isEnabled(key: string, context: Context): Promise<boolean> {
+  const cacheKey = buildCacheKey(key, context);
+
+  // Check Redis first
+  const cached = await redis.get(cacheKey);
+  if (cached !== null) return cached === 'true';
+
+  // Evaluate flag hierarchy (most specific first)
+  let flag: FeatureFlag | null = null;
+
+  // 1. Check space-scoped flag
+  if (context.spaceId) {
+    flag = await db.featureFlag.findUnique({
+      where: {
+        key_ownerModel_organizationId_spaceId: {
+          key,
+          ownerModel: 'Space',
+          organizationId: null,
+          spaceId: context.spaceId,
+        }
+      }
+    });
+  }
+
+  // 2. Check org-scoped flag
+  if (!flag && context.organizationId) {
+    flag = await db.featureFlag.findUnique({
+      where: {
+        key_ownerModel_organizationId_spaceId: {
+          key,
+          ownerModel: 'Organization',
+          organizationId: context.organizationId,
+          spaceId: null,
+        }
+      }
+    });
+  }
+
+  // 3. Check platform-scoped flag
+  if (!flag) {
+    flag = await db.featureFlag.findUnique({
+      where: {
+        key_ownerModel_organizationId_spaceId: {
+          key,
+          ownerModel: 'Platform',
+          organizationId: null,
+          spaceId: null,
+        }
+      }
+    });
+  }
+
+  if (!flag) return false;
+
+  // Evaluate targeting rules
+  const result = evaluateFlagTargeting(flag, context);
+
+  // Cache result (TTL based on rollout % for consistency)
+  const ttl = flag.rollout ? 300 : 3600; // 5min if rollout, 1hr if static
+  await redis.setex(cacheKey, ttl, result.toString());
+
+  return result;
+}
+
+// On flag change (create/update/delete):
+async function onFlagChange(flag: FeatureFlag) {
+  // Invalidate all cached evaluations for this flag
+  await redis.del(`flag:*:*:${flag.key}`);
+
+  // Broadcast to frontend via WebSocket
+  io.emit('feature-flag:changed', {
+    key: flag.key,
+    ownerModel: flag.ownerModel,
+    organizationId: flag.organizationId,
+    spaceId: flag.spaceId,
+  });
+}
+
+// ==========================================
+// Frontend: Real-time Updates via WebSocket
+// ==========================================
+
+// 1. Initial load: Fetch flags from API
+const { data: flags } = useQuery({
+  queryKey: ['feature-flags', context],
+  queryFn: () => api.getFeatureFlags({ organizationId, spaceId }),
+});
+
+// 2. Subscribe to real-time updates
+useEffect(() => {
+  socket.on('feature-flag:changed', (event) => {
+    // Refetch flags for this context
+    if (matchesContext(event, context)) {
+      queryClient.invalidateQueries(['feature-flags']);
+
+      // Optional: Show toast notification
+      toast.info(`Feature "${event.key}" has been updated`);
+    }
+  });
+
+  return () => socket.off('feature-flag:changed');
+}, [context]);
+
+// 3. Usage in components (reactively updates on flag change)
+<Button show={() => featureFlags.isEnabled('beta-analytics')}>
+  View Beta Analytics
+</Button>
+
+// When admin toggles flag in UI:
+// 1. API updates DB
+// 2. API invalidates Redis cache
+// 3. API broadcasts WebSocket event
+// 4. All connected clients refetch flags
+// 5. Components re-render with new flag values (no page refresh!)
+```
 
 
-
-NOTES w/ Hernan
-audit/activity logs
-mermaid for markdown
-pen test? - autonoma
-lets set default orderby in paginate
-both auths are token (JWT) -docs (session is cookies?)
-look into turbo repo (w/ bun) to skip unchanged tests
-optimisitic updates in tanstack query
-- when you change data, change the cache of the data before the real trigger/invalidate
-- 
-DionyzRex was referencing Django Admin - Django's automatic admin interface that generates CRUD UI directly from your model definitions. You define a Python model class, and
-Django automatically creates forms, lists, filters, and search based on field types. It's the same concept: schema → generated UI.
+consider adding a permissions builder to the front end
