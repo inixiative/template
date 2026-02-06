@@ -21,7 +21,7 @@ export * from './components/layout/Header';
 export * from './components/layout/UserMenu';
 export * from './components/layout/MasterDetailLayout';
 export * from './components/layout/DetailPanel';
-export * from './components/layout/DrawerOverlay';
+export * from './components/layout/ResponsiveDrawer';
 export * from './components/layout/Modal';
 export * from './components/layout/AppShell';
 
@@ -30,6 +30,9 @@ export * from './components/auth/LoginForm';
 export * from './components/auth/SignupForm';
 export * from './components/auth/SocialAuthButton';
 export * from './components/auth/AuthDivider';
+
+// Hooks
+export * from './hooks/useMediaQuery';
 
 // Utils
 export * from './lib/utils';

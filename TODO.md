@@ -106,7 +106,7 @@ Implementation:
   - [ ] Storybook or similar component documentation
   - [ ] Additional UI primitives (Badge, Tabs, Select, Checkbox, Radio, Switch, Slider, etc.)
   - [ ] Form components (FormField, FormError, FormLabel with validation)
-  - [ ] Responsive Drawer component - should become Dialog on small screens
+  - [x] Responsive Drawer component - should become Dialog on small screens
 - [ ] Admin app UI
   - [ ] Organization management pages
   - [ ] Space management pages

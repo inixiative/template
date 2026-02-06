@@ -1172,11 +1172,34 @@ const columns = [
 
 **Additional layout components in `/packages/ui/src/components/layout/`:**
 
+- **ResponsiveDrawer** - Drawer (desktop) / Modal (mobile) - **Recommended for detail views**
 - **Modal** - Base modal with overlay
 - **DetailPanel** - Slide-out detail panel
-- **DrawerOverlay** - Mobile drawer overlay
 - **Header** - Page header with breadcrumbs
 - **MasterDetailLayout** - Split-view layout for list/detail
+
+**Example: ResponsiveDrawer (Recommended)**
+
+```typescript
+// Automatically switches between drawer (desktop) and modal (mobile)
+<ResponsiveDrawer
+  open={isOpen}
+  onClose={onClose}
+  title="User Details"
+  breakpoint="md" // Default: switches at 768px
+>
+  <div className="space-y-4">
+    <div>
+      <h3 className="font-semibold">Name</h3>
+      <p>{user.name}</p>
+    </div>
+    <div>
+      <h3 className="font-semibold">Email</h3>
+      <p>{user.email}</p>
+    </div>
+  </div>
+</ResponsiveDrawer>
+```
 
 **Example: Modal**
 
@@ -1191,6 +1214,13 @@ const columns = [
   </form>
 </Modal>
 ```
+
+**When to Use:**
+
+| Component | Desktop | Mobile | Best For |
+|-----------|---------|--------|----------|
+| **ResponsiveDrawer** | Side drawer | Modal | Detail views, user profiles, settings panels |
+| **Modal** | Centered modal | Centered modal | Forms, confirmations, focused actions |
 
 ---
 
