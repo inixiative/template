@@ -49,7 +49,7 @@ export const executeRequest = async (
   };
 
   if (!response.ok) {
-    result.error = responseBody.message || 'Request failed';
+    result.error = (responseBody as { message?: string })?.message || 'Request failed';
   }
 
   return result;

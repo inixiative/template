@@ -86,7 +86,7 @@ export const transactionPerRound: StrategyExecutor = async (
         successfulRequests,
         failedRequests,
         strategy: 'transactionPerRound',
-        status: status as const,
+        status,
       },
     };
   }

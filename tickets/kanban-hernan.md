@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Todo
+    BRAND-001-fundraising-marketing-materials
     OTEL-001-observability-infrastructure
   In Progress
   Review
@@ -17,6 +18,7 @@ kanban
 ## Tickets
 
 ### 🆕 Todo
+- [BRAND-001: Fundraising & Marketing Materials](./BRAND-001-fundraising-marketing-materials.md) ⭐ - Pitch deck, social media, brand identity, technical marketing
 - [OTEL-001: Observability Infrastructure](./OTEL-001-observability-infrastructure.md) - Implement OTEL instrumentation, OpenPanel, and superadmin observability dashboard
 
 ### 🚧 In Progress
@@ -32,7 +34,7 @@ _No completed tickets yet_
 
 ## Quick Stats
 
-- **Total Tickets**: 1
+- **Total Tickets**: 2
 - **In Progress**: 0
 - **Blocked**: 0
 - **Completed This Week**: 0

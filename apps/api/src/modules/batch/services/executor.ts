@@ -23,13 +23,13 @@ const calculateTimeout = (totalRequests: number): number => {
 };
 
 export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => {
-  const { requests: rounds, strategy, headers: sharedHeaders = {} } = c.req.valid('json');
-  const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
+  const { requests: rounds, strategy, headers: sharedHeaders = {} } = (c.req as unknown as { valid: (key: string) => unknown }).valid('json') as { requests: BatchRequest[][]; strategy: string; headers?: Record<string, string> };
+  const totalRequests = rounds.reduce((sum: number, round: BatchRequest[]) => sum + round.length, 0);
   const timeout = calculateTimeout(totalRequests);
 
   const app = c.get('app');
   const baseRequest = c.req.raw;
 
-  const executor = batchExecutionStrategies[strategy];
+  const executor = batchExecutionStrategies[strategy as keyof typeof batchExecutionStrategies];
   return await executor(app, rounds, sharedHeaders, baseRequest, c, timeout);
 };

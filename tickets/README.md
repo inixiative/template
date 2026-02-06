@@ -38,6 +38,9 @@ Examples:
 - **API** - API endpoints, routes
 - **FE** - Frontend, UI, UX
 - **INFRA** - Infrastructure, deployment, CI/CD
+- **COMM** - Communications, email, notifications
+- **BRAND** - Marketing, branding, fundraising
+- **FIN** - Financial systems, payments
 - **DOC** - Documentation
 - **BUG** - Bug fixes
 - **FEAT** - New features

@@ -28,14 +28,14 @@ export const paginate = async <T extends AnyDelegate, A extends Args<T, 'findMan
   options?: {
     searchableFields?: string[];
     where?: Record<string, any>;
-    include?: A extends { include: infer I } ? I : never;
-    omit?: A extends { omit: infer O } ? O : never;
+    include?: Record<string, unknown>;
+    omit?: Record<string, unknown>;
   },
 ): Promise<PaginatedResult<Result<T, A, 'findMany'>[number]>> => {
-  const query = c.req.valid('query');
+  const query = (c.req as unknown as { valid: (key: string) => unknown }).valid('query') as Record<string, any>;
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
 
-  const bracketQuery = c.get('bracketQuery') ?? {};
+  const bracketQuery = (c.get('bracketQuery') ?? {}) as Record<string, any>;
   const searchFields = bracketQuery.searchFields ?? query.searchFields;
 
   const contextSearchableFields = c.get('searchableFields');
@@ -58,7 +58,7 @@ export const paginate = async <T extends AnyDelegate, A extends Args<T, 'findMan
       omit: options?.omit,
       take: pageSize,
       skip: (page - 1) * pageSize,
-    } as A),
+    } as unknown as A),
     delegate.count({ where }),
   ]);
 
