@@ -16,8 +16,12 @@ export const fetchOne = async <T extends HydratedRecord>(
   const key = cacheKey(accessor, identifier);
   const delegate = db[accessor] as unknown as RuntimeDelegate;
 
-  return cache<T | null>(key, async () => {
-    const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-    return delegate.findFirst({ where }) as Promise<T | null>;
-  }, ttl);
+  return cache<T | null>(
+    key,
+    async () => {
+      const where = typeof identifier === 'string' ? { id: identifier } : identifier;
+      return delegate.findFirst({ where }) as Promise<T | null>;
+    },
+    ttl,
+  );
 };

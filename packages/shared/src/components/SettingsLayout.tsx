@@ -1,5 +1,5 @@
+import { cn } from '@template/ui/lib/utils';
 import { useState } from 'react';
-import { cn } from '@ui/lib/utils';
 
 export type SettingsTab = {
   id: string;

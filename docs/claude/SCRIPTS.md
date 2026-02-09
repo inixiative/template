@@ -33,7 +33,7 @@ scripts/
 │   ├── setup.sh            # Full project setup
 │   ├── sync-env.sh         # Sync .env from examples
 │   ├── init.sh             # Initialize from template
-│   └── doppler-setup.ts    # Doppler secrets setup
+│   └── dopplerSetup.ts     # Doppler secrets setup
 ├── db/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
@@ -62,28 +62,43 @@ From root `package.json`:
 # Run all local services (api, web, worker, db)
 bun run local
 
-# Run individual services
-bun run local:api       # API server with hot reload
-bun run local:web       # Web app dev server
-bun run local:worker    # Background job worker
-bun run local:admin     # Admin dashboard
-bun run local:superadmin
-
-# Just the API (shorthand)
-bun run dev             # → bun run --filter=api dev
+# Run specific services with Turborepo filtering
+turbo watch local#api
+turbo watch local#web
+turbo watch local#admin
+turbo watch local#superadmin
+turbo watch local:worker#api
 
 # Start database containers
 bun run local:db        # docker-compose up -d --wait
 ```
 
-From `apps/api/package.json`:
+**Development (from root):**
+```bash
+bun run local                              # All services with Turborepo watching
+turbo watch local#api                      # Just API with hot reload
+turbo watch local:worker#api               # Just worker with hot reload
+bun run with prod api turbo watch local#api # API with prod env
+```
 
+**Production (from root):**
+```bash
+bun run start:api                          # Start API server
+bun run start:worker                       # Start background worker
+bun run start:web                          # Start web preview
+```
+
+**Direct execution (from apps/api):**
 ```bash
 cd apps/api
-bun run dev             # --watch src/index.ts
-bun run start           # Production start
+bun run local           # bun --hot src/index.ts (API with hot reload)
+bun run local:worker    # bun --hot src/jobs/worker.ts (worker with hot reload)
+bun run start           # Production API
+bun run start:worker    # Production worker
 bun run build           # Build to dist/
 ```
+
+**Note:** Direct execution only watches files within that app. For workspace dependency watching, use Turborepo commands from root.
 
 ---
 
@@ -165,7 +180,7 @@ bun run setup           # → scripts/setup/setup.sh
 bun run sync-env        # → scripts/setup/sync-env.sh
 
 # Setup Doppler secrets
-bun run setup:doppler   # → scripts/setup/doppler-setup.ts
+bun run setup:doppler   # → scripts/setup/dopplerSetup.ts
 ```
 
 ---
@@ -180,9 +195,9 @@ bun run deploy          # → scripts/deployment/deploy.sh
 bun run with <env> <app> <command>
 
 # Examples:
-bun run with local api bun run dev
+bun run with local api bun run local
 bun run with test api bun test
-bun run with production api bun run start
+bun run with prod api bun run start
 ```
 
 The `with-env.sh` script:

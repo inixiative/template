@@ -1,6 +1,6 @@
-import { type LucideIcon } from 'lucide-react';
-import { cn } from '@ui/lib/utils';
-import { Button } from './Button';
+import { Button } from '@template/ui/components/Button';
+import { cn } from '@template/ui/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 
 export type EmptyStateProps = {
   icon?: LucideIcon;
@@ -14,7 +14,7 @@ export type EmptyStateProps = {
   show?: boolean | (() => boolean);
 };
 
-export function EmptyState({ icon: Icon, title, description, action, className, show = true }: EmptyStateProps) {
+export const EmptyState = ({ icon: Icon, title, description, action, className, show = true }: EmptyStateProps) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
@@ -34,4 +34,4 @@ export function EmptyState({ icon: Icon, title, description, action, className, 
       )}
     </div>
   );
-}
+};

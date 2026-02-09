@@ -1,9 +1,8 @@
+import { cache, cacheKey, upsertCache } from '@template/db';
 import { createHash } from 'crypto';
 import type { Context, Next } from 'hono';
-import { cache, cacheKey, upsertCache } from '@template/db';
-import type { TokenWithRelations } from '#/lib/context/types';
-
 import { setUserContext } from '#/lib/context/setUserContext';
+import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
@@ -18,9 +17,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     const authorization = c.req.header('authorization');
     const urlToken = new URL(c.req.url).searchParams.get('token');
 
-    const apiKey = authorization?.startsWith('Bearer ')
-      ? authorization.slice(7)
-      : urlToken;
+    const apiKey = authorization?.startsWith('Bearer ') ? authorization.slice(7) : urlToken;
 
     if (!apiKey) return next();
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
@@ -61,9 +58,24 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
     if (token.user) upsertCache(cacheKey('user', token.user.id), token.user);
     if (token.organization) upsertCache(cacheKey('organization', token.organization.id), token.organization);
-    if (token.organizationUser) upsertCache(cacheKey('organizationUser', { organizationId: token.organizationUser.organizationId, userId: token.organizationUser.userId }), token.organizationUser);
+    if (token.organizationUser)
+      upsertCache(
+        cacheKey('organizationUser', {
+          organizationId: token.organizationUser.organizationId,
+          userId: token.organizationUser.userId,
+        }),
+        token.organizationUser,
+      );
     if (token.space) upsertCache(cacheKey('space', token.space.id), token.space);
-    if (token.spaceUser) upsertCache(cacheKey('spaceUser', { organizationId: token.spaceUser.organizationId, spaceId: token.spaceUser.spaceId, userId: token.spaceUser.userId }), token.spaceUser);
+    if (token.spaceUser)
+      upsertCache(
+        cacheKey('spaceUser', {
+          organizationId: token.spaceUser.organizationId,
+          spaceId: token.spaceUser.spaceId,
+          userId: token.spaceUser.userId,
+        }),
+        token.spaceUser,
+      );
 
     // Update lastUsedAt (fire and forget, don't block request)
     db.token

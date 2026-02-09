@@ -2,9 +2,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun
 import { db } from '@template/db';
 import { WebhookModel } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
+import { registerWebhookHook } from '#/hooks/webhooks/hook';
+import { resetWebhookEnabledModels, setWebhookEnabledModels } from '#/hooks/webhooks/utils';
 import * as enqueueModule from '#/jobs/enqueue';
-import { registerWebhookHook } from './hook';
-import { resetWebhookEnabledModels, setWebhookEnabledModels } from './utils';
 
 registerWebhookHook();
 
@@ -34,10 +34,7 @@ describe('webhook hook', () => {
       userId = user.id;
 
       // Subscribe to CustomerRef - User changes route here via relatedModels
-      await createWebhookSubscription(
-        { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' },
-        context,
-      );
+      await createWebhookSubscription({ model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' }, context);
     });
 
     afterEach(() => {

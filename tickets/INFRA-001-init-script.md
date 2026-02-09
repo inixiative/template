@@ -152,11 +152,11 @@ Interactive setup wizard that transforms a fresh fork into a production-ready en
   "version": "1.0",
   "projectName": "my-saas",
   "startedAt": "2026-02-06T10:00:00Z",
-  "lastStep": "doppler-setup",
+  "lastStep": "dopplerSetup",
   "completed": [
     "prerequisites",
     "project-config",
-    "doppler-setup"
+    "dopplerSetup"
   ],
   "data": {
     "projectName": "my-saas",

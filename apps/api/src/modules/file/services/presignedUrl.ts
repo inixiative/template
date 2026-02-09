@@ -28,7 +28,7 @@ const sanitizeFileName = (fileName: string): string => {
     fileName
       .trim()
       .replace(/\.\./g, '')
-      .replace(/[\/\\]/g, '')
+      .replace(/[/\\]/g, '')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .substring(0, 200) || 'file'
   );

@@ -10,11 +10,7 @@ type InquiryLike = {
   targetOrganizationId: string | null;
 };
 
-export const getUserOrganizationIds = async (
-  db: Db,
-  userId: string,
-  roles: Role[],
-): Promise<string[]> => {
+export const getUserOrganizationIds = async (db: Db, userId: string, roles: Role[]): Promise<string[]> => {
   const memberships = await db.organizationUser.findMany({
     where: { userId, role: { in: roles } },
     select: { organizationId: true },
@@ -22,19 +18,11 @@ export const getUserOrganizationIds = async (
   return memberships.map((m: { organizationId: string }) => m.organizationId);
 };
 
-export const checkInquiryAccess = async (
-  db: Db,
-  inquiry: InquiryLike,
-  userId: string,
-): Promise<boolean> => {
+export const checkInquiryAccess = async (db: Db, inquiry: InquiryLike, userId: string): Promise<boolean> => {
   return (await checkIsSource(db, inquiry, userId)) || (await checkIsTarget(db, inquiry, userId));
 };
 
-export const checkIsSource = async (
-  db: Db,
-  inquiry: InquiryLike,
-  userId: string,
-): Promise<boolean> => {
+export const checkIsSource = async (db: Db, inquiry: InquiryLike, userId: string): Promise<boolean> => {
   if (inquiry.sourceModel === 'User') {
     return inquiry.sourceUserId === userId;
   }
@@ -45,11 +33,7 @@ export const checkIsSource = async (
   return !!membership && ['owner', 'admin'].includes(membership.role);
 };
 
-export const checkIsTarget = async (
-  db: Db,
-  inquiry: InquiryLike,
-  userId: string,
-): Promise<boolean> => {
+export const checkIsTarget = async (db: Db, inquiry: InquiryLike, userId: string): Promise<boolean> => {
   if (!inquiry.targetModel) return false;
 
   if (inquiry.targetModel === 'User') {

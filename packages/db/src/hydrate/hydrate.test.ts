@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
-  registerTestTracker,
-  createUser,
   createOrganizationUser,
-  createToken,
   createSession,
+  createToken,
+  createUser,
+  registerTestTracker,
 } from '../test';
-import { hydrate } from './hydrate';
 import { fetchOne } from './fetchOne';
+import { hydrate } from './hydrate';
 
 describe('hydrate', () => {
   beforeEach(() => {
@@ -55,11 +55,16 @@ describe('hydrate', () => {
     const { entity: token } = await createToken({ organizationUser: {} });
 
     const pending = new Map();
-    await hydrate(db, 'token', {
-      id: token.id,
-      userId: token.userId,
-      organizationId: token.organizationId,
-    }, pending);
+    await hydrate(
+      db,
+      'token',
+      {
+        id: token.id,
+        userId: token.userId,
+        organizationId: token.organizationId,
+      },
+      pending,
+    );
 
     // Organization accessed via token.organizationId - should only be in pending once
     // Cache key format: cache:organization:id:<value>

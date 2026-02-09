@@ -105,6 +105,64 @@ export { logScope } from './scope';
 
 Actual code files always use aliases.
 
+### TypeScript Configuration
+
+Each package's `tsconfig.json` must map **all packages** to ensure consistent import resolution across the monorepo.
+
+**Standard mappings for each package:**
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@template/<package>/*": ["./src/*"],          // Self-reference
+      "@template/db/*": ["../db/src/*"],             // Database package
+      "@template/shared/*": ["../shared/src/*"],     // Shared utilities
+      "@template/ui/*": ["../ui/src/*"],             // UI components
+      "@template/permissions/*": ["../permissions/src/*"] // Permissions
+    }
+  }
+}
+```
+
+**Special cases:**
+
+- `packages/db` includes `@template/db-test/*` → `./test/*` for test utilities
+- `packages/shared` includes `@template/shared/openapi.json` → `./openapi.json` for API spec
+- Apps use `#/*` → `./src/*` for internal imports instead of `@template/`
+
+**Why this matters:**
+
+- Missing mappings cause "Cannot find module" errors
+- Inconsistent mappings prevent cross-package imports
+- TypeScript can't resolve deep imports without proper configuration
+- Each package must map ALL other packages, even if not currently imported
+
+**Example: Adding a new cross-package import**
+
+If `packages/permissions` needs to import from `packages/ui`:
+
+```typescript
+// This will fail without tsconfig mapping
+import { Button } from '@template/ui/components/Button';
+```
+
+The `permissions/tsconfig.json` must include:
+
+```json
+"@template/ui/*": ["../ui/src/*"]
+```
+
+**Verification:**
+
+```bash
+# Check all package tsconfigs have consistent mappings
+bun run typecheck
+```
+
+If you see "Cannot find module '@template/x'" errors, check that the importing package's tsconfig.json includes the path mapping for package x.
+
 ---
 
 ## Dependencies

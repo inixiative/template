@@ -1,6 +1,0 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { HomePage } from '@template/shared';
-
-export const Route = createFileRoute('/')({
-  component: () => <HomePage title="Template" subtitle="TanStack Router + React Aria + Tailwind" />,
-});

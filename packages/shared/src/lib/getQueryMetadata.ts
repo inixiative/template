@@ -1,5 +1,5 @@
-import openApiSpec from '../../openapi.json';
-import type { EnumFilter } from './makeDataTableConfig';
+import type { EnumFilter } from '@template/shared/lib/makeDataTableConfig';
+import openApiSpec from '@template/shared/openapi.json';
 
 export type QueryMetadata = {
   searchableFields?: string[];
@@ -11,11 +11,7 @@ export type QueryMetadata = {
  * Extract orderable fields from schema recursively.
  * Excludes arrays, includes nested objects with dot notation.
  */
-function extractOrderableFields(
-  schema: any,
-  prefix: string = '',
-  visited: Set<any> = new Set(),
-): string[] {
+const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<any> = new Set()): string[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
     return [];
   }
@@ -41,16 +37,12 @@ function extractOrderableFields(
   }
 
   return fields;
-}
+};
 
 /**
  * Extract enum filters from schema recursively.
  */
-function extractEnumFilters(
-  schema: any,
-  prefix: string = '',
-  visited: Set<any> = new Set(),
-): EnumFilter[] {
+const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> = new Set()): EnumFilter[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
     return [];
   }
@@ -78,12 +70,12 @@ function extractEnumFilters(
   }
 
   return filters;
-}
+};
 
 /**
  * Get response schema for an operation.
  */
-function getResponseSchema(operation: any): any {
+const getResponseSchema = (operation: any): any => {
   const response200 = operation.responses?.['200'];
   if (!response200) return null;
 
@@ -114,7 +106,7 @@ function getResponseSchema(operation: any): any {
   }
 
   return schema;
-}
+};
 
 /**
  * Extract query metadata from OpenAPI spec for a given endpoint.
@@ -127,7 +119,7 @@ function getResponseSchema(operation: any): any {
  * //   enumFilters: [{ field: 'status', values: [...], operators: [...] }]
  * // }
  */
-export function getQueryMetadata(path: string, method: string = 'get'): QueryMetadata {
+export const getQueryMetadata = (path: string, method: string = 'get'): QueryMetadata => {
   const spec = openApiSpec as any;
   const operation = spec.paths?.[path]?.[method.toLowerCase()];
 
@@ -142,7 +134,7 @@ export function getQueryMetadata(path: string, method: string = 'get'): QueryMet
     orderableFields: responseSchema ? extractOrderableFields(responseSchema) : [],
     enumFilters: responseSchema ? extractEnumFilters(responseSchema) : [],
   };
-}
+};
 
 /**
  * Get query metadata by operation ID.
@@ -151,19 +143,20 @@ export function getQueryMetadata(path: string, method: string = 'get'): QueryMet
  * const meta = getQueryMetadataByOperation('adminOrganizationReadMany');
  * // => { searchableFields: ['name', 'slug'], orderableFields: [...], ... }
  */
-export function getQueryMetadataByOperation(operationId: string): QueryMetadata {
+export const getQueryMetadataByOperation = (operationId: string): QueryMetadata => {
   const spec = openApiSpec as any;
 
   for (const [path, pathItem] of Object.entries(spec.paths || {})) {
     for (const [method, operation] of Object.entries(pathItem as any)) {
-      if (operation.operationId === operationId) {
+      const op = operation as any;
+      if (op.operationId === operationId) {
         return getQueryMetadata(path, method);
       }
     }
   }
 
   return {};
-}
+};
 
 /**
  * Hook to get query metadata for a given operation.
@@ -181,6 +174,6 @@ export function getQueryMetadataByOperation(operationId: string): QueryMetadata 
  *   );
  * }
  */
-export function useQueryMetadata(operationId: string): QueryMetadata {
+export const useQueryMetadata = (operationId: string): QueryMetadata => {
   return getQueryMetadataByOperation(operationId);
-}
+};

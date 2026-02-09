@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export function useMediaQuery(query: string): boolean {
+export const useMediaQuery = (query: string): boolean => {
   const [matches, setMatches] = useState(false);
 
   useEffect(() => {
@@ -16,9 +16,9 @@ export function useMediaQuery(query: string): boolean {
   }, [query]);
 
   return matches;
-}
+};
 
-export function useBreakpoint(breakpoint: 'sm' | 'md' | 'lg' | 'xl' | '2xl'): boolean {
+export const useBreakpoint = (breakpoint: 'sm' | 'md' | 'lg' | 'xl' | '2xl'): boolean => {
   const breakpoints = {
     sm: '(min-width: 640px)',
     md: '(min-width: 768px)',
@@ -28,4 +28,4 @@ export function useBreakpoint(breakpoint: 'sm' | 'md' | 'lg' | 'xl' | '2xl'): bo
   };
 
   return useMediaQuery(breakpoints[breakpoint]);
-}
+};

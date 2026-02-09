@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { interpolateRequest, interpolateValue } from './interpolation';
+import { interpolateRequest, interpolateValue } from '#/modules/batch/services/interpolation';
 
 describe('interpolation', () => {
   describe('interpolateValue', () => {
@@ -37,10 +37,7 @@ describe('interpolation', () => {
 
     it('interpolates across multiple rounds', () => {
       const context = {
-        results: [
-          [{ id: 'user-123' }],
-          [{ userId: 'user-123', orgId: 'org-456' }],
-        ],
+        results: [[{ id: 'user-123' }], [{ userId: 'user-123', orgId: 'org-456' }]],
       };
 
       const result = interpolateValue('User: <<0.0.id>>, Org: <<1.0.orgId>>', context);
@@ -57,7 +54,7 @@ describe('interpolation', () => {
           userId: '<<0.0.id>>',
           name: 'Test',
         },
-        context
+        context,
       );
 
       expect(result).toEqual({
@@ -84,7 +81,7 @@ describe('interpolation', () => {
         {
           users: [{ id: '<<0.0.id>>', name: '<<0.0.name>>' }],
         },
-        context
+        context,
       );
 
       expect(result).toEqual({
@@ -115,7 +112,9 @@ describe('interpolation', () => {
       };
 
       expect(() => interpolateValue('<<0.5.id>>', context)).toThrow('Request index out of bounds');
-      expect(() => interpolateValue('<<0.10.id>>', context)).toThrow('request 10 does not exist in round 0 (only 2 requests completed)');
+      expect(() => interpolateValue('<<0.10.id>>', context)).toThrow(
+        'request 10 does not exist in round 0 (only 2 requests completed)',
+      );
     });
 
     it('throws error for missing field', () => {
@@ -254,13 +253,13 @@ describe('interpolation', () => {
         method: 'GET',
         path: '/api/v1/me',
         headers: {
-          'Authorization': 'Bearer <<0.0.token>>',
+          Authorization: 'Bearer <<0.0.token>>',
         },
       };
 
       const result = interpolateRequest(request, context);
       expect(result.headers).toEqual({
-        'Authorization': 'Bearer secret-token',
+        Authorization: 'Bearer secret-token',
       });
     });
 

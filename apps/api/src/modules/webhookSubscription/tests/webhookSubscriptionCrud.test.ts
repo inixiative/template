@@ -1,11 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createOrganizationUser,
-  createUser,
-  createWebhookSubscription,
-} from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser, createUser, createWebhookSubscription } from '@template/db/test';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, json, patch } from '#tests/utils/request';
@@ -80,9 +75,7 @@ describe('WebhookSubscription CRUD', () => {
         isActive: true,
       });
 
-      const response = await fetch(
-        patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
-      );
+      const response = await fetch(patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }));
       const { data } = await json<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
@@ -113,9 +106,7 @@ describe('WebhookSubscription CRUD', () => {
         isActive: false,
       });
 
-      const response = await fetch(
-        patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
-      );
+      const response = await fetch(patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }));
       const { data } = await json<WebhookSubscription>(response);
 
       expect(response.status).toBe(200);
@@ -129,9 +120,7 @@ describe('WebhookSubscription CRUD', () => {
         userId: otherUser.id,
       });
 
-      const response = await fetch(
-        patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }),
-      );
+      const response = await fetch(patch(`/api/v1/webhookSubscription/${sub.id}`, { isActive: false }));
       expect(response.status).toBe(403);
     });
   });

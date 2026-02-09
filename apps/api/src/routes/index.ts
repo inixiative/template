@@ -3,11 +3,10 @@ import { isTest } from '@template/shared/utils';
 import { auth } from '#/lib/auth';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { testRouter } from '#/modules/test';
-import type { AppEnv } from '#/types/appEnv';
-
 import { apiRouter } from '#/routes/api';
-import bullBoardRouter from '#/routes/bullBoard';
+import { bullBoardRouter } from '#/routes/bullBoard';
 import { healthRouter } from '#/routes/health';
+import type { AppEnv } from '#/types/appEnv';
 
 export const routes = new OpenAPIHono<AppEnv>();
 

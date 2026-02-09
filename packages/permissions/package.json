@@ -8,7 +8,10 @@
     "typecheck": "tsc --noEmit"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./rebac/*": "./src/rebac/*",
+    "./roles/*": "./src/roles/*"
   },
   "dependencies": {
     "lodash-es": "^4.17.21",

@@ -2,19 +2,24 @@ import { z } from '@hono/zod-openapi';
 import { mapValues } from 'lodash';
 
 // JSON schema that properly types to Prisma's InputJsonValue
-const InputJsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.record(z.string(), z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
-    z.array(z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
-  ]),
-).openapi({
-  type: 'object',
-  description: 'JSON value (string, number, boolean, object, or array)',
-  example: { key: 'value' },
-});
+const InputJsonValueSchema: z.ZodType<unknown> = z
+  .lazy(() =>
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.record(
+        z.string(),
+        z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)])),
+      ),
+      z.array(z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
+    ]),
+  )
+  .openapi({
+    type: 'object',
+    description: 'JSON value (string, number, boolean, object, or array)',
+    example: { key: 'value' },
+  });
 
 /**
  * Transforms z.unknown() fields to InputJsonValueSchema for Prisma JSON compatibility.

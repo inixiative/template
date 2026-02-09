@@ -1,5 +1,5 @@
-import { Card, CardHeader, CardTitle, CardContent, Button, Table } from '@template/ui';
 import { CreateTokenModal, checkPermission } from '@template/shared';
+import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '#/store';
@@ -13,7 +13,7 @@ type Token = {
   spaceId?: string;
 };
 
-export function SpaceTokensTab({ spaceId }: { spaceId: string }) {
+export const SpaceTokensTab = ({ spaceId }: { spaceId: string }) => {
   const [tokens] = useState<Token[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const permissions = useAppStore((state) => state.permissions);
@@ -32,7 +32,7 @@ export function SpaceTokensTab({ spaceId }: { spaceId: string }) {
     {
       key: 'lastUsed',
       label: 'Last Used',
-      render: (token: Token) => token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never',
+      render: (token: Token) => (token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never'),
     },
     {
       key: 'actions',
@@ -71,9 +71,7 @@ export function SpaceTokensTab({ spaceId }: { spaceId: string }) {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>API Tokens</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create and manage API tokens for this space
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Create and manage API tokens for this space</p>
             </div>
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -98,4 +96,4 @@ export function SpaceTokensTab({ spaceId }: { spaceId: string }) {
       />
     </>
   );
-}
+};

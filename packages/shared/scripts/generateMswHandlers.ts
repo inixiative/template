@@ -7,7 +7,7 @@ interface EndpointInfo {
   functionName: string;
 }
 
-function extractEndpoints(sdkContent: string): EndpointInfo[] {
+const extractEndpoints = (sdkContent: string): EndpointInfo[] => {
   const endpoints: EndpointInfo[] = [];
   const lines = sdkContent.split('\n');
 
@@ -39,12 +39,10 @@ function extractEndpoints(sdkContent: string): EndpointInfo[] {
   }
 
   return endpoints;
-}
+};
 
-function generateHandlers(endpoints: EndpointInfo[]): string {
-  const apiEndpoints = endpoints.filter(e =>
-    e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin')
-  );
+const generateHandlers = (endpoints: EndpointInfo[]): string => {
+  const apiEndpoints = endpoints.filter((e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'));
 
   const handlerCases: string[] = [];
 
@@ -78,13 +76,10 @@ import { buildUser, buildOrganizationUser, buildSpaceUser } from '@template/db/t
 export const handlers = [${handlerCases.join('')}
 ];
 `;
-}
+};
 
-async function main() {
-  const sdkPath = path.join(
-    process.cwd(),
-    'src/apiClient/sdk.gen.ts'
-  );
+const main = async () => {
+  const sdkPath = path.join(process.cwd(), 'src/apiClient/sdk.gen.ts');
 
   const sdkContent = fs.readFileSync(sdkPath, 'utf-8');
   const endpoints = extractEndpoints(sdkContent);
@@ -93,15 +88,12 @@ async function main() {
 
   const handlersContent = generateHandlers(endpoints);
 
-  const outputPath = path.join(
-    process.cwd(),
-    'src/test/mocks/handlers.gen.ts'
-  );
+  const outputPath = path.join(process.cwd(), 'src/test/mocks/handlers.gen.ts');
 
   fs.writeFileSync(outputPath, handlersContent);
 
   console.log(`✓ Generated ${outputPath}`);
   console.log('  Customize handlers by editing the file or creating handlers.ts');
-}
+};
 
 main().catch(console.error);

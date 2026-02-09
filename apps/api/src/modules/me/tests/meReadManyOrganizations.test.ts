@@ -4,7 +4,7 @@ import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
+import type { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
@@ -65,14 +65,8 @@ describe('GET /me/organizations', () => {
     const { entity: org1 } = await createOrganization({ name: 'Org One' });
     const { entity: org2 } = await createOrganization({ name: 'Org Two' });
 
-    await createOrganizationUser(
-      { role: Role.owner },
-      { user, organization: org1 },
-    );
-    await createOrganizationUser(
-      { role: Role.member },
-      { user, organization: org2 },
-    );
+    await createOrganizationUser({ role: Role.owner }, { user, organization: org1 });
+    await createOrganizationUser({ role: Role.member }, { user, organization: org2 });
 
     const response = await fetch(get('/api/v1/me/organizations'));
     const { data, pagination } = await json<ReadManyOrgsResponse>(response);

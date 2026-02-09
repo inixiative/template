@@ -3,7 +3,7 @@ import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation
 type BuildWhereOptions = {
   search?: string;
   searchFields?: Record<string, any>;
-  searchableFields: string[];
+  searchableFields?: string[];
   filters?: Record<string, any>;
 };
 
@@ -15,7 +15,13 @@ const validateAndTransformSearchFields = (
   searchableFields: string[],
   prefix = '',
   autoContains = true,
+  depth = 0,
 ): any => {
+  // Prevent stack overflow from deeply nested or circular queries
+  if (depth > 10) {
+    throw new Error('Search query nesting too deep (max 10 levels)');
+  }
+
   const result: Record<string, any> = {};
 
   for (const [key, value] of Object.entries(obj)) {
@@ -46,7 +52,13 @@ const validateAndTransformSearchFields = (
         result[key] = {};
         for (const [opKey, opValue] of Object.entries(value)) {
           if (relationOperators.includes(opKey) && typeof opValue === 'object') {
-            result[key][opKey] = validateAndTransformSearchFields(opValue as Record<string, any>, searchableFields, currentPath, false);
+            result[key][opKey] = validateAndTransformSearchFields(
+              opValue as Record<string, any>,
+              searchableFields,
+              currentPath,
+              false,
+              depth + 1,
+            );
           }
         }
       } else if (hasFieldOperator) {
@@ -58,7 +70,7 @@ const validateAndTransformSearchFields = (
         }
         result[key] = value;
       } else {
-        result[key] = validateAndTransformSearchFields(value, searchableFields, currentPath, autoContains);
+        result[key] = validateAndTransformSearchFields(value, searchableFields, currentPath, autoContains, depth + 1);
       }
     }
   }
@@ -67,10 +79,10 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): any => {
-  const { search, searchFields, searchableFields, filters = {} } = options;
+  const { search, searchFields, searchableFields = [], filters = {} } = options;
   const conditions: any[] = [];
 
-  if (search) {
+  if (search && searchableFields.length) {
     const searchConditions = searchableFields.map((field) => {
       if (!validatePathNotation(field)) {
         throw new Error(`Invalid searchable field: ${field}`);
@@ -84,7 +96,7 @@ export const buildWhereClause = (options: BuildWhereOptions): any => {
     conditions.push({ OR: searchConditions });
   }
 
-  if (searchFields) {
+  if (searchFields && searchableFields.length) {
     const transformed = validateAndTransformSearchFields(searchFields, searchableFields);
     for (const [key, value] of Object.entries(transformed)) {
       conditions.push({ [key]: value });

@@ -459,9 +459,35 @@ const internalRequest = new Request(url, {
 // Middleware loads batch context and skips re-authentication
 ```
 
+**State isolation:**
+
+Each batch sub-request gets **deep clones** of mutable context to prevent state leakage:
+
+```typescript
+// apps/api/src/middleware/prepareRequest.ts
+if (batchContext) {
+  // Read-only metadata (safe to share)
+  c.set('app', batchContext.baseContext.get('app'));
+
+  // Deep clone mutable state (isolated per request)
+  const keysToClone = ['user', 'session', 'organizationUsers', 'organizations',
+                       'spaceUsers', 'spaces', 'token', 'spoofedBy'];
+  for (const key of keysToClone) {
+    const value = batchContext.baseContext.get(key);
+    c.set(key, value ? structuredClone(value) : null);
+  }
+}
+```
+
+**Why deep cloning matters:**
+- Prevents mutations in one batch request from affecting subsequent requests
+- Each request has its own isolated copy of user data, memberships, etc.
+- Array/object mutations during request processing don't leak
+- Fresh `permix` instance created per request (already isolated)
+
 **Key files:**
 - `apps/api/src/modules/batch/services/batchRegistry.ts` - In-memory storage
-- `apps/api/src/middleware/prepareRequest.ts` - Context injection
+- `apps/api/src/middleware/prepareRequest.ts` - Context injection + deep cloning
 - `apps/api/src/middleware/auth/*.ts` - Auth skipping logic
 
 ---

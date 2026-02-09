@@ -1,12 +1,10 @@
 import type * as runtime from '@prisma/client/runtime/client';
-import { Prisma } from '@template/db/generated/client/client';
+import type { Prisma } from '@template/db/generated/client/client';
 
 export type ModelName = Prisma.ModelName;
 
 // DefaultSelection gives full model with required scalars (like User, Organization exports)
-export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<
-  Prisma.TypeMap['model'][K]['payload']
->;
+export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<Prisma.TypeMap['model'][K]['payload']>;
 
 export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 

@@ -1,7 +1,8 @@
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useSearch } from '@tanstack/react-router';
+import type { AuthSession, AuthUser } from '@template/shared/auth/types';
+import type { AuthClient } from '@template/shared/lib/createAuthClient';
+import { LoginForm } from '@template/ui/components/auth/LoginForm';
 import { useState } from 'react';
-import { LoginForm } from '../components/auth/LoginForm';
-import type { AuthClient, AuthUser, AuthSession } from '../auth/types';
 
 type LoginPageProps = {
   authClient: AuthClient;
@@ -10,7 +11,6 @@ type LoginPageProps = {
 };
 
 export const LoginPage = ({ authClient, onSuccess, hideSignup }: LoginPageProps) => {
-  const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
@@ -20,18 +20,12 @@ export const LoginPage = ({ authClient, onSuccess, hideSignup }: LoginPageProps)
     setIsLoading(true);
 
     try {
-      const result = await authClient.signIn.email({
+      const result = await authClient.signIn({
         email,
         password,
       });
-
-      if (result.error) {
-        setError(result.error.message);
-        return;
-      }
-
-      onSuccess(result.data?.user, result.data?.session);
-      navigate({ to: search.redirectTo || '/dashboard' });
+      onSuccess(result.user, result.session);
+      window.location.assign(search.redirectTo || '/dashboard');
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {
@@ -43,10 +37,7 @@ export const LoginPage = ({ authClient, onSuccess, hideSignup }: LoginPageProps)
     <div className="min-h-screen flex items-center justify-center p-4">
       <LoginForm
         onSubmit={handleLogin}
-        onSignupClick={hideSignup ? undefined : () => navigate({
-          to: '/signup',
-          search: search.redirectTo ? { redirectTo: search.redirectTo } : undefined,
-        })}
+        onSignupClick={hideSignup ? undefined : () => window.location.assign('/signup')}
         error={error}
         isLoading={isLoading}
       />

@@ -1,4 +1,4 @@
-import type { WebhookModel, FlexibleRef } from '@template/db';
+import type { FlexibleRef, WebhookModel } from '@template/db';
 import { isEqual, omit } from 'lodash-es';
 import { webhookEnabledModels } from '#/hooks/webhooks/constants/enabledModels';
 import { webhookIgnoredFields } from '#/hooks/webhooks/constants/ignoredFields';

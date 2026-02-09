@@ -10,7 +10,10 @@ export const buildNestedPath = (path: string, value: any): Record<string, any> =
 };
 
 export const validatePathNotation = (path: string, maxDepth = 5): boolean => {
-  if (!/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/.test(path)) return false;
+  // Allow camelCase and Prisma meta-fields (_count, _max, etc.)
+  // Rejects snake_case (underscores in middle of field names)
+  // Examples: ✓ user.name ✓ organization._count ✗ user_name ✗ created_at
+  if (!/^_?[a-zA-Z0-9]+(\._?[a-zA-Z0-9]+)*$/.test(path)) return false;
   if (path.split('.').length > maxDepth) return false;
   return true;
 };

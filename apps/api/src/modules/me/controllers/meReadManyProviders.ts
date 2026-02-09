@@ -1,4 +1,3 @@
-
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';

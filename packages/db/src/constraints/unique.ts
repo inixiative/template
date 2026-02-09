@@ -1,7 +1,7 @@
 import { db } from '@template/db/client';
 import type { UniqueWhereNotNull } from './types';
 
-export async function addUniqueWhereNotNull({ table, fields }: UniqueWhereNotNull) {
+export const addUniqueWhereNotNull = async ({ table, fields }: UniqueWhereNotNull) => {
   const name = `${table}_${fields.join('_')}_unique_nn`;
   const fieldList = fields.map((f) => `"${f}"`).join(', ');
   const whereClause = fields.map((f) => `"${f}" IS NOT NULL`).join(' AND ');
@@ -13,4 +13,4 @@ export async function addUniqueWhereNotNull({ table, fields }: UniqueWhereNotNul
       END IF;
     END $$;
   `);
-}
+};

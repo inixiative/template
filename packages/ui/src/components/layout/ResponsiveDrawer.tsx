@@ -1,7 +1,7 @@
+import { Modal } from '@template/ui/components/layout/Modal';
+import { useBreakpoint } from '@template/ui/hooks/useMediaQuery';
+import { cn } from '@template/ui/lib/utils';
 import { X } from 'lucide-react';
-import { useBreakpoint } from '../../hooks/useMediaQuery';
-import { Modal } from './Modal';
-import { cn } from '../../lib/utils';
 
 export type ResponsiveDrawerProps = {
   open: boolean;
@@ -27,10 +27,7 @@ export const ResponsiveDrawer = ({
   if (isDesktop) {
     return (
       <>
-        <div
-          className="fixed inset-0 bg-black/50 z-40 transition-opacity"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 transition-opacity" onClick={onClose} />
         <div
           className={cn(
             'fixed top-0 right-0 bottom-0 w-96 bg-background border-l z-50 overflow-y-auto',
@@ -48,9 +45,7 @@ export const ResponsiveDrawer = ({
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="p-4">
-            {children}
-          </div>
+          <div className="p-4">{children}</div>
         </div>
       </>
     );

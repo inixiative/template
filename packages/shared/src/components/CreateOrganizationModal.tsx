@@ -1,78 +1,79 @@
-import { Button, Modal, Input, Label } from '@template/ui';
+import { useDebounce, useValidateUniqueness } from '@template/shared/utils';
+import { Button, Input, Label, Modal } from '@template/ui';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { useState, memo } from 'react';
-import { useDebounce, useValidateUniqueness } from '../utils';
+import { memo, useState } from 'react';
 
-export const CreateOrganizationModal = memo(({
-  isOpen,
-  onClose,
-  onSubmit,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (name: string, slug: string) => void;
-}) => {
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [slugTouched, setSlugTouched] = useState(false);
+export const CreateOrganizationModal = memo(
+  ({
+    isOpen,
+    onClose,
+    onSubmit,
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (name: string, slug: string) => void;
+  }) => {
+    const [name, setName] = useState('');
+    const [slug, setSlug] = useState('');
+    const [slugTouched, setSlugTouched] = useState(false);
 
-  const debouncedSlug = useDebounce(slug, 300);
-  const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug', debouncedSlug);
+    const debouncedSlug = useDebounce(slug, 300);
+    const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug', debouncedSlug);
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value;
-    setName(newName);
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newName = e.target.value;
+      setName(newName);
 
-    if (!slugTouched) {
-      const autoSlug = newName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setSlug(autoSlug);
-    }
-  };
+      if (!slugTouched) {
+        const autoSlug = newName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        setSlug(autoSlug);
+      }
+    };
 
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSlugTouched(true);
-    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-  };
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSlugTouched(true);
+      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+    };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
 
-    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-    if (!slugRegex.test(slug)) {
-      return;
-    }
+      const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+      if (!slugRegex.test(slug)) {
+        return;
+      }
 
-    if (isChecking || !isAvailable) {
-      return;
-    }
+      if (isChecking || !isAvailable) {
+        return;
+      }
 
-    if (name.trim() && slug.trim()) {
-      onSubmit(name, slug);
-      setName('');
-      setSlug('');
-      setSlugTouched(false);
-    }
-  };
+      if (name.trim() && slug.trim()) {
+        onSubmit(name, slug);
+        setName('');
+        setSlug('');
+        setSlugTouched(false);
+      }
+    };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Organization">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Organization Name</Label>
-          <Input
-            id="name"
-            type="text"
-            value={name}
-            onChange={handleNameChange}
-            placeholder="Enter organization name"
-            autoFocus
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="slug">Slug</Label>
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Create Organization">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Organization Name</Label>
+            <Input
+              id="name"
+              type="text"
+              value={name}
+              onChange={handleNameChange}
+              placeholder="Enter organization name"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="slug">Slug</Label>
             <div className="relative">
               <Input
                 id="slug"
@@ -98,20 +99,19 @@ export const CreateOrganizationModal = memo(({
               Used in URLs. Lowercase letters, numbers, and hyphens only.
             </p>
             {slug && !isAvailable && !isChecking && (
-              <p className="text-xs text-destructive mt-1">
-                This slug is already taken
-              </p>
+              <p className="text-xs text-destructive mt-1">This slug is already taken</p>
             )}
-        </div>
-        <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!name.trim() || !slug.trim() || !isAvailable || isChecking}>
-            Create
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-});
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim() || !slug.trim() || !isAvailable || isChecking}>
+              Create
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    );
+  },
+);

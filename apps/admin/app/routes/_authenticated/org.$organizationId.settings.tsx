@@ -6,17 +6,13 @@ import { OrganizationProfileTab } from '#/components/settings/OrganizationProfil
 import { OrganizationTokensTab } from '#/components/settings/OrganizationTokensTab';
 import { OrganizationWebhooksTab } from '#/components/settings/OrganizationWebhooksTab';
 
-export const Route = createFileRoute('/_authenticated/org/$organizationId/settings')({
-  component: OrganizationSettingsPage,
-});
-
 const tabs = [
   { id: 'profile', label: 'Profile', icon: Building2 },
   { id: 'tokens', label: 'Tokens', icon: Key },
   { id: 'webhooks', label: 'Webhooks', icon: Webhook },
 ];
 
-function OrganizationSettingsPage() {
+const OrganizationSettingsPage = () => {
   const { organizationId } = Route.useParams();
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -33,4 +29,8 @@ function OrganizationSettingsPage() {
       {activeTab === 'webhooks' && <OrganizationWebhooksTab organizationId={organizationId} />}
     </SettingsLayout>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/org/$organizationId/settings')({
+  component: OrganizationSettingsPage,
+});

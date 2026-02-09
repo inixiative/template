@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
-import { db, DbAction, HookTiming, registerDbHook, clearHookRegistry } from '@template/db';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
 
 describe('many operations with hooks', () => {
   beforeEach(() => {
@@ -9,15 +9,18 @@ describe('many operations with hooks', () => {
   describe('createManyAndReturn', () => {
     it('triggers after hooks with result[]', async () => {
       let hookResult: unknown;
-      registerDbHook('test-createManyAndReturn', 'User', HookTiming.after, [DbAction.createManyAndReturn], async ({ result }) => {
-        hookResult = result;
-      });
+      registerDbHook(
+        'test-createManyAndReturn',
+        'User',
+        HookTiming.after,
+        [DbAction.createManyAndReturn],
+        async ({ result }) => {
+          hookResult = result;
+        },
+      );
 
       const result = await db.user.createManyAndReturn({
-        data: [
-          { email: `test-cmar-1-${Date.now()}@example.com` },
-          { email: `test-cmar-2-${Date.now()}@example.com` },
-        ],
+        data: [{ email: `test-cmar-1-${Date.now()}@example.com` }, { email: `test-cmar-2-${Date.now()}@example.com` }],
       });
 
       expect(result.length).toBe(2);
@@ -32,10 +35,16 @@ describe('many operations with hooks', () => {
 
       let hookPrevious: unknown;
       let hookResult: unknown;
-      registerDbHook('test-updateManyAndReturn', 'User', HookTiming.after, [DbAction.updateManyAndReturn], async ({ previous, result }) => {
-        hookPrevious = previous;
-        hookResult = result;
-      });
+      registerDbHook(
+        'test-updateManyAndReturn',
+        'User',
+        HookTiming.after,
+        [DbAction.updateManyAndReturn],
+        async ({ previous, result }) => {
+          hookPrevious = previous;
+          hookResult = result;
+        },
+      );
 
       const result = await db.user.updateManyAndReturn({
         where: { id: user.id },
@@ -56,10 +65,16 @@ describe('many operations with hooks', () => {
 
       let hookPrevious: unknown;
       let hookResult: unknown;
-      registerDbHook('test-deleteMany', 'User', HookTiming.after, [DbAction.deleteMany], async ({ previous, result }) => {
-        hookPrevious = previous;
-        hookResult = result;
-      });
+      registerDbHook(
+        'test-deleteMany',
+        'User',
+        HookTiming.after,
+        [DbAction.deleteMany],
+        async ({ previous, result }) => {
+          hookPrevious = previous;
+          hookResult = result;
+        },
+      );
 
       const result = await db.user.deleteMany({ where: { id: user.id } });
 

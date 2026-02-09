@@ -1,9 +1,9 @@
-import { type JobPayloads, isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { redisNamespace } from '@template/db';
+import { log } from '@template/shared/logger';
+import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
-import { redisNamespace } from '@template/db';
-import { log } from '@template/shared/logger';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];

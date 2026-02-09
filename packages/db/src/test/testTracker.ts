@@ -1,5 +1,5 @@
-import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mutationLifeCycle';
 import type { Db } from '@template/db/clientTypes';
+import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mutationLifeCycle';
 
 const touchedTables = new Set<string>();
 

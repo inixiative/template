@@ -1,18 +1,18 @@
 import { readdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { OpenAPIHono } from '@hono/zod-openapi';
+import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppEnv } from '#/types/appEnv';
 
-export async function autoRegisterRoutes(
+export const autoRegisterRoutes = async (
   router: OpenAPIHono<AppEnv>,
   moduleDir: string,
-  options?: { admin?: boolean }
-): Promise<void> {
+  options?: { admin?: boolean },
+): Promise<void> => {
   const routesDir = resolve(moduleDir, 'routes');
   const controllersDir = resolve(moduleDir, 'controllers');
 
-  const routeFiles = readdirSync(routesDir).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const routeFiles = readdirSync(routesDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 
   const prefix = options?.admin ? 'admin' : '';
 
@@ -35,11 +35,8 @@ export async function autoRegisterRoutes(
 
     router.openapi(route, controller);
   }
-}
+};
 
-export async function autoRegisterAdminRoutes(
-  router: OpenAPIHono<AppEnv>,
-  modulePath: string
-): Promise<void> {
+export const autoRegisterAdminRoutes = async (router: OpenAPIHono<AppEnv>, modulePath: string): Promise<void> => {
   return autoRegisterRoutes(router, modulePath, { admin: true });
-}
+};

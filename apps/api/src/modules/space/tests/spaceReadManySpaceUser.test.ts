@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -57,7 +57,10 @@ describe('GET /api/v1/space/:id/spaceUsers', () => {
   });
 
   it('returns multiple space users', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
     await db.spaceUser.create({
       data: {
         role: 'member',

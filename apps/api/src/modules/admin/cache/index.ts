@@ -1,8 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { adminCacheClearController } from '#/modules/admin/cache/controllers/adminCacheClear';
+import { adminCacheClearRoute } from '#/modules/admin/cache/routes/adminCacheClear';
 import type { AppEnv } from '#/types/appEnv';
-
-import { adminCacheClearController } from './controllers/adminCacheClear';
-import { adminCacheClearRoute } from './routes/adminCacheClear';
 
 export const adminCacheRouter = new OpenAPIHono<AppEnv>();
 

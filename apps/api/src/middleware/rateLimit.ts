@@ -1,5 +1,5 @@
-import type { Context, Next } from 'hono';
 import { getRedisClient, redisNamespace } from '@template/db';
+import type { Context, Next } from 'hono';
 
 import type { AppEnv } from '#/types/appEnv';
 
@@ -39,7 +39,7 @@ type RateLimitConfig = {
   key: string;
 };
 
-export function rateLimit(config: RateLimitConfig) {
+export const rateLimit = (config: RateLimitConfig) => {
   const { windowMs, max, key } = config;
   const windowSec = Math.ceil(windowMs / 1000);
 
@@ -57,7 +57,7 @@ export function rateLimit(config: RateLimitConfig) {
 
     await next();
   };
-}
+};
 
 const getClientIp = (c: Context): string =>
   c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown';

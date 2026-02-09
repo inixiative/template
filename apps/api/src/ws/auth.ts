@@ -14,7 +14,7 @@ export type WSAuthResult = {
  *
  * Returns unique connectionId for tracking (supports multiple tabs per user).
  */
-export async function authenticateWS(req: Request): Promise<WSAuthResult> {
+export const authenticateWS = async (req: Request): Promise<WSAuthResult> => {
   const connectionId = crypto.randomUUID();
 
   try {
@@ -36,4 +36,4 @@ export async function authenticateWS(req: Request): Promise<WSAuthResult> {
   } catch {
     return { connectionId, userId: null };
   }
-}
+};

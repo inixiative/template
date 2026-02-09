@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db';
-import { cleanupTouchedTables, createOrganization, createOrganizationUser, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
@@ -61,78 +67,106 @@ describe('OrganizationUser Token Permissions', () => {
   describe('Token Creation', () => {
     it('owner can create owner-role token', async () => {
       const { fetch } = createApp(ownerUser, [ownerOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${ownerOrgUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${ownerOrgUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }),
+      );
       expect(response.status).toBe(201);
     });
 
     it('owner can create member-role token', async () => {
       const { fetch } = createApp(ownerUser, [ownerOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${ownerOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${ownerOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+      );
       expect(response.status).toBe(201);
     });
 
     it('admin can create admin-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }),
+      );
       expect(response.status).toBe(201);
     });
 
     it('admin can create member-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+      );
       expect(response.status).toBe(201);
     });
 
     it('admin cannot create owner-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }),
+      );
       expect(response.status).toBe(403);
     });
 
     it('member can create member-role token', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+      );
       expect(response.status).toBe(201);
     });
 
     it('member cannot create admin-role token', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser]);
-      const response = await fetch(post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }),
+      );
       expect(response.status).toBe(403);
     });
 
     it('cannot create token for another user', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       // Try to create a token for member's orgUser
-      const response = await fetch(post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Token', role: 'member' }));
+      const response = await fetch(
+        post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, { name: 'Token', role: 'member' }),
+      );
       expect(response.status).toBe(403);
     });
   });
 
   describe('Token Deletion', () => {
     it('user can delete their own token', async () => {
-      const { entity: token } = await createToken({ ownerModel: 'OrganizationUser', role: 'member' }, { organizationUser: memberOrgUser });
+      const { entity: token } = await createToken(
+        { ownerModel: 'OrganizationUser', role: 'member' },
+        { organizationUser: memberOrgUser },
+      );
       const { fetch } = createApp(memberUser, [memberOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
       expect(response.status).toBe(204);
     });
 
     it('owner can delete member token via org permission', async () => {
-      const { entity: token } = await createToken({ ownerModel: 'OrganizationUser', role: 'member' }, { organizationUser: memberOrgUser });
+      const { entity: token } = await createToken(
+        { ownerModel: 'OrganizationUser', role: 'member' },
+        { organizationUser: memberOrgUser },
+      );
       const { fetch } = createApp(ownerUser, [ownerOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
       expect(response.status).toBe(204);
     });
 
     it('admin can delete member token via org permission', async () => {
-      const { entity: token } = await createToken({ ownerModel: 'OrganizationUser', role: 'member' }, { organizationUser: memberOrgUser });
+      const { entity: token } = await createToken(
+        { ownerModel: 'OrganizationUser', role: 'member' },
+        { organizationUser: memberOrgUser },
+      );
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
       expect(response.status).toBe(204);
     });
 
     it('admin cannot delete owner token', async () => {
-      const { entity: token } = await createToken({ ownerModel: 'OrganizationUser', role: 'owner' }, { organizationUser: ownerOrgUser });
+      const { entity: token } = await createToken(
+        { ownerModel: 'OrganizationUser', role: 'owner' },
+        { organizationUser: ownerOrgUser },
+      );
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
       expect(response.status).toBe(403);
@@ -141,7 +175,10 @@ describe('OrganizationUser Token Permissions', () => {
     it('member cannot delete another member token', async () => {
       // Create another member
       const { entity: otherMemberOrgUser } = await createOrganizationUser({ role: 'member' }, { organization: org });
-      const { entity: token } = await createToken({ ownerModel: 'OrganizationUser', role: 'member' }, { organizationUser: otherMemberOrgUser });
+      const { entity: token } = await createToken(
+        { ownerModel: 'OrganizationUser', role: 'member' },
+        { organizationUser: otherMemberOrgUser },
+      );
       const { fetch } = createApp(memberUser, [memberOrgUser]);
       const response = await fetch(del(`/api/v1/token/${token.id}`));
       expect(response.status).toBe(403);

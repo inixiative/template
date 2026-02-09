@@ -1,5 +1,5 @@
-import { compact, isNil } from 'lodash-es';
 import { log } from '@template/shared/logger';
+import { compact, isNil } from 'lodash-es';
 import { getRedisClient } from './client';
 import { redisNamespace } from './namespaces';
 
@@ -11,12 +11,12 @@ type Identifier = string | Record<string, string>;
 // ISO 8601 date regex for reviver
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
 
-function dateReviver(_key: string, value: any): any {
+const dateReviver = (_key: string, value: any): any => {
   if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
     return new Date(value);
   }
   return value;
-}
+};
 
 /**
  * Build a cache key. Composite keys are sorted alphabetically for consistency.
@@ -29,7 +29,7 @@ function dateReviver(_key: string, value: any): any {
  * cacheKey('user', 'abc-123', ['organizationUsers'])                 // cache:user:id:abc-123:organizationUsers
  * cacheKey('session', { userId: 'abc-123' }, [], true)               // cache:session:userId:abc-123:*
  */
-export function cacheKey(accessor: string, identifier: Identifier, tags: string[] = [], wildcard = false): string {
+export const cacheKey = (accessor: string, identifier: Identifier, tags: string[] = [], wildcard = false): string => {
   const idParts: string[] = [];
 
   if (typeof identifier === 'string') {
@@ -43,13 +43,13 @@ export function cacheKey(accessor: string, identifier: Identifier, tags: string[
   }
 
   return compact([redisNamespace.cache, accessor, ...idParts, ...tags, wildcard && '*']).join(':');
-}
+};
 
-function validateKey(key: string): void {
+const validateKey = (key: string): void => {
   if (key.includes('undefined')) {
     throw new Error(`Cache key contains 'undefined': ${key}`);
   }
-}
+};
 
 /**
  * Get value from cache, or compute and store it.
@@ -70,7 +70,7 @@ function validateKey(key: string): void {
  * const stats = await cache(cacheKey('stats', 'daily'), fetchStats, 60 * 60);
  * ```
  */
-export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> {
+export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> => {
   validateKey(key);
 
   const redis = getRedisClient();
@@ -95,13 +95,13 @@ export async function cache<T>(key: string, fn: () => Promise<T>, ttl: number = 
   });
 
   return value;
-}
+};
 
-export async function upsertCache<T>(
+export const upsertCache = async <T>(
   key: string,
   value: T,
   options: { ttl?: number; force?: boolean } = {},
-): Promise<boolean> {
+): Promise<boolean> => {
   const { ttl = DEFAULT_TTL, force = false } = options;
   validateKey(key);
 
@@ -113,7 +113,7 @@ export async function upsertCache<T>(
   } catch {
     return false;
   }
-}
+};
 
 /**
  * Clear cache entries matching a pattern.
@@ -125,7 +125,7 @@ export async function upsertCache<T>(
  * await clearKey('cache:User:*');             // Pattern with wildcard
  * await clearKey('cache:*');                  // All cache entries
  */
-export async function clearKey(pattern: string): Promise<number> {
+export const clearKey = async (pattern: string): Promise<number> => {
   validateKey(pattern);
 
   try {
@@ -155,4 +155,4 @@ export async function clearKey(pattern: string): Promise<number> {
     log.error(`Failed to clear cache for pattern ${pattern}:`, error);
     return 0;
   }
-}
+};

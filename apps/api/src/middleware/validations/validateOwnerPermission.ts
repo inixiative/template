@@ -1,6 +1,6 @@
 import { db, hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Action } from '@template/permissions/client';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { HTTPException } from 'hono/http-exception';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 

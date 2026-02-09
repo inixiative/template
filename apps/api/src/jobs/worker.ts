@@ -1,5 +1,5 @@
-import { db } from '@template/db';
-import { log, logScope, LogScope } from '@template/shared/logger';
+import { createRedisConnection, db } from '@template/db';
+import { LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
@@ -7,7 +7,6 @@ import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
-import { createRedisConnection } from '@template/db';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -36,33 +35,35 @@ export const initializeWorker = async (): Promise<void> => {
       const handler = jobHandlers[job.name];
 
       const scopeId = `${job.name}:${job.id}`;
-      await logScope(LogScope.worker, () => logScope(scopeId, () =>
-        db.scope(scopeId, async () => {
-          // Helper that logs to both stdout and BullBoard
-          const jobLog = (message: string) => {
-            log.info(message);
-            job.log(message);
-          };
+      await logScope(LogScope.worker, () =>
+        logScope(scopeId, () =>
+          db.scope(scopeId, async () => {
+            // Helper that logs to both stdout and BullBoard
+            const jobLog = (message: string) => {
+              log.info(message);
+              job.log(message);
+            };
 
-          const ctx: WorkerContext = {
-            db,
-            queue,
-            job,
-            log: jobLog,
-          };
+            const ctx: WorkerContext = {
+              db,
+              queue,
+              job,
+              log: jobLog,
+            };
 
-          jobLog(`Processing job ${job.name} (${job.id})`);
+            jobLog(`Processing job ${job.name} (${job.id})`);
 
-          try {
-            await handler(ctx, job.data.payload || {});
-            jobLog(`Completed job ${job.name} (${job.id})`);
-          } catch (error) {
-            log.error(`Failed job ${job.name} (${job.id}):`, error);
-            job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-          }
-        }),
-      ));
+            try {
+              await handler(ctx, job.data.payload || {});
+              jobLog(`Completed job ${job.name} (${job.id})`);
+            } catch (error) {
+              log.error(`Failed job ${job.name} (${job.id}):`, error);
+              job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
+              throw error;
+            }
+          }),
+        ),
+      );
     },
     {
       connection: workerRedis,

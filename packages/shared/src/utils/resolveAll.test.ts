@@ -1,13 +1,9 @@
-import { describe, it, expect } from 'bun:test';
-import { resolveAll } from './resolveAll';
+import { describe, expect, it } from 'bun:test';
+import { resolveAll } from '@template/shared/utils/resolveAll';
 
 describe('resolveAll', () => {
   it('executes all functions and returns results in order', async () => {
-    const fns = [
-      async () => 1,
-      async () => 2,
-      async () => 3,
-    ];
+    const fns = [async () => 1, async () => 2, async () => 3];
     const results = await resolveAll(fns);
     expect(results).toEqual([1, 2, 3]);
   });

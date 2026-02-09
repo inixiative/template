@@ -1,5 +1,5 @@
+import type { AuthClient } from '@template/shared/lib/createAuthClient';
 import { useCallback, useState } from 'react';
-import type { AuthClient } from '#/lib/createAuthClient';
 
 export const useLogout = (authClient: AuthClient, onSuccess?: () => void) => {
   const [isLoading, setIsLoading] = useState(false);

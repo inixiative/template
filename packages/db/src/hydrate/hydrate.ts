@@ -1,7 +1,7 @@
 import type { Db } from '../clientTypes';
 import { cacheKey } from '../redis';
-import { getAccessorRelations, type Identifier } from '../utils/runtimeDataModel';
 import type { AccessorName } from '../utils/modelNames';
+import { getAccessorRelations, type Identifier } from '../utils/runtimeDataModel';
 import { fetchOne } from './fetchOne';
 import type { HydratedRecord } from './types';
 

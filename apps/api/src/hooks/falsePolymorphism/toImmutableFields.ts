@@ -1,4 +1,4 @@
-import { PolymorphismRegistry, type ModelName } from '@template/db';
+import { type ModelName, PolymorphismRegistry } from '@template/db';
 
 type ImmutableFieldsOverride = {
   exclude?: string[];

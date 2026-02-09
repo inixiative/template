@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
-import { SpaceRole } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createSpaceUser, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
+import type { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
@@ -42,7 +42,7 @@ describe('GET /me/spaces', () => {
 
   it('returns user spaces with membership info', async () => {
     // createSpaceUser auto-creates: User, Organization, OrganizationUser, Space
-    const { entity: spaceUser, context } = await createSpaceUser({ role: SpaceRole.admin }, { user });
+    const { entity: spaceUser, context } = await createSpaceUser({ role: Role.admin }, { user });
     const space = context.space!;
     const org = context.organization!;
 
@@ -59,8 +59,8 @@ describe('GET /me/spaces', () => {
 
   it('returns multiple spaces across orgs', async () => {
     // Two separate SpaceUsers = two separate orgs and spaces
-    await createSpaceUser({ role: SpaceRole.owner }, { user });
-    await createSpaceUser({ role: SpaceRole.member }, { user });
+    await createSpaceUser({ role: Role.owner }, { user });
+    await createSpaceUser({ role: Role.member }, { user });
 
     const response = await fetch(get('/api/v1/me/spaces'));
     const { data, pagination } = await json<ReadManySpacesResponse>(response);

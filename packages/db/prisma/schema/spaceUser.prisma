@@ -12,7 +12,7 @@ model SpaceUser {
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
 
-    role         SpaceRole @default(member)
+    role         Role @default(member)
     entitlements Json?
 
     // Relations
@@ -33,11 +33,4 @@ model SpaceUser {
     // ==========================================================================
     // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
     // ==========================================================================
-}
-
-enum SpaceRole {
-    owner
-    admin
-    member
-    viewer
 }

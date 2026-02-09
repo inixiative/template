@@ -1,17 +1,25 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "useArrowFunction": "error"
       },
       "style": {
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "noDefaultExport": "error",
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "filenameCases": ["camelCase", "PascalCase"],
+            "requireAscii": true,
+            "strictCase": true
+          }
+        }
       }
     }
   },
@@ -29,6 +37,46 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "_old", ".next", "*.gen.ts", "generated"]
-  }
+    "includes": ["**", "!**/node_modules", "!**/dist", "!**/_old", "!**/.next", "!**/*.gen.ts", "!**/generated", "!tmp"]
+  },
+  "overrides": [
+    {
+      "includes": ["apps/**/app/routes/**", "**/app/routes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "style": {},
+          "complexity": {
+            "useArrowFunction": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/vite.config.ts",
+        "**/postcss.config.mjs",
+        "**/app.config.ts",
+        "**/prisma.config.ts",
+        "**/openapiTs.config.ts",
+        "**/apps/**/app/ssr.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -1,12 +1,15 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "rootDir": "..",
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
       "@template/db/*": ["./src/*"],
       "@template/db-test/*": ["./test/*"],
-      "@template/shared/*": ["../shared/src/*"]
+      "@template/permissions/*": ["../permissions/src/*"],
+      "@template/shared/*": ["../shared/src/*"],
+      "@template/ui/*": ["../ui/src/*"]
     },
     "skipLibCheck": true
   },

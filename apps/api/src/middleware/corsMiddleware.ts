@@ -29,6 +29,6 @@ const validateOrigin = (origin: string): string | null => {
 export const corsMiddleware = cors({
   origin: validateOrigin,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'spoof-user-email'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-spoof-user-email'],
   credentials: true,
 });

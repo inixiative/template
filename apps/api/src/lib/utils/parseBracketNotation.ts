@@ -6,7 +6,7 @@
  * - ?filters[status]=active → { filters: { status: 'active' } }
  * - ?searchFields[user][name][contains]=dragon → { searchFields: { user: { name: { contains: 'dragon' } } } }
  */
-export function parseBracketNotation(url: string): Record<string, any> {
+export const parseBracketNotation = (url: string): Record<string, any> => {
   const params = new URLSearchParams(url.split('?')[1] || '');
   const result: Record<string, any> = {};
 
@@ -28,4 +28,4 @@ export function parseBracketNotation(url: string): Record<string, any> {
   }
 
   return result;
-}
+};

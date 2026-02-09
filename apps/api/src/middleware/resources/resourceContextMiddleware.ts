@@ -1,4 +1,4 @@
-import { toModelName, type AccessorName, type Db } from '@template/db';
+import { type AccessorName, type Db, toModelName } from '@template/db';
 import type { MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';

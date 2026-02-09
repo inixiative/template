@@ -3,14 +3,14 @@ import { createPermissions } from '@template/permissions';
 import { logScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
+import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { AppEnv } from '#/types/appEnv';
 
 export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
-  const batchId = c.req.header('X-Batch-Id');
+  const batchId = c.req.header('x-batch-id');
   let batchContext;
   if (batchId) {
     const { getBatchContext } = await import('#/modules/batch/services/batchRegistry');
@@ -25,15 +25,15 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('permix', createPermissions());
 
   if (batchContext) {
+    // App metadata is read-only, safe to reuse
     c.set('app', batchContext.baseContext.get('app'));
-    c.set('user', batchContext.baseContext.get('user'));
-    c.set('session', batchContext.baseContext.get('session'));
-    c.set('organizationUsers', batchContext.baseContext.get('organizationUsers'));
-    c.set('organizations', batchContext.baseContext.get('organizations'));
-    c.set('spaceUsers', batchContext.baseContext.get('spaceUsers'));
-    c.set('spaces', batchContext.baseContext.get('spaces'));
-    c.set('token', batchContext.baseContext.get('token'));
-    c.set('spoofedBy', batchContext.baseContext.get('spoofedBy'));
+
+    // Deep clone mutable context to prevent mutation leakage between batch sub-requests
+    const keysToClone = ['user', 'session', 'organizationUsers', 'organizations', 'spaceUsers', 'spaces', 'token', 'spoofedBy'] as const;
+    for (const key of keysToClone) {
+      const value = batchContext.baseContext.get(key);
+      c.set(key, value ? structuredClone(value) : null);
+    }
 
     const user = batchContext.baseContext.get('user');
     if (user) {

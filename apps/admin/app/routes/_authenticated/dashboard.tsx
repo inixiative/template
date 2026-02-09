@@ -1,21 +1,28 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Card, CardHeader, CardTitle, CardContent } from '@template/ui';
+import { useAppStore, usePageMeta } from '@template/shared';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 
-export const Route = createFileRoute('/_authenticated/dashboard')({
-  component: DashboardPage,
-});
+const DashboardPage = () => {
+  const context = useAppStore((state) => state.tenant.context);
+  const { title, description } = usePageMeta();
 
-function DashboardPage() {
   return (
     <div className="p-8">
       <Card>
         <CardHeader>
-          <CardTitle>Admin Dashboard</CardTitle>
+          <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Organization management coming soon.</p>
+          <p className="text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Context: <span className="font-mono">{context.type}</span>
+          </p>
         </CardContent>
       </Card>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/dashboard')({
+  component: DashboardPage,
+});

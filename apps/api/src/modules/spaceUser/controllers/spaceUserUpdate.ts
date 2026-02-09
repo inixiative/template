@@ -1,4 +1,4 @@
-import { db, hydrate, type HydratedRecord } from '@template/db';
+import { db, type HydratedRecord, hydrate } from '@template/db';
 import { greaterRole } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { HTTPException } from 'hono/http-exception';

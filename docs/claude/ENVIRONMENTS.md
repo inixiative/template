@@ -184,13 +184,13 @@ bun run with prod api bun run start
 
 ### Loading Order
 
-For `bun run with local api bun run dev`:
+For `bun run with local api bun run local`:
 
 ```
 1. Load Doppler config: dev_api (base secrets)
 2. Load /.env.local (overrides Doppler)
 3. Load /apps/api/.env.local (overrides)
-4. Run: bun run dev
+4. Run: bun run local
 ```
 
 For `bun run with prod api bun run start`:
@@ -206,7 +206,7 @@ For `bun run with prod api bun run start`:
 
 ```json
 {
-  "local:api": "bun run with local api bun --cwd apps/api dev",
+  "with": "./scripts/deployment/with-env.sh",
   "test": "bun run with test api bun test"
 }
 ```

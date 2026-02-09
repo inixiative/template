@@ -1,4 +1,4 @@
-import { readdirSync, writeFileSync, readFileSync } from 'fs';
+import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
 
@@ -16,9 +16,7 @@ const modelRelations: Record<string, string[]> = {};
 for (const modelName of modelNames) {
   const model = dataModel.models[modelName];
   if (model) {
-    modelRelations[modelName] = model.fields
-      .filter((f) => f.kind === 'object')
-      .map((f) => f.name);
+    modelRelations[modelName] = model.fields.filter((f) => f.kind === 'object').map((f) => f.name);
   } else {
     modelRelations[modelName] = [];
   }

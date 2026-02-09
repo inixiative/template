@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { createTestWorker } from '#tests/createTestWorker';
-import { type SupersedingJobHandler, makeSupersedingJob } from '#/jobs/makeSupersedingJob';
+import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
+import { createTestWorker } from '#tests/createTestWorker';
 
 describe('makeSupersedingJob', () => {
   let ctx: WorkerContext;

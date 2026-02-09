@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, type UseMutationOptions, type QueryKey } from '@tanstack/react-query';
+import { type QueryKey, type UseMutationOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Optimistic mutation wrapper for TanStack Query.
@@ -18,12 +18,7 @@ import { useMutation, useQueryClient, type UseMutationOptions, type QueryKey } f
  * });
  * ```
  */
-export function useOptimisticMutation<
-  TData,
-  TError = Error,
-  TVariables = void,
-  TQueryData = unknown,
->(options: {
+export const useOptimisticMutation = <TData, TError = Error, TVariables = void, TQueryData = unknown>(options: {
   /** The mutation function */
   mutationFn: (variables: TVariables) => Promise<TData>;
   /** Query key to invalidate on success/error */
@@ -39,7 +34,7 @@ export function useOptimisticMutation<
     UseMutationOptions<TData, TError, TVariables, { previousData: TQueryData | undefined }>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
-}) {
+}) => {
   const queryClient = useQueryClient();
   const { mutationFn, queryKey, optimisticUpdate, mutationOptions } = options;
 
@@ -74,14 +69,14 @@ export function useOptimisticMutation<
 
     ...mutationOptions,
   });
-}
+};
 
 /**
  * Simplified optimistic mutation for list operations.
  * Handles common patterns: create, update, delete items from a list.
  * Operation names match controller/route naming conventions.
  */
-export function useOptimisticListMutation<
+export const useOptimisticListMutation = <
   TItem extends { id: string },
   TError = Error,
   TVariables extends Partial<TItem> & { id: string } = Partial<TItem> & { id: string },
@@ -94,7 +89,7 @@ export function useOptimisticListMutation<
     UseMutationOptions<TItem, TError, TVariables, { previousData: TItem[] | undefined }>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
-}) {
+}) => {
   const { operation, ...rest } = options;
 
   return useOptimisticMutation<TItem, TError, TVariables, TItem[]>({
@@ -114,4 +109,4 @@ export function useOptimisticListMutation<
       }
     },
   });
-}
+};

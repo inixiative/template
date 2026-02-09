@@ -5,15 +5,16 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "../../scripts/watch/api.sh",
-    "dev:worker": "../../scripts/watch/worker.sh",
+    "local": "bun --hot src/index.ts",
+    "local:worker": "bun --hot src/jobs/worker.ts",
     "start": "bun run src/index.ts",
+    "start:worker": "bun run src/jobs/worker.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun",
     "test": "bun run --cwd ../.. with test api bun test --concurrency=1",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "typecheck": "tsc --noEmit",
-    "generate:openapi": "bun run scripts/generateOpenApiSpec.ts"
+    "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.json bun run ./scripts/generateOpenApiSpec.ts && cp ./openapi.local.json ../../packages/shared/openapi.json"
   },
   "dependencies": {
     "@bull-board/api": "^6.14.2",

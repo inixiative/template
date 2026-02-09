@@ -38,7 +38,7 @@ describe('POST /api/v1/batch/execute', () => {
         post('/api/v1/batch/execute', {
           requests: [[{ method: 'GET', path: '/api/v1/me' }]],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -61,7 +61,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -89,7 +89,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/organization/<<0.0.body.data.id>>' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -107,7 +107,7 @@ describe('POST /api/v1/batch/execute', () => {
           requests: [[{ method: 'GET', path: '/api/v1/me' }]],
           headers: { 'X-Custom-Header': 'test-value' },
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -130,7 +130,7 @@ describe('POST /api/v1/batch/execute', () => {
           ],
           headers: { 'X-Custom': 'shared' },
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -161,7 +161,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'transactionAll',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -202,7 +202,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'transactionAll',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -239,7 +239,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'transactionPerRound',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -275,7 +275,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'transactionPerRound',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -300,7 +300,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/me/organizations' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -325,7 +325,7 @@ describe('POST /api/v1/batch/execute', () => {
             ],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -348,7 +348,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/me/organizations' }],
           ],
           strategy: 'failOnRound',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -371,7 +371,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/me/organizations' }],
           ],
           strategy: 'failOnRound',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -393,7 +393,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/me/spaces' }],
           ],
           strategy: 'failOnRound',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -415,7 +415,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/organization/<<invalid>>' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -432,7 +432,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/organization/<<0.0.<<1.0.id>>>>' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -449,7 +449,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/organization/<<1.0.id>>' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -466,7 +466,7 @@ describe('POST /api/v1/batch/execute', () => {
             [{ method: 'GET', path: '/api/v1/organization/<<2.0.id>>' }],
           ],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -480,7 +480,7 @@ describe('POST /api/v1/batch/execute', () => {
         post('/api/v1/batch/execute', {
           requests: [[{ method: 'GET', path: 'https://evil.com/api' }]],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       const { data } = await json(response);
@@ -496,7 +496,7 @@ describe('POST /api/v1/batch/execute', () => {
         post('/api/v1/batch/execute', {
           requests: tooManyRounds,
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       expect(response.status).toBe(400);
@@ -509,7 +509,7 @@ describe('POST /api/v1/batch/execute', () => {
         post('/api/v1/batch/execute', {
           requests: [tooManyRequests],
           strategy: 'allowFailures',
-        })
+        }),
       );
 
       expect(response.status).toBe(400);

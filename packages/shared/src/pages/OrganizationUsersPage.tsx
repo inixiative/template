@@ -1,18 +1,17 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent, Button, Table } from '@template/ui';
-import { InviteUserModal } from '../components/InviteUserModal';
-import { checkPermission } from '#/lib';
-import { useOptimisticListMutation } from '#/hooks';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  type OrganizationReadManyUsersResponse,
+  organizationCreateOrganizationUserMutation,
   organizationReadManyUsersOptions,
   organizationReadManyUsersQueryKey,
-  organizationCreateOrganizationUserMutation,
   organizationUserDeleteMutation,
-  type OrganizationReadManyUsersResponse,
 } from '@template/shared/apiClient';
-import { UserPlus, Trash2 } from 'lucide-react';
-import { useState, useMemo } from 'react';
-import { useAppStore } from '#/store';
+import { InviteUserModal } from '@template/shared/components/InviteUserModal';
+import { checkPermission } from '@template/shared/hooks/usePermission';
+import { useAppStore } from '@template/shared/store';
+import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui';
+import { Trash2, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 
 type OrganizationUser = NonNullable<OrganizationReadManyUsersResponse>['data'][number];
 
@@ -26,24 +25,18 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const tenant = useAppStore((state) => state.tenant);
   const queryClient = useQueryClient();
 
-  const { data: response, isLoading } = useQuery(
-    organizationReadManyUsersOptions({ path: { id: organizationId } })
-  );
+  const { data: response, isLoading } = useQuery(organizationReadManyUsersOptions({ path: { id: organizationId } }));
   const users = response?.data || [];
 
-  const deleteMutation = useOptimisticListMutation<OrganizationUser>({
-    mutationFn: (variables) =>
-      organizationUserDeleteMutation({ path: { id: variables.id } }).mutationFn({ path: { id: variables.id } }),
-    queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
-    operation: 'delete',
+  const deleteMutation = useMutation({
+    ...organizationUserDeleteMutation(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }) });
+    },
   });
 
   const createMutation = useMutation({
-    mutationFn: (variables: { email: string; role: string }) =>
-      organizationCreateOrganizationUserMutation({ path: { id: organizationId } }).mutationFn({
-        path: { id: organizationId },
-        body: variables,
-      }),
+    ...organizationCreateOrganizationUserMutation(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }) });
     },
@@ -53,18 +46,18 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'user.name',
       label: 'Name',
-      render: (orgUser: OrganizationUser) => orgUser.user?.name || 'N/A',
+      render: (orgUser: OrganizationUser) => orgUser.name || 'N/A',
     },
     {
       key: 'user.email',
       label: 'Email',
-      render: (orgUser: OrganizationUser) => orgUser.user?.email || 'N/A',
+      render: (orgUser: OrganizationUser) => orgUser.email || 'N/A',
     },
     {
       key: 'role',
       label: 'Role',
       render: (orgUser: OrganizationUser) => (
-        <span className="capitalize">{orgUser.role}</span>
+        <span className="capitalize">{(orgUser as any).organizationUser?.role ?? 'member'}</span>
       ),
     },
     {
@@ -83,7 +76,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => deleteMutation.mutate(orgUser)}
+              onClick={() => deleteMutation.mutate({ path: { id: orgUser.id } })}
               show={checkPermission(permissions, 'organizationUser', orgUserRecord, 'manage')}
             >
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -95,7 +88,10 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   ];
 
   const handleInvite = (email: string, role: string) => {
-    createMutation.mutate({ email, role } as OrganizationUser);
+    createMutation.mutate({
+      path: { id: organizationId },
+      body: { email, role: role as any },
+    });
     setIsInviteModalOpen(false);
   };
 
@@ -112,9 +108,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>Organization Users</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage users and their roles in this organization
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Manage users and their roles in this organization</p>
             </div>
             <Button
               onClick={() => setIsInviteModalOpen(true)}

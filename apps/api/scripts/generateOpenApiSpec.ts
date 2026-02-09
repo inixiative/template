@@ -11,7 +11,7 @@ const spec = app.getOpenAPIDocument({
   },
 });
 
-const outputPath = resolve(__dirname, '../openapi.json');
+const outputPath = resolve(process.cwd(), process.env.OPENAPI_OUTPUT_PATH || './openapi.local.json');
 writeFileSync(outputPath, JSON.stringify(spec, null, 2));
 console.log(`OpenAPI spec written to ${outputPath}`);
 process.exit(0);

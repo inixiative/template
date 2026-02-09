@@ -1,8 +1,8 @@
 import { db } from '@template/db';
+import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
-import { registerBatch, refreshBatchContext, unregisterBatch } from '#/modules/batch/services/batchRegistry';
-import { executeRequest } from './executeRequest';
-import type { StrategyExecutor } from './types';
+import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
+import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
 export const transactionAll: StrategyExecutor = async (
   app,

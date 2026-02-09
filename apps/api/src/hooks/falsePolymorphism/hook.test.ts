@@ -1,6 +1,12 @@
-import { describe, it, expect, afterAll } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { createUser, createOrganization, createOrganizationUser, getNextSeq, cleanupTouchedTables } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+  getNextSeq,
+} from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 
 // Polymorphism validation is now handled via rules (auto-injected from FalsePolymorphismRegistry)
@@ -28,7 +34,13 @@ describe('falsePolymorphism hook', () => {
     const seq = getNextSeq();
 
     const token = await db.token.create({
-      data: { name: 'test', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'Organization', organizationId: org.id },
+      data: {
+        name: 'test',
+        keyHash: `h${seq}`,
+        keyPrefix: `p${seq}`,
+        ownerModel: 'Organization',
+        organizationId: org.id,
+      },
     });
 
     expect(token.organizationId).toBe(org.id);
@@ -61,7 +73,14 @@ describe('falsePolymorphism hook', () => {
 
     const promise = async () =>
       db.token.create({
-        data: { name: 'test', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'User', userId: user.id, organizationId: org.id },
+        data: {
+          name: 'test',
+          keyHash: `h${seq}`,
+          keyPrefix: `p${seq}`,
+          ownerModel: 'User',
+          userId: user.id,
+          organizationId: org.id,
+        },
       });
 
     await expect(promise).toThrow('Invalid ownerModel value on Token');
@@ -77,7 +96,14 @@ describe('falsePolymorphism hook', () => {
       db.token.createManyAndReturn({
         data: [
           { name: 'valid', keyHash: `h${seq1}`, keyPrefix: `p${seq1}`, ownerModel: 'User', userId: user.id },
-          { name: 'invalid', keyHash: `h${seq2}`, keyPrefix: `p${seq2}`, ownerModel: 'User', userId: user.id, organizationId: org.id },
+          {
+            name: 'invalid',
+            keyHash: `h${seq2}`,
+            keyPrefix: `p${seq2}`,
+            ownerModel: 'User',
+            userId: user.id,
+            organizationId: org.id,
+          },
         ],
       });
 
@@ -190,7 +216,13 @@ describe('falsePolymorphism hook', () => {
               createMany: {
                 data: [
                   { name: 'valid', keyHash: `h${seq1}`, keyPrefix: `p${seq1}`, ownerModel: 'User' },
-                  { name: 'invalid', keyHash: `h${seq2}`, keyPrefix: `p${seq2}`, ownerModel: 'User', organizationId: org.id },
+                  {
+                    name: 'invalid',
+                    keyHash: `h${seq2}`,
+                    keyPrefix: `p${seq2}`,
+                    ownerModel: 'User',
+                    organizationId: org.id,
+                  },
                 ],
               },
             },

@@ -1,6 +1,6 @@
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 
-export function OrganizationWebhooksTab({ organizationId }: { organizationId: string }) {
+export const OrganizationWebhooksTab = ({ organizationId }: { organizationId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>
@@ -8,12 +8,10 @@ export function OrganizationWebhooksTab({ organizationId }: { organizationId: st
           <CardTitle>Webhooks</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Configure webhooks for this organization
-          </p>
+          <p className="text-sm text-muted-foreground mb-4">Configure webhooks for this organization</p>
           <Button>Create Webhook</Button>
         </CardContent>
       </Card>
     </div>
   );
-}
+};

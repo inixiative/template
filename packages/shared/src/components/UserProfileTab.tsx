@@ -1,4 +1,5 @@
-import { Card, CardHeader, CardTitle, CardContent, Input, Label, Button } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, ThemeToggle } from '@template/ui';
+import { useAppStore } from '../store';
 
 export const UserProfileTab = () => {
   return (
@@ -17,6 +18,15 @@ export const UserProfileTab = () => {
             <Input id="email" type="email" placeholder="your@email.com" />
           </div>
           <Button>Save Changes</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ThemeToggle />
         </CardContent>
       </Card>
     </div>

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'bun:test';
-import { db } from '@template/db';
-import { createUser, createOrganizationUser, getNextSeq, cleanupTouchedTables } from '@template/db/test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { registerRulesHook } from './hook';
-import { clearRulesCache, setRulesCache } from './registry';
+import { db } from '@template/db';
+import { cleanupTouchedTables, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import { registerRulesHook } from '#/hooks/rules/hook';
+import { clearRulesCache, setRulesCache } from '#/hooks/rules/registry';
 
 registerRulesHook();
 
@@ -154,7 +154,12 @@ describe('rules hook', () => {
 
   describe('recursive nested validation', () => {
     it('validates nested create on relation', async () => {
-      setRulesCache('OrganizationUser', { field: 'role', operator: Operator.in, value: ['member', 'admin', 'owner'], error: 'invalid role' });
+      setRulesCache('OrganizationUser', {
+        field: 'role',
+        operator: Operator.in,
+        value: ['member', 'admin', 'owner'],
+        error: 'invalid role',
+      });
 
       const { entity: user } = await createUser();
       const seq = getNextSeq();
@@ -175,7 +180,12 @@ describe('rules hook', () => {
 
     it('validates nested update on relation', async () => {
       const { entity: orgUser } = await createOrganizationUser({ role: 'member' });
-      setRulesCache('OrganizationUser', { field: 'role', operator: Operator.in, value: ['member', 'admin', 'owner'], error: 'invalid role' });
+      setRulesCache('OrganizationUser', {
+        field: 'role',
+        operator: Operator.in,
+        value: ['member', 'admin', 'owner'],
+        error: 'invalid role',
+      });
 
       const result = await db.user.update({
         where: { id: orgUser.userId },

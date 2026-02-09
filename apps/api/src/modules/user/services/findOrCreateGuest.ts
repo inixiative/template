@@ -11,10 +11,7 @@ type GuestParams = {
  * Find existing user by email or create a guest user.
  * Guest users have emailVerified=false and no linked accounts.
  */
-export async function findUserOrCreateGuest(
-  db: Db,
-  { email, name }: GuestParams,
-): Promise<User> {
+export const findUserOrCreateGuest = async (db: Db, { email, name }: GuestParams): Promise<User> => {
   const normalized = normalizeEmail(email);
 
   return db.user.upsert({
@@ -26,4 +23,4 @@ export async function findUserOrCreateGuest(
       emailVerified: false,
     },
   });
-}
+};

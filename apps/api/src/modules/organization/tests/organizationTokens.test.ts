@@ -10,8 +10,8 @@ import {
   createUser,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
-import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
-import { organizationReadManyTokensRoute } from '#/modules/organization/routes/organizationReadManyTokens';
+import type { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
+import type { organizationReadManyTokensRoute } from '#/modules/organization/routes/organizationReadManyTokens';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
@@ -50,7 +50,9 @@ describe('Organizations Tokens', () => {
 
   describe('POST /api/v1/organization/:id/tokens', () => {
     it('creates a token and returns raw key', async () => {
-      const response = await fetch(post(`/api/v1/organization/${org.id}/tokens`, { name: 'Org API Key', role: 'admin' }));
+      const response = await fetch(
+        post(`/api/v1/organization/${org.id}/tokens`, { name: 'Org API Key', role: 'admin' }),
+      );
       const { data } = await json<CreateTokenResponse>(response);
 
       expect(response.status).toBe(201);

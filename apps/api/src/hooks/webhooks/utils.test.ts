@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import {
-  isWebhookEnabled,
-  getRelatedWebhookRefs,
   getIgnoredFields,
-  selectRelevantFields,
+  getRelatedWebhookRefs,
   isNoOpUpdate,
-} from './utils';
+  isWebhookEnabled,
+  selectRelevantFields,
+} from '#/hooks/webhooks/utils';
 
 describe('webhook utils', () => {
   describe('isWebhookEnabled', () => {

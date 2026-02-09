@@ -1,7 +1,7 @@
 import { db } from '@template/db/client';
 import type { CheckConstraint } from './types';
 
-export async function addCheckConstraint({ table, field, condition = '>= 0' }: CheckConstraint) {
+export const addCheckConstraint = async ({ table, field, condition = '>= 0' }: CheckConstraint) => {
   const name = `${table}_${field}_check`;
 
   await db.$executeRawUnsafe(`
@@ -15,4 +15,4 @@ export async function addCheckConstraint({ table, field, condition = '>= 0' }: C
   await db.$executeRawUnsafe(`
     ALTER TABLE "${table}" ADD CONSTRAINT "${name}" CHECK ("${field}" ${condition});
   `);
-}
+};

@@ -1,4 +1,3 @@
-
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySentRoute } from '#/modules/inquiry/routes/inquirySent';
 import { getUserOrganizationIds } from '#/modules/inquiry/services/access';

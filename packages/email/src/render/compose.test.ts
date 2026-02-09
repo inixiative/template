@@ -1,7 +1,7 @@
-import { describe, it, expect, afterAll, beforeEach } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
-import { composeTemplate, composeComponent } from './compose';
+import { composeComponent, composeTemplate } from './compose';
 import { EmailRenderError } from './errors';
 
 describe('composeTemplate', () => {

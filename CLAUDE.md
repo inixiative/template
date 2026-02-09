@@ -49,7 +49,9 @@ Examples:
 | Category | Doc | When to Read |
 |----------|-----|--------------|
 | **Setup** | [SETUP.md](docs/claude/SETUP.md) | Prerequisites, initial setup, forking |
+| **Init Script** | [INIT_SCRIPT.md](docs/claude/INIT_SCRIPT.md) | Automated initialization, rename, secrets, cloud setup |
 | **Developer** | [DEVELOPER.md](docs/claude/DEVELOPER.md) | Daily workflow, commands, debugging |
+| **Turborepo** | [TURBOREPO.md](docs/claude/TURBOREPO.md) | Task orchestration, watch mode, caching, naming conventions |
 | **Docker** | [DOCKER.md](docs/claude/DOCKER.md) | Local Postgres/Redis, docker-compose |
 | **Scripts** | [SCRIPTS.md](docs/claude/SCRIPTS.md) | Commands, script locations |
 | **Environments** | [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md) | Env vars, Doppler, with-env composition |
@@ -64,11 +66,38 @@ Examples:
 
 ## Quick Reference
 
+**Development:**
 ```bash
-cd packages/db && bun run db:generate   # Generate Prisma
-cd apps/api && bun run dev              # Run API
-cd apps/api && bun test                 # Run tests
+bun run local                                # All services with Turborepo watching
+turbo watch local#api                        # Just API with hot reload
+turbo watch local:worker#api                 # Just worker with hot reload
+bun run with prod api turbo watch local#api  # API with prod env + turbo watching
 ```
+
+**Production:**
+```bash
+bun run start:api                            # Start API server
+bun run start:worker                         # Start background worker
+```
+
+**Database:**
+```bash
+cd packages/db && bun run db:generate        # Generate Prisma client + Zod schemas
+bun run db:push                              # Push schema to database
+bun run db:seed                              # Seed database
+```
+
+**Testing:**
+```bash
+cd apps/api && bun test                      # Run API tests
+bun run test                                 # Run all tests
+```
+
+**Turborepo Conventions:**
+- Tasks in `turbo.json`: Match script names → `local`, `local:worker`, `build`
+- Package scripts: Use `:` delimiter → `local`, `local:worker`, `start:worker`
+- Filtering: `turbo watch <task>#<package>` → `turbo watch local#api`
+- Env composition: `bun run with <env> <app> turbo watch <task>` → `bun run with prod api turbo watch local#api`
 
 ## Path Aliases
 

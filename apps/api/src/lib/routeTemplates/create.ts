@@ -1,6 +1,13 @@
 import { createRoute as honoCreateRoute } from '@hono/zod-openapi';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
-import { buildOperationId, buildRequest, buildResponses, buildRoutePath, buildTags, prepareMiddleware } from '#/lib/routeTemplates/utils';
+import {
+  buildOperationId,
+  buildRequest,
+  buildResponses,
+  buildRoutePath,
+  buildTags,
+  prepareMiddleware,
+} from '#/lib/routeTemplates/utils';
 
 export const createRoute = <const T extends RouteArgs>(args: T) => {
   const { model, submodel, action, description, skipId, many, middleware = [], admin, tags, ...routeArgs } = args;

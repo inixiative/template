@@ -28,10 +28,7 @@ export const mapRefs = (input: string): MapResult => {
   return { map, mjml, refs };
 };
 
-const processLevel = (
-  input: string,
-  map: RefMap,
-): { mjml: string; refs: string[] } => {
+const processLevel = (input: string, map: RefMap): { mjml: string; refs: string[] } => {
   const blocks = extractBlocks(input);
   if (!blocks.length) return { mjml: input, refs: [] };
 

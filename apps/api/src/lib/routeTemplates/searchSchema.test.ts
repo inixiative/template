@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createAdvancedSearchSchema } from './searchSchema';
+import { createAdvancedSearchSchema } from '#/lib/routeTemplates/searchSchema';
 
 describe('createAdvancedSearchSchema', () => {
   it('should create schema with specified fields', () => {

@@ -21,9 +21,7 @@ export const parseOrderBy = (orderBy: string[]): Record<string, Prisma.SortOrder
       throw new Error(`Invalid orderBy path: ${field}`);
     }
 
-    const sortOrder = direction.toLowerCase() === 'asc'
-      ? Prisma.SortOrder.asc
-      : Prisma.SortOrder.desc;
+    const sortOrder = direction.toLowerCase() === 'asc' ? Prisma.SortOrder.asc : Prisma.SortOrder.desc;
 
     return buildNestedPath(field, sortOrder);
   });

@@ -4,10 +4,8 @@
     "baseUrl": ".",
     "paths": {
       "#/*": ["./app/*"],
-      "@template/db": ["../../packages/db/src"],
-      "@template/shared": ["../../packages/shared/src"],
+      "@template/db/*": ["../../packages/db/src/*"],
       "@template/shared/*": ["../../packages/shared/src/*"],
-      "@template/ui": ["../../packages/ui/src"],
       "@template/ui/*": ["../../packages/ui/src/*"]
     }
   },

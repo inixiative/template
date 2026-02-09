@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
-import { logout } from './logout';
-import { useAppStore } from '../store';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
+import { logout } from '@template/shared/auth/logout';
+import { useAppStore } from '@template/shared/store';
 import '../test/setup';
 
 describe('logout', () => {
@@ -40,7 +40,7 @@ describe('logout', () => {
         hydrate: async () => {},
         clear: () => {},
       },
-    });
+    } as any);
   });
 
   it('should call signOut API and clear all state', async () => {
@@ -56,12 +56,9 @@ describe('logout', () => {
     const { http, HttpResponse } = await import('msw');
 
     server.use(
-      http.post('*/api/auth/sign-out', () => {
-        return HttpResponse.json(
-          { error: 'Server error' },
-          { status: 500 }
-        );
-      })
+      http.post('*/auth/sign-out', () => {
+        return HttpResponse.json({ error: 'Server error' }, { status: 500 });
+      }),
     );
 
     // Better-auth client doesn't throw on HTTP errors, so we just verify state is cleared

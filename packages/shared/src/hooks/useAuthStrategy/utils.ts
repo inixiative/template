@@ -1,4 +1,4 @@
-import type { AuthStrategy } from './types';
+import type { AuthStrategy } from '@template/shared/hooks/useAuthStrategy/types';
 
 export const isEmbedded = (): boolean => {
   try {
@@ -8,10 +8,7 @@ export const isEmbedded = (): boolean => {
   }
 };
 
-export const detectAuthStrategy = (options?: {
-  loginUrl?: string;
-  parentOrigin?: string;
-}): AuthStrategy => {
+export const detectAuthStrategy = (options?: { loginUrl?: string; parentOrigin?: string }): AuthStrategy => {
   if (isEmbedded()) {
     return { type: 'embed', parentOrigin: options?.parentOrigin };
   }

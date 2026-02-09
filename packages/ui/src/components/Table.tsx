@@ -1,4 +1,4 @@
-import { Button } from './Button';
+import { Button } from '@template/ui/components/Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type Column<T> = {
@@ -20,7 +20,7 @@ export type TableProps<T> = {
   };
 };
 
-export function Table<T>({ columns, data, keyExtractor, emptyMessage, show = true, pagination }: TableProps<T>) {
+export const Table = <T,>({ columns, data, keyExtractor, emptyMessage, show = true, pagination }: TableProps<T>) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
@@ -91,4 +91,4 @@ export function Table<T>({ columns, data, keyExtractor, emptyMessage, show = tru
       )}
     </div>
   );
-}
+};

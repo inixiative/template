@@ -726,8 +726,8 @@ model SpaceUser {
   createdAt       DateTime
   updatedAt       DateTime
 
-  role            SpaceRole   // owner, admin, member, viewer
-  entitlements    Json?       // Fine-grained permission overrides at space level
+  role            Role   // owner, admin, member, viewer
+  entitlements    Json?  // Fine-grained permission overrides at space level
 
   organizationId  String
   spaceId         String
@@ -741,13 +741,6 @@ model SpaceUser {
   tokens          Token[]
 
   @@unique([organizationId, spaceId, userId])
-}
-
-enum SpaceRole {
-  owner
-  admin
-  member
-  viewer
 }
 ```
 

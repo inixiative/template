@@ -3,12 +3,13 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": ".",
+    "lib": ["ES2022", "DOM"],
     "paths": {
       "#/*": ["./src/*"],
       "#tests/*": ["./tests/*"],
       "@template/db/*": ["../../packages/db/src/*"],
-      "@template/db-test/*": ["../../packages/db/test/*"],
-      "@template/permissions/*": ["../../packages/permissions/src/*"]
+      "@template/permissions/*": ["../../packages/permissions/src/*"],
+      "@template/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*"],

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AppEventPayload = {
   type: string;
@@ -47,17 +47,8 @@ type UseAppEventsReturn = {
 
 const MAX_EVENTS = 50;
 
-export function useAppEvents(options: UseAppEventsOptions = {}): UseAppEventsReturn {
-  const {
-    url,
-    token,
-    channels = [],
-    onEvent,
-    onOpen,
-    onClose,
-    reconnect = true,
-    reconnectDelay = 3000,
-  } = options;
+export const useAppEvents = (options: UseAppEventsOptions = {}): UseAppEventsReturn => {
+  const { url, token, channels = [], onEvent, onOpen, onClose, reconnect = true, reconnectDelay = 3000 } = options;
 
   const [connected, setConnected] = useState(false);
   const [connectionId, setConnectionId] = useState<string | null>(null);
@@ -206,4 +197,4 @@ export function useAppEvents(options: UseAppEventsOptions = {}): UseAppEventsRet
     ping,
     disconnect,
   };
-}
+};

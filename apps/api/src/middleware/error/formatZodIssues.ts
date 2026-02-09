@@ -1,10 +1,10 @@
 import type { ZodError } from 'zod';
-import type { IssueItem, PublicZodIssue } from './types';
+import type { IssueItem, PublicZodIssue } from '#/middleware/error/types';
 
-export function formatZodIssues(err: ZodError): PublicZodIssue[] {
+export const formatZodIssues = (err: ZodError): PublicZodIssue[] => {
   return err.issues.map((i: IssueItem) => ({
     path: i.path.join('.'),
     code: i.code,
     message: i.message,
   }));
-}
+};

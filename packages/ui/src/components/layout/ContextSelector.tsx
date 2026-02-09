@@ -1,24 +1,16 @@
 import { useState } from 'react';
-import {
-  ChevronsUpDown,
-  Check,
-  User,
-  Building2,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  Boxes,
-} from 'lucide-react';
-import { cn } from '@ui/lib/utils';
+import { useAppStore } from '@template/shared';
+import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/Avatar';
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from '../DropdownMenu';
-import { Avatar, AvatarFallback, AvatarImage } from '../Avatar';
+  DropdownMenuTrigger,
+} from '@template/ui/components/DropdownMenu';
+import { cn } from '@template/ui/lib/utils';
+import { Boxes, Building2, Check, ChevronDown, ChevronsUpDown, ChevronUp, Settings, User } from 'lucide-react';
 
 export type ContextType = 'personal' | 'organization' | 'space';
 
@@ -42,36 +34,27 @@ export type CurrentContext = {
 };
 
 export type ContextSelectorProps = {
-  current: CurrentContext;
-  organizations: OrganizationOption[];
-  onSelectPersonal: () => void;
-  onSelectOrganization: (organizationId: string) => void;
-  onSelectSpace: (organizationId: string, spaceId: string) => void;
   onManageOrganizations?: () => void;
   locked?: boolean;
   className?: string;
 };
 
 export const ContextSelector = ({
-  current,
-  organizations,
-  onSelectPersonal,
-  onSelectOrganization,
-  onSelectSpace,
   onManageOrganizations,
   locked = false,
   className,
 }: ContextSelectorProps) => {
+  // Read from Zustand store
+  const tenant = useAppStore((state) => state.tenant);
+  const auth = useAppStore((state) => state.auth);
+
+  const current = tenant.getCurrentContext();
+  const organizations = auth.getOrganizationOptions();
+
   const [expandedOrgId, setExpandedOrgId] = useState<string | null>(current.organizationId || null);
-  const [isOpen, setIsOpen] = useState(false);
 
   const toggleOrg = (orgId: string) => {
     setExpandedOrgId(expandedOrgId === orgId ? null : orgId);
-  };
-
-  const handleSelect = (callback: () => void) => {
-    callback();
-    setIsOpen(false);
   };
 
   if (locked) {
@@ -121,14 +104,12 @@ export const ContextSelector = ({
             if (spaces.length === 1) {
               const space = spaces[0];
               const isCurrentSpace =
-                current.organizationId === org.id &&
-                current.spaceId === space.id &&
-                current.type === 'space';
+                current.organizationId === org.id && current.spaceId === space.id && current.type === 'space';
 
               return (
                 <DropdownMenuItem
                   key={org.id}
-                  onClick={() => handleSelect(() => onSelectSpace(org.id, space.id))}
+                  onClick={() => tenant.selectSpace(space.id)}
                   className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                 >
                   <Building2 className="h-4 w-4 mr-2" />
@@ -140,37 +121,25 @@ export const ContextSelector = ({
 
             return (
               <div key={org.id}>
-                <DropdownMenuItem
-                  onClick={() => toggleOrg(org.id)}
-                  className="cursor-pointer"
-                >
+                <DropdownMenuItem onClick={() => toggleOrg(org.id)} className="cursor-pointer">
                   <Building2 className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">
                     {org.name} ({spaces.length})
                   </span>
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
+                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </DropdownMenuItem>
 
                 {isExpanded && (
                   <div className="pl-6 py-1 space-y-1">
                     {spaces.map((space) => {
                       const isCurrentSpace =
-                        current.organizationId === org.id &&
-                        current.spaceId === space.id &&
-                        current.type === 'space';
+                        current.organizationId === org.id && current.spaceId === space.id && current.type === 'space';
 
                       return (
                         <DropdownMenuItem
                           key={space.id}
-                          onClick={() => handleSelect(() => onSelectSpace(org.id, space.id))}
-                          className={cn(
-                            'cursor-pointer',
-                            isCurrentSpace && 'bg-accent text-accent-foreground',
-                          )}
+                          onClick={() => tenant.selectSpace(space.id)}
+                          className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                         >
                           <span className="flex-1 truncate">{space.name}</span>
                           {isCurrentSpace && <Check className="h-4 w-4 ml-2" />}
@@ -179,7 +148,7 @@ export const ContextSelector = ({
                     })}
 
                     <DropdownMenuItem
-                      onClick={() => handleSelect(() => onSelectOrganization(org.id))}
+                      onClick={() => tenant.selectOrganization(org.id)}
                       className="cursor-pointer border-t"
                     >
                       <Settings className="h-4 w-4 mr-2" />
@@ -195,11 +164,8 @@ export const ContextSelector = ({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          onClick={() => handleSelect(onSelectPersonal)}
-          className={cn(
-            'cursor-pointer',
-            current.type === 'personal' && 'bg-accent text-accent-foreground',
-          )}
+          onClick={tenant.setPersonal}
+          className={cn('cursor-pointer', current.type === 'personal' && 'bg-accent text-accent-foreground')}
         >
           <User className="h-4 w-4 mr-2" />
           <span className="flex-1">Personal</span>
@@ -207,7 +173,7 @@ export const ContextSelector = ({
         </DropdownMenuItem>
 
         {onManageOrganizations && (
-          <DropdownMenuItem onClick={() => handleSelect(onManageOrganizations)} className="cursor-pointer">
+          <DropdownMenuItem onClick={onManageOrganizations} className="cursor-pointer">
             <Boxes className="h-4 w-4 mr-2" />
             <span>Your Organizations</span>
           </DropdownMenuItem>

@@ -12,13 +12,13 @@
  *   bun run db:seed user               # Seed specific table
  */
 
-import { omit } from 'lodash-es';
-import { log, LogScope } from '@template/shared/logger';
+import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency } from '@template/shared/utils/concurrency';
 import { resolveAll } from '@template/shared/utils/resolveAll';
-import { db, type AccessorName } from '@template/db';
+import { omit } from 'lodash-es';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
-import seeds from './seeds';
+import { seeds } from './seeds';
 
 export type SeedFile = {
   /** Prisma model accessor name */
@@ -81,11 +81,7 @@ const checkUUIDUniqueness = () => {
  * Seed a single table
  */
 const seedTable = async (seedFile: SeedFile): Promise<void> => {
-  const delegate = db[seedFile.model] as {
-    findFirst: (args: { where: Record<string, unknown> }) => Promise<unknown>;
-    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
-    update: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => Promise<unknown>;
-  };
+  const delegate = db[seedFile.model] as unknown as RuntimeDelegate;
 
   if (!delegate) {
     log.error(`Model not found: ${seedFile.model}`, LogScope.seed);
@@ -153,7 +149,7 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
 /**
  * Main seed function
  */
-async function seed() {
+const seed = async () => {
   const isProduction = process.env.NODE_ENV === 'production';
 
   log.info('Starting database seed...', LogScope.seed);
@@ -172,7 +168,7 @@ async function seed() {
   }
 
   log.success('Seed completed!', LogScope.seed);
-}
+};
 
 seed()
   .then(() => process.exit(0))

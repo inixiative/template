@@ -1,5 +1,5 @@
-import type { Db, OrganizationId } from '@template/db/index';
 import { Role } from '@template/db/generated/client/enums';
+import type { Db, OrganizationId } from '@template/db/index';
 import { HTTPException } from 'hono/http-exception';
 
 export const validateNotLastOwner = async (db: Db, orgId: OrganizationId) => {

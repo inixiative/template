@@ -1,8 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { AppEnv } from '#/types/appEnv';
+import { adminUserRedactController } from '#/modules/user/controllers/adminUserRedact';
 
 import { adminUserRedactRoute } from '#/modules/user/routes/adminUserRedact';
-import { adminUserRedactController } from '#/modules/user/controllers/adminUserRedact';
+import type { AppEnv } from '#/types/appEnv';
 
 export const adminUserRouter = new OpenAPIHono<AppEnv>();
 

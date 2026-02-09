@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import { PlatformRole } from '@template/db/generated/client/enums';
 import type { Organization, User } from '@template/db';
+import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
 import { adminOrganizationRouter } from '#/modules/organization';
-import { adminOrganizationReadManyRoute } from '#/modules/organization/routes/adminOrganizationReadMany';
+import type { adminOrganizationReadManyRoute } from '#/modules/organization/routes/adminOrganizationReadMany';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
@@ -84,11 +84,13 @@ describe('GET /api/admin/organization', () => {
 
   it('filters by simple search', async () => {
     const response = await fetch(get('/api/admin/organization?search=apple'));
-    const { data} = await json<ReadManyResponse>(response);
+    const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
-    expect(data.every((org) => org.name.toLowerCase().includes('apple') || org.slug.toLowerCase().includes('apple'))).toBe(true);
+    expect(
+      data.every((org) => org.name.toLowerCase().includes('apple') || org.slug.toLowerCase().includes('apple')),
+    ).toBe(true);
   });
 
   it('filters by advanced search on specific field', async () => {
@@ -106,7 +108,9 @@ describe('GET /api/admin/organization', () => {
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
-    expect(data.every((org) => org.name.toLowerCase().includes('cherry') || org.slug.toLowerCase().includes('cherry'))).toBe(true);
+    expect(
+      data.every((org) => org.name.toLowerCase().includes('cherry') || org.slug.toLowerCase().includes('cherry')),
+    ).toBe(true);
   });
 
   it('combines orderBy with search', async () => {

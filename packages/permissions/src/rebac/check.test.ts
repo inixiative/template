@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { createPermissions, type Permix } from '../client';
 import { check } from './check';
@@ -14,7 +14,7 @@ describe('rebac check', () => {
   describe('direct permissions', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: {
+        actions: {
           own: null,
           manage: 'own',
           operate: 'manage',
@@ -39,7 +39,7 @@ describe('rebac check', () => {
   describe('action inheritance (string rule)', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: {
+        actions: {
           own: null,
           manage: 'own',
           operate: 'manage',
@@ -71,7 +71,7 @@ describe('rebac check', () => {
   describe('relation traversal', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: {
+        actions: {
           own: null,
           manage: 'own',
           operate: 'manage',
@@ -131,7 +131,7 @@ describe('rebac check', () => {
   describe('any (OR) logic', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: { own: null, manage: 'own', read: 'manage' },
+        actions: { own: null, manage: 'own', read: 'manage' },
       },
       space: {
         actions: { own: null, manage: 'own', read: 'manage' },
@@ -182,10 +182,10 @@ describe('rebac check', () => {
   describe('all (AND) logic', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: { own: null },
+        actions: { own: null },
       },
       space: {
-                actions: { own: null },
+        actions: { own: null },
       },
       customerRef: {
         actions: {
@@ -235,8 +235,8 @@ describe('rebac check', () => {
 
   describe('json rules attribute checks', () => {
     const schema: RebacSchema = {
-      document: {
-                actions: {
+      inquiry: {
+        actions: {
           read: { rule: { field: 'isPublic', operator: Operator.equals, value: true } },
           edit: {
             all: [
@@ -249,28 +249,28 @@ describe('rebac check', () => {
     };
 
     it('grants read when isPublic is true', () => {
-      const record = { id: 'doc-1', isPublic: true };
-      expect(check(permix, schema, 'document', record, 'read')).toBe(true);
+      const record = { id: 'inq-1', isPublic: true };
+      expect(check(permix, schema, 'inquiry', record, 'read')).toBe(true);
     });
 
     it('denies read when isPublic is false', () => {
-      const record = { id: 'doc-1', isPublic: false };
-      expect(check(permix, schema, 'document', record, 'read')).toBe(false);
+      const record = { id: 'inq-1', isPublic: false };
+      expect(check(permix, schema, 'inquiry', record, 'read')).toBe(false);
     });
 
     it('grants edit when all attribute conditions match', () => {
-      const record = { id: 'doc-1', status: 'draft', isLocked: false };
-      expect(check(permix, schema, 'document', record, 'edit')).toBe(true);
+      const record = { id: 'inq-1', status: 'draft', isLocked: false };
+      expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(true);
     });
 
     it('denies edit when status is not draft', () => {
-      const record = { id: 'doc-1', status: 'published', isLocked: false };
-      expect(check(permix, schema, 'document', record, 'edit')).toBe(false);
+      const record = { id: 'inq-1', status: 'published', isLocked: false };
+      expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
 
-    it('denies edit when document is locked', () => {
-      const record = { id: 'doc-1', status: 'draft', isLocked: true };
-      expect(check(permix, schema, 'document', record, 'edit')).toBe(false);
+    it('denies edit when inquiry is locked', () => {
+      const record = { id: 'inq-1', status: 'draft', isLocked: true };
+      expect(check(permix, schema, 'inquiry', record, 'edit')).toBe(false);
     });
   });
 
@@ -348,10 +348,10 @@ describe('rebac check', () => {
     // Customer can read their refs, provider can manage them
     const schema: RebacSchema = {
       user: {
-                actions: { own: null },
+        actions: { own: null },
       },
       organization: {
-                actions: {
+        actions: {
           own: null,
           manage: 'own',
           operate: 'manage',
@@ -493,7 +493,7 @@ describe('rebac check', () => {
   describe('superadmin bypass', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: { own: null },
+        actions: { own: null },
       },
     };
 
@@ -530,7 +530,7 @@ describe('rebac check', () => {
   describe('undefined model/action handling', () => {
     const schema: RebacSchema = {
       organization: {
-                actions: { own: null },
+        actions: { own: null },
       },
     };
 

@@ -1,5 +1,5 @@
-import type { Context } from 'hono';
 import type { Db } from '@template/db';
+import type { Context } from 'hono';
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
 import type { AppEnv } from '#/types/appEnv';
 

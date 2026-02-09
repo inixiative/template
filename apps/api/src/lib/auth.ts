@@ -1,9 +1,8 @@
-import { db } from '@template/db';
+import { db, getRedisClient, redisNamespace } from '@template/db';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
-import { getRedisClient, redisNamespace } from '@template/db';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({

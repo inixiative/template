@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
+import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
-import type { BatchRequest, RequestResult } from './types';
 
 export const executeRequest = async (
   app: Hono<AppEnv>,
@@ -25,7 +25,7 @@ export const executeRequest = async (
   const headers: Record<string, string> = {
     ...mergedHeaders,
     'Content-Type': 'application/json',
-    'X-Batch-Id': batchId,
+    'x-batch-id': batchId,
   };
 
   const init: RequestInit = {

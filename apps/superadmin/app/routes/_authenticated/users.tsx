@@ -1,12 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 import { UserPlus } from 'lucide-react';
 
-export const Route = createFileRoute('/_authenticated/users')({
-  component: UsersPage,
-});
-
-function UsersPage() {
+const UsersPage = () => {
   return (
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -30,4 +26,8 @@ function UsersPage() {
       </Card>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/users')({
+  component: UsersPage,
+});

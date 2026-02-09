@@ -1,11 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Card, CardHeader, CardTitle, CardContent } from '@template/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 
-export const Route = createFileRoute('/_authenticated/org/$organizationId/communications')({
-  component: OrganizationCommunicationsPage,
-});
-
-function OrganizationCommunicationsPage() {
+const OrganizationCommunicationsPage = () => {
   const { organizationId } = Route.useParams();
 
   return (
@@ -22,4 +18,8 @@ function OrganizationCommunicationsPage() {
       </Card>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/org/$organizationId/communications')({
+  component: OrganizationCommunicationsPage,
+});

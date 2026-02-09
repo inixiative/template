@@ -35,7 +35,9 @@ const validateInterpolationSyntax = (value: string): void => {
 
   for (const pattern of malformedPatterns) {
     if (!INTERPOLATION_PATTERN.test(pattern)) {
-      throw new Error(`Malformed interpolation syntax: ${pattern}. Expected format: <<roundIndex.requestIndex.field.path>>`);
+      throw new Error(
+        `Malformed interpolation syntax: ${pattern}. Expected format: <<roundIndex.requestIndex.field.path>>`,
+      );
     }
   }
 };
@@ -70,11 +72,15 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
       const request = parseInt(reqIdx, 10);
 
       if (context.currentRound !== undefined && round >= context.currentRound) {
-        throw new Error(`Invalid round reference in ${match}: cannot reference round ${round} from round ${context.currentRound}. Interpolation can only reference previous rounds (0-${context.currentRound - 1})`);
+        throw new Error(
+          `Invalid round reference in ${match}: cannot reference round ${round} from round ${context.currentRound}. Interpolation can only reference previous rounds (0-${context.currentRound - 1})`,
+        );
       }
 
       if (round >= context.results.length) {
-        throw new Error(`Round index out of bounds in ${match}: round ${round} does not exist (only ${context.results.length} rounds completed)`);
+        throw new Error(
+          `Round index out of bounds in ${match}: round ${round} does not exist (only ${context.results.length} rounds completed)`,
+        );
       }
 
       if (!context.results[round]) {
@@ -82,7 +88,9 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
       }
 
       if (request >= context.results[round].length) {
-        throw new Error(`Request index out of bounds in ${match}: request ${request} does not exist in round ${round} (only ${context.results[round].length} requests completed)`);
+        throw new Error(
+          `Request index out of bounds in ${match}: request ${request} does not exist in round ${round} (only ${context.results[round].length} requests completed)`,
+        );
       }
 
       if (!context.results[round][request]) {
@@ -92,7 +100,9 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
       const result = navigateFieldPath(context.results[round][request], fieldPath);
 
       if (result === undefined) {
-        throw new Error(`Field not found in interpolation: ${match} - field '${fieldPath}' does not exist in the result`);
+        throw new Error(
+          `Field not found in interpolation: ${match} - field '${fieldPath}' does not exist in the result`,
+        );
       }
 
       return String(result);

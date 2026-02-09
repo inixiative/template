@@ -1,6 +1,6 @@
-import { createHash, randomBytes } from 'crypto';
 import type { Db } from '@template/db';
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import { createHash, randomBytes } from 'crypto';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   User: 'user',

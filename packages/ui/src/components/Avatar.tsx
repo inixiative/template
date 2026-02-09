@@ -1,5 +1,5 @@
+import { cn } from '@template/ui/lib/utils';
 import * as React from 'react';
-import { cn } from '@ui/lib/utils';
 
 export type AvatarProps = {
   className?: string;
@@ -27,23 +27,21 @@ Avatar.displayName = 'Avatar';
 
 export type AvatarImageProps = React.ImgHTMLAttributes<HTMLImageElement>;
 
-export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  ({ className, alt, ...props }, ref) => {
-    const [isError, setIsError] = React.useState(false);
+export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(({ className, alt, ...props }, ref) => {
+  const [isError, setIsError] = React.useState(false);
 
-    if (isError) return null;
+  if (isError) return null;
 
-    return (
-      <img
-        ref={ref}
-        alt={alt}
-        className={cn('aspect-square h-full w-full object-cover', className)}
-        onError={() => setIsError(true)}
-        {...props}
-      />
-    );
-  },
-);
+  return (
+    <img
+      ref={ref}
+      alt={alt}
+      className={cn('aspect-square h-full w-full object-cover', className)}
+      onError={() => setIsError(true)}
+      {...props}
+    />
+  );
+});
 AvatarImage.displayName = 'AvatarImage';
 
 export type AvatarFallbackProps = {

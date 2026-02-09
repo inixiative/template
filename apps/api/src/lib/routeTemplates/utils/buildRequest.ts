@@ -1,5 +1,5 @@
-import type { Prisma } from '@template/db';
 import { z } from '@hono/zod-openapi';
+import type { Prisma } from '@template/db';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
@@ -13,9 +13,7 @@ type BaseSanitizeKey = 'id' | 'uuid' | 'createdAt' | 'updatedAt' | 'deletedAt';
 type Cast<T, U> = T extends unknown ? U : never;
 
 // Transform `unknown` to Prisma's JSON input type via cast through unknown
-type TransformUnknown<T> = unknown extends T
-  ? Cast<T, Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue>
-  : T;
+type TransformUnknown<T> = unknown extends T ? Cast<T, Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue> : T;
 
 // Transform all properties in an object type
 type TransformShape<S> = {
@@ -44,9 +42,8 @@ type ParamsType<T extends RouteArgs> = T['params'] extends ZodSchema
 
 type PaginateShape = (typeof paginateRequestSchema)['shape'];
 
-type MergedQuery<Q extends ZodSchema> = Q extends z.ZodObject<infer Shape>
-  ? z.ZodObject<Shape & PaginateShape>
-  : typeof paginateRequestSchema;
+type MergedQuery<Q extends ZodSchema> =
+  Q extends z.ZodObject<infer Shape> ? z.ZodObject<Shape & PaginateShape> : typeof paginateRequestSchema;
 
 type QueryType<T extends RouteArgs> = T['paginate'] extends true
   ? T['query'] extends ZodSchema
@@ -70,10 +67,19 @@ type RequestWithoutBody<T extends RouteArgs> = {
   query: QueryType<T>;
 };
 
-export function buildRequest<const T extends RouteArgs>(
+export const buildRequest = <const T extends RouteArgs>(
   args: T,
-): T['bodySchema'] extends ZodSchema ? RequestWithBody<T> : RequestWithoutBody<T> {
-  const { params, query, bodySchema, sanitizeKeys = [], skipId = false, paginate = false, many = false, searchableFields } = args;
+): T['bodySchema'] extends ZodSchema ? RequestWithBody<T> : RequestWithoutBody<T> => {
+  const {
+    params,
+    query,
+    bodySchema,
+    sanitizeKeys = [],
+    skipId = false,
+    paginate = false,
+    many = false,
+    searchableFields,
+  } = args;
 
   // Need ID when: not skipId AND (has submodel OR not many)
   // With submodel + many: getting all submodels for a parent, so need parent ID
@@ -108,4 +114,4 @@ export function buildRequest<const T extends RouteArgs>(
     params: paramsSchema,
     query: querySchema,
   } as T['bodySchema'] extends ZodSchema ? RequestWithBody<T> : RequestWithoutBody<T>;
-}
+};

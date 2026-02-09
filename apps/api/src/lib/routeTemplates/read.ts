@@ -1,7 +1,14 @@
 import { createRoute } from '@hono/zod-openapi';
 import pluralize from 'pluralize';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
-import { buildOperationId, buildRequest, buildResponses, buildRoutePath, buildTags, prepareMiddleware } from '#/lib/routeTemplates/utils';
+import {
+  buildOperationId,
+  buildRequest,
+  buildResponses,
+  buildRoutePath,
+  buildTags,
+  prepareMiddleware,
+} from '#/lib/routeTemplates/utils';
 
 export const readRoute = <const T extends RouteArgs>(args: T) => {
   const {

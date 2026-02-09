@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { Role } from '@template/db/generated/client/client';
 import { createFactory, getNextSeq, resetSequence } from './factory';
@@ -113,7 +113,7 @@ describe('createFactory', () => {
       expect(orgUser.organizationId).toBe(context.organization!.id);
     });
 
-    it('Session - uses existing User passed directly in overrides', async () => {
+    it('Session - uses existing User passed via context', async () => {
       const userFactory = createFactory('User', {
         defaults: () => ({
           email: `user-${getNextSeq()}@test.com`,
@@ -131,8 +131,8 @@ describe('createFactory', () => {
       // Build user first
       const { entity: user } = await userFactory.build();
 
-      // Pass existing user directly in overrides (not context)
-      const { entity: session, context } = await sessionFactory.build({ user });
+      // Pass existing user via context (type-safe approach)
+      const { entity: session, context } = await sessionFactory.build(undefined, { user });
 
       expect(session.userId).toBe(user.id);
       expect(context.user).toBe(user);

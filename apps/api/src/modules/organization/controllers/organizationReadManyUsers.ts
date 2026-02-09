@@ -1,7 +1,12 @@
+import { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadManyUsersRoute } from '#/modules/organization/routes/organizationReadManyUsers';
+
+type UserWithOrgUsers = Prisma.UserGetPayload<{
+  include: { organizationUsers: true };
+}>;
 
 export const organizationReadManyUsersController = makeController(
   organizationReadManyUsersRoute,
@@ -9,7 +14,7 @@ export const organizationReadManyUsersController = makeController(
     const db = c.get('db');
     const org = getResource<'organization'>(c);
 
-    const { data: users, pagination } = await paginate(c, db.user, {
+    const { data: users, pagination } = await paginate<typeof db.user, UserWithOrgUsers>(c, db.user, {
       where: { organizationUsers: { some: { organizationId: org.id } } },
       include: { organizationUsers: { where: { organizationId: org.id } } },
     });

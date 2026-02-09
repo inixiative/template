@@ -1,6 +1,6 @@
+import { DbAction, getModelRelations, HookTiming, type ModelName, registerDbHook } from '@template/db';
 import { unset } from 'lodash-es';
-import { DbAction, HookTiming, registerDbHook, getModelRelations, type ModelName } from '@template/db';
-import { getImmutableFields } from './registry';
+import { getImmutableFields } from '#/hooks/immutableFields/registry';
 
 const stripFromObject = (obj: Record<string, unknown>, model: ModelName): void => {
   for (const field of getImmutableFields(model)) {
@@ -38,7 +38,7 @@ const processArgs = (args: unknown, model: ModelName): void => {
   }
 };
 
-export function registerImmutableFieldsHook() {
+export const registerImmutableFieldsHook = () => {
   registerDbHook(
     'immutableFields',
     '*',
@@ -46,4 +46,4 @@ export function registerImmutableFieldsHook() {
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, args }) => processArgs(args, model as ModelName),
   );
-}
+};

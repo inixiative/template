@@ -17,9 +17,9 @@
 bun run local
 
 # Individual services
-bun run local:api     # API on :8000
-bun run local:web     # Web on :3000
-bun run local:worker  # Background jobs
+turbo watch local#api          # API on :8000
+turbo watch local#web          # Web on :3000
+turbo watch local:worker#api   # Background jobs
 ```
 
 ---

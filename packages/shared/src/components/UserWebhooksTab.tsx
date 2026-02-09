@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 
 export const UserWebhooksTab = () => {
   return (
@@ -8,9 +8,7 @@ export const UserWebhooksTab = () => {
           <CardTitle>Webhooks</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Configure webhooks to receive real-time notifications
-          </p>
+          <p className="text-sm text-muted-foreground mb-4">Configure webhooks to receive real-time notifications</p>
           <Button>Create Webhook</Button>
         </CardContent>
       </Card>

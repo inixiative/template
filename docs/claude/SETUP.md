@@ -30,9 +30,6 @@ brew install gh
 
 # Doppler CLI (secrets management)
 brew install dopplerhq/cli/doppler
-
-# fswatch (for HMR watch scripts)
-brew install fswatch
 ```
 
 ### Authentication
@@ -60,7 +57,7 @@ doppler --version
 | `bun run init` | Once per project lifecycle | Person forking the template |
 | `bun run setup` | Each new developer + periodically | Everyone |
 
-**Init** (TODO): Renames packages, updates configs, prepares the template for a new project. Run once when forking.
+**Init**: Not implemented yet (tracked in `INFRA-001`). Until then, forking is manual.
 
 **Setup**: Installs deps, starts Docker, generates Prisma, seeds DB. Run by each developer and whenever the repo needs to be brought up to date.
 

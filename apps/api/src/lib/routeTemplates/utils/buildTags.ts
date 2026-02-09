@@ -1,4 +1,4 @@
-import {Tags} from "#/modules/tags";
+import { Tags } from '#/modules/tags';
 
 type BuildTagsArgs = {
   model: string;

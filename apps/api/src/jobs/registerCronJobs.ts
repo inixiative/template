@@ -1,8 +1,8 @@
 import { db } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 import { isValidHandlerName } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { JobType } from '#/jobs/types';
-import { log, LogScope } from '@template/shared/logger';
 
 export const registerCronJobs = async (): Promise<void> => {
   const cronJobs = await db.cronJob.findMany({

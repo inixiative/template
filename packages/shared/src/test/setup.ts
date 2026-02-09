@@ -1,5 +1,5 @@
-import { beforeAll, afterEach, afterAll } from 'bun:test';
-import { server } from './mocks/server';
+import { afterAll, afterEach, beforeAll } from 'bun:test';
+import { server } from '@template/shared/test/mocks/server';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 afterEach(() => server.resetHandlers());

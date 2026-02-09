@@ -8,6 +8,13 @@ config:
 ---
 kanban
   Backlog
+    API-001-idempotency-and-safe-retries
+    INFRA-006-tenant-isolation-test-matrix
+    INFRA-007-data-lifecycle-retention-export-delete
+    INFRA-008-disaster-recovery-and-restore-drills
+    INFRA-005-platform-baseline-hosting-observability
+    INFRA-003-cicd
+    FE-001-web-tanstack-start-evaluation
     FEAT-006-localization
     FEAT-007-white-labeling
     FEAT-010-addresses
@@ -34,6 +41,19 @@ kanban
 - [FIN-001: Financial - Fiat](./FIN-001-financial-fiat.md) - Stripe alternatives (Paddle, Lemon Squeezy, Adyen)
 - [FIN-002: Financial - Web3](./FIN-002-financial-web3.md) - Crypto payments, NFT gating, wallet connect
 
+**Infrastructure / Platform:**
+- [INFRA-005: Platform Baseline](./INFRA-005-platform-baseline-hosting-observability.md) - Pick default hosting + DB + observability stack
+- [INFRA-003: CI/CD Pipeline](./INFRA-003-cicd.md) - Decision-first CI/CD baseline, implement after platform selection
+- [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
+- [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
+- [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
+
+**API Reliability:**
+- [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
+
+**Frontend Architecture:**
+- [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
+
 ---
 
 ## Categorization
@@ -57,11 +77,14 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 7
+- **Total Backlog Items**: 14
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2
 - **Communication**: 1
+- **Infrastructure**: 5
+- **Frontend Architecture**: 1
+- **API Reliability**: 1
 
 ## Notes
 
@@ -77,4 +100,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-02-06_
+_Last Updated: 2026-02-07_

@@ -1,8 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { AppEnv } from '#/types/appEnv';
+import { batchExecuteController } from '#/modules/batch/controllers/batchExecute';
 
 import { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
-import { batchExecuteController } from '#/modules/batch/controllers/batchExecute';
+import type { AppEnv } from '#/types/appEnv';
 
 export const batchRouter = new OpenAPIHono<AppEnv>();
 

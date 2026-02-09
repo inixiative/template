@@ -2,7 +2,7 @@
  * Lookup template + components at scope.
  */
 
-import type { PrismaClient, EmailComponent, EmailTemplate } from '@template/db';
+import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db';
 import type { SaveContext } from './types';
 
 type LookupResult = {
@@ -27,9 +27,7 @@ export const lookupAtSpace = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug
-      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } })
-      : Promise.resolve(null),
+    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -57,9 +55,7 @@ export const lookupAtOrg = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug
-      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } })
-      : Promise.resolve(null),
+    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -85,9 +81,7 @@ export const lookupAtDefault = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug
-      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } })
-      : Promise.resolve(null),
+    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -113,9 +107,7 @@ export const lookupAtAdmin = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug
-      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } })
-      : Promise.resolve(null),
+    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};

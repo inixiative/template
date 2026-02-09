@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { createOrganizationUser, createToken, cleanupTouchedTables } from '@template/db/test';
-import { registerImmutableFieldsHook } from './hook';
-import { clearImmutableFieldsCache, setImmutableFieldsCache } from './registry';
+import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
+import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { clearImmutableFieldsCache, setImmutableFieldsCache } from '#/hooks/immutableFields/registry';
 
 registerImmutableFieldsHook();
 

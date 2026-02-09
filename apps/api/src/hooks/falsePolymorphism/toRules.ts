@@ -1,6 +1,6 @@
-import { PolymorphismRegistry, type PolymorphicAxis, type PolymorphicValue, type ModelName } from '@template/db';
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
+import { type ModelName, type PolymorphicAxis, type PolymorphicValue, PolymorphismRegistry } from '@template/db';
 
 const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
   const allFks = [...new Set(Object.values(axis.fkMap).flat())];

@@ -1,12 +1,12 @@
-import { SpaceRole } from '@template/db/generated/client/enums';
-import type { BuildContext, CreateInputOf, TypedBuildResult } from '../factoryTypes';
+import { Role } from '@template/db/generated/client/enums';
 import { createFactory } from '../factory';
+import type { BuildContext, CreateInputOf, TypedBuildResult } from '../factoryTypes';
 
 type Result = TypedBuildResult<'SpaceUser', ['User', 'Organization', 'Space', 'OrganizationUser']>;
 
 const spaceUserFactory = createFactory('SpaceUser', {
   defaults: () => ({
-    role: SpaceRole.member,
+    role: Role.member,
   }),
   dependencies: {
     // Composite FK to OrganizationUser

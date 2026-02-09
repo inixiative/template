@@ -1,4 +1,4 @@
-import { Prisma, type AccessorName } from '@template/db';
+import { type AccessorName, Prisma } from '@template/db';
 
 // Custom args for specific models (inclusions, selects, etc.)
 // Other models use default findMany with no extra args

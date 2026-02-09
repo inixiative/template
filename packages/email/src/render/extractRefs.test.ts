@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { mapRefs } from './extractRefs';
 
 describe('mapRefs', () => {
@@ -190,4 +190,3 @@ describe('mapRefs', () => {
     expect(mjml).toContain('{{#component:cta-button-1:0}}');
   });
 });
-

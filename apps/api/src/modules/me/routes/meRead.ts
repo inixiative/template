@@ -1,5 +1,11 @@
-import { UserScalarSchema, OrganizationUserScalarSchema, SpaceUserScalarSchema, OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
 import { z } from '@hono/zod-openapi';
+import {
+  OrganizationScalarSchema,
+  OrganizationUserScalarSchema,
+  SpaceScalarSchema,
+  SpaceUserScalarSchema,
+  UserScalarSchema,
+} from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';

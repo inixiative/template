@@ -18,24 +18,13 @@ import { cacheKey } from '@template/db';
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const CACHE_REFERENCE: CacheReference = {
-  User: (r) => [
-    cacheKey('user', r.id),
-    cacheKey('user', { email: r.email }),
-  ],
+  User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
 
-  Session: (r) => [
-    cacheKey('session', r.id),
-    cacheKey('session', { userId: r.userId }, [], true),
-  ],
+  Session: (r) => [cacheKey('session', r.id), cacheKey('session', { userId: r.userId }, [], true)],
 
-  Token: (r) => [
-    cacheKey('token', { keyHash: r.keyHash }),
-  ],
+  Token: (r) => [cacheKey('token', { keyHash: r.keyHash })],
 
-  Organization: (r) => [
-    cacheKey('organization', r.id),
-    cacheKey('organization', { slug: r.slug }),
-  ],
+  Organization: (r) => [cacheKey('organization', r.id), cacheKey('organization', { slug: r.slug })],
 
   OrganizationUser: (r) => [
     cacheKey('organizationUser', { organizationId: r.organizationId, userId: r.userId }),
@@ -66,8 +55,10 @@ export const CACHE_REFERENCE: CacheReference = {
   WebhookSubscription: (r) => {
     const ownerId = (() => {
       switch (r.ownerModel) {
-        case 'User': return r.userId;
-        case 'Organization': return r.organizationId;
+        case 'User':
+          return r.userId;
+        case 'Organization':
+          return r.organizationId;
       }
     })();
     if (!ownerId) return [];

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { organizationRead, spaceRead } from '../apiClient';
+import { organizationRead, spaceRead } from '@template/shared/apiClient';
 
 type Model = 'organization' | 'space';
 
@@ -15,7 +15,7 @@ export const useValidateUniqueness = (
   options?: {
     enabled?: boolean;
     excludeId?: string;
-  }
+  },
 ) => {
   const enabled = options?.enabled ?? true;
 

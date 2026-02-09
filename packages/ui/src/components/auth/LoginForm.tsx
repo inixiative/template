@@ -1,8 +1,8 @@
+import { Button } from '@template/ui/components/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/Card';
+import { Input } from '@template/ui/components/Input';
+import { Label } from '@template/ui/components/Label';
 import { useState } from 'react';
-import { Button } from '../Button';
-import { Input } from '../Input';
-import { Label } from '../Label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../Card';
 
 export type LoginFormProps = {
   onSubmit: (email: string, password: string) => Promise<void>;
@@ -29,9 +29,7 @@ export const LoginForm = ({ onSubmit, onSignupClick, error, isLoading }: LoginFo
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
-              {error}
-            </div>
+            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">{error}</div>
           )}
 
           <div className="space-y-2">
@@ -66,11 +64,7 @@ export const LoginForm = ({ onSubmit, onSignupClick, error, isLoading }: LoginFo
           {onSignupClick && (
             <div className="text-center text-sm text-muted-foreground">
               Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={onSignupClick}
-                className="text-primary hover:underline"
-              >
+              <button type="button" onClick={onSignupClick} className="text-primary hover:underline">
                 Sign up
               </button>
             </div>

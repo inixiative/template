@@ -1,4 +1,3 @@
-
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateWebhookSubscriptionRoute } from '#/modules/me/routes/meCreateWebhookSubscription';
 

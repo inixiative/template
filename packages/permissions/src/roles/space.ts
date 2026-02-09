@@ -1,6 +1,6 @@
 import type { SpaceId } from '@template/db';
-import { SpaceRole } from '@template/db/generated/client/enums';
-import { SpaceAction, type Entitlements, type PermissionEntry, type Permix } from '@template/permissions/client';
+import type { Role } from '@template/db/generated/client/enums';
+import { type Entitlements, type PermissionEntry, type Permix, SpaceAction } from '@template/permissions/client';
 import { allTrue } from './shared';
 
 export const spaceRoles = {
@@ -10,28 +10,16 @@ export const spaceRoles = {
   viewer: { space: { read: true } },
 } as const;
 
-export function getSpacePermissions(
-  role: SpaceRole,
+export const getSpacePermissions = (
+  role: Role,
   spaceId: SpaceId,
   entitlements?: Entitlements,
-): PermissionEntry {
+): PermissionEntry => {
   const baseActions = spaceRoles[role].space;
   return {
     resource: 'space',
     id: spaceId,
     actions: { ...baseActions, ...entitlements },
   };
-}
-
-type SpaceContextParams = {
-  role: SpaceRole;
-  spaceId: SpaceId;
-  entitlements?: Entitlements;
 };
 
-export async function setupSpaceContext(
-  permix: Permix,
-  params: SpaceContextParams,
-): Promise<void> {
-  await permix.setup(getSpacePermissions(params.role, params.spaceId, params.entitlements));
-}

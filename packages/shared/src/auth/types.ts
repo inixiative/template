@@ -18,6 +18,7 @@ export type AuthSession = {
   id: string;
   userId: string;
   token: string;
+  accessToken: string;
   expiresAt: string;
   createdAt: string;
   ipAddress: string | null;
@@ -60,7 +61,11 @@ export type AuthSpaceUser = {
 
 export type AuthClient = {
   signIn: (credentials: { email: string; password: string }) => Promise<{ user: AuthUser; session: AuthSession }>;
-  signUp: (credentials: { email: string; password: string; name?: string }) => Promise<{ user: AuthUser; session: AuthSession }>;
+  signUp: (credentials: {
+    email: string;
+    password: string;
+    name?: string;
+  }) => Promise<{ user: AuthUser; session: AuthSession }>;
   signOut: () => Promise<void>;
 };
 

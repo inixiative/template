@@ -1,16 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Card, CardHeader, CardTitle, CardContent } from '@template/ui';
+import { usePageMeta } from '@template/shared';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 
-export const Route = createFileRoute('/_authenticated/dashboard')({
-  component: DashboardPage,
-});
+const DashboardPage = () => {
+  const { title, description } = usePageMeta();
 
-function DashboardPage() {
   return (
     <div className="p-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Platform Operations</h1>
-        <p className="text-muted-foreground">Manage the entire platform and system health</p>
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <p className="text-muted-foreground">{description}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -43,4 +42,8 @@ function DashboardPage() {
       </div>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/dashboard')({
+  component: DashboardPage,
+});

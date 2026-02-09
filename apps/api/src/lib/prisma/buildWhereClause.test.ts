@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildWhereClause } from './buildWhereClause';
+import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
 describe('buildWhereClause', () => {
   describe('simple search', () => {
@@ -62,9 +62,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { user: { email: { contains: 'test@example.com', mode: 'insensitive' } } },
-        ],
+        AND: [{ user: { email: { contains: 'test@example.com', mode: 'insensitive' } } }],
       });
     });
 
@@ -73,7 +71,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           searchFields: { name: 'john', password: 'secret' },
           searchableFields: ['name', 'email'],
-        })
+        }),
       ).toThrow("Field 'password' is not searchable");
     });
   });
@@ -90,9 +88,7 @@ describe('buildWhereClause', () => {
         deletedAt: null,
         AND: [
           {
-            OR: [
-              { name: { contains: 'john', mode: 'insensitive' } },
-            ],
+            OR: [{ name: { contains: 'john', mode: 'insensitive' } }],
           },
         ],
       });
@@ -108,9 +104,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({
         status: 'active',
         deletedAt: null,
-        AND: [
-          { name: { contains: 'john', mode: 'insensitive' } },
-        ],
+        AND: [{ name: { contains: 'john', mode: 'insensitive' } }],
       });
     });
   });
@@ -145,10 +139,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'john' } },
-          { age: { gte: 18 } },
-        ],
+        AND: [{ name: { contains: 'john' } }, { age: { gte: 18 } }],
       });
     });
 
@@ -165,9 +156,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { user: { profile: { name: { contains: 'john' } } } },
-        ],
+        AND: [{ user: { profile: { name: { contains: 'john' } } } }],
       });
     });
 
@@ -184,9 +173,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { posts: { some: { status: 'published' } } },
-        ],
+        AND: [{ posts: { some: { status: 'published' } } }],
       });
     });
 
@@ -203,9 +190,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { members: { every: { role: 'admin' } } },
-        ],
+        AND: [{ members: { every: { role: 'admin' } } }],
       });
     });
 
@@ -222,9 +207,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { comments: { none: { flagged: true } } },
-        ],
+        AND: [{ comments: { none: { flagged: true } } }],
       });
     });
 
@@ -258,7 +241,7 @@ describe('buildWhereClause', () => {
             },
           },
           searchableFields: ['posts.status'],
-        })
+        }),
       ).toThrow("Field 'posts.secretField' is not searchable");
     });
 
@@ -277,9 +260,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { posts: { some: { author: { name: 'John' } } } },
-        ],
+        AND: [{ posts: { some: { author: { name: 'John' } } } }],
       });
     });
   });
@@ -290,7 +271,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           search: 'test',
           searchableFields: ['user$email'],
-        })
+        }),
       ).toThrow('Invalid searchable field');
     });
 
@@ -299,7 +280,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           searchFields: { '../admin': 'test' },
           searchableFields: ['../admin'],
-        })
+        }),
       ).toThrow('Invalid search field');
     });
   });

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -57,7 +57,10 @@ describe('POST /api/v1/space/:id/tokens', () => {
   });
 
   it('returns 403 for non-admin user', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
     const memberSpaceUser = await db.spaceUser.create({
       data: {
         role: 'member',
@@ -74,7 +77,9 @@ describe('POST /api/v1/space/:id/tokens', () => {
       mount: [(app) => app.route('/api/v1/space', spaceRouter)],
     });
 
-    const response = await memberHarness.fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role: 'member' }));
+    const response = await memberHarness.fetch(
+      post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role: 'member' }),
+    );
     expect(response.status).toBe(403);
   });
 });

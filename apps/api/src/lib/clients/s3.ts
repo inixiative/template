@@ -36,4 +36,4 @@ export const getS3Client = async () => {
 };
 
 // Re-export types for convenience
-export type { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+export type { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';

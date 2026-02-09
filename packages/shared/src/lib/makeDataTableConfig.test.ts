@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
-import { makeDataTableConfig } from './makeDataTableConfig';
+import { beforeAll, describe, expect, it } from 'bun:test';
+import { makeDataTableConfig } from '@template/shared/lib/makeDataTableConfig';
 
 describe('makeDataTableConfig', () => {
   it('extracts searchable fields from x-searchable-fields', () => {
@@ -28,8 +28,8 @@ describe('makeDataTableConfig', () => {
   it('excludes array fields from orderable fields', () => {
     const config = makeDataTableConfig('adminOrganizationReadMany');
 
-    const arrayFields = config.orderableFields.filter(f =>
-      f.includes('spaces') || f.includes('users') || f.includes('tokens')
+    const arrayFields = config.orderableFields.filter(
+      (f) => f.includes('spaces') || f.includes('users') || f.includes('tokens'),
     );
     expect(arrayFields).toEqual([]);
   });
@@ -37,7 +37,7 @@ describe('makeDataTableConfig', () => {
   it('auto-detects enum filters from schema with in/notin ops', () => {
     const config = makeDataTableConfig('adminInquiryReadMany');
 
-    const statusFilter = config.enumFilters.find(f => f.field === 'status');
+    const statusFilter = config.enumFilters.find((f) => f.field === 'status');
     expect(statusFilter).toBeDefined();
     expect(statusFilter?.values).toContain('draft');
     expect(statusFilter?.values).toContain('sent');
@@ -87,9 +87,7 @@ describe('makeDataTableConfig', () => {
       defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
     });
 
-    expect(config.defaultOrderBy).toEqual([
-      { field: 'createdAt', direction: 'desc' }
-    ]);
+    expect(config.defaultOrderBy).toEqual([{ field: 'createdAt', direction: 'desc' }]);
   });
 
   it('returns empty config for unknown operation', () => {
@@ -113,8 +111,8 @@ describe('makeDataTableConfig', () => {
 
     expect(config.enumFilters.length).toBeGreaterThan(1);
 
-    const typeFilter = config.enumFilters.find(f => f.field === 'type');
-    const statusFilter = config.enumFilters.find(f => f.field === 'status');
+    const typeFilter = config.enumFilters.find((f) => f.field === 'type');
+    const statusFilter = config.enumFilters.find((f) => f.field === 'status');
 
     expect(typeFilter).toBeDefined();
     expect(statusFilter).toBeDefined();

@@ -27,7 +27,8 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
     }
   }
 
-  const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
+  const targetUserId =
+    body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
 
   const inquiry = await db.inquiry.create({
     data: {

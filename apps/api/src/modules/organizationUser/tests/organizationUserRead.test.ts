@@ -1,10 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { OrganizationUser, User } from '@template/db';
+import type { OrganizationUser, OrganizationUser as OrgUserType, User } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
-import type { OrganizationUser as OrgUserType } from '@template/db';
 
 describe('GET /api/v1/organizationUser/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

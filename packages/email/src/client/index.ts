@@ -1,3 +1,3 @@
-export * from './types';
-export { createResendClient } from './resend';
 export { createConsoleClient } from './console';
+export { createResendClient } from './resend';
+export * from './types';

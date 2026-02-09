@@ -4,7 +4,7 @@ import { setUserContext } from '#/lib/context/setUserContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
-export async function authMiddleware(c: Context<AppEnv>, next: Next) {
+export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
   // Skip if context already set from batch
   if (c.get('user')) return next();
 
@@ -23,4 +23,4 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
 
   await setUserContext(c, user);
   await next();
-}
+};

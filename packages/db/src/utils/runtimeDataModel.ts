@@ -10,9 +10,9 @@
  */
 
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { toAccessor, toModelName, type AccessorName, type ModelName } from './modelNames';
+import { fileURLToPath } from 'url';
+import { type AccessorName, type ModelName, toAccessor, toModelName } from './modelNames';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -101,10 +101,7 @@ const getInlineSchema = (): string => {
     throw new Error('Could not extract inlineSchema from generated client');
   }
 
-  cachedInlineSchema = match[1]
-    .replace(/\\n/g, '\n')
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, '\\');
+  cachedInlineSchema = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
 
   return cachedInlineSchema;
 };

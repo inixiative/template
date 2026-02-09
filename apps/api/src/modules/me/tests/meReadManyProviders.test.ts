@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createCustomerRef, createOrganizationUser, createSpace, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCustomerRef,
+  createOrganizationUser,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';
+import type { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 

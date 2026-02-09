@@ -2,10 +2,10 @@
  * Cascade lookup for template or component: Space → Org → default
  */
 
+import type { EmailComponent, EmailTemplate } from '@template/db';
 import { db } from '@template/db';
-import type { EmailTemplate, EmailComponent } from '@template/db';
+import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from './lookup';
 import type { SaveContext } from './types';
-import { lookupAtSpace, lookupAtOrg, lookupAtDefault, lookupAtAdmin } from './lookup';
 
 type LookupFn<T> = () => Promise<T | null | undefined>;
 

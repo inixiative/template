@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
@@ -48,7 +48,10 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
   });
 
   it('deletes the spaceUser', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
     const memberSpaceUser = await db.spaceUser.create({
       data: {
         role: 'member',
@@ -66,7 +69,10 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
   });
 
   it('allows user to leave (delete self)', async () => {
-    const { entity: viewerOrgUser, context: viewerCtx } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const { entity: viewerOrgUser, context: viewerCtx } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization: org },
+    );
     const viewerSpaceUser = await db.spaceUser.create({
       data: {
         role: 'viewer',

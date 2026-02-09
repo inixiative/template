@@ -1,9 +1,9 @@
-import { Card, CardHeader, CardTitle, CardContent, Button, Table } from '@template/ui';
-import { CreateTokenModal } from './CreateTokenModal';
-import { checkPermission } from '#/lib';
+import { CreateTokenModal } from '@template/shared/components/CreateTokenModal';
+import { checkPermission } from '@template/shared/hooks/usePermission';
+import { useAppStore } from '@template/shared/store';
+import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAppStore } from '#/store';
 
 type Token = {
   id: string;
@@ -32,7 +32,7 @@ export const UserTokensTab = () => {
     {
       key: 'lastUsed',
       label: 'Last Used',
-      render: (token: Token) => token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never',
+      render: (token: Token) => (token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never'),
     },
     {
       key: 'actions',
@@ -71,9 +71,7 @@ export const UserTokensTab = () => {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>API Tokens</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create and manage API tokens for programmatic access
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Create and manage API tokens for programmatic access</p>
             </div>
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />

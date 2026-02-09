@@ -4,6 +4,9 @@
 
 - [x] Token permission tests - comprehensive tests for OrganizationUser and SpaceUser tokens
 - [x] setupSpacePermissions - space-level permission setup mirroring org pattern
+- [ ] CI/CD decision capture (defer final implementation until work patterns are validated)
+- [ ] Platform baseline decision (hosting + DB + observability)
+- [ ] TanStack Start re-evaluation for `apps/web` (clean migration or full rollback)
 
 ## Type Errors
 
@@ -68,6 +71,15 @@ Implementation:
 
 ### Features
 
+- [ ] Unified auth system (AUTH-002)
+  - [ ] Single `authenticate(method, credentials)` interface for all auth types
+  - [ ] Auth methods discovery endpoint (`/auth/methods`)
+  - [ ] Support email/password, OAuth (Google, GitHub, Microsoft), SSO/SAML
+  - [ ] Domain-based auth routing (email domain → SSO provider)
+  - [ ] Dynamic UI that renders available auth methods
+  - [ ] Move auth methods into Zustand (remove createAuthClient prop pattern)
+  - [ ] Standardized sign-in/sign-up experience across all methods
+  - [ ] Session handling consistent regardless of auth type
 - [ ] Feature flags system
   - [ ] Backend: Feature flag model with polymorphic ownership
     - Uses `ownerModel` pattern: 'Platform' | 'Organization' | 'Space'
@@ -145,6 +157,8 @@ Implementation:
 - [ ] Turborepo (with Bun) - skip unchanged tests
 - [ ] Default orderBy in paginate utility
 - [ ] Pen testing setup (consider Autonoma)
+- [ ] Create/maintain `scripts/scratch/` for experimental scripts (keep production script paths clean)
+- [ ] CI hygiene pass: remove/relocate generated or accidental cruft before each merge
 
 ### Infrastructure
 

@@ -2,10 +2,10 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { serveStatic } from 'hono/bun';
-import { isLocal } from '@template/shared/utils';
-import { queue } from '#/jobs/queue';
 import { log } from '@template/shared/logger';
+import { isLocal } from '@template/shared/utils';
+import { serveStatic } from 'hono/bun';
+import { queue } from '#/jobs/queue';
 import { basicAuthMiddleware } from '#/middleware/auth/basicAuthMiddleware';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -41,4 +41,4 @@ const createBullBoardRouter = (): OpenAPIHono<AppEnv> => {
   return router;
 };
 
-export default createBullBoardRouter();
+export const bullBoardRouter = createBullBoardRouter();

@@ -14,7 +14,7 @@ import { buildUser } from '@template/db/test'; // Use factories for data
 MSW handlers are auto-generated from the SDK:
 
 ```bash
-bun run generate:api  # Generates SDK + MSW handlers
+bun run generate:sdk  # Generates SDK + MSW handlers
 ```
 
 This creates:

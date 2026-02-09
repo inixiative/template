@@ -1,6 +1,6 @@
-import type { HookOptions, ManyAction, SingleAction, FlexibleRef } from '@template/db';
+import type { FlexibleRef, HookOptions, ManyAction, SingleAction } from '@template/db';
+import { DbAction, db, HookTiming, isFalsePolymorphismRef, registerDbHook } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
-import { DbAction, HookTiming, db, registerDbHook, isFalsePolymorphismRef } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -32,9 +32,7 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
 };
 
 const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn ||
-  action === DbAction.updateManyAndReturn ||
-  action === DbAction.deleteMany;
+  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
 
 const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): WebhookAction => {
   if (dbAction === DbAction.upsert) {
@@ -70,7 +68,7 @@ const processSingleRecord = (
   return getWebhookCallbacks(subscriptions, payload);
 };
 
-export function registerWebhookHook() {
+export const registerWebhookHook = () => {
   const actions = [
     DbAction.create,
     DbAction.update,
@@ -124,7 +122,14 @@ export function registerWebhookHook() {
         for (const resultData of results) {
           const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));
           const previousData = previousById.get(resultData.id);
-          const callbacks = processSingleRecord(subscriptions, webhookModel, model, webhookAction, resultData, previousData);
+          const callbacks = processSingleRecord(
+            subscriptions,
+            webhookModel,
+            model,
+            webhookAction,
+            resultData,
+            previousData,
+          );
           allCallbacks = allCallbacks.concat(callbacks);
         }
       } else {
@@ -132,7 +137,14 @@ export function registerWebhookHook() {
         const resultData = result as Record<string, unknown> & { id: string };
         const previousData = previous as Record<string, unknown> | undefined;
         const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
-        const callbacks = processSingleRecord(subscriptions, webhookModel, model, webhookAction, resultData, previousData);
+        const callbacks = processSingleRecord(
+          subscriptions,
+          webhookModel,
+          model,
+          webhookAction,
+          resultData,
+          previousData,
+        );
         allCallbacks = allCallbacks.concat(callbacks);
       }
     }
@@ -141,4 +153,4 @@ export function registerWebhookHook() {
 
     db.onCommit(allCallbacks, ConcurrencyType.queue);
   });
-}
+};

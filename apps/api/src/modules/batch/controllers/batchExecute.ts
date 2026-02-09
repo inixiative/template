@@ -4,7 +4,7 @@ import { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
 import { executeBatch } from '#/modules/batch/services/executor';
 
 export const batchExecuteController = makeController(batchExecuteRoute, async (c, respond) => {
-  const batchId = c.req.header('X-Batch-Id');
+  const batchId = c.req.header('x-batch-id');
   if (batchId) throw new HTTPException(400, { message: 'Batch requests cannot be nested' });
 
   const body = c.req.valid('json');

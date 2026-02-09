@@ -8,7 +8,7 @@ type SuccessResponse<T extends ZodResponseSchema> = {
   description: string;
 };
 
-export function buildResponses<const T extends RouteArgs>(args: T, statusCode: 200 | 201 = 200) {
+export const buildResponses = <const T extends RouteArgs>(args: T, statusCode: 200 | 201 = 200) => {
   const { responseSchema, many = false, paginate = false } = args;
 
   if (responseSchema) {
@@ -31,4 +31,4 @@ export function buildResponses<const T extends RouteArgs>(args: T, statusCode: 2
     204: { description: 'Success' },
     ...errorResponses,
   } as { 204: { description: string } } & typeof errorResponses;
-}
+};

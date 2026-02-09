@@ -4,8 +4,6 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
-import type { AppEnv } from '#/types/appEnv';
-
 import { batchRouter } from '#/modules/batch';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
@@ -16,6 +14,7 @@ import { spaceUserRouter } from '#/modules/spaceUser';
 import { tokenRouter } from '#/modules/token';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
+import type { AppEnv } from '#/types/appEnv';
 
 export const apiRouter = new OpenAPIHono<AppEnv>();
 

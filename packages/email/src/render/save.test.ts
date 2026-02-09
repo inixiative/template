@@ -1,8 +1,8 @@
-import { describe, it, expect, afterAll, beforeEach } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
-import { saveEmailTemplate } from './save';
 import { MjmlValidationError } from '../validations/MjmlValidationError';
+import { saveEmailTemplate } from './save';
 
 /** Wrap content in valid MJML structure */
 const mjml = (content: string) =>
@@ -55,7 +55,9 @@ describe('saveEmailTemplate', () => {
       name: 'Dup Header',
       subject: 'Hello',
       category: 'system',
-      mjml: mjml('{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}'),
+      mjml: mjml(
+        '{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}',
+      ),
       ownerModel: 'default',
     });
 
@@ -69,7 +71,9 @@ describe('saveEmailTemplate', () => {
       name: 'Variants',
       subject: 'Hello',
       category: 'system',
-      mjml: mjml('{{#component:header}}<mj-text>Version A</mj-text>{{/component:header}}{{#component:header}}<mj-text>Version B</mj-text>{{/component:header}}'),
+      mjml: mjml(
+        '{{#component:header}}<mj-text>Version A</mj-text>{{/component:header}}{{#component:header}}<mj-text>Version B</mj-text>{{/component:header}}',
+      ),
       ownerModel: 'default',
     });
 
@@ -147,7 +151,9 @@ describe('saveEmailTemplate', () => {
       name: 'Nested',
       subject: 'Hello',
       category: 'system',
-      mjml: mjml('{{#component:outer}}<mj-text>Outer {{#component:inner}}<mj-text>Inner</mj-text>{{/component:inner}}</mj-text>{{/component:outer}}'),
+      mjml: mjml(
+        '{{#component:outer}}<mj-text>Outer {{#component:inner}}<mj-text>Inner</mj-text>{{/component:inner}}</mj-text>{{/component:outer}}',
+      ),
       ownerModel: 'default',
     });
 

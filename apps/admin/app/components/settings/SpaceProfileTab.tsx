@@ -1,6 +1,6 @@
-import { Card, CardHeader, CardTitle, CardContent, Input, Label, Button } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@template/ui';
 
-export function SpaceProfileTab({ spaceId }: { spaceId: string }) {
+export const SpaceProfileTab = ({ spaceId }: { spaceId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>
@@ -21,4 +21,4 @@ export function SpaceProfileTab({ spaceId }: { spaceId: string }) {
       </Card>
     </div>
   );
-}
+};

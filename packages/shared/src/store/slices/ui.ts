@@ -6,10 +6,11 @@ export type UISlice = {
   ui: {
     theme: Theme;
     isLoading: boolean;
-    isInitialized: boolean;
+    appName: string;
+    shortName: string;
+    description: string;
     setTheme: (theme: Theme) => void;
     setLoading: (loading: boolean) => void;
-    hydrateSettings: (settings: { theme?: Theme }) => void;
     updateTheme: (theme: Theme) => Promise<void>;
   };
 };
@@ -18,7 +19,9 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
   ui: {
     theme: 'system',
     isLoading: false,
-    isInitialized: false,
+    appName: import.meta.env.VITE_APP_NAME || 'Template',
+    shortName: import.meta.env.VITE_APP_SHORT_NAME || 'Template',
+    description: import.meta.env.VITE_APP_DESCRIPTION || 'TanStack Router + React Aria + Tailwind',
 
     setTheme: (theme) =>
       set((state) => ({
@@ -28,15 +31,6 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     setLoading: (loading) =>
       set((state) => ({
         ui: { ...state.ui, isLoading: loading },
-      })),
-
-    hydrateSettings: (settings) =>
-      set((state) => ({
-        ui: {
-          ...state.ui,
-          theme: settings.theme ?? state.ui.theme,
-          isInitialized: true,
-        },
       })),
 
     updateTheme: async (theme) => {

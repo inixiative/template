@@ -1,95 +1,69 @@
-import { createFileRoute, Outlet, useNavigate, useLocation } from '@tanstack/react-router';
-import { AppShell } from '@template/ui';
-import { useAppStore, initializeAuth, logout } from '@template/shared';
+import { createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
+import { logout, useAppStore, useAuthenticatedRouting } from '@template/shared';
+import { AppShell, Unauthorized } from '@template/ui';
+import { useEffect } from 'react';
 import { navConfig } from '#/config/nav';
 import { requireAuth } from '#/guards';
-import { log } from '#/lib/logger';
-import { useEffect } from 'react';
+
+const AuthenticatedLayout = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const auth = useAppStore((state) => state.auth);
+  const tenant = useAppStore((state) => state.tenant);
+
+  const { isUnauthorized } = useAuthenticatedRouting({
+    pathname: location.pathname,
+    search: location.search,
+    navigate,
+    navConfig,
+  });
+
+  const spaceTheme = tenant.context.type === 'space' ? tenant.context.space : null;
+
+  // Apply space theme
+  useEffect(() => {
+    if (tenant.context.type === 'space' && spaceTheme?.primaryColor) {
+      document.documentElement.style.setProperty('--space-primary', spaceTheme.primaryColor);
+    } else {
+      document.documentElement.style.removeProperty('--space-primary');
+    }
+
+    if (tenant.context.type === 'space' && spaceTheme?.logoUrl) {
+      document.documentElement.style.setProperty('--space-logo-url', `url(${spaceTheme.logoUrl})`);
+    } else {
+      document.documentElement.style.removeProperty('--space-logo-url');
+    }
+  }, [tenant.context.type, spaceTheme?.primaryColor, spaceTheme?.logoUrl]);
+
+  return (
+    <AppShell
+      currentPath={location.pathname}
+      onLogout={async () => {
+        await logout(import.meta.env.VITE_API_URL);
+        // Don't redirect - let permission check handle it
+        // URL update effect will remove query params
+        // If page isn't accessible in public context, will show Unauthorized
+      }}
+    >
+      {isUnauthorized ? (
+        <Unauthorized
+          onGoHome={() => {
+            if (auth.isAuthenticated) {
+              tenant.setPersonal();
+              navigate({ to: '/dashboard' });
+            } else {
+              navigate({ to: '/login' });
+            }
+          }}
+        />
+      ) : (
+        <Outlet />
+      )}
+    </AppShell>
+  );
+};
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: (ctx) => requireAuth(ctx),
   component: AuthenticatedLayout,
 });
-
-function AuthenticatedLayout() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const tenant = useAppStore((state) => state.tenant);
-  const permissions = useAppStore((state) => state.permissions);
-  const auth = useAppStore((state) => state.auth);
-
-  useEffect(() => {
-    if (!auth.isInitialized) {
-      initializeAuth().catch((error) => {
-        log.error('Failed to initialize auth', error);
-        navigate({
-          to: '/login',
-          search: { redirectTo: location.pathname },
-        });
-      });
-    }
-  }, [auth.isInitialized, navigate, location.pathname]);
-
-  const currentContext = {
-    type: tenant.context.type,
-    label: tenant.context.type === 'personal'
-      ? 'Personal'
-      : tenant.context.type === 'organization'
-      ? tenant.context.organization?.name || 'Organization'
-      : tenant.context.space?.name || 'Space',
-    organizationId: tenant.context.organization?.id,
-    spaceId: tenant.context.space?.id,
-  };
-
-  const organizations = auth.organizations || [];
-
-  const navContext = {
-    organization: tenant.context.organization,
-    space: tenant.context.space,
-  };
-
-  const navSections = tenant.context.type === 'personal'
-    ? navConfig.personal
-    : tenant.context.type === 'organization'
-    ? navConfig.organization
-    : navConfig.space;
-
-  const user = {
-    name: auth.user?.name || 'User',
-    email: auth.user?.email || '',
-    avatarUrl: undefined,
-  };
-
-  return (
-    <AppShell
-      logo={<div className="text-lg font-bold">App</div>}
-      currentContext={currentContext}
-      organizations={organizations}
-      navSections={navSections}
-      navContext={navContext}
-      currentPath={location.pathname}
-      permissions={permissions}
-      user={user}
-      isSuperadmin={permissions.isSuperadmin()}
-      isSpoofing={false}
-      onSelectPersonal={() => tenant.setPersonal()}
-      onSelectOrganization={(orgId) => {}}
-      onSelectSpace={(orgId, spaceId) => {}}
-      onNavigate={(path) => navigate({ to: path })}
-      onProfile={() => navigate({ to: '/profile' })}
-      onSettings={() => navigate({ to: '/settings' })}
-      onLogout={async () => {
-        try {
-          await logout(import.meta.env.VITE_API_URL);
-        } catch (error) {
-          log.error('Logout failed', error);
-        } finally {
-          navigate({ to: '/login' });
-        }
-      }}
-    >
-      <Outlet />
-    </AppShell>
-  );
-}

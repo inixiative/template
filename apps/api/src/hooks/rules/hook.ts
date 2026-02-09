@@ -1,9 +1,17 @@
-import { DbAction, HookTiming, registerDbHook, getModelRelations, type ModelName, type SingleAction, type HookOptions } from '@template/db';
 import { check } from '@inixiative/json-rules';
-import { isEmpty } from 'lodash-es';
+import {
+  DbAction,
+  getModelRelations,
+  type HookOptions,
+  HookTiming,
+  type ModelName,
+  registerDbHook,
+  type SingleAction,
+} from '@template/db';
 import { log } from '@template/shared/logger';
-import { getRule } from './registry';
-import { shadowMerge } from './shadowMerge';
+import { isEmpty } from 'lodash-es';
+import { getRule } from '#/hooks/rules/registry';
+import { shadowMerge } from '#/hooks/rules/shadowMerge';
 
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);
@@ -90,7 +98,7 @@ const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<st
   }
 };
 
-export function registerRulesHook() {
+export const registerRulesHook = () => {
   // Create hooks
   registerDbHook(
     'rules:create',
@@ -101,32 +109,20 @@ export function registerRulesHook() {
   );
 
   // Upsert hook - validate create path always, update path only if record exists
-  registerDbHook(
-    'rules:upsert',
-    '*',
-    HookTiming.before,
-    [DbAction.upsert],
-    async (options) => {
-      const { model, args, previous } = options as HookOptions & { action: SingleAction };
-      processCreateArgs(args, model as ModelName);
-      // Only validate update path if previous record exists (otherwise it's a create)
-      if (previous) {
-        processUpdateArgs(args, model as ModelName, previous);
-      }
-    },
-  );
+  registerDbHook('rules:upsert', '*', HookTiming.before, [DbAction.upsert], async (options) => {
+    const { model, args, previous } = options as HookOptions & { action: SingleAction };
+    processCreateArgs(args, model as ModelName);
+    // Only validate update path if previous record exists (otherwise it's a create)
+    if (previous) {
+      processUpdateArgs(args, model as ModelName, previous);
+    }
+  });
 
   // Update hooks
-  registerDbHook(
-    'rules:update',
-    '*',
-    HookTiming.before,
-    [DbAction.update],
-    async (options) => {
-      const { model, args, previous } = options as HookOptions & { action: SingleAction };
-      processUpdateArgs(args, model as ModelName, previous);
-    },
-  );
+  registerDbHook('rules:update', '*', HookTiming.before, [DbAction.update], async (options) => {
+    const { model, args, previous } = options as HookOptions & { action: SingleAction };
+    processUpdateArgs(args, model as ModelName, previous);
+  });
 
   // UpdateManyAndReturn - validate results (runs in transaction for rollback on failure)
   registerDbHook(
@@ -143,4 +139,4 @@ export function registerRulesHook() {
       }
     },
   );
-}
+};

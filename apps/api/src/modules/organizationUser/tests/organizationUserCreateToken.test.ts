@@ -3,7 +3,7 @@ import type { z } from '@hono/zod-openapi';
 import type { OrganizationUser, User } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
-import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
+import type { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 
@@ -34,7 +34,9 @@ describe('POST /api/v1/organizationUser/:id/token', () => {
   });
 
   it('creates a token for the organizationUser', async () => {
-    const response = await fetch(post(`/api/v1/organizationUser/${orgUser.id}/tokens`, { name: 'Test Token', role: 'admin' }));
+    const response = await fetch(
+      post(`/api/v1/organizationUser/${orgUser.id}/tokens`, { name: 'Test Token', role: 'admin' }),
+    );
     const { data } = await json<CreateTokenResponse>(response);
 
     expect(response.status).toBe(201);

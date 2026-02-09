@@ -12,7 +12,9 @@
     "baseUrl": ".",
     "paths": {
       "@template/permissions/*": ["./src/*"],
-      "@template/db/*": ["../db/src/*"]
+      "@template/db/*": ["../db/src/*"],
+      "@template/shared/*": ["../shared/src/*"],
+      "@template/ui/*": ["../ui/src/*"]
     }
   },
   "include": ["src/**/*"],

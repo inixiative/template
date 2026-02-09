@@ -1,6 +1,6 @@
+import { type QueryKey, useQueryClient } from '@tanstack/react-query';
+import { type AppEventPayload, useAppEvents } from '@template/shared/hooks/useAppEvents';
 import { useEffect, useRef } from 'react';
-import { useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { useAppEvents, type AppEventPayload } from './useAppEvents';
 
 type EventMatcher = string | RegExp | ((event: AppEventPayload) => boolean);
 
@@ -22,7 +22,7 @@ type UseEventRefetchOptions = {
   onEvent?: (event: AppEventPayload) => void;
 };
 
-function matchEvent(event: AppEventPayload, matcher: EventMatcher): boolean {
+const matchEvent = (event: AppEventPayload, matcher: EventMatcher): boolean => {
   if (typeof matcher === 'string') {
     // Support wildcards: "user.*" matches "user.signedUp", "user.updated", etc.
     if (matcher.includes('*')) {
@@ -37,12 +37,12 @@ function matchEvent(event: AppEventPayload, matcher: EventMatcher): boolean {
   }
 
   return matcher(event);
-}
+};
 
-function matchesAny(event: AppEventPayload, matchers: EventMatcher | EventMatcher[]): boolean {
+const matchesAny = (event: AppEventPayload, matchers: EventMatcher | EventMatcher[]): boolean => {
   const matcherArray = Array.isArray(matchers) ? matchers : [matchers];
   return matcherArray.some((m) => matchEvent(event, m));
-}
+};
 
 /**
  * Hook that refetches TanStack Query queries when specific WebSocket events are received.
@@ -66,7 +66,7 @@ function matchesAny(event: AppEventPayload, matchers: EventMatcher | EventMatche
  * });
  * ```
  */
-export function useEventRefetch(options: UseEventRefetchOptions): void {
+export const useEventRefetch = (options: UseEventRefetchOptions): void => {
   const { url, channels, rules, onEvent } = options;
   const queryClient = useQueryClient();
   const rulesRef = useRef(rules);
@@ -93,4 +93,4 @@ export function useEventRefetch(options: UseEventRefetchOptions): void {
       }
     },
   });
-}
+};

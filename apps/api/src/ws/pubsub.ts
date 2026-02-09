@@ -1,4 +1,4 @@
-import { log, LogScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 /**
  * WebSocket Pub/Sub Layer
  *
@@ -28,7 +28,7 @@ let pubsubEnabled = false;
  * Initialize Redis pub/sub for WebSocket broadcasting.
  * Call this once at server startup.
  */
-export async function initWebSocketPubSub(): Promise<void> {
+export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
   initialized = true;
 
@@ -67,12 +67,12 @@ export async function initWebSocketPubSub(): Promise<void> {
     log.warn('⚠️ WebSocket pub/sub disabled (Redis unavailable):', err);
     pubsubEnabled = false;
   }
-}
+};
 
 /**
  * Publish a message to all servers via Redis.
  */
-async function publish(message: PubSubMessage): Promise<void> {
+const publish = async (message: PubSubMessage): Promise<void> => {
   if (!pubsubEnabled) {
     // Fallback to local-only
     switch (message.type) {
@@ -107,32 +107,32 @@ async function publish(message: PubSubMessage): Promise<void> {
         break;
     }
   }
-}
+};
 
 /**
  * Send an event to a specific user across all servers.
  */
-export function sendToUser(userId: string, event: AppEventPayload): void {
+export const sendToUser = (userId: string, event: AppEventPayload): void => {
   publish({ type: 'user', target: userId, event });
-}
+};
 
 /**
  * Send an event to all subscribers of a channel across all servers.
  */
-export function sendToChannel(channel: string, event: AppEventPayload): void {
+export const sendToChannel = (channel: string, event: AppEventPayload): void => {
   publish({ type: 'channel', target: channel, event });
-}
+};
 
 /**
  * Broadcast an event to all connected users across all servers.
  */
-export function broadcast(event: AppEventPayload): void {
+export const broadcast = (event: AppEventPayload): void => {
   publish({ type: 'broadcast', event });
-}
+};
 
 /**
  * Check if pub/sub is enabled (Redis connected).
  */
-export function isPubSubEnabled(): boolean {
+export const isPubSubEnabled = (): boolean => {
   return pubsubEnabled;
-}
+};

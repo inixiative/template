@@ -1,7 +1,14 @@
-import type { Hono } from 'hono';
 import type { Db, Prisma } from '@template/db';
-import type { Organization, OrganizationUser, Session, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Session,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
+import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
 
 export type AppVars = {

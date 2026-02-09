@@ -1,4 +1,4 @@
-import { log, LogScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 
 export enum DbAction {
   create = 'create',

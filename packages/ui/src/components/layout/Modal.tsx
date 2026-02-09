@@ -1,5 +1,5 @@
+import { cn } from '@template/ui/lib/utils';
 import { X } from 'lucide-react';
-import { cn } from '@ui/lib/utils';
 
 export type ModalSize = 'small' | 'large';
 
@@ -20,10 +20,7 @@ export const Modal = ({ open, isOpen, onClose, size = 'small', title, children, 
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-        onClick={onClose}
-      >
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
         <div
           className={cn(
             'bg-background rounded-lg shadow-lg max-h-[90vh] overflow-hidden flex flex-col',
@@ -42,15 +39,13 @@ export const Modal = ({ open, isOpen, onClose, size = 'small', title, children, 
             {title && <h2 className="text-lg font-semibold">{title}</h2>}
             <button
               onClick={onClose}
-              className={cn("p-2 hover:bg-accent rounded-md transition-colors", !title && "ml-auto")}
+              className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
               aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            {children}
-          </div>
+          <div className="flex-1 overflow-y-auto p-6">{children}</div>
         </div>
       </div>
     </>

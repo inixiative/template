@@ -164,7 +164,7 @@ TODO: Tailwind conventions
 |------|------------|---------|
 | Model | PascalCase singular | `User`, `Organization` |
 | Field | camelCase | `firstName`, `organizationId` |
-| Enum | PascalCase | `Role`, `PlatformRole`, `SpaceRole` |
+| Enum | PascalCase | `Role`, `PlatformRole` |
 | Relation | camelCase, descriptive | `organization`, `members`, `createdBy` |
 
 ### IDs

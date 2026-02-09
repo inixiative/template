@@ -1,5 +1,5 @@
-import type { ModelName } from '@template/db';
 import type { Condition } from '@inixiative/json-rules';
+import type { ModelName } from '@template/db';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
 
 export const RulesRegistry: Partial<Record<ModelName, Condition>> = {

@@ -1,4 +1,4 @@
-import type { EmailComponent, EmailTemplate, EmailOwnerModel } from '@template/db';
+import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db';
 
 export type SaveContext = {
   ownerModel: EmailOwnerModel;

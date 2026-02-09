@@ -3,8 +3,8 @@
  */
 
 import type { EmailComponent, EmailTemplate } from '@template/db';
-import type { SaveContext } from './types';
 import type { RefMap } from './extractRefs';
+import type { SaveContext } from './types';
 
 export type ResolveResult = {
   template: Partial<EmailTemplate>;
@@ -25,18 +25,14 @@ export const resolveVariants = (
   for (const [baseSlug, variants] of Object.entries(map)) {
     const existingComponent = existing[baseSlug];
 
-    const matchedIdx = existingComponent
-      ? variants.findIndex((v) => v.mjml === existingComponent.mjml)
-      : -1;
+    const matchedIdx = existingComponent ? variants.findIndex((v) => v.mjml === existingComponent.mjml) : -1;
 
     let suffixCounter = 1;
     for (let i = 0; i < variants.length; i++) {
       const ref = `${baseSlug}:${i}`;
 
       const finalSlug =
-        i === matchedIdx || (!existingComponent && i === 0)
-          ? baseSlug
-          : `${baseSlug}-${suffixCounter++}`;
+        i === matchedIdx || (!existingComponent && i === 0) ? baseSlug : `${baseSlug}-${suffixCounter++}`;
 
       slugMap[ref] = finalSlug;
       rawComponents.push({ slug: finalSlug, mjml: variants[i].mjml, refs: variants[i].refs });
@@ -48,8 +44,10 @@ export const resolveVariants = (
     let resultMjml = mjml;
     for (const [from, to] of Object.entries(slugMap)) {
       resultMjml = resultMjml
-        .split(`{{#component:${from}}}`).join(`{{#component:${to}}}`)
-        .split(`{{/component:${from}}}`).join(`{{/component:${to}}}`);
+        .split(`{{#component:${from}}}`)
+        .join(`{{#component:${to}}}`)
+        .split(`{{/component:${from}}}`)
+        .join(`{{/component:${to}}}`);
     }
     return {
       mjml: resultMjml,

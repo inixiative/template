@@ -68,7 +68,9 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     select: { status: true },
   });
 
-  const allFailed = recentEvents.length >= FAILURE_THRESHOLD && recentEvents.every((e: Pick<WebhookEvent, 'status'>) => e.status !== 'success');
+  const allFailed =
+    recentEvents.length >= FAILURE_THRESHOLD &&
+    recentEvents.every((e: Pick<WebhookEvent, 'status'>) => e.status !== 'success');
   if (allFailed) {
     await db.webhookSubscription.update({ where: { id: subscriptionId }, data: { isActive: false } });
     log(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);

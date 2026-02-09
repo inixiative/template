@@ -1,7 +1,7 @@
 import type { AccessorName } from '@template/db';
 import { db, hydrate } from '@template/db';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Action } from '@template/permissions/client';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { HTTPException } from 'hono/http-exception';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 

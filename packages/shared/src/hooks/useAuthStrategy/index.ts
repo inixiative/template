@@ -1,10 +1,10 @@
-export { useAuthStrategy } from './useAuthStrategy';
 export { AuthStrategyProvider } from './provider';
-export { detectAuthStrategy, isEmbedded } from './utils';
 export type {
   AuthStrategy,
+  EmbedAuthCompleteMessage,
   EmbedAuthRequiredMessage,
   EmbedAuthTokenMessage,
-  EmbedAuthCompleteMessage,
   EmbedMessage,
 } from './types';
+export { useAuthStrategy } from './useAuthStrategy';
+export { detectAuthStrategy, isEmbedded } from './utils';

@@ -1,25 +1,23 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { AppEnv } from '#/types/appEnv';
-
-import { spaceReadRoute } from '#/modules/space/routes/spaceRead';
-import { spaceReadProtectedRoute } from '#/modules/space/routes/spaceReadProtected';
-import { spaceUpdateRoute } from '#/modules/space/routes/spaceUpdate';
-import { spaceDeleteRoute } from '#/modules/space/routes/spaceDelete';
-import { spaceReadManySpaceUsersRoute } from '#/modules/space/routes/spaceReadManySpaceUsers';
-import { spaceReadManyTokensRoute } from '#/modules/space/routes/spaceReadManyTokens';
-import { spaceReadManyCustomersRoute } from '#/modules/space/routes/spaceReadManyCustomers';
-import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
-import { adminSpaceReadManyRoute } from '#/modules/space/routes/adminSpaceReadMany';
-
-import { spaceReadController } from '#/modules/space/controllers/spaceRead';
-import { spaceReadProtectedController } from '#/modules/space/controllers/spaceReadProtected';
-import { spaceUpdateController } from '#/modules/space/controllers/spaceUpdate';
+import { adminSpaceReadManyController } from '#/modules/space/controllers/adminSpaceReadMany';
+import { spaceCreateTokenController } from '#/modules/space/controllers/spaceCreateToken';
 import { spaceDeleteController } from '#/modules/space/controllers/spaceDelete';
+import { spaceReadController } from '#/modules/space/controllers/spaceRead';
+import { spaceReadManyCustomersController } from '#/modules/space/controllers/spaceReadManyCustomers';
 import { spaceReadManySpaceUsersController } from '#/modules/space/controllers/spaceReadManySpaceUsers';
 import { spaceReadManyTokensController } from '#/modules/space/controllers/spaceReadManyTokens';
-import { spaceReadManyCustomersController } from '#/modules/space/controllers/spaceReadManyCustomers';
-import { spaceCreateTokenController } from '#/modules/space/controllers/spaceCreateToken';
-import { adminSpaceReadManyController } from '#/modules/space/controllers/adminSpaceReadMany';
+import { spaceReadProtectedController } from '#/modules/space/controllers/spaceReadProtected';
+import { spaceUpdateController } from '#/modules/space/controllers/spaceUpdate';
+import { adminSpaceReadManyRoute } from '#/modules/space/routes/adminSpaceReadMany';
+import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
+import { spaceDeleteRoute } from '#/modules/space/routes/spaceDelete';
+import { spaceReadRoute } from '#/modules/space/routes/spaceRead';
+import { spaceReadManyCustomersRoute } from '#/modules/space/routes/spaceReadManyCustomers';
+import { spaceReadManySpaceUsersRoute } from '#/modules/space/routes/spaceReadManySpaceUsers';
+import { spaceReadManyTokensRoute } from '#/modules/space/routes/spaceReadManyTokens';
+import { spaceReadProtectedRoute } from '#/modules/space/routes/spaceReadProtected';
+import { spaceUpdateRoute } from '#/modules/space/routes/spaceUpdate';
+import type { AppEnv } from '#/types/appEnv';
 
 export const spaceRouter = new OpenAPIHono<AppEnv>();
 

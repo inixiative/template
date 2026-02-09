@@ -1,7 +1,7 @@
-import { Component, type ReactNode } from 'react';
+import { Button } from '@template/ui/components/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/Card';
 import { AlertTriangle } from 'lucide-react';
-import { Button } from './Button';
-import { Card, CardHeader, CardTitle, CardContent } from './Card';
+import { Component, type ReactNode } from 'react';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -49,9 +49,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                An error occurred while rendering this component.
-              </p>
+              <p className="text-sm text-muted-foreground">An error occurred while rendering this component.</p>
               {this.state.error && (
                 <details className="text-xs">
                   <summary className="cursor-pointer font-medium mb-2">Error details</summary>

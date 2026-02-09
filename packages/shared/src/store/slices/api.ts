@@ -1,6 +1,6 @@
-import type { StateCreator } from 'zustand';
 import { QueryClient } from '@tanstack/react-query';
-import { client } from '../../apiClient';
+import { client } from '@template/shared/apiClient';
+import type { StateCreator } from 'zustand';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,10 +16,8 @@ export type ApiSlice = {
     baseUrl: string;
     client: typeof client;
     queryClient: QueryClient;
-    spoofUserEmail: string | null;
     setBaseUrl: (url: string) => void;
     setAuthToken: (token: string | null) => void;
-    setSpoofUserEmail: (email: string | null) => void;
   };
 };
 
@@ -32,7 +30,6 @@ export const createApiSlice: StateCreator<ApiSlice> = (set, get) => {
       baseUrl,
       client,
       queryClient,
-      spoofUserEmail: null,
 
       setBaseUrl: (url) => {
         client.setConfig({ baseUrl: url });
@@ -50,19 +47,6 @@ export const createApiSlice: StateCreator<ApiSlice> = (set, get) => {
 
         client.setConfig({ headers });
       },
-
-      setSpoofUserEmail: (email) => {
-        const headers: Record<string, string> = {};
-
-        if (email) {
-          headers['spoof-user-email'] = email;
-        }
-
-        client.setConfig({ headers });
-        set((state) => ({
-          api: { ...state.api, spoofUserEmail: email },
-        }));
-      },
     },
   };
 };
@@ -74,6 +58,6 @@ export const createApiSlice: StateCreator<ApiSlice> = (set, get) => {
  * const queryClient = useQueryClient();
  * queryClient.invalidateQueries({ queryKey: ['organizations'] });
  */
-export function useQueryClient() {
+export const useQueryClient = () => {
   return queryClient;
-}
+};

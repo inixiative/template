@@ -1,12 +1,12 @@
-import { Prisma } from '@template/db/generated/client/client';
 import type { Db } from '@template/db/clientTypes';
-import { toAccessor } from '@template/db/utils/modelNames';
+import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { log, LogScope } from '@template/shared/logger';
-import { DbAction, HookTiming, executeHooks, type HookOptions } from './hookRegistry';
+import { toAccessor } from '@template/db/utils/modelNames';
+import { LogScope, log } from '@template/shared/logger';
+import { DbAction, executeHooks, type HookOptions, HookTiming } from './hookRegistry';
 
-export { DbAction, HookTiming, registerDbHook, executeHooks, clearHookRegistry } from './hookRegistry';
-export type { HookFunction, HookOptions, SingleAction, ManyAction } from './hookRegistry';
+export type { HookFunction, HookOptions, ManyAction, SingleAction } from './hookRegistry';
+export { clearHookRegistry, DbAction, executeHooks, HookTiming, registerDbHook } from './hookRegistry';
 
 const SLOW_MUTATION_THRESHOLD = 5000;
 

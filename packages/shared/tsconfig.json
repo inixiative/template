@@ -1,11 +1,16 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "rootDir": "..",
     "outDir": "./dist",
+    "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "#/*": ["./src/*"],
-      "@template/db/*": ["../db/src/*"]
+      "@template/db/*": ["../db/src/*"],
+      "@template/permissions/*": ["../permissions/src/*"],
+      "@template/shared/*": ["./src/*"],
+      "@template/shared/openapi.json": ["./openapi.json"],
+      "@template/ui/*": ["../ui/src/*"]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true

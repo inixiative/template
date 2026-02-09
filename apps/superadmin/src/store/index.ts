@@ -1,11 +1,6 @@
+import { type ApiSlice, type AuthSlice, createApiSlice, createAuthSlice } from '@template/shared';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import {
-  createApiSlice,
-  createAuthSlice,
-  type ApiSlice,
-  type AuthSlice,
-} from '@template/shared';
 
 export type SuperadminStore = ApiSlice & AuthSlice;
 

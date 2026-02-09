@@ -1,11 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { SettingsLayout, UserProfileTab, UserTokensTab, UserWebhooksTab } from '@template/shared';
-import { User, Key, Webhook } from 'lucide-react';
+import { Key, User, Webhook } from 'lucide-react';
 import { useState } from 'react';
-
-export const Route = createFileRoute('/_authenticated/settings')({
-  component: SettingsPage,
-});
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -13,7 +9,7 @@ const tabs = [
   { id: 'webhooks', label: 'Webhooks', icon: Webhook },
 ];
 
-function SettingsPage() {
+const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('profile');
 
   return (
@@ -29,4 +25,8 @@ function SettingsPage() {
       {activeTab === 'webhooks' && <UserWebhooksTab />}
     </SettingsLayout>
   );
-}
+};
+
+export const Route = createFileRoute('/_authenticated/settings')({
+  component: SettingsPage,
+});

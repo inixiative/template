@@ -1,5 +1,5 @@
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 import { Component, type ReactNode } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@template/ui';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -44,9 +44,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               {this.state.error && (
                 <details className="text-xs">
                   <summary className="cursor-pointer font-medium">Error details</summary>
-                  <pre className="mt-2 p-2 bg-muted rounded overflow-auto">
-                    {this.state.error.toString()}
-                  </pre>
+                  <pre className="mt-2 p-2 bg-muted rounded overflow-auto">{this.state.error.toString()}</pre>
                 </details>
               )}
               <Button onClick={() => window.location.reload()} className="w-full">

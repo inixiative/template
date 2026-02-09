@@ -1,4 +1,4 @@
-import { Button } from '../Button';
+import { Button } from '@template/ui/components/Button';
 
 export type SocialAuthButtonProps = {
   provider: 'google';

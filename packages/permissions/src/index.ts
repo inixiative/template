@@ -3,55 +3,39 @@
  * All other files in this package should use absolute #/ imports.
  */
 
+export { Role } from '@template/db/generated/client/enums';
 // Client
 export {
-  createPermissions,
-  StandardAction,
-  OrganizationAction,
-  SpaceAction,
-  UserAction,
-  type Permix,
-  type PermissionEntry,
-  type ActionState,
   type Action,
+  type ActionState,
+  createPermissions,
   type Entitlements,
+  OrganizationAction,
+  type PermissionEntry,
+  type Permix,
+  SpaceAction,
+  StandardAction,
+  UserAction,
 } from './client';
-
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type { ActionRule, ModelPermission, RebacSchema, RelationCheck, RuleCheck } from './rebac/types';
 
+// Organization permissions
+export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
-  isSuperadmin,
-  roleHierarchy,
-  lesserRole,
+  allTrue,
   greaterRole,
   intersectEntitlements,
-  allTrue,
+  isSuperadmin,
+  lesserRole,
+  roleHierarchy,
   roleToStandardAction,
 } from './roles/shared';
 
-// Organization permissions
-export {
-  organizationRoles,
-  getOrgPermissions,
-  setupOrgContext,
-} from './roles/organization';
-
-// User permissions
-export {
-  userRoles,
-  getUserPermissions,
-  setupUserContext,
-} from './roles/user';
-
 // Space permissions
-export {
-  spaceRoles,
-  getSpacePermissions,
-  setupSpaceContext,
-} from './roles/space';
-
-export { Role, SpaceRole } from '@template/db/generated/client/enums';
+export { getSpacePermissions, spaceRoles } from './roles/space';
+// User permissions
+export { getUserPermissions, userRoles } from './roles/user';

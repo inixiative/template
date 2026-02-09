@@ -1,6 +1,6 @@
+import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord, ModelName } from '@template/db';
 import { getModelRelations, toAccessor, toModelName } from '@template/db';
-import { check as checkRule } from '@inixiative/json-rules';
 import { isNil } from 'lodash-es';
 import type { Action, Permix } from '../client';
 import type { ActionRule, RebacSchema } from './types';

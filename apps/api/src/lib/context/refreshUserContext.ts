@@ -1,8 +1,8 @@
+import type { Db } from '@template/db';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { Db } from '@template/db';
+import { setUserContext } from '#/lib/context/setUserContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
-import { setUserContext } from './setUserContext';
 import type { AppEnv } from '#/types/appEnv';
 
 export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {

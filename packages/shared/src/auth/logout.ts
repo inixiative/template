@@ -1,7 +1,7 @@
-import { useAppStore } from '../store';
-import { createAuthClient } from '../lib/createAuthClient';
+import { createAuthClient } from '@template/shared/lib/createAuthClient';
+import { useAppStore } from '@template/shared/store';
 
-export async function logout(baseURL: string) {
+export const logout = async (baseURL: string) => {
   const queryClient = useAppStore.getState().api.queryClient;
   const clearAuth = useAppStore.getState().auth.logout;
   const clearPermissions = useAppStore.getState().permissions.clear;
@@ -17,4 +17,4 @@ export async function logout(baseURL: string) {
     clearPermissions();
     throw error;
   }
-}
+};

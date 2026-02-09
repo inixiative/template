@@ -1,5 +1,4 @@
-import type { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Hono } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
 export type BatchRequest = {

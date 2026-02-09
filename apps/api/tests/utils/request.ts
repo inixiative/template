@@ -1,6 +1,6 @@
 // Test request helpers
 
-import { log, LogScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 import type { PaginationMetadata } from '#/lib/routeTemplates';
 
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
@@ -8,24 +8,24 @@ type ErrorResponse = { error: string; message: string; stack?: string; guidance?
 
 export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
-export async function json<T = unknown>(response: Response): Promise<SuccessResponse<T>> {
+export const json = async <T = unknown>(response: Response): Promise<SuccessResponse<T>> => {
   const body = await response.json();
   if (!response.ok) log.error(`[${response.status}] ${JSON.stringify(body)}`, LogScope.test);
   return body as SuccessResponse<T>;
-}
+};
 
-export async function jsonError(response: Response): Promise<ErrorResponse> {
+export const jsonError = async (response: Response): Promise<ErrorResponse> => {
   return response.json() as Promise<ErrorResponse>;
-}
+};
 
-export function createRequest(
+export const createRequest = (
   method: string,
   path: string,
   options?: {
     body?: unknown;
     headers?: Record<string, string>;
   },
-) {
+) => {
   const url = `http://t${path}`;
   const init: RequestInit = {
     method,
@@ -40,20 +40,20 @@ export function createRequest(
   }
 
   return new Request(url, init);
-}
+};
 
-export function get(path: string, headers?: Record<string, string>) {
+export const get = (path: string, headers?: Record<string, string>) => {
   return createRequest('GET', path, { headers });
-}
+};
 
-export function post(path: string, body?: unknown, headers?: Record<string, string>) {
+export const post = (path: string, body?: unknown, headers?: Record<string, string>) => {
   return createRequest('POST', path, { body, headers });
-}
+};
 
-export function patch(path: string, body?: unknown, headers?: Record<string, string>) {
+export const patch = (path: string, body?: unknown, headers?: Record<string, string>) => {
   return createRequest('PATCH', path, { body, headers });
-}
+};
 
-export function del(path: string, headers?: Record<string, string>) {
+export const del = (path: string, headers?: Record<string, string>) => {
   return createRequest('DELETE', path, { headers });
-}
+};

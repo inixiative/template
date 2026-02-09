@@ -1,16 +1,16 @@
 import * as Sentry from '@sentry/bun';
-import type { Context } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
+import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { ResponseValidationError } from '#/lib/utils/makeController';
+import { formatZodIssues } from '#/middleware/error/formatZodIssues';
+import { isZodError } from '#/middleware/error/isZodError';
+import { respond422 } from '#/middleware/error/respond422';
+import { respond500 } from '#/middleware/error/respond500';
 import type { AppEnv } from '#/types/appEnv';
-import { formatZodIssues } from './formatZodIssues';
-import { isZodError } from './isZodError';
-import { respond422 } from './respond422';
-import { respond500 } from './respond500';
 
-export async function errorHandlerMiddleware(err: unknown, c: Context<AppEnv>) {
+export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) => {
   c.header('Cache-Control', 'no-store');
 
   if (process.env.NODE_ENV === 'test') {
@@ -65,4 +65,4 @@ export async function errorHandlerMiddleware(err: unknown, c: Context<AppEnv>) {
   }
 
   return respond500(c, err);
-}
+};

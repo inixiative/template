@@ -1,7 +1,7 @@
+import { log } from '@template/shared/logger';
+import { isTest } from '@template/shared/utils';
 import Redis from 'ioredis';
 import RedisMock from 'ioredis-mock';
-import { isTest } from '@template/shared/utils';
-import { log } from '@template/shared/logger';
 
 /**
  * Redis Connection Strategy:

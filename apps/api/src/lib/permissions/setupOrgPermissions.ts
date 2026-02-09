@@ -1,13 +1,14 @@
 import type { OrganizationId } from '@template/db';
 import {
   type Entitlements,
-  type Role,
+  getOrgPermissions,
   intersectEntitlements,
   lesserRole,
-  setupOrgContext,
+  type Role,
 } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
+import { validateRole } from './validateRole';
 
 /**
  * Set up permissions for user's orgs at auth time.
@@ -20,11 +21,13 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
 
   // Org token → single org, token permissions only
   if (token?.ownerModel === 'Organization' && token.organizationId) {
-    await setupOrgContext(permix, {
-      role: token.role as Role,
-      orgId: token.organizationId as OrganizationId,
-      entitlements: token.entitlements as Entitlements,
-    });
+    await permix.setup(
+      getOrgPermissions(
+        validateRole(token.role),
+        token.organizationId as OrganizationId,
+        token.entitlements as Entitlements,
+      ),
+    );
     return;
   }
 
@@ -32,14 +35,13 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   if (token?.ownerModel === 'OrganizationUser' && token.organizationId) {
     const orgUser = orgUsers?.find((ou) => ou.organizationId === token.organizationId);
     if (orgUser) {
-      await setupOrgContext(permix, {
-        role: lesserRole(orgUser.role as Role, token.role as Role),
-        orgId: token.organizationId as OrganizationId,
-        entitlements: intersectEntitlements(
-          orgUser.entitlements as Entitlements,
-          token.entitlements as Entitlements,
+      await permix.setup(
+        getOrgPermissions(
+          lesserRole(validateRole(orgUser.role), validateRole(token.role)),
+          token.organizationId as OrganizationId,
+          intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements),
         ),
-      });
+      );
     }
     return;
   }
@@ -51,12 +53,12 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   for (const orgUser of orgUsers) {
     const orgId = orgUser.organizationId as OrganizationId;
     const role = token
-      ? lesserRole(orgUser.role as Role, token.role as Role)
-      : (orgUser.role as Role);
+      ? lesserRole(validateRole(orgUser.role), validateRole(token.role))
+      : validateRole(orgUser.role);
     const entitlements = token
       ? intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements)
       : (orgUser.entitlements as Entitlements);
 
-    await setupOrgContext(permix, { role, orgId, entitlements });
+    await permix.setup(getOrgPermissions(role, orgId, entitlements));
   }
 };

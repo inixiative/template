@@ -1,4 +1,4 @@
-import { log, LogScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 import type { AppEventPayload, WSSocket } from '#/ws/types';
 
 // Primary index: connectionId → socket
@@ -12,7 +12,7 @@ const connectionsByChannel = new Map<string, Set<string>>();
 
 const STALE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes without ping = stale
 
-export function addConnection(ws: WSSocket): void {
+export const addConnection = (ws: WSSocket): void => {
   const { connectionId, userId } = ws.data;
 
   connectionsById.set(connectionId, ws);
@@ -24,9 +24,9 @@ export function addConnection(ws: WSSocket): void {
     }
     connectionsByUser.get(userId)!.add(connectionId);
   }
-}
+};
 
-export function removeConnection(ws: WSSocket): void {
+export const removeConnection = (ws: WSSocket): void => {
   const { connectionId, userId, channels } = ws.data;
 
   connectionsById.delete(connectionId);
@@ -46,35 +46,35 @@ export function removeConnection(ws: WSSocket): void {
       connectionsByChannel.delete(channel);
     }
   }
-}
+};
 
-export function subscribeToChannel(ws: WSSocket, channel: string): void {
+export const subscribeToChannel = (ws: WSSocket, channel: string): void => {
   ws.data.channels.add(channel);
 
   if (!connectionsByChannel.has(channel)) {
     connectionsByChannel.set(channel, new Set());
   }
   connectionsByChannel.get(channel)!.add(ws.data.connectionId);
-}
+};
 
-export function unsubscribeFromChannel(ws: WSSocket, channel: string): void {
+export const unsubscribeFromChannel = (ws: WSSocket, channel: string): void => {
   ws.data.channels.delete(channel);
 
   connectionsByChannel.get(channel)?.delete(ws.data.connectionId);
   if (connectionsByChannel.get(channel)?.size === 0) {
     connectionsByChannel.delete(channel);
   }
-}
+};
 
-export function updateLastPing(ws: WSSocket): void {
+export const updateLastPing = (ws: WSSocket): void => {
   ws.data.lastPing = Date.now();
-}
+};
 
 /**
  * Send message to a socket, removing it if send fails.
  * Returns true if sent successfully.
  */
-function safeSend(ws: WSSocket, message: string): boolean {
+const safeSend = (ws: WSSocket, message: string): boolean => {
   try {
     ws.send(message);
     return true;
@@ -83,13 +83,13 @@ function safeSend(ws: WSSocket, message: string): boolean {
     removeConnection(ws);
     return false;
   }
-}
+};
 
 /**
  * Send an event to a specific user (all their connections, LOCAL only).
  * Use sendToUser from pubsub.ts for cross-server broadcasting.
  */
-export function sendToUserLocal(userId: string, event: AppEventPayload): void {
+export const sendToUserLocal = (userId: string, event: AppEventPayload): void => {
   const connectionIds = connectionsByUser.get(userId);
   if (!connectionIds) return;
 
@@ -98,13 +98,13 @@ export function sendToUserLocal(userId: string, event: AppEventPayload): void {
     const ws = connectionsById.get(connId);
     if (ws) safeSend(ws, message);
   }
-}
+};
 
 /**
  * Send an event to all subscribers of a channel (LOCAL only).
  * Use sendToChannel from pubsub.ts for cross-server broadcasting.
  */
-export function sendToChannelLocal(channel: string, event: AppEventPayload): void {
+export const sendToChannelLocal = (channel: string, event: AppEventPayload): void => {
   const connectionIds = connectionsByChannel.get(channel);
   if (!connectionIds) return;
 
@@ -113,24 +113,24 @@ export function sendToChannelLocal(channel: string, event: AppEventPayload): voi
     const ws = connectionsById.get(connId);
     if (ws) safeSend(ws, message);
   }
-}
+};
 
 /**
  * Broadcast an event to all connections (LOCAL only).
  * Use broadcast from pubsub.ts for cross-server broadcasting.
  */
-export function broadcastLocal(event: AppEventPayload): void {
+export const broadcastLocal = (event: AppEventPayload): void => {
   const message = JSON.stringify(event);
   for (const [, ws] of connectionsById) {
     safeSend(ws, message);
   }
-}
+};
 
 /**
  * Remove stale connections (no ping within timeout).
  * Call this periodically.
  */
-export function cleanupStaleConnections(): number {
+export const cleanupStaleConnections = (): number => {
   const now = Date.now();
   let cleaned = 0;
 
@@ -147,24 +147,24 @@ export function cleanupStaleConnections(): number {
   }
 
   return cleaned;
-}
+};
 
 /**
  * Get stats about current connections.
  */
-export function getConnectionStats() {
+export const getConnectionStats = () => {
   return {
     connections: connectionsById.size,
     users: connectionsByUser.size,
     channels: connectionsByChannel.size,
   };
-}
+};
 
 /**
  * Drain all WebSocket connections for graceful shutdown.
  * Sends reconnect message to clients, then closes connections.
  */
-export async function drainConnections(): Promise<void> {
+export const drainConnections = async (): Promise<void> => {
   const stats = getConnectionStats();
   if (stats.connections === 0) return;
 
@@ -191,4 +191,4 @@ export async function drainConnections(): Promise<void> {
   connectionsByChannel.clear();
 
   log.info('✅ WebSocket connections drained');
-}
+};

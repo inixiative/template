@@ -1,4 +1,5 @@
-import { log, LogScope } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
+
 /**
  * Graceful Shutdown Handler
  *
@@ -17,21 +18,17 @@ let isShuttingDown = false;
  * Register a shutdown handler.
  * Handlers run in order of registration.
  */
-export function onShutdown(handler: ShutdownHandler): void {
+export const onShutdown = (handler: ShutdownHandler): void => {
   handlers.push(handler);
-}
+};
 
 /**
  * Initialize graceful shutdown listeners.
  * Call once at server startup.
  */
-export function initGracefulShutdown(
-  options: {
-    timeout?: number;
-    onStart?: () => void;
-    onComplete?: () => void;
-  } = {},
-): void {
+export const initGracefulShutdown = (
+  options: { timeout?: number; onStart?: () => void; onComplete?: () => void } = {},
+): void => {
   const { timeout = 30_000, onStart, onComplete } = options;
 
   const shutdown = async (signal: string) => {
@@ -66,11 +63,11 @@ export function initGracefulShutdown(
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-}
+};
 
 /**
  * Check if shutdown is in progress.
  */
-export function isShutdownInProgress(): boolean {
+export const isShutdownInProgress = (): boolean => {
   return isShuttingDown;
-}
+};

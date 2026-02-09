@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { interpolate } from './interpolate';
 
 describe('interpolate', () => {
@@ -98,10 +98,9 @@ describe('interpolate', () => {
 
     it('substitutes variables after conditional evaluation', () => {
       const rule = JSON.stringify({ field: 'recipient.premium', operator: 'equals', value: true });
-      const result = interpolate(
-        `Hi {{recipient.name}}{{#if rule=${rule}}}, thanks for being premium{{/if}}!`,
-        { recipient: { name: 'John', premium: true } },
-      );
+      const result = interpolate(`Hi {{recipient.name}}{{#if rule=${rule}}}, thanks for being premium{{/if}}!`, {
+        recipient: { name: 'John', premium: true },
+      });
       expect(result).toBe('Hi John, thanks for being premium!');
     });
 
@@ -153,20 +152,16 @@ describe('interpolate', () => {
     });
 
     it('shows error comment for invalid JSON rule in test env', () => {
-      const result = interpolate(
-        '{{#if rule={invalid json}}}Content{{/if}}',
-        { recipient: {} },
-      );
+      const result = interpolate('{{#if rule={invalid json}}}Content{{/if}}', { recipient: {} });
       expect(result).toContain('<!-- RULE ERROR:');
       expect(result).toContain('Content');
     });
 
     it('shows error comment for valid JSON but invalid rule structure', () => {
       // Valid JSON but missing required 'operator' field
-      const result = interpolate(
-        '{{#if rule={"field":"recipient.name"}}}Content{{/if}}',
-        { recipient: { name: 'John' } },
-      );
+      const result = interpolate('{{#if rule={"field":"recipient.name"}}}Content{{/if}}', {
+        recipient: { name: 'John' },
+      });
       // json-rules check may return false or error string for invalid rules
       // Either way, we should get some output (content or error)
       expect(result.length).toBeGreaterThan(0);

@@ -5,7 +5,7 @@ export const Tags = {
   // Integrations
   // s3: 's3',
   // stripe: 'stripe',
-  admin: 'admin'
+  admin: 'admin',
 } as const;
 
 export type Tag = (typeof Tags)[keyof typeof Tags];

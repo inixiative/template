@@ -3,7 +3,7 @@ import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
-import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
+import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
 import { json, patch } from '#tests/utils/request';
 

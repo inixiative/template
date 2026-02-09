@@ -6,7 +6,7 @@ import type { Context, Next } from 'hono';
  *
  * Note: For production, consider placing behind VPN/firewall.
  */
-export function basicAuthMiddleware(username: string, password: string, realm = 'Secure Area') {
+export const basicAuthMiddleware = (username: string, password: string, realm = 'Secure Area') => {
   const unauthorized = () =>
     new Response('Unauthorized', {
       status: 401,
@@ -37,4 +37,4 @@ export function basicAuthMiddleware(username: string, password: string, realm = 
 
     await next();
   };
-}
+};

@@ -3,10 +3,10 @@
  */
 
 import type { CommunicationCategory } from '@template/db';
-import type { SaveContext } from './types';
-import { lookupTemplate, lookupComponent } from './lookupTemplate';
-import { expand } from './expand';
 import { EmailRenderError } from './errors';
+import { expand } from './expand';
+import { lookupComponent, lookupTemplate } from './lookupTemplate';
+import type { SaveContext } from './types';
 
 /** Reuse SaveContext - same shape needed for compose */
 export type ComposeContext = SaveContext;
@@ -24,10 +24,7 @@ export type ComposeComponentResult = {
 /**
  * Compose a template - fetch and expand all component refs.
  */
-export const composeTemplate = async (
-  slug: string,
-  ctx: ComposeContext,
-): Promise<ComposeTemplateResult> => {
+export const composeTemplate = async (slug: string, ctx: ComposeContext): Promise<ComposeTemplateResult> => {
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
@@ -39,10 +36,7 @@ export const composeTemplate = async (
 /**
  * Compose a component - fetch and expand nested refs (for component editor preview).
  */
-export const composeComponent = async (
-  slug: string,
-  ctx: ComposeContext,
-): Promise<ComposeComponentResult> => {
+export const composeComponent = async (slug: string, ctx: ComposeContext): Promise<ComposeComponentResult> => {
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 

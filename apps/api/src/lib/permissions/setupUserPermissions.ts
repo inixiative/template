@@ -1,6 +1,8 @@
-import { type Entitlements, Role, setupUserContext } from '@template/permissions';
+import type { UserId } from '@template/db';
+import { type Entitlements, getUserPermissions, Role } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
+import { validateRole } from './validateRole';
 
 /**
  * Set up permissions for user's own resources at auth time.
@@ -23,15 +25,12 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
 
   // User token → restricted by token role
   if (token?.ownerModel === 'User') {
-    await setupUserContext(permix, {
-      user,
-      role: (token.role as Role) ?? Role.owner,
-      entitlements: token.entitlements as Entitlements,
-    });
+    await permix.setup(
+      getUserPermissions(user.id as UserId, validateRole(token.role), token.entitlements as Entitlements),
+    );
     return;
   }
 
   // Session auth → owner (full permissions)
-  await setupUserContext(permix, { user });
+  await permix.setup(getUserPermissions(user.id as UserId));
 };
-

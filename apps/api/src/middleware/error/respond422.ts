@@ -1,8 +1,8 @@
 import type { Context } from 'hono';
+import type { PublicZodIssue } from '#/middleware/error/types';
 import type { AppEnv } from '#/types/appEnv';
-import type { PublicZodIssue } from './types';
 
-export function respond422(c: Context<AppEnv>, issues: PublicZodIssue[]) {
+export const respond422 = (c: Context<AppEnv>, issues: PublicZodIssue[]) => {
   return c.json(
     {
       error: 'Unprocessable Entity',
@@ -11,4 +11,4 @@ export function respond422(c: Context<AppEnv>, issues: PublicZodIssue[]) {
     },
     422,
   );
-}
+};

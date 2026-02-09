@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
 import seeds from '../../prisma/seeds';
 

@@ -1,5 +1,5 @@
-import { type JobHandler, JobType } from '#/jobs/types';
 import { redisNamespace } from '@template/db';
+import { type JobHandler, JobType } from '#/jobs/types';
 
 export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayload>): JobHandler<TPayload> => {
   return async (ctx, payload) => {

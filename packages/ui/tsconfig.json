@@ -6,7 +6,10 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@ui/*": ["./src/*"]
+      "@template/db/*": ["../db/src/*"],
+      "@template/permissions/*": ["../permissions/src/*"],
+      "@template/shared/*": ["../shared/src/*"],
+      "@template/ui/*": ["./src/*"]
     }
   },
   "include": ["src"],

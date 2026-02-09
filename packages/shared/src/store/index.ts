@@ -1,38 +1,38 @@
+import { createApiSlice } from '@template/shared/store/slices/api';
+import { createAuthSlice } from '@template/shared/store/slices/auth';
+import { createNavigationSlice } from '@template/shared/store/slices/navigation';
+import { createPermissionsSlice } from '@template/shared/store/slices/permissions';
+import { createTenantSlice } from '@template/shared/store/slices/tenant';
+import { createUISlice } from '@template/shared/store/slices/ui';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { ApiSlice } from './slices/api';
-import type { AuthSlice } from './slices/auth';
-import type { PermissionsSlice } from './slices/permissions';
-import type { TenantSlice } from './slices/tenant';
-import type { UISlice } from './slices/ui';
-import { createApiSlice } from './slices/api';
-import { createAuthSlice } from './slices/auth';
-import { createPermissionsSlice } from './slices/permissions';
-import { createTenantSlice } from './slices/tenant';
-import { createUISlice } from './slices/ui';
+import type {
+  ApiSlice,
+  AppStore,
+  AuthSlice,
+  NavigationSlice,
+  PermissionsSlice,
+  TenantSlice,
+  UISlice,
+} from './types';
 
-// Export individual slice creators for composition
-export { createApiSlice, type ApiSlice } from './slices/api';
-export { createAuthSlice, type AuthSlice } from './slices/auth';
-export { createPermissionsSlice, type PermissionsSlice } from './slices/permissions';
-export { createTenantSlice, type TenantSlice } from './slices/tenant';
-export { createUISlice, type UISlice } from './slices/ui';
+// Export all types from centralized types folder
+export * from './types';
 
-// Export all types
-export * from './slices/api';
-export * from './slices/auth';
-export * from './slices/permissions';
-export * from './slices/tenant';
-export * from './slices/ui';
-
-// Create a composed store for testing/standalone usage
-export type AppStore = ApiSlice & AuthSlice & PermissionsSlice & TenantSlice & UISlice;
+// Export slice creators
+export { createApiSlice } from '@template/shared/store/slices/api';
+export { createAuthSlice } from '@template/shared/store/slices/auth';
+export { createNavigationSlice } from '@template/shared/store/slices/navigation';
+export { createPermissionsSlice } from '@template/shared/store/slices/permissions';
+export { createTenantSlice } from '@template/shared/store/slices/tenant';
+export { createUISlice } from '@template/shared/store/slices/ui';
 
 export const useAppStore = create<AppStore>()(
   devtools(
     (...a) => ({
       ...createApiSlice(...a),
       ...createAuthSlice(...a),
+      ...createNavigationSlice(...a),
       ...createPermissionsSlice(...a),
       ...createTenantSlice(...a),
       ...createUISlice(...a),

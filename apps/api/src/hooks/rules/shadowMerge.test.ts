@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { shadowMerge } from './shadowMerge';
+import { shadowMerge } from '#/hooks/rules/shadowMerge';
 
 describe('shadowMerge', () => {
   describe('basic merging', () => {

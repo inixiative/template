@@ -2,7 +2,7 @@
  * Evaluate {{#if rule={...}}}...{{/if}} conditional blocks in MJML.
  */
 
-import { check, type Condition } from '@inixiative/json-rules';
+import { type Condition, check } from '@inixiative/json-rules';
 import { isDev, isLocal, isTest } from '@template/shared/utils';
 import type { Variables } from './interpolate';
 

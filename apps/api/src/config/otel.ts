@@ -1,5 +1,5 @@
+import { LogScope, log } from '@template/shared/logger';
 import { isLocal, isTest } from '@template/shared/utils';
-import { log, LogScope } from '@template/shared/logger';
 
 /**
  * Initialize OpenTelemetry for BetterStack (or any OTLP-compatible backend).
@@ -12,7 +12,7 @@ import { log, LogScope } from '@template/shared/logger';
  * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g., Authorization=Bearer <token>)
  * - OTEL_SERVICE_NAME: Service name for traces (defaults to 'inixiative-api')
  */
-export async function initializeOpenTelemetry() {
+export const initializeOpenTelemetry = async () => {
   // Skip in local/test environments
   if (isLocal || isTest) {
     log.info('Skipping OpenTelemetry initialization (local/test environment)', LogScope.api);
@@ -25,7 +25,10 @@ export async function initializeOpenTelemetry() {
     return;
   }
 
-  log.info(`Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`, LogScope.api);
+  log.info(
+    `Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`,
+    LogScope.api,
+  );
 
   try {
     // Dynamic imports to avoid loading OTel in local/test
@@ -74,4 +77,4 @@ export async function initializeOpenTelemetry() {
   } catch (error) {
     log.error(`Failed to initialize OpenTelemetry: ${error}`, LogScope.api);
   }
-}
+};

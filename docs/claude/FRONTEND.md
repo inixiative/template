@@ -35,33 +35,32 @@ Modern, type-safe, permission-aware React architecture with TanStack Router, Zus
 └─────────────────────────────────────────────┘
 ```
 
-### Zustand Store Composition
+### State Management
 
-Every app composes the same 5 slices:
+**See:** [ZUSTAND.md](./ZUSTAND.md) for complete documentation
+
+Apps compose Zustand slices:
+- **Web/Admin:** 6 slices (Auth, Permissions, Tenant, API, UI, Navigation)
+- **Superadmin:** 5 slices (Auth, Permissions, API, UI, Navigation - no Tenant)
+
+**Key slices:**
+- **AuthSlice** - User + session + orgs + spaces
+- **PermissionsSlice** - ReBAC (Permix)
+- **TenantSlice** - Context switching (personal/org/space)
+- **ApiSlice** - QueryClient + API config
+- **UISlice** - Theme + UI state
+- **NavigationSlice** - Router navigation + nav config
 
 ```typescript
-// apps/web/app/store/index.ts
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import {
-  createApiSlice,         // QueryClient wrapper
-  createAuthSlice,        // User + session + orgs + spaces
-  createPermissionsSlice, // ReBAC (Permix)
-  createTenantSlice,      // Context switching
-  createUISlice,          // UI state (modals, etc)
-} from '@template/shared';
+import { useAppStore } from '#/store';
 
-export type AppStore = ApiSlice & AuthSlice & PermissionsSlice & TenantSlice & UISlice;
+// Read state
+const user = useAppStore((state) => state.auth.user);
+const theme = useAppStore((state) => state.ui.theme);
 
-export const useAppStore = create<AppStore>()(
-  devtools((...a) => ({
-    ...createApiSlice(...a),
-    ...createAuthSlice(...a),
-    ...createPermissionsSlice(...a),
-    ...createTenantSlice(...a),
-    ...createUISlice(...a),
-  }), { name: 'AppStore' }),
-);
+// Call actions
+const logout = useAppStore((state) => state.auth.logout);
+await logout();
 ```
 
 ---
@@ -137,172 +136,6 @@ export const Route = createFileRoute('/login')({
   component: LoginPage,
 });
 ```
-
----
-
-## State Management
-
-### 1. AuthSlice
-
-**Location:** `/packages/shared/src/store/slices/auth.ts`
-
-**State:**
-
-```typescript
-{
-  user: User | null;
-  session: Session | null;
-  organizationUsers: OrganizationUser[];  // User's org memberships
-  organizations: Organization[];           // Full org objects
-  spaceUsers: SpaceUser[];                 // User's space memberships
-  spaces: Space[];                         // Full space objects
-  isAuthenticated: boolean;
-  isInitialized: boolean;
-}
-```
-
-**Actions:**
-
-```typescript
-// Hydrate from /me endpoint
-hydrate({ user, session, organizationUsers, organizations, spaceUsers, spaces })
-
-// Set user
-setUser(user)
-
-// Logout
-logout()
-```
-
-### 2. PermissionsSlice
-
-**Location:** `/packages/shared/src/store/slices/permissions.ts`
-
-**Purpose:** ReBAC permission checks on frontend
-
-**State:**
-
-```typescript
-{
-  permissions: Permix & {
-    check: (model: string, record: any, action: string) => boolean;
-    hydrate: (me: MeResponse) => Promise<void>;
-  }
-}
-```
-
-**Hydration (matches backend permission setup):**
-
-```typescript
-await hydratePermissions({
-  id: user.id,
-  platformRole: user.platformRole,
-  organizationUsers: [
-    { organizationId: 'org1', role: 'owner', entitlements: {...} }
-  ],
-  spaceUsers: [
-    { spaceId: 'space1', role: 'admin', entitlements: {...} }
-  ],
-});
-
-// Internally calls:
-for (const orgUser of organizationUsers) {
-  await setupOrgContext(permix, {
-    role: orgUser.role,
-    orgId: orgUser.organizationId,
-    entitlements: orgUser.entitlements,
-  });
-}
-
-for (const spaceUser of spaceUsers) {
-  await setupSpaceContext(permix, {
-    role: spaceUser.role,
-    spaceId: spaceUser.spaceId,
-    entitlements: spaceUser.entitlements,
-  });
-}
-```
-
-**Usage:**
-
-```typescript
-const permissions = useAppStore(state => state.permissions);
-const canManage = permissions.check('organization', org, 'manage');
-
-<Button show={canManage}>Edit</Button>
-```
-
-### 3. TenantSlice
-
-**Location:** `/packages/shared/src/store/slices/tenant.ts`
-
-**Purpose:** Multi-tenant context switching
-
-**State:**
-
-```typescript
-{
-  context: {
-    type: 'personal' | 'organization' | 'space';
-    organization?: Organization;
-    space?: Space;
-  };
-  page: {
-    organization?: Organization;  // From route params
-    space?: Space;
-  };
-}
-```
-
-**Difference:**
-- `context`: Global app-level context (shown in ContextSelector)
-- `page`: Route-specific context (from URL params like `/org/:orgId`)
-
-**Actions:**
-
-```typescript
-setPersonal()  // Switch to personal context
-setOrganization(org, space?)  // Switch to org (optional space)
-setSpace(org, space)  // Switch to space
-```
-
-**Usage:**
-
-```typescript
-const tenant = useAppStore(state => state.tenant);
-
-// Set context
-tenant.setOrganization(org);
-
-// Read context for nav selection
-const navSections = tenant.context.type === 'personal'
-  ? navConfig.personal
-  : tenant.context.type === 'organization'
-  ? navConfig.organization
-  : navConfig.space;
-```
-
-### 4. ApiSlice
-
-**Location:** `/packages/shared/src/store/slices/api.ts`
-
-**Purpose:** TanStack Query QueryClient wrapper
-
-```typescript
-{
-  queryClient: QueryClient;
-}
-```
-
-**Why?** Allows calling `queryClient.fetchQuery()` outside React components (used by `initializeAuth()`).
-
-### 5. UISlice
-
-**Location:** `/packages/shared/src/store/slices/ui.ts`
-
-**Purpose:** Generic UI state (modals, drawers, etc)
-
-Currently minimal - placeholder for app-specific UI state.
 
 ---
 
@@ -1306,6 +1139,265 @@ const { logout, isLoading } = useLogout(authClient, () => {
   navigate({ to: '/login' });
 });
 ```
+
+---
+
+## Theme System
+
+Multi-tier theming with automatic shade generation, dark mode support, and tenant white-labeling.
+
+### Architecture
+
+**Three-tier CSS variable system:**
+
+```
+App Theme (--app-*)     → Platform baseline colors
+  ↓
+Space Theme (--space-*) → Tenant overrides (set dynamically)
+  ↓
+Active Theme (--primary) → What components reference
+```
+
+**Automatic shade generation** via CSS `color-mix()`:
+
+```css
+/* Light mode: mix with white */
+:root {
+  --primary: var(--space-primary, var(--app-primary));
+  --primary-1: var(--space-primary-1, color-mix(in hsl, hsl(var(--primary)), white 60%));
+  --primary-2: var(--space-primary-2, color-mix(in hsl, hsl(var(--primary)), white 40%));
+  --primary-3: var(--space-primary-3, color-mix(in hsl, hsl(var(--primary)), white 20%));
+  --primary-4: var(--space-primary-4, color-mix(in hsl, hsl(var(--primary)), white 10%));
+}
+
+/* Dark mode: mix with black */
+.dark {
+  --primary-1: var(--space-primary-1, color-mix(in hsl, hsl(var(--primary)), black 60%));
+  /* ... */
+}
+```
+
+**Browser support:** 97% (Chrome 111+, Firefox 113+, Safari 16.2+)
+
+### Hooks
+
+#### useThemePersistence
+
+**Location:** `/packages/ui/src/hooks/useThemePersistence.ts`
+
+Hydrates theme from localStorage on mount, persists changes automatically.
+
+```typescript
+// In __root.tsx
+useThemePersistence(); // Reads from Zustand, no props needed
+```
+
+**Behavior:**
+- On mount: Load theme from `localStorage.getItem('theme')`
+- On change: Save to `localStorage.setItem('theme', value)`
+- Works across public and authenticated routes
+
+#### useDarkMode
+
+**Location:** `/packages/ui/src/hooks/useDarkMode.ts`
+
+Toggles `.dark` class on `<html>` based on theme preference.
+
+```typescript
+const theme = useAppStore((state) => state.ui.theme);
+useDarkMode(theme); // 'light' | 'dark' | 'system'
+```
+
+**Behavior:**
+- `'light'` → Remove `.dark` class
+- `'dark'` → Add `.dark` class
+- `'system'` → Match `prefers-color-scheme: dark`
+
+#### useSpaceTheme
+
+**Location:** `/packages/ui/src/hooks/useSpaceTheme.ts`
+
+Sets CSS custom properties for tenant white-labeling.
+
+```typescript
+const pageSpace = useAppStore((state) => state.tenant.page.space);
+
+const mockSpaceTheme = {
+  primary: "262 80% 46%",
+  secondary: "142 76% 46%",
+  logo: "https://example.com/logo.png",
+};
+
+const spaceTheme = pageSpace ? mockSpaceTheme : null;
+useSpaceTheme(spaceTheme);
+```
+
+**Color format:** HSL without wrapper: `"H S% L%"`
+
+**URL handling:** Automatically wraps `logo`, `logoDark`, `favicon` in `url()`
+
+**Clears variables** when leaving space context (theme = null)
+
+#### useLanguage
+
+**Location:** `/packages/ui/src/hooks/useLanguage.ts`
+
+Sets `document.documentElement.lang` from navigator.
+
+```typescript
+useLanguage(); // Sets lang="en" (or user's browser language)
+```
+
+### Components
+
+#### ThemeToggle
+
+**Location:** `/packages/ui/src/components/ThemeToggle.tsx`
+
+Button group for selecting light/dark/system preference.
+
+```typescript
+import { ThemeToggle } from '@template/ui';
+import { useAppStore } from '#/store';
+
+const theme = useAppStore((state) => state.ui.theme);
+const setTheme = useAppStore((state) => state.ui.setTheme);
+
+<ThemeToggle value={theme} onChange={setTheme} />
+```
+
+**Usage:** Added to `UserProfileTab` in personal settings
+
+**Variants:**
+- Selected: `variant="default"` (filled)
+- Unselected: `variant="outline"` (border only)
+
+### Types
+
+#### SpaceTheme
+
+**Location:** `/packages/ui/src/types/SpaceTheme.ts`
+
+All properties optional for tenant override:
+
+```typescript
+type SpaceTheme = {
+  // Brand colors
+  primary?: string;
+  primary1?: string;    // Lightest shade
+  primary2?: string;
+  primary3?: string;
+  primary4?: string;    // Darkest shade
+  primaryForeground?: string;
+
+  // Same pattern for: secondary, tertiary, quaternary, accent
+
+  // Assets
+  logo?: string;
+  logoDark?: string;
+  favicon?: string;
+} | null;
+```
+
+#### AppTheme
+
+**Location:** `/packages/ui/src/types/AppTheme.ts`
+
+Complete theme definition (all properties required):
+
+```typescript
+type AppTheme = {
+  primary: string;
+  primary1: string;
+  // ... all shades
+  // ... all status colors (success, error, warning, info)
+  // ... all UI colors (background, foreground, card, etc.)
+};
+```
+
+### Usage in Root Component
+
+**Pattern (all apps):**
+
+```typescript
+// apps/{web,admin,superadmin}/app/routes/__root.tsx
+import { useDarkMode, useLanguage, useSpaceTheme, useThemePersistence } from '@template/ui';
+
+const RootComponent = () => {
+  const theme = useAppStore((state) => state.ui.theme);
+  const pageSpace = useAppStore((state) => state.tenant.page.space);
+
+  useLanguage();
+  useThemePersistence();
+
+  // Mock theme (TODO: load from database)
+  const mockSpaceTheme = pageSpace ? {
+    primary: "262 80% 46%",
+    secondary: "142 76% 46%",
+    logo: "https://example.com/logo.png",
+  } : null;
+
+  useDarkMode(theme);
+  useSpaceTheme(mockSpaceTheme); // Web/Admin only, not Superadmin
+
+  return <QueryClientProvider><Outlet /></QueryClientProvider>;
+};
+```
+
+### Testing
+
+**Location:** `/packages/ui/src/hooks/*.test.ts`
+
+```bash
+cd packages/ui && bun test
+```
+
+**Coverage:**
+- `useDarkMode.test.ts` - Dark class toggling for light/dark/system
+- `useSpaceTheme.test.ts` - CSS variable setting, URL wrapping, clearing
+- `ThemeToggle.test.tsx` - Theme option rendering and selection
+
+### White-Labeling Flow
+
+**For tenants to customize their space:**
+
+1. **Database** (future): Add theme fields to Space model
+   ```prisma
+   model Space {
+     primaryColor   String?  // "262 80% 46%"
+     secondaryColor String?
+     logoUrl        String?
+   }
+   ```
+
+2. **Backend**: Return theme in space data
+   ```typescript
+   const space = await db.space.findUnique({
+     select: { primaryColor, secondaryColor, logoUrl }
+   });
+   ```
+
+3. **Frontend**: Pass to `useSpaceTheme`
+   ```typescript
+   const spaceTheme = pageSpace ? {
+     primary: space.primaryColor,
+     secondary: space.secondaryColor,
+     logo: space.logoUrl,
+   } : null;
+
+   useSpaceTheme(spaceTheme);
+   ```
+
+4. **Automatic**: Shades (1-4) generated via `color-mix()`
+
+### Key Benefits
+
+- **One color = full palette** - Set primary, get 4 shades automatically
+- **Dark mode adaptive** - Shades adjust (mix with black vs white)
+- **Type-safe** - SpaceTheme type prevents invalid properties
+- **Persistent** - Theme preference saved to localStorage
+- **Context-aware** - Space theme only applies in space context
+- **Graceful degradation** - Older browsers get app theme (no space overrides)
 
 ---
 

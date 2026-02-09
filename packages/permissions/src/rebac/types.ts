@@ -1,5 +1,5 @@
-import type { AccessorName } from '@template/db';
 import type { Condition } from '@inixiative/json-rules';
+import type { AccessorName } from '@template/db';
 
 export type RelationCheck = {
   rel: string; // Field name on record (e.g., 'organization')
@@ -9,7 +9,7 @@ export type RuleCheck = { rule: Condition };
 export type SelfCheck = { self: string }; // FK field to match against current user (e.g., 'userId')
 
 export type ActionRule =
-  | string                        // inherit action from same model
+  | string // inherit action from same model
   | RelationCheck
   | RuleCheck
   | SelfCheck

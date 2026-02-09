@@ -12,18 +12,15 @@
  *   bun run db:truncate:webhooks
  */
 
-import { log, LogScope } from '@template/shared/logger';
 import { db } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 
-async function truncateWebhookSubscriptions() {
+const truncateWebhookSubscriptions = async () => {
   const env = process.env.ENVIRONMENT || process.env.NODE_ENV;
 
   // Safety check - only run in local/test (explicit allowlist)
   if (env !== 'local' && env !== 'test') {
-    log.error(
-      `Cannot truncate webhooks in "${env}" environment. Only allowed in local/test.`,
-      LogScope.db,
-    );
+    log.error(`Cannot truncate webhooks in "${env}" environment. Only allowed in local/test.`, LogScope.db);
     process.exit(1);
   }
 
@@ -40,7 +37,7 @@ async function truncateWebhookSubscriptions() {
     console.error(error);
     throw error;
   }
-}
+};
 
 truncateWebhookSubscriptions()
   .then(() => process.exit(0))

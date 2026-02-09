@@ -2,11 +2,11 @@ import { db } from '@template/db';
 import { getHandlers } from '#/events/registry';
 import type { AppEventOptions, AppEventPayload, AppEventType } from '#/events/types';
 
-export async function createAppEvent(
+export const createAppEvent = async (
   type: AppEventType,
   data: Record<string, unknown>,
   options?: AppEventOptions,
-): Promise<void> {
+): Promise<void> => {
   const event: AppEventPayload = {
     type,
     ...options,
@@ -27,4 +27,4 @@ export async function createAppEvent(
   } else {
     await runHandlers();
   }
-}
+};

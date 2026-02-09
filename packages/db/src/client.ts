@@ -1,11 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
-import { log, LogScope } from '@template/shared/logger';
-import { resolveAll, getConcurrency, type ConcurrencyType } from '@template/shared/utils';
+import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
 import { PrismaClient } from '@template/db/generated/client/client';
-import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';
+import { LogScope, log } from '@template/shared/logger';
+import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { Pool } from 'pg';
 
 type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -29,11 +29,16 @@ const createClient = (): Db => {
 };
 
 const dbMethods = {
-  get raw() { return __raw ??= createClient(); },
+  get raw() {
+    return (__raw ??= createClient());
+  },
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();
-    return store.run({ txn: null, scopeId: scopeId ?? null, scopeContext: context ?? null, afterCommitBatches: [] }, fn);
+    return store.run(
+      { txn: null, scopeId: scopeId ?? null, scopeContext: context ?? null, afterCommitBatches: [] },
+      fn,
+    );
   },
 
   txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {
@@ -47,8 +52,11 @@ const dbMethods = {
         const result = await db.raw.$transaction(
           async (t) => {
             s.txn = t as Db;
-            try { return await fn(); }
-            finally { s.txn = null; }
+            try {
+              return await fn();
+            } finally {
+              s.txn = null;
+            }
           },
           options?.timeout ? { timeout: options.timeout } : undefined,
         );
@@ -67,7 +75,10 @@ const dbMethods = {
           const slowThreshold = s.scopeContext === 'worker' ? 30000 : 5000;
           if (duration > slowThreshold) {
             const types = [...new Set(s.afterCommitBatches.flatMap((b) => b.types ?? []))];
-            log.warn(`afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`, LogScope.db);
+            log.warn(
+              `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
+              LogScope.db,
+            );
           }
         }
         return result;

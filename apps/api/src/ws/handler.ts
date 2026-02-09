@@ -1,8 +1,9 @@
+import { LogScope, log } from '@template/shared/logger';
 import type { Server } from 'bun';
-import { log, LogScope } from '@template/shared/logger';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
+
 import { authenticateWS } from '#/ws/auth';
 import {
   addConnection,
@@ -25,7 +26,7 @@ setInterval(() => {
  * Handle WebSocket upgrade requests.
  * Allows anonymous connections (userId will be null).
  */
-export async function handleUpgrade(req: Request, server: WSServer): Promise<Response | undefined> {
+export const handleUpgrade = async (req: Request, server: WSServer): Promise<Response | undefined> => {
   const { connectionId, userId } = await authenticateWS(req);
 
   const now = Date.now();
@@ -40,7 +41,7 @@ export async function handleUpgrade(req: Request, server: WSServer): Promise<Res
   const success = server.upgrade(req, { data });
 
   return success ? undefined : new Response('Upgrade failed', { status: 500 });
-}
+};
 
 /**
  * WebSocket event handlers for Bun.serve().

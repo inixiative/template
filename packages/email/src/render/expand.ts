@@ -2,18 +2,14 @@
  * Expand component refs in MJML - replaces {{#component:slug}}...{{/component:slug}} with content.
  */
 
-import type { SaveContext } from './types';
-import { lookupCascade } from './lookupCascade';
 import { EmailRenderError } from './errors';
+import { lookupCascade } from './lookupCascade';
+import type { SaveContext } from './types';
 
 /**
  * Recursively expand all component refs in MJML.
  */
-export const expand = async (
-  mjml: string,
-  componentRefs: string[],
-  ctx: SaveContext,
-): Promise<string> => {
+export const expand = async (mjml: string, componentRefs: string[], ctx: SaveContext): Promise<string> => {
   if (!componentRefs.length) return mjml;
 
   // Batch fetch all referenced components
@@ -36,9 +32,6 @@ export const expand = async (
 };
 
 const replaceBlock = (mjml: string, slug: string, content: string): string => {
-  const pattern = new RegExp(
-    `\\{\\{#component:${slug}\\}\\}[\\s\\S]*?\\{\\{\\/component:${slug}\\}\\}`,
-    'g',
-  );
+  const pattern = new RegExp(`\\{\\{#component:${slug}\\}\\}[\\s\\S]*?\\{\\{\\/component:${slug}\\}\\}`, 'g');
   return mjml.replace(pattern, content);
 };

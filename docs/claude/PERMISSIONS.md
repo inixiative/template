@@ -284,6 +284,39 @@ await setupUserContext(permix, { user, role, entitlements });
 
 A read-only token (`role: 'viewer'`) can't modify user profile even though the user owns it.
 
+### Role Validation
+
+All permission setup functions validate role values before use to prevent permission bypass from corrupted database data.
+
+**validateRole helper** (`apps/api/src/lib/permissions/validateRole.ts`):
+
+```typescript
+import { Role } from '@template/db/generated/client/enums';
+
+export const validateRole = (value: unknown): Role => {
+  if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
+    return value as Role;
+  }
+  return Role.viewer; // Fail closed (most restrictive)
+};
+```
+
+**Security principles:**
+- **Fail closed**: Invalid roles default to `viewer` (most restrictive), not `owner`
+- **Runtime validation**: Type assertions alone don't protect against corrupted DB values
+- **Defense in depth**: Extra safety layer even though API validation should prevent invalid data
+
+**Usage in permission setup:**
+```typescript
+// Before: Trust type assertion
+role: token.role as Role
+
+// After: Validate before using
+role: validateRole(token.role)
+```
+
+This prevents scenarios where database corruption or bugs could result in invalid role values bypassing security checks.
+
 ---
 
 ## Permission Checks
@@ -466,13 +499,15 @@ export const rebacSchema: RebacSchema = {
 
 Spaces are containers within organizations. Space permissions delegate to the parent organization via REBAC.
 
-### SpaceRole
+### Space Roles
+
+Spaces use the same `Role` enum as organizations:
 
 ```prisma
-enum SpaceRole {
-  owner   // Full control of space
-  admin   // Manage space settings and members
-  member  // Operate within space
+enum Role {
+  owner   // Full control
+  admin   // Manage settings and members
+  member  // Operate within resource
   viewer  // Read-only access
 }
 ```
@@ -481,7 +516,7 @@ enum SpaceRole {
 
 ```prisma
 model SpaceUser {
-  role            SpaceRole
+  role            Role
   organizationId  String
   spaceId         String
   userId          String

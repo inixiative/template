@@ -10,12 +10,8 @@ import type { FlexibleRef } from '@template/db';
  * who have a relationship via the referenced axis.
  */
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
-  User: [
-    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
-  ],
-  Organization: [
-    { model: 'CustomerRef', axis: 'customerModel', value: 'Organization' },
-  ],
+  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
+  Organization: [{ model: 'CustomerRef', axis: 'customerModel', value: 'Organization' }],
   Space: [
     { model: 'CustomerRef', axis: 'customerModel', value: 'Space' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'Space' },

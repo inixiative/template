@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db';
-import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+  getNextSeq,
+} from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
-import { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
+import type { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
 import { createTestApp } from '#tests/createTestApp';
 import { json, jsonError, patch } from '#tests/utils/request';
 

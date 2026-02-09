@@ -9,7 +9,7 @@ type UserOverrides = Partial<{
 
 let userCounter = 0;
 
-export function createUser(overrides?: UserOverrides) {
+export const createUser = (overrides?: UserOverrides) => {
   userCounter++;
   const id = overrides?.id ?? `user-${userCounter}`;
 
@@ -21,8 +21,8 @@ export function createUser(overrides?: UserOverrides) {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
-}
+};
 
-export function resetUserFactory() {
+export const resetUserFactory = () => {
   userCounter = 0;
-}
+};

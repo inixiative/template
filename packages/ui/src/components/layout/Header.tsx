@@ -1,13 +1,19 @@
+import { useAppStore } from '@template/shared';
+import { cn } from '@template/ui/lib/utils';
 import { Menu } from 'lucide-react';
-import { cn } from '@ui/lib/utils';
+import { ShareButton } from '@template/ui/components/ShareButton';
 
 export type HeaderProps = {
-  logo?: React.ReactNode;
   onMenuClick?: () => void;
   className?: string;
 };
 
-export const Header = ({ logo, onMenuClick, className }: HeaderProps) => {
+export const Header = ({ onMenuClick, className }: HeaderProps) => {
+  // Read from Zustand store
+  const shortName = useAppStore((state) => state.ui.shortName);
+  const context = useAppStore((state) => state.tenant.context);
+
+  const logo = <div className="text-lg font-bold">{shortName}</div>;
   return (
     <header
       className={cn(
@@ -26,6 +32,9 @@ export const Header = ({ logo, onMenuClick, className }: HeaderProps) => {
           </button>
         )}
         {logo}
+      </div>
+      <div className="flex items-center gap-2">
+        {context && context.type !== 'public' && <ShareButton />}
       </div>
     </header>
   );

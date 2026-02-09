@@ -6,95 +6,85 @@
 // Database client with scope/transaction methods
 export { db } from './client';
 export type { Db } from './clientTypes';
-
+// Constraint helpers (CHECK, partial unique indexes)
+export { addCheckConstraint, addGistIndex, addUniqueWhereNotNull } from './constraints';
 // Mutation lifecycle hooks
 export {
-  DbAction,
-  HookTiming,
-  registerDbHook,
-  executeHooks,
   clearHookRegistry,
+  DbAction,
+  executeHooks,
   type HookFunction,
   type HookOptions,
-  type SingleAction,
+  HookTiming,
   type ManyAction,
+  registerDbHook,
+  type SingleAction,
 } from './extensions/mutationLifeCycle';
-
-// Typed model IDs (phantom types for compile-time safety)
-export * from './typedModelIds';
-
-// Constraint helpers (CHECK, partial unique indexes)
-export { addCheckConstraint, addUniqueWhereNotNull, addGistIndex } from './constraints';
-
-// Registries (schema-level configuration)
-export * from './registries';
-
-// Model name utilities
-export {
-  ModelNames,
-  modelNames,
-  isModelName,
-  toModelName,
-  AccessorNames,
-  accessorNames,
-  isAccessorName,
-  toAccessor,
-  type ModelName,
-  type AccessorName,
-  type ModelTypeMap,
-} from './utils/modelNames';
-
-// Type-safe delegate helpers (pass-the-delegate pattern)
-export {
-  query,
-  findFirst,
-  findUnique,
-  findMany,
-  create,
-  update,
-  del,
-  count,
-  type Args,
-  type Result,
-  type AnyDelegate,
-  type AnyCrudDelegate,
-  type RuntimeDelegate,
-} from './utils/delegates';
-
-// SQL utilities
-export { aliasColumns } from './utils/aliasColumns';
-
-// Runtime schema introspection (Prisma 7)
-export { getRuntimeDataModel, getModelRelations } from './utils/runtimeDataModel';
-export type { RuntimeDataModel, RuntimeModel, RuntimeField } from './utils/runtimeDataModel';
-
-// Scalar schemas (model schemas without relations)
-export * from './generated/zod/scalarSchemas';
-
-// Enum schemas and other zod types (from prisma-zod-generator)
-export * from './generated/zod/schemas';
-
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
-
+// Scalar schemas (model schemas without relations)
+export * from './generated/zod/scalarSchemas';
+// Enum schemas and other zod types (from prisma-zod-generator)
+export * from './generated/zod/schemas';
+export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
+// Hydration
+export { fetchOne, hydrate } from './hydrate';
 // Redis client and cache utilities
 export {
-  createRedisConnection,
-  getRedisClient,
-  getRedisPub,
-  getRedisSub,
-  flushRedis,
-  redisNamespace,
-  type RedisNamespace,
   cache,
   cacheKey,
   clearKey,
+  createRedisConnection,
+  flushRedis,
+  getRedisClient,
+  getRedisPub,
+  getRedisSub,
+  type RedisNamespace,
+  redisNamespace,
   upsertCache,
 } from './redis';
-
-// Hydration
-export { hydrate, fetchOne } from './hydrate';
-export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
+// Registries (schema-level configuration)
+export * from './registries';
+// Typed model IDs (phantom types for compile-time safety)
+export * from './typedModelIds';
+// User with relations type and schema
+export type { UserWithRelations } from './types/userWithRelations';
+export { UserWithRelationsSchema } from './types/userWithRelations';
+// SQL utilities
+export { aliasColumns } from './utils/aliasColumns';
+// Type-safe delegate helpers (pass-the-delegate pattern)
+export {
+  type AnyCrudDelegate,
+  type AnyDelegate,
+  type Args,
+  count,
+  create,
+  del,
+  findFirst,
+  findMany,
+  findUnique,
+  query,
+  type Result,
+  type RuntimeDelegate,
+  update,
+} from './utils/delegates';
+// Model name utilities
+export {
+  type AccessorName,
+  AccessorNames,
+  accessorNames,
+  isAccessorName,
+  isModelName,
+  type ModelName,
+  ModelNames,
+  type ModelTypeMap,
+  modelNames,
+  toAccessor,
+  toModelName,
+} from './utils/modelNames';
+export type { RuntimeDataModel, RuntimeField, RuntimeModel } from './utils/runtimeDataModel';
+// Runtime schema introspection (Prisma 7)
+export { getModelRelations, getRuntimeDataModel } from './utils/runtimeDataModel';
 
 // For model types: import from @template/db/client or @template/db/models
 // For runtime enum values: import from @template/db/enums

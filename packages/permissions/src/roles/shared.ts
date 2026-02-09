@@ -1,7 +1,7 @@
-import { compact } from 'lodash-es';
-import { PlatformRole, Role } from '@template/db/generated/client/enums';
 import type { User } from '@template/db/generated/client/client';
-import { type Action, type Entitlements } from '@template/permissions/client';
+import { PlatformRole, Role } from '@template/db/generated/client/enums';
+import type { Action, Entitlements } from '@template/permissions/client';
+import { compact } from 'lodash-es';
 
 export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
   user?.platformRole === PlatformRole.superadmin;
@@ -18,9 +18,7 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 export const lesserRole = (...roles: (Role | null | undefined)[]): Role => {
   const valid = compact(roles);
   if (!valid.length) return 'viewer';
-  return valid.reduce((min, role) =>
-    roleHierarchy.indexOf(role) < roleHierarchy.indexOf(min) ? role : min
-  );
+  return valid.reduce((min, role) => (roleHierarchy.indexOf(role) < roleHierarchy.indexOf(min) ? role : min));
 };
 
 /**
@@ -29,9 +27,7 @@ export const lesserRole = (...roles: (Role | null | undefined)[]): Role => {
 export const greaterRole = (...roles: (Role | null | undefined)[]): Role => {
   const valid = compact(roles);
   if (!valid.length) return 'viewer';
-  return valid.reduce((max, role) =>
-    roleHierarchy.indexOf(role) > roleHierarchy.indexOf(max) ? role : max
-  );
+  return valid.reduce((max, role) => (roleHierarchy.indexOf(role) > roleHierarchy.indexOf(max) ? role : max));
 };
 
 /**

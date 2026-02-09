@@ -28,9 +28,6 @@
 
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db/client';
-import { toAccessor } from '@template/db/utils/modelNames';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
   BuildContext,
@@ -42,6 +39,9 @@ import type {
   ModelName,
   ModelOf,
 } from '@template/db/test/factoryTypes';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { toAccessor } from '@template/db/utils/modelNames';
+import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 
 const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
   const dataModel = getRuntimeDataModel();
@@ -75,10 +75,7 @@ type RegisteredFactory = {
 
 const factoryRegistry = new Map<ModelName, RegisteredFactory>();
 
-export const createFactory = <K extends ModelName>(
-  modelName: K,
-  config: FactoryConfig<K>,
-): Factory<K> => {
+export const createFactory = <K extends ModelName>(modelName: K, config: FactoryConfig<K>): Factory<K> => {
   const dependencies = mergeDependencies(modelName, config.dependencies);
 
   factoryRegistry.set(modelName, {
@@ -130,7 +127,9 @@ export const createFactory = <K extends ModelName>(
           const depFactory = createFactory(dep.modelName, {
             defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
           });
-          await (persist ? depFactory.create(relationValue as never, ctx) : depFactory.build(relationValue as never, ctx));
+          await (persist
+            ? depFactory.create(relationValue as never, ctx)
+            : depFactory.build(relationValue as never, ctx));
         }
       } else if (!ctx[depAccessor] && dep.required) {
         const depFactory = createFactory(dep.modelName, {
@@ -156,7 +155,7 @@ export const createFactory = <K extends ModelName>(
     }
 
     const entity: ModelOf<K> = persist
-      ? await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged }) as ModelOf<K>
+      ? ((await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
     (ctx as Record<string, unknown>)[toAccessor(modelName)] = entity;

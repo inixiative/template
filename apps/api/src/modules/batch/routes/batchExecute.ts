@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { actionRoute } from '#/lib/routeTemplates';
-import { Modules } from '#/modules/modules';
 import { batchExecutionStrategyEnum, batchStatusEnum } from '#/modules/batch/constants';
+import { Modules } from '#/modules/modules';
 
 const batchRequestSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),

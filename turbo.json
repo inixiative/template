@@ -1,0 +1,165 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    // ============================================
+    // GENERATION TASKS (One-shot, cached)
+    // ============================================
+
+    "db:generate": {
+      "inputs": [
+        "prisma/schema.prisma",
+        "scripts/generateScalarSchemas.ts"
+      ],
+      "outputs": [
+        "src/generated/**",
+        ".prisma-generated"
+      ],
+      "cache": true
+    },
+
+    "generate:openapi": {
+      "dependsOn": ["^db:generate"],
+      "inputs": [
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "scripts/generateOpenApiSpec.ts"
+      ],
+      "outputs": [
+        "openapi.local.json",
+        "../../packages/shared/openapi.json"
+      ],
+      "cache": true
+    },
+
+    "generate:sdk": {
+      "dependsOn": ["^generate:openapi"],
+      "inputs": [
+        "openapi.json",
+        "openapiTs.config.ts",
+        "scripts/generateMswHandlers.ts"
+      ],
+      "outputs": [
+        "src/apiClient/**/*.gen.ts",
+        "src/test/mocks/handlers.gen.ts"
+      ],
+      "cache": true
+    },
+
+    "generate:routes": {
+      "inputs": [
+        "app/routes/**/*.tsx",
+        "app/routes/**/*.ts",
+        "scripts/generateRouteTree.ts"
+      ],
+      "outputs": ["app/routeTree.gen.ts"],
+      "cache": true
+    },
+
+    // ============================================
+    // LOCAL DEVELOPMENT TASKS
+    // ============================================
+    // Task names match package.json script names
+    // Use turbo watch <task>#<package> to filter by package
+    // ============================================
+
+    "local": {
+      "dependsOn": ["db:generate", "generate:openapi", "generate:sdk", "generate:routes"],
+      "inputs": [
+        "src/**/*.ts",
+        "app/**/*.ts",
+        "app/**/*.tsx",
+        "!src/**/*.test.ts",
+        "!openapi.local.json",
+        "!openapi.json",
+        "!app/routeTree.gen.ts",
+        // Watch workspace deps but exclude generated files
+        "../../packages/db/src/**/*.ts",
+        "!../../packages/db/src/generated/**",
+        "../../packages/permissions/src/**/*.ts",
+        "../../packages/shared/src/**/*.ts",
+        "../../packages/shared/src/**/*.tsx",
+        "!../../packages/shared/src/apiClient/**",
+        "!../../packages/shared/src/test/mocks/handlers.gen.ts"
+      ],
+      "persistent": true,
+      "interruptible": true
+    },
+
+    "local:worker": {
+      "dependsOn": ["db:generate"],
+      "inputs": [
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        // Watch workspace deps but exclude generated files
+        "../../packages/db/src/**/*.ts",
+        "!../../packages/db/src/generated/**",
+        "../../packages/permissions/src/**/*.ts",
+        "../../packages/shared/src/**/*.ts",
+        "../../packages/shared/src/**/*.tsx",
+        "!../../packages/shared/src/apiClient/**",
+        "!../../packages/shared/src/test/mocks/handlers.gen.ts"
+      ],
+      "persistent": true,
+      "interruptible": true
+    },
+
+    // ============================================
+    // BUILD TASKS (Production)
+    // ============================================
+
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "app/**"],
+      "outputs": ["dist/**", "build/**"],
+      "cache": true
+    },
+
+    // ============================================
+    // QUALITY TASKS
+    // ============================================
+
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "app/**/*.ts",
+        "app/**/*.tsx",
+        "tsconfig.json"
+      ],
+      "outputs": [".tsbuildinfo"],
+      "cache": true
+    },
+
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+
+    "lint": {
+      "inputs": ["src/**", "app/**", "biome.json"],
+      "cache": true
+    },
+
+    // ============================================
+    // LEGACY COMPATIBILITY
+    // ============================================
+
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+
+    "watch": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

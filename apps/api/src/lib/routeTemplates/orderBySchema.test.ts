@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Prisma } from '@template/db';
-import { parseOrderBy } from './orderBySchema';
+import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 
 describe('orderBySchema', () => {
   describe('parseOrderBy', () => {
@@ -16,10 +16,7 @@ describe('orderBySchema', () => {
 
     it('parses multiple fields', () => {
       const result = parseOrderBy(['name:asc', 'createdAt:desc']);
-      expect(result).toEqual([
-        { name: Prisma.SortOrder.asc },
-        { createdAt: Prisma.SortOrder.desc },
-      ]);
+      expect(result).toEqual([{ name: Prisma.SortOrder.asc }, { createdAt: Prisma.SortOrder.desc }]);
     });
 
     it('parses nested field paths', () => {
@@ -37,10 +34,7 @@ describe('orderBySchema', () => {
 
     it('handles case insensitive directions', () => {
       const result = parseOrderBy(['name:ASC', 'email:DESC']);
-      expect(result).toEqual([
-        { name: Prisma.SortOrder.asc },
-        { email: Prisma.SortOrder.desc },
-      ]);
+      expect(result).toEqual([{ name: Prisma.SortOrder.asc }, { email: Prisma.SortOrder.desc }]);
     });
 
     it('throws error for invalid path notation', () => {

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import { buildUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meReadRoute } from '#/modules/me/routes/meRead';
+import type { meReadRoute } from '#/modules/me/routes/meRead';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 

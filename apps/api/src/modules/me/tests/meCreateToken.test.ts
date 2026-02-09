@@ -3,7 +3,7 @@ import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';
+import type { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 

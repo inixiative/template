@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import type { Organization, OrganizationUser, Space, SpaceUser, Token, User } from '@template/db';
+import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -78,7 +78,10 @@ describe('GET /api/v1/space/:id/tokens', () => {
   });
 
   it('allows member to view tokens (read permission)', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
     const memberSpaceUser = await db.spaceUser.create({
       data: {
         role: 'member',

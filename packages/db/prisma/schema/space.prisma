@@ -15,6 +15,10 @@ model Space {
   name           String
   slug           String
 
+  // White-label/theming (optional)
+  logoUrl        String?
+  primaryColor   String?
+
   // Parent organization (required - Spaces must be owned by Orgs)
   organizationId String       @db.VarChar(36)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

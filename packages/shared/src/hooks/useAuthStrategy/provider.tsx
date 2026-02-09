@@ -1,12 +1,12 @@
-import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type {
   AuthStrategy,
   AuthStrategyContextType,
-  PendingAuthCallback,
-  EmbedMessage,
   EmbedAuthCompleteMessage,
   EmbedAuthRequiredMessage,
-} from './types';
+  EmbedMessage,
+  PendingAuthCallback,
+} from '@template/shared/hooks/useAuthStrategy/types';
+import { createContext, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 export const AuthStrategyContext = createContext<AuthStrategyContextType | null>(null);
 
@@ -43,7 +43,7 @@ export const AuthStrategyProvider = ({
 
         window.parent.postMessage(
           { type: 'embed:auth_complete', success: true } satisfies EmbedAuthCompleteMessage,
-          strategy.parentOrigin ?? '*'
+          strategy.parentOrigin ?? '*',
         );
 
         pendingCallbackRef.current?.();
@@ -51,7 +51,7 @@ export const AuthStrategyProvider = ({
       } catch {
         window.parent.postMessage(
           { type: 'embed:auth_complete', success: false } satisfies EmbedAuthCompleteMessage,
-          strategy.parentOrigin ?? '*'
+          strategy.parentOrigin ?? '*',
         );
       }
     };
@@ -106,13 +106,13 @@ export const AuthStrategyProvider = ({
           pendingCallbackRef.current = onSuccess ?? null;
           window.parent.postMessage(
             { type: 'embed:auth_required' } satisfies EmbedAuthRequiredMessage,
-            strategy.parentOrigin ?? '*'
+            strategy.parentOrigin ?? '*',
           );
           break;
         }
       }
     },
-    [strategy, isAuthenticated]
+    [strategy, isAuthenticated],
   );
 
   const setEmbedToken = useCallback(
@@ -121,7 +121,7 @@ export const AuthStrategyProvider = ({
       pendingCallbackRef.current?.();
       pendingCallbackRef.current = null;
     },
-    [onTokenReceived]
+    [onTokenReceived],
   );
 
   const closeOtpModal = useCallback(() => {
@@ -136,7 +136,7 @@ export const AuthStrategyProvider = ({
       pendingCallbackRef.current?.();
       pendingCallbackRef.current = null;
     },
-    [onTokenReceived]
+    [onTokenReceived],
   );
 
   return (

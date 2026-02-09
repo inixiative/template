@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { parseBracketNotation } from './parseBracketNotation';
+import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 
 describe('parseBracketNotation', () => {
   it('parses single-level bracket notation', () => {

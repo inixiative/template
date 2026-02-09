@@ -1,6 +1,6 @@
-import { http, HttpResponse } from 'msw';
-import { buildUser, buildOrganizationUser, buildSpaceUser } from '@template/db/test';
-import { handlers as generatedHandlers } from './handlers.gen';
+import { buildOrganizationUser, buildSpaceUser, buildUser } from '@template/db/test';
+import { handlers as generatedHandlers } from '@template/shared/test/mocks/handlers.gen';
+import { HttpResponse, http } from 'msw';
 
 /**
  * Custom MSW handlers that override generated defaults.
@@ -8,13 +8,13 @@ import { handlers as generatedHandlers } from './handlers.gen';
  */
 const customHandlers = [
   // Auth endpoints (BetterAuth, not in OpenAPI spec)
-  http.post('*/api/auth/sign-out', () => {
+  http.post('*/auth/sign-out', () => {
     return HttpResponse.json({ success: true });
   }),
 
-  http.post('*/api/auth/sign-in/email', async ({ request }) => {
+  http.post('*/auth/sign-in/email', async ({ request }) => {
     const body = await request.json();
-    const user = buildUser({
+    const { entity: user } = await buildUser({
       email: (body as any).email,
     });
 
@@ -30,10 +30,10 @@ const customHandlers = [
   }),
 
   // Override /api/v1/me with realistic data
-  http.get('*/api/v1/me', () => {
-    const user = buildUser({ platformRole: 'user' });
-    const org = buildOrganizationUser({ userId: user.id });
-    const space = buildSpaceUser({ userId: user.id });
+  http.get('*/api/v1/me', async () => {
+    const { entity: user } = await buildUser({ platformRole: 'user' });
+    const { entity: org } = await buildOrganizationUser({ userId: user.id });
+    const { entity: space } = await buildSpaceUser({ userId: user.id });
 
     return HttpResponse.json({
       data: {

@@ -1,5 +1,5 @@
+import { type ModelName, modelNames } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
-import { modelNames, type ModelName } from '@template/db/utils/modelNames';
 
 /**
  * Generates aliased column expressions for raw SQL queries.

@@ -279,12 +279,16 @@ const { data, pagination } = await paginate(c, db.organization, {
 - **Generic**: Works for any query param, not just searchFields
 - **Validated**: `buildWhereClause` only allows fields in the `searchableFields` whitelist
 - **Values trimmed**: All values automatically trimmed of whitespace
+- **Depth limited**: Maximum 10 levels of nesting to prevent stack overflow
 
 **Security:**
 - Only fields in `searchableFields` can be searched (whitelist validation with full paths)
-- Path notation is validated to prevent injection
+- Path notation is validated to prevent injection (camelCase enforced, rejects snake_case)
+- Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
 - Supports nested relation fields (e.g., `posts.status`, `posts.author.name`)
 - Relation fields must be explicitly whitelisted to prevent unauthorized access
+- Depth limit (10 levels) prevents stack overflow from deeply nested queries
+- Routes without `searchableFields` gracefully ignore search parameters (no crash)
 
 ### Bracket Notation Query Parsing
 

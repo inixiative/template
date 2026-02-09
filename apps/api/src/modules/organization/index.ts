@@ -1,6 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { autoRegisterAdminRoutes, autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import { validateActor } from '#/middleware/validations/validateActor';
-import { autoRegisterRoutes, autoRegisterAdminRoutes } from '#/lib/utils/autoRegisterRoutes';
 import type { AppEnv } from '#/types/appEnv';
 
 export const organizationRouter = new OpenAPIHono<AppEnv>();

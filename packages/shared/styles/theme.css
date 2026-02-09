@@ -1,41 +1,88 @@
 @import "tailwindcss";
 
+/*
+ * Two-Tier Theme System
+ *
+ * Layer 1: App Theme (--app-*)
+ *   Platform baseline colors used by shell, nav, and default pages
+ *
+ * Layer 2: Space Theme (--space-*)
+ *   Tenant overrides set dynamically in Web app when in space context
+ *   Falls back to app theme if not set
+ *
+ * Layer 3: Active Theme (--primary, --secondary, etc)
+ *   What components actually reference
+ *   Resolves from space → app
+ */
+
 :root {
   /* Base */
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
 
-  /* Primary (1-4 shades) */
-  --primary-1: 222.2 47.4% 91%;
-  --primary-2: 222.2 47.4% 71%;
-  --primary-3: 222.2 47.4% 51%;
-  --primary-4: 222.2 47.4% 11.2%;
-  --primary: var(--primary-4);
-  --primary-foreground: 210 40% 98%;
+  /* App Theme - Platform baseline */
+  --app-primary-1: 222.2 47.4% 91%;
+  --app-primary-2: 222.2 47.4% 71%;
+  --app-primary-3: 222.2 47.4% 51%;
+  --app-primary-4: 222.2 47.4% 11.2%;
+  --app-primary: var(--app-primary-4);
+  --app-primary-foreground: 210 40% 98%;
 
-  /* Secondary (1-4 shades) */
-  --secondary-1: 210 40% 98%;
-  --secondary-2: 210 40% 92%;
-  --secondary-3: 210 40% 82%;
-  --secondary-4: 210 40% 66%;
-  --secondary: var(--secondary-1);
-  --secondary-foreground: 222.2 47.4% 11.2%;
+  /* Active Theme - What components use (space override → computed) */
+  --primary: var(--space-primary, var(--app-primary));
+  --primary-1: var(--space-primary-1, color-mix(in hsl, hsl(var(--primary)), white 60%));
+  --primary-2: var(--space-primary-2, color-mix(in hsl, hsl(var(--primary)), white 40%));
+  --primary-3: var(--space-primary-3, color-mix(in hsl, hsl(var(--primary)), white 20%));
+  --primary-4: var(--space-primary-4, color-mix(in hsl, hsl(var(--primary)), white 10%));
+  --primary-foreground: var(--space-primary-foreground, var(--app-primary-foreground));
 
-  /* Tertiary (1-4 shades) */
-  --tertiary-1: 262 80% 96%;
-  --tertiary-2: 262 80% 86%;
-  --tertiary-3: 262 80% 66%;
-  --tertiary-4: 262 80% 46%;
-  --tertiary: var(--tertiary-3);
-  --tertiary-foreground: 0 0% 100%;
+  /* App Theme - Secondary */
+  --app-secondary-1: 210 40% 98%;
+  --app-secondary-2: 210 40% 92%;
+  --app-secondary-3: 210 40% 82%;
+  --app-secondary-4: 210 40% 66%;
+  --app-secondary: var(--app-secondary-1);
+  --app-secondary-foreground: 222.2 47.4% 11.2%;
 
-  /* Quaternary (1-4 shades) */
-  --quaternary-1: 174 72% 94%;
-  --quaternary-2: 174 72% 80%;
-  --quaternary-3: 174 72% 56%;
-  --quaternary-4: 174 72% 36%;
-  --quaternary: var(--quaternary-3);
-  --quaternary-foreground: 0 0% 100%;
+  /* Active Theme - Secondary (space override → computed) */
+  --secondary: var(--space-secondary, var(--app-secondary));
+  --secondary-1: var(--space-secondary-1, color-mix(in hsl, hsl(var(--secondary)), white 60%));
+  --secondary-2: var(--space-secondary-2, color-mix(in hsl, hsl(var(--secondary)), white 40%));
+  --secondary-3: var(--space-secondary-3, color-mix(in hsl, hsl(var(--secondary)), white 20%));
+  --secondary-4: var(--space-secondary-4, color-mix(in hsl, hsl(var(--secondary)), white 10%));
+  --secondary-foreground: var(--space-secondary-foreground, var(--app-secondary-foreground));
+
+  /* App Theme - Tertiary */
+  --app-tertiary-1: 262 80% 96%;
+  --app-tertiary-2: 262 80% 86%;
+  --app-tertiary-3: 262 80% 66%;
+  --app-tertiary-4: 262 80% 46%;
+  --app-tertiary: var(--app-tertiary-3);
+  --app-tertiary-foreground: 0 0% 100%;
+
+  /* Active Theme - Tertiary (space override → computed) */
+  --tertiary: var(--space-tertiary, var(--app-tertiary));
+  --tertiary-1: var(--space-tertiary-1, color-mix(in hsl, hsl(var(--tertiary)), white 60%));
+  --tertiary-2: var(--space-tertiary-2, color-mix(in hsl, hsl(var(--tertiary)), white 40%));
+  --tertiary-3: var(--space-tertiary-3, color-mix(in hsl, hsl(var(--tertiary)), white 20%));
+  --tertiary-4: var(--space-tertiary-4, color-mix(in hsl, hsl(var(--tertiary)), white 10%));
+  --tertiary-foreground: var(--space-tertiary-foreground, var(--app-tertiary-foreground));
+
+  /* App Theme - Quaternary */
+  --app-quaternary-1: 174 72% 94%;
+  --app-quaternary-2: 174 72% 80%;
+  --app-quaternary-3: 174 72% 56%;
+  --app-quaternary-4: 174 72% 36%;
+  --app-quaternary: var(--app-quaternary-3);
+  --app-quaternary-foreground: 0 0% 100%;
+
+  /* Active Theme - Quaternary (space override → computed) */
+  --quaternary: var(--space-quaternary, var(--app-quaternary));
+  --quaternary-1: var(--space-quaternary-1, color-mix(in hsl, hsl(var(--quaternary)), white 60%));
+  --quaternary-2: var(--space-quaternary-2, color-mix(in hsl, hsl(var(--quaternary)), white 40%));
+  --quaternary-3: var(--space-quaternary-3, color-mix(in hsl, hsl(var(--quaternary)), white 20%));
+  --quaternary-4: var(--space-quaternary-4, color-mix(in hsl, hsl(var(--quaternary)), white 10%));
+  --quaternary-foreground: var(--space-quaternary-foreground, var(--app-quaternary-foreground));
 
   /* Status: Success (1-4 shades) */
   --success-1: 142 76% 94%;
@@ -69,15 +116,33 @@
   --info: var(--info-3);
   --info-foreground: 0 0% 100%;
 
-  /* UI */
+  /* UI - App Theme */
+  --app-accent: 210 40% 96.1%;
+  --app-accent-foreground: 222.2 47.4% 11.2%;
+
+  /* App Theme - Accent (with shades) */
+  --app-accent-1: 210 40% 98%;
+  --app-accent-2: 210 40% 90%;
+  --app-accent-3: 210 40% 80%;
+  --app-accent-4: 210 40% 96.1%;
+  --app-accent: var(--app-accent-4);
+  --app-accent-foreground: 222.2 47.4% 11.2%;
+
+  /* Active Theme - Accent (space override → computed) */
+  --accent: var(--space-accent, var(--app-accent));
+  --accent-1: var(--space-accent-1, color-mix(in hsl, hsl(var(--accent)), white 60%));
+  --accent-2: var(--space-accent-2, color-mix(in hsl, hsl(var(--accent)), white 40%));
+  --accent-3: var(--space-accent-3, color-mix(in hsl, hsl(var(--accent)), white 20%));
+  --accent-4: var(--space-accent-4, color-mix(in hsl, hsl(var(--accent)), white 10%));
+  --accent-foreground: var(--space-accent-foreground, var(--app-accent-foreground));
+
+  /* UI - Active Theme */
   --card: 0 0% 100%;
   --card-foreground: 222.2 84% 4.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
   --destructive: var(--error);
   --destructive-foreground: var(--error-foreground);
   --border: 214.3 31.8% 91.4%;
@@ -91,37 +156,85 @@
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
 
-  /* Primary (1-4 shades) */
-  --primary-1: 222.2 47.4% 21%;
-  --primary-2: 222.2 47.4% 41%;
-  --primary-3: 222.2 47.4% 61%;
-  --primary-4: 210 40% 98%;
-  --primary: var(--primary-4);
-  --primary-foreground: 222.2 47.4% 11.2%;
+  /* App Theme - Platform baseline */
+  --app-primary-1: 222.2 47.4% 21%;
+  --app-primary-2: 222.2 47.4% 41%;
+  --app-primary-3: 222.2 47.4% 61%;
+  --app-primary-4: 210 40% 98%;
+  --app-primary: var(--app-primary-4);
+  --app-primary-foreground: 222.2 47.4% 11.2%;
 
-  /* Secondary (1-4 shades) */
-  --secondary-1: 217.2 32.6% 12%;
-  --secondary-2: 217.2 32.6% 17.5%;
-  --secondary-3: 217.2 32.6% 27%;
-  --secondary-4: 217.2 32.6% 37%;
-  --secondary: var(--secondary-2);
-  --secondary-foreground: 210 40% 98%;
+  /* Space Theme - Tenant overrides (falls back to app) */
+  --space-primary: var(--app-primary);
+  --space-primary-foreground: var(--app-primary-foreground);
 
-  /* Tertiary (1-4 shades) */
-  --tertiary-1: 262 60% 16%;
-  --tertiary-2: 262 60% 26%;
-  --tertiary-3: 262 60% 46%;
-  --tertiary-4: 262 60% 66%;
-  --tertiary: var(--tertiary-3);
-  --tertiary-foreground: 0 0% 100%;
+  /* Active Theme - What components use (space override → computed) */
+  --primary: var(--space-primary, var(--app-primary));
+  --primary-1: var(--space-primary-1, color-mix(in hsl, hsl(var(--primary)), black 60%));
+  --primary-2: var(--space-primary-2, color-mix(in hsl, hsl(var(--primary)), black 40%));
+  --primary-3: var(--space-primary-3, color-mix(in hsl, hsl(var(--primary)), black 20%));
+  --primary-4: var(--space-primary-4, color-mix(in hsl, hsl(var(--primary)), black 10%));
+  --primary-foreground: var(--space-primary-foreground, var(--app-primary-foreground));
 
-  /* Quaternary (1-4 shades) */
-  --quaternary-1: 174 52% 16%;
-  --quaternary-2: 174 52% 26%;
-  --quaternary-3: 174 52% 46%;
-  --quaternary-4: 174 52% 66%;
-  --quaternary: var(--quaternary-3);
-  --quaternary-foreground: 0 0% 100%;
+  /* App Theme - Secondary */
+  --app-secondary-1: 217.2 32.6% 12%;
+  --app-secondary-2: 217.2 32.6% 17.5%;
+  --app-secondary-3: 217.2 32.6% 27%;
+  --app-secondary-4: 217.2 32.6% 37%;
+  --app-secondary: var(--app-secondary-2);
+  --app-secondary-foreground: 210 40% 98%;
+
+  /* Space Theme - Secondary */
+  --space-secondary: var(--app-secondary);
+  --space-secondary-foreground: var(--app-secondary-foreground);
+
+  /* Active Theme - Secondary (space override → computed) */
+  --secondary: var(--space-secondary, var(--app-secondary));
+  --secondary-1: var(--space-secondary-1, color-mix(in hsl, hsl(var(--secondary)), black 60%));
+  --secondary-2: var(--space-secondary-2, color-mix(in hsl, hsl(var(--secondary)), black 40%));
+  --secondary-3: var(--space-secondary-3, color-mix(in hsl, hsl(var(--secondary)), black 20%));
+  --secondary-4: var(--space-secondary-4, color-mix(in hsl, hsl(var(--secondary)), black 10%));
+  --secondary-foreground: var(--space-secondary-foreground, var(--app-secondary-foreground));
+
+  /* App Theme - Tertiary */
+  --app-tertiary-1: 262 60% 16%;
+  --app-tertiary-2: 262 60% 26%;
+  --app-tertiary-3: 262 60% 46%;
+  --app-tertiary-4: 262 60% 66%;
+  --app-tertiary: var(--app-tertiary-3);
+  --app-tertiary-foreground: 0 0% 100%;
+
+  /* Space Theme - Tertiary */
+  --space-tertiary: var(--app-tertiary);
+  --space-tertiary-foreground: var(--app-tertiary-foreground);
+
+  /* Active Theme - Tertiary (space override → computed) */
+  --tertiary: var(--space-tertiary, var(--app-tertiary));
+  --tertiary-1: var(--space-tertiary-1, color-mix(in hsl, hsl(var(--tertiary)), black 60%));
+  --tertiary-2: var(--space-tertiary-2, color-mix(in hsl, hsl(var(--tertiary)), black 40%));
+  --tertiary-3: var(--space-tertiary-3, color-mix(in hsl, hsl(var(--tertiary)), black 20%));
+  --tertiary-4: var(--space-tertiary-4, color-mix(in hsl, hsl(var(--tertiary)), black 10%));
+  --tertiary-foreground: var(--space-tertiary-foreground, var(--app-tertiary-foreground));
+
+  /* App Theme - Quaternary */
+  --app-quaternary-1: 174 52% 16%;
+  --app-quaternary-2: 174 52% 26%;
+  --app-quaternary-3: 174 52% 46%;
+  --app-quaternary-4: 174 52% 66%;
+  --app-quaternary: var(--app-quaternary-3);
+  --app-quaternary-foreground: 0 0% 100%;
+
+  /* Space Theme - Quaternary */
+  --space-quaternary: var(--app-quaternary);
+  --space-quaternary-foreground: var(--app-quaternary-foreground);
+
+  /* Active Theme - Quaternary (space override → computed) */
+  --quaternary: var(--space-quaternary, var(--app-quaternary));
+  --quaternary-1: var(--space-quaternary-1, color-mix(in hsl, hsl(var(--quaternary)), black 60%));
+  --quaternary-2: var(--space-quaternary-2, color-mix(in hsl, hsl(var(--quaternary)), black 40%));
+  --quaternary-3: var(--space-quaternary-3, color-mix(in hsl, hsl(var(--quaternary)), black 20%));
+  --quaternary-4: var(--space-quaternary-4, color-mix(in hsl, hsl(var(--quaternary)), black 10%));
+  --quaternary-foreground: var(--space-quaternary-foreground, var(--app-quaternary-foreground));
 
   /* Status: Success (1-4 shades) */
   --success-1: 142 56% 16%;
@@ -155,15 +268,37 @@
   --info: var(--info-3);
   --info-foreground: 0 0% 100%;
 
-  /* UI */
+  /* UI - App Theme */
+  --app-accent: 217.2 32.6% 17.5%;
+  --app-accent-foreground: 210 40% 98%;
+
+  /* UI - Space Theme */
+  --space-accent: var(--app-accent);
+  --space-accent-foreground: var(--app-accent-foreground);
+
+  /* App Theme - Accent (with shades) */
+  --app-accent-1: 217.2 32.6% 12%;
+  --app-accent-2: 217.2 32.6% 15%;
+  --app-accent-3: 217.2 32.6% 20%;
+  --app-accent-4: 217.2 32.6% 17.5%;
+  --app-accent: var(--app-accent-4);
+  --app-accent-foreground: 210 40% 98%;
+
+  /* Active Theme - Accent (space override → computed) */
+  --accent: var(--space-accent, var(--app-accent));
+  --accent-1: var(--space-accent-1, color-mix(in hsl, hsl(var(--accent)), black 60%));
+  --accent-2: var(--space-accent-2, color-mix(in hsl, hsl(var(--accent)), black 40%));
+  --accent-3: var(--space-accent-3, color-mix(in hsl, hsl(var(--accent)), black 20%));
+  --accent-4: var(--space-accent-4, color-mix(in hsl, hsl(var(--accent)), black 10%));
+  --accent-foreground: var(--space-accent-foreground, var(--app-accent-foreground));
+
+  /* UI - Active Theme */
   --card: 222.2 84% 4.9%;
   --card-foreground: 210 40% 98%;
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;
   --muted: 217.2 32.6% 17.5%;
   --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
   --destructive: var(--error);
   --destructive-foreground: var(--error-foreground);
   --border: 217.2 32.6% 17.5%;

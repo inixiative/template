@@ -15,8 +15,8 @@ type SpecialOwner = 'default' | 'admin';
 export type PolymorphicValue = ModelName | SpecialOwner;
 
 export type PolymorphicAxis = {
-  field: string;                                        // e.g., 'customerModel', 'ownerModel'
-  fkMap: Partial<Record<PolymorphicValue, string[]>>;   // typeValue → required FK fields
+  field: string; // e.g., 'customerModel', 'ownerModel'
+  fkMap: Partial<Record<PolymorphicValue, string[]>>; // typeValue → required FK fields
 };
 
 export type PolymorphicConfig = {
@@ -32,8 +32,8 @@ export type PolymorphicConfig = {
 
 // Reference to a model via its false polymorphic relationship
 export type FalsePolymorphismRef = {
-  model: ModelName;        // The polymorphic model (e.g., CustomerRef)
-  axis: string;            // Which axis (e.g., customerModel, providerModel)
+  model: ModelName; // The polymorphic model (e.g., CustomerRef)
+  axis: string; // Which axis (e.g., customerModel, providerModel)
   value: PolymorphicValue; // The type value (e.g., User, Organization, Space)
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildNestedPath, validatePathNotation } from './pathNotation';
+import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
 
 describe('pathNotation', () => {
   describe('buildNestedPath', () => {
@@ -66,6 +66,21 @@ describe('pathNotation', () => {
     it('accepts alphanumeric with dots', () => {
       expect(validatePathNotation('user123.email456')).toBe(true);
       expect(validatePathNotation('field1.field2.field3')).toBe(true);
+    });
+
+    it('accepts Prisma meta-fields with leading underscore', () => {
+      expect(validatePathNotation('_count')).toBe(true);
+      expect(validatePathNotation('_max')).toBe(true);
+      expect(validatePathNotation('_min')).toBe(true);
+      expect(validatePathNotation('user._count')).toBe(true);
+      expect(validatePathNotation('organization.members._count')).toBe(true);
+    });
+
+    it('rejects snake_case (underscores in middle)', () => {
+      expect(validatePathNotation('user_name')).toBe(false);
+      expect(validatePathNotation('created_at')).toBe(false);
+      expect(validatePathNotation('organization.created_at')).toBe(false);
+      expect(validatePathNotation('user.first_name')).toBe(false);
     });
   });
 });

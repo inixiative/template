@@ -1,4 +1,3 @@
-
 import { makeController } from '#/lib/utils/makeController';
 import { meReadRoute } from '#/modules/me/routes/meRead';
 

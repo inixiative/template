@@ -1,4 +1,4 @@
-import { getQueryMetadataByOperation, type QueryMetadata } from './getQueryMetadata';
+import { getQueryMetadataByOperation, type QueryMetadata } from '@template/shared/lib/getQueryMetadata';
 
 export type SearchMode = 'combined' | 'field';
 
@@ -41,10 +41,7 @@ export type DataTableOptions = {
  *   searchMode: 'field',
  * });
  */
-export function makeDataTableConfig(
-  operationId: string,
-  options?: DataTableOptions,
-): DataTableConfig {
+export const makeDataTableConfig = (operationId: string, options?: DataTableOptions): DataTableConfig => {
   const metadata = getQueryMetadataByOperation(operationId);
 
   return {
@@ -56,7 +53,7 @@ export function makeDataTableConfig(
     canSearch: options?.canSearch ?? true,
     canOrder: options?.canOrder ?? true,
   };
-}
+};
 
 /**
  * React hook version of makeDataTableConfig.
@@ -80,9 +77,6 @@ export function makeDataTableConfig(
  *   );
  * }
  */
-export function useDataTableConfig(
-  operationId: string,
-  options?: DataTableOptions,
-): DataTableConfig {
+export const useDataTableConfig = (operationId: string, options?: DataTableOptions): DataTableConfig => {
   return makeDataTableConfig(operationId, options);
-}
+};

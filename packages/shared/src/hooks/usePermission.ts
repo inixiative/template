@@ -1,6 +1,6 @@
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { ActionRule } from '@template/permissions';
-import type { PermissionsSlice } from '../store/slices/permissions';
+import type { PermissionsSlice } from '@template/shared/store';
 
 export type PermissionCheck = {
   show: boolean;
@@ -17,14 +17,14 @@ type UsePermissionParams = {
   requireRecord?: boolean;
 };
 
-export function usePermission({
+export const usePermission = ({
   permissions,
   model,
   record,
   action,
   disabledText = 'You do not have permission to perform this action',
   requireRecord = true,
-}: UsePermissionParams): PermissionCheck {
+}: UsePermissionParams): PermissionCheck => {
   // If record is required but missing, hide the action
   if (requireRecord && !record) {
     return {
@@ -42,14 +42,14 @@ export function usePermission({
     disable: !hasPermission,
     disabledText: hasPermission ? undefined : disabledText,
   };
-}
+};
 
-export function checkPermission(
+export const checkPermission = (
   permissions: PermissionsSlice['permissions'],
   model: AccessorName,
   record: HydratedRecord | null | undefined,
   action: ActionRule,
-): boolean {
+): boolean => {
   if (!record) return false;
   return permissions.check(model, record, action);
-}
+};

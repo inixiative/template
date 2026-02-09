@@ -1,7 +1,6 @@
 import type { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 
-
 import type { AppEnv } from '#/types/appEnv';
 
 export const validateNotToken = async (c: Context<AppEnv>, next: Next) => {

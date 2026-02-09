@@ -1,4 +1,4 @@
-import { LogLevels, createConsola, type ConsolaInstance } from 'consola';
+import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
 
@@ -13,9 +13,9 @@ export enum FrontendScope {
 
 const getLogLevel = (): number => {
   // Check for browser environment and window.LOG_LEVEL
-  const level = (typeof globalThis !== 'undefined' && 'window' in globalThis
-    ? (globalThis as any).LOG_LEVEL
-    : undefined) as LogLevel | undefined;
+  const level = (
+    typeof globalThis !== 'undefined' && 'window' in globalThis ? (globalThis as any).LOG_LEVEL : undefined
+  ) as LogLevel | undefined;
   if (level && level in LogLevels) return LogLevels[level];
   return LogLevels.info;
 };

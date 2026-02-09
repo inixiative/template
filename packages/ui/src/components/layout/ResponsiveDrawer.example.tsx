@@ -1,21 +1,15 @@
+import { Button } from '@template/ui/components/Button';
+import { ResponsiveDrawer } from '@template/ui/components/layout/ResponsiveDrawer';
 import { useState } from 'react';
-import { ResponsiveDrawer } from './ResponsiveDrawer';
-import { Button } from '../Button';
 
-export function ResponsiveDrawerExample() {
+export const ResponsiveDrawerExample = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div>
-      <Button onClick={() => setIsOpen(true)}>
-        Open Details
-      </Button>
+      <Button onClick={() => setIsOpen(true)}>Open Details</Button>
 
-      <ResponsiveDrawer
-        open={isOpen}
-        onClose={() => setIsOpen(false)}
-        title="User Details"
-      >
+      <ResponsiveDrawer open={isOpen} onClose={() => setIsOpen(false)} title="User Details">
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold">Name</h3>
@@ -33,51 +27,38 @@ export function ResponsiveDrawerExample() {
       </ResponsiveDrawer>
     </div>
   );
-}
+};
 
-export function ResponsiveDrawerWithCustomBreakpoint() {
+export const ResponsiveDrawerWithCustomBreakpoint = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div>
-      <Button onClick={() => setIsOpen(true)}>
-        Open Settings
-      </Button>
+      <Button onClick={() => setIsOpen(true)}>Open Settings</Button>
 
-      <ResponsiveDrawer
-        open={isOpen}
-        onClose={() => setIsOpen(false)}
-        title="Settings"
-        breakpoint="lg"
-      >
+      <ResponsiveDrawer open={isOpen} onClose={() => setIsOpen(false)} title="Settings" breakpoint="lg">
         <div className="space-y-4">
           <p>
-            This drawer switches to a modal at the lg breakpoint (1024px)
-            instead of the default md breakpoint (768px).
+            This drawer switches to a modal at the lg breakpoint (1024px) instead of the default md breakpoint (768px).
           </p>
         </div>
       </ResponsiveDrawer>
     </div>
   );
-}
+};
 
-export function ResponsiveDrawerNoTitle() {
+export const ResponsiveDrawerNoTitle = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div>
-      <Button onClick={() => setIsOpen(true)}>
-        Quick View
-      </Button>
+      <Button onClick={() => setIsOpen(true)}>Quick View</Button>
 
-      <ResponsiveDrawer
-        open={isOpen}
-        onClose={() => setIsOpen(false)}
-      >
+      <ResponsiveDrawer open={isOpen} onClose={() => setIsOpen(false)}>
         <div>
           <p>Content without a title</p>
         </div>
       </ResponsiveDrawer>
     </div>
   );
-}
+};

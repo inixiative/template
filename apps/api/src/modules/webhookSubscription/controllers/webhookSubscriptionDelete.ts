@@ -2,13 +2,16 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionDeleteRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionDelete';
 
-export const webhookSubscriptionDeleteController = makeController(webhookSubscriptionDeleteRoute, async (c, respond) => {
-  const db = c.get('db');
-  const subscription = getResource<'webhookSubscription'>(c);
+export const webhookSubscriptionDeleteController = makeController(
+  webhookSubscriptionDeleteRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const subscription = getResource<'webhookSubscription'>(c);
 
-  await db.webhookSubscription.delete({
-    where: { id: subscription.id },
-  });
+    await db.webhookSubscription.delete({
+      where: { id: subscription.id },
+    });
 
-  return respond.noContent();
-});
+    return respond.noContent();
+  },
+);

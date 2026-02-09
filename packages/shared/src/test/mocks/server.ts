@@ -1,4 +1,4 @@
+import { handlers } from '@template/shared/test/mocks/handlers';
 import { setupServer } from 'msw/native';
-import { handlers } from './handlers';
 
-export const server = setupServer(...handlers);
+export const server: ReturnType<typeof setupServer> = setupServer(...handlers);

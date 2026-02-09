@@ -1,12 +1,12 @@
-import { trace, metrics, context, propagation } from '@opentelemetry/api';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 
 const environment = process.env.ENVIRONMENT || 'local';
 const serviceName = 'api';
@@ -64,33 +64,33 @@ export const metricsClient = {
     description: 'Duration of HTTP requests in milliseconds',
     unit: 'ms',
   }),
-  
+
   httpRequestTotal: metrics.getMeter(serviceName).createCounter('http_request_total', {
     description: 'Total number of HTTP requests',
   }),
-  
+
   dbQueryDuration: metrics.getMeter(serviceName).createHistogram('db_query_duration', {
     description: 'Duration of database queries in milliseconds',
     unit: 'ms',
   }),
-  
+
   cacheHits: metrics.getMeter(serviceName).createCounter('cache_hits_total', {
     description: 'Total number of cache hits',
   }),
-  
+
   cacheMisses: metrics.getMeter(serviceName).createCounter('cache_misses_total', {
     description: 'Total number of cache misses',
   }),
-  
+
   jobProcessingDuration: metrics.getMeter(serviceName).createHistogram('job_processing_duration', {
     description: 'Duration of job processing in milliseconds',
     unit: 'ms',
   }),
-  
+
   jobProcessedTotal: metrics.getMeter(serviceName).createCounter('job_processed_total', {
     description: 'Total number of jobs processed',
   }),
-  
+
   queueSize: metrics.getMeter(serviceName).createUpDownCounter('queue_size', {
     description: 'Current size of the queue',
   }),
@@ -106,7 +106,7 @@ export const initTelemetry = async () => {
   try {
     await otelSDK.start();
     console.log('🔍 OpenTelemetry initialized');
-    
+
     // Graceful shutdown
     process.on('SIGTERM', async () => {
       await otelSDK.shutdown();

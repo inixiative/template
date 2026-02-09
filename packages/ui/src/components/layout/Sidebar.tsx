@@ -1,36 +1,56 @@
-import { useState } from 'react';
-import { type LucideIcon, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@ui/lib/utils';
+import { cn } from '@template/ui/lib/utils';
+import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useAppStore, findRoute, type PageContext } from '@template/shared';
 
 export type NavContext = {
-  organization?: any;
-  space?: any;
+  organization?: { id: string; name: string; [key: string]: unknown };
+  space?: { id: string; name: string; organizationId?: string; [key: string]: unknown };
 };
 
 export type NavItem = {
   label: string;
   path?: string;
   icon?: LucideIcon;
-  can?: (permissions: any, context: NavContext) => boolean;
+  title?: string | ((context: NavContext, pageContext?: PageContext) => string);
+  description?: string | ((context: NavContext, pageContext?: PageContext) => string);
+  access?: (permissions: { check: (resource: string, entity: unknown, action: string) => boolean }, context: NavContext) => boolean;
+  alias?: boolean;
+  breadcrumbLabel?: (record: Record<string, any>) => string;
   items?: NavItem[];
 };
 
-export type SidebarSection = {
-  label?: string;
-  items: NavItem[];
+export type NavConfig = {
+  personal: NavItem[];
+  organization: NavItem[];
+  space: NavItem[];
+  public?: NavItem[];
 };
 
 export type SidebarProps = {
-  sections: SidebarSection[];
   currentPath: string;
-  permissions: any;
-  context: NavContext;
-  onNavigate: (path: string) => void;
   className?: string;
 };
 
-export const Sidebar = ({ sections, currentPath, permissions, context, onNavigate, className }: SidebarProps) => {
+export const Sidebar = ({ currentPath, className }: SidebarProps) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  // Read from Zustand
+  const permissions = useAppStore((state) => state.permissions.permissions);
+  const tenant = useAppStore((state) => state.tenant);
+  const navigate = useAppStore((state) => state.navigation.navigate);
+  const navConfig = useAppStore((state) => state.navigation.navConfig);
+
+  const context = tenant.getCurrentContext();
+  const contextType = context.type;
+  const items = navConfig?.[contextType] || [];
+
+  // Find which items are in the active path
+  const activeChain = useMemo(() => {
+    if (!navConfig) return [];
+    const match = findRoute(currentPath, navConfig, contextType);
+    return match?.chain || [];
+  }, [currentPath, navConfig, contextType]);
 
   const toggleItem = (label: string) => {
     setExpandedItems((prev) => {
@@ -45,18 +65,20 @@ export const Sidebar = ({ sections, currentPath, permissions, context, onNavigat
   };
 
   const renderItem = (item: NavItem, depth: number = 0) => {
-    if (item.can && !item.can(permissions, context)) return null;
+    // Don't render if no access or if it's an alias (hidden from sidebar)
+    if (item.alias) return null;
+    if (item.access && !item.access(permissions, context)) return null;
 
     const hasChildren = item.items && item.items.length > 0;
     const isExpanded = expandedItems.has(item.label);
-    const isActive = item.path === currentPath;
+    const isActive = activeChain.includes(item);
     const Icon = item.icon;
 
     return (
       <div key={item.label}>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => item.path && onNavigate(item.path)}
+            onClick={() => item.path && navigate?.({ to: item.path })}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               depth > 0 && 'pl-9',
@@ -89,18 +111,11 @@ export const Sidebar = ({ sections, currentPath, permissions, context, onNavigat
     );
   };
 
+  if (!navConfig) return null;
+
   return (
-    <nav className={cn('flex flex-col gap-6 p-4', className)}>
-      {sections.map((section, idx) => (
-        <div key={section.label || idx}>
-          {section.label && (
-            <div className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {section.label}
-            </div>
-          )}
-          <div className="space-y-1">{section.items.map((item) => renderItem(item))}</div>
-        </div>
-      ))}
+    <nav className={cn('flex flex-col gap-4 p-4', className)}>
+      <div className="space-y-1">{items.map((item) => renderItem(item))}</div>
     </nav>
   );
 };

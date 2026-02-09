@@ -4,10 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "local": "vite",
+    "generate:routes": "bun ./scripts/generateRouteTree.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "biome check src",
+    "lint": "biome check app",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

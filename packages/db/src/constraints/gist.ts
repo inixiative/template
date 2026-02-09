@@ -1,6 +1,6 @@
 import { db } from '@template/db/client';
 
-export async function addGistIndex(table: string, column: string) {
+export const addGistIndex = async (table: string, column: string) => {
   const name = `${table}_${column}_gist`;
 
   await db.$executeRawUnsafe(`
@@ -10,4 +10,4 @@ export async function addGistIndex(table: string, column: string) {
       END IF;
     END $$;
   `);
-}
+};

@@ -1,6 +1,6 @@
-import { LogLevels, createConsola, type ConsolaInstance } from 'consola';
-import { isLocal, isProd, isTest } from '../utils/env';
 import { getLogScopes, LogScope } from './scope';
+import { isLocal, isProd, isTest } from '../utils/env';
+import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
 

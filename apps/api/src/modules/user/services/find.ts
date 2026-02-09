@@ -1,31 +1,17 @@
-import type { Db } from '@template/db';
-import type { OrganizationUser, SpaceUser, User, Organization, Space } from '@template/db/generated/client/client';
-import { Role } from '@template/db/generated/client/enums';
+import type { Db, UserWithRelations } from '@template/db';
 import { cache, cacheKey, upsertCache } from '@template/db';
+import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import { Role } from '@template/db/generated/client/enums';
 
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
 const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
-export type UserWithRelations = User & {
-  organizationUsers: OrganizationUser[];
-  organizations: Organization[];
-  spaceUsers: SpaceUser[];
-  spaces: Space[];
-};
-
 /**
  * Find user by email (cached)
  */
-export async function findUserByEmail(
-  db: Db,
-  email: string,
-): Promise<User | null> {
-  return cache<User | null>(
-    cacheKey('User', { email }),
-    () => db.user.findFirst({ where: { email } }),
-    USER_CACHE_TTL,
-  );
-}
+export const findUserByEmail = async (db: Db, email: string): Promise<User | null> => {
+  return cache<User | null>(cacheKey('User', { email }), () => db.user.findFirst({ where: { email } }), USER_CACHE_TTL);
+};
 
 /**
  * Find user with all relations (cached)
@@ -33,10 +19,7 @@ export async function findUserByEmail(
  * Only includes orgs/spaces that aren't soft-deleted
  * Spaces include both explicit memberships and all spaces from owned orgs
  */
-export async function findUserWithRelations(
-  db: Db,
-  userId: string,
-): Promise<UserWithRelations | null> {
+export const findUserWithRelations = async (db: Db, userId: string): Promise<UserWithRelations | null> => {
   return cache<UserWithRelations | null>(
     cacheKey('User', userId, ['Relations']),
     async () => {
@@ -51,9 +34,7 @@ export async function findUserWithRelations(
 
       if (!user) return null;
 
-      const ownedOrgIds = user.organizationUsers
-        .filter((ou) => ou.role === Role.owner)
-        .map((ou) => ou.organizationId);
+      const ownedOrgIds = user.organizationUsers.filter((ou) => ou.role === Role.owner).map((ou) => ou.organizationId);
 
       const [organizations, spaceUsers, spaces] = await Promise.all([
         db.organization.findMany({
@@ -71,10 +52,7 @@ export async function findUserWithRelations(
         db.space.findMany({
           where: {
             deletedAt: null,
-            OR: [
-              { spaceUsers: { some: { userId } } },
-              { organizationId: { in: ownedOrgIds } },
-            ],
+            OR: [{ spaceUsers: { some: { userId } } }, { organizationId: { in: ownedOrgIds } }],
           },
         }),
       ]);
@@ -98,15 +76,27 @@ export async function findUserWithRelations(
       }
 
       for (const orgUser of user.organizationUsers) {
-        upsertCache(cacheKey('organizationUser', { organizationId: orgUser.organizationId, userId: orgUser.userId }), orgUser, { ttl: RECORD_CACHE_TTL });
+        upsertCache(
+          cacheKey('organizationUser', { organizationId: orgUser.organizationId, userId: orgUser.userId }),
+          orgUser,
+          { ttl: RECORD_CACHE_TTL },
+        );
       }
 
       for (const spaceUser of spaceUsers) {
-        upsertCache(cacheKey('spaceUser', { organizationId: spaceUser.organizationId, spaceId: spaceUser.spaceId, userId: spaceUser.userId }), spaceUser, { ttl: RECORD_CACHE_TTL });
+        upsertCache(
+          cacheKey('spaceUser', {
+            organizationId: spaceUser.organizationId,
+            spaceId: spaceUser.spaceId,
+            userId: spaceUser.userId,
+          }),
+          spaceUser,
+          { ttl: RECORD_CACHE_TTL },
+        );
       }
 
       return result;
     },
     USER_CACHE_TTL,
   );
-}
+};
