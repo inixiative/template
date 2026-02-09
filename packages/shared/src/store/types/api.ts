@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { client } from '@template/shared/apiClient';
+import type { client } from '@template/shared';
 
 export type ApiSlice = {
   api: {

@@ -32,6 +32,34 @@ export type ApiMutationOptions<
 };
 
 /**
+ * Converts HeadersInit to Record<string, string>
+ */
+const normalizeHeaders = (headers?: HeadersInit): Record<string, string> => {
+  if (!headers) return {};
+
+  // Handle Headers object
+  if (headers instanceof Headers) {
+    const result: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+
+  // Handle array of tuples
+  if (Array.isArray(headers)) {
+    const result: Record<string, string> = {};
+    for (const [key, value] of headers) {
+      result[key] = value;
+    }
+    return result;
+  }
+
+  // Handle plain object
+  return headers as Record<string, string>;
+};
+
+/**
  * Builds headers with auto-injected auth token and spoof user email
  */
 const useApiHeaders = (customHeaders?: HeadersInit): Record<string, string> => {
@@ -40,7 +68,7 @@ const useApiHeaders = (customHeaders?: HeadersInit): Record<string, string> => {
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(typeof customHeaders === 'object' && !Array.isArray(customHeaders) ? customHeaders : {}),
+    ...normalizeHeaders(customHeaders),
   };
 
   if (token) {

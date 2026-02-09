@@ -1,4 +1,3 @@
-import type { PermissionsSlice } from '@template/shared/store/slices/permissions';
 import type { NavConfig } from '@template/ui';
 import { Building2, Home, Mail, Settings, Users } from 'lucide-react';
 
@@ -37,8 +36,7 @@ export const navConfig: NavConfig = {
       label: 'Users',
       path: '/users',
       icon: Users,
-      access: (p: PermissionsSlice['permissions'], ctx) =>
-        ctx.organization ? p.check('organization', ctx.organization, 'read') : false,
+      access: (p, ctx) => (ctx.organization ? p.check('organization', ctx.organization, 'read') : false),
     },
     {
       label: 'Communications',

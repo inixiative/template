@@ -159,6 +159,7 @@ apps/web/app.config.timestamp_*.js
 **/node_modules/
 
 # Generated artifacts
+**/.tanstack/
 **/routeTree.gen.ts
 **/*.gen.ts
 **/*.generated.ts

@@ -15,8 +15,13 @@ export const createTestStore = (initialState?: Partial<AppStore>) => {
   return createStore<AppStore>()((set, get) => ({
     // API slice
     api: {
+      baseUrl: 'http://localhost:8000',
+      client: null as any,
       queryClient: null as any,
-      setQueryClient: (client: any) => set((state) => ({ api: { ...state.api, queryClient: client } })),
+      spoofUserEmail: null,
+      setBaseUrl: () => {},
+      setAuthToken: () => {},
+      setSpoofUserEmail: () => {},
     },
 
     // Auth slice
@@ -36,6 +41,8 @@ export const createTestStore = (initialState?: Partial<AppStore>) => {
       isInitialized: false,
       isSuperadmin: false,
       initialize: async () => null,
+      signIn: async () => {},
+      signUp: async () => {},
       setUser: () => {},
       setSession: () => {},
       setStrategy: () => {},
@@ -76,15 +83,26 @@ export const createTestStore = (initialState?: Partial<AppStore>) => {
 
     // Navigation slice
     navigation: {
-      sidebarCollapsed: false,
-      setSidebarCollapsed: () => {},
-      toggleSidebar: () => {},
+      navigate: null,
+      navConfig: null,
+      currentPath: '/',
+      currentRouteMatch: null,
+      setNavigate: () => {},
+      setNavConfig: () => {},
+      setCurrentPath: () => {},
+      setCurrentRouteMatch: () => {},
     },
 
     // UI slice
     ui: {
-      theme: 'light',
+      theme: 'system',
+      isLoading: false,
+      appName: 'Template',
+      shortName: 'Template',
+      description: 'Test App',
       setTheme: () => {},
+      setLoading: () => {},
+      updateTheme: async () => {},
     },
 
     // Apply initial state overrides

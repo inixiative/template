@@ -5,7 +5,7 @@ import {
   organizationReadManyUsersOptions,
   organizationReadManyUsersQueryKey,
   organizationUserDeleteMutation,
-} from '@template/shared/apiClient';
+} from '@template/shared';
 import { InviteUserModal } from '@template/shared/components/InviteUserModal';
 import { checkPermission } from '@template/shared/hooks/usePermission';
 import { useAppStore } from '@template/shared/store';

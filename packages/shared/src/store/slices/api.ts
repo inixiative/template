@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { client } from '@template/shared/apiClient';
+import { client } from '@template/shared/apiClient/client.gen';
 import type { StateCreator } from 'zustand';
 
 const queryClient = new QueryClient({

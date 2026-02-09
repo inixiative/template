@@ -9,7 +9,7 @@ type RootNotFoundProps = {
 export const RootNotFound = ({
   title = 'Page not found',
   description = 'This route does not exist.'
-}: RootNotFoundProps = {}): JSX.Element => {
+}: RootNotFoundProps = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
 

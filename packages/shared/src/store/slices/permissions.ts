@@ -2,6 +2,7 @@ import type { AccessorName, HydratedRecord, OrganizationId, SpaceId, UserWithRel
 import {
   type ActionRule,
   createPermissions,
+  type Entitlements,
   getOrgPermissions,
   getSpacePermissions,
   isSuperadmin,
@@ -21,9 +22,8 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
 
   return {
     permissions: {
-      ...permix,
-      check: ((model, record, action) =>
-        (rebacCheck as any)(permix, rebacSchema, model, record, action)) as PermissionsSlice['permissions']['check'],
+      permix,
+      check: (model, record, action) => rebacCheck(permix, rebacSchema, model, record, action),
       clear: () => {
         permix.setSuperadmin(false);
       },
@@ -38,7 +38,11 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
         if (me.organizationUsers) {
           for (const orgUser of me.organizationUsers) {
             await permix.setup(
-              getOrgPermissions(orgUser.role as Role, orgUser.organizationId as OrganizationId, orgUser.entitlements),
+              getOrgPermissions(
+                orgUser.role as Role,
+                orgUser.organizationId as OrganizationId,
+                orgUser.entitlements as Entitlements,
+              ),
             );
           }
         }
@@ -47,7 +51,11 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
         if (me.spaceUsers) {
           for (const spaceUser of me.spaceUsers) {
             await permix.setup(
-              getSpacePermissions(spaceUser.role as Role, spaceUser.spaceId as SpaceId, spaceUser.entitlements),
+              getSpacePermissions(
+                spaceUser.role as Role,
+                spaceUser.spaceId as SpaceId,
+                spaceUser.entitlements as Entitlements,
+              ),
             );
           }
         }

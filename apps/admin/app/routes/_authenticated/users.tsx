@@ -1,14 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { OrganizationUsersPage } from '@template/shared';
+import { Unauthorized } from '@template/ui';
+import { useAppStore } from '../store';
 
 export const Route = createFileRoute('/_authenticated/users')({
   component: UsersPage,
 });
 
 function UsersPage() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Users</h1>
-      <p className="text-muted-foreground">User management for current context</p>
-    </div>
-  );
+  const context = useAppStore((state) => state.tenant.context);
+
+  // Context-aware: render appropriate users page based on current context
+  if (context.type === 'space' && context.space) {
+    return <div>Space Users - TODO</div>;
+  }
+
+  if (context.type === 'organization' && context.organization) {
+    return <OrganizationUsersPage organizationId={context.organization.id} />;
+  }
+
+  // Must be in org or space context to access users
+  return <Unauthorized />;
 }

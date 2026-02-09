@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "useDefineForClassFields": true,
@@ -11,7 +12,7 @@
     "types": ["vite/client"],
     "paths": {
       "@template/db/*": ["packages/db/src/*"],
-      "@template/permissions/*": ["../../packages/permissions/src/*"],
+      "@template/permissions/*": ["packages/permissions/src/*"],
       "@template/shared/*": ["packages/shared/src/*"],
       "@template/ui/*": ["packages/ui/src/*"]
     }

@@ -12,6 +12,7 @@
       "style": {
         "noNonNullAssertion": "off",
         "noDefaultExport": "error",
+        "useExplicitFunctionReturnType": "off",
         "useFilenamingConvention": {
           "level": "error",
           "options": {

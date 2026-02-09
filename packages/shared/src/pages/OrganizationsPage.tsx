@@ -5,7 +5,7 @@ import {
   meReadManyOrganizationsQueryKey,
   organizationCreateMutation,
   organizationDeleteMutation,
-} from '@template/shared/apiClient';
+} from '@template/shared';
 import { CreateOrganizationModal } from '@template/shared/components/CreateOrganizationModal';
 import { checkPermission } from '@template/shared/hooks/usePermission';
 import { useAppStore } from '@template/shared/store';

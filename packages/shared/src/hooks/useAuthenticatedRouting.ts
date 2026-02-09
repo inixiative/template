@@ -3,6 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { checkContextPermission, type NavConfig } from '../lib/checkContextPermission';
 import { useAppStore } from '../store';
 
+type SearchParams = {
+  org?: string;
+  space?: string;
+  spoof?: string;
+  [key: string]: string | undefined;
+};
+
 export type UseAuthenticatedRoutingParams = {
   pathname: string;
   search: string;
@@ -99,15 +106,15 @@ export const useAuthenticatedRouting = ({ pathname, search, navigate, navConfig 
     // Sync spoof to URL
     if (auth.spoofUserEmail && currentSpoofParam !== auth.spoofUserEmail) {
       navigate({
-        search: (prev: any) => ({ ...prev, spoof: auth.spoofUserEmail }),
+        search: ((prev: SearchParams) => ({ ...prev, spoof: auth.spoofUserEmail })) as unknown as true,
         replace: true,
       });
     } else if (!auth.spoofUserEmail && currentSpoofParam) {
       navigate({
-        search: (prev: any) => {
+        search: ((prev: SearchParams) => {
           const { spoof, ...rest } = prev;
           return rest;
-        },
+        }) as unknown as true,
         replace: true,
       });
     }
@@ -115,12 +122,12 @@ export const useAuthenticatedRouting = ({ pathname, search, navigate, navConfig 
     // Sync context to URL
     if (tenant.context.type === 'organization' && tenant.context.organization?.id !== currentOrgParam) {
       navigate({
-        search: (prev: any) => ({ ...prev, org: tenant.context.organization.id, space: undefined }),
+        search: ((prev: SearchParams) => ({ ...prev, org: tenant.context.organization.id, space: undefined })) as unknown as true,
         replace: true,
       });
     } else if (tenant.context.type === 'space' && tenant.context.space?.id !== currentSpaceParam) {
       navigate({
-        search: (prev: any) => ({ ...prev, space: tenant.context.space.id, org: undefined }),
+        search: ((prev: SearchParams) => ({ ...prev, space: tenant.context.space.id, org: undefined })) as unknown as true,
         replace: true,
       });
     } else if (
@@ -128,10 +135,10 @@ export const useAuthenticatedRouting = ({ pathname, search, navigate, navConfig 
       (currentOrgParam || currentSpaceParam)
     ) {
       navigate({
-        search: (prev: any) => {
+        search: ((prev: SearchParams) => {
           const { org, space, ...rest } = prev;
           return rest;
-        },
+        }) as unknown as true,
         replace: true,
       });
     }

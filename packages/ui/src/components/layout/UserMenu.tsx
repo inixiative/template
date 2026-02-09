@@ -65,7 +65,7 @@ export const UserMenu = ({ className }: UserMenuProps) => {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onClick={() => navigate({ to: '/settings' })}>
+        <DropdownMenuItem onClick={() => navigate?.({ to: '/settings' })}>
           <Settings className="h-4 w-4 mr-2" />
           <span>Settings</span>
         </DropdownMenuItem>

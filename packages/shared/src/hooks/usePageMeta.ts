@@ -1,13 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
-import type { NavContext } from '@template/ui';
 import type { PageContext } from '../store/types/tenant';
 
 /**
  * Sets page title and meta description from cached route match.
  * Automatically updates document.title and meta description tag.
  */
-export function usePageMeta() {
+export const usePageMeta = (): { title: string; description: string } => {
   const appName = useAppStore((state) => state.ui.appName);
   const appDescription = useAppStore((state) => state.ui.description);
   const currentRouteMatch = useAppStore((state) => state.navigation.currentRouteMatch);
@@ -37,7 +36,7 @@ export function usePageMeta() {
         if (item.breadcrumbLabel && pageContext) {
           const recordKey = Object.keys(pageContext).find((key) =>
             item.label.toLowerCase().includes(key.toLowerCase()),
-          );
+          ) as keyof PageContext | undefined;
           if (recordKey && pageContext[recordKey]) {
             label = item.breadcrumbLabel(pageContext[recordKey]);
           }
@@ -73,4 +72,4 @@ export function usePageMeta() {
   }, [title, description]);
 
   return { title, description };
-}
+};

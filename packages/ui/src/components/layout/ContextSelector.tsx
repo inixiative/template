@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAppStore } from '@template/shared';
-import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/Avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +29,6 @@ export type CurrentContext = {
   label: string;
   organizationId?: string;
   spaceId?: string;
-  avatarUrl?: string;
 };
 
 export type ContextSelectorProps = {
@@ -61,12 +59,6 @@ export const ContextSelector = ({
     return (
       <div className={cn('w-full', className)}>
         <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-          <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src={current.avatarUrl} alt={current.label} />
-            <AvatarFallback className="rounded-lg">
-              {current.type === 'personal' ? '👤' : current.label.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
           <div className="flex-1 text-left min-w-0">
             <div className="font-semibold truncate">{current.label}</div>
             <div className="text-xs text-muted-foreground capitalize">{current.type}</div>
@@ -80,12 +72,6 @@ export const ContextSelector = ({
     <DropdownMenu>
       <DropdownMenuTrigger className={cn('w-full', className)}>
         <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors">
-          <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src={current.avatarUrl} alt={current.label} />
-            <AvatarFallback className="rounded-lg">
-              {current.type === 'personal' ? '👤' : current.label.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
           <div className="flex-1 text-left min-w-0">
             <div className="font-semibold truncate">{current.label}</div>
             <div className="text-xs text-muted-foreground capitalize">{current.type}</div>

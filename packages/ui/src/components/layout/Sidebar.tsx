@@ -1,20 +1,16 @@
+import type { PermissionsCheck } from '@template/permissions';
 import { cn } from '@template/ui/lib/utils';
 import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useAppStore, findRoute, type PageContext } from '@template/shared';
-
-export type NavContext = {
-  organization?: { id: string; name: string; [key: string]: unknown };
-  space?: { id: string; name: string; organizationId?: string; [key: string]: unknown };
-};
+import { useAppStore, findRoute, type PageContext, type TenantContext } from '@template/shared';
 
 export type NavItem = {
   label: string;
   path?: string;
   icon?: LucideIcon;
-  title?: string | ((context: NavContext, pageContext?: PageContext) => string);
-  description?: string | ((context: NavContext, pageContext?: PageContext) => string);
-  access?: (permissions: { check: (resource: string, entity: unknown, action: string) => boolean }, context: NavContext) => boolean;
+  title?: string | ((context: TenantContext, pageContext?: PageContext) => string);
+  description?: string | ((context: TenantContext, pageContext?: PageContext) => string);
+  access?: (permissions: PermissionsCheck, context: TenantContext, pageContext?: PageContext) => boolean;
   alias?: boolean;
   breadcrumbLabel?: (record: Record<string, any>) => string;
   items?: NavItem[];
@@ -36,12 +32,12 @@ export const Sidebar = ({ currentPath, className }: SidebarProps) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   // Read from Zustand
-  const permissions = useAppStore((state) => state.permissions.permissions);
+  const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
   const navigate = useAppStore((state) => state.navigation.navigate);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
 
-  const context = tenant.getCurrentContext();
+  const context = tenant.context; // TenantContext with full objects
   const contextType = context.type;
   const items = navConfig?.[contextType] || [];
 

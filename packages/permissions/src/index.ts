@@ -4,6 +4,7 @@
  */
 
 export { Role } from '@template/db/generated/client/enums';
+export type { PermissionsCheck } from './types';
 // Client
 export {
   type Action,

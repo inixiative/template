@@ -4,7 +4,9 @@
  */
 
 // Re-export API client
-export { client } from './apiClient';
+export { client } from './apiClient/client.gen';
+export * from './apiClient/@tanstack/react-query.gen';
+export type * from './apiClient/types.gen';
 // Auth utilities
 export { logout } from './auth/logout';
 // Shared components

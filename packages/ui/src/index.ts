@@ -30,7 +30,6 @@ export * from './components/layout/ResponsiveDrawer';
 export {
   Sidebar,
   type NavConfig,
-  type NavContext,
   type NavItem,
 } from './components/layout/Sidebar';
 export * from './components/layout/UserMenu';

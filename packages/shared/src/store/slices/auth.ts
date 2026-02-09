@@ -8,6 +8,7 @@ import type {
   AuthUser,
 } from '@template/shared/auth/types';
 import type { UserWithRelations } from '@template/db';
+import { createAuthClient as createBetterAuthClient } from 'better-auth/client';
 import type { StateCreator } from 'zustand';
 import type { AppStore } from '../types';
 
@@ -32,20 +33,7 @@ type AuthInitializeDependencies = {
     };
   };
   permissions: {
-    hydrate: (me: {
-      id: string;
-      platformRole?: string;
-      organizationUsers?: Array<{
-        organizationId: string;
-        role: string;
-        entitlements: Record<string, boolean>;
-      }>;
-      spaceUsers?: Array<{
-        spaceId: string;
-        role: string;
-        entitlements: Record<string, boolean>;
-      }>;
-    }) => Promise<void>;
+    setup: (me: UserWithRelations) => Promise<void>;
   };
 };
 
@@ -127,7 +115,9 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         if (spoofingEmail && spoofedEmail) state.auth.setSpoofingState(true, spoofingEmail);
         else state.auth.setSpoofingState(false, null);
 
-        const { organizationUsers, organizations, spaceUsers, spaces, ...user } = data;
+        // API wraps response in { data: {...} }, SDK wraps that in { data: {...}, response }
+        const userData = data.data;
+        const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userData;
 
         state.auth.hydrate({
           user: user as AuthUser,
@@ -138,7 +128,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
           spaces,
         });
 
-        await state.permissions.setup(data as UserWithRelations);
+        await state.permissions.setup(userData as UserWithRelations);
 
         return user as AuthUser;
       } catch (error) {
