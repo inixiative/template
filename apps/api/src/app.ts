@@ -1,6 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
+import { httpInstrumentationMiddleware } from "#/telemetry/httpInstrumentationMiddleware";
 import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
@@ -8,6 +9,9 @@ import type { AppEnv } from '#/types/appEnv';
 import '#/events';
 
 export const app = new OpenAPIHono<AppEnv>();
+
+// OpenTelemetry HTTP instrumentation
+app.use(httpInstrumentationMiddleware());
 
 // Make app available in context
 app.use('*', (c, next) => {

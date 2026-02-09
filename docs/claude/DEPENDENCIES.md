@@ -85,8 +85,8 @@ SENTRY_DSN=https://xxx@sentry.io/xxx
 
 # OpenTelemetry (tracing/metrics)
 OTEL_ENABLED=true
-OTEL_EXPORTER_OTLP_ENDPOINT=https://...
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer xxx
+OTEL_EXPORTER_OTLP_ENDPOINT=https://in-otel.logs.betterstack.com
+OTEL_EXPORTER_TOKEN=abcdef1234567890
 ```
 
 ---

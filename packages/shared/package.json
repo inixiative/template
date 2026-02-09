@@ -22,7 +22,8 @@
     "./logger": "./src/logger/index.ts",
     "./store/*": "./src/store/*",
     "./apiClient": "./src/apiClient/index.ts",
-    "./apiClient/*": "./src/apiClient/*"
+    "./apiClient/*": "./src/apiClient/*",
+    "./styles/*": "./styles/*"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
@@ -43,7 +44,7 @@
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   }
 }

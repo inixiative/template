@@ -37,8 +37,7 @@ const envSchema = z.object({
   // OTEL (optional integration)
   OTEL_ENABLED: z.coerce.boolean().default(false),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
-  OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
-  OTEL_SERVICE_NAME: z.string().optional(),
+  OTEL_EXPORTER_TOKEN: z.string().optional(),
 
   // BullBoard
   BULL_BOARD_USERNAME: z.string().optional(),

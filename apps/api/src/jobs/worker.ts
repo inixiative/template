@@ -8,6 +8,8 @@ import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
 import { onShutdown } from '#/lib/shutdown';
+import packageJson from "#/../package.json" with { type: "json" };
+import { BullMQOtel } from "bullmq-otel";
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();
@@ -69,6 +71,7 @@ export const initializeWorker = async (): Promise<void> => {
       connection: workerRedis,
       concurrency: 10,
       lockDuration: 5 * 60 * 1000,
+      telemetry: new BullMQOtel("bullmq-jobs", packageJson.version),
     },
   );
 

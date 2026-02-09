@@ -1,13 +1,14 @@
+import { initTelemetry } from '#/telemetry';
 import { getRedisClient } from '@template/db';
-import { LogScope, log } from '@template/shared/logger';
+import { log, LogScope } from '@template/shared/logger';
 import { app } from '#/app';
 import { initializeOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
 
-// Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
-await initializeOpenTelemetry();
+// Initialize OpenTelemetry
+await initTelemetry();
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();
@@ -33,7 +34,7 @@ const server = Bun.serve({
 // Register shutdown handlers (order matters)
 onShutdown(async () => {
   // 1. Stop accepting new connections
-  server.stop();
+  await server.stop();
   log.info('Stopped accepting new connections', LogScope.api);
 });
 

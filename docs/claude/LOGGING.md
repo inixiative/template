@@ -140,35 +140,86 @@ log.error('API failed');   // [web] API failed
 
 ## OpenTelemetry
 
-Located in `apps/api/src/config/otel.ts`. OTLP-compatible tracing and metrics.
+Located in `apps/api/src/instrumentation.ts`. OTLP-compatible tracing and metrics.
+
+It needs to be the first import to collect initialization timing.
 
 ### Environment Variables
 
 ```env
+OTEL_ENABLED=true
 OTEL_EXPORTER_OTLP_ENDPOINT=https://in-otel.logs.betterstack.com
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <token>
-OTEL_SERVICE_NAME=inixiative-api  # defaults to 'inixiative-api'
+OTEL_EXPORTER_TOKEN=abcdef1234567890
 ```
-
-### Auto-Instrumentation
-
-When endpoint is configured, automatically traces:
-- HTTP requests (excluding `/health`)
-- Prisma queries
-
-Skipped in local/test environments.
 
 ### Initialization
 
-Called at startup in `index.ts`:
+Called at startup in `apps/api/src/index.ts`:
 
 ```typescript
-import { initializeOpenTelemetry } from '#/config/otel';
-await initializeOpenTelemetry();
+import { initTelemetry } from '#/instrumentation';
+await initTelemetry();
 ```
 
 Uses dynamic imports to avoid loading OTel packages in local/test.
 
+- Hono HTTP: file `httpInstrumentationMiddleware.ts`
+- IORedis: https://www.npmjs.com/package/@opentelemetry/instrumentation-ioredis
+- BullMQ: https://docs.bullmq.io/guide/telemetry
+- Prisma: https://www.prisma.io/docs/orm/prisma-client/observability-and-logging/opentelemetry-tracing
+
+Use spans to contribute detail to telemetry flamegraphs. Here's an example: 
+
+```typescript
+  return tracer.startActiveSpan(
+  "name_of_the_operation",
+  {
+    kind: SpanKind.CLIENT, // SpanKind.CLIENT for calls to external services, SpanKind.SERVER for local operations
+    attributes: {
+      // any attribute that is important, like stripe customer or user id 
+    }
+  },
+  async (span) => {
+    try {
+      let response;
+      try {
+        response = await callExternalApi();
+      } catch (_error) {
+        const message = formatError(_error);
+        logger.error(message);
+        span.setStatus({ code: SpanStatusCode.ERROR, message })
+        span.recordException(_error as Exception)
+        throw _error;
+      }
+
+      if (!response.ok) {
+        const errorMsg = await response.text();
+        logger.error(`${args.method} ${args.path}: ${errorMsg}`)
+        span.setStatus({ code: SpanStatusCode.ERROR, message: errorMsg })
+        throw new Error(errorMsg)
+      }
+
+      if (response.status === 204) {
+        logger.debug(`${args.method} ${args.path}: No Content`)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return undefined as T;
+      }
+
+      const data = await response.json() as T;
+      logger.debug(`${args.method} ${args.path}: ${JSON.stringify(data)}`)
+      span.setStatus({ code: SpanStatusCode.OK })
+      return data
+    } finally {
+      span.end();
+    }
+  });
+```
+
+Wrap calls to third-party services to measure the time waiting for someone else.
+
+Use histograms and counters to measure total and concurrent calls to third party services, or expensive resources.
+
+In the package `api` you can't use @template/shared/logger directly, you must create a log instance using buildLogger(name)
 ---
 
 ## Sentry

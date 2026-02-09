@@ -1,11 +1,9 @@
+import { type ConsolaInstance, createConsola, LogLevels, type LogType } from 'consola';
+import { isLocal, isProd, isTest } from '#/utils';
 import { getLogScopes, LogScope } from './scope';
-import { isLocal, isProd, isTest } from '../utils/env';
-import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
-
-type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
 
 const getLogLevel = (): number => {
-  const level = process.env.LOG_LEVEL as LogLevel | undefined;
+  const level = process.env.LOG_LEVEL as LogType | undefined;
   if (level && level in LogLevels) return LogLevels[level];
   return LogLevels.info;
 };

@@ -112,7 +112,7 @@ export const registerRulesHook = () => {
   registerDbHook('rules:upsert', '*', HookTiming.before, [DbAction.upsert], async (options) => {
     const { model, args, previous } = options as HookOptions & { action: SingleAction };
     processCreateArgs(args, model as ModelName);
-    // Only validate update path if previous record exists (otherwise it's a create)
+      // Only validate update path if previous record exists (otherwise it's a "create")
     if (previous) {
       processUpdateArgs(args, model as ModelName, previous);
     }
