@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^1.0.2",
+    "@inixiative/json-rules": "^1.1.2",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "lodash-es": "^4.17.23",
