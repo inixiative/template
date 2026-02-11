@@ -17,13 +17,13 @@ Build a **test harness for prompt engineering** that treats prompt/system-prompt
 
 ### 1. Define a Fixture
 
-A fixture is a self-contained test case:
+A fixture is a self-contained test case. The **prompt is deliberately terse** — one or two sentences, like a real stakeholder would give you in Slack:
 
 ```
 fixtures/
   add-endpoint/
-    prompt.md          # "Add a CRUD endpoint for Projects"
-    subject-context.md # Domain knowledge for the Subject agent
+    prompt.md          # "We need a projects endpoint." (that's it)
+    subject-context.md # Gated Q&A — Subject only reveals answers when asked
     golden/            # The known-good implementation
       apps/api/src/routes/projects/...
       packages/db/prisma/schema.prisma (diff)
@@ -33,9 +33,13 @@ fixtures/
     expected-questions.md  # Questions a good agent SHOULD ask
 ```
 
+The **prompt** is NOT a spec. It's what a product person would say: "We need a projects endpoint" or "Add soft-delete to organizations." The agent has to figure out what questions to ask. If the prompt gives too much away, it's testing "can the agent follow instructions" instead of "can the agent gather requirements and build correctly."
+
+The **subject-context.md** is structured as Q&A pairs — the Subject only reveals a piece of knowledge when the Implementer asks a question that matches. The Subject doesn't volunteer information. This is the key eval signal: did the agent ask the right questions?
+
 The **golden directory** contains the correct output — what a senior dev on your team would produce. This can be a full file tree or a set of diffs.
 
-The **assertions file** is the precision backbone. Instead of relying purely on the Oracle's judgment, every fixture declares exactly what to check — "did it use the factory?", "are types inferred?", "did it set up dependencies correctly?" Each assertion is a concrete, mechanically-checkable rule.
+The **assertions file** is the precision backbone. Every fixture declares exactly what to check — "did it use the factory?", "are types inferred?", "did it set up dependencies correctly?" Each assertion is a concrete, mechanically-checkable rule.
 
 ### 2. Run the Agents
 
@@ -44,19 +48,23 @@ For each fixture, three agents collaborate with **isolated contexts**:
 ```
 Orchestrator
   │
-  ├─→ Implementer: "Add a CRUD endpoint for Projects"
+  ├─→ Implementer: "We need a projects endpoint."  (that's the whole prompt)
   │     │
   │     ├─→ [reads codebase, reads system docs]
   │     │
+  │     ├─→ asks Subject: "What operations do we need? Full CRUD or read-only?"
+  │     │     │
+  │     │     └─→ Subject: "Full CRUD." (terse — doesn't elaborate)
+  │     │
   │     ├─→ asks Subject: "Should deleting a project be a soft delete or hard delete?"
   │     │     │
-  │     │     └─→ Subject: "Soft delete. Projects should be archived, not removed.
-  │     │          We need to keep them for audit trails."
+  │     │     └─→ Subject: "Soft delete. We need them for audit trails."
   │     │
-  │     ├─→ asks Subject: "Can a project name be changed after creation?"
+  │     ├─→ asks Subject: "Can a project name change after creation?"
   │     │     │
-  │     │     └─→ Subject: "Yes, but the name must remain unique within
-  │     │          the organization."
+  │     │     └─→ Subject: "Yes, but unique within the org."
+  │     │
+  │     ├─→ (agent does NOT ask about permissions — misses a question)
   │     │
   │     ├─→ [implements the feature]
   │     │
@@ -190,37 +198,63 @@ The harness uses a **three-agent model** that mirrors how real development works
 └──────────────┘  └──────────────────┘  └────────────────┘
 ```
 
-#### 1. Subject (Domain Expert)
+#### 1. Subject (The Vague PM)
 
-The Subject simulates a **product owner or team lead** — someone who knows what the feature should do but doesn't dictate how to build it.
+The Subject simulates the **stereotypical project manager** — someone who knows the requirements in their head but doesn't think to include the detail. They're not hostile or withholding. They genuinely believe "we need a projects endpoint" is a complete requirement. They have all the answers — they just don't know those are questions until you ask them.
 
-**Context provided:**
-- Business requirements for the fixture (natural language description of the feature)
-- Domain glossary (what terms mean in this project)
-- Constraints and edge cases (what should and shouldn't be allowed)
-- Answers to anticipated clarifying questions
+Think: the PM who writes a one-line Jira ticket, not because they're lazy, but because to *them* the rest is obvious. When you ask "soft delete or hard delete?" they immediately know the answer — they just never thought to write it down.
+
+**Behavior:**
+- **Thinks their vague description is sufficient.** Doesn't understand why the developer needs more detail.
+- **Answers happily when asked.** Not hostile — once you ask the right question, they know the answer immediately. "Oh yeah, soft delete, we need audit trails."
+- **Doesn't connect the dots for you.** Knows permissions matter but won't mention them unless asked about access/roles specifically.
+- **Gives high-level answers first.** "Full CRUD." If you want more detail, you have to ask a more specific follow-up.
+- **Confused by implementation questions.** "Should I use a factory pattern?" → "I don't know what that means. Build it however you normally do."
+- **Has opinions when prompted.** Not empty-headed — they have strong opinions on business rules. They just express them reactively, not proactively.
+
+**Context provided (from subject-context.md):**
+- Q&A pairs with trigger keywords — the Subject reveals an answer when the Implementer asks something that semantically matches
+- A brief persona (who they are, their communication style)
 
 **Context withheld:**
 - The golden implementation (doesn't know the "right" code)
 - System docs / CLAUDE.md (doesn't coach on patterns)
 - Evaluation criteria (doesn't know how grading works)
 
-**Role during a run:**
-- Responds to Implementer's clarifying questions
-- Stays in-character as a domain expert, not a developer
-- Gives business-level answers, not implementation guidance
-
 ```ts
 // Subject agent definition
 const subject: AgentConfig = {
-  model: "sonnet",       // Good reasoning, cost-effective for Q&A
-  systemPrompt: `You are a domain expert for this project. You know the business
-    requirements deeply but you are NOT a developer. Answer questions about WHAT
-    the feature should do, never HOW to implement it. Stay in character.`,
-  context: fixture.subjectContext,   // Business reqs, domain knowledge
+  model: "sonnet",
+  systemPrompt: `You are a project manager. You know what this feature should do
+    but you don't think to include details unless asked. You gave the developer
+    a brief description and you think that's enough.
+
+    How to behave:
+    - When they ask a question you have the answer to, give it naturally.
+      Don't be cagey — you're helpful, just not proactive.
+    - Keep answers conversational and brief. You're replying on Slack, not
+      writing a spec. One or two sentences is normal.
+    - If they ask something you don't have an answer for in your context,
+      say "hmm, good question... I'd say [reasonable default]" or "let me
+      think... [make a call]."
+    - If they ask about code, libraries, patterns, or technical implementation,
+      say "I don't know about that stuff, you're the developer" or "whatever
+      you guys normally do is fine."
+    - Don't use developer jargon. Say "the name has to be unique" not "add a
+      unique constraint on the name column."
+    - You can say "oh good point" or "I didn't think about that" — that's
+      realistic. Real PMs have blind spots.`,
+  context: fixture.subjectContext,   // Gated Q&A pairs
   tools: [],                         // No tools — pure conversation
 };
 ```
+
+**Why a vague PM?** Because that's the real test. The agent's job isn't just to follow instructions — it's to figure out what's *missing* from the instructions and go get it. A PM who writes a perfect spec tests "can the agent read." A vague PM tests "can the agent think." The questions the agent asks (and doesn't ask) are the strongest diagnostic signal the harness produces:
+
+- Agent asks about delete behavior → good, it's thinking about data lifecycle
+- Agent asks about permissions → good, it noticed the permission system in the codebase
+- Agent doesn't ask about field types → bad, it guessed instead of clarifying
+- Agent asks the PM about code patterns → bad, it should have read the docs
 
 #### 2. Implementer (Code Writer)
 
@@ -228,7 +262,7 @@ The Implementer is the **agent under test** — the one whose output we're evalu
 
 **Context provided:**
 - System docs variant being tested (CLAUDE.md + docs/claude/*.md)
-- The task prompt (from the fixture)
+- The task prompt — deliberately vague, 1-2 sentences ("We need a projects endpoint.")
 - Read access to the codebase (the clean work tree)
 - Ability to ask Subject questions via the orchestrator
 
@@ -592,72 +626,187 @@ Every fixture run produces a `dialogue.md` — a structured record of the Implem
 ## Conversation
 
 ### Q1 (Implementer → Subject)
+> What operations does this endpoint need? Full CRUD or just read?
+
+**Answer (Subject):**
+> Full CRUD.
+
+**Oracle Review:**
+- Was expected: YES (matches expected-questions.md #1 — core scope)
+- Subject stayed in character: YES (brief, didn't elaborate on what CRUD means here)
+
+### Q2 (Implementer → Subject)
 > Should deleting a project be a soft delete or hard delete?
 
 **Answer (Subject):**
-> Soft delete. Projects should be archived, not removed. We need them
-> for audit trails.
+> Oh good question. Soft delete — we need them for audit trails.
 
 **Oracle Review:**
-- Was expected: YES (matches expected-questions.md #2)
+- Was expected: YES (matches expected-questions.md #2 — delete behavior)
 - Impacted output: YES (agent implemented soft delete based on this)
-- Subject stayed in character: YES (business-level answer, no code)
+- Subject stayed in character: YES ("oh good question" = realistic PM who didn't think of it)
 
-### Q2 (Implementer → Subject)
+### Q3 (Implementer → Subject)
 > Should I use createRouteConfig or raw Hono routes?
 
 **Answer (Subject):**
-> I'm not sure what those are — that's an implementation detail.
-> Use whatever the team's standard approach is.
+> I don't know what those are. Build it however you guys normally do.
 
 **Oracle Review:**
-- Was expected: NO (implementation question, not domain question)
-- Subject stayed in character: YES (correctly deflected)
-- **FLAG: Agent asked Subject about patterns instead of reading docs.
-  Docs don't clearly convey route factory as required pattern.**
+- Was expected: NO (implementation question — PM can't answer this)
+- Subject stayed in character: YES (correctly confused by technical jargon)
+- **FLAG: Agent asked PM about code patterns instead of reading docs.
+  This is a doc signal — docs don't clearly convey route factory as standard.**
 
 ## Summary
-- Questions asked: 2
-- Expected questions matched: 1/4
-- Wasteful questions: 1 (Q2 — should have been answered by docs)
+- Questions asked: 3
+- Expected questions matched: 2/6 (missed: permissions, field types, name uniqueness, status enum)
+- Wasteful questions: 1 (Q3 — PM can't answer implementation questions)
 - Subject character breaks: 0
+- **Key gap: Agent never asked about permissions. Built the endpoint
+  without any access control. The PM knows "only admins can create"
+  but was never asked.**
 ```
 
 This dialogue file is the **evidence trail**. A reviewer can see exactly what information the agent received, whether the Subject stayed honest, and whether the conversation influenced the output. If the Oracle's score seems wrong, the dialogue is the first place to check.
 
-### Subject Context Authoring
+### Fixture Authoring: One Interview, Two Outputs
 
-The `subject-context.md` for each fixture is built through an **interactive session** — a human answers agent-generated questions to populate the domain knowledge. This happens once per fixture during setup, not during evaluation runs.
+Creating a fixture's Subject knowledge and Oracle checklist is the **same process**. You sit down, an agent plays the Implementer role and asks you questions about a feature you recently built, and the conversation produces both files:
 
-#### The Authoring Workflow
+- **subject-context.md** — the Q&A pairs become the Subject's gated knowledge
+- **expected-questions.md** — the questions the agent asked become the checklist of questions a good Implementer should ask during eval runs
 
-```
-1. IDENTIFY — Pick a feature you recently implemented
-   You know the domain, the decisions, the edge cases
+One interview, two outputs. The Oracle's "did the agent ask the right questions?" checklist is directly derived from the questions that surfaced during authoring. No separate authoring step for each.
 
-2. INTERVIEW — An agent asks you clarifying questions
-   "What happens when a project is deleted?"
-   "Can names contain special characters?"
-   "Who can create projects — any member or just admins?"
+#### The Authoring Session
 
-   You answer naturally, as you would to a developer on your team
-
-3. CAPTURE — Every Q&A pair is recorded
-   These become the raw material for subject-context.md
-
-4. STRUCTURE — Organize Q&A into sections
-   - Core requirements (what the feature does)
-   - Business rules (constraints and invariants)
-   - Edge cases (what happens in unusual situations)
-   - Out of scope (what this feature intentionally doesn't do)
-
-5. REVIEW — Remove any implementation details that leaked in
-   Subject knows WHAT, never HOW
-
-6. COMMIT — Add to .harness/subject-context.md on the subject branch
+```bash
+bun run harness author add-endpoint-simple
 ```
 
-This is also where the expected-questions.md comes from — the questions the agent asked during authoring are candidates for questions the Implementer should ask during evaluation.
+```
+1. YOU SIT DOWN — You recently built this feature. You know the decisions.
+
+2. AGENT PLAYS IMPLEMENTER — It asks you questions, just like the real
+   Implementer will ask the Subject during eval:
+
+   Agent: "What operations does this endpoint need?"
+   You:   "Full CRUD."
+   Agent: "Should delete be soft or hard?"
+   You:   "Soft delete. Audit trail."
+   Agent: "Who can create projects?"
+   You:   "Only org admins."
+   Agent: "Can project names change after creation?"
+   You:   "Yes, but unique within the org."
+   Agent: "What about permissions for viewing vs editing?"
+   You:   "Members can view, admins can edit and delete."
+   Agent: "Any fields besides name?"
+   You:   "Name, description (optional), status enum: active/archived."
+
+3. CONVERSATION ENDS — Agent runs out of questions or you say "that's it"
+
+4. AUTO-GENERATE — The harness produces two files from the transcript:
+
+   subject-context.md:
+   ┌─────────────────────────────────────────────────────┐
+   │ role: "Product lead for the organizations team"     │
+   │                                                     │
+   │ qa:                                                 │
+   │   - q: "What operations?"                           │
+   │     a: "Full CRUD."                                 │
+   │     category: core                                  │
+   │   - q: "Soft or hard delete?"                       │
+   │     a: "Soft delete. Audit trail."                  │
+   │     category: core                                  │
+   │   - q: "Who can create?"                            │
+   │     a: "Only org admins."                           │
+   │     category: permissions                           │
+   │   - q: "Can names change?"                          │
+   │     a: "Yes, but unique within the org."            │
+   │     category: business_rule                         │
+   │   - q: "Permissions for viewing vs editing?"        │
+   │     a: "Members can view, admins can edit/delete."  │
+   │     category: permissions                           │
+   │   - q: "Fields besides name?"                       │
+   │     a: "Name, description (optional), status enum:  │
+   │        active/archived."                            │
+   │     category: core                                  │
+   └─────────────────────────────────────────────────────┘
+
+   expected-questions.md:
+   ┌─────────────────────────────────────────────────────┐
+   │ # Expected Questions                                │
+   │                                                     │
+   │ ## Core (agent should always ask these)             │
+   │ 1. What operations/scope (CRUD? read-only?)        │
+   │ 2. Delete behavior (soft/hard)                     │
+   │ 3. Data model fields                               │
+   │                                                     │
+   │ ## Permissions (agent should ask if docs mention    │
+   │    the permission system)                           │
+   │ 4. Who can create                                  │
+   │ 5. View vs edit permissions                        │
+   │                                                     │
+   │ ## Business Rules (bonus — shows thoroughness)     │
+   │ 6. Name mutability + uniqueness constraints        │
+   └─────────────────────────────────────────────────────┘
+
+5. YOU REVIEW — Add anything the agent didn't think to ask.
+   Remove any implementation details that leaked in.
+   Subject knows WHAT, never HOW.
+
+6. COMMIT — Both files go to the subject branch (.harness/)
+   expected-questions.md ALSO goes to the after branch (.harness/)
+```
+
+The authoring agent asks questions the same way the Implementer will during eval. If the authoring agent didn't think to ask something, the Implementer probably won't either — but if it's important, you add it manually during review. That gap is itself useful signal: questions you had to add manually are the ones the docs should be prompting the agent to ask.
+
+#### subject-context.md as Gated Q&A
+
+The Subject doesn't get a knowledge dump. It gets Q&A pairs, and its system prompt tells it to only reveal answers when a matching question is asked:
+
+```yaml
+# .harness/subject-context.md
+
+role: "Product lead for the organizations team. Busy, terse, answers
+       only what's asked. Doesn't elaborate unless pressed."
+
+qa:
+  - q: "What operations does this endpoint need?"
+    a: "Full CRUD."
+    category: core
+    reveal_on: ["CRUD", "operations", "what does it do", "endpoints", "scope"]
+
+  - q: "Should delete be soft or hard?"
+    a: "Soft delete. Audit trail."
+    category: core
+    reveal_on: ["delete", "remove", "soft", "hard", "archive"]
+
+  - q: "Who can create projects?"
+    a: "Only org admins."
+    category: permissions
+    reveal_on: ["who can", "permissions", "create", "access", "roles"]
+
+  - q: "Can project names change after creation?"
+    a: "Yes, but unique within the org."
+    category: business_rule
+    reveal_on: ["rename", "change name", "update name", "mutable", "unique"]
+
+  - q: "View vs edit permissions?"
+    a: "Members can view, admins can edit and delete."
+    category: permissions
+    reveal_on: ["view", "edit", "read", "write", "member", "admin"]
+
+  - q: "What fields besides name?"
+    a: "Name, description (optional), status enum: active/archived."
+    category: core
+    reveal_on: ["fields", "columns", "schema", "properties", "attributes"]
+```
+
+The `reveal_on` keywords help the Subject match incoming questions to stored answers. If the Implementer asks "what's the data model look like?" the Subject matches on "fields"/"schema" and reveals the answer about name/description/status. If the Implementer never asks about permissions, the Subject never mentions them — and the Oracle scores that as a missed question.
+
+**The Subject is a locked box with keyed slots.** Each question is a key. The knowledge is inside. The Implementer has to bring the right keys.
 
 ### Fixture Bootstrapping from Real PRs
 
@@ -3130,7 +3279,7 @@ The basic diagnostic is cheap enough for CI. The full refinement loop is an inve
 3. **Fixture Freshness** — ~~Auto-generate from new PRs?~~ **Resolved: Rotation model.** Fixtures have a TTL (4-8 weeks by tier). When they expire, extract fresh ones from recent PRs. No rebasing, no patching — full replacement. See "Fixture Expiration & Rotation."
 4. **Partial Credit** — An implementation that works but uses different patterns is... correct? wrong? The scoring weights encode your opinion here.
 5. **Multi-Model** — Different models (Opus, Sonnet, Haiku) will score differently as Implementer. Track per-model or optimize for one?
-6. **Subject Fidelity** — How realistic is a simulated domain expert? Should the Subject be seeded from actual Slack/issue conversations?
+6. **Subject Fidelity** — ~~How realistic?~~ **Resolved: The Vague PM.** Subject is deliberately a stereotypical PM who gives vague instructions and doesn't volunteer detail. Knowledge is gated behind Q&A pairs with trigger keywords. Authoring interview captures domain knowledge + produces expected-questions in one session. See "Subject (The Vague PM)" and "Fixture Authoring."
 7. **Oracle Reliability** — The Oracle is itself an LLM. Can it reliably diagnose *why* a score changed? What if its prescriptions oscillate (patch A → revert A → patch A)?
 8. **Dogfood Recursion** — If the `_self` fixture's docs are themselves tuned by the loop, does the system converge or oscillate? Is there a fixed-point?
 9. **MCP Server Scope** — Which operations should be tools (callable by Claude) vs CLI commands (run by humans)? How much autonomy does Claude get?
