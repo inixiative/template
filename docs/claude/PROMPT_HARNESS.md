@@ -395,147 +395,181 @@ prompt-harness/
 
 ### Git Strategy: Fixture Branches
 
-Everything lives in the repo. No external answer key, no separate golden repo to maintain. Each fixture is a pair of branches — **before** and **after** — that are self-contained. The harness plugs into any repo: define fixture branches and go.
+Everything lives in the repo. No external answer key, no separate golden repo. Each fixture is **three branches** — raw, subject, and after. The harness plugs into any repo: define fixture branches and go.
 
-#### The Two Branches
+#### The Three Branches
+
+Each fixture has three branches. Each agent sees exactly one — physical isolation, no credential tricks needed.
 
 ```
-fixture/add-endpoint-simple/before          fixture/add-endpoint-simple/after
-├── apps/                                   ├── apps/
-│   └── api/src/routes/                     │   └── api/src/routes/
-│       └── organizations/  (exists)        │       ├── organizations/  (exists)
-│                                           │       └── projects/       ← THE GOLDEN
-│                                           │           ├── index.ts
-│                                           │           └── __tests__/
-├── packages/                               ├── packages/
-│   └── db/prisma/schema.prisma             │   └── db/prisma/schema.prisma (+ Project model)
-│                                           │
-├── .harness/                               ├── .harness/
-│   ├── prompt.md                           │   ├── assertions.ts      ← EVAL CHECKLIST
-│   ├── subject-context.md                  │   ├── eval.config.ts     ← SCORING WEIGHTS
-│   └── config.json                         │   ├── expected-questions.md
-│                                           │   ├── config.json
-│                                           │   └── dialogue-template.md
-│                                           │
-├── CLAUDE.md  (overwritten by orchestrator)├── CLAUDE.md
-└── docs/claude/*.md                        └── docs/claude/*.md
+fixture/add-endpoint-simple/raw         ← IMPLEMENTER works here
+├── apps/
+│   └── api/src/routes/
+│       └── organizations/  (exists)
+├── packages/
+│   └── db/prisma/schema.prisma
+├── CLAUDE.md  (injected by orchestrator)
+├── docs/claude/*.md  (injected)
+└── (NO .harness/ — clean codebase, nothing to ignore)
+
+fixture/add-endpoint-simple/subject     ← SUBJECT reads from here
+├── (same codebase as raw)
+└── .harness/
+    ├── subject-context.md              ← Domain knowledge
+    ├── prompt.md                       ← Task description (also given to Implementer)
+    └── config.json                     ← Fixture metadata
+
+fixture/add-endpoint-simple/after       ← ORACLE reads from here
+├── apps/
+│   └── api/src/routes/
+│       ├── organizations/  (exists)
+│       └── projects/                   ← THE GOLDEN IMPLEMENTATION
+│           ├── index.ts
+│           └── __tests__/
+├── packages/
+│   └── db/prisma/schema.prisma         (+ Project model)
+└── .harness/
+    ├── assertions.ts                   ← EVAL CHECKLIST
+    ├── eval.config.ts                  ← SCORING WEIGHTS
+    ├── expected-questions.md           ← Questions agent should ask
+    ├── config.json                     ← Same fixture metadata
+    └── dialogue-template.md
 ```
 
-**Before branch** — What the Implementer sees:
-- The codebase at the starting point (everything except the feature to be built)
-- `.harness/prompt.md` — the task description
-- `.harness/subject-context.md` — domain knowledge for the Subject agent
-- `.harness/config.json` — fixture metadata (tier, model, timeout)
-- System docs (CLAUDE.md + docs/claude/*.md) are **injected by the orchestrator** from the variant being tested — they overwrite what's on the branch
+**Raw branch** — What the Implementer sees:
+- The bare codebase at the starting point. Nothing extra. No `.harness/` directory — there's nothing to strip, nothing to tell the agent to ignore, nothing that could leak.
+- System docs (CLAUDE.md + docs/claude/*.md) are **injected by the orchestrator** from the variant being tested.
+- The task prompt is delivered by the orchestrator (read from the subject branch's `.harness/prompt.md`), not from a file in the worktree.
 
-**After branch** — What the Oracle sees:
-- The codebase WITH the golden implementation (the diff before→after IS the golden)
-- `.harness/assertions.ts` — every specific check to run (the checklist)
+**Subject branch** — What the Subject agent reads:
+- Same codebase as raw (the Subject doesn't need the golden)
+- `.harness/subject-context.md` — the domain knowledge that lets the Subject answer questions
+- `.harness/prompt.md` — the task description (Subject needs to understand what's being built to answer questions about it)
+- `.harness/config.json` — fixture metadata
+
+**After branch** — What the Oracle reads:
+- The codebase WITH the golden implementation applied
+- `.harness/assertions.ts` — every specific check to run
 - `.harness/eval.config.ts` — scoring weights and pattern signatures
 - `.harness/expected-questions.md` — questions the Implementer should have asked
-- `.harness/config.json` — same fixture metadata
+- The golden diff is `git diff raw..after`
 
-The golden implementation is implicit — it's `git diff before..after`. No separate golden directory. You write the feature on the after branch, the diff is the answer key.
+#### Why Three Branches (Not Two)
 
-#### Why Branches
+With two branches (before + after), the before branch had `.harness/` committed to it with `subject-context.md`, `prompt.md`, etc. This meant:
+- The Implementer's worktree had `.harness/` in it. You either had to strip it, `.gitignore` it, or tell the agent to ignore it — all fragile.
+- The Subject's domain knowledge and the Implementer's workspace were on the same branch. The Implementer could read `subject-context.md` and get answers without asking.
 
-1. **The golden IS a codebase state.** The after branch is real, runnable code. Check it out, build it, run its tests. A directory of golden files can't do that.
-2. **Isolation is physical.** The Implementer's worktree is checked out from before. The after branch content simply isn't in its filesystem.
-3. **Maintenance = normal development.** Updating a golden means checking out the after branch and committing like a normal dev.
-4. **The diff is the spec.** `git diff fixture/.../before..fixture/.../after` is the complete, unambiguous golden.
-5. **Rebasing is natural.** When the codebase changes, rebase both branches onto main. Conflicts = the age diagnostic telling you the fixture needs attention.
+With three branches:
+- **Raw is truly raw.** The Implementer's worktree is a clean codebase. Period. No harness metadata anywhere.
+- **Subject context is isolated.** The Subject agent's knowledge lives on its own branch. The Implementer can't access it — different worktree, different branch.
+- **After is for Oracle only.** Golden + assertions + eval config. Never touches the Implementer's workspace.
+- **Each agent sees exactly one branch.** No scoping, no stripping, no "ignore this directory" instructions.
 
 #### .harness/ Directory
 
-Lives on fixture branches only. `.gitignore` on main keeps it out of normal development:
+Lives on `subject` and `after` branches only. Not on `raw`. Not on `main`:
 
 ```gitignore
 # In .gitignore on main branch
 .harness/
 ```
 
-On fixture branches, `.harness/` is committed. Clone the repo, checkout the branch, everything's there.
+On subject/after branches, `.harness/` is committed. Clone the repo, checkout the branch, everything's there.
 
 ```ts
 interface FixtureConfig {
   name: string;                    // "add-endpoint-simple"
   tier: "simple" | "medium" | "complex";
-  beforeBranch: string;            // "fixture/add-endpoint-simple/before"
+  rawBranch: string;               // "fixture/add-endpoint-simple/raw"
+  subjectBranch: string;           // "fixture/add-endpoint-simple/subject"
   afterBranch: string;             // "fixture/add-endpoint-simple/after"
   model: "opus" | "sonnet" | "haiku";
   timeout: number;                 // Max Implementer duration (ms)
-  lastRebaseDate: string;          // When branches were last synced with main
+  createdAt: string;               // When fixture was extracted
+  expiresAt: string;               // When to replace with fresh extraction (4-8 weeks)
+  sourcePR?: number;               // PR this was extracted from (for re-extraction)
 }
 ```
 
 #### Branch Naming
 
 ```
-fixture/{fixture-name}/before     # Starting state
-fixture/{fixture-name}/after      # Golden + eval criteria
+fixture/{fixture-name}/raw        # Clean codebase — Implementer works here
+fixture/{fixture-name}/subject    # Codebase + domain knowledge — Subject reads here
+fixture/{fixture-name}/after      # Golden implementation + eval criteria — Oracle reads here
 ```
 
 Flat. No nesting. Tier is encoded in the fixture name:
 ```
-fixture/add-endpoint-simple/before    fixture/add-endpoint-simple/after
-fixture/add-endpoint-medium/before    fixture/add-endpoint-medium/after
-fixture/schema-hooks-complex/before   fixture/schema-hooks-complex/after
+fixture/add-endpoint-simple/raw       /subject       /after
+fixture/add-endpoint-medium/raw       /subject       /after
+fixture/schema-hooks-complex/raw      /subject       /after
 ```
 
 #### The Run Lifecycle
 
 ```
-1. WORKTREE — Create from the before branch
-   git worktree add /tmp/harness-{id} fixture/{name}/before
+1. WORKTREE — Create from the RAW branch
+   git worktree add /tmp/harness-{id} fixture/{name}/raw
+   (Implementer's workspace — clean codebase, no .harness/)
 
 2. INJECT DOCS — Overwrite CLAUDE.md + docs/claude/ with the system
-   variant being tested (orchestrator controls which version the agent sees)
+   variant being tested (orchestrator controls which doc version the agent sees)
 
-3. READ FIXTURE — Parse .harness/prompt.md and .harness/subject-context.md
+3. READ FIXTURE — Orchestrator reads from the SUBJECT branch
+   git show fixture/{name}/subject:.harness/prompt.md
+   git show fixture/{name}/subject:.harness/subject-context.md
+   git show fixture/{name}/subject:.harness/config.json
+   (These files are never in the Implementer's worktree)
 
-4. SPAWN IMPLEMENTER — In the worktree
-   Sees: codebase + injected system docs + task prompt
-   .harness/ is stripped or the agent is told to ignore it
-   Works on a detached HEAD or throwaway branch within the worktree
+4. SPAWN SUBJECT — With context from the subject branch
+   Subject agent receives subject-context.md as its system context
+   Runs in orchestrator process (lightweight, no separate worktree needed)
 
-5. ROUTE Q&A — Implementer ↔ Subject through orchestrator
+5. SPAWN IMPLEMENTER — In the raw worktree
+   Receives: task prompt (from prompt.md) via orchestrator
+   Sees: clean codebase + injected system docs
+   No .harness/ anywhere in its filesystem
+
+6. ROUTE Q&A — Implementer ↔ Subject through orchestrator
    All questions and answers logged (becomes the dialogue file)
 
-6. CAPTURE OUTPUT — When Implementer finishes
+7. CAPTURE OUTPUT — When Implementer finishes
    git diff of everything changed — the agent's total output
 
-7. EVALUATE — Orchestrator checks out the after branch SEPARATELY
-   Reads .harness/assertions.ts + eval.config.ts from after branch
-   Runs assertions against Implementer's output
-   Diffs Implementer output against before→after golden diff
+8. EVALUATE — Orchestrator reads from the AFTER branch separately
+   git show fixture/{name}/after:.harness/assertions.ts
+   git show fixture/{name}/after:.harness/eval.config.ts
+   Diffs Implementer output against raw→after golden diff
    Runs after branch's tests against Implementer's code
 
-8. RECORD — Results + dialogue stored in ledger
+9. RECORD — Results + dialogue stored in ledger
 
-9. CLEANUP — Remove worktree
+10. CLEANUP — Remove worktree
 ```
 
 #### Implementer Isolation
 
-The Implementer works in a worktree of the before branch. The after branch is never in that worktree. Three levels of protection:
+The Implementer works in a worktree of the **raw** branch. The raw branch has no `.harness/` directory — there's nothing to leak. The subject and after branches are never in the Implementer's worktree. Three levels of protection:
 
 **Level 1: Instruction-based (minimum viable)**
-System prompt says don't access fixture branches. Good enough for non-adversarial models — the agent isn't trying to cheat, it just needs to not accidentally read the answers.
+System prompt says don't access fixture branches. With the three-branch model this is already much safer — even if the agent looked at the raw branch's git history, there's no `.harness/` to find. The answers are on different branches entirely.
 
 **Level 2: Worktree refspec restriction (recommended for local)**
 ```bash
 cd /tmp/harness-{id}
 git config remote.origin.fetch "+refs/heads/main:refs/remotes/origin/main"
-# Only main is fetchable — fixture branches aren't in the refspec
-# Even if the agent runs git fetch, after branches won't download
+# Only main is fetchable — subject and after branches aren't in the refspec
+# Even if the agent runs git fetch, other fixture branches won't download
 ```
 
 **Level 3: Container with shallow clone (strongest, for cloud)**
 ```bash
 git clone --depth 1 --single-branch \
-  --branch fixture/{name}/before \
+  --branch fixture/{name}/raw \
   <repo-url> /workspace
-# The container only has the before branch. Nothing else exists.
+# The container only has the raw branch. Subject and after don't exist here.
 ```
 
 Start with Level 2 locally. Move to Level 3 when deploying to cloud infrastructure.
@@ -620,7 +654,7 @@ The `subject-context.md` for each fixture is built through an **interactive sess
 5. REVIEW — Remove any implementation details that leaked in
    Subject knows WHAT, never HOW
 
-6. COMMIT — Add to .harness/subject-context.md on the before branch
+6. COMMIT — Add to .harness/subject-context.md on the subject branch
 ```
 
 This is also where the expected-questions.md comes from — the questions the agent asked during authoring are candidates for questions the Implementer should ask during evaluation.
@@ -643,14 +677,15 @@ What this does:
 
 ```
 1. FIND COMMITS — Locate the merge commit and its parent
-   Before = parent of merge commit (state before the PR)
+   Raw = parent of merge commit (state before the PR)
    After = merge commit (state after the PR)
 
-2. CREATE BRANCHES
-   git branch fixture/add-endpoint-simple/before <parent-sha>
-   git branch fixture/add-endpoint-simple/after <merge-sha>
+2. CREATE THREE BRANCHES
+   git branch fixture/add-endpoint-simple/raw <parent-sha>      # Clean codebase
+   git branch fixture/add-endpoint-simple/subject <parent-sha>  # Same base + .harness/
+   git branch fixture/add-endpoint-simple/after <merge-sha>     # Golden + .harness/
 
-3. GENERATE SCAFFOLDING on the before branch
+3. GENERATE SCAFFOLDING on the subject branch
    .harness/config.json — pre-filled with name, tier, default timeout
    .harness/prompt.md — DRAFT from PR title + description (needs human review)
    .harness/subject-context.md — EMPTY (human fills via authoring interview)
@@ -670,35 +705,70 @@ What this does:
 
 The script does the mechanical work. The human provides the domain knowledge (subject context) and reviews the generated assertions. The agent-assisted authoring interview fills in subject-context.md interactively.
 
-#### Spec Maintenance When Rules Change
+#### Fixture Expiration & Rotation
 
-When the core rules file (CLAUDE.md, docs/claude/*.md) changes, existing fixture specs may go stale. The assertions on after branches encode specific patterns — if those patterns change in the main docs, the assertions need updating too.
+Fixtures have a TTL. Don't rebase them — replace them.
 
-The age diagnostic catches this:
+**Why not rebase?** Rebasing fixture branches onto main is fragile. One bad conflict resolution and the raw branch has after-branch content baked in, silently invalidating the fixture. Even if the rebase goes clean, a fixture from two months ago tests against patterns the team may no longer use. And rebasing requires someone to understand both the fixture's intent AND the codebase changes across three branches — that's a lot of context to hold.
+
+**The rotation model:**
+
 ```
-AGE DIAGNOSTIC detects:
-  "schema-change-simple" score drifted -0.18
-  Root cause: docs now say getAppContext(c), fixtures still assert getAppEnv(c)
+FIXTURE LIFECYCLE
+
+  Created ──────────────── Active ──────────────── Expired
+  (extracted from PR)      (running in diagnostics) (replaced by fresh extraction)
+       │                        │                        │
+       │  TTL: 4-8 weeks        │  Age diagnostic        │  Extract new fixture
+       │  (simple: 8 weeks)     │  flags score drift     │  from recent PR covering
+       │  (medium: 6 weeks)     │                        │  the same pattern
+       │  (complex: 4 weeks)    │                        │
+       └────────────────────────┴────────────────────────┘
 ```
 
-But you can also proactively check:
+When a fixture expires:
 
 ```bash
-# After changing docs, check which fixtures reference affected patterns
+# Check what's expired
+bun run harness check-expired
+
+# Output:
+# EXPIRED (age > TTL):
+#   fixture/add-endpoint-simple — created 2025-12-01, expired 2026-01-26
+#     Source PR: #142. Recent PRs with same pattern: #198, #215
+#   fixture/schema-hooks-complex — created 2025-11-15, expired 2026-01-10
+#     Source PR: #98. Recent PRs with same pattern: #201
+
+# Replace with fresh extraction
+bun run harness create-fixture --from-pr 215 --name add-endpoint-simple --tier simple
+# Old branches are archived (renamed to archive/...) not deleted
+```
+
+**Why expiration beats maintenance:**
+
+1. **No cross-contamination risk.** No rebase = no chance of leaking after-branch content into before.
+2. **Always current.** Fresh fixtures extracted from recent PRs reflect current patterns, naming, imports, and conventions. No "technically correct but practically stale" fixtures.
+3. **Lower cognitive load.** "Extract a new fixture from a recent PR" is a 10-minute mechanical task. "Rebase a fixture while understanding its original intent and resolving conflicts correctly" is error-prone judgment work.
+4. **Natural pruning.** If there's no recent PR exercising a pattern, maybe that pattern doesn't need a fixture anymore. Expiration forces you to confront whether a fixture is still relevant.
+5. **The assertions stay honest.** Fresh extraction means assertions.ts is generated from a real, working implementation — not patched to match a codebase that moved under it.
+
+**Proactive drift check** — for between-expiration monitoring:
+
+```bash
+# After changing docs, check which active fixtures reference affected patterns
 bun run harness check-drift
 
 # Output:
 # PATTERN CHANGED: getAppEnv → getAppContext (in docs/claude/CONTEXT.md)
 # AFFECTED FIXTURES:
-#   fixture/add-endpoint-simple/after — assertions.ts line 42
-#   fixture/add-endpoint-medium/after — assertions.ts lines 38, 67
-#   fixture/schema-hooks-complex/after — assertions.ts line 55
+#   fixture/add-endpoint-simple/after — assertions.ts line 42 (expires in 3 weeks)
+#   fixture/add-endpoint-medium/after — assertions.ts lines 38, 67 (expires in 1 week)
 #
-# Run: bun run harness update-assertions --pattern "getAppEnv→getAppContext"
-# to auto-update assertion patterns across all affected fixture branches.
+# RECOMMENDATION: fixture/add-endpoint-medium expires soon — let it expire naturally.
+# fixture/add-endpoint-simple has 3 weeks left — consider early rotation.
 ```
 
-This keeps the eval criteria in sync with the living codebase. The rule of thumb: **when you change a doc, run `check-drift`**. When you change a fundamental pattern, run `update-assertions` to propagate.
+The drift check tells you whether to wait for natural expiration or rotate early. Small pattern renames close to expiration? Let it expire. Fundamental API change? Rotate now.
 
 ### Infrastructure & Deployment
 
@@ -745,15 +815,16 @@ The harness supports three deployment tiers: local, single-server, and distribut
 
 #### Container Architecture
 
-Each Implementer runs in its own container with a shallow clone of the before branch. The container has everything the agent needs and nothing it shouldn't see.
+Each Implementer runs in its own container with a shallow clone of the **raw** branch. The container has everything the agent needs and nothing it shouldn't see — no `.harness/`, no subject context, no golden.
 
 ```bash
 #!/bin/bash
 # entrypoint.sh — parameterized per fixture run
 
-# Shallow clone of ONLY the before branch (strongest isolation)
+# Shallow clone of ONLY the raw branch (strongest isolation)
+# No .harness/ directory exists on this branch at all
 git clone --depth 1 --single-branch \
-  --branch "${FIXTURE_BEFORE_BRANCH}" \
+  --branch "${FIXTURE_RAW_BRANCH}" \
   "${REPO_URL}" /workspace
 
 cd /workspace
@@ -766,13 +837,14 @@ cp -r /mnt/system-variant/docs/claude/ docs/claude/
 bun install
 
 # Start Claude session with the fixture prompt
+# Prompt is passed by orchestrator (read from subject branch, not in this container)
 # Orchestrator communicates via HIVEMIND events
-claude --system-prompt "$(cat .harness/prompt.md)" \
+claude --system-prompt "${TASK_PROMPT}" \
        --mcp-server hivemind \
        --dangerously-skip-permissions
 ```
 
-The after branch is **never cloned into Implementer containers.** Oracle evaluation happens orchestrator-side.
+The subject and after branches are **never cloned into Implementer containers.** The orchestrator reads subject context from the subject branch (via `git show`) and passes the task prompt to the container as an environment variable. Oracle evaluation reads the after branch orchestrator-side.
 
 #### Docker Compose for Single Server
 
@@ -2887,20 +2959,24 @@ Add a new fixture when:
 
 1. **A new pattern is introduced.** New route template? New hook type? New background job pattern? Add a simple fixture covering it.
 2. **A pattern combination keeps causing issues.** If agents consistently struggle with "schema change + hooks + cache" as a combined operation but handle each individually, that combination needs its own medium fixture.
-3. **The age diagnostic flags persistent drift.** If a fixture's score keeps degrading despite doc updates, the golden implementation may be outdated or the fixture's scope may need to change.
+3. **The age diagnostic flags persistent drift.** Score keeps degrading despite doc updates → the fixture is stale. Rotate it from a recent PR rather than patching the after branch.
 4. **A real implementation reveals a gap.** When an agent produces notably good or bad output on a real task, that task is a candidate for a new fixture. Extract the prompt, capture the ideal output, write a fixture.
 
-#### When to Retire a Fixture
+#### When to Retire vs Rotate a Fixture
 
-Remove or replace a fixture when:
+**Retire (don't replace):**
+1. **The pattern no longer exists.** Deprecated pattern = no fixture needed.
+2. **Consistently scores 1.0 across all models.** No signal. Keep one simple fixture as a smoke test.
+3. **No recent PR exercises this pattern.** If nobody's building this anymore, the fixture is testing a dead path.
 
-1. **The pattern it tests no longer exists.** If you deprecate a pattern, the fixture testing it is noise.
-2. **It consistently scores 1.0 across all models.** It's not providing signal — the docs perfectly cover it. Keep one simple fixture as a smoke test, retire the rest.
-3. **Its golden implementation has diverged from current patterns.** If updating the golden would change more than 30% of it, consider writing a new fixture from scratch rather than patching.
+**Rotate (replace with fresh extraction):**
+1. **Fixture has expired (past its TTL).** Extract from a recent PR covering the same pattern.
+2. **Major refactor changed the fundamental approach.** The old fixture's structure no longer makes sense. A new PR post-refactor is the right source.
+3. **Score drift detected between diagnostics.** Early rotation beats patching.
 
-### Keeping Goldens Current
+### Keeping Goldens Current: Rotation, Not Patching
 
-Golden implementations are the ground truth. When they go stale, the harness grades against outdated patterns and scores become meaningless.
+Golden implementations are the ground truth. When they go stale, the harness grades against outdated patterns and scores become meaningless. The solution is **rotation** — replace the entire fixture from a fresh PR — not patching individual files on the after branch.
 
 #### The Staleness Problem
 
@@ -2910,60 +2986,73 @@ Week 8: Team migrates to createRouteConfig v2 → agent output uses v2 → score
          The agent is actually correct. The golden is wrong.
 ```
 
-#### Update Triggers
+With the old approach (rebase + patch), you'd update the after branch to use v2. But that means rebasing both branches, resolving conflicts, updating assertions, verifying both branches still build — and hoping you didn't cross-contaminate before/after.
 
-Golden implementations should be updated when:
+**With rotation:** extract a new fixture from a recent PR that already uses v2. The new fixture is born current. The old fixture is archived.
 
-| Trigger | What to Update | How |
-|---------|---------------|-----|
-| **Pattern change** (route factory API changes) | Golden files using that pattern | Extract from the PR that changed the pattern |
-| **Schema refactor** (model renamed, field moved) | Any golden referencing the schema | Run `db:generate`, update golden to match |
-| **New convention** (naming, imports, style) | All goldens that violate the new convention | Batch update — lint the goldens against new rules |
-| **Codebase restructure** (directory moves) | Structural expectations in goldens | Update file paths in golden + eval.config.ts |
-| **Age diagnostic flags drift** | The drifting fixture's golden | Investigate what changed in the codebase, update golden to match |
-
-#### Practical Workflow: Golden Update Process
+#### The Rotation Workflow
 
 ```
-1. DETECT — Age diagnostic shows score drift on a fixture
-2. INVESTIGATE — Oracle reports WHY the drift occurred
-   "Agent used createRouteConfig v2, golden expects v1"
-3. UPDATE GOLDEN — Pull the current pattern from the codebase
-   - Find a recent merged PR using the pattern
-   - Extract the relevant files
-   - Replace golden/ directory (or the appropriate stage)
-   - Update pattern signatures in eval.config.ts
-4. RE-BASELINE — Run the fixture with the updated golden
-   "New baseline: 0.91 (was 0.60 against stale golden)"
-5. RECORD — Log the golden update in the fixture's changelog
+1. DETECT — Age diagnostic or check-expired flags a fixture
+   "add-endpoint-simple expired 5 days ago. Recent PRs with same pattern: #215, #228"
+
+2. PICK SOURCE — Choose a recent PR covering the same pattern
+   PR #215: "Add TeamMembers CRUD endpoint" — good, covers route + schema + hooks
+
+3. EXTRACT — Create new fixture from that PR
+   bun run harness create-fixture --from-pr 215 \
+     --name add-endpoint-simple \
+     --tier simple
+
+   This creates fresh raw/subject/after branches from #215's parent/merge commits
+
+4. AUTHOR — Run the subject context interview
+   bun run harness author-context add-endpoint-simple
+   (The domain is different — TeamMembers not Projects — but the patterns are the same)
+
+5. REVIEW — Check generated assertions, add expected-questions
+   The assertions reflect current patterns because the PR uses current patterns
+
+6. ARCHIVE — Rename old fixture branches
+   fixture/add-endpoint-simple/raw     → archive/add-endpoint-simple-v1/raw
+   fixture/add-endpoint-simple/subject → archive/add-endpoint-simple-v1/subject
+   fixture/add-endpoint-simple/after   → archive/add-endpoint-simple-v1/after
+
+7. BASELINE — Run the new fixture to establish scores
+   bun run harness run add-endpoint-simple
 ```
 
-#### Automating Golden Updates
+The fixture name (`add-endpoint-simple`) stays the same — it represents the *pattern being tested*, not the specific feature. The underlying PR changes each rotation, but the harness tracks the same pattern over time.
 
-Two approaches, used together:
-
-**1. PR-triggered golden candidates.** When a PR merges that touches files matching a fixture's patterns, flag that fixture for review. Don't auto-update — flag for human verification.
+#### CI Integration: Rotation Prompts
 
 ```ts
-// In CI: check if merged PR affects any fixture's domain
-interface GoldenUpdateCandidate {
+// In CI: after PR merge, check if any fixtures should rotate early
+interface RotationCandidate {
   fixture: string;
-  reason: string;           // "PR #142 modified route factory"
-  filesChanged: string[];   // Overlap between PR and fixture's golden
-  confidence: "high" | "medium" | "low";
-  action: "auto_update" | "human_review";
+  status: "expired" | "expiring_soon" | "drift_detected";
+  currentSourcePR: number;       // PR the current fixture was extracted from
+  candidatePRs: number[];        // Recent merged PRs covering the same pattern
+  recommendation: string;        // "Rotate now" | "Rotate within 1 week" | "Monitor"
 }
 ```
 
-**2. Oracle-proposed golden updates.** During age diagnostics, the Oracle can propose specific golden updates when it detects the agent's output is *more correct* than the golden (because it follows newer patterns).
+The CI check runs on PR merge and posts a comment if any fixtures are candidates for rotation: "Fixture `add-endpoint-simple` expired 3 days ago. PR #215 covers the same pattern — run `bun run harness create-fixture --from-pr 215` to rotate."
+
+#### Oracle-Detected Rotation Needs
+
+During age diagnostics, the Oracle can detect when the agent's output is *more correct* than the golden:
 
 ```
-Oracle: "The agent's output uses createRouteConfig v2, which matches the
-  current codebase. The golden still uses v1. Recommending golden update."
-  Prescription type: fixture_update
-  Target: fixtures/add-endpoint-simple/golden/
-  Confidence: 0.90
+Oracle: "Agent used createRouteConfig v2 (current pattern). Golden uses v1
+  (deprecated). Agent is correct. Fixture needs rotation."
+  Prescription type: fixture_rotate
+  Pattern: add-endpoint
+  Confidence: 0.92
+  Candidate PRs: [215, 228]
 ```
+
+This is a rotation signal, not a patch signal. The Oracle says "replace the fixture" not "edit the golden."
 
 ### Keeping Pattern Examples Current
 
@@ -3014,11 +3103,11 @@ export const patternSignatures = [
 | Frequency | Action | What's Involved |
 |-----------|--------|----------------|
 | **Every doc change** | Basic diagnostic | Auto: runs simple fixtures, ~5 min |
-| **Weekly** | Age diagnostic | Auto: full matrix, ~30 min, flags drift |
-| **Per major PR** | Check golden candidates | Semi-auto: CI flags, human reviews |
-| **Monthly** | Review medium/complex goldens | Manual: verify goldens match current codebase |
-| **Quarterly** | Full fixture audit | Manual: retire stale fixtures, add new ones, review prompts |
-| **After major refactor** | Full re-baseline | Manual: update all goldens, re-run full suite, new baseline epoch |
+| **Weekly** | Age diagnostic + expiration check | Auto: full matrix, ~30 min, flags drift + expired fixtures |
+| **Per major PR merge** | Rotation candidate check | Auto: CI flags fixtures whose pattern was touched by the PR |
+| **When fixture expires** | Rotate from recent PR | Semi-auto: extract new fixture, author subject context (~30 min) |
+| **Quarterly** | Full fixture audit | Manual: retire dead patterns, verify coverage across all pattern categories |
+| **After major refactor** | Bulk rotation | Rotate all fixtures touching affected patterns from post-refactor PRs |
 
 ### Cost Estimation
 
@@ -3038,7 +3127,7 @@ The basic diagnostic is cheap enough for CI. The full refinement loop is an inve
 
 1. **Cost** — Each fixture run is a full agent session. Basic diagnostic should be cheap (simple fixtures only + Haiku/Sonnet). Full refinement loops are expensive. Budget per epoch?
 2. **Determinism** — Same prompt can produce different output. How many runs per fixture to get statistical significance? 3 minimum, 5 ideal? Does the Oracle average across runs?
-3. **Fixture Freshness** — The age diagnostic detects stale docs. But who updates the golden implementations when the codebase changes? Auto-generate from new PRs?
+3. **Fixture Freshness** — ~~Auto-generate from new PRs?~~ **Resolved: Rotation model.** Fixtures have a TTL (4-8 weeks by tier). When they expire, extract fresh ones from recent PRs. No rebasing, no patching — full replacement. See "Fixture Expiration & Rotation."
 4. **Partial Credit** — An implementation that works but uses different patterns is... correct? wrong? The scoring weights encode your opinion here.
 5. **Multi-Model** — Different models (Opus, Sonnet, Haiku) will score differently as Implementer. Track per-model or optimize for one?
 6. **Subject Fidelity** — How realistic is a simulated domain expert? Should the Subject be seeded from actual Slack/issue conversations?
