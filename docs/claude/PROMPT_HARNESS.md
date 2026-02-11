@@ -390,19 +390,349 @@ prompt-harness/
 
 **A/B** — Run the same fixture with two different system-prompt variants simultaneously. Directly compare which version produces better output for the same task.
 
-### Work Tree Lifecycle
+### Git Branching Strategy
+
+Each fixture run uses a **before/after branch model**. The "before" branch is the starting state the Implementer works from. The "after" (golden) lives in a branch the Implementer can never access. The Implementer's work happens on a fresh branch checked out from the "before."
 
 ```
-1. git worktree add /tmp/harness-run-{id} {base-commit}
-2. Copy system-variant docs into the work tree
-3. Spawn Subject agent with fixture's domain context
-4. Spawn Implementer agent with system docs + fixture prompt
-5. Route Implementer ↔ Subject Q&A through orchestrator
-6. Capture changed files when Implementer finishes
-7. Spawn Oracle agent with golden + agent output + Q&A log
-8. Store results
-9. git worktree remove /tmp/harness-run-{id}
+  fixture: add-endpoint-simple
+  │
+  ├── fixture/add-endpoint-simple/before    ← Starting state (clean codebase)
+  │     │
+  │     └── agent/add-endpoint-simple/run-003  ← Implementer works here
+  │           (checked out FROM before, never touches golden)
+  │
+  └── fixture/add-endpoint-simple/golden    ← Golden implementation
+        (NEVER accessible to Implementer — different credentials)
 ```
+
+#### Branch Naming Convention
+
+```
+fixture/{fixture-name}/before       # Starting state for this fixture
+fixture/{fixture-name}/golden       # Golden implementation (Oracle-only)
+agent/{fixture-name}/run-{NNN}      # Implementer's work branch (per run)
+agent/{fixture-name}/run-{NNN}-eval # Oracle's evaluation workspace
+```
+
+#### The Before Branch
+
+The "before" branch is a **snapshot of the codebase at the point where the fixture's task would begin.** It's the state a real developer would start from:
+
+- Has the existing schema, routes, tests — everything except the feature being implemented
+- May include scaffolding or setup that the prompt references ("We already have an Organization model")
+- Is pinned to a specific commit, not a moving target
+- Gets updated when the codebase changes significantly enough to warrant re-baselining
+
+```ts
+interface FixtureBranches {
+  before: string;            // "fixture/add-endpoint-simple/before"
+  golden: string;            // "fixture/add-endpoint-simple/golden"
+  beforeCommit: string;      // Pinned commit SHA on the before branch
+  goldenCommit: string;      // Pinned commit SHA on the golden branch
+  lastRebaseDate: string;    // When before/golden were last synced with main
+}
+```
+
+#### The Run Lifecycle
+
+```
+1. CHECKOUT — Create agent branch from the before branch
+   git worktree add /tmp/harness-run-{id} fixture/{name}/before
+   cd /tmp/harness-run-{id}
+   git checkout -b agent/{name}/run-{NNN}
+
+2. CONFIGURE — Copy system-variant docs into the work tree
+   (Implementer sees CLAUDE.md + docs/claude/*.md from the variant being tested)
+
+3. IMPLEMENT — Spawn Implementer with scoped token (see Agent Isolation below)
+   Implementer works on agent/{name}/run-{NNN}
+   All commits go to this branch
+   Implementer can ask Subject questions via orchestrator
+
+4. CAPTURE — Diff the agent branch against the before branch
+   git diff fixture/{name}/before..agent/{name}/run-{NNN}
+   This is the Implementer's total output
+
+5. EVALUATE — Spawn Oracle in a SEPARATE worktree
+   git worktree add /tmp/harness-eval-{id} fixture/{name}/golden
+   Oracle diffs agent output against golden
+   Oracle runs golden tests against agent code
+   Oracle has different credentials — CAN read golden, CANNOT write
+
+6. CLEANUP — Remove worktrees
+   git worktree remove /tmp/harness-run-{id}
+   git worktree remove /tmp/harness-eval-{id}
+   Agent branches are kept for history (pruned by age)
+```
+
+### Agent Isolation via Git Credentials
+
+Instructions aren't enough. "Don't read the golden branch" in a system prompt is a suggestion, not a guarantee. The Implementer agent gets **credentials that physically cannot access the golden branches.** This is the hard boundary.
+
+#### Token Scoping
+
+Three credential sets, each with different repository access:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CREDENTIAL ISOLATION                               │
+│                                                                      │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
+│  │  IMPLEMENTER     │  │  ORACLE          │  │  ORCHESTRATOR    │  │
+│  │  TOKEN           │  │  TOKEN           │  │  TOKEN           │  │
+│  ├──────────────────┤  ├──────────────────┤  ├──────────────────┤  │
+│  │ CAN:             │  │ CAN:             │  │ CAN:             │  │
+│  │ • Read before    │  │ • Read golden    │  │ • Read all       │  │
+│  │   branches       │  │   branches       │  │   branches       │  │
+│  │ • Read/write     │  │ • Read agent     │  │ • Create agent   │  │
+│  │   agent branches │  │   branches       │  │   branches       │  │
+│  │ • Read main      │  │ • Read before    │  │ • Create/remove  │  │
+│  │                  │  │   branches       │  │   worktrees      │  │
+│  │ CANNOT:          │  │                  │  │ • Manage tokens  │  │
+│  │ • Read golden    │  │ CANNOT:          │  │                  │  │
+│  │   branches       │  │ • Write to any   │  │                  │  │
+│  │ • Read fixture   │  │   branch         │  │                  │  │
+│  │   eval configs   │  │ • Read system    │  │                  │  │
+│  │ • Read other     │  │   variant source │  │                  │  │
+│  │   agent runs     │  │                  │  │                  │  │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Implementation Options
+
+**Option A: GitHub Fine-Grained PATs + Branch Protection Rules**
+
+GitHub fine-grained personal access tokens can be scoped per-repository but not per-branch. Use branch protection rules to enforce:
+
+```yaml
+# Branch protection: fixture/*/golden
+- Restrict pushes: orchestrator-bot only
+- Require PR review: never bypass
+- No force push
+
+# The Implementer token is a standard PAT that can read/write the repo
+# but golden branches are protected from writes
+# Problem: Implementer CAN still READ golden branches
+```
+
+This doesn't fully solve read isolation. For that:
+
+**Option B: Separate Repositories (Strongest Isolation)**
+
+```
+repo: template                  ← Implementer works here
+  branches: main, fixture/*/before, agent/*
+
+repo: template-golden           ← Oracle reads from here
+  branches: fixture/*/golden, fixture/*/eval-config
+  permissions: Oracle token has read access, Implementer token does NOT
+```
+
+The golden implementations live in a completely separate repo. The Implementer's token has zero access to it. The Oracle's token can read both repos.
+
+```ts
+interface RepoConfig {
+  // Implementer sees this repo
+  workRepo: {
+    url: string;              // "github.com/org/template"
+    token: string;            // Scoped: read main + before, write agent/*
+  };
+  // Oracle sees this repo (in addition to workRepo for reading agent output)
+  goldenRepo: {
+    url: string;              // "github.com/org/template-golden"
+    token: string;            // Scoped: read-only
+  };
+}
+```
+
+**Option C: Git Credential Helpers + Worktree Isolation (Local)**
+
+For local runs, configure each worktree with a different git credential helper:
+
+```bash
+# Implementer worktree — credential helper returns implementer token
+git worktree add /tmp/harness-impl-{id} fixture/{name}/before
+cd /tmp/harness-impl-{id}
+git config credential.helper "!echo protocol=https; echo host=github.com; echo username=implementer-bot; echo password=${IMPL_TOKEN}"
+
+# Remove golden remote entirely from Implementer's worktree
+git remote set-branches origin --add 'fixture/*/before'
+git remote set-branches origin --add 'agent/*'
+# Golden branches are never fetched into this worktree
+
+# Oracle worktree — different credential helper, read-only
+git worktree add /tmp/harness-eval-{id} fixture/{name}/golden
+cd /tmp/harness-eval-{id}
+git config credential.helper "!echo protocol=https; echo host=github.com; echo username=oracle-bot; echo password=${ORACLE_TOKEN}"
+```
+
+The Implementer's worktree literally doesn't have the golden branches in its refspec. Even if the agent tries `git fetch origin fixture/*/golden`, the credentials won't allow it.
+
+#### Recommended Approach
+
+Start with **Option C** (local worktree isolation) for development — it's fast and doesn't require repo infrastructure changes. Move to **Option B** (separate repos) for production/CI where the isolation guarantee needs to be absolute.
+
+Option A is the weakest but simplest — good enough if you trust the system prompt to prevent the Implementer from *trying* to read golden (the protection is against accidental reads, not adversarial ones).
+
+### Session & Orchestration
+
+The harness needs to keep multiple agent sessions alive, route messages between them, handle failures, and maintain state across potentially long-running fixture evaluations.
+
+#### The Orchestrator Process
+
+The orchestrator is the only process with full access. It spawns and manages all other agents:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      ORCHESTRATOR                                 │
+│                                                                   │
+│  Responsibilities:                                                │
+│  • Create/destroy git worktrees                                  │
+│  • Spawn agent sessions with scoped credentials                  │
+│  • Route Q&A messages between Implementer ↔ Subject              │
+│  • Collect Implementer output when done                          │
+│  • Hand output to Oracle for evaluation                          │
+│  • Record results to ledger                                      │
+│  • Apply Oracle prescriptions to doc variants                    │
+│  • Trigger next iteration of the loop                            │
+│                                                                   │
+│  State:                                                           │
+│  • Active worktrees (path, fixture, status)                      │
+│  • Active agent sessions (PID, role, fixture)                    │
+│  • Current doc variant being tested                              │
+│  • Cost accumulator                                               │
+│  • Loop iteration counter                                        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### Watchdog / Session Health
+
+Long-running agent sessions can stall, hit token limits, or crash. The orchestrator includes a watchdog that monitors agent health:
+
+```ts
+interface AgentSession {
+  pid: number;                  // OS process ID
+  role: "subject" | "implementer" | "oracle";
+  fixture: string;
+  startedAt: string;
+  lastActivity: string;         // Last tool call or output
+  status: "running" | "stalled" | "completed" | "failed" | "timeout";
+  maxDuration: number;          // Per-role timeout (ms)
+  costSoFar: number;
+}
+
+interface WatchdogConfig {
+  stallThreshold: number;       // No activity for N seconds → stalled
+  maxDuration: {
+    implementer: number;        // 15 min for simple, 30 min for complex
+    oracle: number;             // 10 min (evaluation is faster)
+    subject: number;            // 5 min per question (shouldn't take long)
+  };
+  onStall: "warn" | "restart" | "kill";
+  onTimeout: "capture_partial" | "kill";
+  healthCheckInterval: number;  // Check every N seconds
+}
+```
+
+#### What Happens on Failure
+
+```
+Agent stalls (no output for stallThreshold):
+  1. Log warning to orchestrator
+  2. If implementer: capture partial output, mark run as "incomplete"
+  3. Oracle still evaluates partial output (valuable signal — where did it get stuck?)
+  4. Don't restart automatically — partial results are more useful than a retry
+     that might hit the same wall
+
+Agent crashes (process exits non-zero):
+  1. Log error + stack trace
+  2. Capture any output written to worktree before crash
+  3. Mark run as "failed" with crash details
+  4. Oracle evaluates whatever was produced (even nothing — that's a data point)
+
+Agent hits token/cost limit:
+  1. Capture output at the point of exhaustion
+  2. Mark run as "truncated"
+  3. Oracle evaluates partial output
+  4. Flag in ledger: "budget_exceeded" — may need to simplify the fixture
+     or increase per-run budget
+
+Worktree conflict (shouldn't happen but might):
+  1. Each run gets a unique worktree path: /tmp/harness-{fixture}-{run-id}-{timestamp}
+  2. If path exists, fail fast — don't silently reuse
+  3. Stale worktrees are cleaned up by the orchestrator at startup
+```
+
+#### Parallel Session Management
+
+When running all fixtures in parallel, the orchestrator manages N concurrent sessions:
+
+```ts
+interface ParallelRunConfig {
+  maxConcurrent: number;         // Limit parallel agent sessions (memory/API rate limits)
+  staggerDelay: number;          // Delay between session starts (avoid API burst)
+  worktreeRoot: string;          // Parent dir for all worktrees
+  cleanupOnComplete: boolean;    // Remove worktrees after evaluation
+  preserveOnFailure: boolean;    // Keep failed worktrees for debugging
+}
+
+// Default: 4 concurrent (2 Implementer + 2 Oracle at any time)
+// Implementer sessions are the bottleneck — they take longest and cost most
+// Oracle sessions are fast — evaluation is cheaper than implementation
+// Subject sessions are ephemeral — they only exist during Q&A exchanges
+```
+
+The orchestrator uses a work queue:
+
+```
+1. Enqueue all fixtures
+2. Pop fixture from queue
+3. If under maxConcurrent: start worktree + spawn Implementer
+4. When Implementer finishes: spawn Oracle (in parallel with next Implementer)
+5. When Oracle finishes: record results, clean up worktree
+6. Repeat until queue empty
+7. All results collected → Oracle meta-analysis (cross-fixture, signal extraction)
+```
+
+This means Implementer N+1 can start while Oracle N is still evaluating — pipeline parallelism. The bottleneck is Implementer sessions (expensive, slow). Oracle sessions are cheap and fast.
+
+#### HIVEMIND Event Flow
+
+With HIVEMIND coordinating, the orchestrator doesn't need custom IPC. Everything flows through events:
+
+```
+Orchestrator:
+  hivemind_emit type=fixture_start fixture=add-endpoint-simple run=003
+
+Implementer (registered as agent, has scoped token):
+  hivemind_emit type=question target=subject content="Soft or hard delete?"
+  hivemind_query type=answer source=subject  # Blocks until Subject responds
+
+Subject (registered as agent):
+  hivemind_query type=question target=subject  # Polls for questions
+  hivemind_emit type=answer target=implementer content="Soft delete."
+
+Implementer:
+  hivemind_emit type=implementation_complete run=003
+
+Orchestrator:
+  hivemind_emit type=evaluation_start fixture=add-endpoint-simple run=003
+
+Oracle (registered as agent, has golden-access token):
+  hivemind_query type=implementation_complete run=003  # Gets agent output
+  hivemind_query type=question run=003                 # Gets full Q&A log
+  hivemind_emit type=evaluation_complete run=003 scores={...}
+  hivemind_emit type=diagnosis run=003 diagnosis={...}
+  hivemind_emit type=prescription run=003 prescription={...}
+
+Orchestrator:
+  hivemind_query type=prescription run=003  # Gets Oracle's recommendation
+  # Applies patch, triggers next run
+```
+
+The event log IS the run ledger. Every event has a timestamp, agent ID, and fixture context. The ledger is reconstructed from events rather than being a separate data store.
 
 ## Evaluation Detail
 
@@ -1022,6 +1352,145 @@ The parallel approach makes this impossible:
 3. **Positive signals are extracted, not discarded** — a partially-good patch still contributes
 4. **The Oracle learns which changes are safe** — signals that are consistently positive across tiers become high-confidence improvements
 5. **Complex-tier fixtures act as guardrails** — they prevent the docs from being simplified past the point where agents lose their ability to recognize uncertainty
+
+### Perturbation Strategy (Escaping Local Optima)
+
+The Oracle's gradient descent can get stuck. It finds a doc structure that scores 0.85 and keeps making tiny edits — reword this sentence, add an example there — gaining 0.001 per epoch. The score plateaus because the fundamental *structure* of the docs is a local optimum. A completely different organization might score 0.95, but the Oracle will never find it through incremental edits.
+
+The solution: **periodically introduce controlled chaos.** Remove a section, split a doc in two, combine two docs, reorder sections, strip all examples, strip all explanations and leave only examples. Force the system off its current hill so it can find a higher one.
+
+This is simulated annealing applied to documentation.
+
+#### Perturbation Types
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    PERTURBATION CATALOG                            │
+│                                                                   │
+│  STRUCTURAL (change doc organization)                             │
+│  ├── SPLIT    — Break one doc into two by section                │
+│  ├── MERGE    — Combine two related docs into one                │
+│  ├── REORDER  — Shuffle section ordering within a doc            │
+│  ├── FLATTEN  — Collapse knowledge tree depth (3→2 levels)       │
+│  ├── DEEPEN   — Add knowledge tree depth (2→3 levels)            │
+│  │                                                                │
+│  CONTENT (change what's in the docs)                              │
+│  ├── STRIP_EXAMPLES   — Remove all code examples, keep prose     │
+│  ├── STRIP_PROSE      — Remove all prose, keep only examples     │
+│  ├── STRIP_SECTION    — Remove a specific section entirely       │
+│  ├── CONDENSE         — Aggressively shorten (50% reduction)     │
+│  ├── EXPAND           — Add more explanation and examples        │
+│  │                                                                │
+│  RADICAL (fundamentally different approach)                        │
+│  ├── EXAMPLE_ONLY     — Replace entire doc set with just         │
+│  │                       annotated code examples, no prose       │
+│  ├── CHECKLIST        — Replace with step-by-step checklists     │
+│  ├── DECISION_TREE    — Replace with "if X then do Y" trees      │
+│  ├── REFERENCE_ONLY   — Just point to files: "see src/x.ts:15"  │
+│  └── FRESH_START      — Oracle writes docs from scratch given    │
+│                          only the golden implementations         │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### When to Perturb
+
+Perturbation isn't random — it's triggered by specific conditions:
+
+```ts
+interface PerturbationConfig {
+  // Trigger conditions
+  triggers: {
+    plateauEpochs: number;      // Perturb after N epochs without improvement (default: 3)
+    minScoreBeforePerturb: number; // Don't perturb if score is below this (default: 0.5)
+    maxPerturbsPerCycle: number;   // Cap chaos injection (default: 3)
+  };
+
+  // Annealing schedule — chaos decreases over time
+  temperature: {
+    initial: number;            // How aggressive perturbations are at start (0-1)
+    decay: number;              // Reduce temperature by this factor each cycle
+    minimum: number;            // Never go below this (always allow some chaos)
+  };
+
+  // What to try
+  allowedTypes: PerturbationType[];
+
+  // Safety
+  alwaysKeepBestVariant: boolean;  // Never overwrite the known best (default: true)
+}
+```
+
+#### The Annealing Schedule
+
+Early in refinement, temperature is high — the system tries radical perturbations (fresh start, example-only, decision trees). As scores improve, temperature drops — perturbations become smaller (reorder sections, condense a paragraph). But temperature never hits zero — there's always a chance of a radical shake-up.
+
+```
+Temperature: 0.8                Temperature: 0.3              Temperature: 0.1
+(Early refinement)              (Mid refinement)              (Late refinement)
+
+Possible perturbations:         Possible perturbations:       Possible perturbations:
+• FRESH_START         30%       • REORDER             40%     • CONDENSE            50%
+• EXAMPLE_ONLY        25%       • SPLIT               25%     • REORDER             30%
+• STRIP_SECTION       20%       • STRIP_EXAMPLES      20%     • STRIP_SECTION       15%
+• MERGE               15%       • CONDENSE            15%     • FRESH_START          5%
+• CONDENSE            10%
+```
+
+#### Perturbation Epoch Flow
+
+```
+Normal epoch:     variant_v5 → run fixtures → score 0.84 → Oracle patches → variant_v6
+Normal epoch:     variant_v6 → run fixtures → score 0.84 → Oracle patches → variant_v7
+Normal epoch:     variant_v7 → run fixtures → score 0.84 → PLATEAU DETECTED
+                                                              │
+Perturbation:     variant_v7 → STRIP_PROSE → variant_v7p     │
+                  variant_v7p → run fixtures → score 0.72     │ (worse, but different hill)
+                  Oracle patches variant_v7p → variant_v8     │
+                  variant_v8 → run fixtures → score 0.79      │ (climbing new hill)
+                  variant_v8 → Oracle patches → variant_v9    │
+                  variant_v9 → run fixtures → score 0.88      │ (surpassed old plateau!)
+                                                              │
+                  Best variant updated: v5 → v9               ▼
+```
+
+The key: **always keep the best variant safe.** Perturbation explores from the current position, but if every perturbation leads downhill, the system reverts to the best known variant and tries a different perturbation type. The known best is never overwritten.
+
+#### What the Oracle Learns from Perturbation
+
+Perturbations produce valuable meta-signals:
+
+| Perturbation | Result | What It Means |
+|-------------|--------|--------------|
+| STRIP_EXAMPLES → score drops | Examples are critical | Docs need more examples, not more prose |
+| STRIP_PROSE → score holds | Prose isn't helping | Agents work from examples; prose is noise |
+| STRIP_PROSE → score drops | Prose provides context | Examples alone aren't enough, need explanation |
+| MERGE two docs → score improves | Separation was artificial | Agents were losing context switching between docs |
+| SPLIT one doc → score improves | Doc was too long | Agents were loading unnecessary context |
+| FRESH_START → score jumps | Original structure was bad | Let the Oracle redesign from scratch more often |
+| FRESH_START → score tanks | Original structure was good | The current approach is working, just needs tuning |
+| EXAMPLE_ONLY → complex improves | Complex tasks benefit from seeing more code | Add more examples for complex patterns |
+| CHECKLIST → simple improves | Simple tasks are procedural | Checklists work for rote tasks, prose for judgment |
+
+These signals feed back into the Oracle's diagnosis. Instead of just "improve this doc," the Oracle can say "the perturbation data shows that examples matter more than prose for route patterns — restructure API_ROUTES.md to be example-heavy."
+
+#### Cost of Chaos
+
+Perturbation epochs are more expensive because they explore dead ends. Budget for ~30% of epochs being perturbation epochs in the early phase, dropping to ~10% later. The payoff: escaping local optima that incremental refinement can never find.
+
+```ts
+// Rough cost model
+const perturbationBudget = {
+  early: 0.3,    // 30% of epochs are perturbations (high temperature)
+  mid: 0.15,     // 15% of epochs
+  late: 0.05,    // 5% of epochs (near convergence, mostly incremental)
+};
+
+// Example: 20-epoch refinement cycle
+// Early (epochs 1-6):   2 perturbation epochs
+// Mid (epochs 7-14):    1 perturbation epoch
+// Late (epochs 15-20):  1 perturbation epoch
+// Total: 4 perturbation epochs out of 20 (~20% overhead)
+```
 
 ### HIVEMIND Integration
 
