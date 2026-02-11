@@ -797,18 +797,128 @@ The HIVEMIND approach is especially valuable for Phase 4 (Self-Improving Loop) w
 
 ## Fixture Design Principles
 
+### Complexity Tiers
+
+Fixtures are organized by complexity. Each tier has different expectations for what "correct" looks like — and critically, **restraint at higher tiers is scored positively**.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FIXTURE COMPLEXITY TIERS                         │
+├──────────┬────────────────────────────┬────────────────────────────┤
+│  Tier    │  What's Expected           │  Correct Restraint         │
+├──────────┼────────────────────────────┼────────────────────────────┤
+│          │  Complete implementation   │  N/A — should finish       │
+│  SIMPLE  │  All files, all tests      │  everything                │
+│          │  Full pattern compliance   │                            │
+├──────────┼────────────────────────────┼────────────────────────────┤
+│          │  Core implementation done  │  May defer edge cases      │
+│  MEDIUM  │  Main patterns followed    │  Should ask Subject about  │
+│          │  Tests for happy path      │  ambiguous requirements    │
+├──────────┼────────────────────────────┼────────────────────────────┤
+│          │  Skeleton / scaffolding    │  SHOULD stop early and     │
+│  COMPLEX │  Key architectural choices │  flag what needs human     │
+│          │  Partial implementation OK │  review rather than guess  │
+└──────────┴────────────────────────────┴────────────────────────────┘
+```
+
+#### Why Restraint Matters
+
+A doc change that makes the agent nail simple tasks but overreach on complex ones is a **regression**. The ideal agent behavior scales with complexity:
+
+- **Simple fixture**: Implement everything. Ask few questions. Get it right.
+- **Medium fixture**: Implement the core. Ask clarifying questions. Handle the main patterns.
+- **Complex fixture**: Build the skeleton. Ask lots of questions. Explicitly flag what it can't confidently implement. Leave TODO markers with clear descriptions rather than writing wrong code.
+
+```ts
+interface FixtureConfig {
+  name: string;
+  tier: "simple" | "medium" | "complex";
+  prompt: string;
+  subjectContext: string;
+  golden: GoldenImpl;
+  evalConfig: {
+    // Tier-specific scoring weights
+    weights: {
+      structural: number;
+      pattern: number;
+      semantic: number;
+      stylistic: number;
+      questioning: number;
+      restraint: number;      // NEW: penalizes overreach, rewards knowing limits
+    };
+    // What counts as "done" at this tier
+    completionExpectation: "full" | "core" | "skeleton";
+    // Patterns the agent SHOULD NOT attempt at this tier
+    outOfScope: string[];
+  };
+}
+```
+
+#### Scoring Restraint
+
+The `restraint` dimension measures whether the agent correctly judged its own confidence:
+
+| Behavior | Simple | Medium | Complex |
+|----------|--------|--------|---------|
+| Implemented everything correctly | 1.0 | 1.0 | 0.7 (suspicious — did it get lucky or actually know?) |
+| Implemented core, flagged rest as TODO | 0.5 | 0.9 | 1.0 |
+| Built skeleton with clear decision points | 0.2 | 0.6 | 1.0 |
+| Implemented everything but some is wrong | 0.0 | 0.3 | 0.0 (should have stopped) |
+| Didn't attempt enough | 0.3 | 0.5 | 0.7 (at least it knew its limits) |
+
+For complex fixtures, the golden implementation itself may be a **partial implementation** — a well-structured skeleton with clear TODO markers, decision points flagged, and a summary of what needs human input. The Oracle grades against *that*.
+
+#### Fixture Matrix
+
+Fixtures vary on two axes: **pattern** and **complexity**.
+
+| | Simple | Medium | Complex |
+|---|--------|--------|---------|
+| **API Route** | Single CRUD endpoint | CRUD + custom actions + pagination | Multi-resource with relationships, auth, batch |
+| **Schema Change** | Add a field | Add a model with relations | Schema migration with data backfill + hooks |
+| **Background Job** | Simple cron | Job with retry logic | Multi-step pipeline with dependencies |
+| **Permissions** | Add a role | Role + entitlements + middleware | Dynamic permissions with org hierarchy |
+| **Full Feature** | — | — | End-to-end feature touching all layers |
+
+The cross-product gives you fine-grained regression detection. If a doc change improves "API Route / Simple" but regresses "API Route / Complex," the Oracle knows the doc made simple patterns clearer but introduced ambiguity about when to apply them.
+
+#### Partial Golden Implementations
+
+For medium and complex tiers, the golden can have **stages**:
+
+```
+fixtures/
+  api-route-complex/
+    prompt.md
+    subject-context.md
+    golden/
+      stage-1-skeleton/        # Correct scaffolding + TODOs
+      stage-2-core/            # Main patterns implemented
+      stage-3-complete/        # Full implementation (aspirational)
+    eval.config.ts
+```
+
+The Oracle grades against the appropriate stage for the tier:
+- **Simple** fixtures: grade against `stage-3-complete`
+- **Medium** fixtures: grade against `stage-2-core`, bonus for reaching stage 3
+- **Complex** fixtures: grade against `stage-1-skeleton`, bonus for reaching stage 2
+
+This means a doc change can be evaluated at each complexity level independently. The Oracle's cross-tier analysis catches the critical regression: "this doc change moved the agent from correctly stopping at skeleton (score: 0.9) to overreaching with wrong code (score: 0.3)."
+
 ### Coverage
 
 Each fixture should exercise a different combination of patterns:
 
-| Fixture | Patterns Exercised |
-|---------|-------------------|
-| `add-endpoint` | API route, controller, schema, basic test |
-| `add-batch-operation` | Batch API, interpolation, transactions |
-| `schema-change-with-hooks` | Prisma schema, hooks, cache invalidation |
-| `add-background-job` | BullMQ job, cron, worker registration |
-| `add-permissions` | Permix roles, entitlements, middleware |
-| `full-feature` | All of the above combined |
+| Fixture | Tier | Patterns Exercised |
+|---------|------|-------------------|
+| `add-endpoint-simple` | Simple | API route, controller, schema, basic test |
+| `add-endpoint-medium` | Medium | API route + custom actions, pagination, filtering |
+| `add-endpoint-complex` | Complex | Multi-resource, auth, batch, relationships |
+| `schema-change-simple` | Simple | Add field to existing model |
+| `schema-change-complex` | Complex | New model + hooks + cache invalidation + migration |
+| `add-background-job` | Medium | BullMQ job, cron, worker registration |
+| `add-permissions` | Medium | Permix roles, entitlements, middleware |
+| `full-feature` | Complex | All of the above combined |
 
 ### Golden Implementation Quality
 
@@ -818,23 +928,58 @@ The golden implementation must be:
 - **Minimal** — only the changes needed, no extras
 - **Well-tested** — the test suite is the backbone of evaluation
 - **Representative** — uses your current patterns, not legacy approaches
+- **Staged** (for medium/complex) — separate skeleton, core, and complete versions
 
 ### Prompt Realism
 
 Fixture prompts should be realistic — the kind of thing you'd actually tell an agent:
 
 ```markdown
-# Good
+# Good (simple)
 Add a CRUD endpoint for Projects. Projects belong to an Organization
 and have a name (string, required) and status (enum: active, archived).
 Include list, get, create, update, and delete operations.
+
+# Good (complex — intentionally ambiguous)
+We need a full Projects feature. Projects belong to organizations, have
+multiple members with different roles, support file attachments, and need
+an approval workflow. Members should be notified when project status changes.
 
 # Bad (too specific — defeats the purpose)
 Create file apps/api/src/routes/projects/index.ts using createRouteConfig
 with GET /, GET /:id, POST /, PATCH /:id, DELETE /:id...
 ```
 
-The whole point is to test whether the system docs are sufficient for the agent to figure out the *how*.
+For complex prompts, the ambiguity is intentional. The correct response involves asking the Subject clarifying questions AND recognizing what's out of scope for a single implementation pass.
+
+## Cross-Tier Regression Detection
+
+The most valuable signal from the complexity tiers: **doc changes should not cause regressions at any tier.**
+
+```ts
+interface CrossTierAnalysis {
+  fixture: string;
+  byTier: {
+    simple: { before: number; after: number; delta: number };
+    medium: { before: number; after: number; delta: number };
+    complex: { before: number; after: number; delta: number };
+  };
+  overallDelta: number;
+  regressions: TierRegression[];
+}
+
+interface TierRegression {
+  tier: "simple" | "medium" | "complex";
+  dimension: string;        // Which score dimension regressed
+  before: number;
+  after: number;
+  rootCause: string;        // Oracle's analysis
+  // The critical question: did a simplification cause overreach?
+  overreachDetected: boolean;
+}
+```
+
+The Oracle specifically looks for the **simplification trap**: a doc change that makes a pattern easier to understand (improving simple tier) can also make the agent think it fully understands a complex scenario when it doesn't (regressing complex tier).
 
 ## What This Tells You
 
@@ -843,6 +988,7 @@ The whole point is to test whether the system docs are sufficient for the agent 
 - If agents consistently miss a pattern, that pattern is **under-documented**
 - If agents use the wrong pattern, there's **ambiguity** in the docs
 - If agents get it right with extra doc text but not without, you've found the **minimum viable documentation** for that pattern
+- If simple scores improve but complex scores regress, docs are **too prescriptive** — they make easy things easy but remove the agent's ability to recognize uncertainty
 
 ### About Your Patterns
 
@@ -850,11 +996,11 @@ The whole point is to test whether the system docs are sufficient for the agent 
 - If agents produce simpler code that passes all tests, your pattern might be **over-engineered**
 - If small prompt tweaks cause big output swings, your patterns have **too many decision points**
 
-### About Your Prompts
+### About Agent Judgment
 
-- Quantifies how much **context** the agent actually needs
-- Identifies which **terminology** the agent maps correctly to your codebase
-- Shows where **examples** in docs provide more value than **descriptions**
+- If agents overreach on complex tasks, your docs aren't teaching **when to stop**
+- If agents under-deliver on simple tasks, your docs are **too cautious**
+- The ideal doc set produces agents that scale their confidence correctly with complexity
 
 ## Implementation Phases
 
