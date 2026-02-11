@@ -1849,8 +1849,29 @@ async function runFixture(fixture: Fixture, systemVariant: SystemVariant) {
       Implement the following task in ${workTree.path}:
       ${fixture.prompt}
 
-      When you have questions about requirements, use the "ask-subject" agent.
-      Do NOT guess when requirements are ambiguous — ask.
+      BEFORE YOU START CODING: Read the codebase to understand existing patterns.
+      Then identify what you don't know. The task description is intentionally brief
+      — there are details you need that aren't in it.
+
+      Use the "ask-subject" agent to ask the stakeholder questions. They know the
+      answers but won't volunteer them — you have to ask.
+
+      Ask about these categories if the task description doesn't cover them:
+      - Boundaries: Who can access this? What's in scope?
+      - Data model: What fields/types/states? Don't invent fields — ask.
+      - Lifecycle: What happens on create/update/delete? Side effects?
+      - Business rules: Uniqueness? Validation? Constraints?
+      - Relationships: How does this connect to other entities?
+
+      The signal to ask: "I'm about to write something where a different choice
+      would be equally valid." If you're inventing domain details (field names,
+      states, permissions, validation rules), stop and ask instead.
+
+      Do NOT ask the stakeholder about code patterns, libraries, or technical
+      implementation — they won't know. Read the docs for that.
+
+      When you've gathered enough information, implement the feature. Stop when
+      you're done or when you're uncertain — don't push through guesses.
     `,
     options: {
       allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task"],
@@ -2904,23 +2925,116 @@ The golden implementation must be:
 
 ### Prompt Realism
 
-Fixture prompts should be realistic — the kind of thing you'd actually tell an agent:
+Fixture prompts should be what a PM would actually type in Slack. They're terse because the PM thinks they're complete — not because they're deliberately withholding:
 
 ```markdown
-# Good (simple)
-Add a CRUD endpoint for Projects. Projects belong to an Organization
-and have a name (string, required) and status (enum: active, archived).
-Include list, get, create, update, and delete operations.
+# Good (simple — PM thinks this is a full spec)
+We need a projects endpoint.
 
-# Good (complex — intentionally ambiguous)
-We need a full Projects feature. Projects belong to organizations, have
-multiple members with different roles, support file attachments, and need
-an approval workflow. Members should be notified when project status changes.
+# Good (medium — PM adds one detail they think matters)
+We need projects. They belong to an org and need soft delete.
 
-# Bad (too specific — defeats the purpose)
-Create file apps/api/src/routes/projects/index.ts using createRouteConfig
-with GET /, GET /:id, POST /, PATCH /:id, DELETE /:id...
+# Good (complex — PM rambles a bit but still leaves gaps)
+We need a full projects feature. Projects have members, there's some
+kind of approval workflow, and people should get notified when things
+change. Oh and file attachments.
+
+# Bad (too specific — a developer wrote this, not a PM)
+Add a CRUD endpoint for Projects with name (string, required), status
+(enum: active, archived). Use createRouteConfig. Include list, get,
+create, update, and delete. Soft delete with deletedAt timestamp.
+
+# Bad (too vague even for a PM — no signal at all)
+Build something for projects.
 ```
+
+The sweet spot: enough to point the agent in a direction, not enough to actually build from. The agent should read this and immediately have 3-5 questions. If it has zero questions, the prompt is too detailed. If it can't even tell what feature is being requested, the prompt is too vague.
+
+### Decision Point Taxonomy (What Gets Hand-Waved)
+
+When agents implement features, there are specific *categories* of decisions they tend to fill in silently rather than flagging as questions. These are the categories the expected-questions.md should cover, and the categories the Implementer should be trained to recognize:
+
+| Category | What Gets Hand-Waved | Example of Silent Assumption |
+|----------|---------------------|------------------------------|
+| **Boundaries** | Who can access this? What's in scope vs out? | Agent builds endpoint with no permissions check |
+| **Data Model** | What fields? What types? Required vs optional? | Agent invents fields: `name`, `description`, `createdAt` |
+| **Lifecycle** | What happens on create/update/delete? Side effects? | Agent hard-deletes when the PM wanted soft delete |
+| **Relationships** | How does this connect to other entities? | Agent creates a standalone table with no foreign keys |
+| **Business Rules** | Uniqueness? Validation? Constraints? | Agent allows duplicate names when PM expects uniqueness |
+| **Error Cases** | What happens when things go wrong? | Agent returns 500 for everything or invents error handling |
+| **Information Flow** | Who gets notified? What triggers what? | Agent skips notifications the PM assumed were obvious |
+| **Naming/Taxonomy** | What do we call things? What are the states? | Agent invents status enum: `active`/`inactive` vs PM's `active`/`archived` |
+
+**This taxonomy came from watching what actually happened in designing the harness itself.** During the spec refinement conversation:
+- **Boundaries**: "How is context isolated between agents?" → Was filled in (three branches) without asking
+- **Scoring/ranking**: "How do we weigh competing concerns?" → Weights were invented without asking
+- **Data format**: "What does subject-context.md look like?" → YAML with trigger keywords was chosen without asking
+- **Lifecycle**: "What happens when the agent gets stuck?" → Self-termination rules were invented without asking
+- **Information flow**: "How does the Implementer talk to the Subject?" → Routing through orchestrator was assumed
+
+In every case, the fill-in was plausible. That's the danger — the agent writes something reasonable and keeps going. The PM would have had opinions ("oh no, I wanted the scoring to be much simpler") but was never asked.
+
+#### Teaching the Implementer to Recognize Decision Points
+
+The Implementer's prompt should include guidance about when to stop and ask. Not "ask about everything" (that's just thrashing) but "ask when you notice yourself making a choice that could go either way."
+
+The signal is: **"I'm about to write something where a different choice would be equally valid."**
+
+```
+Good ask: "Should delete be soft or hard?"
+(Both are valid — the agent recognizes this is a business decision, not a technical one)
+
+Good ask: "Who can create projects — any member or just admins?"
+(The codebase has a permission system, so this is clearly a decision point)
+
+Bad ask: "What HTTP status code for not found?"
+(404 is obvious. The docs cover this. Don't ask the PM technical questions.)
+
+Bad ask: "Should I use TypeScript?"
+(The codebase is TypeScript. This isn't a decision.)
+
+Not asked (should have been): "What fields does a project have?"
+(The agent invented name/description/status without confirming — all plausible, but wrong)
+```
+
+The rule: **If you're inventing domain details, you're hand-waving. Stop and ask.**
+
+"Domain details" = anything the PM would have an opinion about. Field names, states, permissions, validation rules, relationships, side effects. The PM doesn't know what `createRouteConfig` is — but they absolutely know whether projects should have a `description` field.
+
+#### How This Maps to Expected Questions
+
+Each fixture's `expected-questions.md` should be organized by the decision point taxonomy:
+
+```markdown
+# Expected Questions: add-endpoint-simple
+
+## Boundaries (who can access this?)
+- Who can create/edit/delete projects?
+- Is this endpoint organization-scoped?
+
+## Data Model (what does this thing look like?)
+- What fields does a project have?
+- Are any fields optional?
+- What's the status enum?
+
+## Lifecycle (what happens on mutations?)
+- Soft delete or hard delete?
+- Any side effects on create/update?
+
+## Business Rules (constraints)
+- Is the name unique? Within what scope?
+- Any validation beyond type checking?
+
+## Relationships (how does this connect?)
+- Does a project have members? What roles?
+- Relationship to organization — required?
+
+## Information Flow (who gets notified?)
+- Any notifications on status change?
+- Audit logging needed?
+```
+
+The categories make it easy to see gaps. If a fixture's expected-questions has nothing under "Boundaries," that's a signal — either permissions genuinely don't matter for this feature, or the fixture author forgot to include them.
 
 For complex prompts, the ambiguity is intentional. The correct response involves asking the Subject clarifying questions AND recognizing what's out of scope for a single implementation pass.
 
