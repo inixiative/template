@@ -1,5 +1,34 @@
 # Prompt Refinement Harness
 
+> **Doc status: DESIGN — not implementation-ready.**
+>
+> This document captures design *concepts* and *decisions* from iterative refinement.
+> It is NOT an implementation spec. The TypeScript blocks throughout are **sketches** —
+> they illustrate intent, not actual APIs. Many encode decisions that were filled in
+> without discussion and need validation before building.
+>
+> **What's been decided** (through actual discussion):
+> - Three agents: Subject (vague PM), Implementer (agent under test), Oracle (grader)
+> - Terse prompts — PM gives 1-2 sentences, agent must ask questions to get detail
+> - Subject knowledge is gated — only revealed when the right question is asked
+> - Five scoring rubrics: prompt efficiency, completion, demerits, craft, questioning
+> - Decision point taxonomy — categories of things agents hand-wave instead of asking
+> - Fixture authoring: one interview produces both subject-context and expected-questions
+> - Agent self-termination — agent decides when it's done, not forced to finish
+>
+> **What's speculative** (filled in without asking — needs validation):
+> - All TypeScript interfaces (EvalResult, Diagnosis, RunEntry, etc.)
+> - Data formats (YAML for subject-context? JSON? Plain markdown?)
+> - Storage (run ledger as files? database? Redis?)
+> - Agent SDK API surface (the `query()` calls are invented)
+> - Git branching strategy (three branches — is this the right model?)
+> - Specific scoring weights and formulas
+> - MCP server design
+> - Perturbation/experimentation system
+> - Knowledge tree structure
+>
+> **Read this doc for concepts and intent. Don't treat the TypeScript as a build plan.**
+
 ## Problem
 
 When an AI agent implements a task in a codebase with established patterns (API routes, hooks, permissions, database schema, etc.), the output quality depends heavily on:
@@ -336,6 +365,9 @@ Think: the PM who writes a one-line Jira ticket, not because they're lazy, but b
 - The golden implementation (doesn't know the "right" code)
 - System docs / CLAUDE.md (doesn't coach on patterns)
 - Evaluation criteria (doesn't know how grading works)
+
+> **SKETCH** — The system prompt text below captures the *persona* (decided) but
+> the AgentConfig shape is invented. The actual SDK API may look different.
 
 ```ts
 // Subject agent definition
@@ -1545,6 +1577,9 @@ Count how many pattern signatures are present. This catches cases where code wor
 
 ### Scoring Model
 
+> **SKETCH** — These interfaces illustrate the scoring *concepts* but the specific
+> fields, types, and structure haven't been validated. Don't build from these.
+
 ```ts
 interface EvalResult {
   fixture: string;
@@ -1834,6 +1869,10 @@ questioning score +0.1 if agent now asks about permissions.
 ## Implementation with Claude Agent SDK
 
 The harness orchestrator uses the Claude Agent SDK's subagent system. Each agent is a subagent with isolated context, spawned by the orchestrator via the `Task` tool.
+
+> **SKETCH** — The code below illustrates the orchestration *flow* but uses an
+> invented API. The actual Agent SDK surface, the query function signature, and
+> the subagent routing mechanism all need validation against real SDK docs.
 
 ### Single Run
 
