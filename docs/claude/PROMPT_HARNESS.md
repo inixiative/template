@@ -77,25 +77,141 @@ Orchestrator
   │     ├─→ [checks pattern signatures]
   │     ├─→ [analyzes Q&A quality]
   │     │
-  │     └─→ EvalResult { structural: 0.9, pattern: 0.85, semantic: 1.0, ... }
+  │     └─→ EvalResult { completion: 0.83, craft: 0.9, questioning: 0.6, demerits: [1 minor], ... }
   │
   └─→ Results stored
 ```
 
 ### 3. Evaluate the Output
 
-Compare agent output against the golden implementation:
+Five rubrics. Each measures something fundamentally different. The first is a meta-score on the *docs* being tested — the other four score the agent's *output*.
 
-| Tier | What's Checked | How |
-|------|---------------|-----|
-| **Structural** | Correct files created/modified, right directories | File tree diff |
-| **Pattern** | Correct patterns used (route template, hook structure, test shape) | AST or regex matching against pattern signatures |
-| **Semantic** | Logic is correct, handles edge cases | Test suite passes (run the golden tests against the agent's code) |
-| **Stylistic** | Naming conventions, import style, code organization | Linter + custom rules |
-| **Questioning** | Asked the right clarifying questions | Match against expected-questions |
-| **Exact** | Character-level diff against golden | `git diff` — useful as a signal, not a hard gate |
+#### Rubric 1: Prompt Efficiency (meta — scores the docs, not the agent)
 
-Each tier produces a **score**. The composite score is what you optimize against.
+How much system prompt did it take to get this result? The main prompt (CLAUDE.md) should be as short as possible. Additional docs should be referenceable — the agent looks them up when needed, not front-loaded in the system prompt.
+
+```
+Score = quality_of_output / tokens_in_system_prompt
+```
+
+If Doc Variant A (800 tokens) produces the same quality as Doc Variant B (2400 tokens), Variant A scores 3x better on prompt efficiency. This creates constant pressure to make docs concise and modular:
+
+- **Good:** CLAUDE.md says "see [API_ROUTES.md](docs/claude/API_ROUTES.md) when adding endpoints." Agent finds and reads it when needed.
+- **Bad:** CLAUDE.md inlines the entire API routes guide. Agent performs the same — but the prompt is 3x longer.
+- **Even adding content that improves behavior is penalized if it bloats the main prompt.** The right fix is usually to put the knowledge in a referenceable doc and add a one-line pointer.
+
+| Score | Meaning |
+|-------|---------|
+| High | Short main prompt, agent finds what it needs via doc references |
+| Medium | Moderate prompt, some unnecessary content front-loaded |
+| Low | Bloated prompt — agent performs well but at high token cost |
+
+#### Rubric 2: Completion (positive — how far did the agent get?)
+
+How much of the task did the agent complete correctly before self-terminating? The agent is NOT forced to finish. It decides when it's done — and that decision itself is part of the signal.
+
+```
+Score = (correctly_completed_subtasks / total_subtasks_in_golden)
+```
+
+Subtasks are derived from the golden implementation and assertion checklist. For an "add CRUD endpoint" fixture, the subtasks might be: schema added, route created, CRUD handlers implemented, tests written, hooks wired up, permissions configured.
+
+**Self-termination is respected.** The agent says "I've implemented the endpoint with CRUD operations. I wasn't sure about the permission model so I left a TODO there." That's scored as: completion = 5/6 subtasks, and the agent gets credit for knowing where it was uncertain rather than guessing wrong.
+
+| Score | Meaning |
+|-------|---------|
+| 1.0 | All subtasks completed correctly |
+| 0.7-0.9 | Core done, some edges missed or flagged as uncertain |
+| 0.4-0.6 | Got the skeleton right, missed significant pieces |
+| 0.1-0.3 | Started but got stuck or went off track |
+| 0.0 | Didn't produce usable output |
+
+**Retry loops are limited.** The orchestrator may nudge a stuck agent once ("you seem stuck — would you like to continue or finalize?") but doesn't force continuation. Where the agent stops is the measurement point.
+
+#### Rubric 3: Demerits (negative — driving test style)
+
+Binary violations of specific rules. Each demerit is a concrete, mechanically-checkable mistake. Like a driving test: you can drive well overall but if you run a red light, that's a specific demerit.
+
+Demerits come from two sources:
+- **Fixture assertions** — the `assertions.ts` checklist (e.g., "must use createRouteConfig", "must NOT import from internal package paths")
+- **Global rules** — always checked regardless of fixture (e.g., "never commit .env files", "no raw SQL outside the db package")
+
+```ts
+interface Demerit {
+  rule: string;           // "must-use-route-factory"
+  severity: "major" | "minor";
+  description: string;    // "Used raw Hono app.get() instead of createRouteConfig"
+  file?: string;          // Where the violation occurred
+  line?: number;
+}
+```
+
+| Type | Examples | Impact |
+|------|----------|--------|
+| **Major** | Wrong pattern entirely, security issue, broke existing tests, created file in wrong directory | -0.15 each |
+| **Minor** | Naming convention violation, unnecessary import, slightly wrong file structure | -0.05 each |
+
+Demerits are **subtractive from the composite score**, not a separate 0-1 dimension. Ten minor demerits is -0.5 — significant. Two major demerits is -0.3. They stack. This means an agent that completes everything but violates many rules scores worse than one that completes less but follows conventions.
+
+#### Rubric 4: Craft (qualitative — would a senior dev approve this PR?)
+
+How stylistically similar is the output to the golden implementation? Not "is it character-identical" but "would this pass code review by a senior dev on the team?"
+
+This is the subjective dimension — the Oracle makes a judgment call based on:
+
+| Signal | Good | Bad |
+|--------|------|-----|
+| **Verbosity** | Minimal code to solve the problem | Added helpers/utils/abstractions nobody asked for |
+| **Placement** | Files in the right directories, code in the right layers | New directories created unnecessarily, logic in wrong layer |
+| **Reuse** | Used existing utilities, factories, patterns from the codebase | Reinvented something that already exists |
+| **Naming** | Follows existing conventions in the codebase | Invented new naming patterns |
+| **Scope** | Only changed what was needed | Refactored adjacent code, added comments to untouched files |
+| **Over-engineering** | Simple, direct solution | Feature flags, config options, abstractions for one use case |
+
+```
+Score = Oracle's judgment: 0.0 (unacceptable) to 1.0 (indistinguishable from senior dev)
+```
+
+The craft score is calibrated against the golden. If the golden is a clean 80-line implementation and the agent produced a working but sprawling 200-line version — that's low craft even if it passes all tests.
+
+#### Rubric 5: Questioning (diagnostic — did the agent extract what it needed?)
+
+Did the agent ask the right questions of the Subject (the vague PM)? This is the strongest signal the harness produces because it directly reveals what the agent knew it didn't know.
+
+Scored against `expected-questions.md`:
+
+| Signal | Scoring |
+|--------|---------|
+| Asked an expected question | +points (weighted by category — core > bonus) |
+| Missed a core expected question | Big penalty — this means the agent guessed or skipped |
+| Missed a bonus expected question | Small penalty — nice to have |
+| Asked a wasteful question (PM can't answer technical questions) | Penalty — agent should have read the docs |
+| Asked a useful question NOT on the expected list | Bonus — agent thought of something the fixture author didn't |
+
+The questioning score directly predicts completion quality. An agent that asks 5/6 expected questions almost always scores higher on completion than one that asks 2/6, because it has the information it needs to build correctly.
+
+#### Composite Score
+
+```ts
+composite = (
+  completion * weights.completion        // How far did it get (0-1)
+  + craft * weights.craft                // How clean is the output (0-1)
+  + questioning * weights.questioning    // Did it ask the right questions (0-1)
+  - total_demerit_penalty                // Rule violations (subtractive)
+) * prompt_efficiency_multiplier         // Shorter docs = multiplier > 1.0
+```
+
+The **prompt efficiency multiplier** means: a doc variant that produces the same agent quality with fewer tokens scores higher overall. This prevents the "just add more to the prompt" local optimum.
+
+Default weights (configurable per fixture via `eval.config.ts`):
+
+| Rubric | Default Weight | Notes |
+|--------|---------------|-------|
+| Completion | 0.40 | Did it actually build the thing? |
+| Craft | 0.20 | Is it good code? |
+| Questioning | 0.25 | Did it gather requirements? |
+| Demerits | subtractive | Major: -0.15, Minor: -0.05 |
+| Prompt Efficiency | multiplier | baseline_tokens / actual_tokens |
 
 ### 4. The Refinement Loop
 
@@ -1096,7 +1212,7 @@ The event log IS the run ledger. Every event has a timestamp, agent ID, and fixt
 
 Every fixture includes an `assertions.ts` file — an explicit, enumerated list of **every specific thing to check.** This is not fuzzy. Each assertion is a concrete yes/no question about the agent's output. The Oracle uses these as the primary scoring backbone, then layers its own analysis on top.
 
-The assertions file is what makes scores *actionable*. Instead of "pattern score: 0.7" (which tells you nothing), you get "pattern score: 0.7 — FAILED: did not use createRouteConfig, FAILED: used raw db import instead of getAppEnv, PASSED: correct schema validation."
+The assertions file is what makes scores *actionable*. Instead of a vague craft score, you get specific demerits: "DEMERIT (major): did not use createRouteConfig, DEMERIT (minor): used raw db import instead of getAppEnv, PASS: correct schema validation."
 
 #### Assertion Types
 
@@ -1369,7 +1485,7 @@ interface AssertionReport {
 }
 ```
 
-The Oracle receives the `AssertionReport` as structured input — not just "pattern score: 0.7" but the full breakdown of exactly which assertions passed and failed. This makes its diagnosis precise:
+The Oracle receives the `AssertionReport` as structured input — not just a numeric score but the full breakdown of exactly which assertions passed and which generated demerits. This makes its diagnosis precise:
 
 ```markdown
 ## Oracle Diagnosis (assertion-informed)
@@ -1389,7 +1505,7 @@ examples only for GET — need examples for mutation routes.
 Prescription: Add POST/PATCH/DELETE examples to API_ROUTES.md route factory section.
 ```
 
-Without the assertion checklist, the Oracle would say "pattern score dropped" and have to figure out *what* specifically failed by diffing code. With assertions, the failure is already identified — the Oracle just needs to diagnose *why* and prescribe a fix.
+Without the assertion checklist, the Oracle would say "craft score dropped" and have to figure out *what* specifically failed by diffing code. With assertions, each failure is already a specific demerit — the Oracle just needs to diagnose *why* and prescribe a fix.
 
 #### Writing Good Assertions
 
@@ -1432,24 +1548,57 @@ Count how many pattern signatures are present. This catches cases where code wor
 ```ts
 interface EvalResult {
   fixture: string;
+
+  // The five rubrics
   scores: {
-    structural: number;     // 0-1: correct files in correct places
-    pattern: number;        // 0-1: pattern signatures matched
-    semantic: number;       // 0-1: golden tests pass rate
-    stylistic: number;      // 0-1: linting + naming conventions
-    questioning: number;    // 0-1: asked the right clarifying questions
+    promptEfficiency: number;   // meta: quality / prompt_tokens (multiplier)
+    completion: number;         // 0-1: subtasks completed correctly
+    demerits: Demerit[];        // binary rule violations (subtractive)
+    craft: number;              // 0-1: stylistic similarity to golden
+    questioning: number;        // 0-1: asked the right clarifying questions
   };
-  composite: number;        // Weighted average
-  diff: string;             // Patch from golden
-  qaLog: QAEntry[];         // Full conversation log
-  notes: string[];          // Specific observations
+
+  composite: number;            // Weighted formula (see above)
+
+  // Supporting data
+  completionDetail: {
+    subtasksTotal: number;      // Total subtasks in golden
+    subtasksCompleted: number;  // Correctly completed
+    subtasksMissed: string[];   // What was skipped or wrong
+    selfTerminated: boolean;    // Did agent decide to stop?
+    terminationReason?: string; // "done" | "stuck" | "uncertain" | "forced"
+  };
+
+  demeritDetail: Demerit[];     // Every rule violation with severity + location
+
+  craftDetail: {
+    linesAgent: number;         // Lines of code agent produced
+    linesGolden: number;        // Lines in golden
+    unnecessaryFiles: string[]; // Files agent created that golden doesn't have
+    reinventedUtils: string[];  // Existing utilities the agent re-implemented
+    scopeCreep: string[];       // Changes to files not in the golden
+  };
+
+  qaLog: QAEntry[];             // Full conversation log
+  diff: string;                 // Patch from golden
+  notes: string[];              // Specific observations
+}
+
+interface Demerit {
+  rule: string;                 // "must-use-route-factory"
+  severity: "major" | "minor"; // Major: -0.15, Minor: -0.05
+  description: string;         // Human-readable explanation
+  file?: string;               // Where the violation occurred
+  line?: number;
+  fromAssertion?: string;      // Which assertion.ts rule triggered this
 }
 
 interface QAEntry {
-  question: string;         // What the Implementer asked
-  answer: string;           // What the Subject responded
-  wasExpected: boolean;     // Matched an expected-question
-  impactedOutput: boolean;  // Did the answer change the implementation
+  question: string;             // What the Implementer asked
+  answer: string;               // What the Subject responded
+  matchedExpected?: string;     // Which expected-question it matched (if any)
+  wasWasteful: boolean;         // PM couldn't answer (technical question)
+  impactedOutput: boolean;      // Did the answer change the implementation
 }
 ```
 
@@ -1468,9 +1617,11 @@ interface RunEntry {
   timestamp: string;             // ISO timestamp
   systemVariant: string;         // Which docs version was used
   promptVersion: string;         // Which fixture prompt version
-  scores: EvalResult["scores"];  // The scores from this run
+  promptTokens: number;          // Token count of system prompt (for efficiency rubric)
+  scores: EvalResult["scores"];  // The five rubric scores
   composite: number;
   qaLog: QAEntry[];              // What was asked and answered
+  selfTerminated: boolean;       // Did agent choose to stop?
   diagnosis: Diagnosis;          // Oracle's analysis
   prescription: Prescription | null;  // What the Oracle wants to change
   status: "step_forward" | "step_back" | "plateau" | "converged";
@@ -1479,18 +1630,35 @@ interface RunEntry {
 interface Diagnosis {
   comparedTo: string;            // Run ID this was compared against
   delta: number;                 // Composite score change (+/-)
-  regressions: string[];         // What got worse
-  improvements: string[];        // What got better
+  regressions: string[];         // Which rubrics got worse
+  improvements: string[];        // Which rubrics got better
   rootCause: string;             // Oracle's analysis of WHY
-  patterns: {
-    missed: string[];            // Pattern signatures agent didn't follow
-    wrong: string[];             // Patterns used incorrectly
-    extra: string[];             // Patterns agent added that aren't in golden
+
+  // Per-rubric analysis
+  completionAnalysis: {
+    newlyCompleted: string[];    // Subtasks completed that weren't before
+    newlyMissed: string[];       // Subtasks that regressed
+    stuckPoint?: string;         // Where/why the agent stopped (if self-terminated)
+  };
+  demeritAnalysis: {
+    newDemerits: Demerit[];      // Violations not present in previous run
+    resolvedDemerits: Demerit[]; // Violations fixed since previous run
+  };
+  craftAnalysis: {
+    bloat: string[];             // Unnecessary code/files the agent added
+    goodReuse: string[];         // Existing patterns/utils the agent correctly used
+    missedReuse: string[];       // Existing patterns/utils the agent should have used
   };
   questionAnalysis: {
     shouldHaveAsked: string[];   // Expected questions that weren't asked
     goodQuestions: string[];     // Questions that led to better output
-    wastefulQuestions: string[]; // Questions that didn't help
+    wastefulQuestions: string[]; // Technical questions the PM couldn't answer
+    surpriseQuestions: string[]; // Good questions not on the expected list
+  };
+  promptAnalysis: {
+    tokensUsed: number;          // System prompt tokens for this variant
+    tokensDelta: number;         // Change from previous run's variant
+    efficiencyTrend: "improving" | "degrading" | "stable";
   };
 }
 
@@ -1576,41 +1744,71 @@ Example Oracle report:
 # Run Report: add-endpoint / run-003
 
 ## Scores
-| Dimension    | This Run | Previous | Delta |
-|-------------|----------|----------|-------|
-| Structural  | 0.90     | 0.85     | +0.05 |
-| Pattern     | 0.70     | 0.80     | -0.10 |
-| Semantic    | 1.00     | 0.90     | +0.10 |
-| Stylistic   | 0.85     | 0.85     |  0.00 |
-| Questioning | 0.60     | 0.40     | +0.20 |
-| **Composite** | **0.82** | **0.78** | **+0.04** |
+| Rubric        | This Run | Previous | Delta |
+|---------------|----------|----------|-------|
+| Completion    | 0.83     | 0.67     | +0.16 |
+| Craft         | 0.70     | 0.85     | -0.15 |
+| Questioning   | 0.60     | 0.40     | +0.20 |
+| Demerits      | -0.20    | -0.05    | -0.15 |
+| Prompt Eff.   | ×1.1     | ×1.1     |  0.00 |
+| **Composite** | **0.72** | **0.70** | **+0.02** |
 
-## Status: STEP FORWARD
+## Status: STEP FORWARD (marginal)
+
+## Completion (0.83 — 5/6 subtasks)
+- ✅ Schema added (Project model with correct fields)
+- ✅ Route created (correct directory structure)
+- ✅ CRUD handlers (all four operations working)
+- ✅ Tests written (happy path covers all handlers)
+- ✅ Soft delete (asked the PM, implemented correctly)
+- ❌ Permissions NOT configured (never asked PM about access control)
+
+Agent self-terminated after implementing tests. Said "I've implemented the
+projects endpoint with full CRUD" — did NOT flag permissions as uncertain,
+just didn't think about it.
+
+## Demerits (-0.20)
+- MAJOR: Used raw `app.get()` instead of `createRouteConfig` (-0.15)
+- MINOR: Created `utils/project-helpers.ts` — unnecessary, logic should
+  be inline in the handler (-0.05)
+
+## Craft (0.70)
+Agent produced 180 lines vs golden's 95 lines. Created a helper file that
+doesn't need to exist. The CRUD logic itself is clean but verbose —
+separate validation functions for each operation when the schema handles it.
+Used existing DB patterns correctly (getAppEnv, Prisma client).
+
+## Questioning (0.60)
+- ✅ Asked "Should delete be soft or hard?" (core — impacted output)
+- ✅ Asked "Is project name unique per org?" (business_rule — impacted output)
+- ❌ MISSING: Did not ask about permissions/access control (core)
+- ❌ MISSING: Did not ask about field types / data model (core)
+- ⚠️ WASTEFUL: Asked PM "What HTTP status for not found?" (PM said "I don't
+  know about that stuff" — agent should have read the docs)
 
 ## Diagnosis
-The doc change to API_ROUTES.md (adding the schema example) improved structural
-accuracy — the agent now creates files in the right directories. Semantic score
-jumped because the agent asked the Subject about soft delete (it didn't before)
-and implemented it correctly.
+The doc change to API_ROUTES.md (adding the schema example) improved
+completion — agent now creates the right file structure and asks the PM
+about delete behavior, getting soft delete right.
 
-However, pattern score regressed. The agent stopped using `createRouteConfig`
-and wrote raw Hono routes instead. Root cause: the new example in API_ROUTES.md
-shows a simplified pattern that doesn't use the factory function.
+However, the new example in API_ROUTES.md uses simplified syntax that
+doesn't include `createRouteConfig`. Agent followed the example literally
+→ major demerit. The example is misleading.
 
-## Q&A Analysis
-- GOOD: Asked "Should delete be soft or hard?" (expected, impacted output)
-- GOOD: Asked "Is project name unique per org?" (expected, impacted output)
-- MISSING: Did not ask about authorization requirements (expected)
-- WASTEFUL: Asked "What HTTP status for not found?" (answered by system docs)
+Agent also never asked about permissions. The PM has a gated answer for
+"only admins can create" — but the agent never triggered it. This suggests
+the docs don't prompt the agent to think about access control when building
+endpoints. API_ROUTES.md should cross-reference PERMISSIONS.md.
 
 ## Prescription
 **Type:** doc_patch
 **Target:** docs/claude/API_ROUTES.md
-**Confidence:** 0.75
+**Confidence:** 0.80
 
-The example added in the previous iteration should use `createRouteConfig`
-instead of raw Hono routes. The simplified example is misleading the agent
-into thinking the factory is optional.
+Two changes:
+1. Fix the example to use `createRouteConfig` (caused the major demerit)
+2. Add a cross-reference: "When adding an endpoint, determine who has
+   access — see PERMISSIONS.md" (should trigger the agent to ask the PM)
 
 \`\`\`diff
 - // Example: basic route
@@ -1621,8 +1819,16 @@ into thinking the factory is optional.
 +   handler: async (c) => {
 \`\`\`
 
+\`\`\`diff
++ ## Checklist for New Endpoints
++ - [ ] Determine who has access (see [PERMISSIONS.md](PERMISSIONS.md))
++ - [ ] Define the schema (see schema validation below)
++ - [ ] Use createRouteConfig (ALWAYS — never raw Hono routes)
+\`\`\`
+
 ## Next Action
-Apply patch → re-run fixture → compare against this run.
+Apply both patches → re-run → compare. Expect: major demerit resolved,
+questioning score +0.1 if agent now asks about permissions.
 ```
 
 ## Implementation with Claude Agent SDK
@@ -2295,19 +2501,19 @@ const modelConfigs: Record<string, ModelConfig> = {
   opus: {
     model: "opus",
     expectedTier: { simple: "full", medium: "full", complex: "core" },
-    weights: { pattern: 0.3, restraint: 0.1, questioning: 0.2 },
+    weights: { completion: 0.40, craft: 0.25, questioning: 0.25 },
     costMultiplier: 5.0,
   },
   sonnet: {
     model: "sonnet",
     expectedTier: { simple: "full", medium: "full", complex: "skeleton" },
-    weights: { pattern: 0.2, restraint: 0.2, questioning: 0.2 },
+    weights: { completion: 0.45, craft: 0.20, questioning: 0.20 },
     costMultiplier: 1.0,
   },
   haiku: {
     model: "haiku",
     expectedTier: { simple: "full", medium: "core", complex: "skeleton" },
-    weights: { pattern: 0.1, restraint: 0.3, questioning: 0.2 },
+    weights: { completion: 0.50, craft: 0.15, questioning: 0.15 },
     costMultiplier: 0.2,
   },
 };
@@ -2594,38 +2800,43 @@ A doc change that makes the agent nail simple tasks but overreach on complex one
 interface FixtureConfig {
   name: string;
   tier: "simple" | "medium" | "complex";
-  prompt: string;
-  subjectContext: string;
+  prompt: string;                 // Deliberately terse — 1-2 sentences
+  subjectContext: string;         // Gated Q&A pairs
   golden: GoldenImpl;
   evalConfig: {
-    // Tier-specific scoring weights
+    // Per-fixture weight overrides (defaults shown in scoring section)
     weights: {
-      structural: number;
-      pattern: number;
-      semantic: number;
-      stylistic: number;
-      questioning: number;
-      restraint: number;      // NEW: penalizes overreach, rewards knowing limits
+      completion: number;         // default: 0.40
+      craft: number;              // default: 0.20
+      questioning: number;        // default: 0.25
     };
+    // Demerit severity overrides (some rules matter more for some fixtures)
+    demeritOverrides?: Record<string, "major" | "minor">;
+    // Prompt efficiency baseline (tokens — lower is better)
+    promptBaseline?: number;
     // What counts as "done" at this tier
     completionExpectation: "full" | "core" | "skeleton";
+    // Subtask breakdown for completion scoring
+    subtasks: string[];           // e.g., ["schema", "route", "handlers", "tests", "hooks", "permissions"]
     // Patterns the agent SHOULD NOT attempt at this tier
     outOfScope: string[];
   };
 }
 ```
 
-#### Scoring Restraint
+#### Self-Termination and Completion by Tier
 
-The `restraint` dimension measures whether the agent correctly judged its own confidence:
+The agent isn't forced to finish. It decides when it's done — and where it stops is scored against tier expectations:
 
 | Behavior | Simple | Medium | Complex |
 |----------|--------|--------|---------|
-| Implemented everything correctly | 1.0 | 1.0 | 0.7 (suspicious — did it get lucky or actually know?) |
-| Implemented core, flagged rest as TODO | 0.5 | 0.9 | 1.0 |
-| Built skeleton with clear decision points | 0.2 | 0.6 | 1.0 |
-| Implemented everything but some is wrong | 0.0 | 0.3 | 0.0 (should have stopped) |
-| Didn't attempt enough | 0.3 | 0.5 | 0.7 (at least it knew its limits) |
+| Completed everything correctly | completion: 1.0 | completion: 1.0 | completion: 1.0 (impressive) |
+| Completed core, flagged rest as TODO | completion: 0.6, craft: bonus | completion: 0.85, craft: bonus | completion: 0.7, craft: big bonus |
+| Built skeleton, stopped with clear decision points | completion: 0.3 | completion: 0.5 | completion: 0.6, craft: bonus |
+| Completed everything but some is wrong | completion: high but demerits stack | completion: high but demerits stack | demerits dominate — should have stopped |
+| Got stuck, thrashed, produced garbage | completion: low, craft: low | completion: low, craft: low | completion: low, craft: low |
+
+**Key insight:** At complex tiers, stopping with a clean partial + clear TODOs scores *better on craft* than pushing through and getting things wrong. The agent that writes "I'm not sure about the permission model — leaving a TODO for human review" demonstrates good judgment. The agent that guesses wrong on permissions gets a major demerit.
 
 For complex fixtures, the golden implementation itself may be a **partial implementation** — a well-structured skeleton with clear TODO markers, decision points flagged, and a summary of what needs human input. The Oracle grades against *that*.
 
