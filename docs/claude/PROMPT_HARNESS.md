@@ -1025,14 +1025,176 @@ The parallel approach makes this impossible:
 
 ### HIVEMIND Integration
 
-For more complex multi-agent orchestration patterns beyond what the Claude Agent SDK provides natively, a HIVEMIND-style system can add:
+The harness coordinates its agents through [HIVEMIND](https://github.com/inixiative/hivemind) — a multi-agent coordination system for Claude Code that uses MCP, SQLite, and PID-based agent tracking.
 
-- **Persistent agent identities** — agents maintain state across multiple fixture runs, building up "experience" with the codebase
-- **Shared memory / message bus** — agents communicate through a structured channel rather than only through the orchestrator
-- **Agent-to-agent protocols** — formalized question/answer formats, confidence signals, escalation paths
-- **Swarm evaluation** — multiple Implementer agents tackle the same fixture independently, Oracle grades all of them, best patterns are identified
+HIVEMIND provides exactly what the harness needs:
+- **Event-based messaging** between agents (`hivemind_emit` / `hivemind_query`)
+- **Persistent plans and tasks** that survive across sessions
+- **Agent lifecycle management** via PID monitoring (no heartbeats)
+- **Git worktree coordination** to prevent conflicts across parallel runs
 
-The HIVEMIND approach is especially valuable for Phase 4 (Self-Improving Loop) where agents could collaboratively analyze evaluation results and propose documentation improvements.
+```
+┌─────────────────────────────────────────────────────────┐
+│                 HIVEMIND (MCP Server)                     │
+│  SQLite: ~/.hivemind/claude_hivemind_{project}/          │
+│                                                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
+│  │  agents  │  │  events  │  │  plans   │  │  tasks  │ │
+│  │  table   │  │  table   │  │  table   │  │  table  │ │
+│  └──────────┘  └──────────┘  └──────────┘  └─────────┘ │
+└────────┬──────────────┬──────────────┬──────────────────┘
+         │              │              │
+         ▼              ▼              ▼
+  ┌────────────┐ ┌────────────┐ ┌────────────┐
+  │ Subject    │ │ Implementer│ │ Oracle     │
+  │ (Claude    │ │ (Claude    │ │ (Claude    │
+  │  session)  │ │  session)  │ │  session)  │
+  └────────────┘ └────────────┘ └────────────┘
+```
+
+#### How Agents Use HIVEMIND
+
+Each harness agent is a Claude session registered via `hivemind_register`. They communicate through events, not direct calls:
+
+```
+# Implementer asks a question
+hivemind_emit type=question content="Should project delete be soft or hard?"
+
+# Subject sees the question via hivemind_query, responds
+hivemind_emit type=answer content="Soft delete. Keep for audit trails."
+
+# Implementer queries for answers, continues implementation
+# Oracle observes the full event stream after the run
+```
+
+**Plans** map to fixtures. A fixture run creates a HIVEMIND plan with tasks for each phase (implement, evaluate, diagnose, prescribe). Tasks are claimed by the appropriate agent, preventing duplication when running in parallel.
+
+**Events** are the Q&A log, the score reports, the Oracle's diagnoses — all captured in HIVEMIND's event table with timestamps and metadata. The ledger is built from events rather than being a separate system.
+
+#### Harness-Specific MCP Tools
+
+On top of HIVEMIND's core tools, the harness exposes its own MCP tools for fixture management and evaluation:
+
+```ts
+// packages/prompt-harness/src/mcp/harness-server.ts
+// Tools:
+//   harness_run_fixture     — run a single fixture against a docs variant
+//   harness_evaluate        — score agent output against golden
+//   harness_diagnostic      — run basic or age diagnostic
+//   harness_get_golden      — retrieve golden implementation for a fixture
+//   harness_get_signatures  — get pattern signatures for a fixture
+//   harness_compare         — compare two docs variants across all fixtures
+//   harness_refine          — start the refinement loop
+```
+
+Claude can use these tools directly:
+```
+User: "Run the add-endpoint-simple fixture with the current docs and tell me how it scores"
+Claude: [calls harness_run_fixture] → [calls harness_evaluate] → [queries hivemind events for history]
+        → "Score: 0.85 (up from 0.78). Pattern compliance improved because..."
+```
+
+## Multi-Model Documentation
+
+Different models reason differently. Docs optimized for Opus may be too verbose for Haiku. The harness can generate **model-specific doc variants** and **model-specific test expectations**.
+
+### Per-Model Fixtures
+
+Each fixture can define model-specific golden implementations and scoring weights:
+
+```
+fixtures/
+  add-endpoint-simple/
+    prompt.md
+    subject-context.md
+    eval.config.ts              # Default eval config
+    models/
+      opus/
+        eval.config.ts          # Opus-specific weights (higher pattern expectations)
+        golden/                 # What Opus should produce
+      sonnet/
+        eval.config.ts          # Sonnet-specific weights
+        golden/                 # What Sonnet should produce (may accept simpler patterns)
+      haiku/
+        eval.config.ts          # Haiku-specific weights (lower expectations, focus on correctness)
+        golden/                 # What Haiku should produce (minimal but correct)
+    golden/                     # Default golden (used when no model-specific one exists)
+```
+
+### Per-Model Doc Variants
+
+The refinement loop can optimize docs **per model**. Different models may need different documentation styles:
+
+```
+system-variants/
+  baseline/                     # Current docs — same for all models
+  opus-optimized/               # Concise, pattern-focused (Opus infers well from examples)
+  sonnet-optimized/             # Balanced (good examples + some explanation)
+  haiku-optimized/              # Explicit, step-by-step (Haiku needs more guidance)
+```
+
+### Model-Specific Scoring
+
+```ts
+interface ModelConfig {
+  model: "opus" | "sonnet" | "haiku";
+  expectedTier: {
+    // What complexity tier this model should handle well
+    simple: "full";              // All models should nail simple
+    medium: "full" | "core";     // Opus: full, Sonnet: full, Haiku: core
+    complex: "skeleton" | "core" | "full";  // Varies by model
+  };
+  weights: {
+    // Different models get different scoring emphasis
+    pattern: number;             // Opus: high, Haiku: low
+    restraint: number;           // Haiku: high (better to stop than guess)
+    questioning: number;         // All: medium
+  };
+  costMultiplier: number;        // For budget calculations
+}
+
+const modelConfigs: Record<string, ModelConfig> = {
+  opus: {
+    model: "opus",
+    expectedTier: { simple: "full", medium: "full", complex: "core" },
+    weights: { pattern: 0.3, restraint: 0.1, questioning: 0.2 },
+    costMultiplier: 5.0,
+  },
+  sonnet: {
+    model: "sonnet",
+    expectedTier: { simple: "full", medium: "full", complex: "skeleton" },
+    weights: { pattern: 0.2, restraint: 0.2, questioning: 0.2 },
+    costMultiplier: 1.0,
+  },
+  haiku: {
+    model: "haiku",
+    expectedTier: { simple: "full", medium: "core", complex: "skeleton" },
+    weights: { pattern: 0.1, restraint: 0.3, questioning: 0.2 },
+    costMultiplier: 0.2,
+  },
+};
+```
+
+### Cross-Model Analysis
+
+The parallel suite can run the same fixture across all models simultaneously:
+
+```bash
+# Run the same fixture on all three models
+bun run harness run add-endpoint-simple --models opus,sonnet,haiku
+
+# Generate model-specific doc recommendations
+bun run harness refine --model opus --max-epochs 5
+bun run harness refine --model sonnet --max-epochs 5
+bun run harness refine --model haiku --max-epochs 10  # More iterations, cheaper per run
+```
+
+The Oracle's cross-model analysis answers:
+- "Opus gets 0.95 but Haiku gets 0.60 on the same fixture — what doc changes would bring Haiku up without affecting Opus?"
+- "Sonnet asks better clarifying questions than Opus — what can we learn from its Q&A pattern?"
+- "Haiku correctly stops at skeleton for complex tasks while Opus overreaches — Haiku's restraint is better here"
+
+This naturally produces **model-specific doc variants**: the docs that work best for each model, maintained by the loop, tracked in the ledger.
 
 ## Fixture Design Principles
 
@@ -1241,51 +1403,292 @@ The Oracle specifically looks for the **simplification trap**: a doc change that
 - If agents under-deliver on simple tasks, your docs are **too cautious**
 - The ideal doc set produces agents that scale their confidence correctly with complexity
 
+## Package: `@template/prompt-harness`
+
+This is its own package in the monorepo. It operates **on** other packages — it doesn't depend on them at runtime, it evaluates whether agents can correctly build with them.
+
+```
+packages/
+  prompt-harness/              # @template/prompt-harness
+    package.json
+    tsconfig.json
+    src/
+      cli.ts                   # CLI entry point: `bun run harness <command>`
+      mcp/                     # MCP servers (HIVEMIND integration)
+        harness-server.ts      # run_fixture, evaluate, get_pattern_signatures
+        ledger-server.ts       # get_history, add_entry, get_best, get_matrix
+        worktree-server.ts     # create, capture_changes, apply_patch, cleanup
+      agents/                  # Agent configurations
+        subject.ts
+        implementer.ts
+        oracle.ts
+        orchestrator.ts
+      diagnostics/             # The two diagnostic modes
+        basic.ts               # Quick sanity check
+        age.ts                 # Drift detection over time
+      loop/                    # Core refinement loop
+        single-fixture.ts
+        parallel.ts
+        extraction.ts          # Signal decomposition + positive extraction
+      eval/                    # Evaluation engine
+        structural.ts
+        pattern.ts
+        semantic.ts
+        stylistic.ts
+        questioning.ts
+        restraint.ts
+        composite.ts
+      ledger/                  # Run history management
+        run-ledger.ts
+        master-ledger.ts
+        score-matrix.ts
+      worktree/                # Git worktree lifecycle
+        manager.ts
+      report/                  # Report generation
+        oracle-report.ts
+        epoch-report.ts
+        diagnostic-report.ts
+    fixtures/                  # Test cases
+      add-endpoint-simple/
+      add-endpoint-medium/
+      add-endpoint-complex/
+      schema-change-simple/
+      schema-change-complex/
+      _self/                   # Dogfood fixture (see below)
+    system-variants/           # Versioned doc snapshots
+    results/                   # Run history + epoch data
+```
+
+### CLI
+
+```bash
+# Basic diagnostic — quick sanity check, runs simple fixtures
+bun run harness diagnostic:basic
+
+# Age diagnostic — how have scores drifted since last baseline?
+bun run harness diagnostic:age
+
+# Run a single fixture
+bun run harness run add-endpoint-simple
+
+# Run the full parallel suite
+bun run harness run --parallel
+
+# Start the refinement loop
+bun run harness refine --max-epochs 10 --cost-ceiling 50
+
+# Compare two doc variants
+bun run harness compare baseline v2
+
+# Dogfood — test the harness's own docs
+bun run harness run _self
+```
+
+### Package JSON
+
+```json
+{
+  "name": "@template/prompt-harness",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/cli.ts",
+  "scripts": {
+    "harness": "bun src/cli.ts",
+    "diagnostic:basic": "bun src/cli.ts diagnostic:basic",
+    "diagnostic:age": "bun src/cli.ts diagnostic:age",
+    "test": "bun test"
+  }
+}
+```
+
+## Diagnostic Modes
+
+Two modes for two questions. Basic asks "are the docs working?" Age asks "are the docs still working?"
+
+### Basic Diagnostic
+
+**When to run:** After any doc change. Before merging doc PRs. As a CI check.
+
+**What it does:**
+1. Runs all **simple** fixtures in parallel (fast, cheap)
+2. Reports pass/fail per fixture with a brief score summary
+3. Flags any fixture that dropped below threshold
+
+This is the "does it still compile" equivalent for your docs. Fast, cheap, catches obvious regressions.
+
+```ts
+interface BasicDiagnostic {
+  timestamp: string;
+  variant: string;                // Which docs version
+  fixtures: {
+    name: string;
+    tier: "simple";               // Only simple fixtures
+    composite: number;
+    passed: boolean;              // Above threshold?
+    regressionFromLast: number;   // Delta from last basic diagnostic
+  }[];
+  summary: {
+    passed: number;
+    failed: number;
+    avgComposite: number;
+    recommendation: "ok" | "review" | "block";
+  };
+}
+```
+
+```bash
+$ bun run harness diagnostic:basic
+
+  BASIC DIAGNOSTIC — 2026-02-11
+
+  add-endpoint-simple     0.92  PASS  (+0.02)
+  schema-change-simple    0.88  PASS  (-0.01)
+  add-permissions-simple  0.85  PASS  (+0.05)
+  background-job-simple   0.91  PASS  (+0.00)
+
+  4/4 passed | avg: 0.89 | recommendation: OK
+```
+
+### Age Diagnostic
+
+**When to run:** Weekly. After major refactors. When onboarding patterns start to feel stale.
+
+**What it does:**
+1. Runs the **full fixture matrix** (simple + medium + complex) against the **current** docs
+2. Compares scores to the **historical baseline** — the last known-good epoch
+3. Detects **drift**: scores that have degraded over time even though docs haven't changed
+
+Why do scores drift even when docs don't change? Because the **codebase** changes. New patterns get added, old patterns get refactored, examples in the docs reference code that's been moved. The docs are technically correct but practically stale.
+
+```ts
+interface AgeDiagnostic {
+  timestamp: string;
+  baselineEpoch: string;          // Which epoch we're comparing to
+  currentVariant: string;
+  drift: {
+    fixture: string;
+    tier: "simple" | "medium" | "complex";
+    baseline: number;             // Score when docs were last tuned
+    current: number;              // Score now
+    delta: number;
+    driftCause: "codebase_changed" | "pattern_evolved" | "unknown";
+    details: string;              // Oracle's analysis of WHY it drifted
+  }[];
+  summary: {
+    totalDrift: number;           // Sum of all negative deltas
+    worstFixture: string;
+    recommendation: "stable" | "tune_docs" | "new_fixtures_needed";
+  };
+}
+```
+
+```bash
+$ bun run harness diagnostic:age
+
+  AGE DIAGNOSTIC — 2026-02-11
+  Baseline: epoch-012 (2026-01-15)
+
+  SIMPLE TIER
+  add-endpoint-simple     0.92 → 0.90  drift: -0.02  (stable)
+  schema-change-simple    0.88 → 0.72  drift: -0.16  ⚠ DEGRADED
+
+  MEDIUM TIER
+  add-endpoint-medium     0.80 → 0.78  drift: -0.02  (stable)
+  add-permissions         0.85 → 0.70  drift: -0.15  ⚠ DEGRADED
+
+  COMPLEX TIER
+  add-endpoint-complex    0.65 → 0.60  drift: -0.05  (stable)
+  full-feature            0.55 → 0.40  drift: -0.15  ⚠ DEGRADED
+
+  Worst drift: schema-change-simple (-0.16)
+    Cause: Prisma schema was refactored since baseline. Docs reference
+    old model utility patterns that no longer exist in the codebase.
+
+  Recommendation: TUNE DOCS — 3 fixtures degraded significantly
+```
+
+The age diagnostic tells you **when your docs have gone stale** without anyone noticing. The codebase evolved, the docs didn't, and agents are silently getting worse.
+
+## Dogfooding
+
+The harness tests itself. Fixture `_self` evaluates whether the harness's own documentation is sufficient for an agent to understand and extend the harness.
+
+### The `_self` Fixture
+
+```
+fixtures/
+  _self/
+    prompt.md              # "Add a new evaluation dimension to the harness"
+    subject-context.md     # Domain knowledge about what the harness does
+    golden/
+      stage-1-skeleton/    # Correct file structure + type additions
+      stage-2-core/        # Evaluation logic implemented
+      stage-3-complete/    # Full implementation with tests
+    eval.config.ts         # Pattern signatures for harness code
+    expected-questions.md  # Questions about scoring weights, integration points
+```
+
+### What Dogfooding Tests
+
+The `_self` fixture asks the Implementer to modify the harness itself. This tests:
+
+1. **Can the agent understand this doc?** If the harness docs (this file + code comments) aren't clear enough for an agent to extend the harness, they're not clear enough for anything.
+2. **Does the package structure make sense?** If the agent creates files in the wrong directories within the harness package, the structure is confusing.
+3. **Are the TypeScript interfaces self-documenting?** The agent should be able to look at the interfaces and know what to implement.
+4. **Meta-regression detection:** If a doc change to the harness's own docs makes the `_self` fixture regress, the change made the harness harder to understand — exactly the kind of thing it's designed to catch.
+
+### Dogfood Tiers
+
+| Tier | Fixture | What's Tested |
+|------|---------|--------------|
+| Simple | `_self/add-eval-dimension` | Add a new scoring dimension (e.g., "security") to the eval pipeline |
+| Medium | `_self/add-fixture-type` | Add a new fixture tier (e.g., "integration") with its own scoring weights |
+| Complex | `_self/add-diagnostic-mode` | Add a new diagnostic mode that cross-references with external data |
+
+If the harness can't describe itself well enough for an agent to extend it, it has no business evaluating other docs.
+
 ## Implementation Phases
 
-### Phase 1: Manual Baseline
+### Phase 1: Package Scaffold + Manual Baseline
 
-- Create 2-3 fixtures by hand from recently merged PRs
-- Write a simple runner (shell script + git worktrees)
-- Run the three agents (Subject, Implementer, Oracle) manually
-- Oracle evaluates by hand with a checklist, produces first report
+- Create `packages/prompt-harness` with the package structure above
+- Create 2-3 simple fixtures by hand from recently merged PRs
+- Run the three agents manually (Subject, Implementer, Oracle)
+- Oracle evaluates by hand, produces first report
 - Establish baseline scores and initial run ledger
 
-### Phase 2: Automated Single-Fixture Loop
+### Phase 2: Basic Diagnostic + Single-Fixture Loop
 
+- Implement the basic diagnostic (simple fixtures only, quick feedback)
 - Build the run ledger and Oracle report generation
 - Automate the implement → evaluate → diagnose → prescribe → re-trigger cycle
-- Oracle proposes doc patches, loop applies them automatically
-- Stopping conditions: convergence, cost ceiling, plateau detection
-- Human reviews Oracle reports to validate the loop is learning
+- Add the `_self` dogfood fixture
 
-### Phase 3: Cross-Fixture + Regression Detection
+### Phase 3: Age Diagnostic + Parallel Suite
 
-- Add 5-8 fixtures covering major pattern categories
-- Cross-fixture analysis: detect when a doc change helps one fixture but hurts another
-- Oracle proposes unified patches that maximize improvement across all fixtures
+- Implement age diagnostic (full matrix, drift detection)
+- Add 5-8 fixtures across the complexity tiers
+- Parallel execution with positive signal extraction
 - System variant versioning: every Oracle patch creates a snapshot
-- `current-best` always points to the highest-scoring docs version
+- Cross-tier regression detection
 
-### Phase 4: Full Autonomy (HIVEMIND)
+### Phase 4: MCP Servers + Full Autonomy
 
+- Expose harness, ledger, and worktree as MCP servers
+- Claude can interact with the harness directly via MCP tools
+- HIVEMIND integration for persistent state and cross-run intelligence
 - Loop runs unattended: fixture suite → Oracle analysis → doc patch → re-run
-- Auto-generate fixture candidates from new PRs
-- Persistent agent identities: Subject agents accumulate domain knowledge across runs
-- Swarm evaluation: multiple Implementers tackle same fixture, Oracle picks best patterns
-- Score dashboard: track docs quality over time as a team metric
-- CI integration: run on doc changes, block merges that regress fixture scores
+- CI integration: basic diagnostic on doc changes, age diagnostic weekly
 
 ## Open Questions
 
-1. **Cost** — Each fixture run is a full agent session (now with multi-agent overhead + loop iterations). Batch API or cheaper models for initial screening? Budget per loop?
+1. **Cost** — Each fixture run is a full agent session. Basic diagnostic should be cheap (simple fixtures only + Haiku/Sonnet). Full refinement loops are expensive. Budget per epoch?
 2. **Determinism** — Same prompt can produce different output. How many runs per fixture to get statistical significance? 3 minimum, 5 ideal? Does the Oracle average across runs?
-3. **Fixture Freshness** — Patterns evolve. How to keep golden implementations in sync? Tag them to schema versions?
+3. **Fixture Freshness** — The age diagnostic detects stale docs. But who updates the golden implementations when the codebase changes? Auto-generate from new PRs?
 4. **Partial Credit** — An implementation that works but uses different patterns is... correct? wrong? The scoring weights encode your opinion here.
 5. **Multi-Model** — Different models (Opus, Sonnet, Haiku) will score differently as Implementer. Track per-model or optimize for one?
 6. **Subject Fidelity** — How realistic is a simulated domain expert? Should the Subject be seeded from actual Slack/issue conversations?
-7. **Question Scoring** — How to weight "asked good questions" vs "produced good code"? An agent that asks nothing but gets it right is arguably better than one that asks great questions but still misses patterns.
-8. **HIVEMIND Scope** — Where does the orchestrator end and HIVEMIND begin? Use SDK subagents for the core loop, HIVEMIND for cross-run intelligence?
-9. **Oracle Reliability** — The Oracle is itself an LLM. Can it reliably diagnose *why* a score changed and propose the right fix? What if the Oracle's prescriptions oscillate (patch A → revert A → patch A)?
-10. **Patch Granularity** — Should the Oracle propose one small change per iteration, or batch multiple fixes? Small = easier to attribute, large = faster convergence.
-11. **Human Checkpoints** — At what confidence threshold should the Oracle auto-apply vs flag for human review? Low-confidence prescriptions could waste budget on bad experiments.
+7. **Oracle Reliability** — The Oracle is itself an LLM. Can it reliably diagnose *why* a score changed? What if its prescriptions oscillate (patch A → revert A → patch A)?
+8. **Dogfood Recursion** — If the `_self` fixture's docs are themselves tuned by the loop, does the system converge or oscillate? Is there a fixed-point?
+9. **MCP Server Scope** — Which operations should be tools (callable by Claude) vs CLI commands (run by humans)? How much autonomy does Claude get?
