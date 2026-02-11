@@ -1196,6 +1196,228 @@ The Oracle's cross-model analysis answers:
 
 This naturally produces **model-specific doc variants**: the docs that work best for each model, maintained by the loop, tracked in the ledger.
 
+## Knowledge Tree Architecture
+
+The flat `docs/claude/*.md` files work for humans but are inefficient for agents. An agent doing a schema change shouldn't need to load the permissions doc. The knowledge tree is a **retrieval-optimized** structure where the agent navigates to what it needs in 2-3 hops.
+
+### The Problem with Flat Docs
+
+Today:
+```
+CLAUDE.md says "read DATABASE.md for schema changes"
+→ Agent loads all of DATABASE.md (2000 lines)
+→ Agent only needed the section on model utilities (50 lines)
+→ 97% of loaded context was wasted
+```
+
+With the knowledge tree:
+```
+CLAUDE.md says "database/" for schema changes
+→ Agent reads database/index.md (30 lines, lists 8 concepts)
+→ Agent reads database/concepts/model-utilities.md (50 lines)
+→ Agent has exactly what it needs
+```
+
+### Three-Level Structure
+
+```
+knowledge/
+  index.md                              # Level 0: TOP-LEVEL ROUTER
+  │                                     # "What are you doing? → go to this domain"
+  │                                     # Lists all domains with 1-line descriptions
+  │                                     # ~30 lines. Always loaded.
+  │
+  ├── api-routes/                       # Level 1: DOMAIN
+  │   ├── index.md                      # Domain overview + concept listing
+  │   │                                 # "Here's what's in this domain, pick what you need"
+  │   │                                 # ~50 lines. Loaded when domain is relevant.
+  │   └── concepts/                     # Level 2: CONCEPTS
+  │       ├── route-factory.md          # createRouteConfig pattern + examples
+  │       ├── schema-validation.md      # Zod schemas for routes
+  │       ├── error-handling.md         # Error responses, status codes
+  │       ├── middleware.md             # Auth, rate limiting, etc.
+  │       └── testing.md               # Route test patterns
+  │
+  ├── database/
+  │   ├── index.md
+  │   └── concepts/
+  │       ├── prisma-patterns.md        # Query patterns, relations
+  │       ├── model-utilities.md        # Model helper functions
+  │       ├── migrations.md             # Schema changes, prisma push
+  │       ├── extensions.md             # Prisma extensions
+  │       └── seeding.md               # Seed data patterns
+  │
+  ├── hooks/
+  │   ├── index.md
+  │   └── concepts/
+  │       ├── lifecycle.md              # beforeCreate, afterUpdate, etc.
+  │       ├── validation.md             # Input validation in hooks
+  │       ├── cache-invalidation.md     # When and how to bust cache
+  │       └── webhooks.md              # External webhook dispatch
+  │
+  ├── permissions/
+  │   ├── index.md
+  │   └── concepts/
+  │       ├── roles.md
+  │       ├── entitlements.md
+  │       ├── middleware.md
+  │       └── permix.md
+  │
+  ├── jobs/
+  │   ├── index.md
+  │   └── concepts/
+  │       ├── bullmq.md
+  │       ├── crons.md
+  │       └── workers.md
+  │
+  └── frontend/
+      ├── index.md
+      └── concepts/
+          ├── routing.md
+          ├── data-tables.md
+          ├── state.md
+          └── components.md
+```
+
+### How the Agent Navigates
+
+```
+Task: "Add a CRUD endpoint for Projects with hooks"
+
+Step 1: Read knowledge/index.md
+  → Sees: "api-routes/ — Adding endpoints, controllers, route templates"
+  → Sees: "hooks/ — Mutation lifecycle, validation, cache"
+  → Decides: needs api-routes + hooks
+
+Step 2: Read knowledge/api-routes/index.md
+  → Sees concept list: route-factory, schema-validation, error-handling, middleware, testing
+  → Decides: needs route-factory, schema-validation, testing
+
+Step 3: Read knowledge/hooks/index.md
+  → Sees concept list: lifecycle, validation, cache-invalidation, webhooks
+  → Decides: needs lifecycle, validation
+
+Step 4: Load ONLY these concept files:
+  → api-routes/concepts/route-factory.md        (40 lines)
+  → api-routes/concepts/schema-validation.md    (35 lines)
+  → api-routes/concepts/testing.md              (45 lines)
+  → hooks/concepts/lifecycle.md                 (50 lines)
+  → hooks/concepts/validation.md                (30 lines)
+
+Total context loaded: ~200 lines
+vs flat docs: ~4000 lines (DATABASE.md + API_ROUTES.md + HOOKS.md + TESTING.md)
+```
+
+### Index File Format
+
+Each index file follows the same structure so agents can parse them mechanically:
+
+```markdown
+# API Routes
+
+> Adding endpoints, controllers, route templates
+
+## When You're Here
+- Adding a new endpoint
+- Modifying an existing route
+- Adding middleware to routes
+
+## Concepts
+
+| Concept | File | When to Read |
+|---------|------|-------------|
+| Route Factory | `concepts/route-factory.md` | Creating any new route (ALWAYS read this first) |
+| Schema Validation | `concepts/schema-validation.md` | Defining request/response schemas |
+| Error Handling | `concepts/error-handling.md` | Custom error responses |
+| Middleware | `concepts/middleware.md` | Auth, rate limiting, logging |
+| Testing | `concepts/testing.md` | Writing route tests |
+
+## Cross-References
+- Schema changes? → `../database/`
+- Hooks on mutations? → `../hooks/`
+- Permission checks? → `../permissions/`
+```
+
+### Concept File Format
+
+Each concept file is self-contained: pattern + example + anti-pattern.
+
+```markdown
+# Route Factory
+
+> Use `createRouteConfig` for ALL routes. Never write raw Hono routes.
+
+## Pattern
+
+\`\`\`ts
+const routes = createRouteConfig({
+  schema: {
+    params: z.object({ id: z.string() }),
+    body: CreateProjectSchema,
+  },
+  handler: async (c) => {
+    const { db } = getAppEnv(c);
+    // ...
+  },
+});
+\`\`\`
+
+## Anti-Pattern
+
+\`\`\`ts
+// WRONG: raw Hono route
+app.get("/projects/:id", async (c) => { ... });
+\`\`\`
+
+## Depends On
+- `schema-validation.md` — for schema definitions
+- `../hooks/lifecycle.md` — if the route triggers mutations
+```
+
+### Knowledge Tree in the Harness
+
+The harness evaluates **both** the flat docs and the knowledge tree. They're separate system variants:
+
+```
+system-variants/
+  flat-baseline/              # Current docs/claude/*.md approach
+  tree-baseline/              # Same content, reorganized as knowledge tree
+  tree-opus-optimized/        # Knowledge tree, optimized for Opus
+  tree-sonnet-optimized/      # Knowledge tree, optimized for Sonnet
+  tree-haiku-optimized/       # Knowledge tree, optimized for Haiku
+```
+
+The harness can answer: "Does the tree structure actually produce better scores than flat docs?" and "How much context does the agent load with tree vs flat?"
+
+### Measuring Retrieval Efficiency
+
+A new scoring dimension: **retrieval** — how efficiently did the agent find the information it needed?
+
+```ts
+interface RetrievalScore {
+  totalContextLoaded: number;       // Lines of docs the agent read
+  relevantContextLoaded: number;    // Lines that were actually useful
+  efficiency: number;               // relevant / total (0-1)
+  missedConcepts: string[];         // Concepts it should have read but didn't
+  unnecessaryConcepts: string[];    // Concepts it read but didn't need
+  hops: number;                     // How many index files it traversed
+}
+```
+
+With flat docs, efficiency is typically 0.05-0.15 (agent loads everything, uses 5-15%). With the knowledge tree, target is 0.60+.
+
+### Generating the Knowledge Tree from Flat Docs
+
+The harness can **auto-generate** the knowledge tree from existing flat docs:
+
+1. Parse each `docs/claude/*.md` into sections
+2. Cluster sections by domain (most already map 1:1 to domains)
+3. Split each section into self-contained concepts
+4. Generate index files with concept listings and cross-references
+5. Run fixtures against both flat and tree variants to validate
+
+This means the knowledge tree doesn't require manual authoring — the Oracle can propose tree restructurings as part of the refinement loop, and the harness validates whether the restructuring actually improves retrieval efficiency.
+
 ## Fixture Design Principles
 
 ### Complexity Tiers
