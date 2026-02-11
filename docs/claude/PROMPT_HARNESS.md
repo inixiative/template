@@ -393,346 +393,478 @@ prompt-harness/
 
 **A/B** — Run the same fixture with two different system-prompt variants simultaneously. Directly compare which version produces better output for the same task.
 
-### Git Branching Strategy
+### Git Strategy: Fixture Branches
 
-Each fixture run uses a **before/after branch model**. The "before" branch is the starting state the Implementer works from. The "after" (golden) lives in a branch the Implementer can never access. The Implementer's work happens on a fresh branch checked out from the "before."
+Everything lives in the repo. No external answer key, no separate golden repo to maintain. Each fixture is a pair of branches — **before** and **after** — that are self-contained. The harness plugs into any repo: define fixture branches and go.
 
-```
-  fixture: add-endpoint-simple
-  │
-  ├── fixture/add-endpoint-simple/before    ← Starting state (clean codebase)
-  │     │
-  │     └── agent/add-endpoint-simple/run-003  ← Implementer works here
-  │           (checked out FROM before, never touches golden)
-  │
-  └── fixture/add-endpoint-simple/golden    ← Golden implementation
-        (NEVER accessible to Implementer — different credentials)
-```
-
-#### Branch Naming Convention
+#### The Two Branches
 
 ```
-fixture/{fixture-name}/before       # Starting state for this fixture
-fixture/{fixture-name}/golden       # Golden implementation (Oracle-only)
-agent/{fixture-name}/run-{NNN}      # Implementer's work branch (per run)
-agent/{fixture-name}/run-{NNN}-eval # Oracle's evaluation workspace
+fixture/add-endpoint-simple/before          fixture/add-endpoint-simple/after
+├── apps/                                   ├── apps/
+│   └── api/src/routes/                     │   └── api/src/routes/
+│       └── organizations/  (exists)        │       ├── organizations/  (exists)
+│                                           │       └── projects/       ← THE GOLDEN
+│                                           │           ├── index.ts
+│                                           │           └── __tests__/
+├── packages/                               ├── packages/
+│   └── db/prisma/schema.prisma             │   └── db/prisma/schema.prisma (+ Project model)
+│                                           │
+├── .harness/                               ├── .harness/
+│   ├── prompt.md                           │   ├── assertions.ts      ← EVAL CHECKLIST
+│   ├── subject-context.md                  │   ├── eval.config.ts     ← SCORING WEIGHTS
+│   └── config.json                         │   ├── expected-questions.md
+│                                           │   ├── config.json
+│                                           │   └── dialogue-template.md
+│                                           │
+├── CLAUDE.md  (overwritten by orchestrator)├── CLAUDE.md
+└── docs/claude/*.md                        └── docs/claude/*.md
 ```
 
-#### The Before Branch
+**Before branch** — What the Implementer sees:
+- The codebase at the starting point (everything except the feature to be built)
+- `.harness/prompt.md` — the task description
+- `.harness/subject-context.md` — domain knowledge for the Subject agent
+- `.harness/config.json` — fixture metadata (tier, model, timeout)
+- System docs (CLAUDE.md + docs/claude/*.md) are **injected by the orchestrator** from the variant being tested — they overwrite what's on the branch
 
-The "before" branch is a **snapshot of the codebase at the point where the fixture's task would begin.** It's the state a real developer would start from:
+**After branch** — What the Oracle sees:
+- The codebase WITH the golden implementation (the diff before→after IS the golden)
+- `.harness/assertions.ts` — every specific check to run (the checklist)
+- `.harness/eval.config.ts` — scoring weights and pattern signatures
+- `.harness/expected-questions.md` — questions the Implementer should have asked
+- `.harness/config.json` — same fixture metadata
 
-- Has the existing schema, routes, tests — everything except the feature being implemented
-- May include scaffolding or setup that the prompt references ("We already have an Organization model")
-- Is pinned to a specific commit, not a moving target
-- Gets updated when the codebase changes significantly enough to warrant re-baselining
+The golden implementation is implicit — it's `git diff before..after`. No separate golden directory. You write the feature on the after branch, the diff is the answer key.
+
+#### Why Branches
+
+1. **The golden IS a codebase state.** The after branch is real, runnable code. Check it out, build it, run its tests. A directory of golden files can't do that.
+2. **Isolation is physical.** The Implementer's worktree is checked out from before. The after branch content simply isn't in its filesystem.
+3. **Maintenance = normal development.** Updating a golden means checking out the after branch and committing like a normal dev.
+4. **The diff is the spec.** `git diff fixture/.../before..fixture/.../after` is the complete, unambiguous golden.
+5. **Rebasing is natural.** When the codebase changes, rebase both branches onto main. Conflicts = the age diagnostic telling you the fixture needs attention.
+
+#### .harness/ Directory
+
+Lives on fixture branches only. `.gitignore` on main keeps it out of normal development:
+
+```gitignore
+# In .gitignore on main branch
+.harness/
+```
+
+On fixture branches, `.harness/` is committed. Clone the repo, checkout the branch, everything's there.
 
 ```ts
-interface FixtureBranches {
-  before: string;            // "fixture/add-endpoint-simple/before"
-  golden: string;            // "fixture/add-endpoint-simple/golden"
-  beforeCommit: string;      // Pinned commit SHA on the before branch
-  goldenCommit: string;      // Pinned commit SHA on the golden branch
-  lastRebaseDate: string;    // When before/golden were last synced with main
+interface FixtureConfig {
+  name: string;                    // "add-endpoint-simple"
+  tier: "simple" | "medium" | "complex";
+  beforeBranch: string;            // "fixture/add-endpoint-simple/before"
+  afterBranch: string;             // "fixture/add-endpoint-simple/after"
+  model: "opus" | "sonnet" | "haiku";
+  timeout: number;                 // Max Implementer duration (ms)
+  lastRebaseDate: string;          // When branches were last synced with main
 }
+```
+
+#### Branch Naming
+
+```
+fixture/{fixture-name}/before     # Starting state
+fixture/{fixture-name}/after      # Golden + eval criteria
+```
+
+Flat. No nesting. Tier is encoded in the fixture name:
+```
+fixture/add-endpoint-simple/before    fixture/add-endpoint-simple/after
+fixture/add-endpoint-medium/before    fixture/add-endpoint-medium/after
+fixture/schema-hooks-complex/before   fixture/schema-hooks-complex/after
 ```
 
 #### The Run Lifecycle
 
 ```
-1. CHECKOUT — Create agent branch from the before branch
-   git worktree add /tmp/harness-run-{id} fixture/{name}/before
-   cd /tmp/harness-run-{id}
-   git checkout -b agent/{name}/run-{NNN}
+1. WORKTREE — Create from the before branch
+   git worktree add /tmp/harness-{id} fixture/{name}/before
 
-2. CONFIGURE — Copy system-variant docs into the work tree
-   (Implementer sees CLAUDE.md + docs/claude/*.md from the variant being tested)
+2. INJECT DOCS — Overwrite CLAUDE.md + docs/claude/ with the system
+   variant being tested (orchestrator controls which version the agent sees)
 
-3. IMPLEMENT — Spawn Implementer with scoped token (see Agent Isolation below)
-   Implementer works on agent/{name}/run-{NNN}
-   All commits go to this branch
-   Implementer can ask Subject questions via orchestrator
+3. READ FIXTURE — Parse .harness/prompt.md and .harness/subject-context.md
 
-4. CAPTURE — Diff the agent branch against the before branch
-   git diff fixture/{name}/before..agent/{name}/run-{NNN}
-   This is the Implementer's total output
+4. SPAWN IMPLEMENTER — In the worktree
+   Sees: codebase + injected system docs + task prompt
+   .harness/ is stripped or the agent is told to ignore it
+   Works on a detached HEAD or throwaway branch within the worktree
 
-5. EVALUATE — Spawn Oracle in a SEPARATE worktree
-   git worktree add /tmp/harness-eval-{id} fixture/{name}/golden
-   Oracle diffs agent output against golden
-   Oracle runs golden tests against agent code
-   Oracle has different credentials — CAN read golden, CANNOT write
+5. ROUTE Q&A — Implementer ↔ Subject through orchestrator
+   All questions and answers logged (becomes the dialogue file)
 
-6. CLEANUP — Remove worktrees
-   git worktree remove /tmp/harness-run-{id}
-   git worktree remove /tmp/harness-eval-{id}
-   Agent branches are kept for history (pruned by age)
+6. CAPTURE OUTPUT — When Implementer finishes
+   git diff of everything changed — the agent's total output
+
+7. EVALUATE — Orchestrator checks out the after branch SEPARATELY
+   Reads .harness/assertions.ts + eval.config.ts from after branch
+   Runs assertions against Implementer's output
+   Diffs Implementer output against before→after golden diff
+   Runs after branch's tests against Implementer's code
+
+8. RECORD — Results + dialogue stored in ledger
+
+9. CLEANUP — Remove worktree
 ```
 
-### Agent Isolation via Git Credentials
+#### Implementer Isolation
 
-Instructions aren't enough. "Don't read the golden branch" in a system prompt is a suggestion, not a guarantee. The Implementer agent gets **credentials that physically cannot access the golden branches.** This is the hard boundary.
+The Implementer works in a worktree of the before branch. The after branch is never in that worktree. Three levels of protection:
 
-#### Token Scoping
+**Level 1: Instruction-based (minimum viable)**
+System prompt says don't access fixture branches. Good enough for non-adversarial models — the agent isn't trying to cheat, it just needs to not accidentally read the answers.
 
-Three credential sets, each with different repository access:
+**Level 2: Worktree refspec restriction (recommended for local)**
+```bash
+cd /tmp/harness-{id}
+git config remote.origin.fetch "+refs/heads/main:refs/remotes/origin/main"
+# Only main is fetchable — fixture branches aren't in the refspec
+# Even if the agent runs git fetch, after branches won't download
+```
+
+**Level 3: Container with shallow clone (strongest, for cloud)**
+```bash
+git clone --depth 1 --single-branch \
+  --branch fixture/{name}/before \
+  <repo-url> /workspace
+# The container only has the before branch. Nothing else exists.
+```
+
+Start with Level 2 locally. Move to Level 3 when deploying to cloud infrastructure.
+
+### Dialogue Capture
+
+Every fixture run produces a `dialogue.md` — a structured record of the Implementer↔Subject conversation. This gets stored with the run results. The Oracle uses it for Q&A scoring, and humans review it to verify the Subject didn't leak implementation details or hallucinate domain knowledge.
+
+#### The Dialogue File
+
+```markdown
+# Dialogue: add-endpoint-simple / run-003
+
+## Fixture
+- Tier: simple
+- Model: opus
+- Timestamp: 2026-02-11T14:30:00Z
+- System Variant: tree-opus-v4
+
+## Conversation
+
+### Q1 (Implementer → Subject)
+> Should deleting a project be a soft delete or hard delete?
+
+**Answer (Subject):**
+> Soft delete. Projects should be archived, not removed. We need them
+> for audit trails.
+
+**Oracle Review:**
+- Was expected: YES (matches expected-questions.md #2)
+- Impacted output: YES (agent implemented soft delete based on this)
+- Subject stayed in character: YES (business-level answer, no code)
+
+### Q2 (Implementer → Subject)
+> Should I use createRouteConfig or raw Hono routes?
+
+**Answer (Subject):**
+> I'm not sure what those are — that's an implementation detail.
+> Use whatever the team's standard approach is.
+
+**Oracle Review:**
+- Was expected: NO (implementation question, not domain question)
+- Subject stayed in character: YES (correctly deflected)
+- **FLAG: Agent asked Subject about patterns instead of reading docs.
+  Docs don't clearly convey route factory as required pattern.**
+
+## Summary
+- Questions asked: 2
+- Expected questions matched: 1/4
+- Wasteful questions: 1 (Q2 — should have been answered by docs)
+- Subject character breaks: 0
+```
+
+This dialogue file is the **evidence trail**. A reviewer can see exactly what information the agent received, whether the Subject stayed honest, and whether the conversation influenced the output. If the Oracle's score seems wrong, the dialogue is the first place to check.
+
+### Subject Context Authoring
+
+The `subject-context.md` for each fixture is built through an **interactive session** — a human answers agent-generated questions to populate the domain knowledge. This happens once per fixture during setup, not during evaluation runs.
+
+#### The Authoring Workflow
+
+```
+1. IDENTIFY — Pick a feature you recently implemented
+   You know the domain, the decisions, the edge cases
+
+2. INTERVIEW — An agent asks you clarifying questions
+   "What happens when a project is deleted?"
+   "Can names contain special characters?"
+   "Who can create projects — any member or just admins?"
+
+   You answer naturally, as you would to a developer on your team
+
+3. CAPTURE — Every Q&A pair is recorded
+   These become the raw material for subject-context.md
+
+4. STRUCTURE — Organize Q&A into sections
+   - Core requirements (what the feature does)
+   - Business rules (constraints and invariants)
+   - Edge cases (what happens in unusual situations)
+   - Out of scope (what this feature intentionally doesn't do)
+
+5. REVIEW — Remove any implementation details that leaked in
+   Subject knows WHAT, never HOW
+
+6. COMMIT — Add to .harness/subject-context.md on the before branch
+```
+
+This is also where the expected-questions.md comes from — the questions the agent asked during authoring are candidates for questions the Implementer should ask during evaluation.
+
+### Fixture Bootstrapping from Real PRs
+
+The fastest way to create fixtures: extract them from merged PRs. A PR is already a before/after pair.
+
+#### The Extraction Script
+
+```bash
+# Point the harness at a merged PR and generate fixture branches
+bun run harness create-fixture \
+  --from-pr 142 \
+  --name add-endpoint-simple \
+  --tier simple
+```
+
+What this does:
+
+```
+1. FIND COMMITS — Locate the merge commit and its parent
+   Before = parent of merge commit (state before the PR)
+   After = merge commit (state after the PR)
+
+2. CREATE BRANCHES
+   git branch fixture/add-endpoint-simple/before <parent-sha>
+   git branch fixture/add-endpoint-simple/after <merge-sha>
+
+3. GENERATE SCAFFOLDING on the before branch
+   .harness/config.json — pre-filled with name, tier, default timeout
+   .harness/prompt.md — DRAFT from PR title + description (needs human review)
+   .harness/subject-context.md — EMPTY (human fills via authoring interview)
+
+4. GENERATE EVAL CRITERIA on the after branch
+   .harness/assertions.ts — DRAFT: each changed file becomes a structural
+     assertion, each new import becomes a dependency assertion
+   .harness/eval.config.ts — default weights for the tier
+   .harness/expected-questions.md — EMPTY (human fills after authoring)
+
+5. REPORT — Show what was generated and what needs human input
+   "Created fixture branches. The following need manual completion:
+    - subject-context.md (run: bun run harness author-context add-endpoint-simple)
+    - Review generated assertions.ts (27 auto-generated, likely needs tuning)
+    - expected-questions.md (fill after subject context authoring)"
+```
+
+The script does the mechanical work. The human provides the domain knowledge (subject context) and reviews the generated assertions. The agent-assisted authoring interview fills in subject-context.md interactively.
+
+#### Spec Maintenance When Rules Change
+
+When the core rules file (CLAUDE.md, docs/claude/*.md) changes, existing fixture specs may go stale. The assertions on after branches encode specific patterns — if those patterns change in the main docs, the assertions need updating too.
+
+The age diagnostic catches this:
+```
+AGE DIAGNOSTIC detects:
+  "schema-change-simple" score drifted -0.18
+  Root cause: docs now say getAppContext(c), fixtures still assert getAppEnv(c)
+```
+
+But you can also proactively check:
+
+```bash
+# After changing docs, check which fixtures reference affected patterns
+bun run harness check-drift
+
+# Output:
+# PATTERN CHANGED: getAppEnv → getAppContext (in docs/claude/CONTEXT.md)
+# AFFECTED FIXTURES:
+#   fixture/add-endpoint-simple/after — assertions.ts line 42
+#   fixture/add-endpoint-medium/after — assertions.ts lines 38, 67
+#   fixture/schema-hooks-complex/after — assertions.ts line 55
+#
+# Run: bun run harness update-assertions --pattern "getAppEnv→getAppContext"
+# to auto-update assertion patterns across all affected fixture branches.
+```
+
+This keeps the eval criteria in sync with the living codebase. The rule of thumb: **when you change a doc, run `check-drift`**. When you change a fundamental pattern, run `update-assertions` to propagate.
+
+### Infrastructure & Deployment
+
+The harness supports three deployment tiers: local, single-server, and distributed cloud.
+
+#### Deployment Tiers
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    CREDENTIAL ISOLATION                               │
+│  TIER 1: LOCAL                                                       │
+│  Your laptop. Git worktrees, no containers.                         │
 │                                                                      │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  IMPLEMENTER     │  │  ORACLE          │  │  ORCHESTRATOR    │  │
-│  │  TOKEN           │  │  TOKEN           │  │  TOKEN           │  │
-│  ├──────────────────┤  ├──────────────────┤  ├──────────────────┤  │
-│  │ CAN:             │  │ CAN:             │  │ CAN:             │  │
-│  │ • Read before    │  │ • Read golden    │  │ • Read all       │  │
-│  │   branches       │  │   branches       │  │   branches       │  │
-│  │ • Read/write     │  │ • Read agent     │  │ • Create agent   │  │
-│  │   agent branches │  │   branches       │  │   branches       │  │
-│  │ • Read main      │  │ • Read before    │  │ • Create/remove  │  │
-│  │                  │  │   branches       │  │   worktrees      │  │
-│  │ CANNOT:          │  │                  │  │ • Manage tokens  │  │
-│  │ • Read golden    │  │ CANNOT:          │  │                  │  │
-│  │   branches       │  │ • Write to any   │  │                  │  │
-│  │ • Read fixture   │  │   branch         │  │                  │  │
-│  │   eval configs   │  │ • Read system    │  │                  │  │
-│  │ • Read other     │  │   variant source │  │                  │  │
-│  │   agent runs     │  │                  │  │                  │  │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
+│  Orchestrator: local process                                        │
+│  Implementers: git worktrees with refspec restriction (Level 2)     │
+│  Parallelism: 2-3 concurrent (limited by memory + API rate)         │
+│  Cost: API calls only                                               │
+│  Use for: fixture authoring, basic diagnostic, single-fixture runs  │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  TIER 2: SINGLE SERVER (Digital Ocean Droplet / EC2)                │
+│  One server running containerized fixtures.                         │
+│                                                                      │
+│  Orchestrator: persistent container (always running)                │
+│  Implementers: containers with shallow clones (Level 3 isolation)   │
+│  Oracle: runs in orchestrator context (has after branch access)     │
+│  Parallelism: 4-8 concurrent (server resources)                     │
+│  Cost: $20-80/mo server + API calls                                 │
+│  Use for: parallel epochs, full refinement loops, age diagnostics   │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  TIER 3: DISTRIBUTED (Multiple Droplets)                            │
+│  N servers, each running fixtures independently.                    │
+│                                                                      │
+│  Orchestrator: dedicated droplet                                    │
+│  Implementers: one container per droplet per fixture                │
+│  Results: flow back via HIVEMIND events                             │
+│  Parallelism: N (one fixture per droplet, scale horizontally)       │
+│  Cost: N × $10-20/mo + API calls                                    │
+│  Use for: multi-codebase eval, multi-model sweeps, full parallelism │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Implementation Options
+#### Container Architecture
 
-**Option A: GitHub Fine-Grained PATs + Branch Protection Rules**
-
-GitHub fine-grained personal access tokens can be scoped per-repository but not per-branch. Use branch protection rules to enforce:
-
-```yaml
-# Branch protection: fixture/*/golden
-- Restrict pushes: orchestrator-bot only
-- Require PR review: never bypass
-- No force push
-
-# The Implementer token is a standard PAT that can read/write the repo
-# but golden branches are protected from writes
-# Problem: Implementer CAN still READ golden branches
-```
-
-This doesn't fully solve read isolation. For that:
-
-**Option B: Separate Repositories (Strongest Isolation)**
-
-```
-repo: template                  ← Implementer works here
-  branches: main, fixture/*/before, agent/*
-
-repo: template-golden           ← Oracle reads from here
-  branches: fixture/*/golden, fixture/*/eval-config
-  permissions: Oracle token has read access, Implementer token does NOT
-```
-
-The golden implementations live in a completely separate repo. The Implementer's token has zero access to it. The Oracle's token can read both repos.
-
-```ts
-interface RepoConfig {
-  // Implementer sees this repo
-  workRepo: {
-    url: string;              // "github.com/org/template"
-    token: string;            // Scoped: read main + before, write agent/*
-  };
-  // Oracle sees this repo (in addition to workRepo for reading agent output)
-  goldenRepo: {
-    url: string;              // "github.com/org/template-golden"
-    token: string;            // Scoped: read-only
-  };
-}
-```
-
-**Option C: Git Credential Helpers + Worktree Isolation (Local)**
-
-For local runs, configure each worktree with a different git credential helper:
+Each Implementer runs in its own container with a shallow clone of the before branch. The container has everything the agent needs and nothing it shouldn't see.
 
 ```bash
-# Implementer worktree — credential helper returns implementer token
-git worktree add /tmp/harness-impl-{id} fixture/{name}/before
-cd /tmp/harness-impl-{id}
-git config credential.helper "!echo protocol=https; echo host=github.com; echo username=implementer-bot; echo password=${IMPL_TOKEN}"
+#!/bin/bash
+# entrypoint.sh — parameterized per fixture run
 
-# Remove golden remote entirely from Implementer's worktree
-git remote set-branches origin --add 'fixture/*/before'
-git remote set-branches origin --add 'agent/*'
-# Golden branches are never fetched into this worktree
+# Shallow clone of ONLY the before branch (strongest isolation)
+git clone --depth 1 --single-branch \
+  --branch "${FIXTURE_BEFORE_BRANCH}" \
+  "${REPO_URL}" /workspace
 
-# Oracle worktree — different credential helper, read-only
-git worktree add /tmp/harness-eval-{id} fixture/{name}/golden
-cd /tmp/harness-eval-{id}
-git config credential.helper "!echo protocol=https; echo host=github.com; echo username=oracle-bot; echo password=${ORACLE_TOKEN}"
+cd /workspace
+
+# Inject the system variant docs (overwrite whatever's on the branch)
+cp -r /mnt/system-variant/CLAUDE.md .
+cp -r /mnt/system-variant/docs/claude/ docs/claude/
+
+# Install dependencies
+bun install
+
+# Start Claude session with the fixture prompt
+# Orchestrator communicates via HIVEMIND events
+claude --system-prompt "$(cat .harness/prompt.md)" \
+       --mcp-server hivemind \
+       --dangerously-skip-permissions
 ```
 
-The Implementer's worktree literally doesn't have the golden branches in its refspec. Even if the agent tries `git fetch origin fixture/*/golden`, the credentials won't allow it.
+The after branch is **never cloned into Implementer containers.** Oracle evaluation happens orchestrator-side.
 
-#### Recommended Approach
+#### Docker Compose for Single Server
 
-Start with **Option C** (local worktree isolation) for development — it's fast and doesn't require repo infrastructure changes. Move to **Option B** (separate repos) for production/CI where the isolation guarantee needs to be absolute.
+```yaml
+services:
+  orchestrator:
+    build: ./packages/prompt-harness
+    volumes:
+      - harness-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock  # Spawns containers
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HIVEMIND_DB_PATH=/data/hivemind.db
+      - REPO_URL=${REPO_URL}
 
-Option A is the weakest but simplest — good enough if you trust the system prompt to prevent the Implementer from *trying* to read golden (the protection is against accidental reads, not adversarial ones).
+  # Implementer containers spawned dynamically by orchestrator via Docker API
+volumes:
+  harness-data:
+```
 
-### Session & Orchestration
-
-The harness needs to keep multiple agent sessions alive, route messages between them, handle failures, and maintain state across potentially long-running fixture evaluations.
-
-#### The Orchestrator Process
-
-The orchestrator is the only process with full access. It spawns and manages all other agents:
+The orchestrator uses a work queue to manage concurrent containers:
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                      ORCHESTRATOR                                 │
-│                                                                   │
-│  Responsibilities:                                                │
-│  • Create/destroy git worktrees                                  │
-│  • Spawn agent sessions with scoped credentials                  │
-│  • Route Q&A messages between Implementer ↔ Subject              │
-│  • Collect Implementer output when done                          │
-│  • Hand output to Oracle for evaluation                          │
-│  • Record results to ledger                                      │
-│  • Apply Oracle prescriptions to doc variants                    │
-│  • Trigger next iteration of the loop                            │
-│                                                                   │
-│  State:                                                           │
-│  • Active worktrees (path, fixture, status)                      │
-│  • Active agent sessions (PID, role, fixture)                    │
-│  • Current doc variant being tested                              │
-│  • Cost accumulator                                               │
-│  • Loop iteration counter                                        │
-└──────────────────────────────────────────────────────────────────┘
+1. Enqueue all fixtures for this epoch
+2. Pop fixture from queue
+3. If under maxConcurrent: spawn Implementer container
+4. When Implementer finishes: run Oracle evaluation (parallel with next Implementer)
+5. When Oracle finishes: record results, destroy container
+6. Repeat until queue empty
+7. All results collected → Oracle meta-analysis (signal extraction)
 ```
+
+Pipeline parallelism: Implementer N+1 starts while Oracle N evaluates.
+
+#### Scaling to Multiple Codebases
+
+The harness is repo-agnostic. Point it at any repo with fixture branches:
+
+```bash
+# Run diagnostics across multiple repos
+bun run harness diagnostic:basic --repo template
+bun run harness diagnostic:basic --repo zealot-monorepo
+bun run harness diagnostic:basic --repo organized-play
+```
+
+Each repo has its own fixture branches, its own system docs, its own eval criteria. The orchestrator treats them as independent targets. Cross-codebase analysis: "this doc pattern works in repo A but not B — what's different about B's patterns?"
+
+### Session Management
 
 #### Watchdog / Session Health
 
-Long-running agent sessions can stall, hit token limits, or crash. The orchestrator includes a watchdog that monitors agent health:
+Long-running agent sessions can stall, hit token limits, or crash:
 
 ```ts
-interface AgentSession {
-  pid: number;                  // OS process ID
-  role: "subject" | "implementer" | "oracle";
-  fixture: string;
-  startedAt: string;
-  lastActivity: string;         // Last tool call or output
-  status: "running" | "stalled" | "completed" | "failed" | "timeout";
-  maxDuration: number;          // Per-role timeout (ms)
-  costSoFar: number;
-}
-
 interface WatchdogConfig {
-  stallThreshold: number;       // No activity for N seconds → stalled
+  stallThreshold: number;         // No activity for N seconds → stalled
   maxDuration: {
-    implementer: number;        // 15 min for simple, 30 min for complex
-    oracle: number;             // 10 min (evaluation is faster)
-    subject: number;            // 5 min per question (shouldn't take long)
+    implementer: number;          // 15 min simple, 30 min complex
+    oracle: number;               // 10 min
+    subject: number;              // 5 min per question
   };
   onStall: "warn" | "restart" | "kill";
   onTimeout: "capture_partial" | "kill";
-  healthCheckInterval: number;  // Check every N seconds
+  healthCheckInterval: number;
 }
 ```
 
-#### What Happens on Failure
-
-```
-Agent stalls (no output for stallThreshold):
-  1. Log warning to orchestrator
-  2. If implementer: capture partial output, mark run as "incomplete"
-  3. Oracle still evaluates partial output (valuable signal — where did it get stuck?)
-  4. Don't restart automatically — partial results are more useful than a retry
-     that might hit the same wall
-
-Agent crashes (process exits non-zero):
-  1. Log error + stack trace
-  2. Capture any output written to worktree before crash
-  3. Mark run as "failed" with crash details
-  4. Oracle evaluates whatever was produced (even nothing — that's a data point)
-
-Agent hits token/cost limit:
-  1. Capture output at the point of exhaustion
-  2. Mark run as "truncated"
-  3. Oracle evaluates partial output
-  4. Flag in ledger: "budget_exceeded" — may need to simplify the fixture
-     or increase per-run budget
-
-Worktree conflict (shouldn't happen but might):
-  1. Each run gets a unique worktree path: /tmp/harness-{fixture}-{run-id}-{timestamp}
-  2. If path exists, fail fast — don't silently reuse
-  3. Stale worktrees are cleaned up by the orchestrator at startup
-```
-
-#### Parallel Session Management
-
-When running all fixtures in parallel, the orchestrator manages N concurrent sessions:
-
-```ts
-interface ParallelRunConfig {
-  maxConcurrent: number;         // Limit parallel agent sessions (memory/API rate limits)
-  staggerDelay: number;          // Delay between session starts (avoid API burst)
-  worktreeRoot: string;          // Parent dir for all worktrees
-  cleanupOnComplete: boolean;    // Remove worktrees after evaluation
-  preserveOnFailure: boolean;    // Keep failed worktrees for debugging
-}
-
-// Default: 4 concurrent (2 Implementer + 2 Oracle at any time)
-// Implementer sessions are the bottleneck — they take longest and cost most
-// Oracle sessions are fast — evaluation is cheaper than implementation
-// Subject sessions are ephemeral — they only exist during Q&A exchanges
-```
-
-The orchestrator uses a work queue:
-
-```
-1. Enqueue all fixtures
-2. Pop fixture from queue
-3. If under maxConcurrent: start worktree + spawn Implementer
-4. When Implementer finishes: spawn Oracle (in parallel with next Implementer)
-5. When Oracle finishes: record results, clean up worktree
-6. Repeat until queue empty
-7. All results collected → Oracle meta-analysis (cross-fixture, signal extraction)
-```
-
-This means Implementer N+1 can start while Oracle N is still evaluating — pipeline parallelism. The bottleneck is Implementer sessions (expensive, slow). Oracle sessions are cheap and fast.
+**On failure:** always capture partial output. Oracle evaluates whatever was produced — even nothing is a data point. Partial results are more useful than a retry that might hit the same wall.
 
 #### HIVEMIND Event Flow
 
-With HIVEMIND coordinating, the orchestrator doesn't need custom IPC. Everything flows through events:
+All agent coordination flows through HIVEMIND events:
 
 ```
 Orchestrator:
   hivemind_emit type=fixture_start fixture=add-endpoint-simple run=003
 
-Implementer (registered as agent, has scoped token):
+Implementer (in container, connected to HIVEMIND via MCP):
   hivemind_emit type=question target=subject content="Soft or hard delete?"
   hivemind_query type=answer source=subject  # Blocks until Subject responds
 
-Subject (registered as agent):
+Subject (in orchestrator context):
   hivemind_query type=question target=subject  # Polls for questions
   hivemind_emit type=answer target=implementer content="Soft delete."
 
 Implementer:
   hivemind_emit type=implementation_complete run=003
 
-Orchestrator:
-  hivemind_emit type=evaluation_start fixture=add-endpoint-simple run=003
-
-Oracle (registered as agent, has golden-access token):
-  hivemind_query type=implementation_complete run=003  # Gets agent output
-  hivemind_query type=question run=003                 # Gets full Q&A log
+Oracle (in orchestrator context — has after branch access):
   hivemind_emit type=evaluation_complete run=003 scores={...}
   hivemind_emit type=diagnosis run=003 diagnosis={...}
   hivemind_emit type=prescription run=003 prescription={...}
-
-Orchestrator:
-  hivemind_query type=prescription run=003  # Gets Oracle's recommendation
-  # Applies patch, triggers next run
 ```
 
 The event log IS the run ledger. Every event has a timestamp, agent ID, and fixture context. The ledger is reconstructed from events rather than being a separate data store.
