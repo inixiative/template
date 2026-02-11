@@ -362,11 +362,24 @@ prompt-harness/
       ledger.json
       runs/
         ...
-  cross-fixture/               # Cross-fixture analysis
+  epochs/                       # Parallel epoch history
     epoch-001/
-      scores.json              # All fixture scores for this docs version
-      analysis.md              # Cross-fixture patterns
-      prescription.json        # Unified doc patch
+      score-matrix.json        # Full tier × fixture grid
+      analysis.json            # Oracle's decomposition + signal extraction
+      report.md                # Human-readable summary
+      signals/                 # Decomposed patch signals
+        signal-001.json        # "Clarified route factory usage" → +0.10 simple, +0.05 medium
+        signal-002.json        # "Removed complexity guidance" → -0.20 complex
+      fixtures/                # Per-fixture results from this epoch
+        endpoint-simple/
+          output/
+          eval.json
+          qa-log.json
+        endpoint-complex/
+          ...
+    epoch-002/
+      ...
+  master-ledger.json           # Full epoch history + current best variant
 ```
 
 ### Runner Modes
@@ -489,6 +502,50 @@ interface Prescription {
   patch: string;                // The actual diff to apply
   confidence: number;           // 0-1: how confident the Oracle is
   expectedImpact: string;       // What the Oracle thinks will change
+}
+```
+
+### The Master Ledger (Parallel Epochs)
+
+When running all fixtures in parallel, results are tracked per-epoch rather than per-fixture-run.
+
+```ts
+interface MasterLedger {
+  epochs: ParallelEpochResult[];
+  previousEpoch: ParallelEpochResult | null;
+  lastPatch: Prescription | null;
+}
+
+interface ParallelEpochResult {
+  epoch: number;
+  timestamp: string;
+  variant: string;                        // Docs version ID
+  patch: Prescription | null;             // Patch applied before this epoch
+  fixtureResults: FixtureResult[];        // ALL fixtures from this epoch
+  analysis: {
+    uniformlyPositive: string[];          // Fixtures that improved
+    neutral: string[];                    // No significant change
+    regressions: string[];                // Fixtures that got worse
+    signals: PatchSignal[];               // Decomposed patch signals
+  };
+  nextAction: "accept_full" | "extract_positive" | "reject_full" | "escalate";
+  scoreMatrix: ScoreMatrix;               // Full tier × fixture grid
+}
+
+// The score matrix gives the Oracle a bird's-eye view
+interface ScoreMatrix {
+  byFixture: Record<string, {
+    tier: "simple" | "medium" | "complex";
+    composite: number;
+    delta: number;                        // Change from previous epoch
+    scores: EvalResult["scores"];
+  }>;
+  byTier: {
+    simple:  { avgComposite: number; avgDelta: number };
+    medium:  { avgComposite: number; avgDelta: number };
+    complex: { avgComposite: number; avgDelta: number };
+  };
+  overall: { avgComposite: number; avgDelta: number };
 }
 ```
 
@@ -744,45 +801,227 @@ async function refinementLoop(
 }
 ```
 
-### Cross-Fixture Refinement
+### Parallel Execution + Positive Extraction
 
-A single fixture loop optimizes docs for one task. But doc changes that help one fixture might hurt another. The top-level orchestrator runs all fixtures and detects cross-fixture regressions.
+The key to preventing regressions: **every doc change is tested against ALL fixtures simultaneously.** No change gets applied until we know its impact across every tier.
+
+```
+  Doc Patch Proposed
+       │
+       ▼
+  ┌────────────────────────────────────────────────────┐
+  │  PARALLEL RUN (all fixtures, same doc change)       │
+  │                                                     │
+  │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
+  │  │ endpoint    │  │ endpoint    │  │ endpoint   │ │
+  │  │ simple      │  │ medium      │  │ complex    │ │
+  │  │ score: 0.95 │  │ score: 0.80 │  │ score: 0.40│ │
+  │  │ ▲ +0.10     │  │ ▲ +0.05     │  │ ▼ -0.20   │ │
+  │  └─────────────┘  └─────────────┘  └────────────┘ │
+  │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
+  │  │ schema      │  │ background  │  │ permissions│ │
+  │  │ simple      │  │ job medium  │  │ medium     │ │
+  │  │ score: 0.90 │  │ score: 0.85 │  │ score: 0.75│ │
+  │  │ ▲ +0.05     │  │ ── 0.00     │  │ ▲ +0.10   │ │
+  │  └─────────────┘  └─────────────┘  └────────────┘ │
+  └────────────────────────────────────────────────────┘
+       │
+       ▼
+  Oracle sees ALL results at once
+       │
+       ▼
+  ┌────────────────────────────────────────────────────┐
+  │  ANALYSIS                                           │
+  │                                                     │
+  │  Uniformly positive: endpoint-simple, schema-simple │
+  │  Neutral: background-job-medium                     │
+  │  Regression: endpoint-complex (-0.20)               │
+  │                                                     │
+  │  Root cause: doc change clarified route patterns    │
+  │  (helped simple/medium) but removed nuance about    │
+  │  when to use skeleton approach (hurt complex)       │
+  │                                                     │
+  │  EXTRACTION: Keep the route pattern clarification.  │
+  │  Add back the complexity guidance as a separate     │
+  │  section so both signals coexist.                   │
+  └────────────────────────────────────────────────────┘
+       │
+       ▼
+  Refined patch (positive parts only) → next parallel run
+```
+
+#### The Extraction Problem
+
+A doc patch is rarely uniformly good or bad. It usually contains multiple signals:
+
+- **Signal A**: Clearer example of route factory usage → helps simple + medium
+- **Signal B**: Removed a paragraph about "when patterns get complex, scaffold first" → hurts complex
+
+The naive approach (accept/reject the whole patch) throws away Signal A when Signal B causes a regression. The Oracle needs to **decompose** the patch and extract what worked.
 
 ```ts
-async function fullRefinementSuite(fixtures: Fixture[], initialVariant: SystemVariant) {
-  let currentVariant = initialVariant;
+interface ParallelEpochResult {
+  epoch: number;
+  variant: string;                    // Which docs version was tested
+  patch: Prescription;                // The patch that was applied
+  fixtureResults: FixtureResult[];    // ALL fixtures run in parallel
+  analysis: {
+    uniformlyPositive: string[];      // Fixtures that improved
+    neutral: string[];                // No significant change
+    regressions: string[];            // Fixtures that got worse
+    // The Oracle's decomposition of the patch
+    signals: PatchSignal[];
+  };
+  nextAction: "accept_full" | "extract_positive" | "reject_full" | "escalate";
+}
 
-  for (let epoch = 0; epoch < MAX_EPOCHS; epoch++) {
-    // Run all fixtures in parallel with current docs
+interface PatchSignal {
+  id: string;
+  description: string;               // What this part of the patch does
+  affectedFixtures: {
+    fixture: string;
+    impact: number;                   // +/- delta
+  }[];
+  netImpact: number;                  // Sum across all fixtures
+  keep: boolean;                      // Oracle's recommendation
+}
+```
+
+#### The Parallel Refinement Loop
+
+```ts
+async function parallelRefinementLoop(
+  fixtures: Fixture[],
+  initialVariant: SystemVariant,
+  options: { maxEpochs: number; costCeiling: number }
+) {
+  const masterLedger: MasterLedger = await loadOrCreateMasterLedger();
+  let currentVariant = initialVariant;
+  let totalCost = 0;
+
+  for (let epoch = 0; epoch < options.maxEpochs; epoch++) {
+
+    // --- 1. RUN ALL FIXTURES IN PARALLEL ---
+    // Every fixture gets the exact same docs version
     const results = await Promise.all(
       fixtures.map(f => runFixture(f, currentVariant))
     );
+    totalCost += results.reduce((sum, r) => sum + r.cost, 0);
 
-    // Oracle analyzes cross-fixture patterns
-    const crossAnalysis = await query({
+    // --- 2. ORACLE ANALYZES THE FULL MATRIX ---
+    // Oracle sees every fixture × every tier in one pass
+    const analysis = await query({
       prompt: `
-        Analyze results across ALL fixtures for this docs version.
+        You are the Oracle. A doc change was applied and ALL fixtures ran in parallel.
 
+        PREVIOUS EPOCH RESULTS (baseline):
+        ${JSON.stringify(masterLedger.previousEpoch?.results)}
+
+        CURRENT EPOCH RESULTS:
         ${JSON.stringify(results)}
 
-        Look for:
-        - Patterns that EVERY fixture missed → systemic doc gap
-        - Questions EVERY implementer asked → undocumented decision point
-        - Fixtures that regressed when others improved → doc conflict
-        - The single highest-leverage doc change that would help the most fixtures
+        DOC PATCH THAT WAS APPLIED:
+        ${JSON.stringify(masterLedger.lastPatch)}
 
-        Propose ONE patch that maximizes improvement across all fixtures.
+        FULL HISTORY:
+        ${JSON.stringify(masterLedger.epochs)}
+
+        Your job:
+        1. CLASSIFY each fixture result: improved / neutral / regressed
+        2. DECOMPOSE the doc patch into independent signals
+           - Which part of the change caused which fixture to improve?
+           - Which part caused which fixture to regress?
+        3. EXTRACT the positive signals:
+           - If uniformly positive → accept the full patch
+           - If mixed → propose a refined patch keeping only the positive signals
+           - If uniformly negative → reject and try a fundamentally different approach
+        4. PRESCRIBE the next patch (either the extracted positive parts,
+           or a new approach if the current direction isn't working)
+
+        CRITICAL: A patch that improves simple fixtures but regresses complex
+        fixtures is NOT acceptable. The goal is monotonic improvement across
+        ALL tiers, or at minimum no regressions at any tier.
       `,
-      options: { model: "sonnet" }
+      options: {
+        allowedTools: ["Read", "Grep", "Glob"],
+        model: "opus"  // Use strongest model — this is the hardest reasoning step
+      }
     });
 
-    // Apply, record, check convergence — same pattern as single-fixture loop
-    currentVariant = await applyPatch(currentVariant, crossAnalysis.prescription);
+    // --- 3. RECORD ---
+    const epochEntry: ParallelEpochResult = {
+      epoch,
+      variant: currentVariant.id,
+      patch: masterLedger.lastPatch,
+      fixtureResults: results,
+      analysis: analysis.parsed,
+      nextAction: analysis.nextAction,
+    };
+    masterLedger.epochs.push(epochEntry);
+    await saveMasterLedger(masterLedger);
 
-    if (crossAnalysis.allConverged) break;
+    // --- 4. STOPPING CONDITIONS ---
+    if (allConverged(results, fixtures)) {
+      console.log(`All fixtures converged at epoch ${epoch}`);
+      break;
+    }
+    if (totalCost >= options.costCeiling) break;
+    if (isMasterPlateau(masterLedger, 3)) break;
+
+    // --- 5. APPLY EXTRACTED POSITIVE CHANGES ---
+    switch (analysis.nextAction) {
+      case "accept_full":
+        // Patch was uniformly good — keep it, propose next improvement
+        masterLedger.lastPatch = analysis.nextPrescription;
+        currentVariant = await applyPatch(currentVariant, analysis.nextPrescription);
+        break;
+
+      case "extract_positive":
+        // Mixed results — revert to pre-patch, apply only the good parts
+        currentVariant = await loadVariant(masterLedger.previousEpoch.variant);
+        const extractedPatch = buildPatchFromSignals(
+          analysis.parsed.signals.filter(s => s.keep)
+        );
+        currentVariant = await applyPatch(currentVariant, extractedPatch);
+        masterLedger.lastPatch = extractedPatch;
+        break;
+
+      case "reject_full":
+        // Nothing worked — revert and try a different direction
+        currentVariant = await loadVariant(getBestEpoch(masterLedger).variant);
+        masterLedger.lastPatch = analysis.alternativePrescription;
+        currentVariant = await applyPatch(currentVariant, analysis.alternativePrescription);
+        break;
+
+      case "escalate":
+        // Oracle doesn't know what to do — flag for human review
+        console.log(`Epoch ${epoch}: Oracle escalated for human review`);
+        await notifyHuman(epochEntry);
+        break;
+    }
+
+    await saveVariant(currentVariant);
   }
+
+  return {
+    masterLedger,
+    bestVariant: await loadVariant(getBestEpoch(masterLedger).variant),
+    finalScores: masterLedger.epochs.at(-1)?.fixtureResults,
+  };
 }
 ```
+
+#### Why Parallel-First Matters
+
+The serial approach (one fixture at a time, hope for the best) has a fundamental problem: you optimize for fixture A, then discover the change broke fixture B, then you fix B and break A again. You oscillate.
+
+The parallel approach makes this impossible:
+
+1. **Every change is tested against everything** — no blind spots
+2. **Regressions are caught before they're committed** — the Oracle sees the full matrix
+3. **Positive signals are extracted, not discarded** — a partially-good patch still contributes
+4. **The Oracle learns which changes are safe** — signals that are consistently positive across tiers become high-confidence improvements
+5. **Complex-tier fixtures act as guardrails** — they prevent the docs from being simplified past the point where agents lose their ability to recognize uncertainty
 
 ### HIVEMIND Integration
 
