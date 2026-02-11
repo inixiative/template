@@ -28,11 +28,14 @@ fixtures/
       apps/api/src/routes/projects/...
       packages/db/prisma/schema.prisma (diff)
       apps/api/src/routes/projects/__tests__/...
-    eval.config.ts     # Evaluation criteria (optional overrides)
+    assertions.ts      # Explicit checklist: every specific rule to verify
+    eval.config.ts     # Evaluation criteria (scoring weights, overrides)
     expected-questions.md  # Questions a good agent SHOULD ask
 ```
 
 The **golden directory** contains the correct output — what a senior dev on your team would produce. This can be a full file tree or a set of diffs.
+
+The **assertions file** is the precision backbone. Instead of relying purely on the Oracle's judgment, every fixture declares exactly what to check — "did it use the factory?", "are types inferred?", "did it set up dependencies correctly?" Each assertion is a concrete, mechanically-checkable rule.
 
 ### 2. Run the Agents
 
@@ -736,6 +739,317 @@ The event log IS the run ledger. Every event has a timestamp, agent ID, and fixt
 
 ## Evaluation Detail
 
+### Fixture Assertions (The Checklist)
+
+Every fixture includes an `assertions.ts` file — an explicit, enumerated list of **every specific thing to check.** This is not fuzzy. Each assertion is a concrete yes/no question about the agent's output. The Oracle uses these as the primary scoring backbone, then layers its own analysis on top.
+
+The assertions file is what makes scores *actionable*. Instead of "pattern score: 0.7" (which tells you nothing), you get "pattern score: 0.7 — FAILED: did not use createRouteConfig, FAILED: used raw db import instead of getAppEnv, PASSED: correct schema validation."
+
+#### Assertion Types
+
+```ts
+// assertions.ts — every rule this fixture checks
+
+interface Assertion {
+  id: string;                    // Unique, stable identifier
+  description: string;           // Human-readable: "Used createRouteConfig factory"
+  category: AssertionCategory;   // Which scoring dimension this feeds into
+  weight: number;                // How much this assertion matters (0-1)
+  check: AssertionCheck;         // How to verify it
+  tier: "required" | "expected" | "bonus";  // How severely to penalize failure
+}
+
+type AssertionCategory =
+  | "structural"     // File/directory existence and placement
+  | "pattern"        // Correct pattern usage
+  | "semantic"       // Behavioral correctness
+  | "stylistic"      // Naming, imports, formatting
+  | "dependency"     // Correct wiring between modules
+  | "type-safety"    // TypeScript types, inference, generics
+  | "testing"        // Test structure and coverage
+  | "restraint";     // Correctly scoped, didn't overreach
+
+type AssertionCheck =
+  | { type: "file_exists"; path: string }
+  | { type: "file_not_exists"; path: string }
+  | { type: "file_contains"; path: string; pattern: RegExp }
+  | { type: "file_not_contains"; path: string; pattern: RegExp }
+  | { type: "file_matches_golden"; path: string; tolerance: "exact" | "structural" | "semantic" }
+  | { type: "test_passes"; testFile: string }
+  | { type: "import_from"; file: string; module: string }
+  | { type: "no_import_from"; file: string; module: string }
+  | { type: "export_exists"; file: string; name: string }
+  | { type: "type_inferred"; file: string; pattern: RegExp }   // No explicit type annotation
+  | { type: "type_explicit"; file: string; pattern: RegExp }   // Has explicit type annotation
+  | { type: "ast_match"; file: string; query: string }         // AST pattern (ts-morph)
+  | { type: "custom"; fn: (output: AgentOutput) => AssertionResult };
+```
+
+#### Example: `add-endpoint-simple/assertions.ts`
+
+```ts
+import { Assertion } from "@template/prompt-harness";
+
+export const assertions: Assertion[] = [
+  // ── STRUCTURAL: correct files in correct places ──────────────────
+
+  {
+    id: "struct-route-file",
+    description: "Created route file at correct path",
+    category: "structural",
+    weight: 1.0,
+    tier: "required",
+    check: { type: "file_exists", path: "apps/api/src/routes/projects/index.ts" },
+  },
+  {
+    id: "struct-test-file",
+    description: "Created test file at correct path",
+    category: "structural",
+    weight: 0.8,
+    tier: "expected",
+    check: { type: "file_exists", path: "apps/api/src/routes/projects/__tests__/projects.test.ts" },
+  },
+  {
+    id: "struct-no-random-files",
+    description: "Did not create files outside expected directories",
+    category: "structural",
+    weight: 0.5,
+    tier: "expected",
+    check: { type: "custom", fn: (output) => {
+      const unexpected = output.createdFiles.filter(f =>
+        !f.startsWith("apps/api/src/routes/projects/") &&
+        !f.startsWith("packages/db/prisma/")
+      );
+      return { passed: unexpected.length === 0, details: unexpected };
+    }},
+  },
+
+  // ── PATTERN: used the right patterns ─────────────────────────────
+
+  {
+    id: "pat-route-factory",
+    description: "Used createRouteConfig factory (not raw Hono routes)",
+    category: "pattern",
+    weight: 1.0,
+    tier: "required",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /createRouteConfig\(\{/ },
+  },
+  {
+    id: "pat-no-raw-routes",
+    description: "Did NOT use raw app.get/app.post patterns",
+    category: "pattern",
+    weight: 0.8,
+    tier: "required",
+    check: { type: "file_not_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /app\.(get|post|put|patch|delete)\(/ },
+  },
+  {
+    id: "pat-context-getter",
+    description: "Used getAppEnv(c) to access context",
+    category: "pattern",
+    weight: 0.9,
+    tier: "required",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /getAppEnv\(c\)/ },
+  },
+  {
+    id: "pat-schema-validation",
+    description: "Defined Zod schemas for request validation",
+    category: "pattern",
+    weight: 0.8,
+    tier: "expected",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /schema:\s*\{/ },
+  },
+  {
+    id: "pat-prisma-import",
+    description: "Imported from @template/db (not raw prisma client)",
+    category: "pattern",
+    weight: 0.7,
+    tier: "expected",
+    check: { type: "import_from", file: "apps/api/src/routes/projects/index.ts", module: "@template/db" },
+  },
+
+  // ── DEPENDENCY: correct wiring ───────────────────────────────────
+
+  {
+    id: "dep-db-via-context",
+    description: "Accesses database through context, not direct import",
+    category: "dependency",
+    weight: 0.9,
+    tier: "required",
+    check: { type: "no_import_from", file: "apps/api/src/routes/projects/index.ts", module: "@prisma/client" },
+  },
+  {
+    id: "dep-inferred-types",
+    description: "Let Prisma types be inferred (no manual type for query results)",
+    category: "type-safety",
+    weight: 0.6,
+    tier: "expected",
+    check: { type: "type_inferred", file: "apps/api/src/routes/projects/index.ts", pattern: /const (projects?|result)\s*=\s*await/ },
+  },
+  {
+    id: "dep-zod-from-generated",
+    description: "Used generated Zod schemas (from db:generate) not hand-written",
+    category: "dependency",
+    weight: 0.7,
+    tier: "bonus",
+    check: { type: "import_from", file: "apps/api/src/routes/projects/index.ts", module: "@template/db/zod" },
+  },
+
+  // ── TYPE-SAFETY: TypeScript usage ────────────────────────────────
+
+  {
+    id: "type-no-any",
+    description: "No `any` types in implementation",
+    category: "type-safety",
+    weight: 0.5,
+    tier: "expected",
+    check: { type: "file_not_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /:\s*any\b/ },
+  },
+  {
+    id: "type-response-types",
+    description: "Response types match schema definitions",
+    category: "type-safety",
+    weight: 0.4,
+    tier: "bonus",
+    check: { type: "custom", fn: (output) => {
+      // Check that response shapes match defined Zod schemas
+      return { passed: true, details: "TODO: implement response type validation" };
+    }},
+  },
+
+  // ── SEMANTIC: behavioral correctness ─────────────────────────────
+
+  {
+    id: "sem-crud-operations",
+    description: "All 5 CRUD operations implemented (list, get, create, update, delete)",
+    category: "semantic",
+    weight: 1.0,
+    tier: "required",
+    check: { type: "custom", fn: (output) => {
+      const content = output.fileContents["apps/api/src/routes/projects/index.ts"];
+      const ops = ["GET /", "GET /:id", "POST /", "PATCH /:id", "DELETE /:id"];
+      // Simplified — real check would parse route definitions
+      return { passed: ops.length === 5, details: ops };
+    }},
+  },
+  {
+    id: "sem-tests-pass",
+    description: "Golden test suite passes against agent's implementation",
+    category: "semantic",
+    weight: 1.0,
+    tier: "required",
+    check: { type: "test_passes", testFile: "apps/api/src/routes/projects/__tests__/projects.test.ts" },
+  },
+
+  // ── STYLISTIC: naming, imports, formatting ───────────────────────
+
+  {
+    id: "style-hash-imports",
+    description: "Uses #/ path alias for internal imports",
+    category: "stylistic",
+    weight: 0.5,
+    tier: "expected",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /from\s+['"]#\// },
+  },
+  {
+    id: "style-naming",
+    description: "Route handlers follow naming convention",
+    category: "stylistic",
+    weight: 0.4,
+    tier: "bonus",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/index.ts", pattern: /(list|get|create|update|delete)Project/ },
+  },
+
+  // ── TESTING: test structure ──────────────────────────────────────
+
+  {
+    id: "test-describe-block",
+    description: "Test uses describe block with fixture name",
+    category: "testing",
+    weight: 0.6,
+    tier: "expected",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/__tests__/projects.test.ts", pattern: /describe\(["'].*[Pp]roject/ },
+  },
+  {
+    id: "test-factory-usage",
+    description: "Tests use factory helpers (not inline data)",
+    category: "testing",
+    weight: 0.5,
+    tier: "bonus",
+    check: { type: "file_contains", path: "apps/api/src/routes/projects/__tests__/projects.test.ts", pattern: /factory|create.*Fixture|seed/ },
+  },
+];
+```
+
+#### Assertion Tiers
+
+Assertions are tagged with severity tiers that affect how failures are scored:
+
+| Tier | Meaning | Failure Impact |
+|------|---------|---------------|
+| **required** | Non-negotiable. The agent MUST do this. | Score floors at 0.3 if any required assertion fails |
+| **expected** | Should do this. Missing it is a notable gap. | Each failure reduces category score proportionally |
+| **bonus** | Nice to have. Shows deep pattern understanding. | Only adds to score, never penalizes |
+
+This means an agent that hits all `required` assertions but misses every `bonus` might score 0.75 — solid but not perfect. An agent that nails everything including bonus items scores 0.95+. An agent that misses a `required` is immediately capped.
+
+#### How Assertions Feed Scoring
+
+```ts
+interface AssertionResult {
+  id: string;
+  passed: boolean;
+  details?: any;           // Extra context (e.g., which unexpected files)
+}
+
+interface AssertionReport {
+  fixture: string;
+  totalAssertions: number;
+  results: AssertionResult[];
+  byCategory: Record<AssertionCategory, {
+    total: number;
+    passed: number;
+    failed: string[];       // IDs of failed assertions
+    score: number;           // Weighted pass rate (0-1)
+  }>;
+  requiredFailures: string[];  // Any required assertion that failed
+  composite: number;            // Overall score from assertions alone
+}
+```
+
+The Oracle receives the `AssertionReport` as structured input — not just "pattern score: 0.7" but the full breakdown of exactly which assertions passed and failed. This makes its diagnosis precise:
+
+```markdown
+## Oracle Diagnosis (assertion-informed)
+
+Pattern score: 0.70 (7/10 assertions passed)
+  PASSED: pat-route-factory — Used createRouteConfig ✓
+  PASSED: pat-schema-validation — Defined Zod schemas ✓
+  PASSED: pat-prisma-import — Imported from @template/db ✓
+  FAILED: pat-no-raw-routes — Found app.post() on line 42
+  FAILED: pat-context-getter — Used direct db import instead of getAppEnv
+  FAILED: dep-db-via-context — Imported @prisma/client directly
+
+Root cause: Agent used createRouteConfig for GET routes but fell back to
+raw Hono patterns for POST/PATCH/DELETE. The docs show createRouteConfig
+examples only for GET — need examples for mutation routes.
+
+Prescription: Add POST/PATCH/DELETE examples to API_ROUTES.md route factory section.
+```
+
+Without the assertion checklist, the Oracle would say "pattern score dropped" and have to figure out *what* specifically failed by diffing code. With assertions, the failure is already identified — the Oracle just needs to diagnose *why* and prescribe a fix.
+
+#### Writing Good Assertions
+
+Guidelines for writing assertions that produce useful signal:
+
+1. **Be specific about the positive pattern.** "Used createRouteConfig" is checkable. "Used good patterns" is not.
+2. **Check for anti-patterns explicitly.** Don't just check that the right thing exists — check that the wrong thing doesn't. `file_not_contains: app.get(` catches agents that fall back to raw routes.
+3. **Cover the dependency chain.** It's not enough that the route file is correct — check that it imports from the right places, uses context correctly, and doesn't create tight coupling.
+4. **Include type-safety checks.** Did the agent let types be inferred where they should be? Did it add explicit types where inference wouldn't work? Did it avoid `any`?
+5. **Check what's NOT there.** Restraint assertions are "the agent did NOT create files outside the expected scope" or "did NOT add unnecessary dependencies."
+6. **Each assertion should be independently meaningful.** If assertion A failing always means B fails too, they're testing the same thing — merge them.
+7. **Weight by importance.** The route factory usage is weight 1.0. Import style is weight 0.4. Not everything matters equally.
+
 ### The Golden Test Strategy
 
 The most powerful evaluator: **run the golden implementation's tests against the agent's code.**
@@ -757,6 +1071,8 @@ const routePatternSignatures = [
 ```
 
 Count how many pattern signatures are present. This catches cases where code works but doesn't follow your conventions.
+
+**Note:** Pattern signatures are the lightweight version of assertions. For fixtures that don't need a full `assertions.ts`, pattern signatures in `eval.config.ts` are sufficient. For fixtures where you want precision, use the full assertion spec — each assertion replaces one or more pattern signatures with richer checking.
 
 ### Scoring Model
 
