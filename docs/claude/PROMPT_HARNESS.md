@@ -1903,6 +1903,220 @@ If the harness can't describe itself well enough for an agent to extend it, it h
 - Loop runs unattended: fixture suite → Oracle analysis → doc patch → re-run
 - CI integration: basic diagnostic on doc changes, age diagnostic weekly
 
+## Fixture Strategy & Maintenance
+
+### Recommended Fixture Counts
+
+The right number of fixtures balances coverage against cost. Too few and you have blind spots. Too many and each refinement epoch gets expensive. The sweet spot:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                     FIXTURE PORTFOLIO                                │
+│                                                                      │
+│  SIMPLE (5-8 fixtures)                                              │
+│  ├── Fast: ~2 min each, cheapest model tier                        │
+│  ├── Run on every doc change (basic diagnostic)                     │
+│  ├── Cover the breadth of patterns                                  │
+│  │                                                                   │
+│  │  add-endpoint-simple        (API routes, schema, controller)     │
+│  │  schema-change-simple       (Prisma, model utilities)            │
+│  │  add-permissions-simple     (Permix, roles, middleware)          │
+│  │  background-job-simple      (BullMQ, cron, worker)              │
+│  │  add-hook-simple            (Lifecycle hooks, validation)        │
+│  │  frontend-component-simple  (React, routing, state)             │
+│  │  add-test-simple            (Test patterns, factories)           │
+│  │  add-email-simple           (Communications, templates)          │
+│  │                                                                   │
+│  MEDIUM (2-4 fixtures)                                               │
+│  ├── Moderate: ~5-10 min each, middle cost                          │
+│  ├── Run on parallel epochs + age diagnostic                        │
+│  ├── Test pattern combinations and questioning behavior             │
+│  │                                                                   │
+│  │  add-endpoint-medium        (CRUD + custom actions + pagination) │
+│  │  schema-with-hooks-medium   (Schema + hooks + cache)             │
+│  │  permissions-job-medium     (Permissions + background processing)│
+│  │                                                                   │
+│  COMPLEX (1-2 fixtures)                                              │
+│  ├── Slow: ~15-25 min each, highest cost                            │
+│  ├── Run on age diagnostic + full refinement only                   │
+│  ├── Test restraint, multi-system orchestration, judgment           │
+│  │                                                                   │
+│  │  full-feature-complex       (End-to-end: API + DB + hooks +     │
+│  │                              permissions + jobs + frontend)      │
+│  │  multi-resource-complex     (Cross-resource relationships,       │
+│  │                              batch operations, auth)             │
+│  │                                                                   │
+│  DOGFOOD (1-2 fixtures)                                              │
+│  ├── Self-referential: tests the harness's own docs                 │
+│  │                                                                   │
+│  │  _self/add-eval-dimension   (Simple: add scoring dimension)     │
+│  │  _self/add-diagnostic-mode  (Complex: new diagnostic mode)      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Total: 9-16 fixtures.** Start with 6-8 (mostly simple) and grow organically.
+
+#### Why This Distribution
+
+- **Simple fixtures are your workhorse.** They're cheap, fast, and catch 80% of regressions. A handful covering the breadth of patterns (routes, schema, permissions, jobs, hooks, frontend) gives you a wide net. The basic diagnostic runs only these — you want it finishing in under 5 minutes.
+
+- **Medium fixtures test the interesting stuff.** Pattern combinations, questioning quality, the transition from "just follow the template" to "make judgment calls." Two or three is enough — each one should exercise a *different* combination of systems. Don't duplicate what simples already cover.
+
+- **Complex fixtures are guardrails, not workhorses.** They exist to prevent the simplification trap — docs that make easy things easy but lose nuance for hard things. One or two is sufficient because they're expensive and their primary value is detecting restraint regressions, not driving doc improvements. The Oracle should mostly be learning from simple/medium and using complex as a regression gate.
+
+#### When to Add a New Fixture
+
+Add a new fixture when:
+
+1. **A new pattern is introduced.** New route template? New hook type? New background job pattern? Add a simple fixture covering it.
+2. **A pattern combination keeps causing issues.** If agents consistently struggle with "schema change + hooks + cache" as a combined operation but handle each individually, that combination needs its own medium fixture.
+3. **The age diagnostic flags persistent drift.** If a fixture's score keeps degrading despite doc updates, the golden implementation may be outdated or the fixture's scope may need to change.
+4. **A real implementation reveals a gap.** When an agent produces notably good or bad output on a real task, that task is a candidate for a new fixture. Extract the prompt, capture the ideal output, write a fixture.
+
+#### When to Retire a Fixture
+
+Remove or replace a fixture when:
+
+1. **The pattern it tests no longer exists.** If you deprecate a pattern, the fixture testing it is noise.
+2. **It consistently scores 1.0 across all models.** It's not providing signal — the docs perfectly cover it. Keep one simple fixture as a smoke test, retire the rest.
+3. **Its golden implementation has diverged from current patterns.** If updating the golden would change more than 30% of it, consider writing a new fixture from scratch rather than patching.
+
+### Keeping Goldens Current
+
+Golden implementations are the ground truth. When they go stale, the harness grades against outdated patterns and scores become meaningless.
+
+#### The Staleness Problem
+
+```
+Week 1: Golden uses createRouteConfig v1 → agent output matches → score 0.95
+Week 8: Team migrates to createRouteConfig v2 → agent output uses v2 → score 0.60
+         The agent is actually correct. The golden is wrong.
+```
+
+#### Update Triggers
+
+Golden implementations should be updated when:
+
+| Trigger | What to Update | How |
+|---------|---------------|-----|
+| **Pattern change** (route factory API changes) | Golden files using that pattern | Extract from the PR that changed the pattern |
+| **Schema refactor** (model renamed, field moved) | Any golden referencing the schema | Run `db:generate`, update golden to match |
+| **New convention** (naming, imports, style) | All goldens that violate the new convention | Batch update — lint the goldens against new rules |
+| **Codebase restructure** (directory moves) | Structural expectations in goldens | Update file paths in golden + eval.config.ts |
+| **Age diagnostic flags drift** | The drifting fixture's golden | Investigate what changed in the codebase, update golden to match |
+
+#### Practical Workflow: Golden Update Process
+
+```
+1. DETECT — Age diagnostic shows score drift on a fixture
+2. INVESTIGATE — Oracle reports WHY the drift occurred
+   "Agent used createRouteConfig v2, golden expects v1"
+3. UPDATE GOLDEN — Pull the current pattern from the codebase
+   - Find a recent merged PR using the pattern
+   - Extract the relevant files
+   - Replace golden/ directory (or the appropriate stage)
+   - Update pattern signatures in eval.config.ts
+4. RE-BASELINE — Run the fixture with the updated golden
+   "New baseline: 0.91 (was 0.60 against stale golden)"
+5. RECORD — Log the golden update in the fixture's changelog
+```
+
+#### Automating Golden Updates
+
+Two approaches, used together:
+
+**1. PR-triggered golden candidates.** When a PR merges that touches files matching a fixture's patterns, flag that fixture for review. Don't auto-update — flag for human verification.
+
+```ts
+// In CI: check if merged PR affects any fixture's domain
+interface GoldenUpdateCandidate {
+  fixture: string;
+  reason: string;           // "PR #142 modified route factory"
+  filesChanged: string[];   // Overlap between PR and fixture's golden
+  confidence: "high" | "medium" | "low";
+  action: "auto_update" | "human_review";
+}
+```
+
+**2. Oracle-proposed golden updates.** During age diagnostics, the Oracle can propose specific golden updates when it detects the agent's output is *more correct* than the golden (because it follows newer patterns).
+
+```
+Oracle: "The agent's output uses createRouteConfig v2, which matches the
+  current codebase. The golden still uses v1. Recommending golden update."
+  Prescription type: fixture_update
+  Target: fixtures/add-endpoint-simple/golden/
+  Confidence: 0.90
+```
+
+### Keeping Pattern Examples Current
+
+Pattern examples in docs and fixture prompts must reflect the actual codebase.
+
+#### The Stale Example Problem
+
+```markdown
+## In docs/claude/API_ROUTES.md
+\`\`\`ts
+// Example from 6 months ago
+const routes = createRouteConfig({
+  schema: { params: ParamsSchema },
+  handler: async (c) => {
+    const env = getAppEnv(c);       // ← API changed: now getAppContext(c)
+    const db = env.db;              // ← Changed: now env.services.db
+\`\`\`
+```
+
+The example "compiles" in the doc but doesn't match the real codebase. The agent follows the example, produces code using the old API, and scores drop.
+
+#### Keeping Examples Fresh
+
+**1. Pin examples to real files.** Instead of writing standalone examples, reference actual code:
+
+```markdown
+## Route Factory Pattern
+See: `apps/api/src/routes/organizations/index.ts` (lines 15-45)
+```
+
+The age diagnostic catches when the referenced file changes and the doc's description no longer matches.
+
+**2. Pattern signature validation.** Each fixture's `eval.config.ts` contains regex patterns that represent the current conventions. When patterns change, the signatures need updating:
+
+```ts
+// eval.config.ts — update these when the pattern evolves
+export const patternSignatures = [
+  /createRouteConfig\(\{/,          // Route factory usage
+  /getAppContext\(c\)/,              // Context getter (was getAppEnv)
+  /c\.services\.db/,                // DB access path (was c.db)
+];
+```
+
+**3. Fixture prompt review cadence.** Review fixture prompts quarterly or after major refactors. A prompt that was "appropriately vague" when written may now be confusing if the domain has shifted.
+
+### Maintenance Calendar
+
+| Frequency | Action | What's Involved |
+|-----------|--------|----------------|
+| **Every doc change** | Basic diagnostic | Auto: runs simple fixtures, ~5 min |
+| **Weekly** | Age diagnostic | Auto: full matrix, ~30 min, flags drift |
+| **Per major PR** | Check golden candidates | Semi-auto: CI flags, human reviews |
+| **Monthly** | Review medium/complex goldens | Manual: verify goldens match current codebase |
+| **Quarterly** | Full fixture audit | Manual: retire stale fixtures, add new ones, review prompts |
+| **After major refactor** | Full re-baseline | Manual: update all goldens, re-run full suite, new baseline epoch |
+
+### Cost Estimation
+
+Rough costs per run (model-dependent, approximate):
+
+| Run Type | Fixtures | Estimated Cost | Duration |
+|----------|----------|---------------|----------|
+| Basic diagnostic (simple only) | 5-8 | $2-5 | 5-10 min |
+| Single fixture refinement (1 run) | 1 | $1-3 | 5-15 min |
+| Parallel epoch (all fixtures) | 9-16 | $15-40 | 15-25 min |
+| Full refinement loop (10 epochs) | 9-16 × 10 | $150-400 | 3-5 hours |
+| Age diagnostic (full matrix) | 9-16 | $15-40 | 15-25 min |
+
+The basic diagnostic is cheap enough for CI. The full refinement loop is an investment — run it when docs need meaningful tuning, not on every change.
+
 ## Open Questions
 
 1. **Cost** — Each fixture run is a full agent session. Basic diagnostic should be cheap (simple fixtures only + Haiku/Sonnet). Full refinement loops are expensive. Budget per epoch?
