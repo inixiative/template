@@ -1637,6 +1637,49 @@ interface QAEntry {
 }
 ```
 
+### Score Ceiling Reduction (Demerits as Limiters)
+
+Demerits don't just subtract from the final composite — they **reduce the maximum achievable score**. This prevents inflation where a high completion percentage masks fundamental violations.
+
+**Why:** Without a ceiling reduction, an agent that completes 6/6 subtasks but uses raw `app.get()` everywhere could still score well. That's the wrong incentive. Avoiding problems comes first; positive outcomes are scored within the remaining headroom.
+
+**Mechanic:**
+- Each major demerit reduces the score ceiling by its severity value (e.g., -0.15 means max possible composite drops from 1.0 to 0.85)
+- Minor demerits stack the same way but at lower values (-0.05 each)
+- Positive rubrics (completion, craft, questioning) are scored as a percentage of the *remaining* ceiling, not of 1.0
+- Formula: `composite = (ceiling - total_demerit_penalty) × weighted_positive_score × promptEfficiency`
+
+**Example:**
+- Agent gets 2 major demerits (-0.30 total) → ceiling is now 0.70
+- Agent scores 0.90 across positive rubrics → composite = 0.70 × 0.90 = 0.63
+- Same agent with 0 demerits → composite = 1.0 × 0.90 = 0.90
+- The demerits didn't just subtract 0.30 — they compressed the entire positive outcome
+
+### Paired Categories (Correlated Budgets)
+
+Some scoring categories are **paired** — one gates the acceptable range of the other. This prevents gaming where the agent burns excessive resources to brute-force a good score.
+
+**Token Budget ↔ Completion:**
+- The allowed token budget scales with completion percentage
+- High completion + high tokens = acceptable (you spent what you needed)
+- Low completion + high tokens = penalized (you burned tokens and didn't deliver)
+- High completion + low tokens = rewarded (efficient)
+- Low completion + low tokens = neutral (at least you didn't waste resources)
+
+**How it works:**
+- Define a "par" token count per fixture tier (e.g., Tier 1: 50k tokens, Tier 2: 150k, Tier 3: 400k)
+- Actual tokens / par = `tokenRatio`
+- If `tokenRatio > 1.0` (over budget), penalize proportionally to `(1 - completion)` — the less you completed, the more the overspend hurts
+- If `tokenRatio ≤ 1.0` (under budget), boost proportionally to `completion` — efficient AND complete = best outcome
+- Formula: `tokenAdjustment = completion >= tokenRatio ? bonus : -abs(tokenRatio - completion) × penaltyWeight`
+
+**Other Potential Pairs:**
+- **Lines of code ↔ Completion** — more code is fine if you completed more, otherwise it's scope creep
+- **Questions asked ↔ Questioning score** — more questions is fine if they were the *right* ones, otherwise it's noise
+- **Time (turns) ↔ Completion** — more turns is acceptable for harder fixtures, not for simple ones
+
+**The Principle:** Every resource expenditure must be *justified by outcomes*. Correlating categories prevents the agent from optimizing one dimension at the expense of another.
+
 ### The Run Ledger
 
 Every run is recorded in an append-only ledger. The Oracle reads this to understand trajectory — not just "how did this run go" but "are we getting better."
