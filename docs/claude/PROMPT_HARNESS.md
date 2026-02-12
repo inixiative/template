@@ -3647,3 +3647,6 @@ The basic diagnostic is cheap enough for CI. The full refinement loop is an inve
 7. **Oracle Reliability** — The Oracle is itself an LLM. Can it reliably diagnose *why* a score changed? What if its prescriptions oscillate (patch A → revert A → patch A)?
 8. **Dogfood Recursion** — If the `_self` fixture's docs are themselves tuned by the loop, does the system converge or oscillate? Is there a fixed-point?
 9. **MCP Server Scope** — Which operations should be tools (callable by Claude) vs CLI commands (run by humans)? How much autonomy does Claude get?
+10. **Time Tracking** — Wall-clock time per fixture run, per agent turn, per full epoch. Needed for cost modeling and for detecting regressions where the agent "solves" a fixture by burning 10x more turns.
+11. **Token Tracking** — Input/output tokens per run, per agent. Correlate with score — are expensive runs actually better? Track burn rate to catch runaway loops early.
+12. **Auto Compaction Strategy** — Claude Code's default strategy (compact at 100% context) loses too much context at once. Investigate proactive compaction (e.g., at 70-80%), rolling summarization, or tiered eviction (drop tool output before conversation). This matters for long fixture runs where late-session context loss tanks score.
