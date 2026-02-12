@@ -1,24 +1,18 @@
-import { createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
-import { logout } from '@template/shared';
-import { AppShell } from '@template/ui';
-import { navConfig } from '#/config/nav';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { AppShell, Unauthorized } from '@template/ui/components';
 import { requireAuth } from '#/guards';
+import { useAppStore } from '#/store';
 
 const AuthenticatedLayout = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const permix = useAppStore((state) => state.permissions.permix);
+  const isSuperadmin = permix.isSuperadmin?.() ?? false;
+
+  if (!isSuperadmin) {
+    return <Unauthorized />;
+  }
 
   return (
-    <AppShell
-      navConfig={navConfig}
-      currentPath={location.pathname}
-      lockedContext={true} // Prevent context switching - superadmin manages resources
-      onNavigate={(path) => navigate({ to: path })}
-      onLogout={async () => {
-        await logout(import.meta.env.VITE_API_URL);
-        navigate({ to: '/login' });
-      }}
-    >
+    <AppShell lockedContext={true}>
       <Outlet />
     </AppShell>
   );

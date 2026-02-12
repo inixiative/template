@@ -1,7 +1,7 @@
 import {
-  type ApiSlice,
+  type ClientSlice,
   type AuthSlice,
-  createApiSlice,
+  createClientSlice,
   createAuthSlice,
   createNavigationSlice,
   createPermissionsSlice,
@@ -11,16 +11,16 @@ import {
   type PermissionsSlice,
   type TenantSlice,
   type UISlice,
-} from '@template/shared';
+} from '@template/ui/store';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-export type AppStore = ApiSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
+export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 
 export const useAppStore = create<AppStore>()(
   devtools(
     (...a) => ({
-      ...createApiSlice(...a),
+      ...createClientSlice(...a),
       ...createAuthSlice(...a),
       ...createNavigationSlice(...a),
       ...createPermissionsSlice(...a),

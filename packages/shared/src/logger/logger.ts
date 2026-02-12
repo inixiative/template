@@ -1,5 +1,5 @@
-import { getLogScopes, LogScope } from './scope';
-import { isLocal, isProd, isTest } from '../utils/env';
+import { getLogScopes, LogScope } from '@template/shared/logger/scope';
+import { isLocal, isProd, isTest } from '@template/shared/utils/env';
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';

@@ -1,0 +1,10 @@
+// ARCHIVED: This config was used with Doppler. The template now uses Infisical.
+// Configuration is now managed via .infisical.json (created during bun run init)
+//
+// Original doppler.config.ts:
+
+export const dopplerConfig = {
+  project: 'template',
+  environments: ['dev', 'staging', 'sandbox', 'prod'],
+  apps: ['api', 'web', 'admin', 'superadmin'],
+} as const;

@@ -10,6 +10,6 @@ export const spaceCreateTokenRoute = createRoute({
   submodel: Modules.token,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validatePermission('manage'), validateNotToken],
+  middleware: [validatePermission('operate'), validateNotToken],
   tags: [Tags.token],
 });

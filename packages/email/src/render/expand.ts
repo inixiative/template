@@ -2,9 +2,9 @@
  * Expand component refs in MJML - replaces {{#component:slug}}...{{/component:slug}} with content.
  */
 
-import { EmailRenderError } from './errors';
-import { lookupCascade } from './lookupCascade';
-import type { SaveContext } from './types';
+import { EmailRenderError } from '@template/email/render/errors';
+import { lookupCascade } from '@template/email/render/lookupCascade';
+import type { SaveContext } from '@template/email/render/types';
 
 /**
  * Recursively expand all component refs in MJML.

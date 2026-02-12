@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppStore } from '@template/shared';
+import { useAppStore } from '@template/ui/store';
 import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/Avatar';
 import { Button } from '@template/ui/components/Button';
 import {
@@ -22,23 +22,23 @@ export const UserMenu = ({ className }: UserMenuProps) => {
   const [spoofEmail, setSpoofEmail] = useState('');
 
   // Read all state from Zustand store
-  const user = useAppStore((state) => state.auth.getUserMenu());
-  const isSuperadmin = useAppStore((state) => state.auth.isSuperadmin);
-  const isSpoofing = useAppStore((state) => state.auth.isSpoofing);
+  const user = useAppStore((state) => state.auth.user);
+  const isSuperadmin = useAppStore((state) => state.permissions.permix.isSuperadmin());
+  const isSpoofing = useAppStore((state) => state.auth.spoofUserEmail !== null);
   const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
-  const setSpoofUserEmail = useAppStore((state) => state.auth.setSpoofUserEmail);
+  const setSpoof = useAppStore((state) => state.auth.setSpoof);
   const logout = useAppStore((state) => state.auth.logout);
-  const navigate = useAppStore((state) => state.navigation.navigate);
+  const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
 
-  const handleSpoofSubmit = () => {
+  const handleSpoofSubmit = async () => {
     if (spoofEmail.trim()) {
-      setSpoofUserEmail(spoofEmail.trim());
+      await setSpoof(spoofEmail.trim());
       setSpoofEmail('');
     }
   };
 
-  const handleExitSpoof = () => {
-    setSpoofUserEmail(null);
+  const handleExitSpoof = async () => {
+    await setSpoof(null);
   };
   return (
     <DropdownMenu>
@@ -50,22 +50,22 @@ export const UserMenu = ({ className }: UserMenuProps) => {
           )}
         >
           <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src={user.avatarUrl} alt={user.name} />
-            <AvatarFallback className="rounded-lg">{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
+            <AvatarFallback className="rounded-lg">{user?.name?.charAt(0).toUpperCase() ?? 'U'}</AvatarFallback>
           </Avatar>
           <div className="flex-1 text-left min-w-0">
-            <div className="text-sm font-semibold truncate">{user.name}</div>
+            <div className="text-sm font-semibold truncate">{user?.name ?? 'User'}</div>
             <div
               className={cn('text-xs truncate', isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground')}
             >
-              {isSpoofing ? 'Spoofing' : user.email}
+              {isSpoofing ? 'Spoofing' : user?.email ?? ''}
             </div>
           </div>
         </div>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onClick={() => navigate?.({ to: '/settings' })}>
+        <DropdownMenuItem onClick={() => navigatePreservingSpoof('/settings')}>
           <Settings className="h-4 w-4 mr-2" />
           <span>Settings</span>
         </DropdownMenuItem>

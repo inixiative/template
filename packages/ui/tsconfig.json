@@ -2,13 +2,17 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["dom", "ES2015"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["bun-types"],
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
       "@template/db/*": ["../db/src/*"],
       "@template/permissions/*": ["../permissions/src/*"],
       "@template/shared/*": ["../shared/src/*"],
+      "@template/ui/test": ["./src/test/index.ts"],
+      "@template/ui/test/*": ["./src/test/*"],
+      "@template/ui/openapi.json": ["./openapi.json"],
       "@template/ui/*": ["./src/*"]
     }
   },

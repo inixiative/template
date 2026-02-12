@@ -1,9 +1,10 @@
+import type { SpaceUser } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 /**
  * Prime space user relationships.
  */
-export const spaceUserSeeds: SeedFile = {
+export const spaceUserSeeds: SeedFile<SpaceUser> = {
   model: 'spaceUser',
   updateOmitFields: ['createdAt'],
   records: [

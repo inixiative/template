@@ -1,4 +1,4 @@
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryReadRoute } from '#/modules/inquiry/routes/inquiryRead';
@@ -12,12 +12,12 @@ export const inquiryReadController = makeController(inquiryReadRoute, async (c, 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
 
   if (!inquiry) {
-    throw new HTTPException(404, { message: 'Inquiry not found' });
+    throw makeError({ status: 404, message: 'Inquiry not found', requestId: c.get('requestId') });
   }
 
   const hasAccess = await checkInquiryAccess(db, inquiry, user.id);
   if (!hasAccess) {
-    throw new HTTPException(403, { message: 'Access denied' });
+    throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
   }
 
   return respond.ok(inquiry);

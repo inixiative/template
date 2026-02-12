@@ -28,15 +28,15 @@
 # GitHub CLI
 brew install gh
 
-# Doppler CLI (secrets management)
-brew install dopplerhq/cli/doppler
+# Infisical CLI (secrets management - installed during init)
+brew install infisical/get-cli/infisical  # Optional, init script can install
 ```
 
 ### Authentication
 
 ```bash
 gh auth login
-doppler login
+# Infisical login handled during bun run init
 ```
 
 ### Verification
@@ -45,7 +45,6 @@ doppler login
 bun --version
 docker --version
 gh --version
-doppler --version
 ```
 
 ---
@@ -57,7 +56,7 @@ doppler --version
 | `bun run init` | Once per project lifecycle | Person forking the template |
 | `bun run setup` | Each new developer + periodically | Everyone |
 
-**Init**: Not implemented yet (tracked in `INFRA-001`). Until then, forking is manual.
+**Init**: Interactive setup that configures Infisical, generates secrets, and provisions services. See [INIT_SCRIPT.md](INIT_SCRIPT.md).
 
 **Setup**: Installs deps, starts Docker, generates Prisma, seeds DB. Run by each developer and whenever the repo needs to be brought up to date.
 

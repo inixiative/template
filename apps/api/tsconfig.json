@@ -3,7 +3,6 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": ".",
-    "lib": ["ES2022", "DOM"],
     "paths": {
       "#/*": ["./src/*"],
       "#tests/*": ["./tests/*"],

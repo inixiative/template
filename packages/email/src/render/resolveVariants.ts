@@ -2,9 +2,9 @@
  * Resolve variants: match existing or suffix, rewrite MJML.
  */
 
-import type { EmailComponent, EmailTemplate } from '@template/db';
-import type { RefMap } from './extractRefs';
-import type { SaveContext } from './types';
+import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
+import type { RefMap } from '@template/email/render/extractRefs';
+import type { SaveContext } from '@template/email/render/types';
 
 export type ResolveResult = {
   template: Partial<EmailTemplate>;

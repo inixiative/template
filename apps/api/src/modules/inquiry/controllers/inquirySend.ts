@@ -1,4 +1,4 @@
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
@@ -12,21 +12,21 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
 
   if (!inquiry) {
-    throw new HTTPException(404, { message: 'Inquiry not found' });
+    throw makeError({ status: 404, message: 'Inquiry not found', requestId: c.get('requestId') });
   }
 
   if (inquiry.status !== 'draft') {
-    throw new HTTPException(400, { message: 'Only draft inquiries can be sent' });
+    throw makeError({ status: 400, message: 'Only draft inquiries can be sent', requestId: c.get('requestId') });
   }
 
   const hasTarget = inquiry.targetModel && (inquiry.targetUserId || inquiry.targetOrganizationId);
   if (!hasTarget) {
-    throw new HTTPException(400, { message: 'Target must be set before sending' });
+    throw makeError({ status: 400, message: 'Target must be set before sending', requestId: c.get('requestId') });
   }
 
   const isSource = await checkIsSource(db, inquiry, user.id);
   if (!isSource) {
-    throw new HTTPException(403, { message: 'Only the source can send' });
+    throw makeError({ status: 403, message: 'Only the source can send', requestId: c.get('requestId') });
   }
 
   const updated = await db.inquiry.update({

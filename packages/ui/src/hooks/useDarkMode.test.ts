@@ -1,7 +1,18 @@
 import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
-import { setupDOMEnvironment, cleanupDOMEnvironment } from '@template/shared/test';
+import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
 
 describe('useDarkMode', () => {
+  const applyTheme = (theme: 'light' | 'dark' | 'system') => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      return;
+    }
+
+    if (theme === 'light') {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   beforeEach(() => {
     setupDOMEnvironment();
     document.documentElement.classList.remove('dark');
@@ -12,25 +23,14 @@ describe('useDarkMode', () => {
   });
 
   it('should add dark class when theme is dark', () => {
-    // Test dark mode
-    if ('dark' === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if ('dark' === 'light') {
-      document.documentElement.classList.remove('dark');
-    }
+    applyTheme('dark');
 
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
 
   it('should remove dark class when theme is light', () => {
     document.documentElement.classList.add('dark');
-
-    // Test light mode
-    if ('light' === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if ('light' === 'light') {
-      document.documentElement.classList.remove('dark');
-    }
+    applyTheme('light');
 
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });

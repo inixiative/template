@@ -47,6 +47,9 @@ export const ModelIdType = {
 
   // Jobs
   CronJob: 'CronJob',
+
+  // Auth Providers
+  AuthProvider: 'AuthProvider',
 } as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -85,6 +88,9 @@ export type WebhookEventId = Id<typeof ModelIdType.WebhookEvent>;
 // Jobs
 export type CronJobId = Id<typeof ModelIdType.CronJob>;
 
+// Auth Providers
+export type AuthProviderId = Id<typeof ModelIdType.AuthProvider>;
+
 // ─────────────────────────────────────────────────────────────
 // Constructor functions (cast raw strings to typed IDs)
 // ─────────────────────────────────────────────────────────────
@@ -120,3 +126,6 @@ export const webhookEventId = (id: string): WebhookEventId => id as WebhookEvent
 
 // Jobs
 export const cronJobId = (id: string): CronJobId => id as CronJobId;
+
+// Auth Providers
+export const authProviderId = (id: string): AuthProviderId => id as AuthProviderId;

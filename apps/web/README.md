@@ -7,13 +7,13 @@ Consumer-facing frontend built with Vite + React + TanStack Router.
 Run from repo root:
 
 ```bash
-turbo watch local#web
+bun run local:web
 ```
 
 Or from this workspace:
 
 ```bash
-bun run local
+bun run dev
 ```
 
 Default local port: `3000`.

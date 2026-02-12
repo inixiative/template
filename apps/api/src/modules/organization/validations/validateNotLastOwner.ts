@@ -1,10 +1,12 @@
 import { Role } from '@template/db/generated/client/enums';
 import type { Db, OrganizationId } from '@template/db/index';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
-export const validateNotLastOwner = async (db: Db, orgId: OrganizationId) => {
+export const validateNotLastOwner = async (db: Db, orgId: OrganizationId, requestId: string) => {
   const ownerCount = await db.organizationUser.count({
     where: { organizationId: orgId, role: Role.owner },
   });
-  if (ownerCount === 1) throw new HTTPException(400, { message: 'Cannot remove last owner' });
+  if (ownerCount === 1) {
+    throw makeError({ status: 400, message: 'Cannot remove last owner', requestId });
+  }
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { interpolate } from './interpolate';
+import { interpolate } from '@template/email/render/interpolate';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {

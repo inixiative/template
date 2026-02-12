@@ -1,7 +1,7 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Context } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getS3Client } from '#/lib/clients/s3';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -64,15 +64,17 @@ export const generatePresignedUrl = async (
   const user = c.get('user');
 
   if (!user) {
-    throw new HTTPException(401, { message: 'Authentication required' });
+    throw makeError({ status: 401, message: 'Authentication required', requestId: c.get('requestId') });
   }
 
   const { fileName, contentType, folder } = request;
 
   // Validate content type
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
-    throw new HTTPException(400, {
+    throw makeError({
+      status: 400,
       message: `Invalid content type. Allowed: ${ALLOWED_CONTENT_TYPES.join(', ')}`,
+      requestId: c.get('requestId'),
     });
   }
 
@@ -91,7 +93,7 @@ export const generatePresignedUrl = async (
 
   const bucket = process.env.S3_BUCKET_NAME;
   if (!bucket) {
-    throw new HTTPException(500, { message: 'S3 not configured' });
+    throw makeError({ status: 500, message: 'S3 not configured', requestId: c.get('requestId') });
   }
 
   const maxSize = MAX_FILE_SIZES[contentType] || 10 * 1024 * 1024;

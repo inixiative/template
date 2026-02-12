@@ -13,6 +13,69 @@ Examples:
 - Background job → JOBS + possibly REDIS, LOGGING
 - Building a data table → FRONTEND (DataTables) + API_ROUTES
 
+## MANDATORY: Pattern Discovery Before Implementation
+
+**YOU MUST COMPLETE THIS CHECKLIST BEFORE WRITING ANY NEW CODE:**
+
+1. **Find 2-3 Similar Existing Modules**
+   - Adding authProvider? Read: token, webhookSubscription, organizationUser modules
+   - Adding a controller? Read: 3 existing controllers in similar modules
+   - Adding middleware? Read: existing middleware in `/middleware/validations/`
+
+2. **Extract and Document Patterns** - Create a list:
+   ```
+   Patterns observed:
+   - Functions: export const fn = () => {} (arrow functions)
+   - Types: OrganizationId not string (typed IDs from @template/db)
+   - DB access: const db = c.get('db') (from context, not imported)
+   - Permissions: validatePermission('own') middleware (not manual checks)
+   - Error handling: getResource() handles 404 (no manual null checks)
+   - Organization context: getActor(c).organization (not c.get('organization'))
+   ```
+
+3. **Ask User to Confirm**
+   - List patterns you found
+   - Ask: "Are these the correct patterns to follow?"
+   - **WAIT for confirmation**
+
+4. **ONLY THEN Start Implementation**
+
+**Why this matters:**
+- Saves hours of rework
+- Maintains codebase consistency
+- Respects existing architecture decisions
+- Prevents code review rejection
+
+**If you skip this checklist, your code WILL be rejected.**
+
+### Pattern Discovery for Tests
+
+**Before Writing Tests:**
+
+1. **Check for Existing Factory**
+   - Look in `/packages/db/src/test/factories/`
+   - If factory exists, use it with minimal overrides
+   - If not, create factory first following existing patterns
+
+2. **Factory Usage Patterns**
+   ```
+   ✅ Use: createModel({ field: value })
+   ❌ Avoid: db.model.create({ data: { ...allFields } })
+
+   ✅ Auto-inferred dependencies (no explicit dependencies object)
+   ❌ Manually specifying organizationId, userId, etc.
+
+   ✅ Override only what's needed for the test
+   ❌ Specifying all required fields manually
+   ```
+
+3. **Creating New Factories**
+   - Follow pattern from existing factories (tokenFactory, organizationFactory)
+   - Use faker for realistic test data
+   - Only add `dependencies` object for composite FKs or custom behavior
+   - Export both `buildModel` and `createModel`
+   - Add to `/packages/db/src/test/factories/index.ts`
+
 ## Categories
 
 ### Implementation
@@ -20,11 +83,13 @@ Examples:
 | Category | Doc | When to Read |
 |----------|-----|--------------|
 | **API Routes** | [API_ROUTES.md](docs/claude/API_ROUTES.md) | Adding endpoints, controllers, route templates |
+| **Authentication** | [AUTHENTICATION.md](docs/claude/AUTHENTICATION.md) | Frontend auth: hooks, login/signup, OAuth, navigation |
+| **Auth (Backend)** | [AUTH.md](docs/claude/AUTH.md) | BetterAuth, tokens, session vs token auth |
 | **Batch API** | [BATCH.md](docs/claude/BATCH.md) | Multi-request operations, transactions, interpolation |
-| **Auth** | [AUTH.md](docs/claude/AUTH.md) | BetterAuth, tokens, session vs token auth |
 | **Communications** | [COMMUNICATIONS.md](docs/claude/COMMUNICATIONS.md) | Email, notifications (stub) |
 | **Context** | [CONTEXT.md](docs/claude/CONTEXT.md) | Request context, AppEnv, getters, scopes |
 | **Database** | [DATABASE.md](docs/claude/DATABASE.md) | Schema changes, Prisma patterns, model utilities |
+| **Encryption** | [ENCRYPTION.md](docs/claude/ENCRYPTION.md) | Field encryption, key rotation, registry pattern |
 | **Hooks** | [HOOKS.md](docs/claude/HOOKS.md) | Mutation lifecycle, validation, webhooks, cache |
 | **Jobs** | [JOBS.md](docs/claude/JOBS.md) | Background jobs, crons, BullMQ |
 | **Logging** | [LOGGING.md](docs/claude/LOGGING.md) | Consola, scopes, OpenTelemetry, Sentry |
@@ -99,10 +164,33 @@ bun run test                                 # Run all tests
 - Filtering: `turbo watch <task>#<package>` → `turbo watch local#api`
 - Env composition: `bun run with <env> <app> turbo watch <task>` → `bun run with prod api turbo watch local#api`
 
-## Path Aliases
+## Path Aliases & Import Rules
 
+**Path Aliases:**
 - `#/` - Internal imports (same app/package)
 - `@template/*` - Cross-package imports
+
+**Import Rules:**
+- ✅ **Always use absolute imports** - Never use relative imports (`../`, `./`) except in barrel files (`index.ts`)
+- ✅ Use `@template/package` for cross-package imports
+- ✅ Use `#/module/file` for same-package imports
+- ❌ Never use `./sibling.ts` or `../parent/file.ts`
+
+**Example:**
+```typescript
+// ❌ Wrong - relative imports
+import { helper } from './utils/helper';
+import { types } from '../types';
+
+// ✅ Correct - absolute imports
+import { helper } from '@template/db/utils/helper';
+import { types } from '@template/db/types';
+
+// ✅ Exception - barrel files only
+// In packages/db/src/index.ts:
+export * from './lib/encryption/types';
+export * from './lib/encryption/helpers';
+```
 
 ## Tickets
 

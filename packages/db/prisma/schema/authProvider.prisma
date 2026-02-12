@@ -1,0 +1,41 @@
+// ============================================================================
+// AUTH PROVIDER - OAuth, SAML, SSO configuration per organization
+// ============================================================================
+
+enum AuthProviderType {
+  EMAIL
+  OAUTH
+  SAML
+}
+
+model AuthProvider {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  type     AuthProviderType
+  provider String // 'google', 'github', 'okta', 'azure-ad'
+  name     String // Display name for UI
+  enabled  Boolean          @default(true)
+
+  // Organization scoping (required - org-specific providers only)
+  organizationId String       @db.VarChar(36)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Public configuration (safe to return in API)
+  config Json // { domains: [], scopes: [], logoUrl: '', callbackUrl: '' }
+
+  // Encrypted secrets (NEVER return in API)
+  encryptedSecrets           String // Base64 AES-256-GCM ciphertext
+  encryptedSecretsMetadata   Json // { iv, authTag }
+  encryptedSecretsKeyVersion Int // 1, 2, 3, etc.
+
+  // Audit
+  createdBy String?
+
+  @@unique([organizationId, provider, type])
+  @@index([organizationId])
+  @@index([type])
+  @@index([enabled])
+  @@index([encryptedSecretsKeyVersion])
+}

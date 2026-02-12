@@ -7,9 +7,7 @@ export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayloa
     const redis = queue.redis;
     const jobData = job.data;
 
-    const isCronJob = jobData.type === JobType.cron || jobData.type === JobType.cronTrigger;
-    if (!isCronJob) return handler(ctx, payload);
-    if (!jobData.id) throw new Error('Cron job missing id');
+    if (!jobData.id) throw new Error('Singleton job missing id');
 
     const lockKey = `${redisNamespace.job}:lock:${jobData.id}`;
     const lockTTL = 300;

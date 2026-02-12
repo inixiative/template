@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
-import { setupDOMEnvironment, cleanupDOMEnvironment } from '@template/shared/test';
-import type { SpaceTheme } from '../types';
+import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
+import type { SpaceTheme } from '@template/ui/types';
 
 describe('useSpaceTheme', () => {
   beforeEach(() => {

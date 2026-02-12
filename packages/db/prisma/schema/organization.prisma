@@ -22,6 +22,7 @@ model Organization {
   emailTemplates       EmailTemplate[]
   spaces               Space[]
   providerRefs         CustomerRef[]         @relation("providerRefs")
+  authProviders        AuthProvider[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

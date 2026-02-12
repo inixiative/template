@@ -235,6 +235,88 @@ afterAll(async () => {
 });
 ```
 
+### Test Data Patterns
+
+**Always Use Factories:**
+
+```typescript
+// ✅ CORRECT - Use factory with minimal overrides
+import { createAuthProvider } from '@template/db/test';
+await createAuthProvider({ encryptedSecretsKeyVersion: 2 });
+
+// ❌ WRONG - Manual db.create() with data objects
+await db.authProvider.create({
+  data: {
+    organizationId: organizationId(org.id),
+    type: 'OAUTH',
+    provider: 'test',
+    name: 'Test',
+    enabled: true,
+    config: {},
+    encryptedSecrets: '...',
+    encryptedSecretsMetadata: { ... },
+    encryptedSecretsKeyVersion: 2,
+  },
+});
+```
+
+**Factory Dependencies Are Auto-Inferred:**
+
+```typescript
+// ✅ CORRECT - Dependencies inferred from schema
+const authProviderFactory = createFactory('AuthProvider', {
+  defaults: () => ({
+    type: AuthProviderType.OAUTH,
+    provider: 'google',
+    // ... other defaults
+  }),
+  // No dependencies object needed - organizationId auto-inferred
+});
+
+// ❌ WRONG - Manually specifying inferred dependencies
+const authProviderFactory = createFactory('AuthProvider', {
+  defaults: () => ({ ... }),
+  dependencies: {
+    organization: {  // Unnecessary - auto-inferred from organizationId FK
+      modelName: 'Organization',
+      foreignKey: { id: 'organizationId' },
+      required: true,
+    },
+  },
+});
+```
+
+**When to Create a New Factory:**
+
+Before writing test data manually:
+1. Check if factory exists: `/packages/db/src/test/factories/`
+2. If not, create factory following existing patterns
+3. Export from `/packages/db/src/test/factories/index.ts`
+4. Use in tests with minimal overrides
+
+**Factory Creation Pattern:**
+
+```typescript
+// packages/db/src/test/factories/modelFactory.ts
+import { faker } from '@faker-js/faker';
+import { createFactory } from '@template/db/test/factory';
+
+const modelFactory = createFactory('Model', {
+  defaults: () => ({
+    name: faker.company.name(),
+    enabled: true,
+    // Only required fields with sensible defaults
+  }),
+  // Only add dependencies object for:
+  // - Composite FKs (organizationId + userId)
+  // - Optional dependencies needing custom behavior
+  // - Non-standard FK patterns (createdById, etc.)
+});
+
+export const buildModel = modelFactory.build;
+export const createModel = modelFactory.create;
+```
+
 ---
 
 ## Test App

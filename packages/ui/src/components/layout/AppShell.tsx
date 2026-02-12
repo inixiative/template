@@ -1,4 +1,4 @@
-import { useAppStore } from '@template/shared';
+import { useAppStore } from '@template/ui/store';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
@@ -8,20 +8,17 @@ import { HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 
 export type AppShellProps = {
-  currentPath: string;
   onSupport?: () => void;
   lockedContext?: boolean;
   children: React.ReactNode;
 };
 
 export const AppShell = ({
-  currentPath,
   onSupport,
   lockedContext = false,
   children,
 }: AppShellProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const navigate = useAppStore((state) => state.navigation.navigate);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -36,7 +33,7 @@ export const AppShell = ({
             <ContextSelector locked={lockedContext} />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <Sidebar currentPath={currentPath} />
+            <Sidebar />
           </div>
           <div className="border-t">
             {onSupport && (

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useAppStore } from '@template/shared/store';
+import { useAppStore } from '@template/ui/store';
 
 export const useThemePersistence = () => {
   const theme = useAppStore((state) => state.ui.theme);

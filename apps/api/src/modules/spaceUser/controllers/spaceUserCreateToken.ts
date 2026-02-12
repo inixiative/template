@@ -1,7 +1,7 @@
 import { db, type HydratedRecord, hydrate } from '@template/db';
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
@@ -19,7 +19,7 @@ export const spaceUserCreateTokenController = makeController(spaceUserCreateToke
   const checkSpace = check(permix, rebacSchema, 'space', space, roleToStandardAction(body.role));
   // Option B: Only admins+ can create tokens (uses 'assign' rules)
   // const checkSpace = check(permix, rebacSchema, 'space', { ...hydrated.space, role: body.role }, 'assign');
-  if (!checkLeave || !checkSpace) throw new HTTPException(403, { message: `Cannot create ${body.role} token` });
+  if (!checkLeave || !checkSpace) throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
 
   const token = await createToken(db, {
     name: body.name,

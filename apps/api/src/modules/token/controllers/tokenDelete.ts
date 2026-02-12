@@ -1,7 +1,7 @@
 import type { AccessorName } from '@template/db';
 import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { tokenDeleteRoute } from '#/modules/token/routes/tokenDelete';
@@ -18,7 +18,7 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
       : [token.organizationId, 'organization' as AccessorName];
     const owner = await hydrate(db, ownerType, { id: ownerId! });
     if (!check(permix, rebacSchema, ownerType, { ...owner, role: token.role }, 'assign'))
-      throw new HTTPException(403, { message: 'Access denied' });
+      throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
   }
 
   await db.token.delete({ where: { id: token.id } });

@@ -6,7 +6,7 @@ Currently, setting up a fresh fork of this template requires ~2 hours of manual 
 - Renaming @template/* to @projectname/* in package names and imports
 - Generating secrets (BETTER_AUTH_SECRET, webhook signing keys)
 - Creating .env files from examples
-- Setting up Doppler (REQUIRED for this template)
+- Setting up Infisical for secret management (or bring your own)
 - Provisioning cloud services (Render, Sentry, email, OAuth)
 - Configuring DNS and domain settings
 - Starting Docker, initializing database, running seeds
@@ -34,9 +34,9 @@ This plan implements an automated `bun run init` script that reduces this to ~10
 - Located: `/scripts/setup/setup.sh`
 - **Multi-dev workflow:** After someone runs `init`, other devs run `setup` (not init)
   - **init-config.json is committed to git** (everyone has the same config)
-  - Setup pulls secrets from Doppler (not from config file)
+  - Setup pulls secrets from Infisical (not from config file)
   - Config has shared project settings (name, domain, flags, service IDs)
-  - Secrets live in Doppler (per environment: dev/staging/prod)
+  - Secrets live in Infisical (per environment: dev/staging/prod)
 
 **Existing Init Stub** (`/scripts/setup/init.sh`):
 - ❌ TODO comments only, not implemented
@@ -45,7 +45,6 @@ This plan implements an automated `bun run init` script that reduces this to ~10
 **Existing Components to Reuse:**
 - `/scripts/setup/check-prereqs.sh` - Verifies Bun + Docker (will enhance)
 - `/scripts/setup/sync-env.sh` - Copies `.env.example` → `.env` files
-- `/scripts/setup/dopplerSetup.ts` - Creates Doppler project + configs
 - `/scripts/setup/wait-postgres.sh`, `wait-redis.sh` - Health checks
 - `/scripts/deployment/with-env.sh` - Environment composition
 
@@ -333,7 +332,7 @@ async function deployToProduction(config: Config) {
 
 async function runProductionMigrations(config: Config) {
   if (config.flags.database.strategy === 'migrate') {
-    await $`doppler run --config prod -- bun run db:migrate`;
+    await $`infisical run --env=prod -- bun run db:migrate`;
   }
 }
 
@@ -390,7 +389,7 @@ async function launch() {
 
 **Behavior Changes:**
 - **Development** (after init): db:push, local Docker, .env.local
-- **Production** (after launch): db:migrate, Render services, Doppler prod
+- **Production** (after launch): db:migrate, Render services, Infisical prod
 
 **Why separate from init:**
 - Init: Infrastructure provisioning (one-time, ~10-15min)
@@ -470,18 +469,18 @@ bun run launch
 
 **All Steps (Complete in One Implementation):**
 
-1. Prerequisites check (Bun, Docker, Git, **Doppler CLI required**)
+1. Prerequisites check (Bun, Docker, Git, Infisical CLI detection)
 2. Interactive TUI configuration (name, org, domain, environments, service API keys)
 3. Monorepo rename (@template → @projectname in packages and imports ONLY)
-4. Doppler setup (REQUIRED - create project + environments first)
-5. Secret generation (BETTER_AUTH_SECRET, Ed25519 webhook keys → push to Doppler immediately)
+4. Infisical setup (cloud or self-hosted - create project + environments)
+5. Secret generation (BETTER_AUTH_SECRET, Ed25519 webhook keys → push to Infisical immediately)
 6. Cloud service provisioning:
    - Render: Create web services (API, worker), database, Redis
    - Sentry: Create projects (API, web, admin, superadmin), get DSNs
    - Email: Configure provider (Resend/SendGrid/SES)
    - OAuth: Configure providers (Google, GitHub - optional)
 7. DNS configuration (instructions + verification)
-8. PROJECT_NAME environment variable setup (all .env files + Doppler)
+8. PROJECT_NAME environment variable setup (all .env files + Infisical)
 9. Environment file generation (.env.local with secrets + service tokens)
 10. Database initialization (Docker + Prisma + offer both db:push and db:migrate)
 11. Validation (DB/Redis connection + smoke tests + service connectivity)
@@ -497,17 +496,17 @@ scripts/
 ├── init/
 │   ├── index.ts                    # Main orchestrator (handles init, init:new, init:edit)
 │   ├── steps/
-│   │   ├── 01-prerequisites.ts     # Enhanced prereq checks (Doppler CLI REQUIRED)
+│   │   ├── 01-prerequisites.ts     # Enhanced prereq checks (Infisical CLI detection)
 │   │   ├── 02-configure.ts         # Simple TUI with @inquirer/prompts
 │   │   ├── 03-rename.ts            # Surgical rename (packages + imports ONLY)
-│   │   ├── 04-doppler.ts           # Doppler setup FIRST (create project + envs)
-│   │   ├── 05-secrets.ts           # Generate secrets + push to Doppler immediately
+│   │   ├── 04-infisical.ts         # Infisical setup (cloud/self-hosted + project creation)
+│   │   ├── 05-secrets.ts           # Generate secrets + push to Infisical immediately
 │   │   ├── 06-render.ts            # Render service provisioning
 │   │   ├── 07-sentry.ts            # Sentry projects + DSNs
 │   │   ├── 08-email.ts             # Email provider configuration
 │   │   ├── 09-oauth.ts             # OAuth providers (optional)
 │   │   ├── 10-dns.ts               # DNS configuration + verification
-│   │   ├── 11-project-name.ts      # Set PROJECT_NAME in env files + Doppler
+│   │   ├── 11-project-name.ts      # Set PROJECT_NAME in env files + Infisical
 │   │   ├── 12-environment.ts       # Create .env files with all secrets/tokens
 │   │   ├── 13-database.ts          # Docker + Prisma + seed (offer push/migrate)
 │   │   ├── 14-validate.ts          # Health checks + service connectivity
@@ -521,10 +520,11 @@ scripts/
 │   │   ├── validation.ts           # Validation helpers
 │   │   ├── render.ts               # Render API client (ofetch)
 │   │   ├── sentry.ts               # Sentry API client (ofetch)
-│   │   └── doppler.ts              # Doppler API client
+│   │   └── infisical.ts            # Infisical CLI helpers
 │   └── templates/
 │       ├── INIT_COMPLETE.md.hbs    # Handlebars template
 │       ├── render.yaml.hbs         # Render service definitions
+│       ├── docker-compose.infisical.yml  # Self-hosted Infisical services
 │       └── env-comments.ts         # Comments for secrets
 └── setup/
     └── (existing scripts - reuse as-is)
@@ -541,7 +541,7 @@ scripts/
 - Check Git installed
 - Verify git working tree is clean (or offer to stash)
 - Check if init-config.json exists (detect resume vs new init)
-- Check Doppler CLI (required, not optional)
+- Check Infisical CLI (offer to install if missing)
 ```
 
 #### 2. Interactive Configuration (`02-configure.ts`)
@@ -920,60 +920,268 @@ async function replaceInFiles(options: {
 - ❌ OTEL_SERVICE_NAME (uses `${PROJECT_NAME}-api`)
 - ❌ Container names, database names, service names (all use env var)
 
-#### 4. Doppler Setup (`04-doppler.ts`) - REQUIRED FIRST
-**Reuse:** `dopplerSetup.ts` to create project structure
+#### 4. Infisical Setup (`04-infisical.ts`)
+**Cloud or self-hosted secret management**
 
-**Why first:** Need Doppler ready to receive secrets immediately after generation
+**Why first:** Need Infisical ready to receive secrets immediately after generation
 
 ```typescript
-const spinner = ora('Setting up Doppler...').start();
+import { input, select, confirm } from '@inquirer/prompts';
+import ora from 'ora';
 
-// Create Doppler project + environments
-spinner.text = 'Creating Doppler project...';
-await $`bun ./scripts/setup/dopplerSetup.ts`;
+async function setupInfisical(config: Config) {
+  console.log('\n🔐 Secret Management Setup\n');
 
-spinner.text = 'Verifying Doppler environments...';
-for (const env of config.environments) {
-  await verifyDopplerEnv(config.projectName, env);
+  // Choose hosting option
+  const provider = await select({
+    message: 'Choose secret management:',
+    choices: [
+      {
+        name: 'Infisical Cloud (free, recommended)',
+        value: 'infisical-cloud',
+        description: 'Free tier: unlimited users, 5 projects'
+      },
+      {
+        name: 'Infisical Self-Hosted (Docker)',
+        value: 'infisical-self',
+        description: 'Run on your own infrastructure (~$5-10/mo)'
+      },
+      {
+        name: 'Manual .env files',
+        value: 'none',
+        description: 'Manage secrets yourself (not recommended)'
+      },
+    ],
+  });
+
+  if (provider === 'none') {
+    console.log('⚠️  You will need to manage .env files manually');
+    config.secrets = { provider: 'none' };
+    return config;
+  }
+
+  // Check if Infisical CLI is installed
+  const hasInfisical = await $`command -v infisical`.nothrow().quiet();
+  if (!hasInfisical.success) {
+    const install = await confirm({
+      message: 'Infisical CLI not found. Install it now?',
+      default: true
+    });
+
+    if (install) {
+      const spinner = ora('Installing Infisical CLI...').start();
+      if (process.platform === 'darwin') {
+        await $`brew install infisical/get-cli/infisical`;
+      } else if (process.platform === 'linux') {
+        await $`curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.deb.sh' | sudo bash`;
+        await $`sudo apt-get update && sudo apt-get install -y infisical`;
+      } else {
+        spinner.info('Visit https://infisical.com/docs/cli/overview for install instructions');
+        process.exit(1);
+      }
+      spinner.succeed('Infisical CLI installed');
+    } else {
+      process.exit(1);
+    }
+  }
+
+  if (provider === 'infisical-cloud') {
+    return await setupInfisicalCloud(config);
+  } else {
+    return await setupInfisicalSelfHosted(config);
+  }
 }
 
-spinner.succeed('Doppler project ready');
+async function setupInfisicalCloud(config: Config) {
+  console.log('\n📦 Infisical Cloud Setup\n');
+
+  // 1. Login (opens browser for OAuth)
+  let spinner = ora('Opening browser to authenticate...').start();
+  const login = await $`infisical login`.nothrow();
+  if (!login.success) {
+    spinner.fail('Authentication failed');
+    process.exit(1);
+  }
+  spinner.succeed('Authenticated with Infisical');
+
+  // 2. Create project
+  spinner = ora(`Creating project "${config.project.name}"...`).start();
+  await $`infisical init --name=${config.project.name}`.nothrow();
+
+  // Get project ID from config file
+  const infisicalConfig = JSON.parse(await Bun.file('.infisical.json').text());
+  const projectId = infisicalConfig.workspaceId;
+
+  spinner.succeed('Project created');
+
+  // 3. Save to config
+  config.secrets = {
+    provider: 'infisical',
+    type: 'cloud',
+    projectId,
+    domain: 'https://app.infisical.com',
+  };
+
+  console.log(`\n✅ Infisical configured!`);
+  console.log(`   View at: https://app.infisical.com/project/${projectId}\n`);
+
+  return config;
+}
+
+async function setupInfisicalSelfHosted(config: Config) {
+  console.log('\n🏠 Infisical Self-Hosted Setup\n');
+
+  // 1. Add to docker-compose
+  const spinner = ora('Adding Infisical to docker-compose.yml...').start();
+  await addInfisicalToDockerCompose(config);
+  spinner.succeed('Docker Compose updated');
+
+  // 2. Start services
+  spinner.text = 'Starting Infisical containers...';
+  await $`docker-compose up -d infisical infisical-db infisical-redis`;
+  spinner.succeed('Infisical started');
+
+  // 3. Wait for ready
+  spinner.text = 'Waiting for Infisical to be ready...';
+  await waitForUrl('http://localhost:8080/api/status', 30000);
+  spinner.succeed('Infisical is ready');
+
+  // 4. Open browser for account creation
+  console.log('\n📝 Create your admin account at: http://localhost:8080\n');
+  await $`open http://localhost:8080`;
+
+  await confirm({
+    message: 'Press Enter after creating your admin account...',
+  });
+
+  // 5. Login CLI to local instance
+  spinner = ora('Authenticating CLI with local Infisical...').start();
+  await $`infisical login --domain=http://localhost:8080`;
+  spinner.succeed('CLI authenticated');
+
+  // 6. Create project
+  spinner = ora(`Creating project "${config.project.name}"...`).start();
+  await $`infisical init --name=${config.project.name} --domain=http://localhost:8080`.nothrow();
+
+  const infisicalConfig = JSON.parse(await Bun.file('.infisical.json').text());
+  const projectId = infisicalConfig.workspaceId;
+
+  spinner.succeed('Project created');
+
+  config.secrets = {
+    provider: 'infisical',
+    type: 'self-hosted',
+    projectId,
+    domain: 'http://localhost:8080',
+  };
+
+  console.log(`\n✅ Infisical self-hosted configured!`);
+  console.log(`   View at: http://localhost:8080/project/${projectId}\n`);
+
+  return config;
+}
+
+async function addInfisicalToDockerCompose(config: Config) {
+  // Generate encryption keys
+  const encryptionKey = crypto.randomBytes(32).toString('base64');
+  const jwtSecret = crypto.randomBytes(32).toString('base64');
+
+  // Append Infisical services to docker-compose.yml
+  const infisicalServices = `
+  # Infisical Self-Hosted
+  infisical:
+    image: infisical/infisical:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - ENCRYPTION_KEY=${encryptionKey}
+      - JWT_SECRET=${jwtSecret}
+      - DB_CONNECTION_URI=postgresql://infisical:password@infisical-db:5432/infisical
+      - REDIS_URL=redis://infisical-redis:6379
+      - SITE_URL=http://localhost:8080
+    depends_on:
+      - infisical-db
+      - infisical-redis
+
+  infisical-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=infisical
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=infisical
+    volumes:
+      - infisical-db-data:/var/lib/postgresql/data
+
+  infisical-redis:
+    image: redis:7-alpine
+
+volumes:
+  infisical-db-data:
+`;
+
+  const dockerComposePath = 'docker-compose.yml';
+  const current = await Bun.file(dockerComposePath).text();
+  await Bun.write(dockerComposePath, current + infisicalServices);
+}
 ```
 
+**Cost Comparison:**
+
+| Option | Monthly Cost | Users | Projects |
+|--------|--------------|-------|----------|
+| **Infisical Cloud (Free)** | $0 | Unlimited | 5 |
+| **Infisical Cloud (Pro)** | $18 | Unlimited | Unlimited |
+| **Self-Hosted** | $5-12 (VPS) | Unlimited | Unlimited |
+
 #### 5. Secret Generation (`05-secrets.ts`)
-**Using Node crypto module, push to Doppler immediately**
+**Using Node crypto module, push to Infisical immediately**
 
 ```typescript
 import crypto from 'node:crypto';
 
-const spinner = ora('Generating secrets...').start();
+async function generateAndPushSecrets(config: Config) {
+  const spinner = ora('Generating secrets...').start();
 
-// Generate secrets
-const secrets = {
-  BETTER_AUTH_SECRET: crypto.randomBytes(32).toString('base64'),
-  ...generateWebhookKeys()
-};
-
-function generateWebhookKeys() {
-  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519', {
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    publicKeyEncoding: { type: 'spki', format: 'pem' }
-  });
-  return {
-    WEBHOOK_SIGNING_PRIVATE_KEY: privateKey,
-    WEBHOOK_SIGNING_PUBLIC_KEY: publicKey
+  // Generate secrets
+  const secrets = {
+    BETTER_AUTH_SECRET: crypto.randomBytes(32).toString('base64'),
+    BETTER_AUTH_URL: `https://${config.project.domain}`,
+    ...generateWebhookKeys(),
+    NODE_ENV: 'development',
   };
+
+  function generateWebhookKeys() {
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519', {
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' }
+    });
+    return {
+      WEBHOOK_SIGNING_PRIVATE_KEY: privateKey,
+      WEBHOOK_SIGNING_PUBLIC_KEY: publicKey
+    };
+  }
+
+  spinner.succeed('Secrets generated');
+
+  // Push to Infisical immediately (if not using manual .env)
+  if (config.secrets.provider === 'infisical') {
+    spinner.text = 'Uploading secrets to Infisical...';
+
+    const domain = config.secrets.domain || 'https://app.infisical.com';
+    const domainFlag = domain !== 'https://app.infisical.com' ? `--domain=${domain}` : '';
+
+    for (const [key, value] of Object.entries(secrets)) {
+      // Upload to all environments
+      for (const env of ['dev', 'staging', 'prod']) {
+        await $`infisical secrets set ${key} "${value}" --env=${env} ${domainFlag} --silent`.nothrow();
+      }
+    }
+
+    spinner.succeed(`Secrets uploaded to Infisical (${Object.keys(secrets).length} secrets)`);
+  }
+
+  return secrets;
 }
-
-// Push to Doppler immediately (Doppler was set up in step 4)
-spinner.text = 'Pushing secrets to Doppler...';
-for (const env of config.environments) {
-  await pushToDoppler(env, secrets);
-}
-
-spinner.succeed('Secrets generated and stored in Doppler');
-
-return secrets;
 ```
 
 #### 6. Render Provisioning (`06-render.ts`)
@@ -1049,8 +1257,8 @@ const workerService = await renderApi('/services', {
   }
 });
 
-// Update Doppler with Render URLs
-await pushToDoppler('dev', {
+// Update Infisical with Render URLs
+await pushToInfisical('dev', {
   DATABASE_URL: database.connectionString,
   REDIS_URL: redis.connectionString,
   API_URL: `https://${apiService.service.slug}.onrender.com`,
@@ -1093,9 +1301,9 @@ for (const app of apps) {
   dsns[app] = keys[0].dsn.public;
 }
 
-// Push DSNs to Doppler
+// Push DSNs to Infisical
 for (const env of config.environments) {
-  await pushToDoppler(env, {
+  await pushToInfisical(env, {
     SENTRY_DSN_API: dsns.api,
     SENTRY_DSN_WEB: dsns.web,
     SENTRY_DSN_ADMIN: dsns.admin,
@@ -1122,9 +1330,9 @@ async function setupEmailProvider(config: Config) {
   // Verify API key works
   await verifyEmailProvider(config.emailProvider, config.emailApiKey);
 
-  // Push to Doppler
+  // Push to Infisical
   for (const env of config.environments) {
-    await pushToDoppler(env, {
+    await pushToInfisical(env, {
       EMAIL_PROVIDER: config.emailProvider,
       EMAIL_API_KEY: config.emailApiKey,
       EMAIL_FROM: `noreply@${config.domain}`,
@@ -1174,14 +1382,14 @@ async function setupOAuth(config: Config) {
     oauthCreds[provider] = { clientId, clientSecret };
   }
 
-  // Push to Doppler
+  // Push to Infisical
   for (const env of config.environments) {
     const secrets = {};
     for (const [provider, creds] of Object.entries(oauthCreds)) {
       secrets[`${provider.toUpperCase()}_CLIENT_ID`] = creds.clientId;
       secrets[`${provider.toUpperCase()}_CLIENT_SECRET`] = creds.clientSecret;
     }
-    await pushToDoppler(env, secrets);
+    await pushToInfisical(env, secrets);
   }
 
   console.log('✅ OAuth providers configured');
@@ -1243,10 +1451,10 @@ for (const file of envFiles) {
   }
 }
 
-// Push PROJECT_NAME to Doppler for all environments
-spinner.text = 'Pushing PROJECT_NAME to Doppler...';
+// Push PROJECT_NAME to Infisical for all environments
+spinner.text = 'Pushing PROJECT_NAME to Infisical...';
 for (const env of config.environments) {
-  await pushToDoppler(env, { PROJECT_NAME: config.projectName });
+  await pushToInfisical(env, { PROJECT_NAME: config.projectName });
 }
 
 spinner.succeed('PROJECT_NAME configured');
@@ -1288,7 +1496,7 @@ const spinner = ora('Creating environment files...').start();
 await $`./scripts/setup/sync-env.sh`;
 
 // Files are now ready with PROJECT_NAME from step 11
-// Secrets are already in Doppler from step 5
+// Secrets are already in Infisical from step 5
 
 spinner.succeed('Environment files created');
 ```
@@ -1382,7 +1590,7 @@ const shouldCommit = await confirm({
 
 if (shouldCommit) {
   await $`git add .`;
-  await $`git commit -m "chore: initialize ${config.project.name}\n\nAutomated initialization:\n- Renamed packages from @template to @${config.project.name}\n- Configured Doppler with secrets\n- Provisioned cloud services (Render, Sentry)\n- Set up local development environment\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"`;
+  await $`git commit -m "chore: initialize ${config.project.name}\n\nAutomated initialization:\n- Renamed packages from @template to @${config.project.name}\n- Configured Infisical with secrets\n- Provisioned cloud services (Render, Sentry)\n- Set up local development environment\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"`;
 }
 
 // Success message
@@ -1411,7 +1619,7 @@ console.log('\n' + boxen(
     "render": {
       "keysConfigured": true,
       "apiKeyLast4": "a7f3",
-      "dopplerConfigured": true,
+      "infisicalConfigured": true,
       "localConfigured": false,
       "database": {
         "id": "dpg-abc123",
@@ -1436,7 +1644,7 @@ console.log('\n' + boxen(
     "sentry": {
       "keysConfigured": true,
       "authTokenLast4": "b8k2",
-      "dopplerConfigured": true,
+      "infisicalConfigured": true,
       "localConfigured": true,
       "organization": "my-org",
       "dsns": {
@@ -1450,7 +1658,7 @@ console.log('\n' + boxen(
       "provider": "resend",
       "keysConfigured": true,
       "apiKeyLast4": "c9m7",
-      "dopplerConfigured": true,
+      "infisicalConfigured": true,
       "localConfigured": true
     },
     "doppler": {
@@ -1502,7 +1710,7 @@ console.log('\n' + boxen(
 **Security Note:** API keys and secrets are NEVER stored in `init-config.json`. Only:
 - ✅ Boolean flags indicating configuration status
 - ✅ Non-sensitive metadata (service IDs, URLs, organization names)
-- ✅ Public values (DSNs, connection strings with credentials in Doppler)
+- ✅ Public values (DSNs, connection strings with credentials in Infisical)
 - ❌ API keys, auth tokens, or secrets
 
 **Config File Management:**
@@ -1548,7 +1756,7 @@ const ConfigSchema = z.object({
     render: z.object({
       keysConfigured: z.boolean(),
       apiKeyLast4: z.string().length(4).optional(),
-      dopplerConfigured: z.boolean(),
+      infisicalConfigured: z.boolean(),
       localConfigured: z.boolean(),
       database: z.object({
         id: z.string(),
@@ -1573,7 +1781,7 @@ const ConfigSchema = z.object({
     sentry: z.object({
       keysConfigured: z.boolean(),
       authTokenLast4: z.string().length(4).optional(),
-      dopplerConfigured: z.boolean(),
+      infisicalConfigured: z.boolean(),
       localConfigured: z.boolean(),
       organization: z.string(),
       dsns: z.object({
@@ -1587,10 +1795,14 @@ const ConfigSchema = z.object({
       provider: z.enum(['resend', 'sendgrid', 'ses', 'skip']),
       keysConfigured: z.boolean(),
       apiKeyLast4: z.string().length(4).optional(),
-      dopplerConfigured: z.boolean(),
+      infisicalConfigured: z.boolean(),
       localConfigured: z.boolean()
     }),
-    doppler: z.object({
+    secrets: z.object({
+      provider: z.enum(['infisical', 'none']),
+      type: z.enum(['cloud', 'self-hosted']).optional(),
+      projectId: z.string().optional(),
+      domain: z.string().optional(),
       projectConfigured: z.boolean(),
       secretsPushed: z.boolean(),
       environments: z.array(z.string())

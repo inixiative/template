@@ -1,4 +1,4 @@
-import { createFactory, getNextSeq } from '../factory';
+import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const emailComponentFactory = createFactory('EmailComponent', {
   defaults: () => ({

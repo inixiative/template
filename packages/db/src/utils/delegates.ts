@@ -1,4 +1,4 @@
-import type { Prisma } from '../generated/client/client';
+import type { Prisma } from '@template/db/generated/client/client';
 
 /** Operation type for Prisma delegates */
 export type Operation =

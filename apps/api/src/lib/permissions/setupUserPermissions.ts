@@ -2,7 +2,7 @@ import type { UserId } from '@template/db';
 import { type Entitlements, getUserPermissions, Role } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
-import { validateRole } from './validateRole';
+import { validateRole } from '#/lib/permissions/validateRole';
 
 /**
  * Set up permissions for user's own resources at auth time.

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ComingSoon } from '@template/ui';
+import { ComingSoon } from '@template/ui/components';
 
 const ContentPage = () => {
   return (

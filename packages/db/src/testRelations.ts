@@ -1,4 +1,4 @@
-import { getModelRelations } from './utils/runtimeDataModel';
+import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 
 console.log('User relations:');
 console.log(JSON.stringify(getModelRelations('User'), null, 2));

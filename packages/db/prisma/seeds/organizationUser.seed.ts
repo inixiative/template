@@ -1,9 +1,10 @@
+import type { OrganizationUser } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 /**
  * Prime organization user relationships.
  */
-export const organizationUserSeeds: SeedFile = {
+export const organizationUserSeeds: SeedFile<OrganizationUser> = {
   model: 'organizationUser',
   updateOmitFields: ['createdAt'],
   records: [

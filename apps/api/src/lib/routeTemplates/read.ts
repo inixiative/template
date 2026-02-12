@@ -7,6 +7,7 @@ import {
   buildResponses,
   buildRoutePath,
   buildTags,
+  hasIdParam,
   prepareMiddleware,
 } from '#/lib/routeTemplates/utils';
 
@@ -31,7 +32,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
   const parentContext = submodel ? ` for a ${model}` : '';
   const routePath = buildRoutePath({ submodel, action, skipId, many });
   const routeTags = buildTags({ model, submodel, tags, admin });
-  const skipResource = skipId || (many && !submodel);
+  const skipResource = !hasIdParam(skipId, submodel, many);
 
   const route = createRoute({
     ...args,

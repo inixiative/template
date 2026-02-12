@@ -33,7 +33,7 @@ scripts/
 │   ├── setup.sh            # Full project setup
 │   ├── sync-env.sh         # Sync .env from examples
 │   ├── init.sh             # Initialize from template
-│   └── dopplerSetup.ts     # Doppler secrets setup
+│   └── (init script planned) # Project initialization
 ├── db/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
@@ -44,7 +44,7 @@ scripts/
 └── deployment/
     ├── deploy.sh           # Deploy to environment
     ├── with-env.sh         # Run command with env vars
-    ├── doppler-env.sh      # Load from Doppler
+    ├── (archived)          # Former doppler-env.sh
     └── wait-for-api.sh     # Health check wait
 
 Database utilities (packages/db/prisma/):
@@ -179,8 +179,8 @@ bun run setup           # → scripts/setup/setup.sh
 # Sync env files from examples
 bun run sync-env        # → scripts/setup/sync-env.sh
 
-# Setup Doppler secrets
-bun run setup:doppler   # → scripts/setup/dopplerSetup.ts
+# Initialize project (includes Infisical setup)
+bun run init            # → scripts/init/index.ts (planned)
 ```
 
 ---
@@ -201,8 +201,8 @@ bun run with prod api bun run start
 ```
 
 The `with-env.sh` script:
-1. Loads environment-specific `.env` file
-2. Optionally loads from Doppler
+1. For cloud envs (dev/staging/prod): Uses Infisical if configured, else .env files
+2. For local/test envs: Loads from .env files
 3. Executes the command with those vars
 
 ---

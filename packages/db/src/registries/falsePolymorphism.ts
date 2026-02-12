@@ -1,4 +1,4 @@
-import type { ModelName } from '../utils/modelNames';
+import type { ModelName } from '@template/db/utils/modelNames';
 
 // ============================================================================
 // POLYMORPHISM REGISTRY - Single source of truth for false polymorphism

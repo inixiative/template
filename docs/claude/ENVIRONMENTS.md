@@ -5,7 +5,7 @@
 - [Overview](#overview)
 - [Environment Detection](#environment-detection)
 - [File-Based Environments](#file-based-environments)
-- [Doppler (Cloud Environments)](#doppler-cloud-environments)
+- [Infisical (Cloud Environments)](#infisical-cloud-environments)
 - [with-env Composition](#with-env-composition)
 - [Adding Environment Variables](#adding-environment-variables)
 
@@ -23,12 +23,12 @@ type Environment = 'local' | 'test' | 'dev' | 'staging' | 'sandbox' | 'prod';
 
 | Env | Purpose | Secrets Source |
 |-----|---------|----------------|
-| `local` | Local development | Doppler `dev_*` + `.env.local` overrides |
+| `local` | Local development | `.env.local` files |
 | `test` | Automated tests | `.env.test` files |
-| `dev` | Shared development | Doppler `dev_*` |
-| `staging` | Pre-production | Doppler `staging_*` |
-| `sandbox` | Isolated testing | Doppler `sandbox_*` |
-| `prod` | Production | Doppler `prod_*` |
+| `dev` | Shared development | Infisical `dev` environment |
+| `staging` | Pre-production | Infisical `staging` environment |
+| `sandbox` | Isolated testing | Infisical `sandbox` environment |
+| `prod` | Production | Infisical `prod` environment |
 
 **Always use these abbreviations** in scripts, commands, and config names. Never use `production`, `development`, or other variations.
 
@@ -36,12 +36,12 @@ type Environment = 'local' | 'test' | 'dev' | 'staging' | 'sandbox' | 'prod';
 
 | Environment | NODE_ENV | Notes |
 |-------------|----------|-------|
-| `local` | development | No Doppler |
-| `test` | test | No Doppler |
-| `dev` | development | |
-| `staging` | development | |
+| `local` | development | Uses .env files |
+| `test` | test | Uses .env files |
+| `dev` | development | Uses Infisical |
+| `staging` | development | Uses Infisical |
 | `sandbox` | production | Prod-like, safe to test |
-| `prod` | production | |
+| `prod` | production | Uses Infisical |
 
 ### Branch Deployments
 
@@ -110,50 +110,75 @@ bun run sync-env  # Copies .env.*.example → .env.* (won't overwrite)
 
 ---
 
-## Doppler (Cloud Environments)
+## Infisical (Cloud Environments)
 
-For `dev`, `staging`, `sandbox`, `prod` - secrets managed in Doppler.
+For `dev`, `staging`, `sandbox`, `prod` - secrets managed in Infisical.
 
-### Config Structure
+### Environment Structure
 
-Doppler uses inheritance with three levels:
+Infisical uses a flat environment structure per project:
 
 ```
-root (base secrets - everything inherits)
-├── Apps (inherit root)
-│   ├── api
-│   ├── web
-│   ├── admin
-│   └── super
-├── Environments (inherit root)
-│   ├── dev
-│   ├── staging
-│   ├── sandbox
-│   └── prod
-└── Intersections (inherit both app + env)
-    ├── dev_api, dev_web, dev_admin, dev_super
-    ├── staging_api, staging_web, ...
-    ├── sandbox_api, sandbox_web, ...
-    └── prod_api, prod_web, ...
+Project: your-app-name
+├── dev (development environment)
+├── staging (pre-production)
+├── sandbox (isolated testing)
+└── prod (production)
 ```
 
-Secrets cascade: `root` → `{app}` + `{env}` → `{env}_{app}`
+Each environment contains all secrets needed for that environment.
 
 ### Setup
 
+Infisical is configured during project initialization:
+
 ```bash
-bun run setup:doppler  # Interactive Doppler setup
+bun run init  # Interactive setup (includes Infisical)
+```
+
+**Options:**
+- **Infisical Cloud** (free tier: unlimited users, 5 projects)
+- **Infisical Self-Hosted** (Docker, ~$5-10/mo VPS)
+- **Manual .env** (opt-out, manage secrets yourself)
+
+### Configuration File
+
+After setup, `.infisical.json` is created:
+
+```json
+{
+  "workspaceId": "project-id-here",
+  "domain": "https://app.infisical.com"  // or http://localhost:8080 for self-hosted
+}
 ```
 
 ### Manual Usage
 
 ```bash
-# Run command with Doppler secrets
-doppler run --config dev_api -- bun run start
+# Run command with Infisical secrets
+infisical run --env=dev -- bun run start
 
-# Download secrets to file
-doppler secrets download --config dev_api --no-file --format env
+# Export secrets to file
+infisical export --env=dev > .env.dev
+
+# Set individual secret
+infisical secrets set DATABASE_URL "postgres://..." --env=prod
+
+# List secrets
+infisical secrets list --env=dev
 ```
+
+### CLI Authentication
+
+Team members authenticate once:
+
+```bash
+infisical login  # Opens browser for OAuth
+# or for self-hosted:
+infisical login --domain=http://localhost:8080
+```
+
+Token is stored in `~/.config/infisical/config.json`
 
 ---
 
@@ -176,10 +201,14 @@ bun run with prod api bun run start
 
 ```bash
 # scripts/deployment/with-env.sh
-1. If cloud env (dev/staging/prod): Load from Doppler
-2. Source root .env.$ENV (if exists)
-3. Source app .env.$ENV (if exists, overrides root)
-4. Execute command
+1. If cloud env (dev/staging/sandbox/prod):
+   - Check if Infisical is configured (.infisical.json exists)
+   - If yes: Run via infisical CLI (loads secrets from Infisical)
+   - If no: Fallback to .env files
+2. If local/test env:
+   - Source root .env.$ENV (if exists)
+   - Source app .env.$ENV (if exists, overrides root)
+3. Execute command
 ```
 
 ### Loading Order
@@ -187,19 +216,21 @@ bun run with prod api bun run start
 For `bun run with local api bun run local`:
 
 ```
-1. Load Doppler config: dev_api (base secrets)
-2. Load /.env.local (overrides Doppler)
-3. Load /apps/api/.env.local (overrides)
-4. Run: bun run local
+1. Load /.env.local
+2. Load /apps/api/.env.local (overrides)
+3. Run: bun run local
 ```
 
 For `bun run with prod api bun run start`:
 
 ```
-1. Load Doppler config: prod_api
-2. Load /.env.prod (if exists, overrides Doppler)
-3. Load /apps/api/.env.prod (if exists, overrides)
-4. Run: bun run start
+1. If .infisical.json exists:
+   → infisical run --env=prod -- bun run start
+   (Infisical injects secrets, then runs command)
+2. Else fallback to .env files:
+   → Load /.env.prod (if exists)
+   → Load /apps/api/.env.prod (if exists)
+   → Run: bun run start
 ```
 
 ### Package.json Scripts
@@ -223,10 +254,15 @@ For `bun run with prod api bun run start`:
 
 ### Cloud Environments
 
-1. Add to Doppler at appropriate inheritance level:
-   - All envs: Add to `root`
-   - Env-specific: Add to `dev`, `staging`, or `prod`
-   - App-specific: Add to `dev_api`, `prod_web`, etc.
+1. Add to Infisical for each environment:
+   ```bash
+   # Add to specific environment
+   infisical secrets set NEW_VAR "value" --env=dev
+   infisical secrets set NEW_VAR "value" --env=staging
+   infisical secrets set NEW_VAR "value" --env=prod
+
+   # Or via web UI: https://app.infisical.com
+   ```
 
 ### In Code
 

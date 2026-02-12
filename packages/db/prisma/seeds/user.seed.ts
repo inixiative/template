@@ -1,3 +1,4 @@
+import type { User } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 /**
@@ -11,7 +12,7 @@ import type { SeedFile } from '../seed';
  *
  * Passwords are automatically seeded via account.seed.ts
  */
-export const userSeeds: SeedFile = {
+export const userSeeds: SeedFile<User> = {
   model: 'user',
   updateOmitFields: ['createdAt'],
   records: [

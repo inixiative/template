@@ -1,4 +1,4 @@
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCancelRoute } from '#/modules/inquiry/routes/inquiryCancel';
@@ -12,16 +12,16 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
 
   if (!inquiry) {
-    throw new HTTPException(404, { message: 'Inquiry not found' });
+    throw makeError({ status: 404, message: 'Inquiry not found', requestId: c.get('requestId') });
   }
 
   if (inquiry.status === 'resolved' || inquiry.status === 'canceled') {
-    throw new HTTPException(400, { message: 'Cannot cancel resolved or already canceled inquiry' });
+    throw makeError({ status: 400, message: 'Cannot cancel resolved or already canceled inquiry', requestId: c.get('requestId') });
   }
 
   const isSource = await checkIsSource(db, inquiry, user.id);
   if (!isSource) {
-    throw new HTTPException(403, { message: 'Only the source can cancel' });
+    throw makeError({ status: 403, message: 'Only the source can cancel', requestId: c.get('requestId') });
   }
 
   await db.inquiry.update({

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { UserPlus } from 'lucide-react';
 
 const UsersPage = () => {

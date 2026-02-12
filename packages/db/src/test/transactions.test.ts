@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db';
-import { getNextSeq } from './factory';
-import { cleanupTouchedTables, registerTestTracker } from './testTracker';
+import { getNextSeq } from '@template/db/test/factory';
+import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
 
 describe('transactions', () => {
   beforeEach(() => {
@@ -160,9 +160,15 @@ describe('transactions', () => {
       const callOrder: number[] = [];
 
       await db.txn(async () => {
-        db.onCommit(() => callOrder.push(1));
-        db.onCommit(() => callOrder.push(2));
-        db.onCommit(() => callOrder.push(3));
+        db.onCommit(() => {
+          callOrder.push(1);
+        });
+        db.onCommit(() => {
+          callOrder.push(2);
+        });
+        db.onCommit(() => {
+          callOrder.push(3);
+        });
       });
 
       expect(callOrder).toEqual([1, 2, 3]);

@@ -4,7 +4,7 @@
 
 import { type Condition, check } from '@inixiative/json-rules';
 import { isDev, isLocal, isTest } from '@template/shared/utils';
-import type { Variables } from './interpolate';
+import type { Variables } from '@template/email/render/interpolate';
 
 /**
  * Flatten variables into dot-notation accessible object for json-rules.

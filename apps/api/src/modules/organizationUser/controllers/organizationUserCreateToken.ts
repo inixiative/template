@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
@@ -25,7 +25,7 @@ export const organizationUserCreateTokenController = makeController(
     );
     // Option B: Only admins+ can create tokens (uses 'assign' rules)
     // const checkOrg = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: body.role }, 'assign');
-    if (!checkLeave || !checkOrg) throw new HTTPException(403, { message: `Cannot create ${body.role} token` });
+    if (!checkLeave || !checkOrg) throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
 
     const token = await createToken(db, {
       name: body.name,

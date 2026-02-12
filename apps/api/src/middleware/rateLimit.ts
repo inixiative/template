@@ -1,6 +1,7 @@
 import { getRedisClient, redisNamespace } from '@template/db';
 import type { Context, Next } from 'hono';
 
+import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
 
 const DEFAULT_RATE_LIMIT = 10; // requests per second
@@ -24,7 +25,7 @@ export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
   if (count === 1) await redis.expire(redisKey, 1); // 1 second window
 
   if (count > limit) {
-    return c.json({ error: 'Too Many Requests', message: 'Rate limit exceeded' }, 429);
+    throw makeError({ status: 429, message: 'Rate limit exceeded', requestId: c.get('requestId') });
   }
 
   await next();
@@ -52,7 +53,7 @@ export const rateLimit = (config: RateLimitConfig) => {
     if (count === 1) await redis.expire(redisKey, windowSec);
 
     if (count > max) {
-      return c.json({ error: 'Too Many Requests', message: 'Rate limit exceeded' }, 429);
+      throw makeError({ status: 429, message: 'Rate limit exceeded', requestId: c.get('requestId') });
     }
 
     await next();

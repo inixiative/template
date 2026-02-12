@@ -2,8 +2,8 @@ import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord, ModelName } from '@template/db';
 import { getModelRelations, toAccessor, toModelName } from '@template/db';
 import { isNil } from 'lodash-es';
-import type { Action, Permix } from '../client';
-import type { ActionRule, RebacSchema } from './types';
+import type { Action, Permix } from '@template/permissions/client';
+import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
 /**
  * Check if permix grants access via ReBAC schema traversal.

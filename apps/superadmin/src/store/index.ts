@@ -1,13 +1,13 @@
-import { type ApiSlice, type AuthSlice, createApiSlice, createAuthSlice } from '@template/shared';
+import { type AuthSlice, type ClientSlice, createAuthSlice, createClientSlice } from '@template/ui/store';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-export type SuperadminStore = ApiSlice & AuthSlice;
+export type SuperadminStore = ClientSlice & AuthSlice;
 
 export const useSuperadminStore = create<SuperadminStore>()(
   devtools(
     (...a) => ({
-      ...createApiSlice(...a),
+      ...createClientSlice(...a),
       ...createAuthSlice(...a),
     }),
     { name: 'SuperadminStore' },

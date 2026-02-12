@@ -1,7 +1,7 @@
 # AUTH-002: Unified Auth System
 
-**Status**: 🆕 Not Started
-**Assignee**: TBD
+**Status**: 🏗️ In Progress
+**Assignee**: Claude
 **Priority**: High
 **Created**: 2026-02-09
 **Updated**: 2026-02-09
@@ -22,12 +22,13 @@ Redesign authentication system to support multiple auth methods (email/password,
 
 ## Goals
 
-1. **Unified Interface**: Single `authenticate()` method handles all auth types
-2. **Dynamic Discovery**: Backend tells frontend what auth methods are available
-3. **Standardized UX**: Consistent sign-in/sign-up regardless of auth method
-4. **Domain Routing**: Email domain → appropriate SSO provider
-5. **Zustand Integration**: Auth methods in store, no prop drilling
-6. **Future-Proof**: Easy to add new providers without code changes
+1. **Unified Interface**: Separate `signIn()` and `signUp()` functions handle all auth types
+2. **No AuthClient**: Direct function calls from Zustand, no prop drilling
+3. **Dynamic Discovery**: Backend tells frontend what auth methods are available
+4. **Standardized UX**: Consistent sign-in/sign-up regardless of auth method
+5. **Domain Routing**: Email domain → appropriate SSO provider
+6. **Zustand Integration**: Auth functions called from store, session state managed centrally
+7. **Future-Proof**: Easy to add new providers without code changes
 
 ## Key Components
 
@@ -68,26 +69,74 @@ model AuthProvider {
 ### 1. Unified Auth Interface
 
 ```typescript
-// packages/shared/src/store/slices/auth.ts
+// packages/shared/src/lib/auth/types.ts
+export type EmailAuthMethod = {
+  type: 'email';
+  email: string;
+  password: string;
+  name?: string; // For signup
+};
 
-type AuthMethod =
-  | { type: 'email'; email: string; password: string }
-  | { type: 'oauth'; provider: 'google' | 'github' | 'microsoft' }
-  | { type: 'saml'; provider: string; email?: string };
+export type OAuthAuthMethod = {
+  type: 'oauth';
+  provider: 'google' | 'github' | 'microsoft';
+};
 
-type AuthMethodConfig =
+export type SamlAuthMethod = {
+  type: 'saml';
+  provider: string;
+  email?: string;
+};
+
+export type AuthMethod = EmailAuthMethod | OAuthAuthMethod | SamlAuthMethod;
+
+export type AuthMethodConfig =
   | { type: 'email'; enabled: boolean }
   | { type: 'oauth'; providers: string[] }
   | { type: 'saml'; providers: Array<{ id: string; name: string; domains: string[] }> };
 
+export type AuthSession = {
+  user: AuthUser;
+  session: {
+    token: string;
+    expiresAt: Date;
+  };
+};
+
+// packages/shared/src/lib/auth/signin.ts
+export async function signIn(method: AuthMethod): Promise<AuthSession> {
+  switch (method.type) {
+    case 'email':
+      return signInWithEmail(method);
+    case 'oauth':
+      return signInWithOAuth(method);
+    case 'saml':
+      return signInWithSaml(method);
+  }
+}
+
+// packages/shared/src/lib/auth/signup.ts
+export async function signUp(method: AuthMethod): Promise<AuthSession> {
+  switch (method.type) {
+    case 'email':
+      return signUpWithEmail(method);
+    case 'oauth':
+      return signUpWithOAuth(method); // OAuth auto-creates
+    case 'saml':
+      return signUpWithSaml(method); // JIT provisioning
+  }
+}
+
+// packages/shared/src/store/slices/auth.ts
 export type AuthSlice = {
   auth: {
     // ... existing fields
     availableMethods: AuthMethodConfig[];
 
-    // New methods
+    // New methods - call signIn/signUp functions
     fetchAuthMethods: () => Promise<AuthMethodConfig[]>;
-    authenticate: (method: AuthMethod) => Promise<void>;
+    signIn: (method: AuthMethod) => Promise<void>;
+    signUp: (method: AuthMethod) => Promise<void>;
 
     // Existing methods stay
     initialize: () => Promise<AuthUser | null>;
@@ -216,36 +265,71 @@ const EmailInput = () => {
 
 ## Implementation Plan
 
-### Phase 1: Auth Methods Discovery (Week 1)
-- [ ] Create `GET /auth/methods` endpoint
-- [ ] Add domain-based SAML provider lookup
-- [ ] Update auth slice with `availableMethods` state
-- [ ] Implement `fetchAuthMethods()` in Zustand
+### Phase 1: Database & Encryption ✅ COMPLETE
+- [x] Design AuthProvider schema (org-scoped only)
+- [x] Design encryption service with keyring + AAD
+- [x] Create Prisma schema for AuthProvider
+- [x] Generate migration
+- [x] Implement EncryptionService with full validation
+- [x] Add AuthProviderId to typed IDs system
+- [x] Add authProvider permissions (own → organization.own)
 
-### Phase 2: Unified Auth Interface (Week 1-2)
-- [ ] Create `authenticate(method)` function in auth slice
-- [ ] Handle email/password flow
-- [ ] Handle OAuth redirect flow
-- [ ] Handle SAML redirect flow (stub for now)
-- [ ] Move Better Auth client creation into auth slice
-- [ ] Remove `createAuthClient` file and per-app auth.ts files
+### Phase 2: AuthProvider CRUD API ✅ COMPLETE
+- [x] Create `apps/api/src/modules/authProvider/` module
+- [x] Implement controllers:
+  - [x] `authProviderReadMany.ts` - Returns platform + org providers
+  - [x] `authProviderUpdate.ts` - Update org provider (with validatePermission)
+  - [x] `authProviderDelete.ts` - Delete org provider (with validatePermission)
+- [x] Implement `authProviderService.ts`
+  - [x] `getPlatformProviders()` - Load from env vars
+  - [x] `getAuthProvidersForOrg()` - Merge platform + org
+  - [x] `createAuthProvider()` - Create with encryption
+  - [x] `updateAuthProvider()` - Update with encryption
+  - [x] `deleteAuthProvider()` - Delete provider
+- [x] Create routes with validatePermission('own') middleware
+- [x] Add superadmin readMany endpoint
+- [x] Create organizationCreateAuthProvider (organization submodel pattern)
 
-### Phase 3: Dynamic UI Components (Week 2)
+### Phase 3: Core Auth Functions
+- [ ] Create `packages/shared/src/lib/auth/` directory
+- [ ] Create `types.ts` with AuthMethod, AuthSession types
+- [ ] Create `signin.ts` with signIn() function
+  - [ ] Implement email/password signin
+  - [ ] Implement OAuth signin (redirect initiation)
+  - [ ] Stub SAML signin
+- [ ] Create `signup.ts` with signUp() function
+  - [ ] Implement email/password signup
+  - [ ] Implement OAuth signup
+  - [ ] Stub SAML signup
+
+### Phase 4: Zustand Integration
+- [ ] Update auth slice to call signIn/signUp functions
+- [ ] Add `auth.signIn(method)` - calls signin.ts
+- [ ] Add `auth.signUp(method)` - calls signup.ts
+- [ ] Implement `fetchAuthMethods()` using readMany endpoint
+- [ ] Update session state management
+- [ ] Remove `createAuthClient` file
+- [ ] Remove per-app `auth.ts` files
+
+### Phase 4: Dynamic UI Components (Week 2)
 - [ ] Create `AuthProvider` component
 - [ ] Create `EmailPasswordForm` component
+  - [ ] Call `auth.signIn({ type: 'email', ... })` for login
+  - [ ] Call `auth.signUp({ type: 'email', ... })` for signup
 - [ ] Create `OAuthButton` component
+  - [ ] Call `auth.signIn({ type: 'oauth', ... })`
 - [ ] Create `SSOButton` component (stub)
-- [ ] Update LoginPage to use AuthProvider
-- [ ] Update SignupPage to use AuthProvider
+- [ ] Update LoginPage to use new components
+- [ ] Update SignupPage to use new components
 - [ ] Remove authClient prop from all components
 
-### Phase 4: Email-Based Routing (Week 2-3)
+### Phase 5: Email-Based Routing (Week 2-3)
 - [ ] Add email input with domain detection
 - [ ] Auto-route to SSO if domain matches
 - [ ] Show password field only if email/password allowed
 - [ ] Handle mixed auth scenarios (email + SSO for same domain)
 
-### Phase 5: SSO/SAML Integration (Week 3-4)
+### Phase 6: SSO/SAML Integration (Week 3-4)
 - [ ] Evaluate Better Auth SAML plugin vs custom implementation
 - [ ] Implement SAML provider configuration UI (admin)
 - [ ] Add domain verification flow
@@ -255,25 +339,42 @@ const EmailInput = () => {
 
 ## Files to Modify
 
-### Backend
-- `apps/api/src/lib/auth.ts` - Add OAuth providers, prepare for SAML
-- `apps/api/src/modules/auth/routes/authMethods.ts` (NEW)
-- `apps/api/src/modules/auth/controllers/authMethods.ts` (NEW)
+### Database
+- `packages/db/prisma/schema.prisma` - Add AuthProvider model (NEW)
+- Run migration
 
-### Frontend - Shared Package
-- `packages/shared/src/store/slices/auth.ts` - Add authenticate(), fetchAuthMethods()
-- `packages/shared/src/components/AuthProvider.tsx` (NEW)
-- `packages/shared/src/components/EmailPasswordForm.tsx` (NEW)
-- `packages/shared/src/components/OAuthButton.tsx` (NEW)
-- `packages/shared/src/components/SSOButton.tsx` (NEW)
+### Backend - Encryption
+- `packages/shared/src/lib/encryption/encryptionService.ts` (NEW)
+
+### Backend - AuthProvider Module
+- `apps/api/src/modules/authProvider/routes/authProvider.ts` (NEW)
+- `apps/api/src/modules/authProvider/controllers/readMany.ts` (NEW)
+- `apps/api/src/modules/authProvider/controllers/create.ts` (NEW)
+- `apps/api/src/modules/authProvider/controllers/update.ts` (NEW)
+- `apps/api/src/modules/authProvider/controllers/delete.ts` (NEW)
+- `apps/api/src/modules/authProvider/services/authProviderService.ts` (NEW)
+- `apps/api/src/modules/authProvider/validators/authProvider.ts` (NEW)
+- `apps/api/src/modules/modules.ts` - Register authProvider module
+
+### Backend - Auth Config
+- `apps/api/src/lib/auth/platformProviders.ts` (NEW) - Load from env vars
+- `apps/api/src/lib/auth.ts` - Update to use dynamic providers
+
+### Frontend - Auth Functions
+- `packages/shared/src/lib/auth/types.ts` (NEW)
+- `packages/shared/src/lib/auth/signin.ts` (NEW)
+- `packages/shared/src/lib/auth/signup.ts` (NEW)
+- `packages/shared/src/lib/auth/providers/email.ts` (NEW)
+- `packages/shared/src/lib/auth/providers/oauth.ts` (NEW)
+
+### Frontend - Zustand
+- `packages/shared/src/store/slices/auth.ts` - Add signIn(), signUp(), fetchAuthMethods()
 - `packages/shared/src/lib/createAuthClient.ts` (DELETE after migration)
 
 ### Frontend - Apps
 - `apps/web/app/lib/auth.ts` (DELETE)
 - `apps/admin/app/lib/auth.ts` (DELETE)
-- `apps/web/app/routes/login.tsx` - Use AuthProvider
-- `apps/web/app/routes/signup.tsx` - Use AuthProvider
-- `apps/admin/app/routes/login.tsx` - Use AuthProvider
+- `apps/superadmin/app/lib/auth.ts` (DELETE)
 
 ## Testing
 

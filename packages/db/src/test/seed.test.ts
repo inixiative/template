@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
-import seeds from '../../prisma/seeds';
+import { seeds } from '../../prisma/seeds';
+import type { SeedFile } from '../../prisma/seed';
+import type { User, Account, Organization, Space, Token } from '@template/db/generated/client/client';
 
 describe('Seed System', () => {
   describe('UUID Validation', () => {
@@ -70,7 +72,7 @@ describe('Seed System', () => {
 
   describe('Prime Seed Data', () => {
     test('prime users exist', () => {
-      const userSeed = seeds.find((s) => s.model === 'user');
+      const userSeed = seeds.find((s: SeedFile) => s.model === 'user') as SeedFile<User> | undefined;
       expect(userSeed).toBeDefined();
 
       const primeUsers = userSeed!.records.filter((r) => r.prime);
@@ -83,7 +85,7 @@ describe('Seed System', () => {
     });
 
     test('prime accounts have passwords', () => {
-      const accountSeed = seeds.find((s) => s.model === 'account');
+      const accountSeed = seeds.find((s) => s.model === 'account') as SeedFile<Account> | undefined;
       expect(accountSeed).toBeDefined();
 
       const primeAccounts = accountSeed!.records.filter((r) => r.prime);
@@ -99,7 +101,7 @@ describe('Seed System', () => {
     });
 
     test('prime organization exists', () => {
-      const orgSeed = seeds.find((s) => s.model === 'organization');
+      const orgSeed = seeds.find((s) => s.model === 'organization') as SeedFile<Organization> | undefined;
       expect(orgSeed).toBeDefined();
 
       const primeOrgs = orgSeed!.records.filter((r) => r.prime);
@@ -108,7 +110,7 @@ describe('Seed System', () => {
     });
 
     test('prime space exists', () => {
-      const spaceSeed = seeds.find((s) => s.model === 'space');
+      const spaceSeed = seeds.find((s) => s.model === 'space') as SeedFile<Space> | undefined;
       expect(spaceSeed).toBeDefined();
 
       const primeSpaces = spaceSeed!.records.filter((r) => r.prime);
@@ -117,7 +119,7 @@ describe('Seed System', () => {
     });
 
     test('prime tokens exist', () => {
-      const tokenSeed = seeds.find((s) => s.model === 'token');
+      const tokenSeed = seeds.find((s) => s.model === 'token') as SeedFile<Token> | undefined;
       expect(tokenSeed).toBeDefined();
 
       const primeTokens = tokenSeed!.records.filter((r) => r.prime);

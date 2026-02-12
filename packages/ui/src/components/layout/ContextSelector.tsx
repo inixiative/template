@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppStore } from '@template/shared';
+import { useAppStore } from '@template/ui/store';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
 import { cn } from '@template/ui/lib/utils';
 import { Boxes, Building2, Check, ChevronDown, ChevronsUpDown, ChevronUp, Settings, User } from 'lucide-react';
 
-export type ContextType = 'personal' | 'organization' | 'space';
+export type ContextType = 'user' | 'organization' | 'space' | 'public';
 
 export type SpaceOption = {
   id: string;
@@ -46,10 +46,26 @@ export const ContextSelector = ({
   const tenant = useAppStore((state) => state.tenant);
   const auth = useAppStore((state) => state.auth);
 
-  const current = tenant.getCurrentContext();
-  const organizations = auth.getOrganizationOptions();
+  const current = tenant.context;
+  const organizations = Object.values(auth.organizations ?? {}).map((org) => ({
+    id: org.id,
+    name: org.name,
+    spaces: Object.values(auth.spaces ?? {})
+      .filter((space) => space.organizationId === org.id)
+      .map((space) => ({ id: space.id, name: space.name })),
+  }));
 
-  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(current.organizationId || null);
+  const [expandedOrgId, setExpandedOrgId] = useState<string | null>(current.organization?.id || null);
+
+  // Generate label from context
+  const currentLabel =
+    current.type === 'organization'
+      ? current.organization?.name ?? 'Organization'
+      : current.type === 'space'
+        ? current.space?.name ?? 'Space'
+        : current.type === 'user'
+          ? 'Personal'
+          : 'Public';
 
   const toggleOrg = (orgId: string) => {
     setExpandedOrgId(expandedOrgId === orgId ? null : orgId);
@@ -60,7 +76,7 @@ export const ContextSelector = ({
       <div className={cn('w-full', className)}>
         <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
           <div className="flex-1 text-left min-w-0">
-            <div className="font-semibold truncate">{current.label}</div>
+            <div className="font-semibold truncate">{currentLabel}</div>
             <div className="text-xs text-muted-foreground capitalize">{current.type}</div>
           </div>
         </div>
@@ -73,7 +89,7 @@ export const ContextSelector = ({
       <DropdownMenuTrigger className={cn('w-full', className)}>
         <div className="flex items-center gap-3 p-2 rounded-md hover:bg-accent transition-colors">
           <div className="flex-1 text-left min-w-0">
-            <div className="font-semibold truncate">{current.label}</div>
+            <div className="font-semibold truncate">{currentLabel}</div>
             <div className="text-xs text-muted-foreground capitalize">{current.type}</div>
           </div>
           <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -83,19 +99,19 @@ export const ContextSelector = ({
       <DropdownMenuContent className="w-[280px]" align="start">
         <div className="max-h-[60vh] overflow-y-auto">
           {organizations.map((org) => {
-            const isCurrentOrg = current.organizationId === org.id && current.type === 'organization';
+            const isCurrentOrg = current.organization?.id === org.id && current.type === 'organization';
             const isExpanded = expandedOrgId === org.id;
             const spaces = org.spaces || [];
 
             if (spaces.length === 1) {
               const space = spaces[0];
               const isCurrentSpace =
-                current.organizationId === org.id && current.spaceId === space.id && current.type === 'space';
+                current.organization?.id === org.id && current.space?.id === space.id && current.type === 'space';
 
               return (
                 <DropdownMenuItem
                   key={org.id}
-                  onClick={() => tenant.selectSpace(space.id)}
+                  onClick={() => tenant.setSpace(space.id)}
                   className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                 >
                   <Building2 className="h-4 w-4 mr-2" />
@@ -119,12 +135,12 @@ export const ContextSelector = ({
                   <div className="pl-6 py-1 space-y-1">
                     {spaces.map((space) => {
                       const isCurrentSpace =
-                        current.organizationId === org.id && current.spaceId === space.id && current.type === 'space';
+                        current.organization?.id === org.id && current.space?.id === space.id && current.type === 'space';
 
                       return (
                         <DropdownMenuItem
                           key={space.id}
-                          onClick={() => tenant.selectSpace(space.id)}
+                          onClick={() => tenant.setSpace(space.id)}
                           className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                         >
                           <span className="flex-1 truncate">{space.name}</span>
@@ -134,7 +150,7 @@ export const ContextSelector = ({
                     })}
 
                     <DropdownMenuItem
-                      onClick={() => tenant.selectOrganization(org.id)}
+                      onClick={() => tenant.setOrganization(org.id)}
                       className="cursor-pointer border-t"
                     >
                       <Settings className="h-4 w-4 mr-2" />
@@ -150,12 +166,12 @@ export const ContextSelector = ({
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          onClick={tenant.setPersonal}
-          className={cn('cursor-pointer', current.type === 'personal' && 'bg-accent text-accent-foreground')}
+          onClick={tenant.setUser}
+          className={cn('cursor-pointer', current.type === 'user' && 'bg-accent text-accent-foreground')}
         >
           <User className="h-4 w-4 mr-2" />
           <span className="flex-1">Personal</span>
-          {current.type === 'personal' && <Check className="h-4 w-4 ml-2" />}
+          {current.type === 'user' && <Check className="h-4 w-4 ml-2" />}
         </DropdownMenuItem>
 
         {onManageOrganizations && (

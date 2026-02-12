@@ -2,7 +2,7 @@ import type { OrganizationId } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import type { Role } from '@template/db/generated/client/enums';
 import { type Entitlements, OrganizationAction, type PermissionEntry, type Permix } from '@template/permissions/client';
-import { allTrue, isSuperadmin } from './shared';
+import { allTrue, isSuperadmin } from '@template/permissions/roles/shared';
 
 export const organizationRoles = {
   owner: { organization: { own: true } },

@@ -1,7 +1,7 @@
 import { log } from '@template/shared/logger';
 import { compact, isNil } from 'lodash-es';
-import { getRedisClient } from './client';
-import { redisNamespace } from './namespaces';
+import { getRedisClient } from '@template/db/redis/client';
+import { redisNamespace } from '@template/db/redis/namespaces';
 
 const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
 const NEGATIVE_TTL = 60; // 1 minute for null/undefined results

@@ -9,7 +9,6 @@
   "scripts": {
     "postinstall": "bun run generate:routes && bun run generate:sdk",
     "setup": "./scripts/setup/setup.sh",
-    "setup:doppler": "bun ./scripts/setup/dopplerSetup.ts",
     "sync-env": "./scripts/setup/sync-env.sh",
     "with": "./scripts/deployment/with-env.sh",
     "local": "bun run local:db && turbo watch local#api local#web local#admin local#superadmin local:worker#api",
@@ -38,7 +37,7 @@
     "db:restore": "./scripts/db/restore.sh",
     "db:clone": "./scripts/db/clone.sh",
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
-    "generate:sdk": "bun --cwd apps/api generate:openapi && bun --cwd packages/shared generate:sdk",
+    "generate:sdk": "bun run with local api 'bun --cwd apps/api generate:openapi && bun --cwd packages/ui generate:sdk'",
     "deploy": "./scripts/deployment/deploy.sh",
     "lint": "biome check . && bun run lint:postBiome",
     "lint:postBiome": "./scripts/lint/runPostBiomeChecks.sh",

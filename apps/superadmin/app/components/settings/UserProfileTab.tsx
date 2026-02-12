@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@template/ui/components';
 
 export const UserProfileTab = () => {
   return (

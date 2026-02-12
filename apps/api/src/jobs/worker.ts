@@ -3,10 +3,11 @@ import { LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
+import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
-import type { WorkerContext } from '#/jobs/types';
+import { JobType, type WorkerContext } from '#/jobs/types';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -75,6 +76,7 @@ export const initializeWorker = async (): Promise<void> => {
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+  await enqueueJob('rotateEncryptionKeys', undefined, { id: 'rotateEncryptionKeys' });
 
   onShutdown(async () => {
     log.info('Stopping job worker...', LogScope.worker);

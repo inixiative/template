@@ -1,4 +1,4 @@
-import { createAuthGuards } from '@template/shared';
+import { createAuthGuards } from '@template/ui/guards';
 import { useAppStore } from '#/store';
 
-export const { requireAuth, requireGuest } = createAuthGuards(() => useAppStore.getState());
+export const { requireAuth, requirePublic } = createAuthGuards(() => useAppStore.getState());

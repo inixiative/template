@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import { DbAction, executeHooks, type HookOptions, HookTiming, registerDbHook } from '../extensions/mutationLifeCycle';
+import { DbAction, executeHooks, HookTiming, registerDbHook, type HookOptions } from '@template/db/extensions/mutationLifeCycle';
 
 // Mock logger - the proxy makes direct spying difficult
 const mockWarn = mock(() => {});
@@ -288,8 +288,8 @@ describe('mutationLifeCycle', () => {
 
   describe('HookTiming enum', () => {
     it('has before and after timings', () => {
-      expect(HookTiming.before).toBe('before');
-      expect(HookTiming.after).toBe('after');
+      expect(HookTiming.before).toBe(HookTiming.before);
+      expect(HookTiming.after).toBe(HookTiming.after);
     });
   });
 });

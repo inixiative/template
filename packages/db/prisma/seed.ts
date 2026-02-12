@@ -20,12 +20,12 @@ import { omit } from 'lodash-es';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
 import { seeds } from './seeds';
 
-export type SeedFile = {
+export type SeedFile<T = Record<string, unknown>> = {
   /** Prisma model accessor name */
   model: AccessorName;
 
   /** Records to seed (all must have 'id' field) */
-  records: (Record<string, unknown> & { id: string; prime?: boolean })[];
+  records: (Partial<T> & { id: string; prime?: boolean })[];
 
   /** If true, only insert new records - never update existing */
   createOnly?: boolean;

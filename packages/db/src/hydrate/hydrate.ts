@@ -1,9 +1,9 @@
-import type { Db } from '../clientTypes';
-import { cacheKey } from '../redis';
-import type { AccessorName } from '../utils/modelNames';
-import { getAccessorRelations, type Identifier } from '../utils/runtimeDataModel';
-import { fetchOne } from './fetchOne';
-import type { HydratedRecord } from './types';
+import type { Db } from '@template/db/clientTypes';
+import { cacheKey } from '@template/db/redis';
+import type { AccessorName } from '@template/db/utils/modelNames';
+import { getAccessorRelations, type Identifier } from '@template/db/utils/runtimeDataModel';
+import { fetchOne } from '@template/db/hydrate/fetchOne';
+import type { HydratedRecord } from '@template/db/hydrate/types';
 
 type PendingMap = Map<string, Promise<HydratedRecord | null>>;
 

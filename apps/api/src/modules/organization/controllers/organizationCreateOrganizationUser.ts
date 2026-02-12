@@ -1,5 +1,5 @@
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
@@ -16,7 +16,7 @@ export const organizationCreateOrganizationUserController = makeController(
 
     validateOrganizationCreateOrganizationUserBody(body);
     if (!check(permix, rebacSchema, 'organization', { id: org.id, role: body.role }, 'assign'))
-      throw new HTTPException(403, { message: 'Access denied' });
+      throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
 
     const userId = body.userId ?? (await findUserOrCreateGuest(db, { email: body.email!, name: body.name })).id;
 

@@ -3,6 +3,7 @@ import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin'
 import { adminCacheRouter } from '#/modules/admin/cache';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { adminJobRouter } from '#/modules/admin/job';
+import { adminAuthProviderRouter } from '#/modules/authProvider';
 import { adminInquiryRouter } from '#/modules/inquiry';
 import { adminOrganizationRouter } from '#/modules/organization';
 import { adminSpaceRouter } from '#/modules/space';
@@ -13,6 +14,7 @@ export const adminRouter = new OpenAPIHono<AppEnv>();
 
 adminRouter.use('*', validateSuperadmin);
 
+adminRouter.route('/authProvider', adminAuthProviderRouter);
 adminRouter.route('/cache', adminCacheRouter);
 adminRouter.route('/cronJob', adminCronJobRouter);
 adminRouter.route('/job', adminJobRouter);

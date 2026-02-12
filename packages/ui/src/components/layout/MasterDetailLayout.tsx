@@ -1,5 +1,5 @@
 import { cn } from '@template/ui/lib/utils';
-import { Breadcrumbs } from '../Breadcrumbs';
+import { Breadcrumbs } from '@template/ui/components/Breadcrumbs';
 
 export type MasterDetailLayoutProps = {
   master?: React.ReactNode;

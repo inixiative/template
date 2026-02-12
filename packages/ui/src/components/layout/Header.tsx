@@ -1,4 +1,4 @@
-import { useAppStore } from '@template/shared';
+import { useAppStore } from '@template/ui/store';
 import { cn } from '@template/ui/lib/utils';
 import { Menu } from 'lucide-react';
 import { ShareButton } from '@template/ui/components/ShareButton';

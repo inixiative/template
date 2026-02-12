@@ -1,4 +1,4 @@
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
@@ -13,16 +13,16 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
 
   if (!inquiry) {
-    throw new HTTPException(404, { message: 'Inquiry not found' });
+    throw makeError({ status: 404, message: 'Inquiry not found', requestId: c.get('requestId') });
   }
 
   if (inquiry.status !== 'draft') {
-    throw new HTTPException(400, { message: 'Only draft inquiries can be updated' });
+    throw makeError({ status: 400, message: 'Only draft inquiries can be updated', requestId: c.get('requestId') });
   }
 
   const isSource = await checkIsSource(db, inquiry, user.id);
   if (!isSource) {
-    throw new HTTPException(403, { message: 'Only the source can update' });
+    throw makeError({ status: 403, message: 'Only the source can update', requestId: c.get('requestId') });
   }
 
   const updated = await db.inquiry.update({ where: { id }, data });

@@ -1,5 +1,5 @@
 import { lowerFirst, upperFirst } from 'lodash-es';
-import { Prisma } from '../generated/client/client';
+import { Prisma } from '@template/db/generated/client/client';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -10,6 +10,8 @@ export type ModelName = Prisma.ModelName;
 export type AccessorName = Uncapitalize<ModelName>;
 
 export type ModelTypeMap = { [K in ModelName]: Prisma.TypeMap['model'][K]['payload']['scalars'] };
+
+export type ModelNameFromAccessor<A extends AccessorName> = Extract<ModelName, Capitalize<A>>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PascalCase (ModelName) utilities

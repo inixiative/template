@@ -5,6 +5,7 @@
     "paths": {
       "#/*": ["./app/*"],
       "@template/db/*": ["../../packages/db/src/*"],
+      "@template/permissions/*": ["../../packages/permissions/src/*"],
       "@template/shared/*": ["../../packages/shared/src/*"],
       "@template/ui/*": ["../../packages/ui/src/*"]
     }

@@ -1,4 +1,5 @@
 import { isTest } from '@template/shared/utils';
+import { encryptionKeySchema, createEncryptionEnvRefinement } from '@template/db/lib/encryption/envValidation';
 import { z } from 'zod';
 
 const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
@@ -54,7 +55,17 @@ const envSchema = z.object({
   // Stripe (optional integration)
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
-});
+
+  // Encryption (for sensitive data at rest)
+  AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION: z.coerce.number().int().min(1),
+  AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT: encryptionKeySchema,
+  AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS: encryptionKeySchema.optional(),
+}).superRefine(
+  createEncryptionEnvRefinement(
+    'AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION',
+    'AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS',
+  ),
+);
 
 // Extend ProcessEnv with our schema types
 export type Env = z.infer<typeof envSchema>;

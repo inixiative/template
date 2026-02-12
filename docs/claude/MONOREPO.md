@@ -61,6 +61,99 @@ Defined in root `package.json`:
 | `apps/admin` | `admin` |
 | `apps/superadmin` | `superadmin` |
 
+### Package Descriptions
+
+#### @template/db
+
+**Location:** `packages/db/`
+
+Database layer with Prisma client, hooks, extensions, and encryption.
+
+- **Schema:** `prisma/schema/` - Modular schema files
+- **Hooks:** Mutation lifecycle, validation, audit logging
+- **Extensions:** Redis cache, false polymorphism
+- **Encryption:** Field-level AES-256-GCM encryption with key rotation
+- **Test utilities:** Factories, test database management
+
+#### @template/shared
+
+**Location:** `packages/shared/`
+
+**Isomorphic utilities** shared between frontend and backend. Originally contained frontend code, now focused only on true cross-platform utilities.
+
+**Current contents:**
+- `logger/` - Consola-based logging (works in Node + browser)
+- `errors/` - Error types and utilities
+
+**Historical note:** Previously contained frontend components, hooks, and state management. All frontend code migrated to `@template/ui` for better organization (see below).
+
+#### @template/ui
+
+**Location:** `packages/ui/`
+
+**All frontend code** - components, hooks, state, pages, and API client.
+
+**Why separate from @template/shared?**
+
+Originally, `@template/shared` was meant for code shared between frontend and backend. As the codebase grew, it became clear that:
+- Frontend code is never used by backend
+- OpenAPI client generation is frontend-specific
+- UI components need different testing strategies
+- Package grew too large and unfocused
+
+**Migration (2026-02-12):** Moved all frontend code from `@template/shared` to `@template/ui`:
+- Components, hooks, pages
+- Zustand store slices
+- Auth utilities
+- Test utilities
+
+**Component organization** (by domain, not technical type):
+
+```
+ui/src/components/
+├── auth/              # LoginForm, SignupForm
+├── layout/            # AppShell, Sidebar, Header
+├── organizations/     # CreateOrganizationModal
+├── primitives/        # Button, Input, Card (shadcn/ui)
+├── settings/          # Profile/Tokens/Webhooks tabs
+├── users/             # InviteUserModal
+└── utility/           # ErrorBoundary, NotFound
+```
+
+**OpenAPI client:**
+- Auto-generated from API spec (`openapi.json`)
+- Type-safe API calls
+- Located in `apiClient/`
+
+See `docs/claude/FRONTEND.md` for detailed frontend patterns.
+
+#### @template/permissions
+
+**Location:** `packages/permissions/`
+
+RBAC (Role-Based Access Control) system using Permix and ReBAC.
+
+- Role definitions (organization, space, user)
+- Permission checks
+- Entitlement system
+- Context setup utilities
+
+See `docs/claude/PERMISSIONS.md` for details.
+
+#### @template/email
+
+**Location:** `packages/email/`
+
+Email template system with MJML rendering and composition.
+
+- Template storage and versioning
+- Component library
+- Variable interpolation
+- Conditional rendering
+- Client abstractions (Resend, console)
+
+See `docs/claude/COMMUNICATIONS.md` for details.
+
 ---
 
 ## Path Aliases

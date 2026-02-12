@@ -1,7 +1,7 @@
 import * as zodSchemas from '@template/db/generated/zod/schemas/objects';
 import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 import type { ZodObject, ZodTypeAny } from 'zod';
-import type { DependencyConfig, ModelName } from './factoryTypes';
+import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes';
 
 const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null => {
   const schemaKey = `${modelName}CreateInputObjectSchema` as keyof typeof zodSchemas;

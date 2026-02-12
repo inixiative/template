@@ -1,5 +1,5 @@
 import { Operator } from '@inixiative/json-rules';
-import type { RebacSchema } from './types';
+import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
 
@@ -66,6 +66,12 @@ export const rebacSchema: RebacSchema = {
     actions: {
       // Self-delete for tokens with userId (User, OrgUser, SpaceUser)
       leave: { self: 'userId' },
+    },
+  },
+
+  authProvider: {
+    actions: {
+      own: { rel: 'organization', action: 'own' },
     },
   },
 };

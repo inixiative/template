@@ -3,10 +3,10 @@
  */
 
 import type { CommunicationCategory } from '@template/db';
-import { EmailRenderError } from './errors';
-import { expand } from './expand';
-import { lookupComponent, lookupTemplate } from './lookupTemplate';
-import type { SaveContext } from './types';
+import { EmailRenderError } from '@template/email/render/errors';
+import { expand } from '@template/email/render/expand';
+import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
+import type { SaveContext } from '@template/email/render/types';
 
 /** Reuse SaveContext - same shape needed for compose */
 export type ComposeContext = SaveContext;

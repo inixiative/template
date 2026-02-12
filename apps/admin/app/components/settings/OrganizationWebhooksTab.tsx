@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 
 export const OrganizationWebhooksTab = ({ organizationId }: { organizationId: string }) => {
   return (

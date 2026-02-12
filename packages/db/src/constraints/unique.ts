@@ -1,5 +1,5 @@
 import { db } from '@template/db/client';
-import type { UniqueWhereNotNull } from './types';
+import type { UniqueWhereNotNull } from '@template/db/constraints/types';
 
 export const addUniqueWhereNotNull = async ({ table, fields }: UniqueWhereNotNull) => {
   const name = `${table}_${fields.join('_')}_unique_nn`;

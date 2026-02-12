@@ -1,5 +1,3 @@
-import { HTTPException } from 'hono/http-exception';
-
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 
@@ -18,7 +16,18 @@ export const organizationCreateController = makeController(organizationCreateRou
         },
       },
     },
+    include: {
+      organizationUsers: {
+        where: { userId: user!.id },
+      },
+    },
   });
 
-  return respond.created(organization);
+  const organizationUser = organization.organizationUsers[0];
+
+  return respond.created({
+    ...organization,
+    organizationUser,
+    organizationUsers: undefined,
+  });
 });

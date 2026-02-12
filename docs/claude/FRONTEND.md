@@ -74,16 +74,36 @@ await logout();
 ```
 apps/web/app/routes/
 ├── __root.tsx              # Root layout
-├── index.tsx               # Public landing
-├── login.tsx               # Public login
-├── signup.tsx              # Public signup
+├── _public.tsx             # Public layout (no auth)
+├── _public/
+│   ├── index.tsx           # Landing page
+│   ├── login.tsx
+│   └── signup.tsx
 ├── _authenticated.tsx      # Protected layout (guard + AppShell)
-└── _authenticated/
-    ├── dashboard.tsx
-    ├── settings.tsx
-    ├── organizations.tsx
-    └── org.$organizationId.users.tsx
+├── _authenticated/
+│   ├── dashboard.tsx
+│   ├── settings.tsx
+│   ├── organizations.tsx
+│   └── org.$organizationId.users.tsx
+├── _fullscreen.tsx         # Protected layout (guard, no AppShell)
+└── _fullscreen/
+    └── example.tsx         # Fullscreen pages
 ```
+
+**Layout Types:**
+
+- **`_public`** - Public pages, no authentication
+- **`_authenticated`** - Protected pages with AppShell (sidebar + header)
+- **`_fullscreen`** - Protected pages without AppShell (back button only)
+
+**Fullscreen Layout Use Cases:**
+- Invoice/receipt views
+- Document previews
+- Print layouts
+- Embedded views
+- Focused workflows (onboarding, surveys)
+
+The fullscreen layout preserves context (org/space/spoof) when navigating back via the top-left back button.
 
 ### Guards
 
@@ -139,108 +159,139 @@ export const Route = createFileRoute('/login')({
 
 ---
 
-## Authentication Flow
+## Authentication
 
-### Setup
+**See:** [AUTHENTICATION.md](./AUTHENTICATION.md) for complete authentication documentation including:
+- Login/signup flows
+- OAuth providers
+- Hooks (useAuthFlow, useAuthProviders)
+- Navigation patterns
+- Token management
+- Guards
 
-**1. Create Auth Client:**
+**Quick Reference:**
 
-```typescript
-// apps/web/app/lib/auth.ts
-import { createAuthClient } from '@template/shared';
+### Auth Hooks
 
-export const authClient = createAuthClient(import.meta.env.VITE_API_URL);
-```
+### Login/Signup Pattern
 
-**2. Auth Initialization (on mount):**
-
-**Location:** `/packages/shared/src/auth/initializeAuth.ts`
-
-```typescript
-export async function initializeAuth() {
-  const queryClient = useAppStore.getState().api.queryClient;
-  const hydrate = useAppStore.getState().auth.hydrate;
-  const hydratePermissions = useAppStore.getState().permissions.hydrate;
-
-  // Fetch /me with all relations
-  const result = await queryClient.fetchQuery(meReadOptions());
-  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = result.data;
-
-  // Hydrate auth slice
-  hydrate({ user, session: null, organizationUsers, organizations, spaceUsers, spaces });
-
-  // Hydrate permissions (setup ReBAC contexts)
-  await hydratePermissions({ id: user.id, platformRole: user.platformRole, organizationUsers, spaceUsers });
-}
-```
-
-**Called from authenticated layout:**
+**Use `useAuthFlow` hook for all auth flows:**
 
 ```typescript
-// apps/web/app/routes/_authenticated.tsx
-function AuthenticatedLayout() {
-  const auth = useAppStore(state => state.auth);
+// packages/ui/src/pages/LoginPage.tsx
+import { useAuthFlow, useAuthProviders } from '@template/ui/hooks';
+import { useAppStore } from '@template/ui/store';
+import { buildPathWithSearch } from '@template/ui/lib/searchParams';
 
-  useEffect(() => {
-    if (!auth.isInitialized) {
-      initializeAuth().catch((error) => {
-        console.error('Failed to initialize auth:', error);
-        navigate({ to: '/login', search: { redirectTo: location.pathname } });
-      });
-    }
-  }, [auth.isInitialized]);
+export const LoginPage = ({ hideSignup }: LoginPageProps) => {
+  const signIn = useAppStore((state) => state.auth.signIn);
+  const { handleAuth, error, isLoading } = useAuthFlow(signIn);
+  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
 
-  // Render AppShell
-}
-```
-
-### Login Flow
-
-```typescript
-// packages/shared/src/pages/LoginPage.tsx
-const handleLogin = async (email: string, password: string) => {
-  const result = await authClient.signIn.email({ email, password });
-
-  if (result.error) {
-    setError(result.error.message);
-    return;
-  }
-
-  // Hydrate Zustand store
-  onSuccess(result.data?.user, result.data?.session);
-
-  // Navigate
-  navigate({ to: search.redirectTo || '/dashboard' });
+  return (
+    <LoginForm
+      onSubmit={handleAuth}
+      onSignupClick={() => {
+        const signupUrl = buildPathWithSearch('/signup', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
+        navigatePreservingContext(signupUrl);
+      }}
+      providers={providerError ? [] : providers}
+      error={providerError ? 'Unable to load auth providers.' : error}
+      isLoading={isLoading || isLoadingProviders}
+    />
+  );
 };
 ```
 
-**Full Flow:**
-1. User submits credentials via `LoginForm`
-2. `authClient.signIn.email()` → BetterAuth sets JWT in httpOnly cookie
-3. Frontend hydrates Zustand store with user + session
-4. Redirect to dashboard or `redirectTo` param
+**Flow:**
+1. `useAuthProviders` fetches context-aware providers (platform or org-specific)
+2. User submits credentials via `LoginForm`/`SignupForm`
+3. `useAuthFlow` calls store's `signIn`/`signUp` action
+4. BetterAuth sets JWT in httpOnly cookie
+5. Store hydrates user data
+6. Auto-redirect to `redirectTo` param or `/dashboard`
+
+### Auth Hooks
+
+#### useAuthFlow
+
+**Location:** `/packages/ui/src/hooks/useAuthFlow.ts`
+
+Handles auth submission, loading state, error handling, and redirect logic.
+
+```typescript
+import { useAuthFlow } from '@template/ui/hooks';
+
+const signIn = useAppStore((state) => state.auth.signIn);
+const { handleAuth, error, isLoading } = useAuthFlow(signIn);
+
+// Pass handleAuth to form
+<LoginForm onSubmit={handleAuth} error={error} isLoading={isLoading} />
+```
+
+**Returns:**
+- `handleAuth(credentials)` - Submit handler
+- `error` - Error message
+- `isLoading` - Loading state
+
+**Features:**
+- Preserves `redirectTo` param from URL
+- Auto-redirects after success
+- Generic - works with any auth function
+
+#### useAuthProviders
+
+**Location:** `/packages/ui/src/hooks/useAuthProviders.ts`
+
+Fetches context-aware auth providers (platform or organization-specific).
+
+```typescript
+import { useAuthProviders } from '@template/ui/hooks';
+
+const { providers, isLoading, error } = useAuthProviders();
+
+// Pass to form
+<LoginForm providers={providers} isLoading={isLoading} />
+```
+
+**Returns:**
+- `providers` - Array of enabled providers (OAuth/SAML)
+- `isLoading` - Loading state
+- `error` - Error if fetch fails
+
+**Behavior:**
+- If `?org=xyz` in URL → fetches org providers + platform providers
+- Otherwise → fetches platform providers only
+- Filters to enabled providers automatically
+
+### OAuth Redirect
+
+**Location:** `/packages/ui/src/lib/auth/oauthRedirect.ts`
+
+Utility for initiating OAuth flows.
+
+```typescript
+import { redirectToOAuthProvider } from '@template/ui/lib';
+
+// Automatically called by LoginForm/SignupForm provider buttons
+redirectToOAuthProvider(provider);
+```
+
+**Security:**
+- Validates callback URL origin
+- Only allows current origin + localhost:3000
+- Auto-encodes parameters
 
 ### Logout Flow
 
 ```typescript
-// packages/shared/src/hooks/useLogout.ts
-export const useLogout = (authClient: AuthClient, onSuccess?: () => void) => {
-  const logout = useCallback(async () => {
-    await authClient.signOut();
-    onSuccess?.();
-  }, [authClient, onSuccess]);
+// In UserMenu or anywhere
+const logout = useAppStore((state) => state.auth.logout);
+const navigate = useAppStore((state) => state.navigation.navigate);
 
-  return { logout, isLoading };
-};
-```
-
-**Usage:**
-
-```typescript
-const { logout } = useLogout(authClient, () => {
-  auth.logout();  // Clear Zustand state
-  navigate({ to: '/login' });
-});
+await logout();
+navigate({ to: '/login' });
 ```
 
 ---
@@ -315,10 +366,97 @@ const editBtn = usePermission({
 
 ### Structure
 
-**Per-app nav configs:**
-- `/apps/web/app/config/nav.ts`
-- `/apps/admin/app/config/nav.ts`
-- Superadmin: Hardcoded in layout
+**Location:** `app/config/nav/`
+
+Navigation is organized by **context** (where it appears) and **feature** (what it contains) for better modularity.
+
+```
+nav/
+├── contexts/          # Context-specific navigation (what shows in which mode)
+│   ├── organizationContext.ts  # Org-level sidebar
+│   ├── publicContext.ts        # Logged-out users
+│   ├── spaceContext.ts         # Space-level sidebar
+│   └── userContext.ts          # Personal/user sidebar
+├── features/          # Feature groupings (cross-context)
+│   ├── communications.ts
+│   ├── dashboard.ts
+│   ├── home.ts        # Web only
+│   ├── organizations.ts
+│   ├── settings.ts
+│   ├── spaces.ts
+│   └── users.ts
+└── index.ts           # Exports combined config
+```
+
+**Per-app variations:**
+- **Web:** All contexts (personal, organization, space) + home feature
+- **Admin:** All contexts except home (admin-focused)
+- **Superadmin:** User + public contexts only (no orgs/spaces)
+
+### File Organization
+
+**Context files** define which features appear in each context:
+
+```typescript
+// contexts/organizationContext.ts
+import { dashboardNavigation } from '../features/dashboard';
+import { settingsNavigation } from '../features/settings';
+import { usersNavigation } from '../features/users';
+
+export const organizationContext: SidebarSection[] = [
+  dashboardNavigation,
+  usersNavigation,
+  settingsNavigation,
+];
+```
+
+**Feature files** define navigation items for a logical grouping:
+
+```typescript
+// features/settings.ts
+import { Settings } from 'lucide-react';
+
+export const settingsNavigation: SidebarSection = {
+  items: [
+    {
+      label: 'Settings',
+      path: '/settings',
+      icon: Settings,
+    },
+  ],
+};
+```
+
+### Adding Navigation Items
+
+**By Context** (where does it appear?):
+1. Edit the appropriate context file (`contexts/organizationContext.ts`)
+2. Import and add feature to the context's array
+
+**By Feature** (what logical grouping?):
+1. Create or edit feature file (`features/analytics.ts`)
+2. Import in relevant context files
+
+**Example:**
+```typescript
+// 1. Create feature file
+// features/analytics.ts
+export const analyticsNavigation: SidebarSection = {
+  items: [
+    { label: 'Analytics', path: '/analytics', icon: BarChart },
+  ],
+};
+
+// 2. Add to organization context
+// contexts/organizationContext.ts
+import { analyticsNavigation } from '../features/analytics';
+
+export const organizationContext = [
+  dashboardNavigation,
+  analyticsNavigation,  // Added
+  settingsNavigation,
+];
+```
 
 ### Format
 
@@ -566,40 +704,162 @@ const replaceParams = (path, context) =>
 
 ## Shared Components
 
-### Organization: `@template/ui` vs `@template/shared`
+### Organization: `@template/ui`
 
-**`@template/ui` - Presentational components:**
-- Pure UI (no API calls, no state dependencies)
-- Examples: Button, Table, Avatar, LoginForm
+**Location:** `packages/ui/`
 
-**`@template/shared` - Business logic components:**
-- Contains API calls, state management
-- Examples: OrganizationsPage, CreateOrganizationModal, SettingsLayout
+All frontend code (components, hooks, state, pages) lives in `@template/ui`. Previously scattered across `@template/shared`, everything is now consolidated for better organization and type safety.
+
+#### Why Separate from @template/shared?
+
+`@template/shared` was originally meant for code shared between frontend and backend. As the codebase grew:
+- Frontend code is never used by backend
+- OpenAPI client generation is frontend-specific
+- UI components need different testing strategies
+- Package grew too large and unfocused
+
+**Result:** All frontend code moved to `@template/ui`, `@template/shared` now only contains true isomorphic utilities (logger, errors).
+
+#### Component Organization
+
+Components are organized by **domain** (not technical type):
+
+```
+packages/ui/src/components/
+├── auth/              # Authentication forms, buttons
+│   ├── LoginForm.tsx
+│   └── SignupForm.tsx
+├── layout/            # AppShell, Sidebar, Header, Breadcrumbs
+│   ├── AppShell.tsx
+│   ├── Sidebar.tsx
+│   ├── Header.tsx
+│   └── Breadcrumbs.tsx
+├── organizations/     # Org-specific components
+│   └── CreateOrganizationModal.tsx
+├── primitives/        # Base UI components (shadcn/ui)
+│   ├── Button.tsx
+│   ├── Input.tsx
+│   └── Card.tsx
+├── settings/          # Settings tabs and modals
+│   ├── UserProfileTab.tsx
+│   ├── CreateTokenModal.tsx
+│   └── AuthProviderModal.tsx
+├── users/             # User-specific components
+│   └── InviteUserModal.tsx
+└── utility/           # Generic utilities
+    ├── ErrorBoundary.tsx
+    ├── NotFound.tsx
+    └── Toaster.tsx
+```
+
+**Rule:** Put components where they're used, not by technical type.
+- ✅ `components/settings/CreateTokenModal.tsx`
+- ❌ `components/modals/CreateTokenModal.tsx`
+
+#### OpenAPI Client
+
+API client is auto-generated from OpenAPI spec:
+
+```bash
+cd packages/ui
+bun run generate:api  # Generates apiClient/ from openapi.json
+```
+
+**Location:** `packages/ui/src/apiClient/`
+
+**Usage:**
+```typescript
+import { organizationReadMany } from '@template/ui/apiClient';
+import { apiQuery } from '@template/ui/lib';
+
+const { data } = useQuery({
+  queryKey: ['organizations'],
+  queryFn: apiQuery(organizationReadMany),
+});
+```
+
+See AUTHENTICATION.md for complete API integration patterns.
 
 ### Settings Components
 
-**Location:** `/packages/shared/src/components/`
+**Location:** `packages/ui/src/components/settings/`
 
-- `SettingsLayout` - Tab-based settings container
-- `UserProfileTab` - User profile editor
-- `UserTokensTab` - API token management
-- `UserWebhooksTab` - Webhook subscription management
+Settings use **nested routes** (not tabs) for deep linking, permissions, and URL state preservation.
 
-**Usage:**
+#### Route Structure
+
+```
+app/routes/_authenticated/settings/
+├── authProviders.tsx   # /settings/authProviders
+├── profile.tsx         # /settings/profile
+├── tokens.tsx          # /settings/tokens
+└── webhooks.tsx        # /settings/webhooks
+```
+
+#### Context-Aware Pattern
+
+Settings pages adapt based on current context (personal/org/space):
 
 ```typescript
-import { SettingsLayout, UserProfileTab, UserTokensTab } from '@template/shared';
+// app/routes/_authenticated/settings/profile.tsx
+import { OrganizationProfileTab, SpaceProfileTab, UserProfileTab } from '@template/ui';
 
-const tabs = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'tokens', label: 'Tokens', icon: Key },
-];
+export const ProfilePage = () => {
+  const context = useAppStore((state) => state.tenant.context);
 
-<SettingsLayout title="Settings" tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab}>
-  {activeTab === 'profile' && <UserProfileTab />}
-  {activeTab === 'tokens' && <UserTokensTab />}
-</SettingsLayout>
+  if (context.type === 'organization') return <OrganizationProfileTab />;
+  if (context.type === 'space') return <SpaceProfileTab />;
+  return <UserProfileTab />;
+};
 ```
+
+#### Available Components
+
+**Location:** `packages/ui/src/components/settings/`
+
+- `SettingsLayout` - Master settings container with sidebar
+- `UserProfileTab` - User profile editor
+- `OrganizationProfileTab` - Organization profile editor
+- `SpaceProfileTab` - Space profile editor
+- `UserTokensTab` - User API token management
+- `OrganizationTokensTab` - Organization token management
+- `SpaceTokensTab` - Space token management
+- `UserWebhooksTab` - User webhook subscriptions
+- `OrganizationWebhooksTab` - Org webhook subscriptions
+- `SpaceWebhooksTab` - Space webhook subscriptions
+- `CreateTokenModal` - Token creation modal
+- `AuthProviderModal` - Auth provider configuration modal
+
+#### Example: Settings Layout
+
+```typescript
+import { SettingsLayout } from '@template/ui';
+
+export const SettingsRoute = () => {
+  const context = useAppStore((state) => state.tenant.context);
+
+  // Navigation links adapt to context
+  const navItems = [
+    { label: 'Profile', to: '/settings/profile' },
+    { label: 'Auth Providers', to: '/settings/authProviders' },
+    { label: 'API Tokens', to: '/settings/tokens' },
+    { label: 'Webhooks', to: '/settings/webhooks' },
+  ];
+
+  return (
+    <SettingsLayout title={`${context.type} Settings`} navItems={navItems}>
+      <Outlet />  {/* Nested routes render here */}
+    </SettingsLayout>
+  );
+};
+```
+
+**Benefits:**
+- Deep linking (`/settings/tokens` shareable)
+- Permission-based route guards
+- Browser back/forward works correctly
+- Context preserved in URL
+- No client-side tab state management
 
 ### Modal Components
 
@@ -964,17 +1224,19 @@ const columns = [
 **Locations:**
 - `/packages/ui/src/components/auth/LoginForm.tsx`
 - `/packages/ui/src/components/auth/SignupForm.tsx`
-- `/packages/ui/src/components/auth/AuthDivider.tsx`
-- `/packages/ui/src/components/auth/SocialAuthButton.tsx`
 
 **LoginForm:**
 
 ```typescript
+import type { LoginCredentials } from '@template/ui/types';
+
 <LoginForm
-  onSubmit={async (email, password) => {
-    await authClient.signIn.email({ email, password });
+  onSubmit={async (credentials: LoginCredentials) => {
+    // credentials = { email, password }
+    await handleAuth(credentials);
   }}
-  onSignupClick={() => navigate({ to: '/signup' })}
+  onSignupClick={() => navigatePreservingContext('/signup')}
+  providers={providers}  // OAuth/SAML providers
   error={error}
   isLoading={isLoading}
 />
@@ -983,22 +1245,44 @@ const columns = [
 **SignupForm:**
 
 ```typescript
+import type { SignupCredentials } from '@template/ui/types';
+
 <SignupForm
-  onSubmit={async (email, password, name) => {
-    await authClient.signUp.email({ email, password, name });
+  onSubmit={async (credentials: SignupCredentials) => {
+    // credentials = { email, password, name }
+    await handleAuth(credentials);
   }}
-  onLoginClick={() => navigate({ to: '/login' })}
+  onLoginClick={() => navigatePreservingContext('/login')}
+  providers={providers}  // OAuth/SAML providers
   error={error}
   isLoading={isLoading}
 />
 ```
 
-**Social Auth:**
+**Features:**
+- Email/password form with validation
+- OAuth/SAML provider buttons (Google, GitHub, custom)
+- Provider icons from lucide-react
+- Auto-divider when providers present
+- Error display with styling
+- Loading states
+- Click handlers for form switching
+
+**Credential Types:**
+
+**Location:** `/packages/ui/src/types/auth.ts`
 
 ```typescript
-<SocialAuthButton provider="google" onClick={() => signInWithGoogle()} />
-<SocialAuthButton provider="github" onClick={() => signInWithGithub()} />
-<AuthDivider /> {/* "Or continue with" divider */}
+export type LoginCredentials = {
+  email: string;
+  password: string;
+};
+
+export type SignupCredentials = {
+  email: string;
+  password: string;
+  name: string;
+};
 ```
 
 ### Layout Utilities
@@ -1059,9 +1343,74 @@ const columns = [
 
 ## Hooks
 
-### usePermission
+### Auth Hooks
 
-**Location:** `/packages/shared/src/hooks/usePermission.ts`
+#### useAuthFlow
+
+**Location:** `/packages/ui/src/hooks/useAuthFlow.ts`
+
+Handles auth flow with loading state, errors, and redirect.
+
+```typescript
+const signIn = useAppStore((state) => state.auth.signIn);
+const { handleAuth, error, isLoading } = useAuthFlow(signIn);
+
+<LoginForm onSubmit={handleAuth} error={error} isLoading={isLoading} />
+```
+
+#### useAuthProviders
+
+**Location:** `/packages/ui/src/hooks/useAuthProviders.ts`
+
+Fetches context-aware auth providers (platform or organization).
+
+```typescript
+const { providers, isLoading, error } = useAuthProviders();
+
+<LoginForm providers={providers} />
+```
+
+### Navigation Hooks
+
+#### Navigation Store Methods
+
+**Location:** `/packages/ui/src/store/slices/navigation.ts`
+
+```typescript
+const navigate = useAppStore((state) => state.navigation.navigate);
+const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+
+// Basic navigation
+navigate({ to: '/dashboard' });
+
+// Preserve org/space context params
+navigatePreservingContext('/settings');
+
+// Preserve spoof param only
+navigatePreservingSpoof('/users?org=xyz');
+```
+
+**When to use:**
+- `navigate` - Basic navigation, explicit search params
+- `navigatePreservingContext` - Preserve org/space/spoof params
+- `navigatePreservingSpoof` - Preserve spoof param only (for org switching)
+
+**redirectTo Preservation:**
+
+```typescript
+import { buildPathWithSearch } from '@template/ui/lib/searchParams';
+
+// Preserve redirectTo when navigating between login/signup
+const signupUrl = buildPathWithSearch('/signup', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
+navigatePreservingContext(signupUrl);
+```
+
+### Permission Hooks
+
+#### usePermission
+
+**Location:** `/packages/ui/src/hooks/usePermission.ts`
 
 ```typescript
 const editBtn = usePermission({
@@ -1074,9 +1423,11 @@ const editBtn = usePermission({
 <Button {...editBtn}>Edit</Button>
 ```
 
-### useOptimisticMutation
+### Data Hooks
 
-**Location:** `/packages/shared/src/hooks/useOptimisticMutation.ts`
+#### useOptimisticMutation
+
+**Location:** `/packages/ui/src/hooks/useOptimisticMutation.ts`
 
 **For Lists:**
 
@@ -1102,9 +1453,11 @@ const updateMutation = useOptimisticMutation({
 });
 ```
 
-### useDebounce
+### Utility Hooks
 
-**Location:** `/packages/shared/src/utils/debounce.ts`
+#### useDebounce
+
+**Location:** `/packages/ui/src/hooks/useDebounce.ts`
 
 ```typescript
 const [slug, setSlug] = useState('');
@@ -1113,9 +1466,9 @@ const debouncedSlug = useDebounce(slug, 300);
 // debouncedSlug updates 300ms after slug stops changing
 ```
 
-### useValidateUniqueness
+#### useValidateUniqueness
 
-**Location:** `/packages/shared/src/utils/validateUniqueness.ts`
+**Location:** `/packages/ui/src/hooks/useValidateUniqueness.ts`
 
 ```typescript
 const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug', slug);
@@ -1127,17 +1480,6 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 
 // Disable submit
 <Button disabled={!isAvailable || isChecking}>Create</Button>
-```
-
-### useLogout
-
-**Location:** `/packages/shared/src/hooks/useLogout.ts`
-
-```typescript
-const { logout, isLoading } = useLogout(authClient, () => {
-  auth.logout();
-  navigate({ to: '/login' });
-});
 ```
 
 ---

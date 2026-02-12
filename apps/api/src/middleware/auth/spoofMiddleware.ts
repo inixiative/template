@@ -20,7 +20,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!spoofedBasic) return next();
 
   const spoofedUser = await findUserWithRelations(db, spoofedBasic.id);
-  await setUserContext(c, spoofedUser!);
+  if (!spoofedUser) return next();
+
+  await setUserContext(c, spoofedUser);
   c.set('spoofedBy', user);
   c.header('x-spoofing-user-email', user.email);
   c.header('x-spoofed-user-email', spoofEmail);

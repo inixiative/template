@@ -4,6 +4,7 @@ import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
+import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
 import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
 
 // Base system fields that get sanitized from body schemas
@@ -83,10 +84,16 @@ export const buildRequest = <const T extends RouteArgs>(
 
   // Need ID when: not skipId AND (has submodel OR not many)
   // With submodel + many: getting all submodels for a parent, so need parent ID
-  const needsId = !skipId && (args.submodel || !many);
+  const needsId = hasIdParam(skipId, args.submodel, many);
   const paramsSchema = params ?? (needsId ? idParamsSchema : z.object({}));
 
   let querySchema = query ?? z.object({});
+
+  // Add lookup parameter for routes with id params
+  if (needsId) {
+    querySchema = querySchema.merge(z.object({ lookup: z.string().optional() }));
+  }
+
   if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
   if (searchableFields?.length) {
     const searchSchema = z.object({

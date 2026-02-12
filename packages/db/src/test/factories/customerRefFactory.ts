@@ -1,4 +1,4 @@
-import { createFactory } from '../factory';
+import { createFactory } from '@template/db/test/factory';
 
 const customerRefFactory = createFactory('CustomerRef', {
   defaults: () => ({}),

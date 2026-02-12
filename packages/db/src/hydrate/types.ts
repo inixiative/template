@@ -1,4 +1,4 @@
-import type { Prisma } from '../generated/client/client';
+import type { Prisma } from '@template/db/generated/client/client';
 
 export type HydrateInclude = {
   [relation: string]: boolean | HydrateInclude | { include: HydrateInclude };

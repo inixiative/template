@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import type { Token } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 /**
@@ -22,7 +23,7 @@ const USER_TOKEN = 'local_user_owner_personal';
 const ORG_TOKEN = 'local_orgUser_acme_main';
 const SPACE_TOKEN = 'local_spaceUser_acme_main';
 
-export const tokenSeeds: SeedFile = {
+export const tokenSeeds: SeedFile<Token> = {
   model: 'token',
   updateOmitFields: ['createdAt'],
   records: [

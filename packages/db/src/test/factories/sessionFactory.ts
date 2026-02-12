@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { createFactory } from '../factory';
+import { createFactory } from '@template/db/test/factory';
 
 const sessionFactory = createFactory('Session', {
   defaults: () => ({

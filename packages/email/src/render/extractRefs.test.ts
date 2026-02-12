@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { mapRefs } from './extractRefs';
+import { mapRefs } from '@template/email/render/extractRefs';
 
 describe('mapRefs', () => {
   it('extracts a single component', () => {

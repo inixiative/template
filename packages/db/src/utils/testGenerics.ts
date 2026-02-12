@@ -1,5 +1,5 @@
-import type { Prisma, PrismaClient } from '../generated/client/client';
-import type { ModelName } from './modelNames';
+import type { Prisma, PrismaClient } from '@template/db/generated/client/client';
+import type { ModelName } from '@template/db/utils/modelNames';
 
 type Operation = 'findMany' | 'findFirst' | 'findUnique' | 'create' | 'update' | 'delete';
 

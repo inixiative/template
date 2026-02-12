@@ -1,7 +1,7 @@
 import { db, hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
 type Options = {
@@ -55,5 +55,5 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
     }
   }
 
-  throw new HTTPException(403, { message: 'Access denied' });
+  throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
 });

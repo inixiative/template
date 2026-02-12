@@ -2,7 +2,7 @@ import type { AccessorName } from '@template/db';
 import { db, hydrate } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
 /**
@@ -27,7 +27,7 @@ export const validatePermission = makeMiddleware<Action>((action) => async (c, n
   const hydrated = await hydrate(db, resourceType, resource as { id: string });
 
   if (!check(permix, rebacSchema, resourceType, hydrated, action)) {
-    throw new HTTPException(403, { message: 'Access denied' });
+    throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
   }
 
   await next();

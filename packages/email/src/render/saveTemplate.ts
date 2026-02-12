@@ -3,9 +3,9 @@
  * Uses findFirst to handle nullable FKs in compound unique (Prisma 7 quirk).
  */
 
-import type { EmailTemplate } from '@template/db';
+import type { EmailTemplate } from '@template/db/generated/client/client';
 import { db } from '@template/db';
-import type { SaveContext } from './types';
+import type { SaveContext } from '@template/email/render/types';
 
 export const saveTemplate = async (input: EmailTemplate, ctx: SaveContext): Promise<EmailTemplate> => {
   const where = {

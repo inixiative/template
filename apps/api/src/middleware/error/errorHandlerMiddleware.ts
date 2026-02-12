@@ -3,6 +3,7 @@ import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { ResponseValidationError } from '#/lib/utils/makeController';
 import { formatZodIssues } from '#/middleware/error/formatZodIssues';
 import { isZodError } from '#/middleware/error/isZodError';
@@ -30,17 +31,28 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
 
   // Handle Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    const requestId = c.get('requestId') as string;
+
     // P2002 = unique constraint violation
     if (err.code === 'P2002') {
       const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
-      return c.json({ error: 'Already exists', constraint: target }, 409);
+      return makeError({
+        status: 409,
+        message: `Resource already exists: ${target}`,
+        requestId,
+      }).getResponse();
     }
+    // P2025 = record not found
     if (err.code === 'P2025') {
-      return c.json({ error: 'Not found' }, 404);
+      return makeError({
+        status: 404,
+        message: 'Resource not found',
+        requestId,
+      }).getResponse();
     }
   }
 
-  // Handle HTTP exceptions
+  // Handle HTTP exceptions (including makeError results)
   if (err instanceof HTTPException) {
     if (err.status >= 500) {
       Sentry.captureException(err, {
@@ -51,7 +63,7 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
         },
       });
     }
-    return c.json({ error: err.message }, err.status);
+    return err.getResponse();
   }
 
   // Capture all other errors to Sentry

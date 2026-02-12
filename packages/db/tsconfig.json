@@ -6,10 +6,10 @@
     "baseUrl": ".",
     "paths": {
       "@template/db/*": ["./src/*"],
-      "@template/db-test/*": ["./test/*"],
+      "@template/db/test": ["./src/test/index.ts"],
+      "@template/db/test/*": ["./src/test/*"],
       "@template/permissions/*": ["../permissions/src/*"],
-      "@template/shared/*": ["../shared/src/*"],
-      "@template/ui/*": ["../ui/src/*"]
+      "@template/shared/*": ["../shared/src/*"]
     },
     "skipLibCheck": true
   },

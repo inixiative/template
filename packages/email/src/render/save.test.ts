@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
-import { MjmlValidationError } from '../validations/MjmlValidationError';
-import { saveEmailTemplate } from './save';
+import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
+import { saveEmailTemplate } from '@template/email/render/save';
 
 /** Wrap content in valid MJML structure */
 const mjml = (content: string) =>

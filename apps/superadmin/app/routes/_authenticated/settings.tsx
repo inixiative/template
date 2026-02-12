@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { SettingsLayout } from '@template/shared';
+import { SettingsLayout } from '@template/ui/components';
 import { Key, User, Webhook } from 'lucide-react';
 import { useState } from 'react';
 import { UserProfileTab } from '#/components/settings/UserProfileTab';

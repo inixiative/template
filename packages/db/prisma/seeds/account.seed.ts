@@ -1,4 +1,5 @@
 import { hashSync } from 'bcryptjs';
+import type { Account } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 // Password for all prime users: "asd123!"
@@ -9,7 +10,7 @@ const HASHED_PASSWORD = hashSync(PASSWORD, 10);
  * Prime development accounts with passwords.
  * All use password: "asd123!"
  */
-export const accountSeeds: SeedFile = {
+export const accountSeeds: SeedFile<Account> = {
   model: 'account',
   updateOmitFields: ['createdAt'],
   records: [

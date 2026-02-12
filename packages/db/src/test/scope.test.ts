@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, registerTestTracker } from './testTracker';
+import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
 
 describe('scope', () => {
   beforeEach(() => {
@@ -19,7 +19,7 @@ describe('scope', () => {
         capturedScopeId = db.getScopeId();
       });
 
-      expect(capturedScopeId).toBe('my-request-123');
+      expect(capturedScopeId!).toBe('my-request-123');
     });
 
     it('returns the result of the callback function', async () => {
@@ -52,8 +52,8 @@ describe('scope', () => {
         });
       });
 
-      expect(outerScopeId).toBe('outer-scope');
-      expect(innerScopeId).toBe('outer-scope');
+      expect(outerScopeId!).toBe('outer-scope');
+      expect(innerScopeId!).toBe('outer-scope');
     });
 
     it('isolates scopes between concurrent async operations', async () => {
@@ -101,7 +101,7 @@ describe('scope', () => {
         });
       });
 
-      expect(scopeInTxn).toBe('txn-scope');
+      expect(scopeInTxn!).toBe('txn-scope');
     });
 
     it('handles errors without losing scope state', async () => {
@@ -114,7 +114,7 @@ describe('scope', () => {
         });
       } catch {}
 
-      expect(scopeBeforeError).toBe('error-scope');
+      expect(scopeBeforeError!).toBe('error-scope');
     });
   });
 
@@ -125,7 +125,7 @@ describe('scope', () => {
 
     it('returns the current scope ID when in a scope', async () => {
       await db.scope('active-scope', async () => {
-        expect(db.getScopeId()).toBe('active-scope');
+        expect(db.getScopeId()!).toBe('active-scope');
       });
     });
 
@@ -169,8 +169,8 @@ describe('scope', () => {
         });
       });
 
-      expect(scopeIdInScope).toBe('parent-scope');
-      expect(scopeIdInTxn).toBe('parent-scope');
+      expect(scopeIdInScope!).toBe('parent-scope');
+      expect(scopeIdInTxn!).toBe('parent-scope');
     });
 
     it('transaction creates its own scope ID when no parent scope', async () => {

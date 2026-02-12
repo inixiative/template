@@ -68,6 +68,35 @@ await enqueueJob('sendWebhook', {
 | Circuit breaker | Disables after 5 consecutive failures |
 | Logging | Creates `WebhookEvent` record per attempt |
 
+### rotateEncryptionKeys
+
+Re-encrypts data from old encryption keys to current keys. Auto-enqueued on worker startup.
+
+```typescript
+// Auto-triggered on worker startup
+await enqueueJob('rotateEncryptionKeys', undefined, {
+  id: 'rotateEncryptionKeys'
+});
+
+// Manual trigger (admin endpoint)
+POST /admin/jobs/enqueue
+{
+  "handlerName": "rotateEncryptionKeys",
+  "payload": {},
+  "options": { "id": "manual-rotation" }
+}
+```
+
+| Feature | Detail |
+|---------|--------|
+| Auto-discovery | Iterates all models/keys in `ENCRYPTED_MODELS` registry |
+| Version detection | Reads target versions from environment variables |
+| Concurrency | Parallel processing with db concurrency limits |
+| Idempotency | Version precondition prevents duplicate work |
+| Singleton | Redis lock ensures only one rotation runs at a time |
+
+See [ENCRYPTION.md](ENCRYPTION.md) for complete key rotation documentation.
+
 ---
 
 ## Creating Handlers

@@ -2,8 +2,8 @@
  * Lookup template + components at scope.
  */
 
-import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db';
-import type { SaveContext } from './types';
+import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db/generated/client/client';
+import type { SaveContext } from '@template/email/render/types';
 
 type LookupResult = {
   template: EmailTemplate | null;

@@ -1,40 +1,23 @@
-import type { PermissionsCheck } from '@template/permissions';
+import { useLocation } from '@tanstack/react-router';
+import { findRoute } from '@template/ui/lib/findRoute';
 import { cn } from '@template/ui/lib/utils';
-import { ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
+import { useAppStore } from '@template/ui/store';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useAppStore, findRoute, type PageContext, type TenantContext } from '@template/shared';
-
-export type NavItem = {
-  label: string;
-  path?: string;
-  icon?: LucideIcon;
-  title?: string | ((context: TenantContext, pageContext?: PageContext) => string);
-  description?: string | ((context: TenantContext, pageContext?: PageContext) => string);
-  access?: (permissions: PermissionsCheck, context: TenantContext, pageContext?: PageContext) => boolean;
-  alias?: boolean;
-  breadcrumbLabel?: (record: Record<string, any>) => string;
-  items?: NavItem[];
-};
-
-export type NavConfig = {
-  personal: NavItem[];
-  organization: NavItem[];
-  space: NavItem[];
-  public?: NavItem[];
-};
+import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 
 export type SidebarProps = {
-  currentPath: string;
   className?: string;
 };
 
-export const Sidebar = ({ currentPath, className }: SidebarProps) => {
+export const Sidebar = ({ className }: SidebarProps) => {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const location = useLocation();
 
   // Read from Zustand
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
-  const navigate = useAppStore((state) => state.navigation.navigate);
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
 
   const context = tenant.context; // TenantContext with full objects
@@ -44,9 +27,9 @@ export const Sidebar = ({ currentPath, className }: SidebarProps) => {
   // Find which items are in the active path
   const activeChain = useMemo(() => {
     if (!navConfig) return [];
-    const match = findRoute(currentPath, navConfig, contextType);
+    const match = findRoute(location.pathname, navConfig, contextType);
     return match?.chain || [];
-  }, [currentPath, navConfig, contextType]);
+  }, [location.pathname, navConfig, contextType]);
 
   const toggleItem = (label: string) => {
     setExpandedItems((prev) => {
@@ -74,7 +57,7 @@ export const Sidebar = ({ currentPath, className }: SidebarProps) => {
       <div key={item.label}>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => item.path && navigate?.({ to: item.path })}
+            onClick={() => item.path && navigatePreservingContext(item.path)}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               depth > 0 && 'pl-9',
@@ -108,6 +91,7 @@ export const Sidebar = ({ currentPath, className }: SidebarProps) => {
   };
 
   if (!navConfig) return null;
+  if (items.length === 0) return null;
 
   return (
     <nav className={cn('flex flex-col gap-4 p-4', className)}>

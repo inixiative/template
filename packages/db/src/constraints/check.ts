@@ -1,5 +1,5 @@
 import { db } from '@template/db/client';
-import type { CheckConstraint } from './types';
+import type { CheckConstraint } from '@template/db/constraints/types';
 
 export const addCheckConstraint = async ({ table, field, condition = '>= 0' }: CheckConstraint) => {
   const name = `${table}_${field}_check`;

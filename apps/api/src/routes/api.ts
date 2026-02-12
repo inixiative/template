@@ -4,6 +4,7 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
+import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
@@ -29,6 +30,7 @@ apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.route('/admin', adminRouter);
 
 // v1 Routes
+apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);

@@ -1,7 +1,7 @@
 import type { SpaceId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import { type Entitlements, type PermissionEntry, type Permix, SpaceAction } from '@template/permissions/client';
-import { allTrue } from './shared';
+import { allTrue } from '@template/permissions/roles/shared';
 
 export const spaceRoles = {
   owner: { space: { own: true } },

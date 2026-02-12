@@ -1,5 +1,5 @@
 import { escape, isNil } from 'lodash-es';
-import { evaluateConditions } from './evaluateConditions';
+import { evaluateConditions } from '@template/email/render/evaluateConditions';
 
 /**
  * Variable prefixes for email templates.

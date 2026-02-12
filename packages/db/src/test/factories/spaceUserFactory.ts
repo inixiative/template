@@ -1,6 +1,6 @@
 import { Role } from '@template/db/generated/client/enums';
-import { createFactory } from '../factory';
-import type { BuildContext, CreateInputOf, TypedBuildResult } from '../factoryTypes';
+import { createFactory } from '@template/db/test/factory';
+import type { BuildContext, CreateInputOf, TypedBuildResult } from '@template/db/test/factoryTypes';
 
 type Result = TypedBuildResult<'SpaceUser', ['User', 'Organization', 'Space', 'OrganizationUser']>;
 

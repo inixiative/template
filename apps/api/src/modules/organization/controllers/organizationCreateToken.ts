@@ -1,6 +1,6 @@
 import { db } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
@@ -12,7 +12,7 @@ export const organizationCreateTokenController = makeController(organizationCrea
   const body = c.req.valid('json');
 
   if (!check(permix, rebacSchema, 'organization', { ...org, role: body.role }, 'assign')) {
-    throw new HTTPException(403, { message: `Cannot create ${body.role} token` });
+    throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
   }
 
   const token = await createToken(db, {

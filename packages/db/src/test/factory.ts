@@ -43,6 +43,37 @@ import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 
+/**
+ * Converts Date fields to ISO strings for API compatibility
+ * Recursively handles nested objects and arrays
+ */
+const serializeEntity = (obj: unknown): unknown => {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => serializeEntity(item));
+  }
+
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip non-enumerable properties like __serialize itself
+      if (Object.prototype.propertyIsEnumerable.call(obj, key)) {
+        result[key] = serializeEntity(value);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+};
+
 const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
   const dataModel = getRuntimeDataModel();
   const model = dataModel.models[modelName];
@@ -158,9 +189,22 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       ? ((await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
-    (ctx as Record<string, unknown>)[toAccessor(modelName)] = entity;
+    // Add non-enumerable __serialize() method to convert Date fields to ISO strings
+    Object.defineProperty(entity, '__serialize', {
+      value: function __serialize() {
+        return serializeEntity(this);
+      },
+      enumerable: false,
+      writable: false,
+      configurable: true,
+    });
 
-    return { entity, context: ctx };
+    // Type assertion needed because __serialize() is added at runtime
+    const entityWithSerialize = entity as ModelOf<K> & { __serialize(): unknown };
+
+    (ctx as Record<string, unknown>)[toAccessor(modelName)] = entityWithSerialize;
+
+    return { entity: entityWithSerialize, context: ctx };
   };
 
   return {

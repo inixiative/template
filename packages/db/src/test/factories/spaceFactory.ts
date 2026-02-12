@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { createFactory, getNextSeq } from '../factory';
+import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const spaceFactory = createFactory('Space', {
   defaults: () => ({

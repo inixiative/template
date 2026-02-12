@@ -1,6 +1,6 @@
 import { type AccessorName, type Db, toModelName } from '@template/db';
 import type { MiddlewareHandler } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';
 
 export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next) => {
@@ -17,8 +17,8 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
 
   const resources = await findResources(db, accessor, lookup, id);
 
-  if (!resources.length) throw new HTTPException(404, { message: 'Resource not found' });
-  if (resources.length > 1) throw new HTTPException(409, { message: 'Multiple resources found' });
+  if (!resources.length) throw makeError({ status: 404, message: 'Resource not found', requestId: c.get('requestId') });
+  if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found', requestId: c.get('requestId') });
 
   c.set('resource', resources[0]);
   c.set('resourceType', accessor);

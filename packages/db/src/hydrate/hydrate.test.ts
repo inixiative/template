@@ -7,9 +7,9 @@ import {
   createToken,
   createUser,
   registerTestTracker,
-} from '../test';
-import { fetchOne } from './fetchOne';
-import { hydrate } from './hydrate';
+} from '@template/db/test';
+import { fetchOne } from '@template/db/hydrate/fetchOne';
+import { hydrate } from '@template/db/hydrate/hydrate';
 
 describe('hydrate', () => {
   beforeEach(() => {

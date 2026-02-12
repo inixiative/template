@@ -8,7 +8,7 @@ import {
 } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
-import { validateRole } from './validateRole';
+import { validateRole } from '#/lib/permissions/validateRole';
 
 /**
  * Set up permissions for user's orgs at auth time.

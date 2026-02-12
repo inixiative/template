@@ -9,5 +9,5 @@ export const organizationReadManyTokensRoute = readRoute({
   many: true,
   paginate: true,
   responseSchema: tokenReadResponseSchema,
-  middleware: [validatePermission('read')],
+  middleware: [validatePermission('operate')],
 });

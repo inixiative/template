@@ -12,7 +12,6 @@
       "style": {
         "noNonNullAssertion": "off",
         "noDefaultExport": "error",
-        "useExplicitFunctionReturnType": "off",
         "useFilenamingConvention": {
           "level": "error",
           "options": {
@@ -41,6 +40,64 @@
     "includes": ["**", "!**/node_modules", "!**/dist", "!**/_old", "!**/.next", "!**/*.gen.ts", "!**/generated", "!tmp"]
   },
   "overrides": [
+    {
+      "includes": ["apps/**/app/**", "apps/api/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./**", "../**"],
+                    "message": "Relative imports are not allowed. Use #/ for app-local imports or @template/* for package imports."
+                  },
+                  {
+                    "group": ["##/**", "~/**"],
+                    "message": "Apps should use #/ for local imports and @template/* for package imports."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/**/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["./**", "../**"],
+                    "message": "Relative imports are not allowed in packages. Use @template/<pkg>/* imports."
+                  },
+                  {
+                    "group": ["#/**", "##/**", "~/**"],
+                    "message": "Packages should use @template/<pkg>/* imports for absolute references."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/**/app/**/index.ts", "apps/**/app/**/index.tsx", "apps/api/src/**/index.ts", "packages/**/src/**/index.ts", "packages/**/src/**/index.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
     {
       "includes": ["apps/**/app/routes/**", "**/app/routes/**"],
       "linter": {

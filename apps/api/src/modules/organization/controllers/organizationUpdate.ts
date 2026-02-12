@@ -1,4 +1,3 @@
-import { HTTPException } from 'hono/http-exception';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';

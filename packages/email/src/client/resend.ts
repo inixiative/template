@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import type { EmailClient, SendEmailOptions, SendEmailResult } from './types';
+import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 
 export const createResendClient = (apiKey: string): EmailClient => {
   const resend = new Resend(apiKey);

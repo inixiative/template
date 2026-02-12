@@ -2,10 +2,10 @@
  * Cascade lookup for components: Space → Org → default (based on context)
  */
 
-import type { EmailComponent } from '@template/db';
+import type { EmailComponent } from '@template/db/generated/client/client';
 import { db } from '@template/db';
-import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from './lookup';
-import type { SaveContext } from './types';
+import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
+import type { SaveContext } from '@template/email/render/types';
 
 type LookupFn = () => Promise<Record<string, EmailComponent>>;
 

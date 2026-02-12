@@ -1,9 +1,10 @@
+import type { Space } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 /**
  * Prime development space.
  */
-export const spaceSeeds: SeedFile = {
+export const spaceSeeds: SeedFile<Space> = {
   model: 'space',
   updateOmitFields: ['createdAt'],
   records: [

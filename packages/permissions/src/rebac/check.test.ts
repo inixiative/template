@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { createPermissions, type Permix } from '../client';
-import { check } from './check';
-import type { RebacSchema } from './types';
+import { createPermissions, type Permix } from '@template/permissions/client';
+import { check } from '@template/permissions/rebac/check';
+import type { RebacSchema } from '@template/permissions/rebac/types';
 
 describe('rebac check', () => {
   let permix: Permix;

@@ -58,8 +58,7 @@ describe('Webhook Truncation', () => {
       const webhook = await db.webhookSubscription.create({
         data: {
           url: 'https://example.com/webhook',
-          events: ['user.created'],
-          model: 'User',
+          model: 'CustomerRef',
           ownerModel: 'User',
           userId: '01936d42-8c4a-7000-8000-000000000001',
         },
@@ -96,23 +95,20 @@ describe('Webhook Truncation', () => {
         data: [
           {
             url: 'https://example.com/webhook1',
-            events: ['user.created'],
-            model: 'User',
+            model: 'CustomerRef',
             ownerModel: 'User',
             userId: '01936d42-8c4a-7000-8000-000000000001',
           },
           {
             url: 'https://example.com/webhook2',
-            events: ['user.updated'],
-            model: 'User',
+            model: 'CustomerRef',
             ownerModel: 'User',
             userId: '01936d42-8c4a-7000-8000-000000000002',
           },
           {
             url: 'https://example.com/webhook3',
-            events: ['organization.created'],
-            model: 'Organization',
-            ownerModel: 'OrganizationUser',
+            model: 'CustomerRef',
+            ownerModel: 'Organization',
             userId: '01936d42-8c4a-7000-8000-000000000002',
             organizationId: '01936d42-8c4a-7000-8000-000000000021',
           },

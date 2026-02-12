@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { Role } from '@template/db/generated/client/client';
-import { createFactory, getNextSeq, resetSequence } from './factory';
+import { createFactory, getNextSeq, resetSequence } from '@template/db/test/factory';
 
 beforeEach(() => {
   resetSequence();

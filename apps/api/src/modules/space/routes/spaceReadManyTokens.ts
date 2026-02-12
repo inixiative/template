@@ -10,6 +10,6 @@ export const spaceReadManyTokensRoute = readRoute({
   many: true,
   paginate: true,
   responseSchema: tokenReadResponseSchema,
-  middleware: [validatePermission('read')],
+  middleware: [validatePermission('operate')],
   tags: [Tags.token],
 });

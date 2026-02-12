@@ -8,25 +8,16 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:watch": "bun test --watch",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.json openapi-ts -f openapiTs.config.ts && bun run generate:msw",
-    "generate:msw": "bun scripts/generateMswHandlers.ts"
+    "test:watch": "bun test --watch"
   },
   "exports": {
     ".": "./src/index.ts",
-    "./openapi.json": "./openapi.json",
     "./utils": "./src/utils/index.ts",
-    "./components": "./src/components/index.ts",
     "./lib": "./src/lib/index.ts",
-    "./hooks": "./src/hooks/index.ts",
-    "./logger": "./src/logger/index.ts",
-    "./store/*": "./src/store/*",
-    "./apiClient": "./src/apiClient/index.ts",
-    "./apiClient/*": "./src/apiClient/*"
+    "./logger": "./src/logger/index.ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "better-auth": "^1.4.18",
     "clsx": "^2.1.1",
     "consola": "^3.4.0",
     "lodash-es": "^4.17.21",

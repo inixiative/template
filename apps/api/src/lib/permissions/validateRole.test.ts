@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { Role } from '@template/db/generated/client/enums';
 import { HTTPException } from 'hono/http-exception';
-import { validateRole } from './validateRole';
+import { validateRole } from '#/lib/permissions/validateRole';
 
 describe('validateRole', () => {
   it('should return valid role when given valid Role enum value', () => {

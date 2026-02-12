@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@template/email/*": ["./src/*"],
+      "@template/db/*": ["../db/src/*"],
+      "@template/permissions/*": ["../permissions/src/*"],
+      "@template/shared/*": ["../shared/src/*"],
+      "@template/ui/*": ["../ui/src/*"]
+    },
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

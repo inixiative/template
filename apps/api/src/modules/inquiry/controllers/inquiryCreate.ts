@@ -1,5 +1,5 @@
 import type { InquiryResourceModel } from '@template/db';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
@@ -17,13 +17,13 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
 
   if (body.type === 'inviteOrganizationUser') {
     if (!sourceOrgId) {
-      throw new HTTPException(400, { message: 'Organization ID required in content' });
+      throw makeError({ status: 400, message: 'Organization ID required in content', requestId: c.get('requestId') });
     }
     const membership = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: sourceOrgId, userId: user.id } },
     });
     if (!membership || !['owner', 'admin'].includes(membership.role)) {
-      throw new HTTPException(403, { message: 'Requires admin or owner role to invite' });
+      throw makeError({ status: 403, message: 'Requires admin or owner role to invite', requestId: c.get('requestId') });
     }
   }
 

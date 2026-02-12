@@ -5,6 +5,7 @@
 - [Naming Conventions](#naming-conventions)
 - [Route Templates](#route-templates)
 - [Controllers](#controllers)
+- [Module Examples](#module-examples)
 - [Response Format](#response-format)
 - [Error Responses](#error-responses)
 - [Middleware](#middleware)
@@ -120,6 +121,251 @@ export const userReadController = makeController(userReadRoute, async (c, respon
 | `respond.ok(data)` | 200 | Read, Update |
 | `respond.created(data)` | 201 | Create |
 | `respond.noContent()` | 204 | Delete |
+
+---
+
+## Module Examples
+
+Complete real-world examples showing all patterns together.
+
+### AuthProvider Module
+
+**Location:** `apps/api/src/modules/authProvider/`
+
+Manages authentication providers (OAuth, SAML) at platform and organization level. Demonstrates encryption, permissions, and public/private endpoints.
+
+#### Module Structure
+
+```
+authProvider/
+├── controllers/
+│   ├── authProviderReadMany.ts          # GET /authProviders (public)
+│   ├── authProviderUpdate.ts            # PATCH /authProviders/:id
+│   ├── authProviderDelete.ts            # DELETE /authProviders/:id
+│   └── adminAuthProviderReadMany.ts     # GET /admin/authProviders
+├── routes/
+│   └── [matching route files]
+├── schemas/
+│   └── authProviderSchemas.ts
+├── tests/
+│   └── authProvider.test.ts
+└── index.ts                              # Router exports
+```
+
+#### Endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|-----------|-------------|
+| GET | `/authProviders` | Public | List platform providers (Google, GitHub) |
+| GET | `/organizations/:id/authProviders` | Public | List platform + org providers |
+| POST | `/organizations/:id/authProviders` | `own` | Create org auth provider |
+| PATCH | `/authProviders/:id` | `own` | Update auth provider |
+| DELETE | `/authProviders/:id` | `own` | Delete auth provider |
+| GET | `/admin/authProviders` | Superadmin | List all providers (admin only) |
+
+#### Platform vs Organization Providers
+
+**Platform providers:**
+- Created by superadmins
+- Available to all users/orgs (Google, GitHub, etc.)
+- Immutable by organization owners
+- No encrypted secrets (OAuth configured at platform level)
+
+**Organization providers:**
+- Created by organization owners
+- Only available to that organization (e.g., custom SAML)
+- Can be updated/deleted by org owners
+- Secrets encrypted using encryption service (see ENCRYPTION.md)
+
+#### Example: Read Platform Providers (Public)
+
+```typescript
+// controllers/authProviderReadMany.ts
+import { makeController } from '#/lib/utils/makeController';
+import { getPlatformProviders } from '#/lib/auth/platformProviders';
+
+export const authProviderReadManyController = makeController(
+  authProviderReadManyRoute,
+  async (_c, respond) => {
+    const platformProviders = getPlatformProviders();
+    return respond.ok(platformProviders);
+  },
+);
+```
+
+**No database query** - platform providers are static configuration loaded from env vars.
+
+#### Example: Create Organization Provider (Encrypted)
+
+```typescript
+// organization/controllers/organizationCreateAuthProvider.ts
+import { db, organizationId, userId } from '@template/db';
+import { encryptField } from '@template/db/lib/encryption/helpers';
+import { getResource } from '#/lib/context/getResource';
+import { makeController } from '#/lib/utils/makeController';
+
+export const organizationCreateAuthProviderController = makeController(
+  organizationCreateAuthProviderRoute,
+  async (c, respond) => {
+    const org = getResource<'organization'>(c);
+    const user = c.get('user')!;
+    const { secrets, ...body } = c.req.valid('json');
+
+    const data = {
+      ...body,
+      id: crypto.randomUUID(),
+      organizationId: organizationId(org.id),
+      createdBy: userId(user.id),
+    };
+
+    // Encrypt secrets before storage
+    const encryptedData = await encryptField('authProvider', 'secrets', { ...data, secrets });
+
+    const provider = await db.authProvider.create({
+      data: { ...data, ...encryptedData },
+    });
+
+    // Strip encrypted fields from response
+    const { encryptedSecrets, encryptedSecretsMetadata, encryptedSecretsKeyVersion, ...safeProvider } = provider;
+
+    return respond.created(safeProvider);
+  },
+);
+```
+
+**Key patterns:**
+- Extract `secrets` from body before creating data object
+- Use `encryptField()` helper (see ENCRYPTION.md)
+- Strip encrypted fields from response using destructuring
+- Return `201 Created` with sanitized provider
+
+#### Example: Read Organization Providers (Permission-Aware)
+
+```typescript
+// organization/controllers/organizationReadAuthProvider.ts
+import { getResource } from '#/lib/context/getResource';
+import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { check, rebacSchema } from '@template/permissions/rebac';
+
+export const organizationReadAuthProviderController = makeController(
+  organizationReadAuthProviderRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const organization = getResource(c);
+    const user = c.get('user');
+    const permix = c.get('permix');
+
+    // Owners see all providers (enabled + disabled), others see only enabled
+    const isOwner = user && check(permix, rebacSchema, 'organization', organization, 'own');
+
+    const platformProviders = getPlatformProviders();
+
+    const orgProviders = await db.authProvider.findMany({
+      where: {
+        organizationId: organization.id,
+        ...(isOwner ? {} : { enabled: true }),
+      },
+      omit: {
+        encryptedSecrets: true,
+        encryptedSecretsMetadata: true,
+        encryptedSecretsKeyVersion: true,
+      },
+    });
+
+    return respond.ok({
+      platform: platformProviders,
+      organization: orgProviders,
+    });
+  },
+);
+```
+
+**Key patterns:**
+- Combine platform + org providers in single response
+- Permission-based filtering (owners see all, others see enabled only)
+- Use Prisma `omit` to exclude encrypted fields
+- Return structured response `{ platform: [], organization: [] }`
+
+#### Request/Response Examples
+
+**Create SAML provider:**
+```bash
+POST /organizations/org_123/authProviders
+Content-Type: application/json
+
+{
+  "provider": "SAML",
+  "name": "Company SSO",
+  "enabled": true,
+  "secrets": {
+    "entityId": "https://company.com/saml",
+    "ssoUrl": "https://company.com/sso",
+    "certificate": "-----BEGIN CERTIFICATE-----\n..."
+  }
+}
+
+# Response (201 Created):
+{
+  "data": {
+    "id": "ap_xyz",
+    "organizationId": "org_123",
+    "provider": "SAML",
+    "name": "Company SSO",
+    "enabled": true,
+    "createdBy": "usr_456",
+    "createdAt": "2026-02-12T10:00:00Z"
+    // Note: secrets fields omitted from response
+  }
+}
+```
+
+**Read org providers:**
+```bash
+GET /organizations/org_123/authProviders
+
+# Response (200 OK):
+{
+  "data": {
+    "platform": [
+      { "provider": "GOOGLE", "name": "Google", "enabled": true },
+      { "provider": "GITHUB", "name": "GitHub", "enabled": true }
+    ],
+    "organization": [
+      { "id": "ap_xyz", "provider": "SAML", "name": "Company SSO", "enabled": true }
+    ]
+  }
+}
+```
+
+#### Integration with Frontend
+
+```typescript
+// packages/ui/src/hooks/useAuthProviders.ts
+import { useQuery } from '@tanstack/react-query';
+import { organizationReadAuthProvider } from '@template/ui/apiClient';
+import { apiQuery } from '@template/ui/lib';
+
+export const useAuthProviders = () => {
+  const search = useSearch({ strict: false }) as { org?: string };
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: search.org ? ['authProviders', 'org', search.org] : ['authProviders', 'platform'],
+    queryFn: search.org
+      ? apiQuery((opts) => organizationReadAuthProvider({ ...opts, path: { id: search.org! } }))
+      : apiQuery((opts) => authProviderReadMany(opts)),
+    retry: 2,
+  });
+
+  // Flatten platform + organization providers for display
+  const providers = search.org && data?.platform && data?.organization
+    ? [...data.platform, ...data.organization]
+    : data ?? [];
+
+  return { providers, isLoading, error };
+};
+```
+
+See `docs/claude/AUTHENTICATION.md` for complete frontend integration patterns.
 
 ---
 
@@ -496,16 +742,88 @@ function SpacesTable() {
 
 ## Error Responses
 
-All routes automatically include error responses (400, 401, 403, 404, 409, 422, 500):
+All routes return standardized error responses. Use `makeError` to throw structured errors, or let the error handler normalize unexpected errors.
+
+**Contract:**
 
 ```typescript
 {
-  "error": "NotFound",
-  "message": "User not found",
-  "guidance": "Check the ID is correct",  // optional
-  "stack": "..."  // included until project stable
+  "error": "RESOURCE_NOT_FOUND",    // Stable machine label
+  "message": "User not found",      // User-safe message
+  "guidance": "fixInput",           // Behavior hint for UI
+  "fieldErrors": {                  // Optional (validation only)
+    "email": ["Already taken"]
+  },
+  "requestId": "abc-123"            // Always present (support/tracing)
 }
 ```
+
+**Supported HTTP codes and default guidance:**
+
+| Code | Label | Default Guidance |
+|------|-------|------------------|
+| 400 | BAD_REQUEST | fixInput |
+| 401 | AUTHENTICATION_FAILED | reauthenticate |
+| 403 | PERMISSION_DENIED | requestPermission |
+| 404 | RESOURCE_NOT_FOUND | fixInput |
+| 405 | METHOD_NOT_ALLOWED | contactSupport |
+| 409 | CONFLICT | fixInput |
+| 410 | RESOURCE_GONE | fixInput |
+| 413 | PAYLOAD_TOO_LARGE | fixInput |
+| 415 | UNSUPPORTED_MEDIA_TYPE | contactSupport |
+| 422 | VALIDATION_ERROR | fixInput |
+| 429 | RATE_LIMITED | tryAgain |
+| 500 | SERVER_ERROR | contactSupport |
+| 502 | BAD_GATEWAY | tryAgain |
+| 503 | SERVICE_UNAVAILABLE | refreshAndRetry |
+| 504 | GATEWAY_TIMEOUT | tryAgain |
+
+**Usage:**
+
+```typescript
+import { makeError } from '#/lib/errors';
+
+// Throw with explicit status and message
+throw makeError({
+  status: 404,
+  message: 'Organization not found',
+  requestId: c.get('requestId'),
+});
+
+// Status defaults to 500, message defaults to HTTP status name
+throw makeError({
+  requestId: c.get('requestId'),
+});
+
+// Override default guidance
+throw makeError({
+  status: 404,
+  guidance: 'tryAgain',
+  requestId: c.get('requestId'),
+});
+
+// Include field errors for validation
+throw makeError({
+  status: 422,
+  message: 'Invalid input',
+  fieldErrors: { email: ['Must be a valid email'] },
+  requestId: c.get('requestId'),
+});
+```
+
+**How it works:**
+
+- `makeError` returns an `HTTPException` with a pre-built JSON response
+- Error handler middleware catches and returns `err.getResponse()` for HTTPException
+- Unknown errors are normalized to 500 with standardized body
+- Zod validation errors automatically map to 422 with fieldErrors
+- Prisma errors (P2002, P2025) map to 409/404 with standardized body
+
+Types are defined in `@template/shared/errors` and derived from `HTTP_ERROR_MAP` to prevent drift.
+
+Default guidance for unknown/internal errors: `contactSupport`.
+
+`type` is optional and not required by default. In most cases, `status + guidance` is enough to drive frontend behavior.
 
 Throw `HTTPException` to return errors:
 

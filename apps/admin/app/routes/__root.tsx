@@ -1,6 +1,6 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
-import { RootNotFound, useDarkMode, useLanguage, useSpaceTheme, useThemePersistence } from '@template/ui';
-import { usePageMeta } from '@template/shared';
+import { RootNotFound, Toaster } from '@template/ui/components';
+import { useDarkMode, useLanguage, usePageMeta, useSpaceTheme, useThemePersistence } from '@template/ui/hooks';
 import { useEffect } from 'react';
 import { useAppStore } from '#/store';
 import { navConfig } from '#/config/nav';
@@ -15,7 +15,7 @@ const RootComponent = () => {
   // Initialize navigation in store (one-time setup)
   // navigate, setNavigate, setNavConfig are all stable refs
   useEffect(() => {
-    setNavigate((options: any) => navigate(options));
+    setNavigate(navigate);
     setNavConfig(navConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -39,10 +39,15 @@ const RootComponent = () => {
   useDarkMode(theme);
   useSpaceTheme(spaceTheme);
 
-  return <Outlet />;
+  return (
+    <>
+      <Toaster />
+      <Outlet />
+    </>
+  );
 };
 
 export const Route = createRootRoute({
   component: RootComponent,
-  notFoundComponent: RootNotFound,
+  notFoundComponent: () => <RootNotFound />,
 });

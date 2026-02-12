@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { inferDependencies, mergeDependencies } from './dependencyInference';
+import { inferDependencies, mergeDependencies } from '@template/db/test/dependencyInference';
 
 describe('inferDependencies', () => {
   describe('simple models', () => {
