@@ -80,6 +80,7 @@ web_modules/
 .env.staging
 .env.sandbox
 .env.production
+.env.init
 
 .idea
 
