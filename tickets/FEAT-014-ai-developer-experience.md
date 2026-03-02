@@ -175,6 +175,28 @@ The template already has a strong AI foundation:
 
 ---
 
+## Future: Delphi — Prompt Refinement Harness
+
+**Status**: Design doc complete, ~40% MVP built internally at UserEvidence. Not yet a standalone product.
+
+Delphi is the **validation and optimization layer** for the AI DX features in this ticket. While this ticket builds the skills, rules, and agents, Delphi tests whether they actually work — and systematically makes them better.
+
+**Core concept**: "Gradient descent on documentation" — since you can't fine-tune model weights, you optimize the docs/rules/skills that guide the model. Delphi provides the loss function and training loop.
+
+**Architecture** (from design doc):
+- **Three agents**: Subject (vague PM), Implementer (agent under test), Oracle (grader)
+- **Git branch isolation**: fixtures stored as three branches per test case (raw/subject/after)
+- **Five rubrics**: Prompt Efficiency, Completion, Demerits, Craft, Questioning
+- **Refinement loop**: implement → evaluate → diagnose → prescribe → re-trigger
+
+**Why it belongs on this template**: Delphi needs multi-tenancy (orgs set up their own repos/fixtures), auth, job queues (running harness jobs), encrypted secrets (API keys for LLM providers), and a worker for async evaluation — all things the template already provides. Rebuilding Delphi on the template skips the infrastructure plumbing.
+
+**Reference**: Design doc at `UserEvidence/Zealot-Monorepo/docs/PROMPT_HARNESS_V2.md`. Will get its own ticket when scoped for rebuild.
+
+---
+
 ## Comments
 
 _2026-03-02: Created. The template's existing documentation (CLAUDE.md, docs/claude/) is a strong foundation. This ticket is about packaging that knowledge into formats every AI tool can consume, plus adding skills and MCP servers for workflow automation._
+
+_2026-03-02: Added Delphi reference. Prompt refinement harness (~40% built internally) is the testing/optimization layer for AI DX features. Potential standalone product built on the template._
