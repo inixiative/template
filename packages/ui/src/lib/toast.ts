@@ -1,5 +1,15 @@
 import { toast as sonnerToast } from 'sonner';
 
+type ToastPromiseInput<TData> = Promise<TData> | (() => Promise<TData>);
+type ToastPromiseOptions<TData> = {
+  loading?: string;
+  success?: string | ((data: TData) => string);
+  error?: string | ((error: unknown) => string);
+  description?: string | ((data: TData) => string);
+  finally?: () => void | Promise<void>;
+};
+type ToastPromiseResult<TData> = { unwrap: () => Promise<TData> };
+
 /**
  * Toast notification utility with automatic duration settings
  *
@@ -41,7 +51,12 @@ export const toast = {
   },
 
   // Promise-based toast for async operations
-  promise: sonnerToast.promise,
+  promise: <TData>(
+    promise: ToastPromiseInput<TData>,
+    options?: ToastPromiseOptions<TData>,
+  ): ToastPromiseResult<TData> => {
+    return sonnerToast.promise(promise, options);
+  },
 
   // Dismiss specific or all toasts
   dismiss: sonnerToast.dismiss,

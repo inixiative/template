@@ -34,7 +34,7 @@ export const settingsItem: NavItem = {
       path: '/authProviders',
       icon: ShieldCheck,
       access: (permissions, context) =>
-        context.organization && permissions.check(...getContextParams(context), 'own'),
+        !!context.organization && permissions.check(...getContextParams(context), 'own'),
     },
   ],
 };

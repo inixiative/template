@@ -35,7 +35,12 @@ export type JobData<TPayload = unknown> = {
   dedupeKey?: string;
 };
 
-export type JobHandler<TPayload = unknown> = (ctx: WorkerContext, payload: TPayload) => Promise<void>;
+export type JobHandlerArgs<TPayload = void> = [TPayload] extends [void] ? [] : [payload: TPayload];
+
+export type JobHandler<TPayload = void> = (
+  ctx: WorkerContext,
+  ...args: JobHandlerArgs<TPayload>
+) => Promise<void>;
 
 export type JobOptions = {
   priority?: number;

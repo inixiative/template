@@ -6,6 +6,7 @@ type BeforeLoadContext = {
   location: {
     pathname: string;
     search: Record<string, unknown>;
+    hash: string;
   };
 };
 
@@ -18,14 +19,13 @@ export const createAuthGuards = (getStore: () => AppStore) => ({
     }
 
     if (!getStore().auth.isAuthenticated) {
-      const pathname = context?.location.pathname || '/dashboard';
-      const search = context?.location.search;
-      const preserved = pickSearchParams(search, ['org', 'space', 'spoof']);
-      const redirectTo = buildPathWithSearch(pathname, preserved);
+      const { pathname = '/dashboard', search, hash } = context?.location ?? {};
+      const redirectTo = buildPathWithSearch(pathname, search, hash);
+      const loginParams = pickSearchParams(search, ['org', 'space', 'spoof']);
 
       throw redirect({
         to: '/login',
-        search: { redirectTo },
+        search: { redirectTo, ...loginParams },
       });
     }
   },

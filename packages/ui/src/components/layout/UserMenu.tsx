@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '@template/ui/store';
-import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/Avatar';
-import { Button } from '@template/ui/components/Button';
+import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/primitives/Avatar';
+import { Button } from '@template/ui/components/primitives/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +9,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@template/ui/components/DropdownMenu';
-import { Input } from '@template/ui/components/Input';
+} from '@template/ui/components/primitives/DropdownMenu';
+import { Input } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
 import { LogOut, Settings, ShieldAlert, User } from 'lucide-react';
 

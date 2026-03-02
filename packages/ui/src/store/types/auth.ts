@@ -1,5 +1,6 @@
 import type { MeReadResponses } from '@template/ui/apiClient';
 import { createAuthClient } from 'better-auth/client';
+import type { AuthMethod } from '@template/ui/lib/auth/types';
 
 type BetterAuthClient = ReturnType<typeof createAuthClient>;
 
@@ -26,8 +27,8 @@ export type AuthSlice = {
     isEmbedded: boolean;
     isInitialized: boolean;
     initialize: () => Promise<void>;
-    signIn: (credentials: SignInCredentials) => Promise<void>;
-    signUp: (credentials: SignUpCredentials) => Promise<void>;
+    signIn: (method: AuthMethod) => Promise<void>;
+    signUp: (method: AuthMethod) => Promise<void>;
     setStrategy: (strategy: AuthStrategy) => void;
     setSpoof: (email: string | null) => Promise<void>;
     logout: () => Promise<void>;

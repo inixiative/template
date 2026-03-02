@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
+PROJECT_NAME=${PROJECT_NAME:-template}
+
 timeout=30
-while ! docker exec template-postgres pg_isready -U postgres -q 2>/dev/null; do
+while ! docker exec ${PROJECT_NAME}-postgres pg_isready -U postgres -q 2>/dev/null; do
   sleep 1
   ((timeout--))
   [ $timeout -le 0 ] && { echo "Error: PostgreSQL timeout"; exit 1; }

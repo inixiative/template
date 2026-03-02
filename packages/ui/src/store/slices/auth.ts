@@ -6,6 +6,7 @@ import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { createAuthClient } from 'better-auth/client';
 import type { AppStore } from '@template/ui/store/types';
 import type { AuthSlice } from '@template/ui/store/types/auth';
+import type { AuthMethod } from '@template/ui/lib/auth/types';
 
 export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, get) => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -37,14 +38,18 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       }
     },
 
-    signIn: async (credentials) => {
-      await signInFn(credentials);
-      await fetchAndHydrateMe(set, get);
+    signIn: async (method: AuthMethod) => {
+      await signInFn(method);
+      if (method.type !== 'oauth') {
+        await fetchAndHydrateMe(set, get);
+      }
     },
 
-    signUp: async (credentials) => {
-      await signUpFn(credentials);
-      await fetchAndHydrateMe(set, get);
+    signUp: async (method: AuthMethod) => {
+      await signUpFn(method);
+      if (method.type !== 'oauth') {
+        await fetchAndHydrateMe(set, get);
+      }
     },
 
     setStrategy: (strategy) =>

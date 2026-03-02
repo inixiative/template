@@ -1,4 +1,4 @@
-import { buttonVariants } from '@template/ui/components/Button';
+import { buttonVariants } from '@template/ui/components/primitives/Button';
 
 type HomePageProps = {
   title: string;

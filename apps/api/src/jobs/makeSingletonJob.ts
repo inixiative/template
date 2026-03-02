@@ -1,8 +1,8 @@
 import { redisNamespace } from '@template/db';
-import { type JobHandler, JobType } from '#/jobs/types';
+import type { JobHandler, JobHandlerArgs } from '#/jobs/types';
 
-export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayload>): JobHandler<TPayload> => {
-  return async (ctx, payload) => {
+export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>): JobHandler<TPayload> => {
+  return async (ctx, ...args: JobHandlerArgs<TPayload>) => {
     const { queue, job } = ctx;
     const redis = queue.redis;
     const jobData = job.data;
@@ -18,7 +18,7 @@ export const makeSingletonJob = <TPayload = unknown>(handler: JobHandler<TPayloa
     const heartbeat = setInterval(() => redis.expire(lockKey, lockTTL).catch(() => {}), 120000);
 
     try {
-      await handler(ctx, payload);
+      await handler(ctx, ...args);
     } finally {
       clearInterval(heartbeat);
       await redis.del(lockKey);

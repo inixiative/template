@@ -7,7 +7,7 @@ shift 2
 
 if [ -z "$ENV" ] || [ -z "$APP" ]; then
     echo "Usage: $0 <env> <app> [command...]"
-    echo "Envs: local, test, dev, staging, sandbox, prod"
+    echo "Envs: local, test, pr, staging, prod"
     echo "Apps: api, web, admin, superadmin"
     exit 1
 fi
@@ -18,22 +18,31 @@ APP_DIR="$ROOT_DIR/apps/$APP"
 
 export ROOT_DIR APP_DIR ENV APP
 
-# Use Infisical for cloud environments (dev, staging, sandbox, prod)
-# Use .env files for local/test environments
-if [ "$ENV" != "local" ] && [ "$ENV" != "test" ]; then
+# Use Infisical for all environments except test
+# test uses .env.test files
+if [ "$ENV" != "test" ]; then
     # Check if Infisical is configured
-    if command -v infisical &> /dev/null && [ -f "$ROOT_DIR/.infisical.json" ]; then
-        # Get domain from config if self-hosted
-        DOMAIN_FLAG=""
-        if grep -q '"domain"' "$ROOT_DIR/.infisical.json"; then
-            DOMAIN=$(jq -r '.domain // empty' "$ROOT_DIR/.infisical.json")
-            if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "https://app.infisical.com" ]; then
-                DOMAIN_FLAG="--domain=$DOMAIN"
-            fi
-        fi
+    if command -v infisical &> /dev/null; then
+        # Get projectId from project config using locate-config utility
+        CONFIG_FILE=$(bash "$SCRIPT_DIR/locate-config.sh")
 
-        # Run with Infisical
-        exec infisical run --env="$ENV" $DOMAIN_FLAG -- "$@"
+        PROJECT_ID=$(cd "$ROOT_DIR" && bun -e "import {projectConfig} from './$CONFIG_FILE'; console.log(projectConfig.infisical.projectId)" 2>/dev/null)
+
+        if [ -n "$PROJECT_ID" ]; then
+            # Map local and pr to staging in Infisical
+            INFISICAL_ENV="$ENV"
+            if [ "$ENV" = "local" ] || [ "$ENV" = "pr" ]; then
+                INFISICAL_ENV="staging"
+            fi
+
+            # Run with Infisical using path-based structure
+            # Fetches from env:/app/ which inherits from:
+            #   1. root:/
+            #   2. root:/app/
+            #   3. env:/
+            #   4. env:/app/ (local secrets)
+            exec infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" --include-imports -- "$@"
+        fi
     fi
 fi
 

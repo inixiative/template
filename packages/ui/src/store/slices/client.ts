@@ -4,6 +4,7 @@ import type { AppStore } from '@template/ui/store/types';
 import type { ClientSlice } from '@template/ui/store/types/client';
 import { toast } from '@template/ui/lib/toast';
 import type { ApiErrorBody } from '@template/shared/errors';
+import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 
 const shouldSkipToast = (meta: unknown) => {
   if (!meta || typeof meta !== 'object') return false;
@@ -42,10 +43,7 @@ const handleApiError = (error: unknown, getStore: () => AppStore) => {
       toast.error('Session expired. Please log in again.', {
         action: {
           label: 'Login',
-          onClick: () => {
-            const currentPath = window.location.pathname + window.location.search;
-            getStore().navigation.navigatePreservingContext(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
-          },
+          onClick: () => navigateToLogin(getStore),
         },
       });
       break;

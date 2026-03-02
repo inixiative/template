@@ -27,63 +27,6 @@ Auto-redirect to redirectTo or /dashboard
 
 ## Hooks
 
-### useAuthFlow
-
-**Location:** `/packages/ui/src/hooks/useAuthFlow.ts`
-
-Handles auth submission, loading state, errors, and redirects.
-
-**Purpose:** Eliminates duplication between login/signup flows.
-
-```typescript
-import { useAuthFlow } from '@template/ui/hooks';
-import { useAppStore } from '@template/ui/store';
-
-const signIn = useAppStore((state) => state.auth.signIn);
-const { handleAuth, error, isLoading } = useAuthFlow(signIn);
-
-<LoginForm onSubmit={handleAuth} error={error} isLoading={isLoading} />
-```
-
-**Returns:**
-- `handleAuth(credentials)` - Submit handler function
-- `error` - Error message string or undefined
-- `isLoading` - Loading boolean
-
-**Features:**
-- Generic - works with any auth function (signIn, signUp)
-- Preserves `redirectTo` param from URL
-- Auto-redirects after successful auth
-- Handles errors and loading states
-
-**Implementation:**
-```typescript
-export const useAuthFlow = (authFn: (credentials: Record<string, any>) => Promise<void>) => {
-  const search = useSearch({ strict: false }) as { redirectTo?: string };
-  const [error, setError] = useState<string>();
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useAppStore((state) => state.navigation.navigate);
-
-  const handleAuth = async (credentials: Record<string, any>) => {
-    setError(undefined);
-    setIsLoading(true);
-
-    try {
-      await authFn(credentials);
-      navigate?.({ to: search.redirectTo || '/dashboard' });
-    } catch (err: any) {
-      setError(err?.message || 'An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return { handleAuth, error, isLoading };
-};
-```
-
----
-
 ### useAuthProviders
 
 **Location:** `/packages/ui/src/hooks/useAuthProviders.ts`
@@ -152,33 +95,40 @@ export const useAuthProviders = () => {
 
 ## Login/Signup Pattern
 
+### Unified Auth System
+
+All authentication methods (email/password, OAuth, SAML) use a **unified `AuthMethod` interface**:
+
+```typescript
+// packages/ui/src/lib/auth/types.ts
+type AuthMethod =
+  | { type: 'email', email: string, password: string, name?: string }
+  | { type: 'oauth', provider: string, callbackURL?: string }
+  | { type: 'saml', provider: string, email?: string };
+
+// Unified sign-in interface
+signIn(method: AuthMethod) → Promise<void>
+signUp(method: AuthMethod) → Promise<void>
+```
+
+**Key Architectural Change:** Forms access store directly (no prop drilling).
+
 ### LoginPage
 
 **Location:** `/packages/ui/src/pages/LoginPage.tsx`
 
 ```typescript
-import { useAuthFlow, useAuthProviders } from '@template/ui/hooks';
+import { navigateToSignup } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
-import { buildPathWithSearch } from '@template/ui/lib/searchParams';
+import { LoginForm } from '@template/ui/components/auth/LoginForm';
 
 export const LoginPage = ({ hideSignup }: LoginPageProps) => {
-  const search = useSearch({ strict: false }) as { redirectTo?: string };
-  const signIn = useAppStore((state) => state.auth.signIn);
-  const { handleAuth, error, isLoading } = useAuthFlow(signIn);
-  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const getStore = useAppStore.getState;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <LoginForm
-        onSubmit={handleAuth}
-        onSignupClick={hideSignup ? undefined : () => {
-          const signupUrl = buildPathWithSearch('/signup', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
-          navigatePreservingContext(signupUrl);
-        }}
-        providers={providerError ? [] : providers}
-        error={providerError ? 'Unable to load authentication providers. You can still sign in with email and password.' : error}
-        isLoading={isLoading || isLoadingProviders}
+        onSignupClick={hideSignup ? undefined : () => navigateToSignup(getStore, true)}
       />
     </div>
   );
@@ -186,40 +136,32 @@ export const LoginPage = ({ hideSignup }: LoginPageProps) => {
 ```
 
 **Key Points:**
-- Uses `useAuthFlow` for auth handling
-- Uses `useAuthProviders` for provider fetching
-- Injects error into form (no duplicate renders)
-- Preserves `redirectTo` param when navigating to signup
-- Shows fallback error if providers fail to load
+- ✅ **No props** - form accesses store directly for auth
+- ✅ **No error/loading state** - form manages internally
+- ✅ **No provider fetching** - form handles via `useAuthProviders()`
+- ✅ **Navigation helpers** - `navigateToSignup(getStore, preserveSearch: true)`
 
 ### SignupPage
 
 **Location:** `/packages/ui/src/pages/SignupPage.tsx`
 
 ```typescript
+import { navigateToLogin } from '@template/ui/lib/routeRedirect';
+import { useAppStore } from '@template/ui/store';
+import { SignupForm } from '@template/ui/components/auth/SignupForm';
+
 export const SignupPage = () => {
-  const search = useSearch({ strict: false }) as { redirectTo?: string };
-  const signUp = useAppStore((state) => state.auth.signUp);
-  const { handleAuth, error, isLoading } = useAuthFlow(signUp);
-  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const getStore = useAppStore.getState;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <SignupForm
-        onSubmit={handleAuth}
-        onLoginClick={() => {
-          const loginUrl = buildPathWithSearch('/login', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
-          navigatePreservingContext(loginUrl);
-        }}
-        providers={providerError ? [] : providers}
-        error={providerError ? 'Unable to load authentication providers. You can still sign up with email and password.' : error}
-        isLoading={isLoading || isLoadingProviders}
-      />
+      <SignupForm onLoginClick={() => navigateToLogin(getStore, true)} />
     </div>
   );
 };
 ```
+
+**Same pattern** - minimal page, smart form component.
 
 ---
 
@@ -229,26 +171,78 @@ export const SignupPage = () => {
 
 **Location:** `/packages/ui/src/components/auth/LoginForm.tsx`
 
-Presentational component for login UI.
+**Smart component** - accesses store directly, manages own state.
 
 **Props:**
 ```typescript
 export type LoginFormProps = {
-  onSubmit: (credentials: LoginCredentials) => Promise<void>;
+  hideSignup?: boolean;
   onSignupClick?: () => void;
-  providers?: AuthProvider[];
-  error?: string;
-  isLoading?: boolean;
+};
+```
+
+**Internal Implementation:**
+```typescript
+export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const search = useSearch({ strict: false }) as { redirectTo?: string };
+  const signIn = useAppStore((state) => state.auth.signIn);
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      await signIn({ type: 'email', email, password });
+      navigatePreservingContext(search.redirectTo || '/dashboard');
+    } catch (err: any) {
+      const message = err?.message || 'Sign in failed. Please try again.';
+      setError(message);
+      toast.error(message);  // Dual error handling
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOAuthClick = async (provider: string) => {
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      const redirectTo = search.redirectTo || '/dashboard';
+      localStorage.setItem('authRedirectTo', redirectTo);
+      await signIn({
+        type: 'oauth',
+        provider,
+        callbackURL: `${window.location.origin}/auth/callback`,
+      });
+    } catch (err: any) {
+      const message = err?.message || 'OAuth sign in failed. Please try again.';
+      setError(message);
+      toast.error(message);
+      setIsLoading(false);
+    }
+  };
+
+  // ... render form
 };
 ```
 
 **Features:**
-- Email/password form
-- OAuth/SAML provider buttons
-- Auto-shows divider when providers present
-- Error display
-- Loading states
-- Signup link
+- ✅ Email/password form
+- ✅ OAuth/SAML provider buttons (auto-detected)
+- ✅ **Dual error handling** - inline form errors + toast notifications
+- ✅ **Managed state** - error, isLoading, form fields
+- ✅ **Store access** - calls `signIn()` directly
+- ✅ **Navigation** - `navigatePreservingContext` after success
+- ✅ **OAuth flow** - stores redirectTo in localStorage, uses BetterAuth client
 
 **Provider Icons:**
 ```typescript
@@ -265,91 +259,173 @@ const providerIcons: Record<string, typeof Chrome> = {
 
 **Location:** `/packages/ui/src/components/auth/SignupForm.tsx`
 
-Presentational component for signup UI.
+**Same pattern** - smart component accessing store directly.
 
 **Props:**
 ```typescript
 export type SignupFormProps = {
-  onSubmit: (credentials: SignupCredentials) => Promise<void>;
+  hideLogin?: boolean;
   onLoginClick?: () => void;
-  providers?: AuthProvider[];
-  error?: string;
-  isLoading?: boolean;
 };
 ```
 
 **Features:**
-- Name, email, password fields
-- OAuth/SAML provider buttons
-- Auto-shows divider when providers present
-- Error display
-- Loading states
-- Login link
+- ✅ Name, email, password fields
+- ✅ OAuth/SAML provider buttons (auto-detected)
+- ✅ **Dual error handling** - inline + toast
+- ✅ **Managed state** - form manages error, isLoading
+- ✅ **Store access** - calls `signUp()` directly
+- ✅ **Navigation** - `navigatePreservingContext` after success
 
 ---
 
 ## Types
 
-**Location:** `/packages/ui/src/types/auth.ts`
+**Location:** `/packages/ui/src/lib/auth/types.ts`
+
+### AuthMethod (Unified Auth Interface)
 
 ```typescript
-export type LoginCredentials = {
+export type EmailAuthMethod = {
+  type: 'email';
   email: string;
   password: string;
+  name?: string;  // For signup
 };
 
-export type SignupCredentials = {
-  email: string;
-  password: string;
-  name: string;
+export type OAuthAuthMethod = {
+  type: 'oauth';
+  provider: string;
+  callbackURL?: string;
 };
+
+export type SamlAuthMethod = {
+  type: 'saml';
+  provider: string;
+  email?: string;  // Optional hint for IdP
+};
+
+export type AuthMethod = EmailAuthMethod | OAuthAuthMethod | SamlAuthMethod;
 ```
 
-**Note:** Store uses generic `SignInCredentials` and `SignUpCredentials` as `Record<string, any>` for flexibility with different auth providers.
+**Usage:**
+
+```typescript
+// Email signin
+await signIn({ type: 'email', email: 'user@example.com', password: 'secret' });
+
+// OAuth signin
+await signIn({ type: 'oauth', provider: 'google', callbackURL: '/auth/callback' });
+
+// SAML signin (when implemented)
+await signIn({ type: 'saml', provider: 'okta-sso', email: 'user@company.com' });
+```
+
+**Benefits:**
+- Single interface for all auth methods
+- Type-safe - TypeScript enforces correct fields per method
+- Easy to add new auth methods (just extend union)
+- No code duplication between signin/signup
 
 ---
 
 ## OAuth/SAML
 
-### OAuth Redirect Utility
+### OAuth Flow (BetterAuth Client)
 
-**Location:** `/packages/ui/src/lib/auth/oauthRedirect.ts`
-
-Handles OAuth provider redirects.
-
-```typescript
-import { redirectToOAuthProvider } from '@template/ui/lib';
-
-// Called automatically by LoginForm/SignupForm provider buttons
-redirectToOAuthProvider(provider);
-```
+OAuth authentication uses **BetterAuth's client SDK** (not manual URL construction).
 
 **Implementation:**
+
 ```typescript
-export const redirectToOAuthProvider = (provider: AuthProvider): void => {
-  try {
-    const baseURL = import.meta.env.VITE_API_URL;
-    const callbackURL = `${window.location.origin}/auth/callback`;
+// packages/ui/src/lib/auth/signin.ts
+import { getAuthClient } from '@template/ui/lib/auth/authClient';
 
-    // Security: Validate callback origin
-    const allowedOrigins = [window.location.origin, 'http://localhost:3000'];
-    const callbackOrigin = new URL(callbackURL).origin;
-    if (!allowedOrigins.includes(callbackOrigin)) {
-      throw new Error('Invalid callback URL');
-    }
+const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
+  const client = getAuthClient();
 
-    window.location.href = `${baseURL}/auth/${provider.provider.toLowerCase()}/signin?callbackURL=${encodeURIComponent(callbackURL)}`;
-  } catch (err) {
-    console.error('OAuth redirect failed:', err);
-  }
+  // Store redirectTo before OAuth redirect (URL params lost during OAuth flow)
+  localStorage.setItem('authRedirectTo', window.location.pathname + window.location.search + window.location.hash);
+
+  // BetterAuth handles OAuth negotiation and redirect
+  await client.signIn.social({
+    provider: method.provider,
+    callbackURL: method.callbackURL || `${window.location.origin}/auth/callback`,
+  });
 };
 ```
 
-**Security Features:**
-- Validates callback URL origin
-- Only allows current origin + localhost:3000
-- Auto-encodes callback URL parameter
-- Catches and logs errors
+**OAuth Callback Route:**
+
+```typescript
+// apps/web/app/routes/_public/auth.callback.tsx
+import { useEffect } from 'react';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { setToken } from '@template/ui/lib/auth/token';
+import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
+import { useAppStore } from '@template/ui/store';
+
+export const Route = createFileRoute('/_public/auth/callback')({
+  component: AuthCallbackPage,
+});
+
+function AuthCallbackPage() {
+  const navigate = useNavigate();
+  const store = useAppStore();
+
+  useEffect(() => {
+    const completeOAuth = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+
+        if (!token) {
+          throw new Error('No authentication token received');
+        }
+
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        setToken(token, expiresAt);
+
+        await fetchAndHydrateMe(store.setState, store.getState);
+
+        const redirectTo = localStorage.getItem('authRedirectTo') || '/dashboard';
+        localStorage.removeItem('authRedirectTo');
+
+        navigate({ to: redirectTo });
+      } catch (error: any) {
+        console.error('OAuth callback failed:', error);
+        navigate({
+          to: '/login',
+          search: { error: error.message || 'Authentication failed' },
+        });
+      }
+    };
+
+    completeOAuth();
+  }, []);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div>Completing authentication...</div>
+    </div>
+  );
+}
+```
+
+**Flow:**
+1. User clicks OAuth provider button
+2. `signIn({ type: 'oauth', provider: 'google' })`
+3. BetterAuth redirects to Google OAuth
+4. User authenticates with Google
+5. Google redirects to `/auth/callback?token=...`
+6. Callback route extracts bearer token, stores in localStorage
+7. Hydrates user data via `/me` API call
+8. Navigates to redirectTo destination
+
+**Security:**
+- BetterAuth handles OAuth state/nonce validation
+- Bearer token pattern (not session cookies)
+- Callback routes in all 3 apps (web, admin, superadmin)
 
 ### Provider Configuration
 

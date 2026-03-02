@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { Construction } from 'lucide-react';
 import type { ReactNode } from 'react';
 

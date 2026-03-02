@@ -1,5 +1,5 @@
 import { useAppStore } from '@template/ui/store';
-import { NotFound } from '@template/ui/components/NotFound';
+import { NotFound } from '@template/ui/components/utility/NotFound';
 
 type RootNotFoundProps = {
   title?: string;

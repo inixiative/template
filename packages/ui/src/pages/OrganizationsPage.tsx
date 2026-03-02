@@ -9,7 +9,7 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { CreateOrganizationModal } from '@template/ui/components/CreateOrganizationModal';
+import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';
@@ -117,7 +117,7 @@ export const OrganizationsPage = () => {
               columns={columns}
               data={organizations}
               keyExtractor={(org) => org.id}
-              onRowClick={(org) => navigatePreservingSpoof(`/dashboard?org=${org.id}`)}
+              onRowClick={(org: Organization) => navigatePreservingSpoof(`/dashboard?org=${org.id}`)}
               emptyMessage="You don't belong to any organizations yet"
             />
           </CardContent>

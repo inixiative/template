@@ -76,10 +76,9 @@ web_modules/
 .env
 .env.local
 .env.test
-.env.development
+.env.pr
 .env.staging
-.env.sandbox
-.env.production
+.env.prod
 .env.init
 
 .idea
@@ -145,6 +144,9 @@ dist
 
 # Project-specific Claude instructions
 CLAUDE.local.md
+
+# Template internal config (for template development only)
+project.config.template-internal.ts
 
 # AI Workspace (ignore tmp contents, but keep README)
 tmp/*

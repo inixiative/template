@@ -6,8 +6,15 @@
 
 **Identify what you're touching and read the relevant docs.** Most tasks touch multiple areas - read all that apply.
 
+**🔧 Working on Init Script?**
+- **ALWAYS read** [INIT_SCRIPT_PATTERNS.md](docs/claude/INIT_SCRIPT_PATTERNS.md) FIRST
+- Location: `/scripts/init/`
+- Patterns cover: Context management, prompts, OrgSelector, Railway CLI, retry logic
+- Reference implementations: InfisicalSetupView, PlanetScaleSetupView, RailwaySetupView
+
 Examples:
 - Adding an endpoint → API_ROUTES + DATABASE + possibly HOOKS, PERMISSIONS
+- **Adding init task → INIT_SCRIPT_PATTERNS + existing view as reference**
 - Batch operations → BATCH + API_ROUTES + CONTEXT
 - Schema change → DATABASE + HOOKS + TESTING
 - Background job → JOBS + possibly REDIS, LOGGING

@@ -1,7 +1,8 @@
 import { AlertTriangle } from 'lucide-react';
 import { useAppStore } from '@template/ui/store';
-import { Button } from '@template/ui/components/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/Card';
+import { Button } from '@template/ui/components/primitives/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 
 export type UnauthorizedProps = {
   title?: string;
@@ -14,14 +15,14 @@ export const Unauthorized = ({
 }: UnauthorizedProps) => {
   const isAuthenticated = useAppStore((state) => state.auth.isAuthenticated);
   const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+  const getStore = useAppStore.getState;
 
   const goToPrimary = () => {
     if (isAuthenticated) {
       navigatePreservingSpoof('/dashboard');
       return;
     }
-    const redirectTo = `${window.location.pathname}${window.location.search}`;
-    navigatePreservingSpoof(`/login?redirectTo=${encodeURIComponent(redirectTo)}`);
+    navigateToLogin(getStore);
   };
 
   const handleGoBack = () => {

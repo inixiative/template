@@ -1,12 +1,13 @@
-import { Button } from '@template/ui/components/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/Card';
-import { Input } from '@template/ui/components/Input';
-import { Label } from '@template/ui/components/Label';
+import { Button } from '@template/ui/components/primitives/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import { Input } from '@template/ui/components/primitives/Input';
+import { Label } from '@template/ui/components/primitives/Label';
 import { Chrome, Github, Shield, Key } from 'lucide-react';
 import { useState } from 'react';
-import { redirectToOAuthProvider } from '@template/ui/lib';
-import type { AuthProvider } from '@template/ui/hooks';
-import type { SignupCredentials } from '@template/ui/types';
+import { useSearch } from '@tanstack/react-router';
+import { useAppStore } from '@template/ui/store';
+import { useAuthProviders } from '@template/ui/hooks';
+import { toast } from '@template/ui/lib/toast';
 
 const providerIcons: Record<string, typeof Chrome> = {
   google: Chrome,
@@ -15,25 +16,61 @@ const providerIcons: Record<string, typeof Chrome> = {
 };
 
 export type SignupFormProps = {
-  onSubmit: (credentials: SignupCredentials) => Promise<void>;
   onLoginClick?: () => void;
-  providers?: AuthProvider[];
-  error?: string;
-  isLoading?: boolean;
 };
 
-export const SignupForm = ({ onSubmit, onLoginClick, providers = [], error, isLoading }: SignupFormProps) => {
+export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const search = useSearch({ strict: false }) as { redirectTo?: string };
+  const signUp = useAppStore((state) => state.auth.signUp);
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit({ email, password, name });
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      await signUp({ type: 'email', email, password, name });
+      navigatePreservingContext(search.redirectTo || '/dashboard');
+    } catch (err: any) {
+      const message = err?.message || 'Sign up failed. Please try again.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const enabledProviders = providers.filter((p) => p.enabled);
+  const handleOAuthClick = async (provider: string) => {
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      const redirectTo = search.redirectTo || '/dashboard';
+      localStorage.setItem('authRedirectTo', redirectTo);
+      await signUp({
+        type: 'oauth',
+        provider,
+        callbackURL: `${window.location.origin}/auth/callback`,
+      });
+    } catch (err: any) {
+      const message = err?.message || 'OAuth sign up failed. Please try again.';
+      setError(message);
+      toast.error(message);
+      setIsLoading(false);
+    }
+  };
+
+  const enabledProviders = providers?.filter((p) => p.enabled) || [];
   const showProviders = enabledProviders.length > 0;
+  const displayError = providerError ? 'Unable to load authentication providers. You can still sign up with email and password.' : error;
 
   return (
     <Card className="w-full max-w-md">
@@ -60,7 +97,13 @@ export const SignupForm = ({ onSubmit, onLoginClick, providers = [], error, isLo
                       type="button"
                       variant="outline"
                       className="w-full"
-                      onClick={() => redirectToOAuthProvider(provider)}
+                      onClick={() =>
+                        onSubmit({
+                          type: 'oauth',
+                          provider: provider.provider,
+                          callbackURL: `${window.location.origin}/auth/callback`,
+                        })
+                      }
                       disabled={isLoading}
                     >
                       <Icon className="h-4 w-4 mr-2" />

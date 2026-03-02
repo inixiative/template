@@ -8,7 +8,7 @@ const preprocessEnv = (env: Record<string, string | undefined>): Record<string, 
 
 const envSchema = z.object({
   // Core (required)
-  ENVIRONMENT: z.enum(['local', 'dev', 'staging', 'sandbox', 'prod', 'test']),
+  ENVIRONMENT: z.enum(['local', 'pr', 'staging', 'prod', 'test']),
   DATABASE_URL: z.string(),
   BETTER_AUTH_SECRET: z.string().min(32),
   REDIS_URL: z.string(),

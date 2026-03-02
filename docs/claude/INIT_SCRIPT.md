@@ -1,5 +1,7 @@
 # Init Script Implementation (`bun run init`)
 
+> **📖 Architecture & Patterns:** See [INIT_SCRIPT_PATTERNS.md](./INIT_SCRIPT_PATTERNS.md) for implementation details, code patterns, and how to create new task views.
+
 ## Context
 
 Currently, setting up a fresh fork of this template requires ~2 hours of manual work:
@@ -7,7 +9,7 @@ Currently, setting up a fresh fork of this template requires ~2 hours of manual 
 - Generating secrets (BETTER_AUTH_SECRET, webhook signing keys)
 - Creating .env files from examples
 - Setting up Infisical for secret management (or bring your own)
-- Provisioning cloud services (Render, Sentry, email, OAuth)
+- Provisioning cloud services (Railway, Sentry, email, OAuth)
 - Configuring DNS and domain settings
 - Starting Docker, initializing database, running seeds
 - Testing that everything works
@@ -49,7 +51,7 @@ This plan implements an automated `bun run init` script that reduces this to ~10
 - `/scripts/deployment/with-env.sh` - Environment composition
 
 **Comprehensive Ticket** (`/tickets/INFRA-001-init-script.md`):
-- Specifies 9 phases including cloud service provisioning (Render, Sentry, email, OAuth)
+- Specifies 9 phases including cloud service provisioning (Railway, Sentry, email, OAuth)
 - Includes progress tracking, DNS setup, production deployment
 - Very comprehensive scope
 
@@ -95,7 +97,7 @@ bun run init:new --migrate # Fresh start with db:migrate
 
 **`bun run launch`** - Provision services and go live
 
-**Concept:** Launch uses the collected API keys to provision cloud services (Render, Sentry) and deploy the application.
+**Concept:** Launch uses the collected API keys to provision cloud services (Railway, Sentry) and deploy the application.
 
 **Flow:**
 ```
@@ -184,12 +186,12 @@ async function main() {
 
   // 5. Deploy to production
   const shouldDeploy = await confirm({
-    message: 'Deploy to Render now?',
+    message: 'Deploy to Railway now?',
     default: true
   });
 
   if (shouldDeploy) {
-    spinner = ora('Deploying to Render...').start();
+    spinner = ora('Deploying to Railway...').start();
     await deployToProduction(config);
     spinner.succeed('Deployed to production');
 
@@ -311,7 +313,7 @@ jobs:
       ${config.flags.cicd.requireLinting ? '- run: bun run lint' : ''}
       ${config.flags.cicd.requireTests ? '- run: bun run test' : ''}
       ${config.flags.database.requireMigrations ? '- run: bun run db:migrate' : ''}
-      - name: Deploy to Render
+      - name: Deploy to Railway
         run: curl -X POST https://api.render.com/deploy/...
   `;
 
@@ -319,7 +321,7 @@ jobs:
 }
 
 async function deployToProduction(config: Config) {
-  // Trigger Render deployments
+  // Trigger Railway deployments
   for (const service of [config.services.render.apiService, config.services.render.workerService]) {
     if (service?.id) {
       await ofetch(`https://api.render.com/v1/services/${service.id}/deploys`, {
@@ -346,16 +348,19 @@ main().catch((error) => {
 1. Checks if already launched
 2. Shows what will change:
    - `db:push` → `db:migrate`
+   - PlanetScale: `single` → `multi` (primary + 2 replicas, 99.99% SLA)
    - Vercel password protection → disabled
 3. Confirms with user
 4. **Updates configuration:**
    - `launched`: false → true
    - `flags.database.strategy`: "push" → "migrate"
    - `launchedAt`: timestamp
-5. Disables Vercel password protection (main URL + branch)
-6. Creates initial database migrations (if needed)
-7. Saves config
-8. Shows success message with next steps
+5. Upgrades PlanetScale database plan to multi-replica for high availability:
+   - `pscale database upgrade-plan <database> --org <org> --plan multi`
+6. Disables Vercel password protection (main URL + branch)
+7. Creates initial database migrations (if needed)
+8. Saves config
+9. Shows success message with next steps
 
 **Simple implementation:**
 ```typescript
@@ -389,7 +394,7 @@ async function launch() {
 
 **Behavior Changes:**
 - **Development** (after init): db:push, local Docker, .env.local
-- **Production** (after launch): db:migrate, Render services, Infisical prod
+- **Production** (after launch): db:migrate, Railway services, Infisical prod
 
 **Why separate from init:**
 - Init: Infrastructure provisioning (one-time, ~10-15min)
@@ -459,7 +464,7 @@ bun run local
 # Launch day: Go live
 bun run launch
 # ✅ Migrations created
-# ✅ Deployed to Render
+# ✅ Deployed to Railway
 # ✅ Production database migrated
 # ✅ DNS verified
 # ✅ Live at yourdomain.com
@@ -475,7 +480,7 @@ bun run launch
 4. Infisical setup (cloud or self-hosted - create project + environments)
 5. Secret generation (BETTER_AUTH_SECRET, Ed25519 webhook keys → push to Infisical immediately)
 6. Cloud service provisioning:
-   - Render: Create web services (API, worker), database, Redis
+   - Railway: Create web services (API, worker), database, Redis
    - Sentry: Create projects (API, web, admin, superadmin), get DSNs
    - Email: Configure provider (Resend/SendGrid/SES)
    - OAuth: Configure providers (Google, GitHub - optional)
@@ -501,7 +506,7 @@ scripts/
 │   │   ├── 03-rename.ts            # Surgical rename (packages + imports ONLY)
 │   │   ├── 04-infisical.ts         # Infisical setup (cloud/self-hosted + project creation)
 │   │   ├── 05-secrets.ts           # Generate secrets + push to Infisical immediately
-│   │   ├── 06-render.ts            # Render service provisioning
+│   │   ├── 06-render.ts            # Railway service provisioning
 │   │   ├── 07-sentry.ts            # Sentry projects + DSNs
 │   │   ├── 08-email.ts             # Email provider configuration
 │   │   ├── 09-oauth.ts             # OAuth providers (optional)
@@ -518,12 +523,12 @@ scripts/
 │   │   ├── rename.ts               # Package/import renaming logic (re-runnable)
 │   │   ├── ui.ts                   # ora, chalk, boxen
 │   │   ├── validation.ts           # Validation helpers
-│   │   ├── render.ts               # Render API client (ofetch)
+│   │   ├── render.ts               # Railway API client (ofetch)
 │   │   ├── sentry.ts               # Sentry API client (ofetch)
 │   │   └── infisical.ts            # Infisical CLI helpers
 │   └── templates/
 │       ├── INIT_COMPLETE.md.hbs    # Handlebars template
-│       ├── render.yaml.hbs         # Render service definitions
+│       ├── render.yaml.hbs         # Railway service definitions
 │       ├── docker-compose.infisical.yml  # Self-hosted Infisical services
 │       └── env-comments.ts         # Comments for secrets
 └── setup/
@@ -569,7 +574,7 @@ async function gatherConfiguration(existingConfig?: Config): Promise<Config> {
   const steps: Step[] = [
     { id: 'project', number: 1, name: 'Project Basics', status: 'required', required: true, fn: configureProject },
     { id: 'environments', number: 2, name: 'Environments', status: 'required', required: true, fn: configureEnvironments },
-    { id: 'render', number: 3, name: 'Render (Database, Redis)', status: 'required', required: true, fn: configureRender },
+    { id: 'render', number: 3, name: 'Railway (Database, Redis)', status: 'required', required: true, fn: configureRailway },
     { id: 'sentry', number: 4, name: 'Sentry (Error Tracking)', status: 'required', required: true, fn: configureSentry },
     { id: 'email', number: 5, name: 'Email Provider', status: 'optional', required: false, fn: configureEmail },
     { id: 'oauth', number: 6, name: 'OAuth Providers', status: 'optional', required: false, fn: configureOAuth },
@@ -713,7 +718,7 @@ function updateStepStatuses(steps: Step[], config: Config) {
     envStep.status = config.environments?.length > 0 ? 'done' : 'required';
   }
 
-  // Render
+  // Railway
   const renderStep = steps.find(s => s.id === 'render');
   if (renderStep) {
     renderStep.status = config.services?.render?.keysConfigured ? 'done' : 'required';
@@ -789,11 +794,11 @@ async function configureEnvironments(config: Config): Promise<Partial<Config>> {
   return { environments };
 }
 
-async function configureRender(config: Config): Promise<Partial<Config>> {
+async function configureRailway(config: Config): Promise<Partial<Config>> {
   console.log(chalk.dim('Get your API key from: https://dashboard.render.com/u/settings\n'));
 
   const apiKey = await password({
-    message: 'Render API key:',
+    message: 'Railway API key:',
     validate: (v) => v.length > 0 || 'API key required'
   });
 
@@ -1184,7 +1189,7 @@ async function generateAndPushSecrets(config: Config) {
 }
 ```
 
-#### 6. Render Provisioning (`06-render.ts`)
+#### 6. Railway Provisioning (`06-render.ts`)
 **Create web services, database, Redis**
 
 ```typescript
@@ -1195,7 +1200,7 @@ const renderApi = ofetch.create({
   headers: { Authorization: `Bearer ${config.renderApiKey}` }
 });
 
-const spinner = ora('Provisioning Render services...').start();
+const spinner = ora('Provisioning Railway services...').start();
 
 // Create PostgreSQL database
 spinner.text = 'Creating PostgreSQL database...';
@@ -1257,14 +1262,14 @@ const workerService = await renderApi('/services', {
   }
 });
 
-// Update Infisical with Render URLs
+// Update Infisical with Railway URLs
 await pushToInfisical('dev', {
   DATABASE_URL: database.connectionString,
   REDIS_URL: redis.connectionString,
   API_URL: `https://${apiService.service.slug}.onrender.com`,
 });
 
-spinner.succeed('Render services provisioned');
+spinner.succeed('Railway services provisioned');
 
 return { database, redis, apiService, workerService };
 ```
@@ -1399,7 +1404,7 @@ async function setupOAuth(config: Config) {
 #### 10. DNS Configuration (`10-dns.ts`)
 
 ```typescript
-async function configureDNS(config: Config, services: RenderServices) {
+async function configureDNS(config: Config, services: RailwayServices) {
   console.log(boxen(
     `🌐 DNS Configuration\n\n` +
     `Add these records to your DNS provider:\n\n` +
@@ -1590,7 +1595,7 @@ const shouldCommit = await confirm({
 
 if (shouldCommit) {
   await $`git add .`;
-  await $`git commit -m "chore: initialize ${config.project.name}\n\nAutomated initialization:\n- Renamed packages from @template to @${config.project.name}\n- Configured Infisical with secrets\n- Provisioned cloud services (Render, Sentry)\n- Set up local development environment\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"`;
+  await $`git commit -m "chore: initialize ${config.project.name}\n\nAutomated initialization:\n- Renamed packages from @template to @${config.project.name}\n- Configured Infisical with secrets\n- Provisioned cloud services (Railway, Sentry)\n- Set up local development environment\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"`;
 }
 
 // Success message
@@ -1878,7 +1883,7 @@ export async function updateConfig(data: Partial<Config>) {
   const config = await loadConfig();
   if (!config) throw new Error('No config found');
 
-  // Merge data into config (e.g., Render service metadata)
+  // Merge data into config (e.g., Railway service metadata)
   // Note: This merges NON-SENSITIVE data only (service IDs, URLs, etc.)
   // API keys and secrets are NEVER stored in config
   Object.assign(config, data);
@@ -2007,7 +2012,7 @@ async function main() {
     { name: 'rename', fn: renameMonorepo, resumable: true },
     { name: 'doppler', fn: setupDoppler, resumable: true },
     { name: 'secrets', fn: generateSecrets, resumable: true },
-    { name: 'render', fn: provisionRender, resumable: true },
+    { name: 'render', fn: provisionRailway, resumable: true },
     { name: 'sentry', fn: setupSentry, resumable: true },
     { name: 'email', fn: setupEmail, resumable: true },
     { name: 'oauth', fn: setupOAuth, resumable: true },
@@ -2059,7 +2064,7 @@ main().catch((error) => {
 - `scripts/init/steps/03-rename.ts` - Surgical rename (packages + imports only, re-runnable)
 - `scripts/init/steps/04-doppler.ts` - Doppler setup FIRST (create project + envs)
 - `scripts/init/steps/05-secrets.ts` - Generate secrets + push to Doppler immediately
-- `scripts/init/steps/06-render.ts` - Render service provisioning
+- `scripts/init/steps/06-render.ts` - Railway service provisioning
 - `scripts/init/steps/07-sentry.ts` - Sentry projects + DSNs
 - `scripts/init/steps/08-email.ts` - Email provider configuration
 - `scripts/init/steps/09-oauth.ts` - OAuth providers (optional)
@@ -2077,7 +2082,7 @@ main().catch((error) => {
 - `scripts/init/utils/rename.ts` - Package/import renaming logic (re-runnable)
 - `scripts/init/utils/ui.ts` - ora, chalk, boxen
 - `scripts/init/utils/validation.ts` - Validation helpers
-- `scripts/init/utils/render.ts` - Render API client (ofetch)
+- `scripts/init/utils/render.ts` - Railway API client (ofetch)
 - `scripts/init/utils/sentry.ts` - Sentry API client (ofetch)
 - `scripts/init/utils/doppler.ts` - Doppler API client
 
@@ -2178,7 +2183,7 @@ services:
    - `secrets.ts` - Crypto secret generation (Ed25519, BETTER_AUTH_SECRET)
    - `rename.ts` - Surgical renaming logic (detect current name, re-runnable)
    - `validation.ts` - Health checks (DB, Redis, Sentry connectivity)
-   - `render.ts` - Render API client (ofetch wrapper)
+   - `render.ts` - Railway API client (ofetch wrapper)
    - `sentry.ts` - Sentry API client (ofetch wrapper)
    - `doppler.ts` - Doppler API client
    - `prompt.ts` - @inquirer/prompts wrappers (simple TUI helpers)
@@ -2189,7 +2194,7 @@ services:
    - 03: Rename (surgical: packages + imports only, re-runnable)
    - 04: Doppler setup (FIRST - create project + environments)
    - 05: Secrets generation (generate + push to Doppler immediately)
-   - 06: Render provisioning (database, Redis, API, worker)
+   - 06: Railway provisioning (database, Redis, API, worker)
    - 07: Sentry setup (4 projects + DSNs)
    - 08: Email provider (optional)
    - 09: OAuth (optional)
@@ -2251,7 +2256,7 @@ services:
       - **Test launch script:**
         - After init completes, run `bun run launch`
         - Verify migrations created (not just push)
-        - Verify deployment triggered to Render
+        - Verify deployment triggered to Railway
         - Verify config marked as `launched: true`
         - Try running launch again (should prompt for confirmation)
         - Verify production migrations ran successfully
@@ -2278,7 +2283,7 @@ bun test scripts/init/integration.test.ts
 **Manual Test (on fresh fork):**
 1. Fork template to new directory
 2. Prepare API keys:
-   - Render API key
+   - Railway API key
    - Sentry auth token
    - Email provider API key (optional)
 3. Run `bun run init`
@@ -2287,7 +2292,7 @@ bun test scripts/init/integration.test.ts
    - Organization: Test Org
    - Domain: testproject.com
    - Environments: dev, staging, prod
-   - Render API key: [paste]
+   - Railway API key: [paste]
    - Sentry auth token: [paste]
    - Email provider: Resend (or skip)
    - OAuth: No
@@ -2295,7 +2300,7 @@ bun test scripts/init/integration.test.ts
 6. Verify:
    - Rename completed (check package.json, imports)
    - Doppler project created with secrets
-   - Render services provisioned (database, Redis, API, worker)
+   - Railway services provisioned (database, Redis, API, worker)
    - Sentry projects created (4 DSNs)
    - Email provider configured (if selected)
    - INIT_COMPLETE.md has all credentials
@@ -2456,7 +2461,7 @@ const spaceTypes = await checkbox({
 
 ### 2. Launch Script Enhancements
 
-**Current Plan:** Production deployment script (creates migrations, deploys to Render)
+**Current Plan:** Production deployment script (creates migrations, deploys to Railway)
 
 **Future Enhancements:**
 - Blue-green deployment support
@@ -2470,7 +2475,7 @@ const spaceTypes = await checkbox({
 ### 3. Init Configuration Validation
 
 **Add validation step:**
-- Verify Render services are actually running
+- Verify Railway services are actually running
 - Test Sentry DSNs with test event
 - Verify email provider with test send
 - Check DNS propagation automatically
@@ -2479,13 +2484,13 @@ const spaceTypes = await checkbox({
 
 **Add `bun run init:rollback`:**
 - Restore from `init-config.backup.json`
-- Optionally delete cloud resources (Render, Sentry projects)
+- Optionally delete cloud resources (Railway, Sentry projects)
 - Reset to pre-init state
 
 ### 5. Multi-Region Support
 
 **Allow provisioning in multiple regions:**
-- Render services in multiple regions
+- Railway services in multiple regions
 - Separate Doppler configs per region
 - Region-specific environment files
 
@@ -2493,7 +2498,7 @@ const spaceTypes = await checkbox({
 
 **Auto-generate GitHub Actions / GitLab CI:**
 - Based on init configuration
-- Deploy to Render on push
+- Deploy to Railway on push
 - Run tests, migrations
 - Sentry release tracking
 
@@ -2514,7 +2519,7 @@ const spaceTypes = await checkbox({
 | **Re-runnable Rename** | Support template → name1 → name2 | Detect current name from config/package.json, replace with new name |
 | **PROJECT_NAME** | Env var for runtime config | Container names, DB names, service names all read from env var |
 | **Secret Generation** | Node crypto module | Cross-platform, no openssl dependency |
-| **Cloud APIs** | ofetch for Render/Sentry | Type-safe HTTP client with better DX than fetch |
+| **Cloud APIs** | ofetch for Railway/Sentry | Type-safe HTTP client with better DX than fetch |
 | **DB Setup** | Offer both push AND migrate | User choice during init (migrate for prod, push for dev) |
 | **Validation** | DB/Redis/Sentry connectivity | Verify all services working before completion |
 
@@ -2539,7 +2544,7 @@ const spaceTypes = await checkbox({
 - ✅ init-config.json contains both configuration and progress
 
 **Cloud Services:**
-- ✅ Render services provisioned and running:
+- ✅ Railway services provisioned and running:
   - PostgreSQL database (starter tier)
   - Redis instance
   - API web service
@@ -2578,7 +2583,7 @@ const spaceTypes = await checkbox({
 - ✅ Updates configuration flags (database, CICD, git, monitoring, features)
 - ✅ Generates CI/CD workflow files based on flags
 - ✅ Updates git branch protection rules
-- ✅ Optionally deploys to Render
+- ✅ Optionally deploys to Railway
 - ✅ Creates migrations if strategy changed to migrate
 - ✅ Runs production migrations
 - ✅ Verifies production health

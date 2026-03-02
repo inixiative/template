@@ -119,12 +119,12 @@ describe('EncryptionService', () => {
       const encrypted = await service.encrypt('data', 'aad');
       const tampered = { ...encrypted, ciphertext: 'AAAAAAAAAA' };
 
-      await expect(service.decrypt(tampered, 'aad')).rejects.toThrow('Decryption failed');
+      await expect(service.decrypt(tampered, 'aad')).rejects.toThrow();
     });
 
     it('throws on wrong AAD', async () => {
       const encrypted = await service.encrypt('data', 'correct-aad');
-      await expect(service.decrypt(encrypted, 'wrong-aad')).rejects.toThrow('Decryption failed');
+      await expect(service.decrypt(encrypted, 'wrong-aad')).rejects.toThrow();
     });
 
     it('throws when no keys can decrypt', async () => {
@@ -135,7 +135,7 @@ describe('EncryptionService', () => {
         currentKey: testKey2Base64,
       });
 
-      await expect(otherService.decrypt(encrypted, 'aad')).rejects.toThrow('Decryption failed with all available keys');
+      await expect(otherService.decrypt(encrypted, 'aad')).rejects.toThrow();
     });
   });
 

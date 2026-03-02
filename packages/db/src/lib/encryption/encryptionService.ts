@@ -35,7 +35,7 @@ export class EncryptionService {
       throw new Error('Plaintext cannot be null or undefined');
     }
 
-    const plaintextStr = typeof plaintext === 'string' ? plaintext : JSON.stringify(plaintext);
+    const plaintextStr = JSON.stringify(plaintext);
 
     if (plaintextStr === '' || plaintextStr === '""') {
       throw new Error('Plaintext cannot be empty');
@@ -64,45 +64,25 @@ export class EncryptionService {
   }
 
   async decrypt(encrypted: EncryptedFieldData, aad: string): Promise<any> {
-    if (!aad || typeof aad !== 'string') {
-      throw new Error('AAD must be a non-empty string');
-    }
+    const key =
+      encrypted.version === this.keyring.currentVersion
+        ? this.keyring.currentKey
+        : this.keyring.previousKey;
 
-    const keysToTry = [
-      { version: this.keyring.currentVersion, key: this.keyring.currentKey },
-      ...(this.keyring.previousKey
-        ? [{ version: this.keyring.previousVersion!, key: this.keyring.previousKey }]
-        : []),
-    ];
+    const decipher = crypto.createDecipheriv(
+      ALGORITHM,
+      Buffer.from(key!, 'base64'),
+      Buffer.from(encrypted.iv, 'base64'),
+    );
 
-    for (const { version, key } of keysToTry) {
-      try {
-        const keyBuffer = Buffer.from(key, 'base64');
-        const iv = Buffer.from(encrypted.iv, 'base64');
-        const authTag = Buffer.from(encrypted.authTag, 'base64');
-        const ciphertext = Buffer.from(encrypted.ciphertext, 'base64');
-        const aadBuffer = Buffer.from(aad, 'utf8');
+    decipher.setAAD(Buffer.from(aad, 'utf8'));
+    decipher.setAuthTag(Buffer.from(encrypted.authTag, 'base64'));
 
-        const decipher = crypto.createDecipheriv(ALGORITHM, keyBuffer, iv);
-        decipher.setAAD(aadBuffer);
-        decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encrypted.ciphertext, 'base64')),
+      decipher.final(),
+    ]).toString('utf8');
 
-        const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
-          'utf8',
-        );
-
-        try {
-          return JSON.parse(decrypted);
-        } catch {
-          return decrypted;
-        }
-      } catch (error) {
-        if (version === keysToTry[keysToTry.length - 1].version) {
-          throw new Error('Decryption failed with all available keys');
-        }
-      }
-    }
-
-    throw new Error('No valid keys available');
+    return JSON.parse(decrypted);
   }
 }

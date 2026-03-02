@@ -161,84 +161,91 @@ export const Route = createFileRoute('/login')({
 
 ## Authentication
 
-**See:** [AUTHENTICATION.md](./AUTHENTICATION.md) for complete authentication documentation including:
-- Login/signup flows
-- OAuth providers
-- Hooks (useAuthFlow, useAuthProviders)
-- Navigation patterns
-- Token management
-- Guards
+**See:** [AUTHENTICATION.md](./AUTHENTICATION.md) for complete authentication documentation.
 
 **Quick Reference:**
 
-### Auth Hooks
+### Unified Auth System
+
+All auth methods use a **single interface**:
+
+```typescript
+type AuthMethod =
+  | { type: 'email', email: string, password: string, name?: string }
+  | { type: 'oauth', provider: string, callbackURL?: string }
+  | { type: 'saml', provider: string, email?: string };
+
+signIn(method: AuthMethod) → Promise<void>
+signUp(method: AuthMethod) → Promise<void>
+```
 
 ### Login/Signup Pattern
 
-**Use `useAuthFlow` hook for all auth flows:**
+**Forms access store directly** (no prop drilling):
 
 ```typescript
 // packages/ui/src/pages/LoginPage.tsx
-import { useAuthFlow, useAuthProviders } from '@template/ui/hooks';
+import { navigateToSignup } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
-import { buildPathWithSearch } from '@template/ui/lib/searchParams';
+import { LoginForm } from '@template/ui/components/auth/LoginForm';
 
 export const LoginPage = ({ hideSignup }: LoginPageProps) => {
-  const signIn = useAppStore((state) => state.auth.signIn);
-  const { handleAuth, error, isLoading } = useAuthFlow(signIn);
-  const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const getStore = useAppStore.getState;
 
   return (
-    <LoginForm
-      onSubmit={handleAuth}
-      onSignupClick={() => {
-        const signupUrl = buildPathWithSearch('/signup', search.redirectTo ? { redirectTo: search.redirectTo } : undefined);
-        navigatePreservingContext(signupUrl);
-      }}
-      providers={providerError ? [] : providers}
-      error={providerError ? 'Unable to load auth providers.' : error}
-      isLoading={isLoading || isLoadingProviders}
-    />
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <LoginForm
+        onSignupClick={hideSignup ? undefined : () => navigateToSignup(getStore, true)}
+      />
+    </div>
   );
 };
 ```
 
-**Flow:**
-1. `useAuthProviders` fetches context-aware providers (platform or org-specific)
-2. User submits credentials via `LoginForm`/`SignupForm`
-3. `useAuthFlow` calls store's `signIn`/`signUp` action
-4. BetterAuth sets JWT in httpOnly cookie
-5. Store hydrates user data
-6. Auto-redirect to `redirectTo` param or `/dashboard`
-
-### Auth Hooks
-
-#### useAuthFlow
-
-**Location:** `/packages/ui/src/hooks/useAuthFlow.ts`
-
-Handles auth submission, loading state, error handling, and redirect logic.
+**Form implementation:**
 
 ```typescript
-import { useAuthFlow } from '@template/ui/hooks';
+// packages/ui/src/components/auth/LoginForm.tsx
+export const LoginForm = ({ onSignupClick }: LoginFormProps) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
 
-const signIn = useAppStore((state) => state.auth.signIn);
-const { handleAuth, error, isLoading } = useAuthFlow(signIn);
+  const signIn = useAppStore((state) => state.auth.signIn);
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const { providers } = useAuthProviders();
 
-// Pass handleAuth to form
-<LoginForm onSubmit={handleAuth} error={error} isLoading={isLoading} />
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(undefined);
+    setIsLoading(true);
+
+    try {
+      await signIn({ type: 'email', email, password });
+      navigatePreservingContext(search.redirectTo || '/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Sign in failed.');
+      toast.error(err?.message);  // Dual error handling
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ... form rendering
+};
 ```
 
-**Returns:**
-- `handleAuth(credentials)` - Submit handler
-- `error` - Error message
-- `isLoading` - Loading state
+**Flow:**
+1. Form fetches providers via `useAuthProviders()` hook
+2. User submits credentials
+3. Form calls `signIn({ type: 'email', ... })` directly
+4. BetterAuth validates and returns bearer token
+5. Token stored in localStorage
+6. User data hydrated via `/me` API call
+7. Navigate to `redirectTo` or `/dashboard`
 
-**Features:**
-- Preserves `redirectTo` param from URL
-- Auto-redirects after success
-- Generic - works with any auth function
+### Auth Hooks
 
 #### useAuthProviders
 
@@ -250,9 +257,6 @@ Fetches context-aware auth providers (platform or organization-specific).
 import { useAuthProviders } from '@template/ui/hooks';
 
 const { providers, isLoading, error } = useAuthProviders();
-
-// Pass to form
-<LoginForm providers={providers} isLoading={isLoading} />
 ```
 
 **Returns:**
@@ -265,33 +269,54 @@ const { providers, isLoading, error } = useAuthProviders();
 - Otherwise → fetches platform providers only
 - Filters to enabled providers automatically
 
-### OAuth Redirect
+### OAuth Flow
 
-**Location:** `/packages/ui/src/lib/auth/oauthRedirect.ts`
-
-Utility for initiating OAuth flows.
+**Implementation** uses BetterAuth client SDK:
 
 ```typescript
-import { redirectToOAuthProvider } from '@template/ui/lib';
+// packages/ui/src/lib/auth/signin.ts
+const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
+  const client = getAuthClient();
 
-// Automatically called by LoginForm/SignupForm provider buttons
-redirectToOAuthProvider(provider);
+  localStorage.setItem('authRedirectTo', window.location.pathname + window.location.search + window.location.hash);
+
+  await client.signIn.social({
+    provider: method.provider,
+    callbackURL: method.callbackURL || `${window.location.origin}/auth/callback`,
+  });
+};
 ```
 
-**Security:**
-- Validates callback URL origin
-- Only allows current origin + localhost:3000
-- Auto-encodes parameters
+**OAuth Callback Routes:**
+- `apps/web/app/routes/_public/auth.callback.tsx`
+- `apps/admin/app/routes/_public/auth.callback.tsx`
+- `apps/superadmin/app/routes/_public/auth.callback.tsx`
+
+Callback routes extract bearer token, store it, hydrate user, navigate to redirectTo.
+
+### Navigation Helpers
+
+**Location:** `/packages/ui/src/lib/routeRedirect.ts`
+
+```typescript
+import { navigateToLogin, navigateToSignup } from '@template/ui/lib/routeRedirect';
+
+// Navigate to login, preserve full context (org, space, spoof)
+navigateToLogin(getStore);
+
+// Navigate to signup, preserve search params only
+navigateToSignup(getStore, preserveSearch: true);
+```
 
 ### Logout Flow
 
 ```typescript
 // In UserMenu or anywhere
 const logout = useAppStore((state) => state.auth.logout);
-const navigate = useAppStore((state) => state.navigation.navigate);
+const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
 
 await logout();
-navigate({ to: '/login' });
+navigatePreservingContext('/login');
 ```
 
 ---
@@ -1345,18 +1370,7 @@ export type SignupCredentials = {
 
 ### Auth Hooks
 
-#### useAuthFlow
-
-**Location:** `/packages/ui/src/hooks/useAuthFlow.ts`
-
-Handles auth flow with loading state, errors, and redirect.
-
-```typescript
-const signIn = useAppStore((state) => state.auth.signIn);
-const { handleAuth, error, isLoading } = useAuthFlow(signIn);
-
-<LoginForm onSubmit={handleAuth} error={error} isLoading={isLoading} />
-```
+See [Authentication](#authentication) section above for current auth patterns.
 
 #### useAuthProviders
 
@@ -1367,7 +1381,7 @@ Fetches context-aware auth providers (platform or organization).
 ```typescript
 const { providers, isLoading, error } = useAuthProviders();
 
-<LoginForm providers={providers} />
+// Used internally by LoginForm/SignupForm
 ```
 
 ### Navigation Hooks

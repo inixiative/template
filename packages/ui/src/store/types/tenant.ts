@@ -10,6 +10,10 @@ export type TenantContext = {
   space?: Space;
 };
 
+export type AuthenticatedContext = Omit<TenantContext, 'type'> & {
+  type: Exclude<TenantContext['type'], 'public'>;
+};
+
 export type PageContext = {
   organization?: Organization;
   space?: Space;

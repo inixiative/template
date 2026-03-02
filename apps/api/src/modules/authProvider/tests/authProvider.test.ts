@@ -141,7 +141,7 @@ describe('AuthProvider Endpoints', () => {
         config: { clientId: 'id' },
       }, { organization: org });
 
-      const response = await superadminFetch(get('/api/admin/authProvider'));
+      const response = await superadminFetch(get('/api/admin/authProvider?organizationId=' + org.id));
       const { data, pagination } = await json(response);
 
       const found = data.find((p) => p.id === provider.id);

@@ -13,44 +13,39 @@
 
 ## Environment Names
 
-Canonical environment names used across all scripts, Doppler configs, and code:
+Canonical environment names used across all scripts, Infisical configs, and code:
 
 ```typescript
 import { Environment } from '@template/shared/utils';
 
-type Environment = 'local' | 'test' | 'dev' | 'staging' | 'sandbox' | 'prod';
+type Environment = 'local' | 'test' | 'pr' | 'staging' | 'prod';
 ```
 
-| Env | Purpose | Secrets Source |
-|-----|---------|----------------|
-| `local` | Local development | `.env.local` files |
-| `test` | Automated tests | `.env.test` files |
-| `dev` | Shared development | Infisical `dev` environment |
-| `staging` | Pre-production | Infisical `staging` environment |
-| `sandbox` | Isolated testing | Infisical `sandbox` environment |
-| `prod` | Production | Infisical `prod` environment |
+| Env | Purpose | Secrets Source | Lifecycle |
+|-----|---------|----------------|-----------|
+| `local` | Local development | `.env.local` files | Persistent (your machine) |
+| `test` | Automated tests | `.env.test` files | CI/CD only |
+| `pr` | Pull request previews | Infisical `pr` environment | Ephemeral (deleted when PR closes) |
+| `staging` | Pre-production | Infisical `staging` environment | Persistent (main branch) |
+| `prod` | Production | Infisical `prod` environment | Persistent (manual promotion) |
 
-**Always use these abbreviations** in scripts, commands, and config names. Never use `production`, `development`, or other variations.
+### Deployment Flow
 
-### NODE_ENV Mapping
+```
+Local → PR (feature branch) → Staging (main) → Prod (manual)
+```
 
-| Environment | NODE_ENV | Notes |
-|-------------|----------|-------|
-| `local` | development | Uses .env files |
-| `test` | test | Uses .env files |
-| `dev` | development | Uses Infisical |
-| `staging` | development | Uses Infisical |
-| `sandbox` | production | Prod-like, safe to test |
-| `prod` | production | Uses Infisical |
+| Branch Type | Auto-deploys to | When |
+|-------------|-----------------|------|
+| `feature/*`, `fix/*`, etc. | `pr` | On PR creation |
+| `main` | `staging` | On merge to main |
+| Manual promotion | `prod` | After staging validation |
 
-### Branch Deployments
-
-| Branch | Auto-deploys to |
-|--------|-----------------|
-| `develop` | dev |
-| `main` | prod |
-
-Staging and sandbox are manually triggered or PR-based.
+**PR environments** are ephemeral - created for each PR and destroyed when PR closes. Each gets its own:
+- PlanetScale database branch
+- Render preview deployment
+- Vercel preview deployment
+- Isolated secrets in Infisical
 
 ---
 

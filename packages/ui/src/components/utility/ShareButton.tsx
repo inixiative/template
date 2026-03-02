@@ -1,4 +1,4 @@
-import { Button } from '@template/ui/components/Button';
+import { Button } from '@template/ui/components/primitives/Button';
 import { Check, Share2 } from 'lucide-react';
 import { useState } from 'react';
 

@@ -4,10 +4,13 @@
 
 - [Overview](#overview)
 - [BetterAuth (Session)](#betterauth-session)
+- [OAuth + Bearer Tokens](#oauth--bearer-tokens)
+- [SAML/SSO](#samlsso)
 - [Token Authentication](#token-authentication)
 - [Token Types](#token-types)
 - [Auth Middleware Chain](#auth-middleware-chain)
 - [Spoof Middleware](#spoof-middleware)
+- [Frontend Auth](#frontend-auth)
 
 ---
 
@@ -80,8 +83,8 @@ BetterAuth exposes routes at `/auth/*`:
 
 ```
 POST /auth/sign-up/email     # Email/password signup
-POST /auth/sign-in/email     # Email/password login
-POST /auth/sign-out          # Logout
+POST /auth/sign-in/email     # Email/password signin
+POST /auth/sign-out          # Sign out
 GET  /auth/session           # Get current session
 GET  /auth/sign-in/google    # Google OAuth redirect
 GET  /auth/callback/google   # Google OAuth callback
@@ -107,6 +110,64 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   await next();
 }
 ```
+
+---
+
+## OAuth + Bearer Tokens
+
+Located in `packages/ui/src/lib/auth/signin.ts` and `/apps/*/app/routes/_public/auth.callback.tsx`.
+
+### OAuth Flow
+
+1. **User clicks OAuth provider** (e.g., "Continue with Google")
+2. **Frontend calls BetterAuth** via `client.signIn.social({ provider, callbackURL })`
+3. **BetterAuth redirects** to OAuth provider (Google, GitHub, etc.)
+4. **User authenticates** with provider
+5. **Provider redirects back** to `/auth/callback?token=...`
+6. **Callback route extracts token**:
+   - Read token from query param or hash
+   - Store in localStorage via `setToken()`
+   - Hydrate user data via `fetchAndHydrateMe()`
+   - Navigate to redirectTo destination
+
+### Bearer Token Pattern
+
+OAuth flow returns a **bearer token** (not just session cookie):
+
+```typescript
+// Callback route (apps/web/app/routes/_public/auth.callback.tsx)
+const url = new URL(window.location.href);
+const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+
+if (token) {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  setToken(token, expiresAt);
+  await fetchAndHydrateMe(store.setState, store.getState);
+  navigate({ to: redirectTo });
+}
+```
+
+All API requests include the bearer token:
+
+```typescript
+Authorization: Bearer <token>
+```
+
+See [Frontend Auth](#frontend-auth) for frontend implementation details.
+
+---
+
+## SAML/SSO
+
+**Status:** Planned (see [AUTH-003 ticket](../../tickets/AUTH-003-saml-sso.md))
+
+SAML SSO support using BetterAuth SSO plugin (`@better-auth/sso`):
+- Organization-scoped SAML providers (Okta, Azure AD, OneLogin, etc.)
+- JIT (Just-In-Time) user provisioning
+- Encrypted certificate storage
+- Bearer token integration (same as OAuth)
+
+**Implementation pending** - architecture designed, awaiting BetterAuth SAML plugin maturity.
 
 ---
 
@@ -508,3 +569,24 @@ router.get('/organization/:id/users', validateUser, handler);
 // ✅ Correct - org tokens can access org resources
 router.get('/organization/:id/users', validateActor, handler);
 ```
+
+---
+
+## Frontend Auth
+
+For frontend authentication patterns, see [AUTHENTICATION.md](./AUTHENTICATION.md):
+
+- **Unified Auth System**: Single `signIn(method: AuthMethod)` interface for email, OAuth, and SAML
+- **AuthMethod Types**: `EmailAuthMethod | OAuthAuthMethod | SamlAuthMethod`
+- **Store Integration**: Zustand store with auth slice (`useAppStore((state) => state.auth)`)
+- **Forms**: LoginForm and SignupForm access store directly (no prop drilling)
+- **Navigation**: Context preservation (org, space, spoof, hash) through auth flow
+- **OAuth Callback**: `/auth/callback` routes in all 3 apps (web, admin, superadmin)
+- **Error Handling**: Dual errors (inline form + toast notifications)
+
+**Key Files:**
+- `packages/ui/src/lib/auth/types.ts` - AuthMethod type definitions
+- `packages/ui/src/lib/auth/signin.ts` - Unified signin implementation
+- `packages/ui/src/lib/auth/signup.ts` - Unified signup implementation
+- `packages/ui/src/components/auth/LoginForm.tsx` - Login form component
+- `packages/ui/src/components/auth/SignupForm.tsx` - Signup form component

@@ -7,7 +7,7 @@ import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
-import { JobType, type WorkerContext } from '#/jobs/types';
+import type { WorkerContext } from '#/jobs/types';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -55,7 +55,12 @@ export const initializeWorker = async (): Promise<void> => {
             jobLog(`Processing job ${job.name} (${job.id})`);
 
             try {
-              await handler(ctx, job.data.payload || {});
+              const payload = (job.data as { payload?: unknown }).payload;
+              if (payload === undefined) {
+                await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+              } else {
+                await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(ctx, payload);
+              }
               jobLog(`Completed job ${job.name} (${job.id})`);
             } catch (error) {
               log.error(`Failed job ${job.name} (${job.id}):`, error);

@@ -8,25 +8,37 @@ import {
 } from '@template/ui/apiClient';
 import { apiQuery } from '@template/ui/lib';
 
-type PlatformProvider = AuthProviderReadManyResponses[200]['data'][0];
-type OrgProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][0];
+type PlatformProvider = AuthProviderReadManyResponses[200]['data'][number];
+type OrgProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];
 export type AuthProvider = PlatformProvider | OrgProvider;
 
 export const useAuthProviders = () => {
   const search = useSearch({ strict: false }) as { org?: string };
+  const organizationId = search.org;
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: search.org ? ['authProviders', 'org', search.org] : ['authProviders', 'platform'],
-    queryFn: search.org
-      ? apiQuery((opts: Parameters<typeof organizationReadAuthProvider>[0]) =>
-          organizationReadAuthProvider({ ...opts, path: { id: search.org! } }))
-      : apiQuery((opts: Parameters<typeof authProviderReadMany>[0]) => authProviderReadMany(opts)),
+  const platformQuery = useQuery({
+    queryKey: ['authProviders', 'platform'],
+    queryFn: apiQuery((opts: Parameters<typeof authProviderReadMany>[0]) => authProviderReadMany(opts)),
+    enabled: !organizationId,
     retry: 2,
   });
 
-  const providers = search.org && data?.platform && data?.organization
-    ? [...data.platform, ...data.organization]
-    : data ?? [];
+  const organizationQuery = useQuery({
+    queryKey: ['authProviders', 'org', organizationId ?? ''],
+    queryFn: apiQuery((opts: Parameters<typeof organizationReadAuthProvider>[0]) =>
+      organizationReadAuthProvider({ ...opts, path: { id: organizationId! } })),
+    enabled: !!organizationId,
+    retry: 2,
+  });
 
-  return { providers, isLoading, error };
+  const platformProviders: AuthProvider[] = platformQuery.data?.data ?? [];
+  const organizationProviders: AuthProvider[] = organizationQuery.data?.data
+    ? [...organizationQuery.data.data.platform, ...organizationQuery.data.data.organization]
+    : [];
+
+  return {
+    providers: organizationId ? organizationProviders : platformProviders,
+    isLoading: platformQuery.isLoading || organizationQuery.isLoading,
+    error: platformQuery.error ?? organizationQuery.error,
+  };
 };

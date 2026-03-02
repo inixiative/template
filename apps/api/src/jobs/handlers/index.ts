@@ -1,10 +1,12 @@
 import { type SendWebhookPayload, sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
+import { cleanStaleWebhooks } from '#/jobs/handlers/cleanStaleWebhooks';
 import type { JobHandler } from '#/jobs/types';
 
 export const JobHandlerName = {
   sendWebhook: 'sendWebhook',
   rotateEncryptionKeys: 'rotateEncryptionKeys',
+  cleanStaleWebhooks: 'cleanStaleWebhooks',
 } as const;
 
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
@@ -12,6 +14,7 @@ export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName
 export type JobPayloads = {
   sendWebhook: SendWebhookPayload;
   rotateEncryptionKeys: void;
+  cleanStaleWebhooks: void;
 };
 
 export type JobHandlers = {
@@ -21,6 +24,7 @@ export type JobHandlers = {
 export const jobHandlers: JobHandlers = {
   sendWebhook,
   rotateEncryptionKeys,
+  cleanStaleWebhooks,
 };
 
 export const isValidHandlerName = (name: string): name is JobHandlerName => name in jobHandlers;

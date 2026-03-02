@@ -1,4 +1,4 @@
-import { Button } from '@template/ui/components/Button';
+import { Button } from '@template/ui/components/primitives/Button';
 import { ResponsiveDrawer } from '@template/ui/components/layout/ResponsiveDrawer';
 import { useState } from 'react';
 

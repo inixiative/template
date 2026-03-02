@@ -1,4 +1,4 @@
-import { Button } from '@template/ui/components/Button';
+import { Button } from '@template/ui/components/primitives/Button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export type Column<T> = {
@@ -11,6 +11,7 @@ export type TableProps<T> = {
   columns: Column<T>[];
   data: T[];
   keyExtractor: (item: T) => string;
+  onRowClick?: (item: T) => void;
   emptyMessage?: string;
   show?: boolean | (() => boolean);
   pagination?: {
@@ -20,7 +21,15 @@ export type TableProps<T> = {
   };
 };
 
-export const Table = <T,>({ columns, data, keyExtractor, emptyMessage, show = true, pagination }: TableProps<T>) => {
+export const Table = <T,>({
+  columns,
+  data,
+  keyExtractor,
+  onRowClick,
+  emptyMessage,
+  show = true,
+  pagination,
+}: TableProps<T>) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
@@ -50,7 +59,11 @@ export const Table = <T,>({ columns, data, keyExtractor, emptyMessage, show = tr
           </thead>
           <tbody className="divide-y">
             {data.map((item) => (
-              <tr key={keyExtractor(item)} className="hover:bg-muted/30 transition-colors">
+              <tr
+                key={keyExtractor(item)}
+                className={`hover:bg-muted/30 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                onClick={onRowClick ? () => onRowClick(item) : undefined}
+              >
                 {columns.map((column) => (
                   <td key={column.key} className="px-4 py-3 text-sm">
                     {column.render ? column.render(item) : (item as any)[column.key]}

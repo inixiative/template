@@ -7,7 +7,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@template/ui/components/DropdownMenu';
+} from '@template/ui/components/primitives/DropdownMenu';
 import { cn } from '@template/ui/lib/utils';
 import { Boxes, Building2, Check, ChevronDown, ChevronsUpDown, ChevronUp, Settings, User } from 'lucide-react';
 

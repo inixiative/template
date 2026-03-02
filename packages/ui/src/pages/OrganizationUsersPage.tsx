@@ -11,7 +11,7 @@ import {
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import type { Role } from '@template/db';
-import { InviteUserModal } from '@template/ui/components/InviteUserModal';
+import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';

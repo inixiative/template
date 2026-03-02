@@ -1,13 +1,20 @@
 import {
   meReadManyWebhookSubscriptions,
   meReadManyWebhookSubscriptionsQueryKey,
+  type MeReadManyWebhookSubscriptionsResponse,
   meCreateWebhookSubscription,
   organizationReadManyWebhookSubscriptions,
   organizationReadManyWebhookSubscriptionsQueryKey,
+  type OrganizationReadManyWebhookSubscriptionsResponse,
   organizationCreateWebhookSubscription,
+  spaceReadManyWebhookSubscriptions,
+  spaceReadManyWebhookSubscriptionsQueryKey,
+  type SpaceReadManyWebhookSubscriptionsResponse,
+  spaceCreateWebhookSubscription,
   webhookSubscriptionDelete,
   type MeCreateWebhookSubscriptionData,
   type OrganizationCreateWebhookSubscriptionData,
+  type SpaceCreateWebhookSubscriptionData,
   type WebhookSubscriptionDeleteData,
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -15,41 +22,49 @@ import { apiQuery } from '@template/ui/lib/apiQuery';
 import { MasterDetailLayout, DetailPanel } from '@template/ui/components/layout';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
+import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { Button, Table } from '@template/ui/components';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-type WebhookSubscription = {
-  id: string;
-  url: string;
-  events: string[];
-  createdAt: string;
-};
+type WebhookSubscription =
+  | MeReadManyWebhookSubscriptionsResponse['data'][number]
+  | OrganizationReadManyWebhookSubscriptionsResponse['data'][number]
+  | SpaceReadManyWebhookSubscriptionsResponse['data'][number];
 
 export const WebhooksPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const context = useAppStore((state) => state.tenant.context);
-  const contextId = context.organization?.id;
+  const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
+  const organizationId = context.organization?.id;
+  const spaceId = context.space?.id;
 
-  const endpoints = {
-    user: {
-      queryKey: meReadManyWebhookSubscriptionsQueryKey(),
-      queryFn: apiQuery((opts: Parameters<typeof meReadManyWebhookSubscriptions>[0]) =>
-        meReadManyWebhookSubscriptions(opts)),
-      createFn: meCreateWebhookSubscription,
-    },
-    organization: {
-      queryKey: organizationReadManyWebhookSubscriptionsQueryKey({ path: { id: contextId! } }),
-      queryFn: apiQuery((opts: Parameters<typeof organizationReadManyWebhookSubscriptions>[0]) =>
-        organizationReadManyWebhookSubscriptions({ ...opts, path: { id: contextId! } })),
-      createFn: organizationCreateWebhookSubscription,
-    },
-  }[context.type];
+  const endpoints = (() => {
+    switch (context.type) {
+      case 'user':
+        return {
+          queryKey: meReadManyWebhookSubscriptionsQueryKey(),
+          queryFn: apiQuery((opts: Parameters<typeof meReadManyWebhookSubscriptions>[0]) =>
+            meReadManyWebhookSubscriptions(opts)),
+        };
+      case 'organization':
+        return {
+          queryKey: organizationReadManyWebhookSubscriptionsQueryKey({ path: { id: organizationId! } }),
+          queryFn: apiQuery((opts: Parameters<typeof organizationReadManyWebhookSubscriptions>[0]) =>
+            organizationReadManyWebhookSubscriptions({ ...opts, path: { id: organizationId! } })),
+        };
+      case 'space':
+        return {
+          queryKey: spaceReadManyWebhookSubscriptionsQueryKey({ path: { id: spaceId! } }),
+          queryFn: apiQuery((opts: Parameters<typeof spaceReadManyWebhookSubscriptions>[0]) =>
+            spaceReadManyWebhookSubscriptions({ ...opts, path: { id: spaceId! } })),
+        };
+    }
+  })();
 
   const { data, isLoading } = useQuery({
     queryKey: endpoints.queryKey,
     queryFn: endpoints.queryFn,
-    enabled: context.type === 'user' || !!contextId,
+    enabled: context.type === 'user' || !!organizationId || !!spaceId,
   });
 
   const webhooks = data?.data ?? [];
@@ -60,10 +75,26 @@ export const WebhooksPage = () => {
     operation: 'delete',
   });
 
-  type CreateData = Omit<MeCreateWebhookSubscriptionData | OrganizationCreateWebhookSubscriptionData, 'url'>;
+  type CreateData = Omit<
+    MeCreateWebhookSubscriptionData | OrganizationCreateWebhookSubscriptionData | SpaceCreateWebhookSubscriptionData,
+    'url'
+  >;
 
   const createMutation = useOptimisticListMutation<WebhookSubscription, CreateData>({
-    mutationFn: apiMutation((opts: any) => endpoints.createFn(opts)),
+    mutationFn: async (vars) => {
+      switch (context.type) {
+        case 'user':
+          return apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) => meCreateWebhookSubscription(opts))(
+            vars as Omit<MeCreateWebhookSubscriptionData, 'url'>,
+          );
+        case 'organization':
+          return apiMutation((opts: Parameters<typeof organizationCreateWebhookSubscription>[0]) =>
+            organizationCreateWebhookSubscription(opts))(vars as Omit<OrganizationCreateWebhookSubscriptionData, 'url'>);
+        case 'space':
+          return apiMutation((opts: Parameters<typeof spaceCreateWebhookSubscription>[0]) =>
+            spaceCreateWebhookSubscription(opts))(vars as Omit<SpaceCreateWebhookSubscriptionData, 'url'>);
+      }
+    },
     queryKey: endpoints.queryKey,
     operation: 'create',
   });
@@ -75,10 +106,10 @@ export const WebhooksPage = () => {
       render: (item: WebhookSubscription) => <span className="font-medium">{item.url}</span>,
     },
     {
-      key: 'events',
-      label: 'Events',
+      key: 'model',
+      label: 'Model',
       render: (item: WebhookSubscription) => (
-        <span className="text-muted-foreground">{item.events.join(', ')}</span>
+        <span className="text-muted-foreground">{item.model}</span>
       ),
     },
     {
@@ -107,11 +138,20 @@ export const WebhooksPage = () => {
     },
   ];
 
-  const handleCreate = (data: { url: string; events: string[] }) => {
-    const payload = context.type === 'user'
-      ? { body: data }
-      : { path: { id: contextId! }, body: data };
-    createMutation.mutate(payload as any);
+  const buildCreatePayload = (body: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>): CreateData => {
+    switch (context.type) {
+      case 'user':
+        return { body };
+      case 'organization':
+        return { path: { id: organizationId! }, body };
+      case 'space':
+        return { path: { id: spaceId! }, body };
+    }
+  };
+
+  const handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
+    const payload = buildCreatePayload(data);
+    createMutation.mutate(payload);
     setIsModalOpen(false);
   };
 

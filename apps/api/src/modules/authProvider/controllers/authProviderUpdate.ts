@@ -1,4 +1,5 @@
 import { encryptField } from '@template/db/lib/encryption/helpers';
+import { isEmpty } from 'lodash-es';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderUpdateRoute } from '#/modules/authProvider/routes/authProviderUpdate';
@@ -12,7 +13,7 @@ export const authProviderUpdateController = makeController(
 
     let encryptedData = {};
 
-    if (secrets) {
+    if (!isEmpty(secrets)) {
       encryptedData = await encryptField('authProvider', 'secrets', {
         ...authProvider,
         ...body,

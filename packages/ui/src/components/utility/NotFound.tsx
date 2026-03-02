@@ -1,5 +1,5 @@
-import { Button } from '@template/ui/components/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/Card';
+import { Button } from '@template/ui/components/primitives/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { AlertTriangle } from 'lucide-react';
 import type { ReactNode } from 'react';
 

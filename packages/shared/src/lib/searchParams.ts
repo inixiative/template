@@ -46,12 +46,14 @@ export const pickSearchParams = (search: SearchInput, keys: readonly string[]): 
   return Object.keys(picked).length > 0 ? picked : undefined;
 };
 
-export const buildPathWithSearch = (pathname: string, search?: Record<string, string>): string => {
-  if (!search) {
-    return pathname;
-  }
-
-  const params = new URLSearchParams(search);
+export const buildPathWithSearch = (
+  pathname: string,
+  search?: SearchInput,
+  hash?: string
+): string => {
+  const params = toUrlSearchParams(search);
   const query = params.toString();
-  return query ? `${pathname}?${query}` : pathname;
+  const searchPart = query ? `?${query}` : '';
+  const hashPart = hash || '';
+  return `${pathname}${searchPart}${hashPart}`;
 };

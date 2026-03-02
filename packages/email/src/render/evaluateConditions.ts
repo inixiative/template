@@ -3,7 +3,7 @@
  */
 
 import { type Condition, check } from '@inixiative/json-rules';
-import { isDev, isLocal, isTest } from '@template/shared/utils';
+import { isLocal, isTest } from '@template/shared/utils';
 import type { Variables } from '@template/email/render/interpolate';
 
 /**
@@ -121,7 +121,7 @@ export const evaluateConditions = (content: string, variables: Variables): strin
         result += innerContent;
       }
     } catch (err) {
-      if (isLocal || isTest || isDev) {
+      if (isLocal || isTest) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         result += `<!-- RULE ERROR: ${msg} -->\n${innerContent}`;
       }

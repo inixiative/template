@@ -7,6 +7,8 @@ import type {
   PendingAuthCallback,
 } from '@template/ui/hooks/useAuthStrategy/types';
 import { createContext, type ReactNode, useCallback, useEffect, useRef } from 'react';
+import { useAppStore } from '@template/ui/store';
+import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 
 export const AuthStrategyContext = createContext<AuthStrategyContextType | null>(null);
 
@@ -24,6 +26,7 @@ export const AuthStrategyProvider = ({
   onTokenReceived,
 }: AuthStrategyProviderProps) => {
   const pendingCallbackRef = useRef<PendingAuthCallback | null>(null);
+  const getStore = useAppStore.getState;
 
   // Embed: Listen for token from parent
   useEffect(() => {
@@ -81,8 +84,7 @@ export const AuthStrategyProvider = ({
 
       switch (strategy.type) {
         case 'login': {
-          const redirectTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-          window.location.assign(`/login?redirectTo=${encodeURIComponent(redirectTo || '/')}`);
+          navigateToLogin(getStore);
           break;
         }
         case 'embed': {

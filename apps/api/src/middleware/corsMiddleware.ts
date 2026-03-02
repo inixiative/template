@@ -4,9 +4,8 @@ import type { Env } from '#/config/env';
 const allowedOrigins: Record<Env['ENVIRONMENT'], string[]> = {
   local: ['*'],
   test: ['*'],
-  dev: ['*localhost:*', '*.vercel.app'],
-  staging: ['*.vercel.app'],
-  sandbox: ['*.vercel.app'],
+  pr: ['*.vercel.app', '*.render.com'],
+  staging: ['*.vercel.app', '*.render.com'],
   prod: [],
 };
 

@@ -1,6 +1,6 @@
 import {
   type OrganizationCreateAuthProviderData,
-  type OrganizationReadAuthProviderResponse,
+  type OrganizationReadAuthProviderResponses,
   organizationCreateAuthProvider,
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
@@ -11,15 +11,15 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { AuthProviderModal } from '@template/ui/components/AuthProviderModal';
+import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { MasterDetailLayout, DetailPanel } from '@template/ui/components/layout';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
-import { Button, Table, Badge } from '@template/ui/components';
+import { Badge, Button, Table } from '@template/ui/components';
 import { Trash2, Plus, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
-type AuthProvider = OrganizationReadAuthProviderResponse['organization'][number];
+type AuthProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];
 
 export const OrganizationAuthProvidersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,7 +33,7 @@ export const OrganizationAuthProvidersPage = () => {
     enabled: !!organizationId,
   });
 
-  const providers = data?.organization ?? [];
+  const providers = data?.data?.organization ?? [];
 
   const deleteMutation = useOptimisticListMutation<AuthProvider, Omit<AuthProviderDeleteData, 'url'>>({
     mutationFn: apiMutation((requestOptions: Parameters<typeof authProviderDelete>[0]) =>
@@ -91,7 +91,7 @@ export const OrganizationAuthProvidersPage = () => {
       key: 'status',
       label: 'Status',
       render: (item: AuthProvider) => (
-        <Badge variant={item.enabled ? 'success' : 'secondary'}>
+        <Badge variant={item.enabled ? 'default' : 'secondary'}>
           {item.enabled ? 'Enabled' : 'Disabled'}
         </Badge>
       ),
@@ -184,7 +184,16 @@ export const OrganizationAuthProvidersPage = () => {
           setEditingProvider(null);
         }}
         onSubmit={editingProvider ? handleEdit : handleAdd}
-        provider={editingProvider || undefined}
+        provider={
+          editingProvider
+            ? {
+                id: editingProvider.id,
+                type: editingProvider.type,
+                provider: editingProvider.provider,
+                name: editingProvider.name,
+              }
+            : undefined
+        }
       />
     </>
   );

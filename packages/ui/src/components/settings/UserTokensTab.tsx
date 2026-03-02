@@ -1,4 +1,5 @@
-import { CreateTokenModal } from '@template/ui/components/CreateTokenModal';
+import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
+import type { MeCreateTokenData } from '@template/ui/apiClient';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
@@ -60,8 +61,8 @@ export const UserTokensTab = () => {
     console.log('Delete token:', tokenId);
   };
 
-  const handleCreate = (name: string) => {
-    console.log('Create token:', name);
+  const handleCreate = (data: Pick<MeCreateTokenData['body'], 'name' | 'role'>) => {
+    console.log('Create token:', data);
   };
 
   return (

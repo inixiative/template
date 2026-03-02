@@ -16,7 +16,6 @@ kanban
     FEAT-002-notes-system
     FEAT-003-feature-flags
     FEAT-004-ai-providers
-    FEAT-005-audit-logs
     FEAT-009-file-management
     FEAT-011-dates-timezones
     COMM-001-email-system
@@ -24,6 +23,7 @@ kanban
   In Progress
   Review
   Done
+    FE-002-navigation-refactoring
 ```
 
 ## Tickets
@@ -41,7 +41,6 @@ kanban
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
 - [FEAT-003: Feature Flags](./FEAT-003-feature-flags.md) ⭐ - DB + Redis + WS + Admin UI
 - [FEAT-004: AI Providers](./FEAT-004-ai-providers.md) - OpenAI, Anthropic, Gemini (from Zealot)
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md) ⭐ - Mutation tracking for compliance
 - [FEAT-009: File Management](./FEAT-009-file-management.md) - S3 uploads, CDN, virus scanning
 - [FEAT-011: Dates & Timezones](./FEAT-011-dates-timezones.md) - Timezone handling, recurring events
 
@@ -60,17 +59,17 @@ _No tickets currently in progress_
 _No tickets currently in review_
 
 ### ✅ Done
-_No completed tickets yet_
+- [FE-002: Navigation Refactoring](./archived/FE-002-navigation-refactoring.md) - Context preservation and navigation cleanup
 
 ---
 
 ## Quick Stats
 
-- **Total Tickets**: 13
-- **Todo**: 13
+- **Total Tickets**: 12
+- **Todo**: 12
 - **In Progress**: 0
 - **Blocked**: 2 (waiting on rules builder)
-- **Completed This Week**: 0
+- **Completed This Week**: 1
 - **Moved to Backlog**: 7 (see [Backlog Board](./kanban-backlog.md))
 
 ## Dependency Map
@@ -90,4 +89,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-02-06_
+_Last Updated: 2026-02-14_
