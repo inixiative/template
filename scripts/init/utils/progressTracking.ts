@@ -1,6 +1,6 @@
 import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
 
-export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway';
+export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway' | 'vercel';
 
 export type InfisicalAction =
 	| 'selectOrg'
@@ -35,11 +35,21 @@ export type RailwayAction =
 	| 'deployWorker'
 	| 'verifyDeployment';
 
+export type VercelAction =
+	| 'selectTeam'
+	| 'createWebProject'
+	| 'createAdminProject'
+	| 'createSuperadminProject'
+	| 'linkGitHub'
+	| 'configureEnvVars'
+	| 'deployProduction';
+
 export type ProgressActions = {
 	project: ProjectAction;
 	infisical: InfisicalAction;
 	planetscale: PlanetScaleAction;
 	railway: RailwayAction;
+	vercel: VercelAction;
 };
 
 /**

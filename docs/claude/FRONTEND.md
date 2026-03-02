@@ -26,12 +26,12 @@ Modern, type-safe, permission-aware React architecture with TanStack Router, Zus
 ┌─────────────────────────────────────────────┐
 │ Apps: web, admin, superadmin                │
 │ ├─ TanStack Router (routes/_authenticated) │
-│ ├─ Zustand Store (5 slices)                │
+│ ├─ Zustand Store (6 slices)                │
 │ └─ BetterAuth Client                       │
 ├─────────────────────────────────────────────┤
 │ Shared Packages                             │
-│ ├─ @template/shared (logic + state)        │
-│ └─ @template/ui (presentational)           │
+│ ├─ @template/shared (SDK, types)           │
+│ └─ @template/ui (components, hooks, state) │
 └─────────────────────────────────────────────┘
 ```
 
@@ -39,29 +39,31 @@ Modern, type-safe, permission-aware React architecture with TanStack Router, Zus
 
 **See:** [ZUSTAND.md](./ZUSTAND.md) for complete documentation
 
-Apps compose Zustand slices:
-- **Web/Admin:** 6 slices (Auth, Permissions, Tenant, API, UI, Navigation)
-- **Superadmin:** 5 slices (Auth, Permissions, API, UI, Navigation - no Tenant)
+Apps compose Zustand slices from `@template/ui/store`:
+- **Web/Admin:** 6 slices (auth, tenant, permissions, navigation, ui, client)
+- **Superadmin:** 5 slices (auth, permissions, navigation, ui, client - no tenant)
 
 **Key slices:**
-- **AuthSlice** - User + session + orgs + spaces
-- **PermissionsSlice** - ReBAC (Permix)
-- **TenantSlice** - Context switching (personal/org/space)
-- **ApiSlice** - QueryClient + API config
-- **UISlice** - Theme + UI state
-- **NavigationSlice** - Router navigation + nav config
+- **auth** - User, session, organizations, spaces, spoof
+- **tenant** - Multi-tenant context (user/org/space/public)
+- **permissions** - ReBAC (Permix client), permission checks
+- **navigation** - URL/query param syncing, breadcrumbs
+- **ui** - Theme, sidebar state, modals, toasts
+- **client** - API configuration, base URL, headers
 
 ```typescript
-import { useAppStore } from '#/store';
+import { useAppStore } from '@template/ui/store';
 
 // Read state
 const user = useAppStore((state) => state.auth.user);
-const theme = useAppStore((state) => state.ui.theme);
+const currentContext = useAppStore((state) => state.tenant.current);
 
 // Call actions
 const logout = useAppStore((state) => state.auth.logout);
 await logout();
 ```
+
+**Package Consolidation:** Frontend state, hooks, and pages previously in `@template/shared` are now consolidated in `@template/ui` for better organization.
 
 ---
 
@@ -135,8 +137,8 @@ export const createAuthGuards = (getStore: () => AuthStore) => ({
 
 ```typescript
 // apps/web/app/guards/index.ts
-import { createAuthGuards } from '@template/shared';
-import { useAppStore } from '#/store';
+import { createAuthGuards } from '@template/ui/guards';
+import { useAppStore } from '@template/ui/store';
 
 export const { requireAuth, requireGuest } = createAuthGuards(() => useAppStore.getState());
 ```
@@ -155,6 +157,145 @@ export const Route = createFileRoute('/login')({
   beforeLoad: (ctx) => requireGuest(ctx), // Redirect if already logged in
   component: LoginPage,
 });
+```
+
+---
+
+## Navigation Configuration
+
+**Location:** `apps/*/app/config/nav/`
+
+Navigation is now **declarative and context-aware** using a split architecture:
+
+### Structure
+
+```
+apps/web/app/config/nav/
+├── index.ts                    # Exports combined config
+├── contexts/                   # Context-specific navigation
+│   ├── userContext.ts          # User context routes
+│   ├── organizationContext.ts  # Organization context routes
+│   ├── spaceContext.ts         # Space context routes
+│   └── publicContext.ts        # Public (logged out) routes
+└── features/                   # Feature-grouped routes
+    ├── dashboard.ts
+    ├── organizations.ts
+    ├── spaces.ts
+    ├── users.ts
+    ├── settings.ts
+    ├── communications.ts
+    └── home.ts
+```
+
+### Feature Pattern
+
+```typescript
+// features/organizations.ts
+import { getContextParams } from '@template/ui/lib';
+import type { TenantContext } from '@template/ui/store/types/tenant';
+
+export const organizationsFeature = {
+  id: 'organizations',
+  label: 'Organizations',
+  icon: Building2,
+  items: [
+    {
+      label: 'All Organizations',
+      to: (context: TenantContext) => {
+        const [contextType, contextId] = getContextParams(context);
+        return `/${contextType}/${contextId}/organizations`;
+      },
+      requirePermission: () => ({
+        action: 'read',
+        resource: 'organization',
+      }),
+    },
+  ],
+};
+```
+
+### Context Params
+
+The `getContextParams()` utility extracts the current context:
+
+```typescript
+import { getContextParams } from '@template/ui/lib';
+
+const context = useAppStore((state) => state.tenant.current);
+const [contextType, contextId] = getContextParams(context);
+// Returns: ['organization', 'org-123'] or ['space', 'space-456'] or ['user', 'user-789']
+```
+
+### Benefits
+
+- **Context-aware:** Routes adapt to current tenant context
+- **Permission-based:** Menu items only show if user has permission
+- **Feature cohesion:** All organization routes together
+- **Reusable:** Share features across apps (web, admin, superadmin)
+
+---
+
+## API Client Usage
+
+**Location:** `packages/shared/src/lib/apiQuery.ts`, `apiMutation.ts`
+
+New wrapper functions for type-safe API calls with TanStack Query.
+
+### apiQuery (For Queries)
+
+```typescript
+import { apiQuery } from '@template/ui/lib';
+import { organizationRead, organizationReadQueryKey } from '@template/shared';
+import { useQuery } from '@tanstack/react-query';
+
+const { data, isLoading } = useQuery({
+  queryKey: organizationReadQueryKey({ path: { id } }),
+  queryFn: apiQuery(() => organizationRead({ path: { id } })),
+});
+
+// data is unwrapped automatically
+const org = data;  // Organization type
+```
+
+### apiMutation (For Mutations)
+
+```typescript
+import { apiMutation } from '@template/ui/lib';
+import { organizationCreate } from '@template/shared';
+import { useMutation } from '@tanstack/react-query';
+
+const mutation = useMutation({
+  mutationFn: apiMutation(organizationCreate),
+  onSuccess: (data) => {
+    // data is full response for optimistic updates
+    console.log(data);
+  },
+});
+
+await mutation.mutateAsync({ name: 'New Org' });
+```
+
+### Why Separate Wrappers?
+
+- **apiQuery**: Unwraps `data.data` for convenient query usage
+- **apiMutation**: Returns full response for optimistic update patterns
+- **Both**: Handle authentication, spoof headers, error formatting
+
+### Migration from Old Pattern
+
+```typescript
+// OLD (deprecated)
+import { apiFetch } from '@template/shared';
+const result = await apiFetch(organizationRead)({ path: { id } });
+const org = result.data?.data;
+
+// NEW
+import { apiQuery } from '@template/ui/lib';
+const { data } = useQuery({
+  queryKey: organizationReadQueryKey({ path: { id } }),
+  queryFn: apiQuery(() => organizationRead({ path: { id } })),
+});
+const org = data;  // Already unwrapped
 ```
 
 ---

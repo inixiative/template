@@ -1,9 +1,13 @@
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { getSecret, setSecret } from '../tasks/infisicalSetup';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { retryWithTimeout } from '../utils/retry';
 import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+
+const execAsync = promisify(exec);
 
 const RAILWAY_API = 'https://backboard.railway.app/graphql/v2';
 const RAILWAY_CONFIG_PATH = join(homedir(), '.railway', 'config.json');
@@ -124,17 +128,12 @@ export const getRailwayWorkspaceToken = async (): Promise<string> => {
 
 /**
  * Make authenticated GraphQL request to Railway API
- * @param useWorkspaceToken - Use workspace token instead of user token (required for serviceConnect)
  */
-const railwayGraphQL = async <T>(
+const railwayGraphQLWithToken = async <T>(
+	token: string,
 	query: string,
-	variables?: Record<string, any>,
-	useWorkspaceToken = false
+	variables?: Record<string, any>
 ): Promise<T> => {
-	const token = useWorkspaceToken
-		? await getRailwayWorkspaceToken()
-		: await getRailwayUserToken();
-
 	const response = await fetch(RAILWAY_API, {
 		method: 'POST',
 		headers: {
@@ -164,20 +163,30 @@ const railwayGraphQL = async <T>(
 	return result.data as T;
 };
 
+const railwayGraphQLUser = async <T>(
+	query: string,
+	variables?: Record<string, any>
+): Promise<T> => {
+	const token = await getRailwayUserToken();
+	return railwayGraphQLWithToken<T>(token, query, variables);
+};
+
+const railwayGraphQLWorkspace = async <T>(
+	query: string,
+	variables?: Record<string, any>
+): Promise<T> => {
+	const token = await getRailwayWorkspaceToken();
+	return railwayGraphQLWithToken<T>(token, query, variables);
+};
+
 /**
  * List all workspaces for the authenticated user
  * Uses Railway CLI instead of GraphQL API for reliability
  */
 export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
-	const { execSync } = await import('child_process');
-
 	try {
-		const output = execSync('railway whoami --json', {
-			encoding: 'utf-8',
-			stdio: ['pipe', 'pipe', 'pipe'],
-		}).trim();
-
-		const data = JSON.parse(output);
+		const { stdout } = await execAsync('railway whoami --json', { encoding: 'utf-8' });
+		const data = JSON.parse(stdout.trim());
 		return data.workspaces || [];
 	} catch (error) {
 		// If CLI fails, return empty array
@@ -192,24 +201,19 @@ export const createProject = async (
 	workspaceId: string,
 	name: string
 ): Promise<RailwayProject> => {
-	const { execSync } = await import('child_process');
-
 	try {
-		const output = execSync(
+		const { stdout } = await execAsync(
 			`railway init -n "${name}" -w "${workspaceId}" --json`,
-			{
-				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
-			}
-		).trim();
+			{ encoding: 'utf-8' }
+		);
 
 		// Railway CLI outputs prompts before JSON
 		// Find the line that starts with { (the actual JSON)
-		const lines = output.split('\n');
+		const lines = stdout.split('\n');
 		const jsonLine = lines.find(line => line.trim().startsWith('{'));
 
 		if (!jsonLine) {
-			throw new Error(`No JSON output found. Raw output: ${output}`);
+			throw new Error(`No JSON output found. Raw output: ${stdout}`);
 		}
 
 		const data = JSON.parse(jsonLine);
@@ -246,7 +250,7 @@ const getServiceInstanceId = async (
 				}
 			`;
 
-			const data = await railwayGraphQL<{
+			const data = await railwayGraphQLUser<{
 				serviceInstance: { id: string } | null;
 			}>(query, { serviceId, environmentId });
 
@@ -282,7 +286,7 @@ export const isServiceConnectedToGitHub = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{
+	const data = await railwayGraphQLUser<{
 		serviceInstance: { id: string; source: { repo: string } | null } | null;
 	}>(query, { serviceId, environmentId });
 
@@ -292,7 +296,7 @@ export const isServiceConnectedToGitHub = async (
 
 /**
  * Connect a service to a GitHub repository
- * Note: Requires workspace token for authorization
+ * Uses service instance source update because serviceConnect is currently unauthorized.
  */
 export const connectServiceToGitHub = async (
 	serviceId: string,
@@ -300,27 +304,35 @@ export const connectServiceToGitHub = async (
 	repo: string,
 	branch: string = 'main'
 ): Promise<void> => {
-	const serviceInstanceId = await getServiceInstanceId(serviceId, environmentId);
-
-	const mutation = `
-		mutation ServiceConnect($id: String!, $input: ServiceConnectInput!) {
-			serviceConnect(id: $id, input: $input) {
-				id
+	void branch;
+	const data = await railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(
+		`
+			mutation ServiceInstanceUpdate(
+				$serviceId: String!,
+				$environmentId: String!,
+				$input: ServiceInstanceUpdateInput!
+			) {
+				serviceInstanceUpdate(
+					serviceId: $serviceId,
+					environmentId: $environmentId,
+					input: $input
+				)
 			}
-		}
-	`;
-
-	await railwayGraphQL<{ serviceConnect: { id: string } }>(
-		mutation,
+		`,
 		{
-			id: serviceInstanceId,
+			serviceId,
+			environmentId,
 			input: {
-				repo,
-				branch,
+				source: { repo },
 			},
-		},
-		true // Use workspace token for GitHub connection
+		}
 	);
+
+	if (!data.serviceInstanceUpdate) {
+		throw new Error(
+			`Failed to connect service ${serviceId} to GitHub repository ${repo} in environment ${environmentId}`
+		);
+	}
 };
 
 /**
@@ -339,7 +351,7 @@ export const renameService = async (
 		}
 	`;
 
-	await railwayGraphQL<{ serviceUpdate: { id: string; name: string } }>(mutation, {
+	await railwayGraphQLUser<{ serviceUpdate: { id: string; name: string } }>(mutation, {
 		id: serviceId,
 		input: {
 			name,
@@ -377,7 +389,7 @@ export const updateServiceInstanceConfig = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{ serviceInstanceUpdate: boolean }>(mutation, {
+	const data = await railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(mutation, {
 		serviceId,
 		environmentId,
 		input,
@@ -411,7 +423,7 @@ export const getProjectVolumes = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{
+	const data = await railwayGraphQLUser<{
 		project: {
 			volumes: {
 				edges: Array<{
@@ -464,7 +476,7 @@ export const renameVolume = async (
 		}
 	`;
 
-	await railwayGraphQL<{ volumeUpdate: { id: string; name: string } }>(mutation, {
+	await railwayGraphQLUser<{ volumeUpdate: { id: string; name: string } }>(mutation, {
 		volumeId,
 		input: {
 			name,
@@ -479,18 +491,11 @@ export const createService = async (
 	projectId: string,
 	environmentId: string,
 	environmentName: string,
-	name: string,
-	source?: {
-		repo: string;
-		branch: string;
-	}
+	name: string
 ): Promise<RailwayService> => {
-	const { execSync } = await import('child_process');
-
 	// Link to environment first
-	execSync(`railway environment link ${environmentName}`, {
+	await execAsync(`railway environment link ${environmentName}`, {
 		encoding: 'utf-8',
-		stdio: ['pipe', 'pipe', 'pipe'],
 		cwd: process.cwd(),
 		env: {
 			...process.env,
@@ -501,25 +506,23 @@ export const createService = async (
 	// Escape special characters to prevent command injection
 	const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 	const escapedName = escapeName(name);
-	const repoArg = source?.repo ? ` --repo "${escapeName(source.repo)}"` : '';
 
-	// Create service (optionally linked to GitHub repo at creation time)
-	const output = execSync(`railway add --service "${escapedName}"${repoArg} --json`, {
+	// Create service without repo linkage; GitHub connect happens in explicit connect step.
+	const { stdout } = await execAsync(`railway add --service "${escapedName}" --json`, {
 		encoding: 'utf-8',
-		stdio: ['pipe', 'pipe', 'pipe'],
 		cwd: process.cwd(),
 		env: {
 			...process.env,
 			RAILWAY_PROJECT_ID: projectId,
 		}
-	}).trim();
+	});
 
 	// Find JSON line
-	const lines = output.split('\n');
+	const lines = stdout.split('\n');
 	const jsonLine = lines.find(line => line.trim().startsWith('{'));
 
 	if (!jsonLine) {
-		throw new Error(`No JSON output found. Raw output: ${output}`);
+		throw new Error(`No JSON output found. Raw output: ${stdout}`);
 	}
 
 	const data = JSON.parse(jsonLine);
@@ -553,7 +556,7 @@ export const getProjectEnvironments = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{
+	const data = await railwayGraphQLUser<{
 		project: { environments: { edges: Array<{ node: { id: string; name: string } }> } };
 	}>(query, { projectId });
 
@@ -568,30 +571,27 @@ export const createEnvironment = async (
 	name: string,
 	sourceEnvironmentId?: string
 ): Promise<{ id: string; name: string }> => {
-	const { execSync } = await import('child_process');
-
 	try {
 		// Build command - duplicate from source if provided
 		const duplicateFlag = sourceEnvironmentId ? `--duplicate ${sourceEnvironmentId}` : '';
-		const output = execSync(
+		const { stdout } = await execAsync(
 			`railway environment new "${name}" ${duplicateFlag} --json`,
 			{
 				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
 				cwd: process.cwd(),
 				env: {
 					...process.env,
 					RAILWAY_PROJECT_ID: projectId,
 				}
 			}
-		).trim();
+		);
 
 		// Find JSON line (CLI may output prompts)
-		const lines = output.split('\n');
+		const lines = stdout.split('\n');
 		const jsonLine = lines.find(line => line.trim().startsWith('{'));
 
 		if (!jsonLine) {
-			throw new Error(`No JSON output found. Raw output: ${output}`);
+			throw new Error(`No JSON output found. Raw output: ${stdout}`);
 		}
 
 		const data = JSON.parse(jsonLine);
@@ -615,14 +615,11 @@ export const deleteEnvironment = async (
 	projectId: string,
 	environmentName: string
 ): Promise<void> => {
-	const { execSync } = await import('child_process');
-
 	try {
-		execSync(
+		await execAsync(
 			`railway environment delete "${environmentName}" --yes --json`,
 			{
 				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
 				cwd: process.cwd(),
 				env: {
 					...process.env,
@@ -651,7 +648,7 @@ export const renameEnvironment = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{ environmentRename: boolean }>(mutation, {
+	const data = await railwayGraphQLUser<{ environmentRename: boolean }>(mutation, {
 		id: environmentId,
 		name: newName,
 	});
@@ -668,15 +665,12 @@ export const createRedis = async (
 	environmentId: string,
 	environmentName: string
 ): Promise<RailwayRedis> => {
-	const { execSync } = await import('child_process');
-
 	try {
 		// Step 1: Link to the environment
-		execSync(
+		await execAsync(
 			`railway environment link ${environmentName}`,
 			{
 				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
 				cwd: process.cwd(),
 				env: {
 					...process.env,
@@ -687,25 +681,24 @@ export const createRedis = async (
 
 		// Step 2: Add Redis to the linked environment
 		// Note: Railway CLI doesn't support custom naming for databases
-		const output = execSync(
+		const { stdout } = await execAsync(
 			`railway add -d redis --json`,
 			{
 				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
 				cwd: process.cwd(),
 				env: {
 					...process.env,
 					RAILWAY_PROJECT_ID: projectId,
 				}
 			}
-		).trim();
+		);
 
 		// Find JSON line (CLI may output prompts)
-		const lines = output.split('\n');
+		const lines = stdout.split('\n');
 		const jsonLine = lines.find(line => line.trim().startsWith('{'));
 
 		if (!jsonLine) {
-			throw new Error(`No JSON output found. Raw output: ${output}`);
+			throw new Error(`No JSON output found. Raw output: ${stdout}`);
 		}
 
 		const data = JSON.parse(jsonLine);
@@ -733,23 +726,20 @@ export const getRedisUrl = async (
 	environmentName: string,
 	projectId: string
 ): Promise<string> => {
-	const { execSync } = await import('child_process');
-
 	try {
-		const output = execSync(
+		const { stdout } = await execAsync(
 			`railway variables list -s ${serviceId} -e ${environmentName} --json`,
 			{
 				encoding: 'utf-8',
-				stdio: ['pipe', 'pipe', 'pipe'],
 				cwd: process.cwd(),
 				env: {
 					...process.env,
 					RAILWAY_PROJECT_ID: projectId,
 				}
 			}
-		).trim();
+		);
 
-		const variables = JSON.parse(output);
+		const variables = JSON.parse(stdout.trim());
 
 		// Find REDIS_URL in the variables
 		const redisUrl = variables.REDIS_URL;
@@ -786,7 +776,7 @@ export const setEnvironmentVariables = async (
 	// Railway expects variables as JSON string
 	const variablesJson = JSON.stringify(variables);
 
-	await railwayGraphQL<{ variableCollectionUpsert: { id: string } }>(mutation, {
+	await railwayGraphQLUser<{ variableCollectionUpsert: { id: string } }>(mutation, {
 		serviceId,
 		environmentId,
 		variables: variablesJson,
@@ -811,11 +801,46 @@ export const getLatestDeployment = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{
+	const data = await railwayGraphQLUser<{
 		serviceInstance: { latestDeployment: RailwayDeployment | null };
 	}>(query, { serviceId, environmentId });
 
 	return data.serviceInstance.latestDeployment;
+};
+
+/**
+ * Trigger a deployment for a connected service instance.
+ * Uses latest commit from connected source.
+ */
+export const triggerServiceDeployment = async (
+	serviceId: string,
+	environmentId: string
+): Promise<void> => {
+	const mutation = `
+		mutation ServiceInstanceDeploy(
+			$serviceId: String!,
+			$environmentId: String!,
+			$latestCommit: Boolean!
+		) {
+			serviceInstanceDeploy(
+				serviceId: $serviceId,
+				environmentId: $environmentId,
+				latestCommit: $latestCommit
+			)
+		}
+	`;
+
+	const data = await railwayGraphQLUser<{ serviceInstanceDeploy: boolean }>(mutation, {
+		serviceId,
+		environmentId,
+		latestCommit: true,
+	});
+
+	if (!data.serviceInstanceDeploy) {
+		throw new Error(
+			`Failed to trigger deployment for service ${serviceId} in environment ${environmentId}`
+		);
+	}
 };
 
 /**
@@ -837,7 +862,7 @@ export const getServiceDomain = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{
+	const data = await railwayGraphQLUser<{
 		serviceInstance: {
 			domains: {
 				serviceDomains: Array<{ domain: string }>;
@@ -885,7 +910,7 @@ export const setupInfisicalIntegration = async (
 		}
 	`;
 
-	const data = await railwayGraphQL<{ integrationCreate: { id: string } }>(mutation, {
+	const data = await railwayGraphQLUser<{ integrationCreate: { id: string } }>(mutation, {
 		projectId,
 		environmentId,
 		infisicalProjectId,

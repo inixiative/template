@@ -17,7 +17,7 @@
     "setup": "./scripts/setup/setup.sh",
     "sync-env": "./scripts/setup/sync-env.sh",
     "with": "./scripts/deployment/with-env.sh",
-    "local": "bun run local:db && turbo watch local#api local#web local#admin local#superadmin local:worker#api",
+    "local": "./scripts/local.sh",
     "local:db": "docker-compose up -d --wait",
     "start:api": "bun --cwd apps/api start",
     "start:worker": "bun --cwd apps/api start:worker",

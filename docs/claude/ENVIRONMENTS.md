@@ -107,7 +107,7 @@ bun run sync-env  # Copies .env.*.example → .env.* (won't overwrite)
 
 ## Infisical (Cloud Environments)
 
-For `dev`, `staging`, `sandbox`, `prod` - secrets managed in Infisical.
+For `pr`, `staging`, `prod` - secrets managed in Infisical.
 
 ### Environment Structure
 
@@ -115,9 +115,8 @@ Infisical uses a flat environment structure per project:
 
 ```
 Project: your-app-name
-├── dev (development environment)
+├── pr (pull request previews)
 ├── staging (pre-production)
-├── sandbox (isolated testing)
 └── prod (production)
 ```
 
@@ -151,16 +150,16 @@ After setup, `.infisical.json` is created:
 
 ```bash
 # Run command with Infisical secrets
-infisical run --env=dev -- bun run start
+infisical run --env=pr -- bun run start
 
 # Export secrets to file
-infisical export --env=dev > .env.dev
+infisical export --env=staging > .env.staging
 
 # Set individual secret
 infisical secrets set DATABASE_URL "postgres://..." --env=prod
 
 # List secrets
-infisical secrets list --env=dev
+infisical secrets list --env=staging
 ```
 
 ### CLI Authentication
@@ -196,7 +195,7 @@ bun run with prod api bun run start
 
 ```bash
 # scripts/deployment/with-env.sh
-1. If cloud env (dev/staging/sandbox/prod):
+1. If cloud env (pr/staging/prod):
    - Check if Infisical is configured (.infisical.json exists)
    - If yes: Run via infisical CLI (loads secrets from Infisical)
    - If no: Fallback to .env files
@@ -252,7 +251,7 @@ For `bun run with prod api bun run start`:
 1. Add to Infisical for each environment:
    ```bash
    # Add to specific environment
-   infisical secrets set NEW_VAR "value" --env=dev
+   infisical secrets set NEW_VAR "value" --env=pr
    infisical secrets set NEW_VAR "value" --env=staging
    infisical secrets set NEW_VAR "value" --env=prod
 

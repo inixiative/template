@@ -401,18 +401,27 @@ await retryWithTimeout(
 - Resource not found (404)
 - Conflict errors (409) unless explicitly handling race conditions
 
-### 10. Railway CLI vs GraphQL API
+### 10. Async Exec for Smooth Animations
 
-**Pattern:** Use Railway CLI commands for simple queries, GraphQL API for mutations.
+**⚠️ CRITICAL:** Always use async `exec` with `promisify`, never `execSync`. Synchronous calls block the event loop and freeze spinner animations.
+
+**Pattern:** Convert all CLI calls to async using promisify wrapper.
 
 **Why:**
-- ✅ CLI is more reliable for auth (uses local session)
-- ✅ No need to manage API tokens for read-only operations
-- ✅ Consistent with how other services work (Infisical, PlanetScale)
+- ✅ Spinner animations continue during CLI calls
+- ✅ Non-blocking - UI remains responsive
+- ✅ Better UX - no freezing or lag
+- ❌ execSync blocks Node event loop and pauses React rendering
 
 **Implementation:**
 ```typescript
-// ✅ Good: Use CLI for workspace listing
+// At top of file - setup once
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
+
+// ❌ Bad: Blocks event loop, freezes spinners
 export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
   const { execSync } = await import('child_process');
 
@@ -421,23 +430,256 @@ export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
     stdio: ['pipe', 'pipe', 'pipe'],
   }).trim();
 
-  const data = JSON.parse(output);
-  return data.workspaces || [];
+  return JSON.parse(output).workspaces || [];
 };
 
-// ❌ Bad: Use GraphQL API (requires token management)
+// ✅ Good: Async, animations continue smoothly
 export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
-  const token = await getRailwayToken(); // Extra complexity
-  const data = await railwayGraphQL<...>(query);
-  return data.me.workspaces;
+  const { stdout } = await execAsync('railway whoami --json', {
+    encoding: 'utf-8'
+  });
+
+  return JSON.parse(stdout.trim()).workspaces || [];
 };
 ```
+
+**Key differences:**
+- `execSync` returns `string` directly, `execAsync` returns `{ stdout, stderr }`
+- Remove `stdio: ['pipe', 'pipe', 'pipe']` - not needed with promisify
+- Use `stdout.trim()` instead of `.trim()` on the result
+- Always `await` the async call
+
+**Convert ALL CLI calls:**
+```typescript
+// PlanetScale
+await execAsync('pscale org list --format json', { encoding: 'utf-8' });
+await execAsync('pscale region list --org ${org} --format json', { encoding: 'utf-8' });
+await execAsync('pscale branch create ${db} ${branch} --org ${org} --format json', { encoding: 'utf-8' });
+
+// Railway
+await execAsync('railway whoami --json', { encoding: 'utf-8' });
+await execAsync('railway environment link ${env}', { encoding: 'utf-8', cwd: process.cwd() });
+await execAsync('railway add --service "${name}" --json', { encoding: 'utf-8', cwd: process.cwd() });
+
+// Infisical
+await execAsync('infisical org list --format json', { encoding: 'utf-8' });
+```
+
+**Rule:** If you see `execSync` anywhere in `scripts/init/api/`, it's a bug. Convert to async immediately.
+
+### 11. Railway CLI vs GraphQL API
+
+**Pattern:** Use Railway CLI commands for simple queries, GraphQL API for mutations.
+
+**Why:**
+- ✅ CLI is more reliable for auth (uses local session)
+- ✅ No need to manage API tokens for read-only operations
+- ✅ Consistent with how other services work (Infisical, PlanetScale)
 
 **When to use each:**
 - **CLI**: Workspace/org listing, read-only queries, session checks
 - **GraphQL API**: Creating resources, updating config, deployments
 
-### 11. OrgSelector Always Requires onCancel
+### 12. Token Input Flow with Proper State Management
+
+**Pattern:** When prompting for tokens/credentials, manage loading states carefully to prevent UI jumps or blank screens.
+
+**Why:**
+- ✅ Smooth transitions between input → storage → next step
+- ✅ Immediate visual feedback during async operations
+- ✅ No unexpected view changes or blank screens
+- ❌ Common bug: setting running state at wrong time causes blank screen
+
+**Implementation:**
+```typescript
+const handleTokenSubmit = async () => {
+  if (!config || !workspaceToken.trim()) return;
+
+  setStoringToken(true);  // Show "Storing..." spinner
+
+  try {
+    // Store token in Infisical
+    await setSecret(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
+
+    setStoringToken(false);  // Hide storing spinner
+
+    // Determine next step
+    const existingWorkspace = config.railway?.workspaceId;
+
+    if (existingWorkspace) {
+      // Have workspace - go directly to setup
+      setRunning(true);
+      setViewState('status');
+      await runSetup(existingWorkspace);
+    } else if (workspaces.length === 1) {
+      // Only one workspace - auto-select it
+      setRunning(true);
+      setViewState('status');
+      await runSetup(workspaces[0].id);
+    } else {
+      // Multiple workspaces - need to select
+      setRunning(false);  // ⚠️ CRITICAL: Must set false for selector
+      setViewState('workspace-select');
+    }
+  } catch (error) {
+    setStoringToken(false);
+    setRunning(false);
+    throw error;
+  }
+};
+```
+
+**Key rules:**
+1. **Set loading states BEFORE changing viewState**
+   - ✅ `setStoringToken(true)` → show spinner in current view
+   - ✅ `setRunning(true)` → show spinner in status view
+   - ❌ Never switch views without setting appropriate loading state first
+
+2. **Clear loading states BEFORE next transition**
+   - ✅ `setStoringToken(false)` after storage completes
+   - ✅ Then set next state (`setRunning` or `setViewState`)
+   - ❌ Don't leave multiple loading states active simultaneously
+
+3. **Always set running=false before showing selectors**
+   - ✅ `setRunning(false)` + `setViewState('workspace-select')`
+   - ❌ Leaving `running=true` will show loading spinner in selector
+
+**Visual feedback in token input:**
+```typescript
+{storingToken ? (
+  <Box marginTop={1}>
+    <Text color="cyan">
+      <Spinner type="dots" /> Storing token and continuing setup...
+    </Text>
+  </Box>
+) : (
+  <>
+    <Box marginTop={1}>
+      <Text>Token: </Text>
+      <TextInput value={token} onChange={setToken} onSubmit={handleSubmit} mask="*" />
+    </Box>
+    <Box marginTop={1}>
+      <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+    </Box>
+  </>
+)}
+```
+
+### 13. Idempotent API Calls
+
+**Pattern:** Make setup operations idempotent - detect existing resources and skip creation instead of failing.
+
+**Why:**
+- ✅ Setup can be re-run without errors
+- ✅ Handles interrupted setup gracefully
+- ✅ Resume from any point without manual cleanup
+- ✅ Better UX - no "already exists" errors
+
+**Implementation:**
+```typescript
+// ❌ Bad: Fails if resource already exists
+export const createRailwayConnection = async (
+  infisicalProjectId: string,
+  railwayApiToken: string,
+  connectionName: string
+): Promise<string> => {
+  const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
+    method: 'POST',
+    body: JSON.stringify({ name: connectionName, ... })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create connection: ${await response.text()}`);
+  }
+
+  return response.json().appConnection.id;
+};
+
+// ✅ Good: Idempotent - returns existing if already created
+export const createRailwayConnection = async (
+  infisicalProjectId: string,
+  railwayApiToken: string,
+  connectionName: string
+): Promise<string> => {
+  const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
+    method: 'POST',
+    body: JSON.stringify({ name: connectionName, ... })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    // If connection already exists, find and return its ID
+    if (errorText.includes('already exists')) {
+      const connections = await listRailwayConnections(infisicalProjectId);
+      const existing = connections.find(conn => conn.name === connectionName);
+      if (existing) {
+        return existing.id;  // Return existing instead of failing
+      }
+    }
+
+    throw new Error(`Failed to create connection: ${errorText}`);
+  }
+
+  return response.json().appConnection.id;
+};
+```
+
+**Pattern for sync creation:**
+```typescript
+export const createRailwaySync = async (
+  projectId: string,
+  syncName: string,
+  ...config
+): Promise<void> => {
+  const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
+    method: 'POST',
+    body: JSON.stringify({ name: syncName, ...config })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    // If sync already exists, silently skip - this makes setup idempotent
+    if (errorText.includes('already exists')) {
+      return;  // Success - sync exists
+    }
+
+    throw new Error(`Failed to create sync: ${errorText}`);
+  }
+};
+```
+
+**When to make operations idempotent:**
+- ✅ Resource creation (projects, services, connections, syncs)
+- ✅ Configuration updates (can be reapplied safely)
+- ✅ Secret storage (overwriting is fine)
+- ❌ Destructive operations (deletes, renames) - use progress flags instead
+
+**Alternative pattern - check before create:**
+```typescript
+// Option 2: Check existence before attempting creation
+export const ensureRailwayConnection = async (...): Promise<string> => {
+  // Try to find existing
+  const connections = await listRailwayConnections(projectId);
+  const existing = connections.find(conn => conn.name === connectionName);
+
+  if (existing) {
+    return existing.id;  // Already exists
+  }
+
+  // Create new
+  const response = await fetch(...);
+  return response.json().appConnection.id;
+};
+```
+
+**Choose approach based on API:**
+- **Catch error pattern**: When API doesn't provide list endpoint
+- **Check-then-create pattern**: When list endpoint is available and efficient
+- **Both**: Catch error + check list (safest, handles race conditions)
+
+### 14. OrgSelector Always Requires onCancel
 
 **Pattern:** OrgSelector component always requires `onCancel` prop (not optional).
 
@@ -474,7 +716,7 @@ onCancel?: () => void;
 onCancel: () => void;
 ```
 
-### 12. Interactive User Prompts for Required Input
+### 15. Interactive User Prompts for Required Input
 
 **Pattern:** When setup requires user-provided values (tokens, credentials, etc.), prompt interactively using TextInput instead of failing with error messages.
 
@@ -589,6 +831,129 @@ useInput((input, key) => {
 6. View stores token in Infisical
 7. View continues with automated setup
 8. Future runs skip input (token already exists)
+
+### 16. State Management Standards
+
+**Pattern:** Consistent naming and separation of concerns for state variables across all setup views.
+
+**Why:**
+- ✅ Predictable code - same patterns everywhere
+- ✅ Clear separation between UI navigation and business logic
+- ✅ Easier debugging and maintenance
+- ✅ No confusion between execution state and view state
+
+**Implementation:**
+
+#### ViewState - UI Navigation Only
+
+**Always use:**
+- **Variable name**: `viewState` (never `state`)
+- **Type name**: `ViewState`
+- **Values**: UI screen names only
+
+```typescript
+type ViewState = 'status' | 'org-select' | 'token-input' | 'region-select';
+const [viewState, setViewState] = useState<ViewState>('status');
+```
+
+**Rules:**
+- ❌ Never include execution states like `'running'`, `'executing'`, `'loading'` in ViewState
+- ❌ Never use generic name `state` instead of `viewState`
+- ✅ Only include screen/modal names that represent what the user sees
+
+#### SetupState - Business Logic State
+
+**Always use:**
+- **Variable name**: `setupState` (derived, never stored)
+- **Type name**: `SetupState`
+- **Values**: `'new' | 'stale' | 'incomplete' | 'complete'`
+- **Derived via**: `useMemo` from config
+
+```typescript
+type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
+
+const setupState = useMemo(
+  () => config ? detectSetupState(config) : 'new',
+  [config]
+);
+```
+
+**Rules:**
+- ✅ Always derive from config using `useMemo` (never `useState`)
+- ✅ Compute in `detectSetupState()` helper function
+- ❌ Never store in state (always computed from config)
+
+#### Boolean Flags - Execution State
+
+**Naming conventions:**
+- **`running`**: Main setup task is executing
+- **`loading<Entity>`**: Specific entity is loading (e.g., `loadingOrgs`, `loadingWorkspaces`, `loadingRegions`)
+- **`storing<Action>`**: Async storage operation in progress (e.g., `storingToken`)
+
+```typescript
+const [running, setRunning] = useState(false);           // Setup is running
+const [loadingOrgs, setLoadingOrgs] = useState(true);    // Fetching organizations
+const [loadingRegions, setLoadingRegions] = useState(false); // Fetching regions
+```
+
+**Rules:**
+- ✅ Use `running` for main setup execution
+- ✅ Use `loading<Entity>` pattern for data fetching
+- ✅ Use `storing<Action>` for specific async operations
+- ❌ Never duplicate execution state (e.g., don't have `running` boolean AND `'running'` ViewState)
+
+#### Complete Example
+
+```typescript
+// ✅ Good - Follows all standards
+type ViewState = 'status' | 'org-select' | 'region-select' | 'token-input';
+type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
+
+const [viewState, setViewState] = useState<ViewState>('status');
+const [running, setRunning] = useState(false);
+const [loadingOrgs, setLoadingOrgs] = useState(true);
+
+const setupState = useMemo(
+  () => config ? detectSetupState(config) : 'new',
+  [config]
+);
+```
+
+```typescript
+// ❌ Bad - Multiple issues
+type ViewState = 'loading' | 'prompt-name' | 'executing' | 'running' | 'complete'; // Execution states in ViewState
+const [state, setState] = useState<ViewState>('loading'); // Generic name
+const [running, setRunning] = useState(false); // Duplicates 'running' ViewState
+```
+
+#### Animation/Loading State Pattern
+
+**Always set loading state BEFORE async operations:**
+
+```typescript
+// ✅ Good - Immediate visual feedback
+const handleAction = async () => {
+  setRunning(true);        // Show spinner immediately
+  setViewState('status');  // Switch to status view
+  await runSetup();        // Then run async work
+};
+```
+
+```typescript
+// ❌ Bad - Blank screen during async work
+const handleAction = async () => {
+  await updateConfigField('org', orgName);  // User sees nothing
+  await clearAllProgress();                 // Still nothing
+  setRunning(true);                         // Finally shows spinner
+  await runSetup();
+};
+```
+
+**Rules:**
+- ✅ Set `running` and `viewState` BEFORE any async operations
+- ✅ Add optional 10ms delay in `onStepComplete` callbacks if animations don't show
+- ❌ Never use IIFE pattern `(async () => { ... })()` - make handler async instead
+- ❌ Never use `setTimeout` before showing loading state
 
 ---
 

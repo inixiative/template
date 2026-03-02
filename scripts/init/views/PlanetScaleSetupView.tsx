@@ -12,7 +12,7 @@ import { updateConfigField, clearAllProgress, clearConfigError, setConfigError, 
 import { setSecret } from '../tasks/infisicalSetup';
 import { prompt } from '../utils/prompts';
 
-type ViewState = 'status' | 'org-select' | 'region-select' | 'token-id-input' | 'token-value-input';
+type ViewState = 'status' | 'org-select' | 'region-select' | 'token-confirm' | 'token-id-input' | 'token-value-input';
 type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
 
 type PlanetScaleSetupViewProps = {
@@ -105,6 +105,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 	const [loadingRegions, setLoadingRegions] = useState(false);
 	const [tokenInput, setTokenInput] = useState('');
 	const [tokenIdInput, setTokenIdInput] = useState('');
+	const [savingToken, setSavingToken] = useState(false);
 
 	// Derive setup state from config (no delay)
 	const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
@@ -132,8 +133,12 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 		if (key.escape) {
 			onCancel();
 		} else if (key.return) {
-			// Enter: Run setup or Continue
-			handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			// Enter: Complete, Continue, or Run setup
+			if (setupState === 'complete') {
+				onComplete();
+			} else {
+				handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			}
 		} else if (input.toLowerCase() === 'r') {
 			// R: Restart
 			handleAction('restart');
@@ -217,20 +222,22 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 		}
 	};
 
-	const handleOrgSelect = async (orgId: string) => {
+	const handleOrgSelect = async (orgName: string) => {
 		if (!config || !organizations) return;
 
-		// Find org by ID to get the name
-		const selectedOrg = organizations.find((org) => org.id === orgId);
+		// Find org by name
+		const selectedOrg = organizations.find((org) => org.name === orgName);
 		if (!selectedOrg) {
 			setViewState('status');
 			return;
 		}
 
+		// Show loading immediately
+		setLoadingRegions(true);
+
 		// Clear if org changed
 		const currentOrg = config.planetscale.organization;
 		if (currentOrg && currentOrg !== selectedOrg.name) {
-			console.log('Organization changed - clearing PlanetScale config');
 			await updateConfigField('planetscale', 'organization', '');
 			await updateConfigField('planetscale', 'region', '');
 			await updateConfigField('planetscale', 'database', '');
@@ -248,7 +255,6 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 		await syncConfig();
 
 		// Load regions for this org
-		setLoadingRegions(true);
 		try {
 			const availableRegions = await listRegions(selectedOrg.name);
 			setRegions(availableRegions);
@@ -279,35 +285,45 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 		setViewState('token-value-input');
 	};
 
-	const handleTokenValueSubmit = () => {
+	const handleTokenValueSubmit = async () => {
 		if (!config || !tokenInput.trim() || !tokenIdInput.trim()) return;
 
-		// Navigate to status immediately
-		setViewState('status');
+		setSavingToken(true);
 
-		// Run async operations in background
-		(async () => {
-			try {
-				const infisicalProjectId = config.infisical.projectId;
+		try {
+			const infisicalProjectId = config.infisical.projectId;
+			const orgName = config.planetscale.organization;
+			const region = config.planetscale.region;
 
-				// Store both token ID and token value in Infisical root environment
-				await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
-				await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
+			// Store PlanetScale configuration in Infisical root environment
+			await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
+			await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
+			await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
+			await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
 
-				// Mark token steps as complete
-				await updateConfigField('planetscale', 'tokenId', tokenIdInput);
-				await setProgressComplete('planetscale', 'createToken');
-				await setProgressComplete('planetscale', 'setInfisicalToken');
-				await syncConfig();
+			// Mark token steps as complete
+			await updateConfigField('planetscale', 'tokenId', tokenIdInput);
+			await setProgressComplete('planetscale', 'createToken');
+			await setProgressComplete('planetscale', 'setInfisicalToken');
+			await syncConfig();
 
-				// Continue with setup
-				const orgName = config.planetscale.organization;
-				await runSetup(orgName);
-			} catch (err) {
-				await setConfigError('planetscale', err instanceof Error ? err.message : 'Failed to store token');
-				await syncConfig();
-			}
-		})();
+			setSavingToken(false);
+
+			// Show confirmation screen to verify permissions
+			setViewState('token-confirm');
+		} catch (err) {
+			setSavingToken(false);
+			await setConfigError('planetscale', err instanceof Error ? err.message : 'Failed to store token');
+			await syncConfig();
+		}
+	};
+
+	const handleTokenConfirm = async () => {
+		if (!config) return;
+
+		// Continue with setup
+		const orgName = config.planetscale.organization;
+		await runSetup(orgName);
 	};
 
 	const runSetup = async (orgName: string) => {
@@ -321,11 +337,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 			// Refresh config to show completed progress (setupState will auto-update via useMemo)
 			await syncConfig();
 
-			// Auto-return to main menu
-			setTimeout(() => {
-				setRunning(false);
-				onComplete();
-			}, 2000);
+			setRunning(false);
 		} catch (err) {
 			// Error is already persisted by setupPlanetScale via setError
 			// Return to status view and refresh to show error
@@ -341,6 +353,8 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 			<OrgSelector
 				organizations={organizations}
 				serviceName="PlanetScale"
+				identifierKey="name"
+				loading={loadingRegions}
 				onSelect={handleOrgSelect}
 				onCancel={onCancel}
 			/>
@@ -387,12 +401,48 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 				<SelectInput
 					items={regionItems}
 					itemComponent={regionItemComponent}
+					indicatorComponent={() => null}
 					onSelect={(item) => handleRegionSelect(item.value)}
 				/>
 
 				<Box marginTop={1}>
 					<Text dimColor>Use ↑/↓ to navigate, Enter to select</Text>
 				</Box>
+			</Box>
+		);
+	}
+
+	// Token permission confirmation view
+	if (viewState === 'token-confirm') {
+		const orgName = config?.planetscale.organization || '';
+
+		return (
+			<Box flexDirection="column" padding={1}>
+				<Box marginBottom={1}>
+					<Text bold>Confirm Token Permissions</Text>
+				</Box>
+
+				<Box flexDirection="column" marginBottom={1}>
+					<Text bold color="yellow">⚠ IMPORTANT: Verify your service token has these permissions:</Text>
+				</Box>
+
+				<Box flexDirection="column" marginBottom={1}>
+					<Text color="cyan" bold>Required Permissions:</Text>
+					<Text>  ✓ Create databases</Text>
+					<Text>  ✓ Create branches</Text>
+					<Text>  ✓ Create passwords</Text>
+				</Box>
+
+				<Box flexDirection="column" marginBottom={1}>
+					<Text dimColor>If you're missing any permissions, you'll get a 403 error.</Text>
+					<Text dimColor>Check your token at: https://app.planetscale.com/{orgName}/settings/service-tokens</Text>
+				</Box>
+
+				<Box marginTop={1}>
+					<Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+				</Box>
+
+				<TextInput value="" onChange={() => {}} onSubmit={handleTokenConfirm} />
 			</Box>
 		);
 	}
@@ -451,9 +501,19 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 					<TextInput value={tokenInput} onChange={setTokenInput} onSubmit={handleTokenValueSubmit} />
 				</Box>
 
-				<Box marginTop={1}>
-					<Text dimColor>{prompt(['enter', 'cancel'])}</Text>
-				</Box>
+				{savingToken && (
+					<Box marginTop={1}>
+						<Text color="cyan">
+							<Spinner type="dots" /> Saving to Infisical...
+						</Text>
+					</Box>
+				)}
+
+				{!savingToken && (
+					<Box marginTop={1}>
+						<Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+					</Box>
+				)}
 			</Box>
 		);
 	}
@@ -528,7 +588,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 							? prompt(['enter', 'cancel'])
 							: setupState === 'incomplete'
 								? prompt(['enter', 'restart', 'cancel'])
-								: `Setup complete! ${prompt(['restart', 'cancel'])}`}
+								: prompt(['enter', 'restart'])}
 					</Text>
 				</Box>
 			)}

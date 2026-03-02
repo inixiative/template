@@ -11,7 +11,7 @@ import { updateConfigField, clearAllProgress, clearConfigError } from '../utils/
 import { setupRailway } from '../tasks/railwaySetup';
 import { setSecret, getSecret } from '../tasks/infisicalSetup';
 
-type ViewState = 'status' | 'workspace-select' | 'token-input' | 'github-prompt' | 'running';
+type ViewState = 'status' | 'workspace-select' | 'token-input' | 'github-prompt';
 type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
 
 type RailwaySetupViewProps = {
@@ -110,14 +110,6 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 			completed: progress.createInfisicalConnection
 		},
 		{
-			label: 'Infisical sync created for prod',
-			completed: progress.createInfisicalSyncProd
-		},
-		{
-			label: 'Infisical sync created for staging',
-			completed: progress.createInfisicalSyncStaging
-		},
-		{
 			label: 'GitHub setup confirmed',
 			completed: progress.promptedForGithub
 		},
@@ -126,12 +118,20 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 			completed: progress.createApiProd
 		},
 		{
+			label: 'Infisical sync created for prod API',
+			completed: progress.createInfisicalSyncProd
+		},
+		{
 			label: 'Prod API connected to GitHub and deployed',
 			completed: progress.connectApiProdGithub
 		},
 		{
 			label: stagingApiServiceId ? `Staging API service created: ${stagingApiServiceId}` : 'Staging API service created',
 			completed: progress.createApiStaging
+		},
+		{
+			label: 'Infisical sync created for staging API',
+			completed: progress.createInfisicalSyncStagingApi
 		},
 		{
 			label: 'Staging API connected to GitHub and deployed',
@@ -154,6 +154,10 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 			completed: progress.createWorkerStaging
 		},
 		{
+			label: 'Infisical sync created for staging Worker',
+			completed: progress.createInfisicalSyncStagingWorker
+		},
+		{
 			label: 'Staging Worker connected to GitHub and deployed',
 			completed: progress.connectWorkerStagingGithub
 		},
@@ -172,7 +176,6 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 	const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
 	const [workspaceToken, setWorkspaceToken] = useState('');
 	const [storingToken, setStoringToken] = useState(false);
-	const [showGithubPrompt, setShowGithubPrompt] = useState(false);
 
 	// Derive setup state from config
 	const setupState = useMemo(
@@ -214,8 +217,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		if (key.escape) {
 			onCancel();
 		} else if (key.return) {
-			// Enter: Run setup or Continue
-			handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			// Enter: Complete, Continue, or Run setup
+			if (setupState === 'complete') {
+				onComplete();
+			} else {
+				handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			}
 		} else if (input.toLowerCase() === 'r') {
 			// R: Restart
 			handleAction('restart');
@@ -235,10 +242,14 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 			await updateConfigField('railway', 'projectId', '');
 			await updateConfigField('railway', 'prodEnvironmentId', '');
 			await updateConfigField('railway', 'stagingEnvironmentId', '');
-			await updateConfigField('railway', 'apiServiceId', '');
-			await updateConfigField('railway', 'workerServiceId', '');
+			await updateConfigField('railway', 'prodApiServiceId', '');
+			await updateConfigField('railway', 'stagingApiServiceId', '');
+			await updateConfigField('railway', 'prodWorkerServiceId', '');
+			await updateConfigField('railway', 'stagingWorkerServiceId', '');
 			await updateConfigField('railway', 'prodRedisServiceId', '');
 			await updateConfigField('railway', 'stagingRedisServiceId', '');
+			await updateConfigField('railway', 'prodRedisVolumeId', '');
+			await updateConfigField('railway', 'stagingRedisVolumeId', '');
 			await updateConfigField('railway', 'configProjectName', '');
 			await clearAllProgress('railway');
 			await clearConfigError('railway');
@@ -310,7 +321,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		try {
 			await setupRailway(workspaceId, syncConfig);
 			await syncConfig();
-			setTimeout(() => onComplete(), 2000);
+			setRunning(false);
 		} catch (error) {
 			// Check if this is the GitHub setup required error
 			if (error instanceof Error && error.message === 'GITHUB_SETUP_REQUIRED') {
@@ -334,13 +345,17 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
 		// Mark as complete to proceed past the check
 		// If GitHub connection fails, the setup task will clear this flag
+		// Fetch fresh config to avoid using stale progress from React state
+		await syncConfig();
+		const { getProjectConfig } = await import('../utils/getProjectConfig');
+		const freshConfig = await getProjectConfig();
 		await updateConfigField('railway', 'progress', {
-			...config.railway.progress,
+			...freshConfig.railway.progress,
 			promptedForGithub: true
 		});
 		await syncConfig();
 
-		const existingWorkspace = config.railway?.workspaceId;
+		const existingWorkspace = freshConfig.railway?.workspaceId;
 		if (existingWorkspace) {
 			setViewState('status');
 			setRunning(true);
@@ -356,23 +371,34 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		try {
 			// Store token in Infisical
 			const infisicalProjectId = config.infisical.projectId;
-			setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+			await setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+
+			setStoringToken(false);
 
 			// Continue with setup
 			const existingWorkspace = config.railway?.workspaceId;
 			if (existingWorkspace && existingWorkspace.trim() !== '') {
+				setRunning(true);
+				setViewState('status');
 				await runSetup(existingWorkspace);
 			} else if (workspaces && workspaces.length === 1) {
+				setRunning(true);
+				setViewState('status');
 				await runSetup(workspaces[0].id);
 			} else {
+				setRunning(false);
 				setViewState('workspace-select');
 			}
-		} finally {
+		} catch (error) {
 			setStoringToken(false);
+			setRunning(false);
+			throw error;
 		}
 	};
 
 	const handleWorkspaceSelect = async (workspaceId: string) => {
+		// Show spinner immediately when workspace is selected
+		setRunning(true);
 		await runSetup(workspaceId);
 	};
 
@@ -441,6 +467,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 			<OrgSelector
 				organizations={workspaces || []}
 				serviceName="Railway"
+				loading={running}
 				onSelect={handleWorkspaceSelect}
 				onCancel={onCancel}
 			/>
@@ -554,7 +581,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 						<Text dimColor>{prompt(['enter', 'cancel'])}</Text>
 					)}
 					{setupState === 'complete' && (
-						<Text dimColor>{prompt(['enter'])}</Text>
+						<Text dimColor>{prompt(['enter', 'restart'])}</Text>
 					)}
 				</Box>
 			)}

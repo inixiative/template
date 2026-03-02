@@ -262,6 +262,49 @@ export const checkRailwaySessionAsync = async (): Promise<InfisicalSession> => {
 };
 
 /**
+ * Check if user is logged into GitHub CLI (async version)
+ */
+export const checkGitHubSessionAsync = async (): Promise<InfisicalSession> => {
+	try {
+		const { stdout } = await execAsync('gh auth status');
+		const output = stdout.trim();
+
+		// gh auth status prints to stderr on success, stdout on error
+		// Check for "Logged in" in output
+		const isLoggedIn = output.toLowerCase().includes('logged in');
+
+		// Extract username if available
+		const userMatch = output.match(/Logged in to .+ as (.+?) \(/);
+		const user = userMatch?.[1];
+
+		return {
+			loggedIn: isLoggedIn,
+			user: user || (isLoggedIn ? 'Authenticated' : undefined),
+		};
+	} catch (error) {
+		// gh auth status exits with non-zero if not authenticated
+		// But it may print to stderr, check the error output
+		const errorOutput = error instanceof Error && 'stderr' in error
+			? String((error as any).stderr)
+			: '';
+
+		if (errorOutput.toLowerCase().includes('logged in')) {
+			const userMatch = errorOutput.match(/Logged in to .+ as (.+?) \(/);
+			const user = userMatch?.[1];
+			return {
+				loggedIn: true,
+				user: user || 'Authenticated',
+			};
+		}
+
+		return {
+			loggedIn: false,
+			error: 'Not logged in',
+		};
+	}
+};
+
+/**
  * Check if Docker daemon is running
  */
 export const checkDockerRunningAsync = async (): Promise<InfisicalSession> => {

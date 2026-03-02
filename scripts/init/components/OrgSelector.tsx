@@ -1,26 +1,29 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
+import Spinner from 'ink-spinner';
 import { prompt } from '../utils/prompts';
 
 export type Organization = {
-	id: string;
+	id?: string;
 	name: string;
 	slug?: string;
 };
 
 type OrgSelectorProps = {
 	organizations: Organization[];
-	defaultOrgId?: string;
 	serviceName: string;
+	identifierKey?: 'id' | 'name';
+	loading?: boolean;
 	onSelect: (orgId: string) => void;
 	onCancel: () => void;
 };
 
 export const OrgSelector: React.FC<OrgSelectorProps> = ({
 	organizations,
-	defaultOrgId,
 	serviceName,
+	identifierKey = 'id',
+	loading = false,
 	onSelect,
 	onCancel,
 }) => {
@@ -62,21 +65,21 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
 		);
 	}
 
-	const items = organizations.map((org) => ({
-		key: org.id,
-		label: org.slug ? `${org.name} (${org.slug})` : org.name,
-		value: org.id,
-		isDefault: org.id === defaultOrgId,
-	}));
+	const items = organizations.map((org) => {
+		const identifier = org[identifierKey];
+		return {
+			key: identifier,
+			label: org.slug ? `${org.name} (${org.slug})` : org.name,
+			value: identifier,
+		};
+	});
 
 	const itemComponent = ({ isSelected, label }: { isSelected: boolean; label: string }) => {
-		const item = items.find((i) => i.label === label);
 		const prefix = isSelected ? '❯ ' : '  ';
-		const defaultBadge = item?.isDefault ? ' (default)' : '';
 
 		return (
 			<Text color={isSelected ? 'cyan' : undefined}>
-				{prefix}{label}{defaultBadge}
+				{prefix}{label}
 			</Text>
 		);
 	};
@@ -96,6 +99,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
 			<SelectInput
 				items={items}
 				itemComponent={itemComponent}
+				indicatorComponent={() => null}
 				onSelect={(item) => {
 					if (item?.value) {
 						onSelect(item.value);
@@ -103,9 +107,19 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
 				}}
 			/>
 
-			<Box marginTop={1}>
-				<Text dimColor>{prompt(['navigate', 'select', 'cancel'])}</Text>
-			</Box>
+			{loading && (
+				<Box marginTop={1}>
+					<Text color="cyan">
+						<Spinner type="dots" /> Processing...
+					</Text>
+				</Box>
+			)}
+
+			{!loading && (
+				<Box marginTop={1}>
+					<Text dimColor>{prompt(['navigate', 'select', 'cancel'])}</Text>
+				</Box>
+			)}
 		</Box>
 	);
 };

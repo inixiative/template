@@ -7,6 +7,9 @@ import { getCurrentConfig, updateProjectConfig, renameProject } from '../tasks/p
 import { prompt } from '../utils/prompts';
 import { setProgressComplete } from '../utils/configHelpers';
 
+// NOTE: This is a linear wizard flow (not resumable like other setup views)
+// ViewState includes execution states because they represent distinct screens
+// No SetupState needed - wizard either completes or errors
 type ViewState = 'loading' | 'prompt-name' | 'prompt-org' | 'confirm' | 'executing' | 'running-setup' | 'complete';
 
 type ProjectConfigViewProps = {
@@ -15,16 +18,18 @@ type ProjectConfigViewProps = {
 };
 
 export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete, onCancel }) => {
-	const [state, setState] = useState<ViewState>('loading');
+	const [viewState, setViewState] = useState<ViewState>('loading');
 	const [currentConfig, setCurrentConfig] = useState({ name: '', organization: '' });
 	const [newName, setNewName] = useState('');
 	const [newOrg, setNewOrg] = useState('');
 	const [error, setError] = useState<string | null>(null);
 
-	// Handle escape key to cancel
+	// Handle escape and enter keys
 	useInput((input, key) => {
-		if (key.escape && state !== 'executing' && state !== 'complete') {
+		if (key.escape && viewState !== 'executing' && viewState !== 'complete') {
 			onCancel();
+		} else if (key.return && viewState === 'complete') {
+			onComplete();
 		}
 	});
 
@@ -35,7 +40,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 				setCurrentConfig(config);
 				setNewName(config.name);
 				setNewOrg(config.organization);
-				setState('prompt-name');
+				setViewState('prompt-name');
 			} catch (err) {
 				setError(err instanceof Error ? err.message : 'Failed to load config');
 			}
@@ -47,43 +52,41 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 
 	const handleNameSubmit = (value: string) => {
 		setNewName(value || currentConfig.name);
-		setState('prompt-org');
+		setViewState('prompt-org');
 	};
 
 	const handleOrgSubmit = (value: string) => {
 		setNewOrg(value || currentConfig.organization);
-		setState('confirm');
+		setViewState('confirm');
 	};
 
-	const handleConfirm = () => {
-		setState('executing');
+	const handleConfirm = async () => {
+		// Show spinner immediately
+		setViewState('executing');
 
-		setTimeout(async () => {
-			try {
-				updateProjectConfig({ name: newName, organization: newOrg });
+		try {
+			updateProjectConfig({ name: newName, organization: newOrg });
 
-				if (newOrg && newOrg.trim() !== '') {
-					await setProgressComplete('project', 'renameOrg');
-				}
-
-				if (newName !== currentConfig.name) {
-					renameProject(currentConfig.name, newName);
-				}
-
-				if (newName && newName.trim() !== '') {
-					await setProgressComplete('project', 'renameProject');
-				}
-
-				setState('running-setup');
-				execSync('bun run setup', { stdio: 'pipe' });
-				await setProgressComplete('project', 'setup');
-
-				setState('complete');
-				setTimeout(() => onComplete(), 2000);
-			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to update config');
+			if (newOrg && newOrg.trim() !== '') {
+				await setProgressComplete('project', 'renameOrg');
 			}
-		}, 100);
+
+			if (newName !== currentConfig.name) {
+				renameProject(currentConfig.name, newName);
+			}
+
+			if (newName && newName.trim() !== '') {
+				await setProgressComplete('project', 'renameProject');
+			}
+
+			setViewState('running-setup');
+			execSync('bun run setup', { stdio: 'pipe' });
+			await setProgressComplete('project', 'setup');
+
+			setViewState('complete');
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Failed to update config');
+		}
 	};
 
 	if (error) {
@@ -97,7 +100,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'loading') {
+	if (viewState === 'loading') {
 		return (
 			<Box padding={1}>
 				<Text>Loading current configuration...</Text>
@@ -105,7 +108,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'prompt-name') {
+	if (viewState === 'prompt-name') {
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Box marginBottom={1}>
@@ -130,7 +133,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'prompt-org') {
+	if (viewState === 'prompt-org') {
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Box marginBottom={1}>
@@ -155,7 +158,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'confirm') {
+	if (viewState === 'confirm') {
 		const nameChanging = newName !== currentConfig.name;
 		const orgChanging = newOrg !== currentConfig.organization;
 		const anyChanges = nameChanging || orgChanging;
@@ -196,7 +199,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'executing') {
+	if (viewState === 'executing') {
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Text>
@@ -206,7 +209,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'running-setup') {
+	if (viewState === 'running-setup') {
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Text color="green">✓ Configuration updated</Text>
@@ -217,11 +220,14 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 		);
 	}
 
-	if (state === 'complete') {
+	if (viewState === 'complete') {
 		return (
 			<Box flexDirection="column" padding={1}>
 				<Text color="green">✓ Configuration complete!</Text>
 				<Text color="green">✓ Docker started with new project names</Text>
+				<Box marginTop={1}>
+					<Text dimColor>{prompt(['enter'])}</Text>
+				</Box>
 			</Box>
 		);
 	}

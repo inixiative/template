@@ -42,11 +42,22 @@ Split schema in `packages/db/prisma/schema/`:
 packages/db/prisma/
 ├── schema/           # One file per model
 │   ├── user.prisma
+│   ├── account.prisma
+│   ├── authProvider.prisma
 │   ├── organization.prisma
+│   ├── organizationUser.prisma
+│   ├── space.prisma
+│   ├── spaceUser.prisma
+│   ├── token.prisma
+│   ├── webhookSubscription.prisma
+│   ├── inquiry.prisma
+│   ├── customer.prisma
 │   └── ...
 ├── seed.ts           # Seed script
 └── seeds/            # Seed data files
 ```
+
+**For model definitions and relationships:** See the schema files directly at `packages/db/prisma/schema/`. Each file is self-documenting with Prisma schema syntax.
 
 ### Generator Output
 
@@ -682,122 +693,33 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.
 
 ---
 
-## Additional Models
+## Schema Reference
 
-### Space
+For complete model definitions, relationships, and fields, see the schema files directly:
 
-Flexible container within organizations (e.g., initiatives, projects, storefronts).
+**Location:** `packages/db/prisma/schema/`
 
-```prisma
-model Space {
-  id              String   @id
-  createdAt       DateTime
-  updatedAt       DateTime
-  deletedAt       DateTime?
+**Core Models:**
+- `user.prisma` - User accounts and authentication
+- `account.prisma` - BetterAuth account data (passwords, OAuth)
+- `authProvider.prisma` - Multi-provider auth configuration (OAuth/SAML)
+- `organization.prisma` - Multi-tenant organizations
+- `organizationUser.prisma` - Organization memberships and roles
+- `space.prisma` - Flexible containers within organizations
+- `spaceUser.prisma` - Space memberships (requires organization membership)
+- `token.prisma` - API tokens (user/org/space scoped)
+- `webhookSubscription.prisma` - Webhook configurations
+- `inquiry.prisma` - False polymorphic inquiry system
+- `customer.prisma` - Customer references
 
-  name            String
-  slug            String
+**Communications:**
+- See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models
 
-  organizationId  String
-  organization    Organization @relation(...)
+Each schema file is self-documenting with:
+- Model definitions
+- Field types and constraints
+- Relations and foreign keys
+- Unique constraints and indexes
+- Enums and their values
 
-  // Relations
-  spaceUsers      SpaceUser[]
-  tokens          Token[]
-  webhookSubscriptions WebhookSubscription[]
-  emailComponents EmailComponent[]
-  emailTemplates  EmailTemplate[]
-  customerRefs    CustomerRef[]   // As provider
-  providerRefs    CustomerRef[]   // As customer
-  inquiriesSent   Inquiry[]
-  inquiriesReceived Inquiry[]
-
-  @@unique([organizationId, slug])
-}
-```
-
-### SpaceUser
-
-Staff with role-based access to a Space. Requires user to be an OrganizationUser first.
-
-```prisma
-model SpaceUser {
-  id              String   @id
-  createdAt       DateTime
-  updatedAt       DateTime
-
-  role            Role   // owner, admin, member, viewer
-  entitlements    Json?  // Fine-grained permission overrides at space level
-
-  organizationId  String
-  spaceId         String
-  userId          String
-
-  // Composite FK ensures user is OrganizationUser first
-  organizationUser OrganizationUser @relation(fields: [organizationId, userId], ...)
-  organization    Organization
-  space           Space
-  user            User
-  tokens          Token[]
-
-  @@unique([organizationId, spaceId, userId])
-}
-```
-
-### CustomerRef
-
-Polymorphic customer relationship using false polymorphism. Links customers (User, Org, or Space) to providers (Space).
-
-```prisma
-model CustomerRef {
-  id              String   @id
-  createdAt       DateTime
-  updatedAt       DateTime
-
-  // Customer side (who is the customer)
-  customerModel   CustomerModel   // User, Organization, Space
-  customerUserId          String?
-  customerOrganizationId  String?
-  customerSpaceId         String?
-
-  // Provider side (who is the provider)
-  providerModel   ProviderModel   // Space
-  providerSpaceId String?
-
-  // Relations
-  customerUser         User?
-  customerOrganization Organization?
-  customerSpace        Space?
-  providerSpace        Space?
-}
-
-enum CustomerModel {
-  User
-  Organization
-  Space
-}
-
-enum ProviderModel {
-  Space
-}
-```
-
-### EmailTemplate & EmailComponent
-
-See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for full documentation.
-
-Key enums:
-
-```prisma
-enum CommunicationCategory {
-  system        // OTP, password reset - cannot unsubscribe
-  promotional   // Marketing - can unsubscribe
-}
-
-enum EmailOwnerModel {
-  default       // Base templates - read: all, write: super admin
-  admin         // Platform internal - super admin only
-  Organization  // Tenant-branded
-  Space         // Space-specific overrides
-}
-```
+**Why schema files over docs?** Schema files are the source of truth and stay in sync automatically. Duplicating schema definitions in documentation creates a maintenance burden.

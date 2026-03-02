@@ -41,10 +41,6 @@ export const retryWithTimeout = async <T>(
 				throw new Error(`${timeoutMessage}: ${error.message}`);
 			}
 
-			// Log retry attempt
-			console.log(`   Retry ${attempt + 1}/${maxRetries}: ${error.message}`);
-			console.log(`   Waiting ${delayMs}ms before next attempt...`);
-
 			// Wait before next retry
 			await new Promise((resolve) => setTimeout(resolve, delayMs));
 		}

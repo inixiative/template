@@ -7,6 +7,7 @@ import {
 	checkPlanetScaleSessionAsync,
 	checkVercelSessionAsync,
 	checkRailwaySessionAsync,
+	checkGitHubSessionAsync,
 	checkDockerRunningAsync,
 } from '../utils/checkPrerequisites';
 
@@ -29,6 +30,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 	// Individual state variables for each check
 	const [bunCLI, setBunCLI] = useState<Check>(DEFAULT_CHECK());
 	const [gitCLI, setGitCLI] = useState<Check>(DEFAULT_CHECK());
+	const [ghCLI, setGhCLI] = useState<Check>(DEFAULT_CHECK());
 	const [dockerCLI, setDockerCLI] = useState<Check>(DEFAULT_CHECK());
 	const [infisicalCLI, setInfisicalCLI] = useState<Check>(DEFAULT_CHECK());
 	const [pscaleCLI, setPscaleCLI] = useState<Check>(DEFAULT_CHECK());
@@ -40,12 +42,14 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 	const [pscaleSession, setPscaleSession] = useState<Check>(DEFAULT_CHECK());
 	const [vercelSession, setVercelSession] = useState<Check>(DEFAULT_CHECK());
 	const [railwaySession, setRailwaySession] = useState<Check>(DEFAULT_CHECK());
+	const [ghSession, setGhSession] = useState<Check>(DEFAULT_CHECK());
 
 	// Memoized completion checks
 	const allDone = useMemo(
 		() =>
 			bunCLI.status !== 'pending' && bunCLI.status !== 'checking' &&
 			gitCLI.status !== 'pending' && gitCLI.status !== 'checking' &&
+			ghCLI.status !== 'pending' && ghCLI.status !== 'checking' &&
 			dockerCLI.status !== 'pending' && dockerCLI.status !== 'checking' &&
 			dockerRunning.status !== 'pending' && dockerRunning.status !== 'checking' &&
 			infisicalCLI.status !== 'pending' && infisicalCLI.status !== 'checking' &&
@@ -55,14 +59,16 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 			infisicalSession.status !== 'pending' && infisicalSession.status !== 'checking' &&
 			pscaleSession.status !== 'pending' && pscaleSession.status !== 'checking' &&
 			vercelSession.status !== 'pending' && vercelSession.status !== 'checking' &&
-			railwaySession.status !== 'pending' && railwaySession.status !== 'checking',
-		[bunCLI, gitCLI, dockerCLI, dockerRunning, infisicalCLI, pscaleCLI, vercelCLI, railwayCLI, infisicalSession, pscaleSession, vercelSession, railwaySession]
+			railwaySession.status !== 'pending' && railwaySession.status !== 'checking' &&
+			ghSession.status !== 'pending' && ghSession.status !== 'checking',
+		[bunCLI, gitCLI, ghCLI, dockerCLI, dockerRunning, infisicalCLI, pscaleCLI, vercelCLI, railwayCLI, infisicalSession, pscaleSession, vercelSession, railwaySession, ghSession]
 	);
 
 	const allPassed = useMemo(
 		() =>
 			bunCLI.status === 'success' &&
 			gitCLI.status === 'success' &&
+			ghCLI.status === 'success' &&
 			dockerCLI.status === 'success' &&
 			dockerRunning.status === 'success' &&
 			infisicalCLI.status === 'success' &&
@@ -72,8 +78,9 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 			vercelCLI.status === 'success' &&
 			vercelSession.status === 'success' &&
 			railwayCLI.status === 'success' &&
-			railwaySession.status === 'success',
-		[bunCLI, gitCLI, dockerCLI, dockerRunning, infisicalCLI, pscaleCLI, vercelCLI, railwayCLI, infisicalSession, pscaleSession, vercelSession, railwaySession]
+			railwaySession.status === 'success' &&
+			ghSession.status === 'success',
+		[bunCLI, gitCLI, ghCLI, dockerCLI, dockerRunning, infisicalCLI, pscaleCLI, vercelCLI, railwayCLI, infisicalSession, pscaleSession, vercelSession, railwaySession, ghSession]
 	);
 
 	// Fire off all checks on mount
@@ -94,6 +101,26 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 				status: result.installed ? 'success' : 'failed',
 				version: result.version,
 			});
+		});
+
+		// GitHub CLI → Session
+		setGhCLI({ status: 'checking' });
+		checkCLIAsync('GitHub CLI', 'gh', '--version').then(async (result) => {
+			setGhCLI({
+				status: result.installed ? 'success' : 'failed',
+				version: result.version,
+			});
+
+			if (result.installed) {
+				setGhSession({ status: 'checking' });
+				const sessionResult = await checkGitHubSessionAsync();
+				setGhSession({
+					status: sessionResult.loggedIn ? 'success' : 'failed',
+					user: sessionResult.user,
+				});
+			} else {
+				setGhSession({ status: 'failed' });
+			}
 		});
 
 		setDockerCLI({ status: 'checking' });
@@ -236,6 +263,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 				<Text dimColor>Required CLIs:</Text>
 				<Box marginLeft={2}>{renderCheck(bunCLI, 'Bun')}</Box>
 				<Box marginLeft={2}>{renderCheck(gitCLI, 'Git')}</Box>
+				<Box marginLeft={2}>{renderCheck(ghCLI, 'GitHub CLI')}</Box>
 				<Box marginLeft={2}>{renderCheck(dockerCLI, 'Docker')}</Box>
 				<Box marginLeft={2}>{renderCheck(infisicalCLI, 'Infisical CLI')}</Box>
 				<Box marginLeft={2}>{renderCheck(pscaleCLI, 'PlanetScale CLI')}</Box>
@@ -246,6 +274,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
 			<Box flexDirection="column" marginBottom={1}>
 				<Text dimColor>Docker & Sessions:</Text>
 				<Box marginLeft={2}>{renderCheck(dockerRunning, 'Docker Daemon')}</Box>
+				<Box marginLeft={2}>{renderCheck(ghSession, 'GitHub')}</Box>
 				<Box marginLeft={2}>{renderCheck(infisicalSession, 'Infisical')}</Box>
 				<Box marginLeft={2}>{renderCheck(pscaleSession, 'PlanetScale')}</Box>
 				<Box marginLeft={2}>{renderCheck(vercelSession, 'Vercel')}</Box>

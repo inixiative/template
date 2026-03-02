@@ -166,3 +166,4 @@ apps/web/app.config.timestamp_*.js
 **/routeTree.gen.ts
 **/*.gen.ts
 **/*.generated.ts
+.vercel

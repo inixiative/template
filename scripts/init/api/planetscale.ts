@@ -1,11 +1,13 @@
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { getSecret } from '../tasks/infisicalSetup';
 import { getProjectConfig } from '../utils/getProjectConfig';
+
+const execAsync = promisify(exec);
 
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 
 type PlanetScaleOrganization = {
-	id: string;
 	name: string;
 	slug?: string;
 };
@@ -95,12 +97,11 @@ const planetscaleFetch = async <T>(
  * Uses CLI (pscale) instead of API since we may not have a service token yet
  */
 export const listOrganizations = async (): Promise<PlanetScaleOrganization[]> => {
-	const output = execSync('pscale org list --format json', { encoding: 'utf-8' });
-	const orgs = JSON.parse(output);
+	const { stdout } = await execAsync('pscale org list --format json', { encoding: 'utf-8' });
+	const orgs = JSON.parse(stdout);
 
 	// Map CLI response to our Organization type
 	return orgs.map((org: any) => ({
-		id: org.id,
 		name: org.name,
 		slug: org.slug,
 	}));
@@ -110,8 +111,8 @@ export const listOrganizations = async (): Promise<PlanetScaleOrganization[]> =>
  * List available regions for an organization
  */
 export const listRegions = async (organizationName: string): Promise<PlanetScaleRegion[]> => {
-	const output = execSync(`pscale region list --org ${organizationName} --format json`, { encoding: 'utf-8' });
-	const regions = JSON.parse(output);
+	const { stdout } = await execAsync(`pscale region list --org ${organizationName} --format json`, { encoding: 'utf-8' });
+	const regions = JSON.parse(stdout);
 
 	// Map CLI response to our Region type
 	return regions.map((region: any) => ({
@@ -164,11 +165,11 @@ export const getDatabase = async (
 	organizationName: string,
 	databaseName: string
 ): Promise<PlanetScaleDatabase> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale database show ${databaseName} --org ${organizationName} --format json`,
 		{ encoding: 'utf-8' }
 	);
-	return JSON.parse(output);
+	return JSON.parse(stdout);
 };
 
 /**
@@ -217,11 +218,11 @@ export const createBranch = async (
 	parentBranch?: string
 ): Promise<PlanetScaleBranch> => {
 	const parentFlag = parentBranch ? `--from ${parentBranch}` : '';
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale branch create ${databaseName} ${branchName} --org ${organizationName} ${parentFlag} --format json`,
 		{ encoding: 'utf-8' }
 	);
-	return JSON.parse(output);
+	return JSON.parse(stdout);
 };
 
 /**
@@ -233,11 +234,11 @@ export const getBranch = async (
 	databaseName: string,
 	branchName: string
 ): Promise<PlanetScaleBranch> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale branch show ${databaseName} ${branchName} --org ${organizationName} --format json`,
 		{ encoding: 'utf-8' }
 	);
-	return JSON.parse(output);
+	return JSON.parse(stdout);
 };
 
 /**
@@ -263,11 +264,11 @@ export const createRole = async (
 	branchName: string,
 	roleName: string
 ): Promise<PlanetScalePassword> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale role create ${databaseName} ${branchName} ${roleName} --org ${organizationName} --inherited-roles postgres --format json`,
 		{ encoding: 'utf-8' }
 	);
-	const result = JSON.parse(output);
+	const result = JSON.parse(stdout);
 
 	const host = result.hostname || result.access_host_url || 'aws.connect.psdb.cloud';
 	const connectionString = `postgresql://${result.username}:${result.password}@${host}:5432/postgres`;
@@ -293,11 +294,11 @@ export const createPassword = async (
 	branchName: string,
 	passwordName: string
 ): Promise<PlanetScalePassword> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale password create ${databaseName} ${branchName} ${passwordName} --org ${organizationName} --format json`,
 		{ encoding: 'utf-8' }
 	);
-	const result = JSON.parse(output);
+	const result = JSON.parse(stdout);
 
 	const host = result.hostname || result.access_host_url || 'aws.connect.psdb.cloud';
 	const connectionString = `postgresql://${result.username}:${result.plain_text}@${host}:5432/postgres`;
@@ -336,11 +337,11 @@ export const promoteBranch = async (
 	databaseName: string,
 	branchName: string
 ): Promise<PlanetScaleBranch> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale branch promote ${databaseName} ${branchName} --org ${organizationName} --format json`,
 		{ encoding: 'utf-8' }
 	);
-	return JSON.parse(output);
+	return JSON.parse(stdout);
 };
 
 /**
@@ -374,7 +375,7 @@ export const deleteBranch = async (
 	databaseName: string,
 	branchName: string
 ): Promise<void> => {
-	execSync(
+	await execAsync(
 		`pscale branch delete ${databaseName} ${branchName} --org ${organizationName} --force`,
 		{ encoding: 'utf-8' }
 	);
@@ -391,12 +392,12 @@ type ServiceToken = {
 export const createServiceToken = async (
 	orgName: string
 ): Promise<ServiceToken> => {
-	const output = execSync(
+	const { stdout } = await execAsync(
 		`pscale service-token create --org ${orgName} --format json`,
 		{ encoding: 'utf-8' }
 	);
 
-	const result = JSON.parse(output);
+	const result = JSON.parse(stdout);
 	return {
 		id: result.id,
 		token: result.token,

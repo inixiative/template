@@ -126,7 +126,7 @@ Examples:
 | **Turborepo** | [TURBOREPO.md](docs/claude/TURBOREPO.md) | Task orchestration, watch mode, caching, naming conventions |
 | **Docker** | [DOCKER.md](docs/claude/DOCKER.md) | Local Postgres/Redis, docker-compose |
 | **Scripts** | [SCRIPTS.md](docs/claude/SCRIPTS.md) | Commands, script locations |
-| **Environments** | [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md) | Env vars, Doppler, with-env composition |
+| **Environments** | [ENVIRONMENTS.md](docs/claude/ENVIRONMENTS.md) | Env vars, Infisical, with-env composition |
 | **CI/CD** | [CICD.md](docs/claude/CICD.md) | Pipelines, deployment (stub) |
 | **Documentation** | [DOCUMENTATION.md](docs/claude/DOCUMENTATION.md) | Doc workflow, RAW_NOTES → sorted docs |
 

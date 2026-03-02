@@ -55,6 +55,85 @@ This plan implements an automated `bun run init` script that reduces this to ~10
 - Includes progress tracking, DNS setup, production deployment
 - Very comprehensive scope
 
+## Resource Naming Conventions
+
+All Railway services and resources follow the pattern: **`{project}-{env}-{app}`**
+
+This ensures consistent, searchable naming across all cloud resources with clear project ownership.
+
+### Format
+
+```
+{project}-{env}-{app}
+```
+
+### Components
+
+- **`{project}`**: Project name from init config (e.g., "template", "myapp")
+- **`{env}`**: Environment identifier
+  - `prod` - Production environment
+  - `staging` - Staging environment
+- **`{app}`**: Application/service type
+  - `api` - API server
+  - `worker` - Background job worker
+  - `redis` - Redis database
+
+### Examples
+
+**API Services:**
+- `template-prod-api`
+- `template-staging-api`
+- `myapp-prod-api`
+- `myapp-staging-api`
+
+**Worker Services:**
+- `template-prod-worker`
+- `template-staging-worker`
+
+**Redis Services:**
+- `template-prod-redis`
+- `template-staging-redis`
+
+**Redis Volumes:**
+- `template-prod-redis-data`
+- `template-staging-redis-data`
+
+**Infisical Syncs:**
+- `template-prod-api` (syncs to Railway API service)
+- `template-staging-api`
+
+### Benefits
+
+1. **Clear Ownership**: Project name prefix makes it obvious which resources belong to which project
+2. **Consistent Ordering**: Always project → environment → app (no mixing `app-env` and `env-app`)
+3. **Searchable**: Easy to filter Railway dashboard by project (`template-*`)
+4. **Scalable**: Supports multiple projects in the same Railway workspace
+5. **No Conflicts**: Project prefix prevents name collisions between projects
+
+### Implementation
+
+All service names in `/scripts/init/tasks/railwaySetup.ts` use dynamic template literals:
+
+```typescript
+// API service creation
+`${configProjectName}-prod-api`
+`${configProjectName}-staging-api`
+
+// Worker service creation
+`${configProjectName}-prod-worker`
+`${configProjectName}-staging-worker`
+
+// Redis service naming
+`${configProjectName}-prod-redis`
+`${configProjectName}-staging-redis`
+
+// Volume naming
+`${configProjectName}-prod-redis-data`
+`${configProjectName}-staging-redis-data`
+```
+
+This ensures names are always generated dynamically based on the user's project name from init config.
+
 ## Proposed Design
 
 ### Commands
@@ -808,7 +887,7 @@ async function configureRailway(config: Config): Promise<Partial<Config>> {
   // Show confirmation with sanitized key
   console.log(chalk.green(`\n✓ API key saved: ${'•'.repeat(apiKey.length - 4)}${apiKeyLast4}\n`));
 
-  // Store last 4 digits and flag, actual key goes to Doppler
+  // Store last 4 digits and flag, actual key goes to Infisical
   return {
     services: {
       ...config.services,
@@ -816,7 +895,7 @@ async function configureRailway(config: Config): Promise<Partial<Config>> {
         ...config.services?.render,
         keysConfigured: true,
         apiKeyLast4,
-        dopplerConfigured: false,
+        infisicalConfigured: false,
         localConfigured: false
       }
     }
@@ -921,7 +1000,7 @@ async function replaceInFiles(options: {
 **What this DOESN'T touch (uses PROJECT_NAME instead):**
 - ❌ docker-compose.yml (uses `${PROJECT_NAME:-template}`)
 - ❌ .env* files DATABASE_URL (uses `${PROJECT_NAME}`)
-- ❌ doppler.config.ts (uses `PROJECT_NAME` env var)
+- ❌ infisical.config.ts (uses `PROJECT_NAME` env var)
 - ❌ OTEL_SERVICE_NAME (uses `${PROJECT_NAME}-api`)
 - ❌ Container names, database names, service names (all use env var)
 
@@ -1239,7 +1318,7 @@ const apiService = await renderApi('/services', {
     envVars: [
       { key: 'DATABASE_URL', value: database.connectionString },
       { key: 'REDIS_URL', value: redis.connectionString },
-      // Doppler will provide other secrets
+      // Infisical will provide other secrets
     ],
     autoDeploy: true,
   }
@@ -1666,7 +1745,7 @@ console.log('\n' + boxen(
       "infisicalConfigured": true,
       "localConfigured": true
     },
-    "doppler": {
+    "infisical": {
       "projectConfigured": true,
       "secretsPushed": true,
       "environments": ["dev", "staging", "prod"]
@@ -1898,10 +1977,10 @@ export function isStepComplete(config: Config, stepName: string): boolean {
       return !!config.project.name && !!config.project.domain;
     case 'rename':
       return !!config.project.name; // Rename depends on having project name
-    case 'doppler':
-      return config.services.doppler.projectConfigured;
+    case 'infisical':
+      return config.services.infisical.projectConfigured;
     case 'secrets':
-      return config.services.doppler.secretsPushed;
+      return config.services.infisical.secretsPushed;
     case 'render':
       return !!config.services.render.database?.id;
     case 'sentry':
@@ -2010,7 +2089,7 @@ async function main() {
     { name: 'prerequisites', fn: checkPrerequisites, resumable: false },
     { name: 'configure', fn: () => Promise.resolve(), resumable: true }, // Already done
     { name: 'rename', fn: renameMonorepo, resumable: true },
-    { name: 'doppler', fn: setupDoppler, resumable: true },
+    { name: 'infisical', fn: setupInfisical, resumable: true },
     { name: 'secrets', fn: generateSecrets, resumable: true },
     { name: 'render', fn: provisionRailway, resumable: true },
     { name: 'sentry', fn: setupSentry, resumable: true },
@@ -2059,11 +2138,11 @@ main().catch((error) => {
 - `scripts/init/index.ts` - Entry point (handles init, init:new, init:edit commands)
 
 **Step Implementations:**
-- `scripts/init/steps/01-prerequisites.ts` - Enhanced prereq checks (Doppler CLI required)
+- `scripts/init/steps/01-prerequisites.ts` - Enhanced prereq checks (Infisical CLI required)
 - `scripts/init/steps/02-configure.ts` - Simple TUI with @inquirer/prompts
 - `scripts/init/steps/03-rename.ts` - Surgical rename (packages + imports only, re-runnable)
-- `scripts/init/steps/04-doppler.ts` - Doppler setup FIRST (create project + envs)
-- `scripts/init/steps/05-secrets.ts` - Generate secrets + push to Doppler immediately
+- `scripts/init/steps/04-infisical.ts` - Infisical setup FIRST (create project + envs)
+- `scripts/init/steps/05-secrets.ts` - Generate secrets + push to Infisical immediately
 - `scripts/init/steps/06-render.ts` - Railway service provisioning
 - `scripts/init/steps/07-sentry.ts` - Sentry projects + DSNs
 - `scripts/init/steps/08-email.ts` - Email provider configuration
@@ -2084,7 +2163,7 @@ main().catch((error) => {
 - `scripts/init/utils/validation.ts` - Validation helpers
 - `scripts/init/utils/render.ts` - Railway API client (ofetch)
 - `scripts/init/utils/sentry.ts` - Sentry API client (ofetch)
-- `scripts/init/utils/doppler.ts` - Doppler API client
+- `scripts/init/utils/infisical.ts` - Infisical API client
 
 **Templates:**
 - `scripts/init/templates/INIT_COMPLETE.md.hbs` - Handlebars template
@@ -2144,14 +2223,14 @@ services:
 **scripts/setup/init.sh** - DELETE (replaced by TypeScript implementation)
 
 **scripts/setup/check-prereqs.sh** - ENHANCE:
-- Add Doppler CLI check (required, not optional)
+- Add Infisical CLI check (required, not optional)
 - Add version checks for Bun (1.0+), Docker (20.10+)
 - Add git clean check
 
 ### Files Referenced (Reuse As-Is)
 
 - `scripts/setup/sync-env.sh` - Copy .env.example → .env.local
-- `scripts/setup/dopplerSetup.ts` - Create Doppler project + environments
+- `scripts/setup/infisicalSetup.ts` - Create Infisical project + environments
 - `scripts/setup/wait-postgres.sh` - Wait for PostgreSQL ready
 - `scripts/setup/wait-redis.sh` - Wait for Redis ready
 
@@ -2185,21 +2264,21 @@ services:
    - `validation.ts` - Health checks (DB, Redis, Sentry connectivity)
    - `render.ts` - Railway API client (ofetch wrapper)
    - `sentry.ts` - Sentry API client (ofetch wrapper)
-   - `doppler.ts` - Doppler API client
+   - `infisical.ts` - Infisical API client
    - `prompt.ts` - @inquirer/prompts wrappers (simple TUI helpers)
 
 5. **Implement All Steps** (01-15)
-   - 01: Prerequisites (Doppler CLI required, Bun, Docker, Git)
+   - 01: Prerequisites (Infisical CLI required, Bun, Docker, Git)
    - 02: Configuration (simple TUI with sectioned prompts)
    - 03: Rename (surgical: packages + imports only, re-runnable)
-   - 04: Doppler setup (FIRST - create project + environments)
-   - 05: Secrets generation (generate + push to Doppler immediately)
+   - 04: Infisical setup (FIRST - create project + environments)
+   - 05: Secrets generation (generate + push to Infisical immediately)
    - 06: Railway provisioning (database, Redis, API, worker)
    - 07: Sentry setup (4 projects + DSNs)
    - 08: Email provider (optional)
    - 09: OAuth (optional)
    - 10: DNS configuration (instructions + verification)
-   - 11: PROJECT_NAME setup (env files + Doppler)
+   - 11: PROJECT_NAME setup (env files + Infisical)
    - 12: Environment files (sync-env.sh)
    - 13: Database setup (Docker + Prisma + offer push/migrate + seed)
    - 14: Validation (DB, Redis, smoke tests)
@@ -2299,7 +2378,7 @@ bun test scripts/init/integration.test.ts
 5. Wait for provisioning (~10-15 minutes)
 6. Verify:
    - Rename completed (check package.json, imports)
-   - Doppler project created with secrets
+   - Infisical project created with secrets
    - Railway services provisioned (database, Redis, API, worker)
    - Sentry projects created (4 DSNs)
    - Email provider configured (if selected)
@@ -2366,10 +2445,10 @@ This plan evolved based on user feedback. Key architectural changes:
   - Comprehensive structure includes all service credentials
   - Supports editing via `init:edit` command
 
-### 5. Doppler Timing
-- **Original:** Secrets (#4) before Doppler (#5)
-- **Updated:** Doppler (#4) before Secrets (#5)
-  - Rationale: Push secrets to Doppler immediately after generation
+### 5. Infisical Timing
+- **Original:** Secrets (#4) before Infisical (#5)
+- **Updated:** Infisical (#4) before Secrets (#5)
+  - Rationale: Push secrets to Infisical immediately after generation
 
 ### 6. DATABASE_URL & Container Names
 - **Original:** Hardcode replacements in .env files and docker-compose.yml
@@ -2388,9 +2467,9 @@ This plan evolved based on user feedback. Key architectural changes:
 ### 8. Security - API Key Storage
 - **Original:** Store API keys in init-config.json (marked as [REDACTED])
 - **Updated:** NEVER store API keys in config file
-  - Only store boolean flags: `keysConfigured`, `dopplerConfigured`, `localConfigured`
+  - Only store boolean flags: `keysConfigured`, `infisicalConfigured`, `localConfigured`
   - Store non-sensitive metadata: service IDs, URLs, organization names
-  - Store public values: DSNs (already public), connection strings (credentials in Doppler)
+  - Store public values: DSNs (already public), connection strings (credentials in Infisical)
   - Benefits: No secrets at rest in config, safe to commit to version control (with .gitignore)
 
 ### 9. Launch Script (Mode-Based Configuration)
@@ -2491,7 +2570,7 @@ const spaceTypes = await checkbox({
 
 **Allow provisioning in multiple regions:**
 - Railway services in multiple regions
-- Separate Doppler configs per region
+- Separate Infisical configs per region
 - Region-specific environment files
 
 ### 6. CI/CD Integration
@@ -2507,8 +2586,8 @@ const spaceTypes = await checkbox({
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | **Scope** | Full provisioning (local + cloud) | User choice: complete setup in one run |
-| **Doppler** | **REQUIRED** (not optional) | User choice: standardize on Doppler for secrets |
-| **Doppler Timing** | BEFORE secret generation | Secrets pushed immediately after generation |
+| **Infisical** | **REQUIRED** (not optional) | User choice: standardize on Infisical for secrets |
+| **Infisical Timing** | BEFORE secret generation | Secrets pushed immediately after generation |
 | **Implementation** | All at once (not incremental) | User choice: single PR with full feature |
 | **Language** | TypeScript | Better than Bash for complex logic, error handling, type safety |
 | **TUI** | Simple (@inquirer/prompts) | User choice: simple is better than complex (not ink framework) |
@@ -2538,9 +2617,9 @@ const spaceTypes = await checkbox({
 - ✅ DATABASE_URL uses ${PROJECT_NAME} in env files
 
 **Secrets & Configuration:**
-- ✅ Doppler project created BEFORE secret generation
-- ✅ All secrets pushed to Doppler immediately after generation
-- ✅ PROJECT_NAME set in all .env.local files and Doppler environments
+- ✅ Infisical project created BEFORE secret generation
+- ✅ All secrets pushed to Infisical immediately after generation
+- ✅ PROJECT_NAME set in all .env.local files and Infisical environments
 - ✅ init-config.json contains both configuration and progress
 
 **Cloud Services:**
@@ -2574,8 +2653,8 @@ const spaceTypes = await checkbox({
 
 **Security:**
 - ✅ API keys and secrets NEVER stored in init-config.json
-- ✅ Config only contains flags (keysConfigured, dopplerConfigured, localConfigured)
-- ✅ All secrets stored in Doppler and .env.local only
+- ✅ Config only contains flags (keysConfigured, infisicalConfigured, localConfigured)
+- ✅ All secrets stored in Infisical and .env.local only
 - ✅ init:edit re-prompts for API keys (never pre-filled)
 
 **Launch Script (Production Mode Switch):**

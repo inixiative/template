@@ -183,6 +183,12 @@ export const setupInfisical = async (
 				// Suppressed for TUI: console.log('  ✓ Inheritance already configured (skipping)');
 			}
 
+			// Always enforce runtime environment markers used by API/worker.
+			// These are idempotent upserts and keep env behavior consistent across reruns.
+			await setSecretAsync(projectId, 'root', 'NODE_ENV', 'production', '/');
+			await setSecretAsync(projectId, 'prod', 'ENVIRONMENT', 'prod', '/api');
+			await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
+
 			// Step 6: Ensure API auth secrets exist for deploy environments
 			if (!(await isProgressComplete('infisical', 'ensureApiAuthSecrets'))) {
 				for (const env of ['prod', 'staging']) {

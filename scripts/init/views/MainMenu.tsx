@@ -98,6 +98,29 @@ const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; 
 	return { status: 'completed', details };
 };
 
+const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+	const { progress, error } = config.vercel;
+	const completed = Object.values(progress).filter((v) => v === true).length;
+	const total = Object.keys(progress).length;
+
+	const details: string[] = [];
+	if (progress.selectTeam) details.push('Team selected');
+	if (progress.createWebProject) details.push('Web project created');
+	if (progress.createAdminProject) details.push('Admin project created');
+	if (progress.createSuperadminProject) details.push('Superadmin project created');
+	if (progress.linkGitHub) details.push('GitHub linked');
+	if (progress.configureEnvVars) details.push('Environment variables configured');
+	if (progress.deployProduction) details.push('Production deployment complete');
+
+	if (error) {
+		details.push(`Error: ${error}`);
+	}
+
+	if (completed === 0) return { status: 'pending', details: [] };
+	if (completed < total) return { status: 'incomplete', details };
+	return { status: 'completed', details };
+};
+
 const DEFAULT_ITEMS: MenuItem[] = [
 	{ label: '1. Project Configuration', value: 'project-config', status: 'pending' },
 	{ label: '2. Infisical Setup', value: 'infisical', status: 'pending' },
@@ -137,6 +160,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 			const infisicalStatus = getInfisicalStatus(cfg);
 			const planetscaleStatus = getPlanetScaleStatus(cfg);
 			const railwayStatus = getRailwayStatus(cfg);
+			const vercelStatus = getVercelStatus(cfg);
 
 			const updatedItems = [
 				{
@@ -161,7 +185,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 					value: 'railway',
 					status: railwayStatus.status,
 				},
-				{ label: '5. Vercel Setup', value: 'vercel', status: 'pending' },
+				{
+					label: '5. Vercel Setup',
+					value: 'vercel',
+					status: vercelStatus.status,
+					progressDetails: vercelStatus.details,
+				},
 				{ label: '6. Resend Setup', value: 'resend', status: 'pending' },
 				{ label: '7. Optional Integrations', value: 'integrations', status: 'pending' },
 				{ label: '8. DNS Configuration', value: 'dns', status: 'pending' },
@@ -219,7 +248,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 				</Text>
 			</Box>
 
-			<SelectInput key={initialIndex} items={items} itemComponent={itemComponent} onSelect={(item) => onSelectTask(item.value)} initialIndex={initialIndex} />
+			<SelectInput key={initialIndex} items={items} itemComponent={itemComponent} indicatorComponent={() => null} onSelect={(item) => onSelectTask(item.value)} initialIndex={initialIndex} />
 
 			<Box marginTop={1}>
 				<Text dimColor>{prompt(['navigate', 'select'])}</Text>

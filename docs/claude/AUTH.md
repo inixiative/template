@@ -5,7 +5,7 @@
 - [Overview](#overview)
 - [BetterAuth (Session)](#betterauth-session)
 - [OAuth + Bearer Tokens](#oauth--bearer-tokens)
-- [SAML/SSO](#samlsso)
+- [Multi-Provider Authentication (AuthProvider)](#multi-provider-authentication-authprovider)
 - [Token Authentication](#token-authentication)
 - [Token Types](#token-types)
 - [Auth Middleware Chain](#auth-middleware-chain)
@@ -54,6 +54,10 @@ export const auth = betterAuth({
 
   session: {
     expiresIn: 7 * 24 * 60 * 60,  // 7 days
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,  // 5-minute cache window (stateless JWT in cookie)
+    },
   },
 
   user: {
@@ -69,13 +73,28 @@ export const auth = betterAuth({
   plugins: [bearer()],  // Allows session token in Authorization header
 
   secondaryStorage: {
-    // Redis for session storage (faster lookups, distributed)
+    // Redis for frequently-accessed data (permissions, org lists)
+    // NOT primary session storage (uses stateless JWT)
     get: async (key) => { /* redis get */ },
     set: async (key, value, ttl) => { /* redis setex */ },
     delete: async (key) => { /* redis del */ },
   },
 });
 ```
+
+### Session Storage Strategy
+
+Sessions use **stateless JWT tokens** stored in HTTP-only cookies (not database-backed).
+
+- **Primary:** JWT cookie with 5-minute cache window
+- **Secondary:** Redis for frequently-accessed data (permissions, org lists)
+- **Benefit:** Horizontal scaling without session affinity or database lookups
+- **Tradeoff:** 5-minute delay for permission revocation propagation
+
+This means:
+- ✅ No database hit for session validation
+- ✅ Scales horizontally without sticky sessions
+- ⚠️ Permission changes take up to 5 minutes to propagate (cache window)
 
 ### Auth Routes
 
@@ -157,17 +176,131 @@ See [Frontend Auth](#frontend-auth) for frontend implementation details.
 
 ---
 
-## SAML/SSO
+## Multi-Provider Authentication (AuthProvider)
 
-**Status:** Planned (see [AUTH-003 ticket](../../tickets/AUTH-003-saml-sso.md))
+**Status:** ✅ Complete
+**Location:** `apps/api/src/modules/authProvider/`
 
-SAML SSO support using BetterAuth SSO plugin (`@better-auth/sso`):
-- Organization-scoped SAML providers (Okta, Azure AD, OneLogin, etc.)
+The template supports configurable authentication providers at both the platform and organization level, enabling multi-tenant OAuth/SAML configurations.
+
+### Architecture
+
+**Two Provider Types:**
+
+1. **Platform Providers** (`organizationId = null`)
+   - Available to all organizations
+   - Configured by platform administrators
+   - Examples: Google, Microsoft, GitHub
+   - Listed in `apps/api/src/lib/auth/platformProviders.ts`
+
+2. **Organization Providers** (`organizationId != null`)
+   - Organization-specific configurations
+   - Configured by organization administrators
+   - Examples: Custom OAuth apps, SAML/SSO (Okta, Azure AD)
+   - Isolated per organization for security
+
+### Database Schema
+
+```prisma
+model AuthProvider {
+  id               AuthProviderId
+  organizationId   OrganizationId?  // null = platform, set = organization
+
+  name             String            // Display name
+  provider         AuthProviderType  // GOOGLE | MICROSOFT | GITHUB | OKTA | SAML
+  config           Json              // Provider configuration
+  encryptedData    Json              // Encrypted secrets (client secret, certs)
+  encryptionVersion Int              // Key rotation support
+  enabled          Boolean           // Toggle on/off
+
+  organization     Organization?
+  @@unique([organizationId, name])
+}
+```
+
+### Encryption
+
+**All sensitive data is encrypted** using AES-256-GCM:
+
+```typescript
+import { encryptionService } from '@template/shared/lib/encryption';
+
+// Encrypt secrets
+const { encryptedData, version } = encryptionService.encrypt(
+  { clientSecret: 'secret', certificate: 'cert' },
+  `authProvider:${providerId}`,  // AAD binds ciphertext to context
+);
+
+// Decrypt
+const secrets = encryptionService.decrypt(
+  encryptedData,
+  `authProvider:${providerId}`,
+  version,
+);
+```
+
+**Security Features:**
+- AES-256-GCM authenticated encryption
+- Additional Authenticated Data (AAD) prevents tampering
+- Key versioning supports rotation without downtime
+
+### API Endpoints
+
+**Organization-scoped (Org Admins):**
+```
+POST   /organizations/:id/auth-providers      # Create provider
+GET    /organizations/:id/auth-providers      # List org providers
+PATCH  /auth-providers/:id                    # Update provider
+DELETE /auth-providers/:id                    # Delete provider
+GET    /auth-providers                        # List available providers
+```
+
+**Platform-wide (Superadmins):**
+```
+GET    /admin/auth-providers                  # List all providers
+```
+
+### Example: Organization OAuth
+
+```typescript
+// Create custom Google OAuth for organization
+POST /organizations/{orgId}/auth-providers
+{
+  "name": "Acme Google SSO",
+  "provider": "GOOGLE",
+  "config": {
+    "clientId": "123456.apps.googleusercontent.com",
+    "redirectUri": "https://acme.example.com/auth/callback",
+    "allowedDomains": ["acme.com"]  // Optional domain restriction
+  },
+  "secrets": {
+    "clientSecret": "GOCSPX-xxxxx"  // Encrypted before storage
+  }
+}
+```
+
+### Provider Types
+
+```typescript
+enum AuthProviderType {
+  GOOGLE      // Google OAuth
+  MICROSOFT   // Microsoft/Azure AD OAuth
+  GITHUB      // GitHub OAuth
+  OKTA        // Okta SAML/OAuth
+  SAML        // Generic SAML
+}
+```
+
+### SAML/SSO Status
+
+**Schema ready**, **encryption ready**, **API complete**.
+
+SAML integration requires:
+- BetterAuth SAML plugin integration (in progress)
+- SAML metadata parsing
 - JIT (Just-In-Time) user provisioning
-- Encrypted certificate storage
-- Bearer token integration (same as OAuth)
 
-**Implementation pending** - architecture designed, awaiting BetterAuth SAML plugin maturity.
+See [AUTH-003 ticket](../../tickets/AUTH-003-saml-sso.md) for SAML implementation timeline.
 
 ---
 
@@ -423,7 +556,7 @@ export async function spoofMiddleware(c: Context<AppEnv>, next: Next) {
   const user = c.get('user');
   if (!user || !isSuperadmin(c)) return next();
 
-  const rawEmail = c.req.header('spoof-user-email');
+  const rawEmail = c.req.header('x-spoof-user-email');
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
@@ -446,7 +579,7 @@ export async function spoofMiddleware(c: Context<AppEnv>, next: Next) {
 
 ```bash
 curl -H "Cookie: <session>" \
-     -H "spoof-user-email: target@example.com" \
+     -H "x-spoof-user-email: target@example.com" \
      https://api.example.com/api/v1/me
 ```
 

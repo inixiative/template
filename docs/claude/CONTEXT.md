@@ -80,6 +80,8 @@ type AppVars = {
   requestId: string;
   resource: unknown;
   resourceType: string | null;
+  bracketQuery: Record<string, any>;
+  searchableFields: string[] | null;
 };
 
 type AppEnv = { Variables: AppVars };
@@ -98,6 +100,8 @@ type AppEnv = { Variables: AppVars };
 | `session` | `Session \| null` | BetterAuth session |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
+| `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
+| `searchableFields` | `string[] \| null` | Fields for full-text search (set by route) |
 | `permix` | `Permix` | Permission checker instance |
 | `requestId` | `string` | UUID for request tracing |
 | `resource` | `unknown` | Loaded resource from `:id` param |
@@ -111,6 +115,15 @@ Located in `apps/api/src/middleware/prepareRequest.ts`. Runs first on every requ
 
 ```typescript
 export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
+  const isBatch = c.req.path === '/api/batch';
+
+  // Batch requests: minimal context setup (full setup happens per sub-request)
+  if (isBatch) {
+    c.set('db', db);
+    await next();
+    return;
+  }
+
   const requestId = crypto.randomUUID();
 
   // Database client
@@ -119,6 +132,9 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Request tracing
   c.set('requestId', requestId);
   c.header('request-id', requestId);
+
+  // Parse bracket query params (?filter[role]=admin → { filter: { role: 'admin' } })
+  c.set('bracketQuery', parseBracketQuery(c.req.query()));
 
   // Fresh permission instance per request
   c.set('permix', createPermissions());
@@ -138,6 +154,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
+  c.set('searchableFields', null);  // Set by route templates
 
   // Wrap in database scope for logging/tracing
   await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
@@ -215,9 +232,62 @@ const spaceUsers = c.get('spaceUsers');        // SpaceUser[] | null
 const spaces = c.get('spaces');                // Space[] | null
 const requestId = c.get('requestId');          // string
 const db = c.get('db');                        // Db
+const bracketQuery = c.get('bracketQuery');    // Record<string, any>
+const searchableFields = c.get('searchableFields');  // string[] | null
 ```
 
 **Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
+
+#### bracketQuery
+
+**Purpose:** Parsed URL search parameters using bracket notation for Prisma-style queries.
+
+**Example:**
+```typescript
+// URL: /api/users?filter[role]=admin&filter[status]=active&sort[name]=asc
+
+const bracketQuery = c.get('bracketQuery');
+// { filter: { role: 'admin', status: 'active' }, sort: { name: 'asc' } }
+
+// Use directly in Prisma query
+const users = await db.user.findMany({
+  where: bracketQuery.filter || {},
+  orderBy: bracketQuery.sort || {},
+});
+```
+
+**Common patterns:**
+- `?filter[field]=value` → `{ filter: { field: 'value' } }`
+- `?sort[field]=asc` → `{ sort: { field: 'asc' } }`
+- `?include[relation]=true` → `{ include: { relation: true } }`
+
+#### searchableFields
+
+**Purpose:** Fields to search when `?search=query` parameter is provided.
+
+**Set by:** Route templates via `buildRequest()` in route definition
+
+**Example:**
+```typescript
+// Route definition
+export const usersReadMany = readRoute({
+  path: '/users',
+  tags: ['users'],
+  searchableFields: ['name', 'email'],  // ← Set here
+});
+
+// Controller
+const search = c.req.query('search');
+const searchableFields = c.get('searchableFields');
+
+if (search && searchableFields) {
+  where.OR = searchableFields.map(field => ({
+    [field]: { contains: search, mode: 'insensitive' },
+  }));
+}
+```
+
+**Used in:** `readManyTemplate` controllers automatically apply this pattern for list endpoints.
 
 ### Context Types
 

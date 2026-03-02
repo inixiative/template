@@ -98,8 +98,12 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 		if (key.escape) {
 			onCancel();
 		} else if (key.return) {
-			// Enter: Run setup or Continue
-			handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			// Enter: Complete, Continue, or Run setup
+			if (setupState === 'complete') {
+				onComplete();
+			} else {
+				handleAction(setupState === 'incomplete' ? 'continue' : 'run');
+			}
 		} else if (input.toLowerCase() === 'r') {
 			// R: Restart
 			handleAction('restart');
@@ -150,6 +154,9 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 	const handleOrgSelect = async (orgId: string) => {
 		if (!config) return;
 
+		// Show loading immediately
+		setRunning(true);
+
 		// Clear if org changed
 		const currentOrg = config.infisical.organizationId;
 		if (currentOrg && currentOrg !== orgId) {
@@ -163,7 +170,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 			await clearConfigError('infisical');
 		}
 
-		// Return to status and run setup
+		// Change to status view and run setup
 		setViewState('status');
 		await runSetup(orgId);
 	};
@@ -176,9 +183,6 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 			// Refresh config to show completed progress (setupState will auto-update via useMemo)
 			await syncConfig();
 			setRunning(false);
-
-			// Auto-return to main menu
-			setTimeout(() => onComplete(), 2000);
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : 'Setup failed';
 			console.error('Setup error:', errorMsg);
@@ -195,6 +199,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 			<OrgSelector
 				organizations={organizations}
 				serviceName="Infisical"
+				loading={running}
 				onSelect={handleOrgSelect}
 				onCancel={onCancel}
 			/>
@@ -269,7 +274,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 							? prompt(['enter', 'cancel'])
 							: setupState === 'incomplete'
 								? prompt(['enter', 'restart', 'cancel'])
-								: `Setup complete! ${prompt(['restart', 'cancel'])}`}
+								: prompt(['enter', 'restart'])}
 					</Text>
 				</Box>
 			)}

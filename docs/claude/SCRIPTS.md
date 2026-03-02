@@ -44,7 +44,6 @@ scripts/
 └── deployment/
     ├── deploy.sh           # Deploy to environment
     ├── with-env.sh         # Run command with env vars
-    ├── (archived)          # Former doppler-env.sh
     └── wait-for-api.sh     # Health check wait
 
 Database utilities (packages/db/prisma/):
@@ -167,6 +166,36 @@ cd apps/api
 bun run lint            # Check src/ only
 bun run lint:fix
 ```
+
+### Lint Check Scripts
+
+Additional checks run after Biome (used in CI, optional pre-commit):
+
+```bash
+# Check import aliases (enforces #/ not ../)
+./scripts/checks/checkImportAliases.sh
+
+# Check generated files are up-to-date
+./scripts/checks/checkGeneratedFiles.sh
+
+# Run all post-Biome checks
+./scripts/checks/runPostBiomeChecks.sh
+```
+
+**checkImportAliases.sh:**
+- Scans TypeScript files for relative imports (`../`)
+- Fails if any internal imports don't use `#/` alias
+- Enforces consistent import style across codebase
+
+**checkGeneratedFiles.sh:**
+- Verifies Prisma client is up-to-date
+- Verifies OpenAPI SDK is up-to-date
+- Fails if `db:generate` or `openapi:generate` need to be run
+
+**runPostBiomeChecks.sh:**
+- Orchestrates all custom checks
+- Used in CI pipeline after Biome
+- Can be added to pre-commit hooks
 
 ---
 

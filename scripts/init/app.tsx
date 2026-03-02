@@ -6,6 +6,7 @@ import { ProjectConfigView } from './views/ProjectConfigView';
 import { InfisicalSetupView } from './views/InfisicalSetupView';
 import { PlanetScaleSetupView } from './views/PlanetScaleSetupView';
 import { RailwaySetupView } from './views/RailwaySetupView';
+import { VercelSetupView } from './views/VercelSetupView';
 import { ConfigProvider } from './utils/configState';
 
 type AppState = 'prerequisites' | 'menu' | 'task';
@@ -63,10 +64,14 @@ export const App: React.FC = () => {
 						{currentTask === 'railway' && (
 							<RailwaySetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
 						)}
+						{currentTask === 'vercel' && (
+							<VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+						)}
 						{currentTask !== 'project-config' &&
 							currentTask !== 'infisical' &&
 							currentTask !== 'planetscale' &&
-							currentTask !== 'railway' && (
+							currentTask !== 'railway' &&
+							currentTask !== 'vercel' && (
 								<Box flexDirection="column">
 									<Text color="yellow">Task: {currentTask}</Text>
 									<Text dimColor>Coming soon...</Text>

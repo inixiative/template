@@ -52,10 +52,14 @@ export type ProjectConfig = {
 		workspaceId: string;
 		prodEnvironmentId: string;
 		stagingEnvironmentId: string;
-		apiServiceId: string;
-		workerServiceId: string;
+		prodApiServiceId: string;
+		stagingApiServiceId: string;
+		prodWorkerServiceId: string;
+		stagingWorkerServiceId: string;
 		prodRedisServiceId: string;
 		stagingRedisServiceId: string;
+		prodRedisVolumeId: string;
+		stagingRedisVolumeId: string;
 		configProjectName: string;
 		progress: {
 			selectWorkspace: boolean;
@@ -63,14 +67,70 @@ export type ProjectConfig = {
 			createProject: boolean;
 			renameProductionEnv: boolean;
 			createStagingEnv: boolean;
-			provisionRedisProd: boolean;
-			provisionRedisStaging: boolean;
+			createRedisProd: boolean;
+			renameRedisProd: boolean;
+			renameRedisProdVolume: boolean;
+			createRedisStaging: boolean;
+			renameRedisStaging: boolean;
+			renameRedisStagingVolume: boolean;
 			storeRedisUrl: boolean;
-			setupInfisicalIntegration: boolean;
-			deployApi: boolean;
+			createInfisicalConnection: boolean;
+			promptedForGithub: boolean;
+			createApiProd: boolean;
+			createInfisicalSyncProd: boolean;
+			connectApiProdGithub: boolean;
+			createApiStaging: boolean;
+			createInfisicalSyncStagingApi: boolean;
+			connectApiStagingGithub: boolean;
 			storeApiUrl: boolean;
-			deployWorker: boolean;
+			createWorkerProd: boolean;
+			connectWorkerProdGithub: boolean;
+			createWorkerStaging: boolean;
+			createInfisicalSyncStagingWorker: boolean;
+			connectWorkerStagingGithub: boolean;
 			verifyDeployment: boolean;
+		};
+		error: string;
+	};
+	vercel: {
+		teamId: string;
+		teamName: string;
+		webProjectId: string;
+		adminProjectId: string;
+		superadminProjectId: string;
+		configProjectName: string;
+		progress: {
+			selectTeam: boolean;
+			promptedForGithub: boolean;
+			// Web app
+			createWebProject: boolean;
+			configureWebRootDirectory: boolean;
+			createWebStagingEnvironment: boolean;
+			linkWebGitHub: boolean;
+			configureWebBranches: boolean;
+			createWebInfisicalSyncProd: boolean;
+			createWebInfisicalSyncStaging: boolean;
+			createWebInfisicalSyncPreview: boolean;
+			// Admin app
+			createAdminProject: boolean;
+			configureAdminRootDirectory: boolean;
+			createAdminStagingEnvironment: boolean;
+			linkAdminGitHub: boolean;
+			configureAdminBranches: boolean;
+			createAdminInfisicalSyncProd: boolean;
+			createAdminInfisicalSyncStaging: boolean;
+			createAdminInfisicalSyncPreview: boolean;
+			// Superadmin app
+			createSuperadminProject: boolean;
+			configureSuperadminRootDirectory: boolean;
+			createSuperadminStagingEnvironment: boolean;
+			linkSuperadminGitHub: boolean;
+			configureSuperadminBranches: boolean;
+			createSuperadminInfisicalSyncProd: boolean;
+			createSuperadminInfisicalSyncStaging: boolean;
+			createSuperadminInfisicalSyncPreview: boolean;
+			// Final
+			deployProduction: boolean;
 		};
 		error: string;
 	};
