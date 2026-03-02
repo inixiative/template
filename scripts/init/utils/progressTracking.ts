@@ -2,7 +2,13 @@ import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
 
 export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway';
 
-export type InfisicalAction = 'selectOrg' | 'createProject' | 'renameEnv' | 'createApps' | 'setInheritance';
+export type InfisicalAction =
+	| 'selectOrg'
+	| 'createProject'
+	| 'renameEnv'
+	| 'createApps'
+	| 'setInheritance'
+	| 'ensureApiAuthSecrets';
 export type ProjectAction = 'renameOrg' | 'renameProject' | 'setup';
 export type PlanetScaleAction =
 	| 'selectOrg'

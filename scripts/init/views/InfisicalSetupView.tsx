@@ -61,12 +61,16 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 			label: 'Folder structure created',
 			completed: progress.createApps
 		},
-		{
-			label: 'Inheritance chains configured',
-			completed: progress.setInheritance
-		},
-	];
-};
+			{
+				label: 'Inheritance chains configured',
+				completed: progress.setInheritance
+			},
+			{
+				label: 'API auth secrets initialized',
+				completed: progress.ensureApiAuthSecrets
+			},
+		];
+	};
 
 export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComplete, onCancel }) => {
 	const { config, syncConfig } = useConfig();

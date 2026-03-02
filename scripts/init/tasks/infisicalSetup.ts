@@ -151,11 +151,11 @@ export const setupInfisical = async (
 			// Suppressed for TUI: console.log('  ✓ Folder structure already created (skipping)');
 		}
 
-		// Step 5: Set up inheritance chains
-		if (!(await isProgressComplete('infisical', 'setInheritance'))) {
-			// Suppressed for TUI: console.log('  • Setting up inheritance chains...');
-			const apps = ['api', 'web', 'admin', 'superadmin'];
-			const envs = ['staging', 'prod'];
+			// Step 5: Set up inheritance chains
+			if (!(await isProgressComplete('infisical', 'setInheritance'))) {
+				// Suppressed for TUI: console.log('  • Setting up inheritance chains...');
+				const apps = ['api', 'web', 'admin', 'superadmin'];
+				const envs = ['staging', 'prod'];
 
 			for (const env of envs) {
 				for (const app of apps) {
@@ -174,13 +174,36 @@ export const setupInfisical = async (
 			}
 
 			// Suppressed for TUI: console.log('    ✓ Inheritance: 12 import chains configured');
-			await setProgressComplete('infisical', 'setInheritance');
-			await onStepComplete?.();
-		} else {
-			// Suppressed for TUI: console.log('  ✓ Inheritance already configured (skipping)');
-		}
+				await setProgressComplete('infisical', 'setInheritance');
+				await onStepComplete?.();
+			} else {
+				// Suppressed for TUI: console.log('  ✓ Inheritance already configured (skipping)');
+			}
 
-		// Suppressed for TUI: console.log('\n✅ Infisical setup complete!');
+			// Step 6: Ensure API auth secrets exist for deploy environments
+			if (!(await isProgressComplete('infisical', 'ensureApiAuthSecrets'))) {
+				for (const env of ['prod', 'staging']) {
+					try {
+						const existing = getSecret('BETTER_AUTH_SECRET', {
+							projectId,
+							environment: env,
+							path: '/api',
+						});
+						if (existing && existing.trim().length >= 32) continue;
+					} catch {
+						// Missing secret is expected on first run.
+					}
+
+					setSecret(projectId, env, 'BETTER_AUTH_SECRET', generateSecret(), '/api');
+				}
+
+				await setProgressComplete('infisical', 'ensureApiAuthSecrets');
+				await onStepComplete?.();
+			} else {
+				// Suppressed for TUI: console.log('  ✓ API auth secrets already configured (skipping)');
+			}
+
+			// Suppressed for TUI: console.log('\n✅ Infisical setup complete!');
 
 		return { projectId, organizationId };
 	} catch (error) {
@@ -195,7 +218,7 @@ export const setupInfisical = async (
  * Generate a secure random secret
  */
 export const generateSecret = (length = 32): string => {
-	return execSync(`openssl rand -base64 ${length}`, { encoding: 'utf-8' }).trim();
+	return execSync(`openssl rand -hex ${length}`, { encoding: 'utf-8' }).trim();
 };
 
 /**

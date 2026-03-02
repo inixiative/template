@@ -34,6 +34,7 @@ const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']
 	if (progress.renameEnv) details.push('Environments configured');
 	if (progress.createApps) details.push('Folder structure created');
 	if (progress.setInheritance) details.push('Inheritance chains configured');
+	if (progress.ensureApiAuthSecrets) details.push('API auth secrets initialized');
 
 	if (error) {
 		details.push(`Error: ${error}`);

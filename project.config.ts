@@ -14,13 +14,14 @@ export const projectConfig = {
 		"organizationSlug": "",
 		"projectSlug": "",
 		"configProjectName": "",
-		"progress": {
-			"selectOrg": false,
-			"createProject": false,
-			"renameEnv": false,
-			"createApps": false,
-			"setInheritance": false
-		},
+			"progress": {
+				"selectOrg": false,
+				"createProject": false,
+				"renameEnv": false,
+				"createApps": false,
+				"setInheritance": false,
+				"ensureApiAuthSecrets": false
+			},
 		"error": ""
 	},
 	"planetscale": {

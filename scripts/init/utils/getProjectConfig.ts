@@ -16,13 +16,14 @@ export type ProjectConfig = {
 		organizationSlug: string;
 		projectSlug: string;
 		configProjectName: string;
-		progress: {
-			selectOrg: boolean;
-			createProject: boolean;
-			renameEnv: boolean;
-			createApps: boolean;
-			setInheritance: boolean;
-		};
+			progress: {
+				selectOrg: boolean;
+				createProject: boolean;
+				renameEnv: boolean;
+				createApps: boolean;
+				setInheritance: boolean;
+				ensureApiAuthSecrets: boolean;
+			};
 		error: string;
 	};
 	planetscale: {
