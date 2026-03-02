@@ -6,8 +6,12 @@
     "packages/*",
     "apps/*"
   ],
+  "packageManager": "bun@1.3.10",
+  "engines": {
+    "bun": "1.3.10"
+  },
   "scripts": {
-    "postinstall": "bun run generate:routes && bun run generate:sdk",
+    "postinstall": "bash ./scripts/postinstall.sh",
     "init": "NODE_ENV=development bun --env-file=.env.init scripts/init/index.tsx",
     "init:agent": "NODE_ENV=development bun --env-file=.env.init scripts/init/agent.ts",
     "setup": "./scripts/setup/setup.sh",
