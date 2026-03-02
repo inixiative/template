@@ -46,16 +46,17 @@ type SetupResult = {
 	stagingRedisUrl: string;
 };
 
-const RAILWAY_BUILD_COMMAND = 'bun install --frozen-lockfile --ignore-scripts';
+const RAILWAY_BUILD_COMMAND =
+	'bun install --frozen-lockfile --ignore-scripts && bun run --cwd packages/db db:generate';
 const API_SERVICE_CONFIG = {
-	rootDirectory: 'apps/api',
+	rootDirectory: '.',
 	buildCommand: RAILWAY_BUILD_COMMAND,
-	startCommand: 'bun run start',
+	startCommand: 'bun run --cwd apps/api start',
 };
 const WORKER_SERVICE_CONFIG = {
-	rootDirectory: 'apps/api',
+	rootDirectory: '.',
 	buildCommand: RAILWAY_BUILD_COMMAND,
-	startCommand: 'bun run start:worker',
+	startCommand: 'bun run --cwd apps/api start:worker',
 };
 
 /**
