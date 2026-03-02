@@ -43,6 +43,7 @@ describe('POST /api/v1/organization', () => {
     expect(response.status).toBe(201);
     expect(data.name).toBe(`Test Org ${seq}`);
     expect(data.slug).toBe(`test-org-${seq}`);
+    expect((data as unknown as { organizationUsers?: unknown[] }).organizationUsers).toBeUndefined();
 
     const orgUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: data.id, userId: user.id } },

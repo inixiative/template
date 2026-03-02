@@ -61,8 +61,8 @@ export const SpaceTokensTab = ({ spaceId }: { spaceId: string }) => {
     console.log('Delete token:', tokenId, 'for space:', spaceId);
   };
 
-  const handleCreate = (name: string) => {
-    console.log('Create token:', name, 'for space:', spaceId);
+  const handleCreate = (data: { name: string; role: string }) => {
+    console.log('Create token:', data.name, 'role:', data.role, 'for space:', spaceId);
   };
 
   return (

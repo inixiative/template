@@ -1,25 +1,26 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { SpaceTheme } from '@template/ui/types';
 
 const themeUrls = ['logo', 'logoDark', 'favicon'];
 
 export const useSpaceTheme = (spaceTheme: SpaceTheme) => {
-  useEffect(() => {
-    // Step 1: Clear ALL --space-* variables (prevents stale vars from previous theme)
-    const style = document.documentElement.style;
-    for (let i = style.length - 1; i >= 0; i--) {
-      const prop = style[i];
-      if (prop?.startsWith('--space-')) {
-        style.removeProperty(prop);
-      }
-    }
+  const previousThemeKeysRef = useRef<Set<string>>(new Set());
 
-    // Step 2: Set only the keys defined in the new theme
+  useEffect(() => {
+    const style = document.documentElement.style;
+
+    // Clear previously applied keys first so stale values cannot persist.
+    for (const key of previousThemeKeysRef.current) {
+      style.removeProperty(`--space-${key}`);
+    }
+    previousThemeKeysRef.current.clear();
+
     if (spaceTheme) {
       Object.entries(spaceTheme).forEach(([key, value]) => {
         if (value) {
           const cssValue = themeUrls.includes(key) ? `url(${value})` : value;
-          document.documentElement.style.setProperty(`--space-${key}`, cssValue);
+          style.setProperty(`--space-${key}`, cssValue);
+          previousThemeKeysRef.current.add(key);
         }
       });
     }

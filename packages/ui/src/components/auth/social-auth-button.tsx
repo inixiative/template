@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@ui/components/button';
+import { Button } from '@template/ui/components/primitives/Button';
 
 interface SocialAuthButtonProps {
   provider: 'google';

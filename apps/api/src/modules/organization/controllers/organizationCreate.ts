@@ -17,17 +17,15 @@ export const organizationCreateController = makeController(organizationCreateRou
       },
     },
     include: {
-      organizationUsers: {
-        where: { userId: user!.id },
-      },
+      organizationUsers: true
     },
   });
 
   const organizationUser = organization.organizationUsers[0];
+  const { organizationUsers: _organizationUsers, ...organizationData } = organization;
 
   return respond.created({
-    ...organization,
+    ...organizationData,
     organizationUser,
-    organizationUsers: undefined,
   });
 });

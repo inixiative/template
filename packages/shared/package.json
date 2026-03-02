@@ -7,14 +7,15 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test": "bun test --concurrency=1",
+    "test:watch": "bun test --concurrency=1 --watch"
   },
   "exports": {
     ".": "./src/index.ts",
     "./utils": "./src/utils/index.ts",
     "./lib": "./src/lib/index.ts",
-    "./logger": "./src/logger/index.ts"
+    "./logger": "./src/logger/index.ts",
+    "./styles/theme.css": "./styles/theme.css"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",

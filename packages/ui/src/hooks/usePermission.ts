@@ -1,5 +1,5 @@
 import type { AccessorName, HydratedRecord } from '@template/db';
-import type { ActionRule } from '@template/permissions';
+import type { ActionRule } from '@template/permissions/rebac/types';
 import type { PermissionsSlice } from '@template/ui/store';
 
 export type PermissionCheck = {

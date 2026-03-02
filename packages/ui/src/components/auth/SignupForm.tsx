@@ -82,8 +82,8 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {error && (
-            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">{error}</div>
+          {displayError && (
+            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">{displayError}</div>
           )}
 
           {showProviders && (
@@ -97,13 +97,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
                       type="button"
                       variant="outline"
                       className="w-full"
-                      onClick={() =>
-                        onSubmit({
-                          type: 'oauth',
-                          provider: provider.provider,
-                          callbackURL: `${window.location.origin}/auth/callback`,
-                        })
-                      }
+                      onClick={() => handleOAuthClick(provider.provider)}
                       disabled={isLoading}
                     >
                       <Icon className="h-4 w-4 mr-2" />

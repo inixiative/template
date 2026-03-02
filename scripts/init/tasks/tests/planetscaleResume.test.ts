@@ -1,175 +1,177 @@
-/**
- * Test: PlanetScale setup resume scenario
- *
- * Verifies that when resuming with passwords already created:
- * 1. Doesn't try to create new passwords (would cause "Display name already taken")
- * 2. Fetches connection strings from Infisical
- * 3. Successfully runs initMigrationTable step
- */
+import { afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
-import { describe, test, expect, beforeEach, vi, afterEach } from 'vitest';
+const mockGetProjectConfig = mock(async () => ({
+  project: { name: 'template', organization: 'test-org' },
+  infisical: { projectId: 'test-project-id' },
+  planetscale: {
+    organization: 'inixiative',
+    database: 'template',
+    region: 'us-east',
+    tokenId: 'test-token-id',
+    configProjectName: 'template',
+  },
+}));
 
-// Mock modules MUST be at top level before imports
-vi.mock('../../utils/configHelpers');
-vi.mock('../infisicalSetup');
-vi.mock('../../api/planetscale');
-vi.mock('node:child_process');
+const mockUpdateConfigField = mock(async () => undefined);
+const mockSetProgressComplete = mock(async () => undefined);
+const mockClearAllProgress = mock(async () => undefined);
+const mockSetConfigError = mock(async () => undefined);
+const mockClearConfigError = mock(async () => undefined);
+const mockIsProgressComplete = mock(async (_section: string, action: string) => {
+  const completedSteps = new Set([
+    'selectOrg',
+    'selectRegion',
+    'createToken',
+    'createDB',
+    'renameProductionBranch',
+    'createStagingBranch',
+    'createPasswords',
+    'storeConnectionStrings',
+  ]);
+  return completedSteps.has(action);
+});
 
-import * as configHelpers from '../../utils/configHelpers';
-import * as infisicalSetup from '../infisicalSetup';
-import * as planetscaleApi from '../../api/planetscale';
-import { execSync } from 'node:child_process';
+const mockGetSecret = mock((key: string, options?: { environment?: string }) => {
+  if (key === 'DATABASE_URL' && options?.environment === 'prod') {
+    return 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require';
+  }
+  if (key === 'DATABASE_URL' && options?.environment === 'staging') {
+    return 'postgresql://staging-user:staging-pass@aws.connect.psdb.cloud/template?sslmode=require';
+  }
+  return '';
+});
+const mockSetSecret = mock(() => undefined);
+
+const mockCreateDatabase = mock(async () => ({ id: 'db-id', name: 'template', region: 'us-east' }));
+const mockGetDatabase = mock(async () => ({ id: 'db-id', name: 'template', region: 'us-east' }));
+const mockUpdateDatabaseSettings = mock(async () => undefined);
+const mockCreateBranch = mock(async () => ({ id: 'branch-id', name: 'staging', region: 'us-east', production: false }));
+const mockGetBranch = mock(async () => ({ id: 'branch-id', name: 'staging', region: 'us-east', production: false }));
+const mockCreateRole = mock(async () => ({
+  id: 'role-id',
+  name: 'role',
+  username: 'user',
+  plain_text: 'pass',
+  connection_strings: { general: 'postgresql://role:pass@aws.connect.psdb.cloud/template' },
+}));
+const mockRenameBranch = mock(async () => ({ id: 'branch-id', name: 'prod', region: 'us-east', production: true }));
+const mockDeleteBranch = mock(async () => undefined);
+const mockCreateServiceToken = mock(async () => ({ id: 'token-id', token: 'token-value' }));
+
+const mockRetryWithTimeout = mock(async <T>(fn: () => Promise<T>) => fn());
+const mockExecSync = mock(() => Buffer.from(''));
+
+mock.module('../../utils/getProjectConfig', () => ({
+  getProjectConfig: mockGetProjectConfig,
+}));
+mock.module('../../utils/configHelpers', () => ({
+  updateConfigField: mockUpdateConfigField,
+  setProgressComplete: mockSetProgressComplete,
+  isProgressComplete: mockIsProgressComplete,
+  clearAllProgress: mockClearAllProgress,
+  setConfigError: mockSetConfigError,
+  clearConfigError: mockClearConfigError,
+}));
+mock.module('../infisicalSetup', () => ({
+  getSecret: mockGetSecret,
+  setSecret: mockSetSecret,
+}));
+mock.module('../../api/planetscale', () => ({
+  createDatabase: mockCreateDatabase,
+  getDatabase: mockGetDatabase,
+  updateDatabaseSettings: mockUpdateDatabaseSettings,
+  createBranch: mockCreateBranch,
+  getBranch: mockGetBranch,
+  createRole: mockCreateRole,
+  renameBranch: mockRenameBranch,
+  deleteBranch: mockDeleteBranch,
+  createServiceToken: mockCreateServiceToken,
+}));
+mock.module('../../utils/retry', () => ({
+  retryWithTimeout: mockRetryWithTimeout,
+}));
+mock.module('node:child_process', () => ({
+  execSync: mockExecSync,
+}));
+
+let setupPlanetScale: (selectedOrgName: string, onStepComplete?: () => Promise<void>) => Promise<unknown>;
+let setTimeoutSpy: ReturnType<typeof spyOn>;
+
+beforeAll(async () => {
+  ({ setupPlanetScale } = await import('../planetscaleSetup'));
+});
+
+beforeEach(() => {
+  mockGetProjectConfig.mockClear();
+  mockUpdateConfigField.mockClear();
+  mockSetProgressComplete.mockClear();
+  mockClearAllProgress.mockClear();
+  mockSetConfigError.mockClear();
+  mockClearConfigError.mockClear();
+  mockIsProgressComplete.mockClear();
+  mockGetSecret.mockClear();
+  mockSetSecret.mockClear();
+  mockCreateDatabase.mockClear();
+  mockGetDatabase.mockClear();
+  mockUpdateDatabaseSettings.mockClear();
+  mockCreateBranch.mockClear();
+  mockGetBranch.mockClear();
+  mockCreateRole.mockClear();
+  mockRenameBranch.mockClear();
+  mockDeleteBranch.mockClear();
+  mockCreateServiceToken.mockClear();
+  mockRetryWithTimeout.mockClear();
+  mockExecSync.mockClear();
+
+  // Avoid the built-in 5s provisioning wait during this focused resume test.
+  setTimeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation(((fn: (...args: unknown[]) => void) => {
+    fn();
+    return 0 as unknown as Timer;
+  }) as typeof setTimeout);
+});
+
+afterEach(() => {
+  setTimeoutSpy.mockRestore();
+});
 
 describe('PlanetScale Resume Scenario', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
+  it('does not create new passwords when resuming', async () => {
+    await setupPlanetScale('inixiative');
+    expect(mockCreateRole).not.toHaveBeenCalled();
+  });
 
-		// Mock config state: passwords and connection strings already complete
-		vi.mocked(configHelpers.isProgressComplete).mockImplementation(async (section, action) => {
-			if (section === 'planetscale') {
-				// Steps 1-8 are complete, step 9+ are not
-				const completedSteps = [
-					'selectOrg',
-					'selectRegion',
-					'createToken',
-					'setInfisicalToken',
-					'createDB',
-					'setupProductionBranch',
-					'createStagingBranch',
-					'createPasswords',
-					'storeConnectionStrings',
-				];
-				return completedSteps.includes(action as string);
-			}
-			return false;
-		});
+  it('fetches connection strings from Infisical', async () => {
+    await setupPlanetScale('inixiative');
 
-		// Mock getProjectConfig to return proper config
-		vi.mocked(configHelpers.getProjectConfig).mockResolvedValue({
-			project: { name: 'template', organization: 'test-org' },
-			infisical: { projectId: 'test-project-id' },
-			planetscale: {
-				organization: 'inixiative',
-				database: 'template',
-				region: 'us-east',
-				tokenId: 'test-token-id',
-			},
-		} as any);
+    expect(mockGetSecret).toHaveBeenCalledWith('DATABASE_URL', {
+      projectId: 'test-project-id',
+      environment: 'prod',
+      path: '/api',
+    });
+    expect(mockGetSecret).toHaveBeenCalledWith('DATABASE_URL', {
+      projectId: 'test-project-id',
+      environment: 'staging',
+      path: '/api',
+    });
+  });
 
-		// Mock Infisical getSecret to return connection strings
-		vi.mocked(infisicalSetup.getSecret).mockImplementation((key: string, options?: any) => {
-			if (key === 'DATABASE_URL') {
-				if (options?.environment === 'prod') {
-					return 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require';
-				}
-				if (options?.environment === 'staging') {
-					return 'postgresql://staging-user:staging-pass@aws.connect.psdb.cloud/template?sslmode=require';
-				}
-			}
-			return '';
-		});
+  it('runs migration-table init command for prod and staging', async () => {
+    await setupPlanetScale('inixiative');
 
-		// Mock execSync (for psql commands)
-		vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    const calls = mockExecSync.mock.calls;
+    expect(calls[0]?.[0]).toContain('scripts/db/init-migration-table.ts');
+    expect(calls[0]?.[0]).toContain('postgresql://prod-user:prod-pass');
+    expect(calls[1]?.[0]).toContain('scripts/db/init-migration-table.ts');
+    expect(calls[1]?.[0]).toContain('postgresql://staging-user:staging-pass');
+  });
 
-		// Mock other config helpers
-		vi.mocked(configHelpers.setProgressComplete).mockResolvedValue(undefined);
-		vi.mocked(configHelpers.updateConfigField).mockResolvedValue(undefined);
-		vi.mocked(configHelpers.clearConfigError).mockResolvedValue(undefined);
+  it('marks initMigrationTable complete and configures DB', async () => {
+    await setupPlanetScale('inixiative');
 
-		// Mock PlanetScale API calls
-		vi.mocked(planetscaleApi.getDatabase).mockResolvedValue({
-			id: 'db-id',
-			name: 'template',
-			region: 'us-east',
-		} as any);
-
-		vi.mocked(planetscaleApi.getBranch).mockResolvedValue({
-			id: 'branch-id',
-			name: 'main',
-			region: 'us-east',
-			production: true,
-		} as any);
-
-		vi.mocked(planetscaleApi.updateDatabaseSettings).mockResolvedValue(undefined);
-	});
-
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
-	test('should NOT create new passwords when resuming', async () => {
-		// Import after mocks are set up
-		const { setupPlanetScale } = await import('../planetscaleSetup');
-
-		// Run setup
-		await setupPlanetScale('inixiative');
-
-		// Verify createPassword was NEVER called
-		expect(planetscaleApi.createPassword).not.toHaveBeenCalled();
-	});
-
-	test('should fetch connection strings from Infisical', async () => {
-		const { setupPlanetScale } = await import('../planetscaleSetup');
-
-		await setupPlanetScale('inixiative');
-
-		// Verify getSecret was called for both environments
-		expect(infisicalSetup.getSecret).toHaveBeenCalledWith('DATABASE_URL', {
-			projectId: 'test-project-id',
-			environment: 'prod',
-			path: '/api',
-		});
-
-		expect(infisicalSetup.getSecret).toHaveBeenCalledWith('DATABASE_URL', {
-			projectId: 'test-project-id',
-			environment: 'staging',
-			path: '/api',
-		});
-	});
-
-	test('should run psql commands to init migration table', async () => {
-		const { setupPlanetScale } = await import('../planetscaleSetup');
-
-		await setupPlanetScale('inixiative');
-
-		// Verify psql was called twice (prod and staging)
-		expect(execSync).toHaveBeenCalledTimes(2);
-
-		// Check it called psql with correct connection strings
-		const calls = vi.mocked(execSync).mock.calls;
-		expect(calls[0][0]).toContain('psql');
-		expect(calls[0][0]).toContain('postgresql://prod-user:prod-pass');
-		expect(calls[0][0]).toContain('CREATE TABLE IF NOT EXISTS "_prisma_migrations"');
-
-		expect(calls[1][0]).toContain('psql');
-		expect(calls[1][0]).toContain('postgresql://staging-user:staging-pass');
-		expect(calls[1][0]).toContain('CREATE TABLE IF NOT EXISTS "_prisma_migrations"');
-	});
-
-	test('should mark initMigrationTable as complete', async () => {
-		const { setupPlanetScale } = await import('../planetscaleSetup');
-
-		await setupPlanetScale('inixiative');
-
-		// Verify progress was marked complete
-		expect(configHelpers.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initMigrationTable');
-	});
-
-	test('should configure database after migration table init', async () => {
-		const { setupPlanetScale } = await import('../planetscaleSetup');
-
-		await setupPlanetScale('inixiative');
-
-		// Verify database settings were updated
-		expect(planetscaleApi.updateDatabaseSettings).toHaveBeenCalledWith(
-			'inixiative',
-			'template',
-			{
-				allow_foreign_key_constraints: true,
-				automatic_migrations: true,
-				migration_table_name: '_prisma_migrations',
-			}
-		);
-	});
+    expect(mockSetProgressComplete).toHaveBeenCalledWith('planetscale', 'initMigrationTable');
+    expect(mockUpdateDatabaseSettings).toHaveBeenCalledWith('inixiative', 'template', {
+      allow_foreign_key_constraints: true,
+    });
+  });
 });

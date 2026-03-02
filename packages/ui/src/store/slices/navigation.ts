@@ -94,8 +94,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       }
 
       const spoofUserEmail = get().auth.spoofUserEmail;
-      const currentSearch = typeof window === 'undefined' ? '' : window.location.search;
-      const currentHash = typeof window === 'undefined' ? '' : window.location.hash;
+      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
+      const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
       const preservedSearch = resolveSearchForPolicy(currentSearch, 'context', spoofUserEmail);
       const target = parseNavigateTarget(to);
       const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
@@ -110,8 +110,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       }
 
       const spoofUserEmail = get().auth.spoofUserEmail;
-      const currentSearch = typeof window === 'undefined' ? '' : window.location.search;
-      const currentHash = typeof window === 'undefined' ? '' : window.location.hash;
+      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
+      const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
       const preservedSearch = resolveSearchForPolicy(currentSearch, 'spoof', spoofUserEmail);
       const target = parseNavigateTarget(to);
       const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;

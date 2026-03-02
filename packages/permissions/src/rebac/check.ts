@@ -1,8 +1,8 @@
 import { check as checkRule } from '@inixiative/json-rules';
-import type { AccessorName, HydratedRecord, ModelName } from '@template/db';
-import { getModelRelations, toAccessor, toModelName } from '@template/db';
+import type { AccessorName, HydratedRecord } from '@template/db';
 import { isNil } from 'lodash-es';
 import type { Action, Permix } from '@template/permissions/client';
+import { relationTargets } from '@template/permissions/rebac/relationTargetsGen';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
 /**
@@ -38,12 +38,8 @@ export const check = (
     const related = record[rule.rel] as HydratedRecord | null | undefined;
     if (!related) return false;
 
-    const modelName = toModelName(model);
-    if (!modelName) return false;
-    const relations = getModelRelations(modelName);
-    const relation = relations.find((r) => r.relationName === rule.rel);
-    if (!relation) return false;
-    const targetModel = toAccessor(relation.targetModel as ModelName);
+    const targetModel = relationTargets[model]?.[rule.rel];
+    if (!targetModel) return false;
 
     const key = `${targetModel}:${related.id}:${rule.action}`;
     if (visited.has(key)) throw new Error(`Cycle detected in permission graph: ${key}`);

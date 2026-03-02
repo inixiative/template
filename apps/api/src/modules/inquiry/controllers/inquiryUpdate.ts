@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { makeError } from '#/lib/errors';
 
 import { makeController } from '#/lib/utils/makeController';

@@ -12,13 +12,22 @@ const getRouteTargetsFromRouteTree = (filePath: string): Set<string> => {
   return new Set(targets);
 };
 
+const joinNavPath = (parentPath: string | null, path: string): string => {
+  if (!parentPath) return path;
+  if (!path.startsWith('/')) return path;
+  if (path.startsWith(`${parentPath}/`)) return path;
+  if (parentPath === '/') return path;
+  return `${parentPath}${path}`;
+};
+
 const flattenNavPaths = (items: Array<{ path?: string; items?: any[] }>): string[] => {
   const paths: string[] = [];
-  const visit = (itemList: Array<{ path?: string; items?: any[] }>) => {
+  const visit = (itemList: Array<{ path?: string; items?: any[] }>, parentPath: string | null = null) => {
     if (!itemList) return;
     for (const item of itemList) {
-      if (item.path) paths.push(item.path);
-      if (item.items?.length) visit(item.items);
+      const resolvedPath = item.path ? joinNavPath(parentPath, item.path) : parentPath;
+      if (resolvedPath) paths.push(resolvedPath);
+      if (item.items?.length) visit(item.items, resolvedPath);
     }
   };
   visit(items);
@@ -32,7 +41,7 @@ const normalizeNavPath = (path: string): string => {
 describe('frontend nav contract', () => {
   it('web nav paths resolve to generated route targets', () => {
     const routeTargets = getRouteTargetsFromRouteTree(resolve(process.cwd(), 'apps/web/app/routeTree.gen.ts'));
-    const navPaths = flattenNavPaths([...webNavConfig.personal, ...webNavConfig.organization, ...webNavConfig.space]);
+    const navPaths = flattenNavPaths([...webNavConfig.user, ...webNavConfig.organization, ...webNavConfig.space]);
 
     // Deduplicate paths (same path can appear in multiple contexts)
     const uniquePaths = [...new Set(navPaths)];
@@ -43,7 +52,7 @@ describe('frontend nav contract', () => {
   it('admin nav paths resolve to generated route targets', () => {
     const routeTargets = getRouteTargetsFromRouteTree(resolve(process.cwd(), 'apps/admin/app/routeTree.gen.ts'));
     const navPaths = flattenNavPaths([
-      ...adminNavConfig.personal,
+      ...adminNavConfig.user,
       ...adminNavConfig.organization,
       ...adminNavConfig.space,
     ]);

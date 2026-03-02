@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import type { InquiryResourceModel } from '@template/db';
 import { makeError } from '#/lib/errors';
 

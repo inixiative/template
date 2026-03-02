@@ -177,14 +177,10 @@ describe('useSpaceTheme', () => {
     expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe('142 76% 46%');
     expect(document.documentElement.style.getPropertyValue('--space-tertiary')).toBe('174 72% 56%');
 
-    // Apply theme2 with CORRECT clearing logic (clear ALL --space-* vars)
-    const style = document.documentElement.style;
-    for (let i = style.length - 1; i >= 0; i--) {
-      const prop = style[i];
-      if (prop?.startsWith('--space-')) {
-        style.removeProperty(prop);
-      }
-    }
+    // Apply theme2 with clearing logic aligned to hook behavior (remove previously set keys)
+    Object.keys(theme1).forEach((key) => {
+      document.documentElement.style.removeProperty(`--space-${key}`);
+    });
 
     if (theme2) {
       Object.entries(theme2).forEach(([key, value]) => {

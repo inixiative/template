@@ -61,8 +61,8 @@ export const OrganizationTokensTab = ({ organizationId }: { organizationId: stri
     console.log('Delete token:', tokenId, 'for org:', organizationId);
   };
 
-  const handleCreate = (name: string) => {
-    console.log('Create token:', name, 'for org:', organizationId);
+  const handleCreate = (data: { name: string; role: string }) => {
+    console.log('Create token:', data.name, 'role:', data.role, 'for org:', organizationId);
   };
 
   return (

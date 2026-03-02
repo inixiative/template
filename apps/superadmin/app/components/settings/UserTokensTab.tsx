@@ -60,8 +60,8 @@ export const UserTokensTab = () => {
     console.log('Delete token:', tokenId);
   };
 
-  const handleCreate = (name: string) => {
-    console.log('Create token:', name);
+  const handleCreate = (data: { name: string; role: string }) => {
+    console.log('Create token:', data.name, 'role:', data.role);
   };
 
   return (

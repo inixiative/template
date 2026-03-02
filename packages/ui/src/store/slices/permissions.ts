@@ -2,13 +2,13 @@ import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import {
   createPermissions,
   type Entitlements,
-  getOrgPermissions,
-  getSpacePermissions,
-  isSuperadmin,
-  type Role,
-  rebacCheck,
-  rebacSchema,
-} from '@template/permissions';
+} from '@template/permissions/client';
+import { getOrgPermissions } from '@template/permissions/roles/organization';
+import { getSpacePermissions } from '@template/permissions/roles/space';
+import { isSuperadmin } from '@template/permissions/roles/shared';
+import { check as rebacCheck } from '@template/permissions/rebac/check';
+import { rebacSchema } from '@template/permissions/rebac/schema';
+import type { Role } from '@template/db/generated/client/enums';
 import type { StateCreator } from 'zustand';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';

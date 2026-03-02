@@ -10,7 +10,6 @@ export const Route = createFileRoute('/_public/auth/callback')({
 
 function AuthCallbackPage() {
   const navigate = useNavigate();
-  const store = useAppStore();
 
   useEffect(() => {
     const completeOAuth = async () => {
@@ -25,7 +24,7 @@ function AuthCallbackPage() {
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         setToken(token, expiresAt);
 
-        await fetchAndHydrateMe(store.setState, store.getState);
+        await fetchAndHydrateMe(useAppStore.setState, useAppStore.getState);
 
         const redirectTo = localStorage.getItem('authRedirectTo') || '/dashboard';
         localStorage.removeItem('authRedirectTo');
@@ -41,7 +40,7 @@ function AuthCallbackPage() {
     };
 
     completeOAuth();
-  }, [navigate, store]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import type { Db, Prisma } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 

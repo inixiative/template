@@ -64,7 +64,7 @@ describe('space/webhookSubscriptions', () => {
       expect(data.organizationId).toBeNull();
     });
 
-    it('rejects member creating webhook', async () => {
+    it('allows member creating webhook', async () => {
       const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
@@ -93,7 +93,11 @@ describe('space/webhookSubscriptions', () => {
         }),
       );
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(201);
+      const { data } = await json<WebhookSubscription>(response);
+      expect(data.ownerModel).toBe('Space');
+      expect(data.spaceId).toBe(space.id);
+      expect(data.organizationId).toBeNull();
     });
   });
 
@@ -102,7 +106,6 @@ describe('space/webhookSubscriptions', () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
         ownerModel: 'Space',
-        organizationId: org.id,
         spaceId: space.id,
         url: `https://example.com/space-list-${seq}`,
       });
@@ -121,7 +124,6 @@ describe('space/webhookSubscriptions', () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
         ownerModel: 'Space',
-        organizationId: org.id,
         spaceId: otherSpace.id,
         url: `https://example.com/other-space-${seq}`,
       });
