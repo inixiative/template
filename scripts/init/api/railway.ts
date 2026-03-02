@@ -350,6 +350,10 @@ export const renameService = async (
 /**
  * Update service instance runtime settings for a specific environment
  */
+/**
+ * Update service instance configuration (build/start commands, root directory)
+ * Used to configure Railway service build and runtime settings
+ */
 export const updateServiceInstanceConfig = async (
 	serviceId: string,
 	environmentId: string,
@@ -494,10 +498,13 @@ export const createService = async (
 		}
 	});
 
-	const repoArg = source?.repo ? ` --repo "${source.repo}"` : '';
+	// Escape special characters to prevent command injection
+	const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	const escapedName = escapeName(name);
+	const repoArg = source?.repo ? ` --repo "${escapeName(source.repo)}"` : '';
 
 	// Create service (optionally linked to GitHub repo at creation time)
-	const output = execSync(`railway add --service "${name}"${repoArg} --json`, {
+	const output = execSync(`railway add --service "${escapedName}"${repoArg} --json`, {
 		encoding: 'utf-8',
 		stdio: ['pipe', 'pipe', 'pipe'],
 		cwd: process.cwd(),

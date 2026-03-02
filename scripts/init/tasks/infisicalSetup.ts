@@ -1,5 +1,6 @@
-import { execSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import { getProjectConfig, getProjectConfigPath } from '../utils/getProjectConfig';
 import {
 	upsertProject,
@@ -18,6 +19,8 @@ import {
 	setConfigError,
 	clearConfigError,
 } from '../utils/configHelpers';
+
+const execAsync = promisify(exec);
 
 /**
  * Setup Infisical project and environment structure with resume support
@@ -132,8 +135,8 @@ export const setupInfisical = async (
 			// Suppressed for TUI: console.log('  ✓ Environments already configured (skipping)');
 		}
 
-		// Step 4: Create folder structure
-		if (!(await isProgressComplete('infisical', 'createApps'))) {
+			// Step 4: Create folder structure
+			if (!(await isProgressComplete('infisical', 'createApps'))) {
 			// Suppressed for TUI: console.log('  • Creating folder structure...');
 			const apps = ['api', 'web', 'admin', 'superadmin'];
 			const envs = ['staging', 'prod'];
@@ -147,9 +150,9 @@ export const setupInfisical = async (
 			// Suppressed for TUI: console.log('    ✓ Folders created: api, web, admin, superadmin');
 			await setProgressComplete('infisical', 'createApps');
 			await onStepComplete?.();
-		} else {
-			// Suppressed for TUI: console.log('  ✓ Folder structure already created (skipping)');
-		}
+			} else {
+				// Suppressed for TUI: console.log('  ✓ Folder structure already created (skipping)');
+			}
 
 			// Step 5: Set up inheritance chains
 			if (!(await isProgressComplete('infisical', 'setInheritance'))) {
@@ -157,8 +160,8 @@ export const setupInfisical = async (
 				const apps = ['api', 'web', 'admin', 'superadmin'];
 				const envs = ['staging', 'prod'];
 
-			for (const env of envs) {
-				for (const app of apps) {
+				for (const env of envs) {
+					for (const app of apps) {
 					const destPath = `/${app}`;
 
 					// Import order matters! Create from lowest to highest priority:
@@ -171,9 +174,9 @@ export const setupInfisical = async (
 					// Priority 3 (highest): env:/ -> env:/app/
 					await createSecretImport(projectId, env, destPath, env, '/');
 				}
-			}
+				}
 
-			// Suppressed for TUI: console.log('    ✓ Inheritance: 12 import chains configured');
+				// Suppressed for TUI: console.log('    ✓ Inheritance: 12 import chains configured');
 				await setProgressComplete('infisical', 'setInheritance');
 				await onStepComplete?.();
 			} else {
@@ -184,7 +187,7 @@ export const setupInfisical = async (
 			if (!(await isProgressComplete('infisical', 'ensureApiAuthSecrets'))) {
 				for (const env of ['prod', 'staging']) {
 					try {
-						const existing = getSecret('BETTER_AUTH_SECRET', {
+						const existing = await getSecretAsync('BETTER_AUTH_SECRET', {
 							projectId,
 							environment: env,
 							path: '/api',
@@ -194,7 +197,8 @@ export const setupInfisical = async (
 						// Missing secret is expected on first run.
 					}
 
-					setSecret(projectId, env, 'BETTER_AUTH_SECRET', generateSecret(), '/api');
+					const secret = await generateSecretAsync();
+					await setSecretAsync(projectId, env, 'BETTER_AUTH_SECRET', secret, '/api');
 				}
 
 				await setProgressComplete('infisical', 'ensureApiAuthSecrets');
@@ -205,7 +209,7 @@ export const setupInfisical = async (
 
 			// Suppressed for TUI: console.log('\n✅ Infisical setup complete!');
 
-		return { projectId, organizationId };
+			return { projectId, organizationId };
 	} catch (error) {
 		const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 		// Suppressed for TUI: console.error('\n❌ Infisical setup failed:', errorMsg);
@@ -219,6 +223,14 @@ export const setupInfisical = async (
  */
 export const generateSecret = (length = 32): string => {
 	return execSync(`openssl rand -hex ${length}`, { encoding: 'utf-8' }).trim();
+};
+
+/**
+ * Generate a secure random secret (async, non-blocking)
+ */
+export const generateSecretAsync = async (length = 32): Promise<string> => {
+	const { stdout } = await execAsync(`openssl rand -hex ${length}`);
+	return stdout.trim();
 };
 
 /**
@@ -258,6 +270,39 @@ export const getSecret = (
 };
 
 /**
+ * Get a secret using Infisical CLI (async, non-blocking)
+ */
+export const getSecretAsync = async (
+	key: string,
+	options?: {
+		projectId?: string;
+		environment?: string;
+		path?: string;
+	}
+): Promise<string> => {
+	try {
+		let cmd = `infisical secrets get ${key}`;
+
+		if (options?.projectId) {
+			cmd += ` --projectId="${options.projectId}"`;
+		}
+		if (options?.environment) {
+			cmd += ` --env="${options.environment}"`;
+		}
+		if (options?.path) {
+			cmd += ` --path="${options.path}"`;
+		}
+
+		cmd += ' --plain';
+
+		const { stdout } = await execAsync(cmd);
+		return stdout.trim();
+	} catch (error) {
+		throw new Error(`Failed to get secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+	}
+};
+
+/**
  * Set a secret using Infisical CLI
  */
 export const setSecret = (
@@ -273,6 +318,25 @@ export const setSecret = (
 			{
 				stdio: 'pipe',
 			}
+		);
+	} catch (error) {
+		throw new Error(`Failed to set secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+	}
+};
+
+/**
+ * Set a secret using Infisical CLI (async, non-blocking)
+ */
+export const setSecretAsync = async (
+	projectId: string,
+	environment: string,
+	key: string,
+	value: string,
+	path: string = '/'
+): Promise<void> => {
+	try {
+		await execAsync(
+			`infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`
 		);
 	} catch (error) {
 		throw new Error(`Failed to set secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
