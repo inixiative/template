@@ -20,7 +20,7 @@ import {
   createPermissionsSlice, // ReBAC (Permix)
   createTenantSlice,      // Context switching
   createUISlice,          // Theme + UI state
-} from '@template/shared';
+} from '@template/ui';
 
 export type AppStore = ApiSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 
@@ -43,7 +43,7 @@ export const useAppStore = create<AppStore>()(
 - DevTools support
 - Slice composition pattern
 
-**Shared slice creators** in `@template/shared/store/slices/*` ensure:
+**Shared slice creators** in `@template/ui/store/slices/*` ensure:
 - Consistent state shape across apps
 - Reusable logic
 - Single source of truth
@@ -464,7 +464,7 @@ api.setSpoofUserEmail('admin@example.com');
 const queryClient = useAppStore((state) => state.api.queryClient);
 
 // Or use hook
-import { useQueryClient } from '@template/shared';
+import { useQueryClient } from '@template/ui';
 const queryClient = useQueryClient();
 
 // Invalidate queries
@@ -748,7 +748,7 @@ devtools((...a) => ({ ...slices }), { name: 'AppStore' })
 export type AppStore = ApiSlice & AuthSlice & PermissionsSlice & TenantSlice & UISlice;
 ```
 
-**DON'T:** Create app-specific slices in apps - keep them in `@template/shared`
+**DON'T:** Create app-specific slices in apps - keep them in `@template/ui`
 
 ### 2. Selectors
 
@@ -779,7 +779,7 @@ useAppStore.getState().auth.user = newUser;
 
 **DO:** Export and use slice types:
 ```typescript
-import type { AuthSlice } from '@template/shared';
+import type { AuthSlice } from '@template/ui';
 ```
 
 **DON'T:** Use `any`:
@@ -839,7 +839,7 @@ const logout = () => {
 3. **Add to app stores:**
    ```typescript
    // apps/{web,admin,superadmin}/app/store/index.ts
-   import { createMySlice, type MySlice } from '@template/shared';
+   import { createMySlice, type MySlice } from '@template/ui';
 
    export type AppStore = ApiSlice & AuthSlice & ... & MySlice;
 
@@ -855,7 +855,7 @@ const logout = () => {
 ### Removing a Slice
 
 1. Remove from app store compositions
-2. Remove from `@template/shared` exports
+2. Remove from `@template/ui` exports
 3. Delete slice file
 4. Search codebase for usage and remove
 

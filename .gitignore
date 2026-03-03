@@ -170,3 +170,6 @@ apps/web/app.config.timestamp_*.js
 **/*.gen.ts
 **/*.generated.ts
 .vercel
+
+# Init script scratch files
+scripts/init/test-*.ts

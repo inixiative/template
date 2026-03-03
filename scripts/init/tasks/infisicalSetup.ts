@@ -189,6 +189,15 @@ export const setupInfisical = async (
 			await setSecretAsync(projectId, 'prod', 'ENVIRONMENT', 'prod', '/api');
 			await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
 
+			// Project identity — shared across all apps/envs via root:/ inheritance
+			await setSecretAsync(projectId, 'root', 'PROJECT_NAME', configProjectName, '/');
+			await setSecretAsync(projectId, 'root', 'VITE_PROJECT_NAME', configProjectName, '/');
+
+			// Per-app display names — inherited by each app folder
+			await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Web', '/web');
+			await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Admin', '/admin');
+			await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Superadmin', '/superadmin');
+
 			// Step 6: Ensure API auth secrets exist for deploy environments
 			if (!(await isProgressComplete('infisical', 'ensureApiAuthSecrets'))) {
 				for (const env of ['prod', 'staging']) {

@@ -1,6 +1,14 @@
-import { ChevronRight } from 'lucide-react';
+import { Fragment } from 'react';
 import { cn } from '@template/ui/lib/utils';
 import { useBreadcrumbs } from '@template/ui/hooks';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@template/ui/components/primitives/Breadcrumb';
 
 export type BreadcrumbsProps = {
   className?: string;
@@ -12,28 +20,30 @@ export const Breadcrumbs = ({ className }: BreadcrumbsProps) => {
   if (items.length === 0) return null;
 
   return (
-    <nav className={cn('flex items-center gap-2 text-sm text-muted-foreground', className)}>
-      {items.map((item, index) => {
-        const isLast = index === items.length - 1;
+    <Breadcrumb className={cn(className)}>
+      <BreadcrumbList>
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
 
-        return (
-          <div key={item.href} className="flex items-center gap-2">
-            {isLast ? (
-              <span className="text-foreground font-medium">{item.label}</span>
-            ) : (
-              <>
-                <button
-                  onClick={() => onNavigate(item.href)}
-                  className="hover:text-foreground transition-colors"
-                >
-                  {item.label}
-                </button>
-                <ChevronRight className="h-4 w-4" />
-              </>
-            )}
-          </div>
-        );
-      })}
-    </nav>
+          return (
+            <Fragment key={item.href}>
+              <BreadcrumbItem>
+                {isLast ? (
+                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink
+                    href={item.href}
+                    onClick={(e) => { e.preventDefault(); onNavigate(item.href); }}
+                  >
+                    {item.label}
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {!isLast && <BreadcrumbSeparator />}
+            </Fragment>
+          );
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 };

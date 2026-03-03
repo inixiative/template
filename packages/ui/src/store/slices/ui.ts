@@ -6,6 +6,7 @@ export type UISlice = {
   ui: {
     theme: Theme;
     isLoading: boolean;
+    projectName: string;
     appName: string;
     shortName: string;
     description: string;
@@ -19,7 +20,8 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
   ui: {
     theme: 'system',
     isLoading: false,
-    appName: import.meta.env.VITE_APP_NAME || 'Template',
+    projectName: import.meta.env.VITE_PROJECT_NAME || 'Template',
+    appName: import.meta.env.VITE_APP_NAME || 'App',
     shortName: import.meta.env.VITE_APP_SHORT_NAME || 'Template',
     description: import.meta.env.VITE_APP_DESCRIPTION || 'TanStack Router + React Aria + Tailwind',
 

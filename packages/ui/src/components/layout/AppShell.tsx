@@ -1,4 +1,5 @@
 import { useAppStore } from '@template/ui/store';
+import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
@@ -58,6 +59,7 @@ export const AppShell = ({
 
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
+        <Breadcrumbs className="px-6 py-3 border-b" />
         <main className="flex-1 overflow-hidden">{children}</main>
       </div>
     </div>

@@ -95,12 +95,14 @@ export const useOptimisticListMutation = <
   queryKey: QueryKey;
   /** 'create' | 'update' | 'delete' - matches controller naming. TODO: Add 'lookup' for fetching individual items */
   operation: 'create' | 'update' | 'delete';
+  /** Extra fields merged into the optimistic item on create (e.g. derived fields the API would normally compute) */
+  optimisticExtras?: Partial<TItem>;
   mutationOptions?: Omit<
     UseMutationOptions<TItem | void, Error, TVariables, { previousData: TItem[] | undefined }>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
 }) => {
-  const { operation, mutationFn, ...rest } = options;
+  const { operation, optimisticExtras, mutationFn, ...rest } = options;
 
   return useOptimisticMutation<TItem | void, Error, TVariables, TItem[]>({
     ...rest,
@@ -109,24 +111,31 @@ export const useOptimisticListMutation = <
       return result.data;
     },
     optimisticUpdate: (currentData, variables) => {
-      const list = currentData ?? [];
+      // Cache may be a plain array or a wrapped { data: TItem[], ... } shape
+      const isWrapped = currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
+      const list: TItem[] = (isWrapped ? (currentData as any).data : currentData) ?? [];
+
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;
       const body = vars.body as Record<string, unknown> | undefined;
       const id = path?.id;
 
+      let updated: TItem[];
       switch (operation) {
         case 'create':
-          return [...list, { ...body, id: '__optimistic__' } as TItem];
+          updated = [...list, { ...body, ...optimisticExtras, id: '__optimistic__' } as TItem];
+          break;
         case 'update':
-          if (!id) return list;
-          return list.map((item) => (item.id === id ? { ...item, ...body } : item));
+          updated = !id ? list : list.map((item) => (item.id === id ? { ...item, ...body } : item));
+          break;
         case 'delete':
-          if (!id) return list;
-          return list.filter((item) => item.id !== id);
+          updated = !id ? list : list.filter((item) => item.id !== id);
+          break;
         default:
-          return list;
+          updated = list;
       }
+
+      return (isWrapped ? { ...(currentData as object), data: updated } : updated) as TItem[];
     },
   });
 };

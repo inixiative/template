@@ -1,6 +1,7 @@
 export * from './HomePage';
 export * from './LoginPage';
 export * from './OrganizationAuthProvidersPage';
+export * from './OrganizationSpacesPage';
 export * from './OrganizationProfilePage';
 export * from './OrganizationsPage';
 export * from './OrganizationUsersPage';

@@ -114,6 +114,36 @@ export const renameProject = (oldName: string, newName: string): void => {
 		}
 	}
 
+	// 6. Update env example files (PROJECT_NAME, VITE_PROJECT_NAME, DATABASE_URL, OTEL_SERVICE_NAME, etc.)
+	console.log('  • Updating env example files...');
+	const envExampleFiles = [
+		'.env.local.example',
+		'.env.test.example',
+		'apps/api/.env.local.example',
+		'apps/api/.env.test.example',
+		'apps/web/.env.local.example',
+		'apps/admin/.env.local.example',
+		'apps/superadmin/.env.local.example',
+	];
+	for (const envFile of envExampleFiles) {
+		try {
+			const filePath = join(process.cwd(), envFile);
+			const content = readFileSync(filePath, 'utf-8');
+			const pattern = new RegExp(fromName, 'g');
+			const updated = content.split('\n').map((line) => {
+				if (line.trimStart().startsWith('#')) return line.replace(pattern, newName);
+				const eqIdx = line.indexOf('=');
+				if (eqIdx === -1) return line;
+				const key = line.slice(0, eqIdx);
+				const value = line.slice(eqIdx + 1);
+				return `${key}=${value.replace(pattern, newName)}`;
+			}).join('\n');
+			writeFileSync(filePath, updated, 'utf-8');
+		} catch {
+			// File might not exist
+		}
+	}
+
 	console.log('  • Running bun install to update lockfile...');
 	execSync('bun install', { stdio: 'inherit' });
 

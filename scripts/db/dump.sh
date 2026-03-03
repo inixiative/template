@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# TODO: Truncate webhookSubscription and webhookEvent tables before dumping
+# to prevent duplicate deliveries when the dump is restored into another environment.
+# Currently this truncation only happens in clone.sh — move it here so all dump consumers benefit.
+
 ENV=${1:-prod}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

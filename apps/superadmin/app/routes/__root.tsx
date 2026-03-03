@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
-import { RootNotFound, Toaster } from '@template/ui/components';
+import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
 import { useDarkMode, useLanguage, usePageMeta, useThemePersistence } from '@template/ui/hooks';
 import { useLayoutEffect } from 'react';
 import { useAppStore } from '@template/ui/store';
@@ -36,4 +36,5 @@ const RootComponent = () => {
 export const Route = createRootRoute({
   component: RootComponent,
   notFoundComponent: () => <RootNotFound />,
+  errorComponent: ({ error }) => <RouteError error={error} />,
 });

@@ -4,6 +4,7 @@ export type UISlice = {
   ui: {
     theme: Theme;
     isLoading: boolean;
+    projectName: string;
     appName: string;
     shortName: string;
     description: string;

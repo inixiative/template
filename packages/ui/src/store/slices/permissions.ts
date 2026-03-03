@@ -6,6 +6,7 @@ import {
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { isSuperadmin } from '@template/permissions/roles/shared';
+import { getUserPermissions } from '@template/permissions/roles/user';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import type { Role } from '@template/db/generated/client/enums';
@@ -41,6 +42,9 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           permix.setSuperadmin(true);
           return;
         }
+
+        // Set up user permissions (user is always owner of themselves)
+        await permix.setup(getUserPermissions(me.id as UserId));
 
         // Set up org permissions (matches backend setupOrgPermissions)
         if (me.organizationUsers) {

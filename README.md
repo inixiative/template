@@ -13,6 +13,10 @@ bun run setup
 bun run local
 ```
 
+## Features
+
+See [FEATURES.md](./FEATURES.md) for the complete feature catalog.
+
 ## Documentation
 
 - [Developer Guide](docs/claude/DEVELOPER.md) - Setup and tools

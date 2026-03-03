@@ -1,5 +1,5 @@
 import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';
-import { Button, Input, Label, Modal } from '@template/ui/components';
+import { Button, Label, Modal, SlugInput } from '@template/ui/components';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { memo, useState } from 'react';
 
@@ -33,9 +33,9 @@ export const CreateOrganizationModal = memo(
       }
     };
 
-    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSlugChange = (value: string) => {
       setSlugTouched(true);
-      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+      setSlug(value);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -75,9 +75,8 @@ export const CreateOrganizationModal = memo(
           <div className="space-y-2">
             <Label htmlFor="slug">Slug</Label>
             <div className="relative">
-              <Input
+              <SlugInput
                 id="slug"
-                type="text"
                 value={slug}
                 onChange={handleSlugChange}
                 className="font-mono text-sm pr-10"

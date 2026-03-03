@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
+import { ErrorBoundary, RouteError } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';
 
 const PublicLayout = () => {
@@ -33,7 +34,9 @@ const PublicLayout = () => {
         </div>
       </header>
       <main className="flex-1">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );
@@ -41,4 +44,5 @@ const PublicLayout = () => {
 
 export const Route = createFileRoute('/_public')({
   component: PublicLayout,
+  errorComponent: ({ error }) => <RouteError error={error} />,
 });

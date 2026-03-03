@@ -27,6 +27,7 @@ export type AuthSlice = {
     isEmbedded: boolean;
     isInitialized: boolean;
     initialize: () => Promise<void>;
+    refreshMe: () => Promise<void>;
     signIn: (method: AuthMethod) => Promise<void>;
     signUp: (method: AuthMethod) => Promise<void>;
     setStrategy: (strategy: AuthStrategy) => void;

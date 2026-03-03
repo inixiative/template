@@ -38,6 +38,10 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       }
     },
 
+    refreshMe: async () => {
+      await fetchAndHydrateMe(set, get);
+    },
+
     signIn: async (method: AuthMethod) => {
       await signInFn(method);
       if (method.type !== 'oauth') {

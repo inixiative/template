@@ -3,7 +3,7 @@ import { findRoute } from '@template/ui/lib/findRoute';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 
 export type SidebarProps = {
@@ -31,6 +31,19 @@ export const Sidebar = ({ className }: SidebarProps) => {
     return match?.chain || [];
   }, [location.pathname, navConfig, contextType]);
 
+  // Auto-expand parent items when navigating to a child route
+  useEffect(() => {
+    if (activeChain.length > 1) {
+      setExpandedItems((prev) => {
+        const next = new Set(prev);
+        for (let i = 0; i < activeChain.length - 1; i++) {
+          next.add(activeChain[i].label);
+        }
+        return next;
+      });
+    }
+  }, [activeChain]);
+
   const toggleItem = (label: string) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
@@ -43,11 +56,12 @@ export const Sidebar = ({ className }: SidebarProps) => {
     });
   };
 
-  const renderItem = (item: NavItem, depth: number = 0) => {
+  const renderItem = (item: NavItem, depth: number = 0, parentPath: string = '') => {
     // Don't render if no access or if it's an alias (hidden from sidebar)
     if (item.alias) return null;
     if (item.access && !item.access(permissions, context)) return null;
 
+    const fullPath = parentPath + (item.path || '');
     const hasChildren = item.items && item.items.length > 0;
     const isExpanded = expandedItems.has(item.label);
     const isActive = activeChain.includes(item);
@@ -57,7 +71,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
       <div key={item.label}>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => item.path && navigatePreservingContext(item.path)}
+            onClick={() => fullPath && navigatePreservingContext(fullPath)}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               depth > 0 && 'pl-9',
@@ -84,7 +98,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
           )}
         </div>
         {hasChildren && isExpanded && (
-          <div className="mt-1 space-y-1">{item.items!.map((child) => renderItem(child, depth + 1))}</div>
+          <div className="mt-1 space-y-1">{item.items!.map((child) => renderItem(child, depth + 1, fullPath))}</div>
         )}
       </div>
     );

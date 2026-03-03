@@ -23,6 +23,7 @@ export const OrganizationsPage = () => {
   const permissions = useAppStore((state) => state.permissions);
   const queryClient = useAppStore((state) => state.client);
   const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+  const refreshMe = useAppStore((state) => state.auth.refreshMe);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -41,6 +42,10 @@ export const OrganizationsPage = () => {
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreate>[0]) => organizationCreate(requestOptions)),
     queryKey: meReadManyOrganizationsQueryKey(),
     operation: 'create',
+    optimisticExtras: { organizationUser: { role: 'owner' } } as any,
+    mutationOptions: {
+      onSuccess: () => refreshMe(),
+    },
   });
 
   const columns = useMemo(
@@ -52,7 +57,7 @@ export const OrganizationsPage = () => {
       {
         key: 'role',
         label: 'Your Role',
-        render: (org: Organization) => <span className="capitalize">{org.organizationUser.role}</span>,
+        render: (org: Organization) => <span className="capitalize">{org.organizationUser?.role ?? '—'}</span>,
       },
       {
         key: 'spacesCount',

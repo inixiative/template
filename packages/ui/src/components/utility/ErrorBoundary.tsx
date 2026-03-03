@@ -1,9 +1,9 @@
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { Component, type ReactNode } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
-  fallback?: ReactNode;
 };
 
 type ErrorBoundaryState = {
@@ -26,36 +26,30 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
-      return (
-        <div className="min-h-screen flex items-center justify-center p-8">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Something went wrong</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                An unexpected error occurred. Please try refreshing the page.
-              </p>
-              {this.state.error && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer font-medium">Error details</summary>
-                  <pre className="mt-2 p-2 bg-muted rounded overflow-auto">{this.state.error.toString()}</pre>
-                </details>
-              )}
-              <Button onClick={() => window.location.reload()} className="w-full">
-                Refresh Page
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
+    if (this.state.hasError) return <RouteError error={this.state.error} />;
     return this.props.children;
   }
 }
+
+export const RouteError = ({ error }: { error: unknown }) => {
+  const err = error instanceof Error ? error : new Error(String(error));
+  return (
+    <div className="p-8">
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            {err.message}
+          </CardTitle>
+        </CardHeader>
+        {err.stack && (
+          <CardContent>
+            <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all bg-muted p-4 rounded-md overflow-auto">
+              {err.stack}
+            </pre>
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+};

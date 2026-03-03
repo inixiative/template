@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, ThemeToggle } from '@template/ui/components';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, SlugInput, ThemeToggle } from '@template/ui/components';
 
 type ProfileFormCardProps = {
   name: string;
@@ -46,11 +46,11 @@ export const ProfileFormCard = ({
           {showSlug && (
             <div className="space-y-2">
               <Label htmlFor="slug">Slug</Label>
-              <Input
+              <SlugInput
                 id="slug"
                 value={slug}
-                onChange={(e) => onSlugChange?.(e.target.value)}
-                placeholder="slug"
+                onChange={onSlugChange}
+                placeholder="my-slug"
               />
             </div>
           )}

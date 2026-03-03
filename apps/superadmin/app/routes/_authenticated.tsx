@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { AppShell, Unauthorized } from '@template/ui/components';
+import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';
 import { requireAuth } from '#/guards';
 import { useAppStore } from '@template/ui/store';
 
@@ -13,7 +13,9 @@ const AuthenticatedLayout = () => {
 
   return (
     <AppShell lockedContext={true}>
-      <Outlet />
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
     </AppShell>
   );
 };
@@ -21,4 +23,5 @@ const AuthenticatedLayout = () => {
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: (ctx) => requireAuth(ctx),
   component: AuthenticatedLayout,
+  errorComponent: ({ error }) => <RouteError error={error} />,
 });

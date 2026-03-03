@@ -145,15 +145,21 @@ Core WebSocket logic in `apps/api/src/ws/`:
 | `pubsub.ts` | Redis pub/sub for multi-instance |
 | `auth.ts` | Session authentication |
 
-### Broadcasting App Events (Pattern)
+### Broadcasting App Events
 
-To broadcast app events over WebSocket:
+App events are automatically broadcast over WebSocket via `events/handlers/websocket.ts`:
 
 ```typescript
-// events/handlers/websocket.ts (create this)
+// Already implemented in events/handlers/websocket.ts
 registerAppEvent('*', async (event) => {
+  // Send to actor (user who triggered the event)
+  if (event.actorId) {
+    sendToUser(event.actorId, event);
+  }
+
+  // Send to resource channel
   if (event.resourceType && event.resourceId) {
-    await publishToChannel(`${event.resourceType}:${event.resourceId}`, event);
+    sendToChannel(`${event.resourceType}:${event.resourceId}`, event);
   }
 });
 ```

@@ -103,6 +103,22 @@ export const ContextSelector = ({
             const isExpanded = expandedOrgId === org.id;
             const spaces = org.spaces || [];
 
+            // 0 spaces: directly switch to org context, no accordion
+            if (spaces.length === 0) {
+              return (
+                <DropdownMenuItem
+                  key={org.id}
+                  onClick={() => tenant.setOrganization(org.id)}
+                  className={cn('cursor-pointer', isCurrentOrg && 'bg-accent text-accent-foreground')}
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  <span className="flex-1 truncate">{org.name}</span>
+                  {isCurrentOrg && <Check className="h-4 w-4 ml-2" />}
+                </DropdownMenuItem>
+              );
+            }
+
+            // 1 space: directly switch to space context
             if (spaces.length === 1) {
               const space = spaces[0];
               const isCurrentSpace =
@@ -121,15 +137,19 @@ export const ContextSelector = ({
               );
             }
 
+            // 2+ spaces: accordion — use plain div for toggle so dropdown stays open
             return (
               <div key={org.id}>
-                <DropdownMenuItem onClick={() => toggleOrg(org.id)} className="cursor-pointer">
+                <div
+                  onClick={() => toggleOrg(org.id)}
+                  className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"
+                >
                   <Building2 className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">
                     {org.name} ({spaces.length})
                   </span>
                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </DropdownMenuItem>
+                </div>
 
                 {isExpanded && (
                   <div className="pl-6 py-1 space-y-1">

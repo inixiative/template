@@ -1,5 +1,6 @@
 import { organizationRead, spaceRead } from '@template/ui/apiClient';
-import { apiQuery } from '@template/ui/lib/apiQuery';
+import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { useAppStore } from '@template/ui/store';
 import { useQuery } from '@template/ui/hooks/useQuery';
 
 type Model = 'organization' | 'space';
@@ -22,32 +23,39 @@ export const useValidateUniqueness = (
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['validate-uniqueness', model, field, value],
-    queryFn: async (context) => {
+    queryFn: async () => {
       if (!value) return { available: true, existingId: undefined };
 
-      try {
-        const reader = modelReaders[model];
-        type ReaderOptions = Parameters<typeof reader>[0];
-        const params =
-          !field || field === 'id'
-            ? { path: { id: value } }
-            : ({ path: { id: value }, query: { lookup: field } } as ReaderOptions);
-        const result = await apiQuery(
-          (requestOptions: ReaderOptions) => reader({ ...params, ...requestOptions }),
-        )(context);
+      const { auth } = useAppStore.getState();
+      const reader = modelReaders[model];
+      type ReaderOptions = Parameters<typeof reader>[0];
+      const params =
+        !field || field === 'id'
+          ? { path: { id: value } }
+          : ({ path: { id: value }, query: { lookup: field } } as ReaderOptions);
 
-        const isTaken = result.data && (!options?.excludeId || result.data.id !== options.excludeId);
+      // Use throwOnError: false so we can inspect response.status
+      // (throwOnError: true throws the parsed JSON body which has no .status field)
+      const result = await apiFetchInternal(
+        (requestOptions: ReaderOptions) => reader({ ...params, ...requestOptions }),
+        { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
+      )() as any;
 
-        return {
-          available: !isTaken,
-          existingId: result.data?.id,
-        };
-      } catch (err: any) {
-        if (err?.status === 404 || err?.response?.status === 404) {
-          return { available: true, existingId: undefined };
-        }
-        throw err;
+      if (result?.response?.status === 404) {
+        return { available: true, existingId: undefined };
       }
+
+      if (result?.error) {
+        throw result.error;
+      }
+
+      const record = result?.data?.data ?? result?.data;
+      const isTaken = record && (!options?.excludeId || record.id !== options.excludeId);
+
+      return {
+        available: !isTaken,
+        existingId: record?.id,
+      };
     },
     enabled: enabled && !!value && value.length > 0,
     staleTime: 1000 * 5,

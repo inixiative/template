@@ -4,6 +4,7 @@ import { useAppStore } from '@template/ui/store';
 import { applyAuthorizedContext, hasContextChanged, resolveAuthorizedContext } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
 import { parseRoutingSearchParams, syncStoreFromSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/querySync';
 import { buildSearchParamUpdates, replaceUrlSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
+import { findRoute } from '@template/ui/lib/findRoute';
 
 /**
  * Handles all routing logic for authenticated layouts:
@@ -21,8 +22,9 @@ import { buildSearchParamUpdates, replaceUrlSearchParams } from '@template/ui/ho
 export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const { pathname, search } = useLocation();
-  const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
+  const setCurrentRouteMatch = useAppStore((state) => state.navigation.setCurrentRouteMatch);
   const tenant = useAppStore((state) => state.tenant);
   const permissions = useAppStore((state) => state.permissions);
   const auth = useAppStore((state) => state.auth);
@@ -53,30 +55,44 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
 
   // Check permissions and fallback to valid context
   useEffect(() => {
+    if (!navConfig) return;
+
     const authorizedContext = resolveAuthorizedContext({
       path: pathname,
-      navConfig: navConfig!,
+      navConfig,
       permissions,
       context: tenant.context,
       page: tenant.page,
       organizations: auth.organizations,
     });
 
-    if (!authorizedContext) return setIsAuthorized(false);
+    if (!authorizedContext) {
+      setCurrentRouteMatch(null);
+      return setIsAuthorized(false);
+    }
     setIsAuthorized(true);
+    setCurrentRouteMatch(findRoute(pathname, navConfig, authorizedContext.type));
 
     if (hasContextChanged(tenant.context, authorizedContext))
       applyAuthorizedContext({ tenant, context: authorizedContext });
-  }, [pathname, tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id, auth.spoofUserEmail]);
+  }, [navConfig, pathname, tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id, auth.spoofUserEmail]);
 
   // Auto-navigate to dashboard when context changes on same page
   const previousPathname = useRef('');
+  const previousContextType = useRef('');
   useEffect(() => {
+    const prevContextType = previousContextType.current;
+    previousContextType.current = tenant.context.type;
+
     if (!previousPathname.current) {
       previousPathname.current = pathname;
       return;
     }
-    if (pathname === previousPathname.current) navigatePreservingSpoof('/dashboard');
+
+    // Skip redirect when context is being initialized from URL params (public → org/space)
+    if (prevContextType === 'public' || prevContextType === '') return;
+
+    if (pathname === previousPathname.current) navigatePreservingContext('/dashboard');
     previousPathname.current = pathname;
   }, [tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id]);
 

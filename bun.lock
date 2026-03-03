@@ -40,6 +40,7 @@
       "name": "admin",
       "version": "0.0.1",
       "dependencies": {
+        "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
@@ -47,6 +48,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lodash-es": "^4.17.21",
+        "lucide-react": "*",
         "react": "*",
         "react-aria-components": "^1.14.0",
         "react-dom": "*",
@@ -110,6 +112,7 @@
       "name": "superadmin",
       "version": "0.0.1",
       "dependencies": {
+        "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
@@ -117,6 +120,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lodash-es": "^4.17.21",
+        "lucide-react": "*",
         "react": "*",
         "react-aria-components": "^1.14.0",
         "react-dom": "*",
@@ -142,6 +146,7 @@
       "name": "web",
       "version": "0.0.1",
       "dependencies": {
+        "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
@@ -149,6 +154,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lodash-es": "^4.17.21",
+        "lucide-react": "*",
         "react": "*",
         "react-aria-components": "^1.14.0",
         "react-dom": "*",

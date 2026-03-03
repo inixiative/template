@@ -4,7 +4,7 @@ import { FolderKanban } from 'lucide-react';
 
 export const spacesItem: NavItem = {
   label: 'Spaces',
-  path: '/organizations',
+  path: '/spaces',
   icon: FolderKanban,
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
 };

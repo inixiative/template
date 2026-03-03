@@ -8,6 +8,7 @@ type LoginPageProps = {
 
 export const LoginPage = ({ hideSignup }: LoginPageProps) => {
   const getStore = useAppStore.getState;
+  const projectName = useAppStore((state) => state.ui.projectName);
   const appName = useAppStore((state) => state.ui.appName);
 
   return (
@@ -15,7 +16,7 @@ export const LoginPage = ({ hideSignup }: LoginPageProps) => {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Template <span className="text-muted-foreground font-normal">{appName}</span>
+            {projectName} <span className="text-muted-foreground font-normal">{appName}</span>
           </h1>
           <p className="mt-2 text-muted-foreground">Log in to continue to your account</p>
         </div>

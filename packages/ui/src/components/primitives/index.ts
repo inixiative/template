@@ -1,4 +1,5 @@
 export * from './Avatar';
+export * from './Breadcrumb';
 export * from './Badge';
 export * from './Button';
 export * from './Card';
@@ -6,6 +7,8 @@ export * from './DropdownMenu';
 export * from './EmptyState';
 export * from './Input';
 export * from './Label';
+export * from './PasswordInput';
 export * from './Select';
+export * from './SlugInput';
 export * from './Table';
 export * from './ThemeToggle';
