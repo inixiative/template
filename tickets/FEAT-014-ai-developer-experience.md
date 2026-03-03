@@ -175,23 +175,35 @@ The template already has a strong AI foundation:
 
 ---
 
-## Future: Delphi — Prompt Refinement Harness
+## Future: Prompt Refinement Harness
 
-**Status**: Design doc complete, ~40% MVP built internally at UserEvidence. Not yet a standalone product.
+**Status**: Design doc complete, ~40% MVP built internally. Not yet a standalone product. Name TBD.
 
-Delphi is the **validation and optimization layer** for the AI DX features in this ticket. While this ticket builds the skills, rules, and agents, Delphi tests whether they actually work — and systematically makes them better.
+The prompt refinement harness is the **validation and optimization layer** for the AI DX features in this ticket. While this ticket builds the skills, rules, and agents, the harness tests whether they actually work — and systematically makes them better.
 
-**Core concept**: "Gradient descent on documentation" — since you can't fine-tune model weights, you optimize the docs/rules/skills that guide the model. Delphi provides the loss function and training loop.
+**Core concept**: "Gradient descent on documentation" — since you can't fine-tune model weights, you optimize the docs/rules/skills that guide the model. The harness provides the loss function and training loop.
 
 **Architecture** (from design doc):
 - **Three agents**: Subject (vague PM), Implementer (agent under test), Oracle (grader)
 - **Git branch isolation**: fixtures stored as three branches per test case (raw/subject/after)
 - **Five rubrics**: Prompt Efficiency, Completion, Demerits, Craft, Questioning
 - **Refinement loop**: implement → evaluate → diagnose → prescribe → re-trigger
+- **Fixture authoring**: one interview produces both Subject context and expected-questions checklist
+- **Scoring**: ceiling-reduction model — demerits cap the max achievable score, positive rubrics fill remaining headroom
+- **Perturbation**: simulated annealing to escape local optima (strip prose, restructure docs, fresh starts)
 
-**Why it belongs on this template**: Delphi needs multi-tenancy (orgs set up their own repos/fixtures), auth, job queues (running harness jobs), encrypted secrets (API keys for LLM providers), and a worker for async evaluation — all things the template already provides. Rebuilding Delphi on the template skips the infrastructure plumbing.
+**Why it belongs on this template**: The harness needs multi-tenancy (orgs set up their own repos/fixtures), auth, job queues (running harness jobs), encrypted secrets (API keys for LLM providers), and a worker for async evaluation — all things the template already provides.
 
-**Reference**: Design doc at `UserEvidence/Zealot-Monorepo/docs/PROMPT_HARNESS_V2.md`. Will get its own ticket when scoped for rebuild.
+**Implementation target**: `packages/prompt-harness/` (`@template/prompt-harness`)
+
+**Design doc**: Full spec saved at `docs/design/PROMPT_REFINEMENT_HARNESS.md`
+
+**MVP phases**:
+- MVP-0: One fixture, manual runs, basic scoring (Week 1)
+- MVP-1: Three-branch isolation, automated agents, task map comparison (Week 2-3)
+- MVP-2: Oracle prescriptions with human approval, holdout fixtures (Week 4+)
+
+Will get its own ticket when scoped for build.
 
 ---
 
@@ -199,4 +211,4 @@ Delphi is the **validation and optimization layer** for the AI DX features in th
 
 _2026-03-02: Created. The template's existing documentation (CLAUDE.md, docs/claude/) is a strong foundation. This ticket is about packaging that knowledge into formats every AI tool can consume, plus adding skills and MCP servers for workflow automation._
 
-_2026-03-02: Added Delphi reference. Prompt refinement harness (~40% built internally) is the testing/optimization layer for AI DX features. Potential standalone product built on the template._
+_2026-03-02: Added prompt refinement harness reference (~40% built internally). Validation/optimization layer for AI DX features. Potential standalone product built on the template. Full design doc saved to repo. Name TBD — avoiding collision with internal project name._
