@@ -40,19 +40,23 @@ export const log: ConsolaInstance = new Proxy(baseConsola, {
         const lastArg = args[args.length - 1];
         const hasManualScope = typeof lastArg === 'string' && logScopeValues.has(lastArg);
 
-        let logger = target.withTag(timestamp());
+        const time = timestamp();
+        const logger = target;
 
         if (hasManualScope) {
-          // Manual scope overrides all automatic scopes
-          logger = logger.withTag((lastArg as string).slice(0, 8));
-          return (logger[prop as keyof ConsolaInstance] as Function)(...args.slice(0, -1));
+          // Prepend both timestamp and scope to message
+          const scope = lastArg as string;
+          return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}] [${scope}]`, ...args.slice(0, -1));
         }
 
-        // No manual scope - use automatic scopes from logScope()
-        for (const scope of getLogScopes()) {
-          logger = logger.withTag(scope.slice(0, 8));
+        // Prepend timestamp and automatic scopes to message
+        const scopes = getLogScopes();
+        if (scopes.length > 0) {
+          const scopeStr = scopes.map(s => `[${s}]`).join(' ');
+          return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}] ${scopeStr}`, ...args);
         }
-        return (logger[prop as keyof ConsolaInstance] as Function)(...args);
+
+        return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}]`, ...args);
       };
     }
 

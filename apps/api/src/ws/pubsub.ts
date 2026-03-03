@@ -62,7 +62,7 @@ export const initWebSocketPubSub = async (): Promise<void> => {
     });
 
     pubsubEnabled = true;
-    log.info('✅ WebSocket pub/sub enabled (Redis)');
+    log.info('Pub/Sub Enabled', LogScope.ws);
   } catch (err) {
     log.warn('⚠️ WebSocket pub/sub disabled (Redis unavailable):', err);
     pubsubEnabled = false;

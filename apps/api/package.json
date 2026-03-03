@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "local": "bun --hot src/index.ts",
-    "local:worker": "bun --hot src/jobs/worker.ts",
+    "local": "bun --hot --no-clear-screen src/index.ts",
+    "local:worker": "bun --hot --no-clear-screen src/jobs/worker.ts",
     "start": "bun run src/index.ts",
     "start:worker": "bun run src/jobs/worker.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun",

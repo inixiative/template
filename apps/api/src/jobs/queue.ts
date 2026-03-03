@@ -1,9 +1,10 @@
 import { createRedisConnection } from '@template/db';
+import { LogScope } from '@template/shared/logger';
 import { Queue } from 'bullmq';
 import type { JobsQueue } from '#/jobs/types';
 
 // BullMQ Queue needs its own connection (separate from Worker)
-const redis = createRedisConnection('Redis:BullMQ:Queue');
+const redis = createRedisConnection(LogScope.job);
 
 const baseQueue = new Queue('jobs', {
   connection: redis,

@@ -1,4 +1,4 @@
-import { log } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import Redis from 'ioredis';
 import RedisMock from 'ioredis-mock';
@@ -19,10 +19,10 @@ let __main: Redis | null = null;
 let __subscriber: Redis | null = null;
 let __mock: Redis | null = null;
 
-export const createRedisConnection = (name = 'Redis'): Redis => {
+export const createRedisConnection = (scope: LogScope | string = LogScope.db): Redis => {
   if (isTest) {
     if (!__mock) __mock = new RedisMock() as unknown as Redis;
-    log.info(`[${name}] Using shared in-memory mock`);
+    log.info('Using shared in-memory mock', scope);
     return __mock;
   }
 
@@ -31,15 +31,15 @@ export const createRedisConnection = (name = 'Redis'): Redis => {
     enableReadyCheck: false,
   });
 
-  redis.on('error', (err) => log.error(`[${name}] Error:`, err));
-  redis.on('connect', () => log.info(`[${name}] Connected`));
+  redis.on('error', (err) => log.error('Error:', err, scope));
+  redis.on('connect', () => log.info('Connected', scope));
 
   return redis;
 };
 
 /** Main Redis client for all regular operations (cache, otp, session, flags, rate limits) */
 export const getRedisClient = (): Redis => {
-  if (!__main) __main = createRedisConnection('Redis:Main');
+  if (!__main) __main = createRedisConnection(LogScope.db);
   return __main;
 };
 
@@ -48,7 +48,7 @@ export const getRedisPub = (): Redis => getRedisClient();
 
 /** Dedicated subscriber connection (subscribe is blocking) */
 export const getRedisSub = (): Redis => {
-  if (!__subscriber) __subscriber = createRedisConnection('Redis:Subscriber');
+  if (!__subscriber) __subscriber = createRedisConnection(LogScope.ws);
   return __subscriber;
 };
 
