@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: ${PROJECT_NAME:-template}-postgres
+    container_name: ${PROJECT_NAME:-template}_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ${PROJECT_NAME:-template}-redis
+    container_name: ${PROJECT_NAME:-template}_redis
     restart: unless-stopped
     ports:
       - "6379:6379"

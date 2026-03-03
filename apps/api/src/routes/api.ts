@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { auth } from '#/lib/auth';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
@@ -22,6 +23,10 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);
+
+// Auth routes (better-auth handles its own auth, returns early)
+apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
+
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
