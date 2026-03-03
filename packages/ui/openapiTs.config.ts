@@ -11,6 +11,9 @@ export default defineConfig({
     format: 'biome',
     lint: 'biome',
   },
+  logs: {
+    level: 'warn',
+  },
   plugins: [
     '@hey-api/typescript',
     '@hey-api/schemas',

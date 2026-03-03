@@ -15,7 +15,8 @@ const baseConsola = createConsola({
   formatOptions: {
     date: false,
     colors: isLocal || isTest,
-    compact: isProd,
+    compact: true,
+    columns: 0,
   },
 });
 
