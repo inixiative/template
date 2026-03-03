@@ -1,5 +1,6 @@
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -11,6 +12,7 @@ export default defineConfig({
       generatedRouteTree: './app/routeTree.gen.ts',
     }),
     react(),
+    tailwindcss(),
     tsconfigPaths(),
     nodePolyfills({
       // Enable polyfills for Buffer and other Node.js APIs used by better-auth
@@ -20,6 +22,7 @@ export default defineConfig({
       },
     }),
   ],
+  clearScreen: false,
   server: {
     port: 3001,
     watch: {

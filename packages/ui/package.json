@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.86.1",
+    "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.90.5",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19",
