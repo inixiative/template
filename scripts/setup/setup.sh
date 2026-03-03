@@ -13,7 +13,7 @@ docker-compose up -d
 "$ROOT_DIR/scripts/db/wait-postgres.sh"
 "$ROOT_DIR/scripts/db/wait-redis.sh"
 bun run db:generate
-bun run db:push
-bun run db:seed 2>/dev/null || true
+bun run with local api bun run db:push
+bun run with local api bun run db:seed 2>/dev/null || true
 
 echo "Setup complete. Run: bun run local"

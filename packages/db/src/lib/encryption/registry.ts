@@ -1,4 +1,4 @@
-import { upperFirst } from 'lodash';
+import { upperFirst } from 'lodash-es';
 import type { AuthProvider } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
 

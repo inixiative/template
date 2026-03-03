@@ -1,4 +1,4 @@
-import { camelCase, upperFirst } from 'lodash';
+import { camelCase, upperFirst } from 'lodash-es';
 import pluralize from 'pluralize';
 
 type BuildOperationIdArgs = {

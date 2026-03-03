@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { mapValues } from 'lodash';
+import { mapValues } from 'lodash-es';
 
 // JSON schema that properly types to Prisma's InputJsonValue
 const InputJsonValueSchema: z.ZodType<unknown> = z
