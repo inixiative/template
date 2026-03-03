@@ -1,4 +1,4 @@
-import type { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, InquiryStatus, InquiryType, Role } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
@@ -19,26 +19,26 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
     throw makeError({ status: 400, message: 'Invalid content for this inquiry type', requestId });
   }
 
-  let sourceModel: InquiryResourceModel = 'User';
+  let sourceModel: InquiryResourceModel = InquiryResourceModel.User;
   let sourceUserId: string | null = user.id;
   let sourceOrganizationId: string | null = null;
   let sourceSpaceId: string | null = null;
 
-  if (body.type === 'inviteOrganizationUser') {
+  if (body.type === InquiryType.inviteOrganizationUser) {
     const orgId = parsedContent.data.organizationId as string;
     const membership = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: orgId, userId: user.id } },
     });
-    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+    if (!membership || ![Role.owner, Role.admin].includes(membership.role as Role)) {
       throw makeError({ status: 403, message: 'Requires admin or owner role to invite', requestId });
     }
-    sourceModel = 'Organization';
+    sourceModel = InquiryResourceModel.Organization;
     sourceUserId = null;
     sourceOrganizationId = orgId;
   }
 
   const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
-  const targetModel: InquiryResourceModel | null = targetUserId ? 'User' : null;
+  const targetModel: InquiryResourceModel | null = targetUserId ? InquiryResourceModel.User : null;
 
   if (handler.validate) {
     const partialInquiry = {
@@ -75,7 +75,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
       sourceSpaceId,
       targetModel,
       targetUserId: targetUserId ?? null,
-      sentAt: body.status === 'sent' ? new Date() : null,
+      sentAt: body.status === InquiryStatus.sent ? new Date() : null,
     },
   });
 

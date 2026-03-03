@@ -7,10 +7,12 @@ export const createSpaceHandler: InquiryHandler = {
     name: z.string(),
   }),
   resolutionSchema: z.object({
+    spaceId: z.string().optional(), // populated by handleApprove on creation
     explanation: z.string().optional(),
   }),
   handleApprove: async (_db, _inquiry, _resolvedContent) => {
-    // TODO: implement createSpace approval
+    // TODO: create Space, return { spaceId: space.id }
+    return {};
   },
   unique: false,
 };

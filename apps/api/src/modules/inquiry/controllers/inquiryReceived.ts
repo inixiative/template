@@ -1,3 +1,4 @@
+import { InquiryResourceModel, InquiryStatus, Role } from '@template/db/generated/client/enums';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryReceivedRoute } from '#/modules/inquiry/routes/inquiryReceived';
 import { getUserOrganizationIds } from '#/modules/inquiry/services/access';
@@ -7,29 +8,24 @@ export const inquiryReceivedController = makeController(inquiryReceivedRoute, as
   const db = c.get('db');
   const { page = 1, pageSize = 20 } = c.req.valid('query');
 
-  const userOrgIds = await getUserOrganizationIds(db, user.id, ['owner', 'admin', 'member']);
+  const userOrgIds = await getUserOrganizationIds(db, user.id, [Role.owner, Role.admin, Role.member]);
 
   const where = {
     AND: [
       {
         OR: [
-          { targetModel: 'User' as const, targetUserId: user.id },
+          { targetModel: InquiryResourceModel.User, targetUserId: user.id },
           ...(userOrgIds.length > 0
-            ? [{ targetModel: 'Organization' as const, targetOrganizationId: { in: userOrgIds } }]
+            ? [{ targetModel: InquiryResourceModel.Organization, targetOrganizationId: { in: userOrgIds } }]
             : []),
         ],
       },
-      { status: { not: 'draft' as const } },
+      { status: { not: InquiryStatus.draft } },
     ],
   };
 
   const [inquiries, total] = await Promise.all([
-    db.inquiry.findMany({
-      where,
-      take: pageSize,
-      skip: (page - 1) * pageSize,
-      orderBy: { createdAt: 'desc' },
-    }),
+    db.inquiry.findMany({ where, take: pageSize, skip: (page - 1) * pageSize, orderBy: { createdAt: 'desc' } }),
     db.inquiry.count({ where }),
   ]);
 

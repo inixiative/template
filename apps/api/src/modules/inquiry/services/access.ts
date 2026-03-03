@@ -1,5 +1,5 @@
 import type { Db } from '@template/db';
-import type { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 
 type InquiryLike = {
   sourceModel: InquiryResourceModel;
@@ -23,25 +23,20 @@ export const checkInquiryAccess = async (db: Db, inquiry: InquiryLike, userId: s
 };
 
 export const checkIsSource = async (db: Db, inquiry: InquiryLike, userId: string): Promise<boolean> => {
-  if (inquiry.sourceModel === 'User') {
-    return inquiry.sourceUserId === userId;
-  }
+  if (inquiry.sourceModel === InquiryResourceModel.User) return inquiry.sourceUserId === userId;
   if (!inquiry.sourceOrganizationId) return false;
   const membership = await db.organizationUser.findUnique({
     where: { organizationId_userId: { organizationId: inquiry.sourceOrganizationId, userId } },
   });
-  return !!membership && ['owner', 'admin'].includes(membership.role);
+  return !!membership && [Role.owner, Role.admin].includes(membership.role as Role);
 };
 
 export const checkIsTarget = async (db: Db, inquiry: InquiryLike, userId: string): Promise<boolean> => {
   if (!inquiry.targetModel) return false;
-
-  if (inquiry.targetModel === 'User') {
-    return inquiry.targetUserId === userId;
-  }
+  if (inquiry.targetModel === InquiryResourceModel.User) return inquiry.targetUserId === userId;
   if (!inquiry.targetOrganizationId) return false;
   const membership = await db.organizationUser.findUnique({
     where: { organizationId_userId: { organizationId: inquiry.targetOrganizationId, userId } },
   });
-  return !!membership && ['owner', 'admin'].includes(membership.role);
+  return !!membership && [Role.owner, Role.admin].includes(membership.role as Role);
 };

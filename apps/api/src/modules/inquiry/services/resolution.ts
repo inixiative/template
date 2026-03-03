@@ -1,4 +1,5 @@
 import type { Db, Prisma } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
 
@@ -13,11 +14,13 @@ export const resolveInquiry = async (
   resolverId: string,
 ): Promise<Inquiry> => {
   return db.txn(async () => {
-    if (outcome === 'approved') {
+    let approvalOutput: Record<string, unknown> = {};
+
+    if (outcome === InquiryStatus.approved) {
       const handler = inquiryHandlers[inquiry.type];
       const content = inquiry.content as Record<string, unknown>;
       const merged = resolveContent(content, resolutionData);
-      await handler.handleApprove(db, inquiry, merged);
+      approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
     }
 
     return db.inquiry.update({
@@ -26,6 +29,7 @@ export const resolveInquiry = async (
         status: outcome,
         resolution: {
           ...resolutionData,
+          ...approvalOutput,
           resolvedBy: resolverId,
           resolvedAt: new Date().toISOString(),
         },
