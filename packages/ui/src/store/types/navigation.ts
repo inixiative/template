@@ -12,5 +12,6 @@ export type NavigationSlice = {
     setCurrentRouteMatch: (match: RouteMatch | null) => void;
     navigatePreservingContext: (to: string) => void;
     navigatePreservingSpoof: (to: string) => void;
+    navigatePreservingAll: (to: string) => void;
   };
 };

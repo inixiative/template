@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 
 const PublicLayout = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -11,13 +11,13 @@ const PublicLayout = () => {
             </Link>
             <nav className="flex gap-6">
               <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Sign In
+                Log In
               </Link>
             </nav>
           </div>
         </div>
       </header>
-      <main>
+      <main className="flex-1">
         <Outlet />
       </main>
     </div>

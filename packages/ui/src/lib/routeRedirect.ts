@@ -18,7 +18,7 @@ const navigateToAuth = (path: '/login' | '/signup', getStore: () => AppStore, pr
   const redirectTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const searchAndHash = `${window.location.search}${window.location.hash}`;
   const query = preserveSearch ? searchAndHash : `?redirectTo=${encodeURIComponent(redirectTo)}`;
-  getStore().navigation.navigatePreservingContext(`${path}${query}`);
+  getStore().navigation.navigatePreservingAll(`${path}${query}`);
 };
 
 export const navigateToLogin = (getStore: () => AppStore, preserveSearch?: boolean) =>

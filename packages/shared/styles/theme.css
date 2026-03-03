@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../apps/*/app/**/*.{ts,tsx}";
 
 /*
  * Two-Tier Theme System
@@ -304,6 +306,178 @@
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
+}
+
+/*
+ * Semantic Color Utilities
+ *
+ * Defines bg-*, text-*, border-* utilities for all design tokens.
+ * Uses @layer utilities so these are always included and override Tailwind defaults cleanly.
+ *
+ * Note: base colors (--primary, --card, etc.) store raw HSL components → wrap with hsl()
+ *       shade colors (--primary-1..4) resolve to color-mix() values → use var() directly
+ */
+@layer utilities {
+  /* --- Background --- */
+  .bg-background { background-color: hsl(var(--background)); }
+  .text-background { color: hsl(var(--background)); }
+  .border-background { border-color: hsl(var(--background)); }
+
+  /* --- Foreground --- */
+  .bg-foreground { background-color: hsl(var(--foreground)); }
+  .text-foreground { color: hsl(var(--foreground)); }
+  .border-foreground { border-color: hsl(var(--foreground)); }
+
+  /* --- Card --- */
+  .bg-card { background-color: hsl(var(--card)); }
+  .text-card { color: hsl(var(--card)); }
+  .border-card { border-color: hsl(var(--card)); }
+  .bg-card-foreground { background-color: hsl(var(--card-foreground)); }
+  .text-card-foreground { color: hsl(var(--card-foreground)); }
+
+  /* --- Popover --- */
+  .bg-popover { background-color: hsl(var(--popover)); }
+  .text-popover { color: hsl(var(--popover)); }
+  .bg-popover-foreground { background-color: hsl(var(--popover-foreground)); }
+  .text-popover-foreground { color: hsl(var(--popover-foreground)); }
+
+  /* --- Primary --- */
+  .bg-primary { background-color: hsl(var(--primary)); }
+  .text-primary { color: hsl(var(--primary)); }
+  .border-primary { border-color: hsl(var(--primary)); }
+  .ring-primary { --tw-ring-color: hsl(var(--primary)); }
+  .bg-primary-foreground { background-color: hsl(var(--primary-foreground)); }
+  .text-primary-foreground { color: hsl(var(--primary-foreground)); }
+  /* Shades (resolve to color-mix values, use var() directly) */
+  .bg-primary-1 { background-color: var(--primary-1); }
+  .text-primary-1 { color: var(--primary-1); }
+  .border-primary-1 { border-color: var(--primary-1); }
+  .bg-primary-2 { background-color: var(--primary-2); }
+  .text-primary-2 { color: var(--primary-2); }
+  .border-primary-2 { border-color: var(--primary-2); }
+  .bg-primary-3 { background-color: var(--primary-3); }
+  .text-primary-3 { color: var(--primary-3); }
+  .border-primary-3 { border-color: var(--primary-3); }
+  .bg-primary-4 { background-color: var(--primary-4); }
+  .text-primary-4 { color: var(--primary-4); }
+  .border-primary-4 { border-color: var(--primary-4); }
+
+  /* --- Secondary --- */
+  .bg-secondary { background-color: hsl(var(--secondary)); }
+  .text-secondary { color: hsl(var(--secondary)); }
+  .border-secondary { border-color: hsl(var(--secondary)); }
+  .bg-secondary-foreground { background-color: hsl(var(--secondary-foreground)); }
+  .text-secondary-foreground { color: hsl(var(--secondary-foreground)); }
+  .bg-secondary-1 { background-color: var(--secondary-1); }
+  .text-secondary-1 { color: var(--secondary-1); }
+  .bg-secondary-2 { background-color: var(--secondary-2); }
+  .text-secondary-2 { color: var(--secondary-2); }
+  .bg-secondary-3 { background-color: var(--secondary-3); }
+  .text-secondary-3 { color: var(--secondary-3); }
+  .bg-secondary-4 { background-color: var(--secondary-4); }
+  .text-secondary-4 { color: var(--secondary-4); }
+
+  /* --- Tertiary --- */
+  .bg-tertiary { background-color: hsl(var(--tertiary)); }
+  .text-tertiary { color: hsl(var(--tertiary)); }
+  .border-tertiary { border-color: hsl(var(--tertiary)); }
+  .bg-tertiary-foreground { background-color: hsl(var(--tertiary-foreground)); }
+  .text-tertiary-foreground { color: hsl(var(--tertiary-foreground)); }
+  .bg-tertiary-1 { background-color: var(--tertiary-1); }
+  .bg-tertiary-2 { background-color: var(--tertiary-2); }
+  .bg-tertiary-3 { background-color: var(--tertiary-3); }
+  .bg-tertiary-4 { background-color: var(--tertiary-4); }
+
+  /* --- Quaternary --- */
+  .bg-quaternary { background-color: hsl(var(--quaternary)); }
+  .text-quaternary { color: hsl(var(--quaternary)); }
+  .border-quaternary { border-color: hsl(var(--quaternary)); }
+  .bg-quaternary-foreground { background-color: hsl(var(--quaternary-foreground)); }
+  .text-quaternary-foreground { color: hsl(var(--quaternary-foreground)); }
+  .bg-quaternary-1 { background-color: var(--quaternary-1); }
+  .bg-quaternary-2 { background-color: var(--quaternary-2); }
+  .bg-quaternary-3 { background-color: var(--quaternary-3); }
+  .bg-quaternary-4 { background-color: var(--quaternary-4); }
+
+  /* --- Muted --- */
+  .bg-muted { background-color: hsl(var(--muted)); }
+  .text-muted { color: hsl(var(--muted)); }
+  .border-muted { border-color: hsl(var(--muted)); }
+  .bg-muted-foreground { background-color: hsl(var(--muted-foreground)); }
+  .text-muted-foreground { color: hsl(var(--muted-foreground)); }
+
+  /* --- Accent --- */
+  .bg-accent { background-color: hsl(var(--accent)); }
+  .text-accent { color: hsl(var(--accent)); }
+  .border-accent { border-color: hsl(var(--accent)); }
+  .bg-accent-foreground { background-color: hsl(var(--accent-foreground)); }
+  .text-accent-foreground { color: hsl(var(--accent-foreground)); }
+  .hover\:bg-accent:hover { background-color: hsl(var(--accent)); }
+  .hover\:text-accent-foreground:hover { color: hsl(var(--accent-foreground)); }
+  .bg-accent-1 { background-color: var(--accent-1); }
+  .bg-accent-2 { background-color: var(--accent-2); }
+  .bg-accent-3 { background-color: var(--accent-3); }
+  .bg-accent-4 { background-color: var(--accent-4); }
+
+  /* --- Destructive --- */
+  .bg-destructive { background-color: hsl(var(--destructive)); }
+  .text-destructive { color: hsl(var(--destructive)); }
+  .border-destructive { border-color: hsl(var(--destructive)); }
+  .bg-destructive-foreground { background-color: hsl(var(--destructive-foreground)); }
+  .text-destructive-foreground { color: hsl(var(--destructive-foreground)); }
+  .hover\:bg-destructive\/90:hover { background-color: hsl(var(--destructive) / 0.9); }
+
+  /* --- Success --- */
+  .bg-success { background-color: hsl(var(--success)); }
+  .text-success { color: hsl(var(--success)); }
+  .border-success { border-color: hsl(var(--success)); }
+  .bg-success-foreground { background-color: hsl(var(--success-foreground)); }
+  .text-success-foreground { color: hsl(var(--success-foreground)); }
+  .bg-success-1 { background-color: hsl(var(--success-1)); }
+  .bg-success-2 { background-color: hsl(var(--success-2)); }
+
+  /* --- Error --- */
+  .bg-error { background-color: hsl(var(--error)); }
+  .text-error { color: hsl(var(--error)); }
+  .border-error { border-color: hsl(var(--error)); }
+  .bg-error-foreground { background-color: hsl(var(--error-foreground)); }
+  .text-error-foreground { color: hsl(var(--error-foreground)); }
+  .bg-error\/10 { background-color: hsl(var(--error) / 0.1); }
+
+  /* --- Warning --- */
+  .bg-warning { background-color: hsl(var(--warning)); }
+  .text-warning { color: hsl(var(--warning)); }
+  .border-warning { border-color: hsl(var(--warning)); }
+  .bg-warning-foreground { background-color: hsl(var(--warning-foreground)); }
+  .text-warning-foreground { color: hsl(var(--warning-foreground)); }
+
+  /* --- Info --- */
+  .bg-info { background-color: hsl(var(--info)); }
+  .text-info { color: hsl(var(--info)); }
+  .border-info { border-color: hsl(var(--info)); }
+  .bg-info-foreground { background-color: hsl(var(--info-foreground)); }
+  .text-info-foreground { color: hsl(var(--info-foreground)); }
+
+  /* --- UI Tokens --- */
+  .bg-input { background-color: hsl(var(--input)); }
+  .border-input { border-color: hsl(var(--input)); }
+  .border-border { border-color: hsl(var(--border)); }
+  .ring-ring { --tw-ring-color: hsl(var(--ring)); }
+  .border-border\/50 { border-color: hsl(var(--border) / 0.5); }
+
+  /* --- Hover variants for Button --- */
+  .hover\:bg-primary\/90:hover { background-color: hsl(var(--primary) / 0.9); }
+  .hover\:bg-secondary\/80:hover { background-color: hsl(var(--secondary) / 0.8); }
+  .hover\:bg-accent:hover { background-color: hsl(var(--accent)); }
+
+  /* --- Ring/Outline --- */
+  .focus-visible\:ring-ring:focus-visible { --tw-ring-color: hsl(var(--ring)); }
+  .ring-offset-background { --tw-ring-offset-color: hsl(var(--background)); }
+
+  /* --- Gradient stops using direct colors --- */
+  .from-muted { --tw-gradient-from: hsl(var(--muted)); --tw-gradient-from-position: 0%; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  .via-background { --tw-gradient-via: hsl(var(--background)); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to); }
+  .to-background { --tw-gradient-to: hsl(var(--background)); --tw-gradient-to-position: 100%; }
 }
 
 * {

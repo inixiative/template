@@ -1,8 +1,8 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { RootNotFound, Toaster } from '@template/ui/components';
 import { useDarkMode, useLanguage, usePageMeta, useSpaceTheme, useThemePersistence } from '@template/ui/hooks';
-import { useEffect } from 'react';
-import { useAppStore } from '#/store';
+import { useLayoutEffect } from 'react';
+import { useAppStore } from '@template/ui/store';
 import { navConfig } from '#/config/nav';
 
 const RootComponent = () => {
@@ -12,9 +12,9 @@ const RootComponent = () => {
   const setNavigate = useAppStore((state) => state.navigation.setNavigate);
   const setNavConfig = useAppStore((state) => state.navigation.setNavConfig);
 
-  // Initialize navigation in store (one-time setup)
+  // Initialize navigation in store synchronously before paint
   // navigate, setNavigate, setNavConfig are all stable refs
-  useEffect(() => {
+  useLayoutEffect(() => {
     setNavigate(navigate);
     setNavConfig(navConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps

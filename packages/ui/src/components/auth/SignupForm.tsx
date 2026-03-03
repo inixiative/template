@@ -73,9 +73,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const displayError = providerError ? 'Unable to load authentication providers. You can still sign up with email and password.' : error;
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Create account</CardTitle>
+    <Card className="w-full shadow-lg border-border/50">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-xl">Create account</CardTitle>
         <CardDescription>
           {showProviders ? 'Choose your sign-up method' : 'Enter your details to get started'}
         </CardDescription>
@@ -167,7 +167,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
               <div className="text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
-                  Sign in
+                  Log In
                 </button>
               </div>
             )}

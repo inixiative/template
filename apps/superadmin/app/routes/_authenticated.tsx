@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { AppShell, Unauthorized } from '@template/ui/components';
 import { requireAuth } from '#/guards';
-import { useAppStore } from '#/store';
+import { useAppStore } from '@template/ui/store';
 
 const AuthenticatedLayout = () => {
   const permix = useAppStore((state) => state.permissions.permix);

@@ -6,8 +6,14 @@ export const SignupPage = () => {
   const getStore = useAppStore.getState;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <SignupForm onLoginClick={() => navigateToLogin(getStore, true)} />
+    <div className="min-h-full flex items-center justify-center p-4 bg-gradient-to-br from-muted via-background to-background">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome</h1>
+          <p className="mt-2 text-muted-foreground">Create your account to get started</p>
+        </div>
+        <SignupForm onLoginClick={() => navigateToLogin(getStore, true)} />
+      </div>
     </div>
   );
 };

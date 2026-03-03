@@ -15,14 +15,24 @@ export type NavigationSlice = {
     setCurrentRouteMatch: (match: RouteMatch | null) => void;
     navigatePreservingContext: (to: string) => void;
     navigatePreservingSpoof: (to: string) => void;
+    navigatePreservingAll: (to: string) => void;
   };
 };
 
 const resolveSearchForPolicy = (
   currentSearch: string,
-  policy: 'context' | 'spoof',
+  policy: 'context' | 'spoof' | 'all',
   spoofUserEmail: string | null,
 ): Record<string, string> | undefined => {
+  if (policy === 'all') {
+    const params = new URLSearchParams(currentSearch);
+    const search: Record<string, string> = {};
+    params.forEach((value, key) => {
+      search[key] = value;
+    });
+    return Object.keys(search).length > 0 ? search : undefined;
+  }
+
   const preservedContext = policy === 'context' ? pickSearchParams(currentSearch, ['org', 'space']) : undefined;
   const spoof = spoofUserEmail ?? readSearchParam(currentSearch, 'spoof');
 
@@ -88,11 +98,7 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       })),
 
     navigatePreservingContext: (to) => {
-      const navigate = get().navigation.navigate;
-      if (!navigate) {
-        return;
-      }
-
+      const navigate = get().navigation.navigate!;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
@@ -104,15 +110,23 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
     },
 
     navigatePreservingSpoof: (to) => {
-      const navigate = get().navigation.navigate;
-      if (!navigate) {
-        return;
-      }
-
+      const navigate = get().navigation.navigate!;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
       const preservedSearch = resolveSearchForPolicy(currentSearch, 'spoof', spoofUserEmail);
+      const target = parseNavigateTarget(to);
+      const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
+      const search = mergeSearch(target.search, preservedSearch);
+      navigate({ to: finalPath, search });
+    },
+
+    navigatePreservingAll: (to) => {
+      const navigate = get().navigation.navigate!;
+      const spoofUserEmail = get().auth.spoofUserEmail;
+      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
+      const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
+      const preservedSearch = resolveSearchForPolicy(currentSearch, 'all', spoofUserEmail);
       const target = parseNavigateTarget(to);
       const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
       const search = mergeSearch(target.search, preservedSearch);

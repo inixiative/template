@@ -40,7 +40,7 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
       await signIn({ type: 'email', email, password });
       navigatePreservingContext(search.redirectTo || '/dashboard');
     } catch (err: any) {
-      const message = err?.message || 'Sign in failed. Please try again.';
+      const message = err?.message || 'Log in failed. Please try again.';
       setError(message);
       toast.error(message);
     } finally {
@@ -61,7 +61,7 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
         callbackURL: `${window.location.origin}/auth/callback`,
       });
     } catch (err: any) {
-      const message = err?.message || 'OAuth sign in failed. Please try again.';
+      const message = err?.message || 'OAuth log in failed. Please try again.';
       setError(message);
       toast.error(message);
       setIsLoading(false);
@@ -70,12 +70,14 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
 
   const enabledProviders = providers?.filter((p) => p.enabled) || [];
   const showProviders = enabledProviders.length > 0;
-  const displayError = providerError ? 'Unable to load authentication providers. You can still sign in with email and password.' : error;
+  const displayError = providerError
+    ? 'Unable to load authentication providers. You can still log in with email and password.'
+    : error;
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Sign in</CardTitle>
+    <Card className="w-full shadow-lg border-border/50">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-xl">Log In</CardTitle>
         <CardDescription>
           {showProviders ? 'Choose your sign-in method' : 'Enter your email and password to continue'}
         </CardDescription>
@@ -147,14 +149,14 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Logging in...' : 'Log In'}
             </Button>
 
             {onSignupClick && (
               <div className="text-center text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <button type="button" onClick={onSignupClick} className="text-primary hover:underline">
-                  Sign up
+                  Sign Up
                 </button>
               </div>
             )}

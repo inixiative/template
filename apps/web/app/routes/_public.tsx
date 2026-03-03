@@ -1,15 +1,8 @@
-import { createFileRoute, Link, Outlet, useLocation } from '@tanstack/react-router';
-import { BookOpen } from 'lucide-react';
+import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 
 const PublicLayout = () => {
-  const location = useLocation();
-
-  const navItems = [
-    { path: '/content', label: 'Content', icon: BookOpen },
-  ];
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -17,30 +10,17 @@ const PublicLayout = () => {
               Template
             </Link>
             <nav className="flex gap-6">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center gap-2 text-sm transition-colors ${
-                      isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+              <Link to="/signup" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Sign Up
+              </Link>
               <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Sign In
+                Log In
               </Link>
             </nav>
           </div>
         </div>
       </header>
-      <main>
+      <main className="flex-1">
         <Outlet />
       </main>
     </div>

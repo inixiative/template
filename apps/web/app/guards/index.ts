@@ -1,4 +1,4 @@
 import { createAuthGuards } from '@template/ui/guards';
-import { useAppStore } from '#/store';
+import { useAppStore } from '@template/ui/store';
 
 export const { requireAuth, requirePublic } = createAuthGuards(() => useAppStore.getState());

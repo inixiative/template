@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/query-core';
 import type { UseMutationOptions } from '@tanstack/react-query';
-import { useAppStore } from '@template/ui/store';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@template/ui/hooks/useQuery';
 
 /**
@@ -38,7 +38,7 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void, 
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
 }) => {
-  const queryClient = useAppStore((state) => state.client);
+  const queryClient = useQueryClient();
   const { mutationFn, queryKey, optimisticUpdate, mutationOptions } = options;
 
   return useMutation<TData, TError, TVariables, { previousData: TQueryData | undefined }>({
