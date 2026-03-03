@@ -2,7 +2,7 @@
 
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
-**Last Updated:** 2026-03-02
+**Last Updated:** 2026-03-03
 
 ## How to Read This
 
@@ -16,15 +16,15 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Core Platform
 
-- ✅ Monorepo architecture - 4 apps (web, admin, superadmin, api) + shared packages
-- ✅ Bun runtime and package manager
-- ✅ Turborepo orchestration with watch mode for hot reload
-- ✅ Workspace-level build/typecheck/test tooling
-- ✅ Multi-environment setup (pr, staging, prod) with Infisical
-- ✅ Environment composition via `with-env.sh` for secret injection
-- ✅ Docker Compose for supporting services (PostgreSQL 18, Redis 7)
-- ✅ TypeScript 5 with strict mode across all packages
-- 🟡 Init script with React Ink TUI - core complete, additional features in progress
+- ✅ **Monorepo Architecture** - 4 apps (`web`, `admin`, `superadmin`, `api`) + shared packages (`db`, `ui`, `email`, `shared`). Workspace-level scripts for build, typecheck, lint, and test across all packages simultaneously
+- ✅ **Bun Runtime** - Bun 1.3+ as runtime and package manager. Native `--hot` flag for sub-100ms API reloads. Faster installs, faster test runs, faster builds than Node/npm
+- ✅ **Turborepo Orchestration** - Task graph with caching: unchanged packages skip work. `turbo watch local` runs all apps; `turbo watch local#api` filters to one. Cross-package hot reload — change shared UI package, all consuming apps reload instantly
+- ✅ **Workspace Tooling** - Single `bun run lint`, `bun run typecheck`, `bun run test` at root runs across all packages. Task dependencies ensure build order (db → shared → ui → apps)
+- ✅ **Multi-Environment Setup** - Three environments: `pr` (ephemeral per PR), `staging`, `prod`. Each has isolated Infisical project, database, and Redis. PR environments auto-cleaned on merge
+- ✅ **Environment Composition** - `with-env.sh` injects secrets at runtime: `bun run with prod api turbo watch local#api` runs local code against production secrets. No committed `.env` files
+- ✅ **Docker Compose** - PostgreSQL 18 (alpine) and Redis 7 (alpine) for local dev. Persistent volumes, health checks, auto-restart. Bun servers run natively via Turborepo, not containerized
+- ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. No `any`, enforced null checks, proper error handling. Catches entire classes of bugs at compile time
+- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Core flow complete; PlanetScale, Infisical, Railway integrations working. Additional provider integrations in progress
 
 ---
 
@@ -66,32 +66,41 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Authentication & Sessions
 
-- ✅ BetterAuth integration for session and token auth
-- ✅ Email/password authentication with bcrypt hashing
-- ✅ Stateless JWT sessions with cookieCache strategy (5-minute cache window)
-- ✅ HTTP-only cookies with CSRF protection (double-submit cookie)
-- ✅ Redis secondary storage for frequently-accessed data
-- ✅ OAuth via BetterAuth social providers (Google, Microsoft, GitHub)
-- ✅ Multi-provider authentication (AuthProvider) - platform and org-specific configs
-- ✅ Platform providers available to all organizations
-- ✅ Organization-specific providers for custom OAuth/SAML configurations
-- ✅ AES-256-GCM encrypted secrets for OAuth client secrets
-- ✅ Key rotation support via encryption version tracking
-- ✅ Full CRUD API for auth provider management
-- ✅ Bearer token API authentication (`Authorization: Bearer <key>`)
-- ✅ URL token parameter fallback for WebSocket/emails (`?token=`)
-- ✅ SHA-256 token hashing with 10-minute Redis cache
-- ✅ User, Organization, and Space-scoped tokens
-- ✅ Personal access tokens with expiry
-- ✅ Token CRUD operations with usage tracking
-- ✅ Session model with BetterAuth persistence
-- ✅ Verification model for email verification
-- ✅ Account model for OAuth linkage
-- ✅ User impersonation (spoofing) for superadmins via `x-spoof-user-email` header
-- ✅ Spoof status in response headers (x-spoofing-user-email, x-spoofed-user-email)
-- ✅ Frontend spoof badge UI with clear function
-- 🟡 Session refresh - Token refresh/silent re-auth not yet implemented
-- 🟣 SAML/SSO integration (ticket AUTH-001, schema ready, awaiting BetterAuth plugin maturity)
+### Session Authentication (BetterAuth)
+
+- ✅ **BetterAuth Integration** - Session and token auth via BetterAuth ^1.5. Handles email/password, OAuth, session lifecycle, and verification flows out of the box
+- ✅ **Email/Password Auth** - bcrypt password hashing with configurable rounds. Registration, login, password reset, and email verification all handled
+- ✅ **Stateless JWT Sessions** - Signed JWTs stored in HTTP-only cookies. `cookieCache` strategy caches session validation in Redis for 5 minutes — reduces DB reads on every request without sacrificing freshness
+- ✅ **HTTP-Only Cookies + CSRF** - Sessions stored in HTTP-only, Secure, SameSite=Lax cookies. Double-submit cookie pattern prevents CSRF. Tokens never accessible from JavaScript
+- ✅ **Redis Session Cache** - Frequently-accessed session data (user ID, org memberships) cached in Redis. Avoids DB round-trips on every authenticated request
+- ✅ **OAuth Social Providers** - Google, Microsoft, GitHub via BetterAuth social plugin. Provider config set per-platform or per-organization. Callback handling, account linking, and token storage built-in
+- ✅ **BetterAuth Models** - Session (active sessions with expiry), Verification (email verification tokens), Account (OAuth provider linkage) models persisted in Prisma
+
+### Multi-Provider Auth (AuthProvider)
+
+- ✅ **AuthProvider Model** - Organizations configure their own OAuth/SAML providers (client ID, encrypted secret, callback URL, scopes). Users authenticate via the org's configured provider
+- ✅ **Platform Providers** - Providers marked `platformDefault: true` are available to all organizations. Enables centrally-managed SSO configs without per-org setup
+- ✅ **Encrypted Secrets** - OAuth client secrets stored with AES-256-GCM encryption at rest. Key rotation via version tracking. Secret never returned in API responses
+- ✅ **Full CRUD API** - Create, read, update, delete auth providers via API. Admin routes for platform providers, organization routes for org-specific configs
+
+### Token Authentication
+
+- ✅ **Bearer Token Auth** - `Authorization: Bearer <key>` header for API access. SHA-256 hashed at rest. 10-minute Redis cache for frequently-used tokens avoids DB lookup per request
+- ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (WebSocket upgrades, email links). Same validation pipeline as Bearer tokens
+- ✅ **Hierarchical Token Scopes** - Tokens scoped to User (cross-org), Organization (all spaces in org), or Space (single space only). Scope determines which resources the token can access
+- ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. Usage tracking updates `lastUsedAt` on every request
+- ✅ **Token CRUD** - Full lifecycle management. List tokens (with last-used metadata), create with name+expiry, delete by ID. Tokens scoped to the owning User/Org/Space
+
+### User Impersonation
+
+- ✅ **Superadmin Spoofing** - Superadmins send `x-spoof-user-email` header to impersonate any user. Middleware resolves the target user and swaps auth context. Full access to impersonated user's orgs and permissions
+- ✅ **Spoof Response Headers** - API responds with `x-spoofing-user-email` (impersonator) and `x-spoofed-user-email` (target) for auditability. Frontend reads these to show the spoof badge
+- ✅ **Spoof Badge UI** - Yellow banner in AppShell when spoofing is active. Shows impersonated user's email and "Clear Spoof" button that removes the header and refreshes
+
+### Roadmap
+
+- 🟡 **Session Refresh** - Silent re-authentication when session expires. Token refresh flow and auto-retry on 401 not yet implemented
+- 🟣 **SAML/SSO** (ticket AUTH-001) - Schema and encryption infrastructure ready. Awaiting BetterAuth SAML plugin maturity for production-ready SAML 2.0 support
 
 ---
 
@@ -204,15 +213,15 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Admin Operations
 
-- ✅ Admin cache clearing endpoint (`/admin/cache/clear`)
-- ✅ Admin cron job CRUD operations
-- ✅ Admin manual cron job triggering
-- ✅ Admin job enqueueing interface
-- ✅ Admin inquiry oversight and management
-- ✅ Admin webhook oversight and debugging
-- ✅ BullBoard UI at `/admin/queues` for job monitoring
-- ✅ Admin platform auth provider management
-- ✅ Admin organization overview and management
+- ✅ **Cache Clearing** - `POST /admin/cache/clear` flushes Redis caches (permissions, tokens, sessions) without server restart. Essential for invalidating stale permission caches after role changes
+- ✅ **Cron Job CRUD** - Full create/read/update/delete for scheduled jobs. Persist schedule, description, and enabled state. Admin can view all registered crons, their last/next run times, and current status
+- ✅ **Manual Cron Triggering** - `POST /admin/cron/:name/trigger` runs any cron immediately regardless of schedule. Critical for one-off executions (key rotation, cache warming) without waiting for next scheduled run
+- ✅ **Job Enqueueing** - `POST /admin/jobs/enqueue` manually enqueues any registered job with custom payload. Useful for reprocessing failed records or triggering background work on demand
+- ✅ **Inquiry Oversight** - Admin routes to read and manage all inquiries across organizations. View status, override state transitions, inspect resolution metadata for support scenarios
+- ✅ **Webhook Oversight** - Read all webhook subscriptions across organizations. Inspect delivery history via WebhookEvent records (status, response code, error body). Retrigger failed deliveries for integration debugging
+- ✅ **BullBoard Dashboard** - Visual job monitoring at `/admin/queues`. Filterable by queue and status. Inspect job payloads, retry failed jobs, view execution times and error stack traces
+- ✅ **Auth Provider Management** - Platform-level auth provider CRUD (Google, Microsoft, GitHub OAuth configs). Providers marked `platformDefault: true` are available to all organizations
+- ✅ **Organization Management** - Read all organizations across platform with user counts, settings, and status. Superadmin routes bypass organization permission checks
 
 ---
 
@@ -318,45 +327,45 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Field-Level Encryption Engine
 
-- ✅ AES-256-GCM encryption with per-field version tracking
-- ✅ Registry pattern (`ENCRYPTED_MODELS`) — add field, zero code changes
-- ✅ Auto-discovery rotation — one job handles all models/fields
-- ✅ Type-safe `encryptField<M, K>()` / `decryptField()` generics
-- ✅ AAD binds ciphertext to immutable record fields
-- ✅ Idempotent rotation via version precondition in WHERE clause
-- ✅ Singleton job locking — Redis lock with heartbeat
-- ✅ CI blocks deployment on version downgrades, gaps, or mixed versions
-- ✅ Dual-key zero-downtime rotation (current + previous)
-- ✅ 3 env vars per keyring
-- ✅ BullBoard rotation monitoring
-- ✅ Full test suite (service, helpers, validation, env)
-- ✅ AuthProvider secrets encrypted at rest
-- 🟣 Key escrow & lifecycle (ticket FEAT-013)
-- 🟣 Encryption admin dashboard (ticket FEAT-013)
+- ✅ **AES-256-GCM** - Industry-standard authenticated encryption. Each field encrypted independently with a random IV. Authentication tag detects tampering. Per-field version tracking enables targeted key rotation
+- ✅ **Registry Pattern** - `ENCRYPTED_MODELS` config declares which model fields are encrypted. Adding a field to the registry is the only step required — hooks, rotation, and validation all auto-discover it
+- ✅ **Auto-Discovery Rotation** - `rotateEncryptionKeys` job queries the registry, finds all encrypted models/fields, and re-encrypts any record with a stale key version. One job handles the entire system
+- ✅ **Type-Safe Generics** - `encryptField<Model, Key>()` / `decryptField()` enforce that field name is a valid encrypted field for the given model. Typos caught at compile time
+- ✅ **AAD (Additional Authenticated Data)** - Ciphertext cryptographically bound to immutable record fields (e.g. record ID). Prevents ciphertext from being transplanted to another record
+- ✅ **Idempotent Rotation** - Rotation uses `WHERE version = N` precondition. Safe to run multiple times — only records with the old version get re-encrypted. No double-encryption
+- ✅ **Singleton Job Locking** - Redis lock with heartbeat prevents concurrent rotation runs across workers. Lock expires after 5 minutes; heartbeat refreshes every 2 minutes
+- ✅ **CI Version Validation** - Pre-deploy check blocks if key version has gaps, downgrades, or mixed versions across environments. Catches misconfiguration before it reaches production
+- ✅ **Dual-Key Zero-Downtime Rotation** - During rotation window, both current and previous key versions accepted for decryption. No request fails mid-rotation. Old-version records re-encrypted in background
+- ✅ **3 Env Vars Per Keyring** - `ENCRYPTION_KEY_CURRENT`, `ENCRYPTION_KEY_PREVIOUS`, `ENCRYPTION_KEY_VERSION`. Simple, auditable. Rotation = swap current→previous, set new current, bump version
+- ✅ **BullBoard Monitoring** - Rotation jobs visible in BullBoard dashboard. Track progress, execution time, failure reasons
+- ✅ **Full Test Suite** - Coverage for encryption service, helpers, CI validation logic, and environment variable parsing
+- ✅ **AuthProvider Secrets Encrypted** - OAuth client secrets encrypted at rest using the field encryption engine. First production use of the system
+- 🟣 **Key Escrow & Lifecycle** (ticket FEAT-013) - Key backup, recovery procedures, admin visibility into key ages and rotation history
+- 🟣 **Encryption Admin Dashboard** (ticket FEAT-013) - UI for monitoring encrypted field coverage, rotation status, and key health across all models
 
 ### General Security
 
-- ✅ HTTP-only cookies for session security
-- ✅ CSRF protection (BetterAuth double-submit cookie pattern)
-- ✅ SQL injection prevention (Prisma parameterized queries)
-- ✅ XSS prevention (React automatic escaping)
-- ✅ Password hashing with bcrypt (BetterAuth)
-- ✅ Token hashing with SHA-256
-- 🟣 Rate limiting - infrastructure ready with Redis, implementation pending
-- 🟣 Audit logs - infrastructure ready with logging system, implementation pending
+- ✅ **HTTP-Only Cookies** - Session tokens stored in HTTP-only, Secure, SameSite=Lax cookies. Never accessible from JavaScript — eliminates XSS token theft
+- ✅ **CSRF Protection** - BetterAuth double-submit cookie pattern. Requests must include matching CSRF token in header and cookie. Stateless — no server-side CSRF session needed
+- ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
+- ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
+- ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
+- ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
+- 🟣 **Rate Limiting** - Redis infrastructure in place for sliding window rate limits. Implementation pending (ticket INFRA-002 dependency)
+- 🟣 **Audit Logs** - Structured logging captures all mutations. Formal audit log model with queryable history not yet implemented
 
 ---
 
 ## User Management
 
-- ✅ User CRUD operations
-- 🟡 User profile management - Profile page is read-only (intentional, editing not yet implemented)
-- 🟡 User settings and preferences - Settings pages exist as placeholders, not yet implemented
-- ✅ User redaction/anonymization (GDPR compliance)
-- ✅ Me endpoint system (self-service API with 8+ endpoints)
-- ✅ Email verification flow
-- ✅ Password reset flow
-- ✅ User-scoped tokens for API access
+- ✅ **User CRUD** - Create, read, update, delete users. Admin routes for platform-level user management; me routes for self-service operations. Typed IDs prevent accidental cross-model ID mixing
+- ✅ **Me Endpoint System** - Self-service API with 8+ endpoints under `/me`: read profile, update name, change password, list orgs, list spaces, list tokens, manage auth providers, delete account. Authenticated users manage their own data without needing admin access
+- ✅ **Email Verification** - BetterAuth verification flow: send verification email with signed token, verify token on click, mark email as verified. Verification model persists tokens with expiry
+- ✅ **Password Reset** - BetterAuth reset flow: request reset email, validate signed token, set new password. Tokens are single-use and expire after 1 hour
+- ✅ **User Redaction / GDPR** - Anonymize user PII on account deletion: email → `redacted-{uuid}@redacted.invalid`, name → `Redacted User`, avatar cleared. Preserves record for referential integrity while removing identifying data
+- ✅ **User-Scoped Tokens** - Users create personal access tokens for API automation. Tokens inherit user's permissions across all their organizations. Optional expiry, usage tracking via `lastUsedAt`
+- 🟡 **Profile Editing** - Profile page renders name and org slug. Editing not yet wired to API mutations; save handler is a placeholder
+- 🟡 **User Settings** - Settings pages (notifications, preferences, appearance) exist as route shells; content not yet implemented
 
 ---
 
@@ -420,7 +429,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Done (Primitives)
 
-- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Select, Table, ThemeToggle
+- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, PasswordInput, Select, SlugInput, Table, ThemeToggle
 
 - ✅ **AppShell** - Main application layout with sidebar, header, and breadcrumb navigation. Wires to Zustand store for current user, org, space
 
@@ -464,8 +473,12 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **useMediaQuery()** - Responsive design helper that returns boolean for media query matches. Use for conditional rendering based on screen size. Server-safe (returns false during SSR)
 
-- ✅ **Plus**: useAuthProviders, useAppEvents, useDarkMode, useLanguage, usePageMeta, and more
-- 🟡 **useSpaceTheme** - Hook exists but returns mock values; space theming not yet wired to real data
+- ✅ **useAuthProviders()** - Fetches available auth providers for current org or platform. Used by login/signup to render correct OAuth buttons, show SSO option, or show password field based on configured providers
+- ✅ **useAppEvents()** - Subscribes to named DOM custom events for cross-component communication. Pair with `useEventRefetch()` to trigger query invalidations without prop drilling or shared state
+- ✅ **useDarkMode()** - Reads and sets theme preference (light/dark/system). Syncs with Zustand ui slice, persists across sessions, applies Tailwind `dark:` class to document root. Returns `{ theme, setTheme, isDark }`
+- ✅ **useLanguage()** - Returns current locale string and setter. Backed by Zustand ui slice. Ready for i18n integration — currently returns `en` as default, locale-aware components read from this hook
+- ✅ **usePageMeta()** - Sets `document.title` and meta description for the current route. Accepts raw strings or template with app name. Called in page components to keep browser tab titles contextual
+- 🟡 **useSpaceTheme()** - Hook exists but returns mock values; space theming not yet wired to real data
 
 ---
 
@@ -591,15 +604,15 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Architectural Patterns
 
-- ✅ Context isolation in batch API
-- ✅ Multi-strategy authentication (session, token, OAuth)
-- ✅ Polymorphic database patterns (false polymorphism for Token, CustomerRef)
-- ✅ Dynamic schema generation from split files
-- ✅ Permission-based menu rendering
-- ✅ Encryption versioning for key rotation
-- ✅ Hierarchical permission inheritance
-- ✅ Request context scoping across middleware
-- ✅ Factory pattern for test data generation
+- ✅ **Context Isolation in Batch API** - Each request in a batch gets its own isolated AppEnv (db, auth, permissions). Prevents one batch operation from leaking context into another. Transaction strategies (transactionAll, transactionPerRound) wrap operations without sharing mutable state
+- ✅ **Multi-Strategy Authentication** - Single middleware chain handles session cookies, Bearer tokens, and URL token params. Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
+- ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRef) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
+- ✅ **Dynamic Schema Generation** - Prisma schema split across one file per model in `prisma/schema/`. Build step concatenates files before generation. Reduces merge conflicts, enables per-model organization, and makes large schemas navigable
+- ✅ **Permission-Based Menu Rendering** - Navigation config declares required permissions per item. Menu rendered by evaluating each item's permission against the Permix client. Items hidden (not just disabled) if user lacks permission. Re-evaluated on context switch (org/space change)
+- ✅ **Encryption Versioning** - Each encrypted field stores the key version used to encrypt it. Rotation job queries fields WHERE version < current and re-encrypts in batches. CI blocks deploys if version gaps or downgrades detected. Dual-key window (current + previous) enables zero-downtime rotation
+- ✅ **Hierarchical Permission Inheritance** - Space permissions cascade from parent organization. Org owners automatically granted owner access to all spaces. Permission middleware resolves hierarchy at check time — no denormalization needed
+- ✅ **Request Context Scoping** - AppEnv created per request via AsyncLocalStorage. Contains db client, user, org, space, permissions — all scoped to the current request. No global state. Middleware enriches context; controllers read from it. Concurrent requests never share context
+- ✅ **Factory Pattern for Test Data** - `create*()` / `build*()` factories auto-infer relationships (creating a Token auto-creates owning User/Org/Space if not provided). Override only test-relevant fields. Shared across all test files, zero duplication
 
 ---
 
