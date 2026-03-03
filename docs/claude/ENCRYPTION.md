@@ -28,11 +28,11 @@ encryption/
 
 ### Key Features
 
-- **Generic**: One rotation job handles all models forever
-- **Auto-discovery**: Iterates registry, no manual configuration
-- **Type-safe**: `encryptField<M, K>()` with helper types
-- **Idempotent**: Version precondition prevents race conditions
-- **Observable**: BullBoard job monitoring
+- **Generic** — single rotation job for all models
+- **Auto-discovery** — iterates registry automatically
+- **Type-safe** — `encryptField<M, K>()` generics
+- **Idempotent** — version precondition prevents races
+- **Observable** — BullBoard monitoring
 
 ---
 
