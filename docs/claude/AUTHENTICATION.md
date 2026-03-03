@@ -5,20 +5,36 @@ Comprehensive guide to authentication in the template using BetterAuth, JWT sess
 ## Architecture
 
 **Stack:**
-- BetterAuth - Auth framework with JWT sessions
-- httpOnly cookies - Secure token storage
+- BetterAuth - Auth framework issuing stateless JWTs
+- HTTP-only cookie - JWT storage for email/password auth
+- localStorage + Bearer token - JWT storage for OAuth auth
 - OAuth/SAML - External identity providers
 - ReBAC - Permission system (see PERMISSIONS.md)
 
-**Flow:**
+**No server-side sessions** — JWTs are stateless. BetterAuth's `cookieCache` skips DB validation for up to 5 minutes.
+
+**Email/password flow:**
 ```
 User submits credentials
   ↓
-Store calls auth service (signIn/signUp)
+BetterAuth validates + issues JWT in HTTP-only cookie
   ↓
-BetterAuth API validates + sets JWT cookie
+Store hydrates user data via /me
   ↓
-Store hydrates user data
+Auto-redirect to redirectTo or /dashboard
+```
+
+**OAuth flow:**
+```
+User clicks OAuth provider
+  ↓
+BetterAuth redirects to provider (Google, GitHub, etc.)
+  ↓
+Provider redirects back to /auth/callback?token=<jwt>
+  ↓
+Callback extracts JWT from URL, stores in localStorage via setToken()
+  ↓
+Store hydrates user data via /me (Authorization: Bearer <jwt>)
   ↓
 Auto-redirect to redirectTo or /dashboard
 ```

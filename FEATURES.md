@@ -68,13 +68,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Session Authentication (BetterAuth)
 
-- ✅ **BetterAuth Integration** - Session and token auth via BetterAuth ^1.5. Handles email/password, OAuth, session lifecycle, and verification flows out of the box
-- ✅ **Email/Password Auth** - bcrypt password hashing with configurable rounds. Registration, login, password reset, and email verification all handled
-- ✅ **Stateless JWT Sessions** - Signed JWTs stored in HTTP-only cookies. `cookieCache` strategy caches session validation in Redis for 5 minutes — reduces DB reads on every request without sacrificing freshness
-- ✅ **HTTP-Only Cookies + CSRF** - Sessions stored in HTTP-only, Secure, SameSite=Lax cookies. Double-submit cookie pattern prevents CSRF. Tokens never accessible from JavaScript
-- ✅ **Redis Session Cache** - Frequently-accessed session data (user ID, org memberships) cached in Redis. Avoids DB round-trips on every authenticated request
-- ✅ **OAuth Social Providers** - Google, Microsoft, GitHub via BetterAuth social plugin. Provider config set per-platform or per-organization. Callback handling, account linking, and token storage built-in
-- ✅ **BetterAuth Models** - Session (active sessions with expiry), Verification (email verification tokens), Account (OAuth provider linkage) models persisted in Prisma
+- ✅ **BetterAuth Integration** - JWT and token auth via BetterAuth ^1.5. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
+- ✅ **Email/Password Auth** - bcrypt password hashing. On sign-in, BetterAuth issues a **stateless JWT stored in an HTTP-only cookie**. No server-side session — the JWT is the session. CSRF protection via BetterAuth's double-submit cookie pattern
+- ✅ **OAuth Flow → Bearer Token** - OAuth callback (`/auth/callback`) extracts the returned JWT from the URL param and stores it in **localStorage** via `setToken()`. All subsequent API requests send it as `Authorization: Bearer <token>`. No cookie involved for OAuth users
+- ✅ **Stateless JWT** - No server-side session storage. Both email/password (cookie) and OAuth (localStorage Bearer) use the same JWT format. `cookieCache.maxAge: 300` means BetterAuth skips DB validation for up to 5 minutes per JWT
+- ✅ **Redis Secondary Storage** - Frequently-accessed data (permission caches, org lists) cached in Redis. Not the primary auth store — JWTs are self-contained
+- ✅ **OAuth Social Providers** - Google, Microsoft, GitHub via BetterAuth social plugin. Callback handling, account linking, and token issuance built-in
+- ✅ **BetterAuth Models** - Session (persisted for revocation), Verification (email verification tokens), Account (OAuth provider linkage) models in Prisma
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -345,8 +345,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **HTTP-Only Cookies** - Session tokens stored in HTTP-only, Secure, SameSite=Lax cookies. Never accessible from JavaScript — eliminates XSS token theft
-- ✅ **CSRF Protection** - BetterAuth double-submit cookie pattern. Requests must include matching CSRF token in header and cookie. Stateless — no server-side CSRF session needed
+- ✅ **HTTP-Only Cookie (email/password)** - Email/password auth issues a stateless JWT in an HTTP-only, Secure, SameSite=Lax cookie. Not accessible from JavaScript. CSRF protection via BetterAuth double-submit cookie pattern
+- ✅ **Bearer Token (OAuth)** - OAuth flow stores the JWT in localStorage and sends it as `Authorization: Bearer <token>`. No cookie — CSRF is not a risk for Bearer tokens, but XSS is (localStorage is JS-accessible). Trade-off accepted for OAuth compatibility
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
 - ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
