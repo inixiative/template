@@ -219,12 +219,26 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Encryption & Security
 
-- ✅ AES-256-GCM encryption service for sensitive data
-- ✅ Additional Authenticated Data (AAD) prevents ciphertext tampering
-- ✅ Key rotation support via encryption version tracking
-- ✅ Environment-based key management
-- ✅ Encryption helpers and validation
-- ✅ AuthProvider secrets encrypted at rest (OAuth client secrets, SAML certificates)
+### Field-Level Encryption Engine
+
+- ✅ AES-256-GCM encryption with per-field version tracking
+- ✅ Registry pattern (`ENCRYPTED_MODELS`) — add field, zero code changes
+- ✅ Auto-discovery rotation — one job handles all models/fields
+- ✅ Type-safe `encryptField<M, K>()` / `decryptField()` generics
+- ✅ AAD binds ciphertext to immutable record fields
+- ✅ Idempotent rotation via version precondition in WHERE clause
+- ✅ Singleton job locking — Redis lock with heartbeat
+- ✅ CI blocks deployment on version downgrades, gaps, or mixed versions
+- ✅ Dual-key zero-downtime rotation (current + previous)
+- ✅ 3 env vars per keyring
+- ✅ BullBoard rotation monitoring
+- ✅ Full test suite (service, helpers, validation, env)
+- ✅ AuthProvider secrets encrypted at rest
+- 🟣 Key escrow & lifecycle (ticket FEAT-013)
+- 🟣 Encryption admin dashboard (ticket FEAT-013)
+
+### General Security
+
 - ✅ HTTP-only cookies for session security
 - ✅ CSRF protection (BetterAuth double-submit cookie pattern)
 - ✅ SQL injection prevention (Prisma parameterized queries)
@@ -427,7 +441,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - 🟣 Product analytics (ticket INFRA-010, user behavior tracking - OpenPanel/Mixpanel/internal)
 - 🟣 Storybook component showcase (ticket DEV-001, visual documentation for 50+ UI components)
 - 🟣 Visual JSON editor integration (ticket DEV-002, syntax highlighting, collapsible nodes, validation)
-- 🟣 Mobile app template (ticket FEAT-013, React Native app with shared API/types)
+- 🟣 Encryption key escrow & lifecycle (ticket FEAT-013, key backup, recovery, admin visibility)
+- 🟣 AI Developer Experience (ticket FEAT-014, skills, rules, agents, MCP servers for AI-native development)
+- 🟣 Mobile app template (React Native app with shared API/types)
 - 🟣 End-to-End Tests (Playwright/Cypress suite not configured)
 - 🟣 S3/AWS integration - client scaffolds exist
 - 🟣 Stripe integration - client scaffolds exist
@@ -488,4 +504,6 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ⭐ **Navigation Config** - Declarative, context-aware, permission-based menus
 - ⭐ **Comprehensive Testing** - 250+ tests with factories and transaction isolation
 - ⭐ **Production Ready** - Full observability, job queue, webhooks, caching
+- ⭐ **Field-Level Encryption** - AES-256-GCM with registry pattern, auto-rotation, CI validation
 - ⭐ **Developer Experience** - Hot reload, monorepo tooling, type-safe everything
+- 🟣 **AI-Native** - Built-in skills, rules, agents, and MCP servers for AI coding assistants (coming soon)
