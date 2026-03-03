@@ -4,16 +4,15 @@ import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({
-  outcome: z.enum(['approved', 'denied']),
-  explanation: z.string().optional(),
+  explanation: z.string(),
 });
 
-export const inquiryResolveRoute = actionRoute({
+export const inquiryRequestChangesRoute = actionRoute({
   model: Modules.inquiry,
-  action: 'resolve',
+  action: 'request-changes',
   method: 'post',
   bodySchema,
   responseSchema: InquiryModelSchema,
   tags: ['Inquiries'],
-  description: 'Resolves an inquiry as approved or denied.',
+  description: 'Requests changes from the source before the inquiry can be resolved.',
 });

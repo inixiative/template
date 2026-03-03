@@ -59,8 +59,9 @@ enum InquiryType {
 enum InquiryStatus {
   draft
   sent
-  acknowledged
-  resolved
+  changesRequested
+  approved
+  denied
   canceled
 }
 

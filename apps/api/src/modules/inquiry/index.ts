@@ -5,6 +5,7 @@ import { inquiryCancelController } from '#/modules/inquiry/controllers/inquiryCa
 import { inquiryCreateController } from '#/modules/inquiry/controllers/inquiryCreate';
 import { inquiryReadController } from '#/modules/inquiry/controllers/inquiryRead';
 import { inquiryReceivedController } from '#/modules/inquiry/controllers/inquiryReceived';
+import { inquiryRequestChangesController } from '#/modules/inquiry/controllers/inquiryRequestChanges';
 import { inquiryResolveController } from '#/modules/inquiry/controllers/inquiryResolve';
 import { inquirySendController } from '#/modules/inquiry/controllers/inquirySend';
 import { inquirySentController } from '#/modules/inquiry/controllers/inquirySent';
@@ -14,6 +15,7 @@ import { inquiryCancelRoute } from '#/modules/inquiry/routes/inquiryCancel';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
 import { inquiryReadRoute } from '#/modules/inquiry/routes/inquiryRead';
 import { inquiryReceivedRoute } from '#/modules/inquiry/routes/inquiryReceived';
+import { inquiryRequestChangesRoute } from '#/modules/inquiry/routes/inquiryRequestChanges';
 import { inquiryResolveRoute } from '#/modules/inquiry/routes/inquiryResolve';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { inquirySentRoute } from '#/modules/inquiry/routes/inquirySent';
@@ -31,6 +33,7 @@ inquiryRouter.openapi(inquiryReceivedRoute, inquiryReceivedController);
 inquiryRouter.openapi(inquiryUpdateRoute, inquiryUpdateController);
 inquiryRouter.openapi(inquirySendRoute, inquirySendController);
 inquiryRouter.openapi(inquiryResolveRoute, inquiryResolveController);
+inquiryRouter.openapi(inquiryRequestChangesRoute, inquiryRequestChangesController);
 inquiryRouter.openapi(inquiryCancelRoute, inquiryCancelController);
 
 export const adminInquiryRouter = new OpenAPIHono<AppEnv>();

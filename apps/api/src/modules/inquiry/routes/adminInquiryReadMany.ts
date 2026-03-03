@@ -15,5 +15,4 @@ export const adminInquiryReadManyRoute = readRoute({
   admin: true,
   query: querySchema,
   responseSchema: InquiryModelSchema,
-  searchableFields: ['subject', 'message'],
 });

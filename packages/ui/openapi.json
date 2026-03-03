@@ -2608,20 +2608,12 @@
           },
           "_cached": null
         },
-        "searchableFields": [
-          "subject",
-          "message"
-        ],
         "operationId": "adminInquiryReadMany",
         "tags": [
           "admin",
           "inquiry"
         ],
         "description": "Retrieves a list of inquiries.",
-        "x-searchable-fields": [
-          "subject",
-          "message"
-        ],
         "parameters": [
           {
             "schema": {
@@ -2686,28 +2678,6 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "description": "Search across all searchable fields",
-              "example": "john"
-            },
-            "required": false,
-            "in": "query",
-            "name": "search"
-          },
-          {
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              },
-              "description": "Search specific fields (allowed: subject, message)"
-            },
-            "required": false,
-            "in": "query",
-            "name": "searchFields"
           }
         ],
         "responses": {
@@ -21093,7 +21063,7 @@
         "tags": [
           "Inquiries"
         ],
-        "description": "Resolves an inquiry with an outcome.",
+        "description": "Resolves an inquiry as approved or denied.",
         "parameters": [
           {
             "schema": {
@@ -21125,8 +21095,7 @@
                     "type": "string",
                     "enum": [
                       "approved",
-                      "denied",
-                      "canceled"
+                      "denied"
                     ]
                   },
                   "explanation": {
@@ -21135,6 +21104,381 @@
                 },
                 "required": [
                   "outcome"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "sentAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "inviteOrganizationUser",
+                            "createSpace",
+                            "updateSpace",
+                            "transferSpace"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "draft",
+                            "sent",
+                            "acknowledged",
+                            "resolved",
+                            "canceled"
+                          ]
+                        },
+                        "content": {
+                          "nullable": true
+                        },
+                        "resolution": {
+                          "nullable": true
+                        },
+                        "sourceModel": {
+                          "type": "string",
+                          "enum": [
+                            "admin",
+                            "User",
+                            "Organization",
+                            "Space"
+                          ]
+                        },
+                        "sourceUserId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sourceOrganizationId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sourceSpaceId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "sourceUser": {
+                          "nullable": true
+                        },
+                        "sourceOrganization": {
+                          "nullable": true
+                        },
+                        "sourceSpace": {
+                          "nullable": true
+                        },
+                        "targetModel": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "admin",
+                            "User",
+                            "Organization",
+                            "Space"
+                          ]
+                        },
+                        "targetUserId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "targetOrganizationId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "targetSpaceId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "targetUser": {
+                          "nullable": true
+                        },
+                        "targetOrganization": {
+                          "nullable": true
+                        },
+                        "targetSpace": {
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "createdAt",
+                        "updatedAt",
+                        "sentAt",
+                        "type",
+                        "status",
+                        "sourceModel",
+                        "sourceUserId",
+                        "sourceOrganizationId",
+                        "sourceSpaceId",
+                        "targetModel",
+                        "targetUserId",
+                        "targetOrganizationId",
+                        "targetSpaceId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inquiry/:id/request-changes": {
+      "post": {
+        "bodySchema": {
+          "_def": {
+            "unknownKeys": "strip",
+            "catchall": {
+              "_def": {
+                "typeName": "ZodNever"
+              },
+              "~standard": {
+                "version": 1,
+                "vendor": "zod"
+              }
+            },
+            "typeName": "ZodObject"
+          },
+          "~standard": {
+            "version": 1,
+            "vendor": "zod"
+          },
+          "_cached": null
+        },
+        "responseSchema": {
+          "_def": {
+            "unknownKeys": "strict",
+            "catchall": {
+              "_def": {
+                "typeName": "ZodNever"
+              },
+              "~standard": {
+                "version": 1,
+                "vendor": "zod"
+              }
+            },
+            "typeName": "ZodObject"
+          },
+          "~standard": {
+            "version": 1,
+            "vendor": "zod"
+          },
+          "_cached": null
+        },
+        "operationId": "inquiryRequestChanges",
+        "tags": [
+          "Inquiries"
+        ],
+        "description": "Requests changes from the source before the inquiry can be resolved.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "123e4567-e89b-12d3-a456-426614174000"
+            },
+            "required": true,
+            "in": "path",
+            "name": "id"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "lookup",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "explanation": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "explanation"
                 ]
               }
             }

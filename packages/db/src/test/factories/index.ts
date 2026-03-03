@@ -1,4 +1,5 @@
 export * from './authProviderFactory';
+export * from './inquiryFactory';
 export * from './cronJobFactory';
 export * from './customerRefFactory';
 export * from './emailComponentFactory';
