@@ -11,6 +11,7 @@ export {
   type ActionState,
   createPermissions,
   type Entitlements,
+  InquiryAction,
   OrganizationAction,
   type PermissionEntry,
   type Permix,

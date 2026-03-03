@@ -2,6 +2,7 @@ import { Operator } from '@inixiative/json-rules';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
+const spaceSourceTypes = ['updateSpace', 'transferSpace'];
 
 export const rebacSchema: RebacSchema = {
   user: {
@@ -72,6 +73,74 @@ export const rebacSchema: RebacSchema = {
   authProvider: {
     actions: {
       own: { rel: 'organization', action: 'own' },
+    },
+  },
+
+  inquiry: {
+    actions: {
+      // Read: source or target can read their own inquiry
+      read: {
+        any: [
+          { self: 'sourceUserId' },
+          { rel: 'sourceOrganization', action: 'manage' },
+          { rel: 'sourceSpace', action: 'manage' },
+          { self: 'targetUserId' },
+          { rel: 'targetOrganization', action: 'manage' },
+          { rel: 'targetSpace', action: 'manage' },
+        ],
+      },
+
+      // Send: who may create/initiate each inquiry type
+      send: {
+        any: [
+          // inviteOrganizationUser — org admin+ can invite
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+              { rel: 'sourceOrganization', action: 'manage' },
+            ],
+          },
+          // createSpace — any org member may request
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['createSpace'] } },
+              { rel: 'sourceOrganization', action: 'operate' },
+            ],
+          },
+          // updateSpace, transferSpace — space admin+ may request
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: spaceSourceTypes } },
+              { rel: 'sourceSpace', action: 'manage' },
+            ],
+          },
+        ],
+      },
+
+      // Resolve: target decides (approve/deny)
+      // For User targets: self check passes. For admin targets: targetUserId is null,
+      // self check fails for regular users — superadmin bypass handles it.
+      resolve: {
+        any: [
+          { self: 'targetUserId' },
+          { rel: 'targetOrganization', action: 'manage' },
+        ],
+      },
+
+      // Request changes: same as resolve (target-side action)
+      requestChanges: 'resolve',
+
+      // Cancel: source retracts
+      cancel: {
+        any: [
+          { self: 'sourceUserId' },
+          { rel: 'sourceOrganization', action: 'manage' },
+          { rel: 'sourceSpace', action: 'manage' },
+        ],
+      },
+
+      // Update draft: same as cancel (source-side action)
+      update: 'cancel',
     },
   },
 };
