@@ -221,22 +221,21 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Field-Level Encryption Engine
 
-- ✅ AES-256-GCM field-level encryption with per-field version tracking
-- ✅ Encryption registry pattern (`ENCRYPTED_MODELS`) — add model/field, zero code changes needed
-- ✅ Auto-discovery rotation job — one generic job handles all models/fields forever
-- ✅ Type-safe helpers — `encryptField<M, K>()` and `decryptField()` with TypeScript generics
-- ✅ Additional Authenticated Data (AAD) binds ciphertext to immutable record fields
-- ✅ Idempotent key rotation — version precondition in WHERE clause prevents race conditions
-- ✅ Singleton job locking — Redis-based lock with heartbeat prevents concurrent rotation
-- ✅ CI validation — blocks deployment on version downgrades, gaps, or mixed versions
-- ✅ Dual-key support — current + previous keys for zero-downtime rotation
-- ✅ Environment-based key management (3 env vars per keyring)
-- ✅ BullBoard monitoring for rotation job progress
-- ✅ Comprehensive test suite (encryption service, helpers, validation, env validation)
-- ✅ AuthProvider secrets encrypted at rest (OAuth client secrets, SAML certificates)
-- 🟣 Key escrow/backup system (ticket FEAT-013, prevent catastrophic data loss from key deletion)
-- 🟣 Key lifecycle management (ticket FEAT-013, rotation age tracking, backup validation)
-- 🟣 Encryption admin dashboard (ticket FEAT-013, health checks, version status visibility)
+- ✅ AES-256-GCM encryption with per-field version tracking
+- ✅ Registry pattern (`ENCRYPTED_MODELS`) — add field, zero code changes
+- ✅ Auto-discovery rotation — one job handles all models/fields
+- ✅ Type-safe `encryptField<M, K>()` / `decryptField()` generics
+- ✅ AAD binds ciphertext to immutable record fields
+- ✅ Idempotent rotation via version precondition in WHERE clause
+- ✅ Singleton job locking — Redis lock with heartbeat
+- ✅ CI blocks deployment on version downgrades, gaps, or mixed versions
+- ✅ Dual-key zero-downtime rotation (current + previous)
+- ✅ 3 env vars per keyring
+- ✅ BullBoard rotation monitoring
+- ✅ Full test suite (service, helpers, validation, env)
+- ✅ AuthProvider secrets encrypted at rest
+- 🟣 Key escrow & lifecycle (ticket FEAT-013)
+- 🟣 Encryption admin dashboard (ticket FEAT-013)
 
 ### General Security
 
