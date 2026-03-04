@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { InquiryModelSchema } from '@template/db/zod/models';
 import { actionRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({
@@ -16,4 +17,5 @@ export const inquiryResolveRoute = actionRoute({
   responseSchema: InquiryModelSchema,
   tags: ['Inquiries'],
   description: 'Resolves an inquiry as approved or denied.',
+  middleware: [validatePermission('resolve')],
 });

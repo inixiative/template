@@ -1,5 +1,6 @@
 import { InquiryScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 export const inquiryUpdateRoute = updateRoute({
@@ -7,4 +8,5 @@ export const inquiryUpdateRoute = updateRoute({
   bodySchema: InquiryScalarSchema,
   responseSchema: InquiryScalarSchema,
   tags: ['Inquiries'],
+  middleware: [validatePermission('update')],
 });

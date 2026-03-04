@@ -1,5 +1,6 @@
 import { InquiryModelSchema } from '@template/db/zod/models';
 import { actionRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 export const inquirySendRoute = actionRoute({
@@ -9,4 +10,5 @@ export const inquirySendRoute = actionRoute({
   responseSchema: InquiryModelSchema,
   tags: ['Inquiries'],
   description: 'Sends a draft inquiry to the target.',
+  middleware: [validatePermission('send')],
 });
