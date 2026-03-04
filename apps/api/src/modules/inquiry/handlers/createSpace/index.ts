@@ -4,7 +4,7 @@ import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 export const createSpaceHandler: InquiryHandler = {
   sources: [{ sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: 'organizationId' }],
-  targets: [{ targetModel: null }],
+  targets: [{ targetModel: InquiryResourceModel.admin }],
   contentSchema: z.object({
     organizationId: z.string(),
     name: z.string(),

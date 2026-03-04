@@ -118,7 +118,7 @@ export const rebacSchema: RebacSchema = {
       },
 
       // Resolve: target decides (approve/deny)
-      // For User targets: self check passes. For admin targets: targetUserId is null,
+      // For User targets: self check passes. For admin targets (targetModel === admin),
       // self check fails for regular users — superadmin bypass handles it.
       resolve: {
         any: [

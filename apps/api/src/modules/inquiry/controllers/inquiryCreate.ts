@@ -36,12 +36,14 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
     sourceSpaceId = content[source.sourceSpaceId] as string;
   }
 
-  // Derive target fields from request + handler meta
-  const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
+  // Derive target fields from handler meta + request
   const [target] = handler.targets;
   const targetModel = target.targetModel;
-  const targetOrganizationId = target && 'targetOrganizationId' in target ? content[target.targetOrganizationId] as string : null;
-  const targetSpaceId = target && 'targetSpaceId' in target ? content[target.targetSpaceId] as string : null;
+  const targetUserId = targetModel === InquiryResourceModel.User
+    ? (body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null))
+    : null;
+  const targetOrganizationId = 'targetOrganizationId' in target ? content[target.targetOrganizationId] as string : null;
+  const targetSpaceId = 'targetSpaceId' in target ? content[target.targetSpaceId] as string : null;
 
   const partial = await hydrate(db, 'inquiry', {
     id: '',
