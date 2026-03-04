@@ -38,8 +38,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureApiClientIndex.ts && bun run generate:msw",
-    "generate:msw": "bun scripts/generateMswHandlers.ts"
+    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.json openapi-ts -f openapiTs.config.ts && bun scripts/ensure-api-client-index.ts && bun run generate:msw",
+    "generate:msw": "bun scripts/generate-msw-handlers.ts"
   },
   "dependencies": {
     "@template/permissions": "workspace:*",

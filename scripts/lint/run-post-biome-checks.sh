@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 CHECKS=(
-  "./scripts/lint/checkImportAliases.sh"
-  "./scripts/lint/checkGeneratedFiles.sh"
+  "./scripts/lint/check-import-aliases.sh"
+  "./scripts/lint/check-generated-files.sh"
 )
 
 for check in "${CHECKS[@]}"; do

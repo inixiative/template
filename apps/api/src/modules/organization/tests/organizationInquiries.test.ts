@@ -84,22 +84,18 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
   });
 });
 
-describe('POST /api/v1/organization/:id/inquiries', () => {
+describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (low roles)', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
-  let admin: User;
   let org: Organization;
-  let adminOrgUser: OrganizationUser;
 
   beforeAll(async () => {
-    const { entity: u } = await createUser();
-    admin = u;
+    const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
-    adminOrgUser = ou;
+    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -108,7 +104,7 @@ describe('POST /api/v1/organization/:id/inquiries', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('creates a draft inviteOrganizationUser inquiry', async () => {
+  it('admin can invite with member role (draft)', async () => {
     const { entity: invitee } = await createUser();
 
     const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
@@ -128,7 +124,7 @@ describe('POST /api/v1/organization/:id/inquiries', () => {
     expect(data.targetUserId).toBe(invitee.id);
   });
 
-  it('creates and immediately sends when status=sent', async () => {
+  it('admin can send invite immediately (status=sent)', async () => {
     const { entity: invitee } = await createUser();
 
     const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
@@ -168,12 +164,25 @@ describe('POST /api/v1/organization/:id/inquiries', () => {
     expect(response.status).toBe(409);
   });
 
-  it('rejects non-admin creating invite', async () => {
-    const { entity: member } = await createUser();
-    const { entity: memberOu } = await createOrganizationUser({ role: 'member' }, { user: member, organization: org });
+  it('admin cannot invite with high role (owner)', async () => {
     const { entity: invitee } = await createUser();
 
-    const memberFetch = createTestApp({ mockUser: member, mockOrganizationUsers: [memberOu], mount }).fetch;
+    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'owner' },
+      targetUserId: invitee.id,
+    }));
+
+    expect(response.status).toBe(403);
+  });
+
+  it('member cannot invite at all', async () => {
+    const { entity: memberUser } = await createUser();
+    const { entity: memberOu } = await createOrganizationUser({ role: 'member' }, { user: memberUser, organization: org });
+    const { entity: invitee } = await createUser();
+
+    const memberFetch = createTestApp({ mockUser: memberUser, mockOrganizationUsers: [memberOu], mount }).fetch;
     const response = await memberFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
       type: InquiryType.inviteOrganizationUser,
       targetModel: InquiryResourceModel.User,
@@ -183,9 +192,113 @@ describe('POST /api/v1/organization/:id/inquiries', () => {
 
     expect(response.status).toBe(403);
   });
+});
 
-  it('creates a createSpace inquiry targeting admin', async () => {
-    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (high roles)', () => {
+  let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
+  let adminFetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let org: Organization;
+
+  beforeAll(async () => {
+    const { entity: ownerUser } = await createUser();
+    const { entity: adminUser } = await createUser();
+    const { entity: o } = await createOrganization();
+    org = o;
+    const { entity: ownerOu } = await createOrganizationUser({ role: 'owner' }, { user: ownerUser, organization: org });
+    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+
+    const ownerHarness = createTestApp({ mockUser: ownerUser, mockOrganizationUsers: [ownerOu], mount });
+    ownerFetch = ownerHarness.fetch;
+    db = ownerHarness.db;
+    adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('owner can invite with admin role', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await ownerFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'admin' },
+      targetUserId: invitee.id,
+    }));
+
+    expect(response.status).toBe(201);
+    const { data } = await json<Inquiry>(response);
+    expect(data.type).toBe(InquiryType.inviteOrganizationUser);
+  });
+
+  it('owner can invite with owner role', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await ownerFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'owner' },
+      targetUserId: invitee.id,
+    }));
+
+    expect(response.status).toBe(201);
+  });
+
+  it('admin cannot invite with owner role', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await adminFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'owner' },
+      targetUserId: invitee.id,
+    }));
+
+    expect(response.status).toBe(403);
+  });
+
+  it('admin cannot invite with admin role', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await adminFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'admin' },
+      targetUserId: invitee.id,
+    }));
+
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
+  let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
+  let adminFetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let org: Organization;
+
+  beforeAll(async () => {
+    const { entity: ownerUser } = await createUser();
+    const { entity: adminUser } = await createUser();
+    const { entity: o } = await createOrganization();
+    org = o;
+    const { entity: ownerOu } = await createOrganizationUser({ role: 'owner' }, { user: ownerUser, organization: org });
+    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+
+    const ownerHarness = createTestApp({ mockUser: ownerUser, mockOrganizationUsers: [ownerOu], mount });
+    ownerFetch = ownerHarness.fetch;
+    db = ownerHarness.db;
+    adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('owner can create a createSpace inquiry targeting admin', async () => {
+    const response = await ownerFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
       type: InquiryType.createSpace,
       targetModel: InquiryResourceModel.admin,
       content: { organizationId: org.id, name: 'My New Space' },
@@ -198,27 +311,37 @@ describe('POST /api/v1/organization/:id/inquiries', () => {
     expect(data.sourceOrganizationId).toBe(org.id);
     expect(data.targetModel).toBe(InquiryResourceModel.admin);
   });
+
+  it('admin cannot create a createSpace inquiry', async () => {
+    const response = await adminFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
+      type: InquiryType.createSpace,
+      targetModel: InquiryResourceModel.admin,
+      content: { organizationId: org.id, name: 'My New Space' },
+    }));
+
+    expect(response.status).toBe(403);
+  });
 });
 
 describe('GET /api/v1/organization/:id/inquiries/received', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
-  let member: User;
+  let admin: User;
   let org: Organization;
-  let memberOu: OrganizationUser;
+  let adminOu: OrganizationUser;
   let otherOrg: Organization;
 
   beforeAll(async () => {
     const { entity: u } = await createUser();
-    member = u;
+    admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'member' }, { user: member, organization: org });
-    memberOu = ou;
+    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    adminOu = ou;
     const { entity: other } = await createOrganization();
     otherOrg = other;
 
-    const harness = createTestApp({ mockUser: member, mockOrganizationUsers: [memberOu], mount });
+    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOu], mount });
     fetch = harness.fetch;
     db = harness.db;
   });

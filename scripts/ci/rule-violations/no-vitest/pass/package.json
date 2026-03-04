@@ -1,0 +1,7 @@
+{
+  "name": "fixture-no-vitest-pass",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -13,6 +13,7 @@ export const spaceReadManyInquiriesSentController = makeController(
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: { sourceModel: InquiryResourceModel.Space, sourceSpaceId: space.id },
       orderBy: { createdAt: 'desc' },
+    include: { targetUser: true, targetOrganization: true, targetSpace: true },
     });
 
     return respond.ok(data, { pagination });

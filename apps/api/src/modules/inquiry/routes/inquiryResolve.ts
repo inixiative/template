@@ -6,7 +6,7 @@ import { validatePermission } from '#/middleware/validations/validatePermission'
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({
-  status: z.enum([InquiryStatus.approved, InquiryStatus.denied]),
+  status: z.enum([InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.changesRequested]),
   explanation: z.string().optional(),
 });
 
@@ -16,6 +16,6 @@ export const inquiryResolveRoute = actionRoute({
   method: 'post',
   bodySchema,
   responseSchema: InquiryModelSchema,
-  description: 'Resolves an inquiry as approved or denied.',
+  description: 'Resolves an inquiry: approve, deny, or request changes from the source.',
   middleware: [validatePermission('resolve')],
 });

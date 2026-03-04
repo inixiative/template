@@ -505,6 +505,96 @@ describe('rebac check', () => {
     });
   });
 
+  describe('dot-path rel traversal (multi-hop)', () => {
+    const schema: RebacSchema = {
+      organization: {
+        actions: {
+          own: null,
+          manage: 'own',
+        },
+      },
+      space: {
+        actions: {
+          own: { rel: 'organization', action: 'own' },
+          manage: 'own',
+        },
+      },
+      inquiry: {
+        actions: {
+          // updateSpace: space owner or org owner (space.own delegates to org.own)
+          updateSpace: { rel: 'sourceSpace', action: 'own' },
+          // transferSpace: org owner only — explicit 2-hop bypasses direct space.own
+          transferSpace: { rel: 'sourceSpace.organization', action: 'own' },
+        },
+      },
+    };
+
+    it('single-hop rel works as before', async () => {
+      await permix.setup({ resource: 'space', id: 'space-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1', organization: { id: 'org-1' } },
+      };
+      expect(check(permix, schema, 'inquiry', record, 'updateSpace')).toBe(true);
+    });
+
+    it('two-hop dot-path: grants access when org owner', async () => {
+      await permix.setup({ resource: 'organization', id: 'org-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1', organization: { id: 'org-1' } },
+      };
+      expect(check(permix, schema, 'inquiry', record, 'transferSpace')).toBe(true);
+    });
+
+    it('two-hop dot-path: denies when only space owner (not org owner)', async () => {
+      await permix.setup({ resource: 'space', id: 'space-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1', organization: { id: 'org-1' } },
+      };
+      // transferSpace explicitly traverses to org — direct space.own is not enough
+      expect(check(permix, schema, 'inquiry', record, 'transferSpace')).toBe(false);
+    });
+
+    it('two-hop dot-path: updateSpace allows space owner (via delegation to org.own)', async () => {
+      await permix.setup({ resource: 'organization', id: 'org-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1', organization: { id: 'org-1' } },
+      };
+      // space.own delegates to org.own, so org owner passes updateSpace too
+      expect(check(permix, schema, 'inquiry', record, 'updateSpace')).toBe(true);
+    });
+
+    it('two-hop dot-path: returns false when intermediate relation is missing', async () => {
+      await permix.setup({ resource: 'organization', id: 'org-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1' }, // no organization
+      };
+      expect(check(permix, schema, 'inquiry', record, 'transferSpace')).toBe(false);
+    });
+
+    it('two-hop dot-path: returns false when first segment relation is missing', async () => {
+      await permix.setup({ resource: 'organization', id: 'org-1', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        // no sourceSpace at all
+      };
+      expect(check(permix, schema, 'inquiry', record, 'transferSpace')).toBe(false);
+    });
+
+    it('two-hop dot-path: returns false when wrong org', async () => {
+      await permix.setup({ resource: 'organization', id: 'org-2', actions: { own: true } });
+      const record = {
+        id: 'inq-1',
+        sourceSpace: { id: 'space-1', organization: { id: 'org-1' } },
+      };
+      expect(check(permix, schema, 'inquiry', record, 'transferSpace')).toBe(false);
+    });
+  });
+
   describe('missing relation handling', () => {
     const schema: RebacSchema = {
       space: {

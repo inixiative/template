@@ -2,7 +2,6 @@ import { Operator } from '@inixiative/json-rules';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
-const spaceSourceTypes = ['updateSpace', 'transferSpace'];
 
 export const rebacSchema: RebacSchema = {
   user: {
@@ -109,18 +108,25 @@ export const rebacSchema: RebacSchema = {
               { rel: 'sourceOrganization', action: 'manage' },
             ],
           },
-          // createSpace — any org member may request
+          // createSpace — org owner only
           {
             all: [
               { rule: { field: 'type', operator: Operator.in, value: ['createSpace'] } },
-              { rel: 'sourceOrganization', action: 'operate' },
+              { rel: 'sourceOrganization', action: 'own' },
             ],
           },
-          // updateSpace, transferSpace — space admin+ may request
+          // updateSpace — space owner or org owner (sourceSpace.own delegates to org.own)
           {
             all: [
-              { rule: { field: 'type', operator: Operator.in, value: spaceSourceTypes } },
-              { rel: 'sourceSpace', action: 'manage' },
+              { rule: { field: 'type', operator: Operator.in, value: ['updateSpace'] } },
+              { rel: 'sourceSpace', action: 'own' },
+            ],
+          },
+          // transferSpace — org owner only (explicit 2-hop traversal bypasses direct space.own)
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['transferSpace'] } },
+              { rel: 'sourceSpace.organization', action: 'own' },
             ],
           },
         ],

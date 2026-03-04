@@ -1,6 +1,6 @@
 import { createTestStore } from '@template/ui/test';
 import type { HydratedRecord } from '@template/db';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('permissions slice', () => {
   let store: ReturnType<typeof createTestStore>;

@@ -14,7 +14,7 @@ import { json, post } from '#tests/utils/request';
 
 const mount = [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)];
 
-describe('POST /api/v1/inquiry/:id/requestChanges', () => {
+describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
   let org: Organization;
@@ -49,7 +49,7 @@ describe('POST /api/v1/inquiry/:id/requestChanges', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/requestChanges`, { explanation: 'Please change the role' }));
+    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: InquiryStatus.changesRequested, explanation: 'Please change the role' }));
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);

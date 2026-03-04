@@ -1,5 +1,5 @@
 import { createTestStore } from '@template/ui/test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('ui slice', () => {
   let store: ReturnType<typeof createTestStore>;

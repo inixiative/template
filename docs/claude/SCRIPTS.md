@@ -173,29 +173,62 @@ Additional checks run after Biome (used in CI, optional pre-commit):
 
 ```bash
 # Check import aliases (enforces #/ not ../)
-./scripts/checks/checkImportAliases.sh
+./scripts/lint/check-import-aliases.sh
 
 # Check generated files are up-to-date
-./scripts/checks/checkGeneratedFiles.sh
+./scripts/lint/check-generated-files.sh
 
 # Run all post-Biome checks
-./scripts/checks/runPostBiomeChecks.sh
+./scripts/lint/run-post-biome-checks.sh
 ```
 
-**checkImportAliases.sh:**
+**check-import-aliases.sh:**
 - Scans TypeScript files for relative imports (`../`)
 - Fails if any internal imports don't use `#/` alias
 - Enforces consistent import style across codebase
 
-**checkGeneratedFiles.sh:**
+**check-generated-files.sh:**
 - Verifies Prisma client is up-to-date
 - Verifies OpenAPI SDK is up-to-date
 - Fails if `db:generate` or `openapi:generate` need to be run
 
-**runPostBiomeChecks.sh:**
+**run-post-biome-checks.sh:**
 - Orchestrates all custom checks
 - Used in CI pipeline after Biome
 - Can be added to pre-commit hooks
+
+### CI Rule Scripts
+
+Additional CI rules live under `scripts/ci/rules` and run alphabetically by filename:
+
+```bash
+# Run all CI rules
+./scripts/ci/run-ci-rules.sh
+
+# Run CI rule self-tests against rule-violations fixtures
+./scripts/ci/run-ci-rules.sh --test
+
+# Individual rules
+./scripts/ci/rules/no-jest.sh
+./scripts/ci/rules/no-vitest.sh
+./scripts/ci/rules/ui-serialized-factories.sh
+```
+
+Rule self-test fixtures live at:
+- `scripts/ci/rule-violations/<rule>/pass`
+- `scripts/ci/rule-violations/<rule>/fail`
+
+**no-jest.sh:**
+- Fails on Jest dependencies in `package.json`
+- Fails on Jest imports/global usage in source and tests
+
+**no-vitest.sh:**
+- Fails on Vitest dependencies in `package.json`
+- Fails on Vitest imports in source and tests
+
+**ui-serialized-factories.sh:**
+- For UI tests importing `@template/db/test`, requires `__serialize()` usage
+- Fails on `__serialize() as any` casts
 
 ---
 

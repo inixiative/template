@@ -1,9 +1,8 @@
-import { InquiryScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { INQUIRY_SEARCHABLE_FIELDS } from '#/modules/inquiry/schemas/inquirySearchableFields';
 import { Modules } from '#/modules/modules';
-import { Tags } from '#/modules/tags';
 
 export const organizationReadManyInquiriesReceivedRoute = readRoute({
   model: Modules.organization,
@@ -12,7 +11,6 @@ export const organizationReadManyInquiriesReceivedRoute = readRoute({
   many: true,
   paginate: true,
   searchableFields: INQUIRY_SEARCHABLE_FIELDS,
-  responseSchema: InquiryScalarSchema,
-  middleware: [validatePermission('read')],
-  tags: [Tags.organization, Tags.inquiry],
+  responseSchema: inquiryReceivedResponseSchema,
+  middleware: [validatePermission('manage')],
 });

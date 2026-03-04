@@ -1,0 +1,7 @@
+{
+  "name": "fixture-no-vitest-fail",
+  "private": true,
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

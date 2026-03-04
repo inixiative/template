@@ -157,28 +157,28 @@ describe('POST /api/v1/space/:id/inquiries', () => {
 describe('GET /api/v1/space/:id/inquiries/received', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
-  let member: User;
+  let owner: User;
   let org: Organization;
-  let memberOu: OrganizationUser;
+  let ownerOu: OrganizationUser;
   let space: Space;
-  let memberSu: SpaceUser;
+  let ownerSu: SpaceUser;
   let otherSpace: Space;
 
   beforeAll(async () => {
     const { entity: u } = await createUser();
-    member = u;
+    owner = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'member' }, { user: member, organization: org });
-    memberOu = ou;
+    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+    ownerOu = ou;
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
-    const { entity: su } = await createSpaceUser({ role: 'member' }, { ...ouCtx, space });
-    memberSu = su;
+    const { entity: su } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space });
+    ownerSu = su;
     const { entity: other } = await createSpace({}, { organization: org });
     otherSpace = other;
 
-    const harness = createTestApp({ mockUser: member, mockOrganizationUsers: [memberOu], mockSpaceUsers: [memberSu], mount });
+    const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [ownerOu], mockSpaceUsers: [ownerSu], mount });
     fetch = harness.fetch;
     db = harness.db;
   });

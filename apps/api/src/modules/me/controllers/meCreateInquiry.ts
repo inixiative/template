@@ -30,6 +30,7 @@ export const meCreateInquiryController = makeController(meCreateInquiryRoute, as
 
   const inquiry = await db.inquiry.create({
     data: { ...body, content: content as Prisma.InputJsonValue, ...source, ...target, sentAt: body.status === InquiryStatus.sent ? new Date() : null },
+    include: { targetUser: true, targetOrganization: true, targetSpace: true },
   });
 
   return respond.created(inquiry);

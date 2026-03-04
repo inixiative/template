@@ -6,7 +6,7 @@ import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
 
 type Inquiry = Prisma.InquiryGetPayload<{}>;
-type ResolutionStatus = 'approved' | 'denied';
+type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';
 
 export const resolveInquiry = async (
   c: Context<AppEnv>,

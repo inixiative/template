@@ -496,9 +496,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Testing & Quality
 
-- ✅ **93 Test Files with Vitest** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
+- ✅ **93 Test Files with Bun Test Runner** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
 
-- ✅ **Test Factories with Faker** - `create*()` and `build*()` functions generate realistic test data. `create*()` persists to DB, `build*()` is in-memory only. Auto-infers relationships (creating user auto-creates account). Override only what matters for your test. 100% model coverage. Tests run against a dedicated test database
+- ✅ **Test Factories with Faker** - `create*()` and `build*()` functions generate realistic test data. `create*()` persists to DB, `build*()` is in-memory only. Auto-infers relationships (creating user auto-creates account). Override only what matters for your test. Entities expose `__serialize()` for API/UI-shaped assertions (converts `Date` fields to ISO strings). 100% model coverage. Tests run against a dedicated test database
 
 - ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and HMAC signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
 
@@ -520,7 +520,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Biome** - Fast linting and formatting (10x faster than ESLint+Prettier). Consistent code style across monorepo. Auto-fix on save. `bun run lint` checks all packages
 
-- ✅ **Custom Lint Checks** - Three custom validators run in CI: `checkImportAliases.sh` (enforces `#/` imports), `checkGeneratedFiles.sh` (ensures Prisma/OpenAPI SDK up to date), `runPostBiomeChecks.sh` (orchestrates all checks). Prevents common mistakes
+- ✅ **Custom Lint Checks** - Three custom validators run after Biome: `check-import-aliases.sh` (enforces `#/` imports), `check-generated-files.sh` (ensures Prisma/OpenAPI SDK up to date), `run-post-biome-checks.sh` (orchestrates all checks). Prevents common mistakes
+
+- ✅ **Custom CI Rules** - `scripts/ci/run-ci-rules.sh` executes alphabetical rules in `scripts/ci/rules`: `no-jest.sh` (blocks Jest deps/imports/globals), `no-vitest.sh` (blocks Vitest deps/imports), and `ui-serialized-factories.sh` (requires `__serialize()` and forbids `__serialize() as any` in UI tests). `--test` runs rule self-tests against `scripts/ci/rule-violations/*` pass/fail fixtures
 
 - ✅ **Optional Pre-commit Hooks** - Git hooks available for local validation before commit. Not enforced (developer choice) but recommended. Runs lint + type check on staged files
 
@@ -612,7 +614,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Encryption Versioning** - Each encrypted field stores the key version used to encrypt it. Rotation job queries fields WHERE version < current and re-encrypts in batches. CI blocks deploys if version gaps or downgrades detected. Dual-key window (current + previous) enables zero-downtime rotation
 - ✅ **Hierarchical Permission Inheritance** - Space permissions cascade from parent organization. Org owners automatically granted owner access to all spaces. Permission middleware resolves hierarchy at check time — no denormalization needed
 - ✅ **Request Context Scoping** - AppEnv created per request via AsyncLocalStorage. Contains db client, user, org, space, permissions — all scoped to the current request. No global state. Middleware enriches context; controllers read from it. Concurrent requests never share context
-- ✅ **Factory Pattern for Test Data** - `create*()` / `build*()` factories auto-infer relationships (creating a Token auto-creates owning User/Org/Space if not provided). Override only test-relevant fields. Shared across all test files, zero duplication
+- ✅ **Factory Pattern for Test Data** - `create*()` / `build*()` factories auto-infer relationships (creating a Token auto-creates owning User/Org/Space if not provided). Override only test-relevant fields. Use `entity.__serialize()` when tests need API-shaped values (string timestamps). Shared across all test files, zero duplication
 
 ---
 
@@ -688,7 +690,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **Developer Tools:**
 - Turborepo ^2.8 canary (monorepo orchestration)
-- Vitest ^4.0 (testing)
+- Bun native test runner (testing)
 - Biome ^2.3 (linting/formatting)
 - Docker Compose (local services)
 - Infisical (secrets management)

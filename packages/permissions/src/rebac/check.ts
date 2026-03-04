@@ -35,17 +35,25 @@ export const check = (
 
   const rule = actionOrRule;
   if ('rel' in rule && 'action' in rule) {
-    const related = record[rule.rel] as HydratedRecord | null | undefined;
-    if (!related) return false;
+    // Support dot-path traversal: 'sourceSpace.organization' chains through multiple relations
+    const segments = rule.rel.split('.');
+    let current = record;
+    let currentModel: AccessorName = model;
 
-    const targetModel = relationTargets[model]?.[rule.rel];
-    if (!targetModel) return false;
+    for (const segment of segments) {
+      const related = current[segment] as HydratedRecord | null | undefined;
+      if (!related) return false;
+      const targetModel = relationTargets[currentModel]?.[segment];
+      if (!targetModel) return false;
+      current = related;
+      currentModel = targetModel;
+    }
 
-    const key = `${targetModel}:${related.id}:${rule.action}`;
+    const key = `${currentModel}:${current.id}:${rule.action}`;
     if (visited.has(key)) throw new Error(`Cycle detected in permission graph: ${key}`);
     visited.add(key);
 
-    return check(permix, schema, targetModel, related, rule.action, visited);
+    return check(permix, schema, currentModel, current, rule.action, visited);
   }
 
   // { self: 'userId' } - check if record[field] matches current user

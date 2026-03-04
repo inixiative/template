@@ -10,6 +10,7 @@ export const meReadManyInquiriesSentController = makeController(meReadManyInquir
   const { data, pagination } = await paginate(c, db.inquiry, {
     where: { sourceModel: InquiryResourceModel.User, sourceUserId: user.id },
     orderBy: { createdAt: 'desc' },
+    include: { targetUser: true, targetOrganization: true, targetSpace: true },
   });
 
   return respond.ok(data, { pagination });

@@ -87,6 +87,32 @@ const { entity: user } = await createUser();
 
 Both have same signature: `(overrides?, context?) => Promise<{ entity, context }>`
 
+### Serialization for API/UI-Shaped Assertions
+
+Factory entities include a runtime `__serialize()` helper that converts `Date` fields to ISO strings (recursively).
+
+Use it when asserting against API/SDK-shaped types (which use string timestamps):
+
+```typescript
+const { entity } = await buildOrganization({ id: 'org-1', name: 'Test Org' });
+const organization = entity.__serialize();
+
+store.getState().tenant.setPage({ organization });
+```
+
+This keeps cross-system factory usage while matching frontend/API type contracts.
+
+When a factory override provides a non-null Date for a nullable field, inferred serialization reflects that narrowing:
+
+```typescript
+const { entity } = await buildOrganization({
+  deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+});
+
+const organization = entity.__serialize();
+// organization.deletedAt is inferred as string here (not string | null)
+```
+
 ### Basic Usage
 
 ```typescript
