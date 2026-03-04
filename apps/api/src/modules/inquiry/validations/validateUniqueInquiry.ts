@@ -1,16 +1,16 @@
-import type { Db } from '@template/db';
+import type { Db, OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { TERMINAL_STATUSES } from '#/modules/inquiry/validations/validateInquiryMutable';
 
 type UniqueInquiryParams = {
   type: InquiryType;
-  sourceUserId?: string | null;
-  sourceOrganizationId?: string | null;
-  sourceSpaceId?: string | null;
-  targetUserId?: string | null;
-  targetOrganizationId?: string | null;
-  targetSpaceId?: string | null;
+  sourceUserId?: UserId | null;
+  sourceOrganizationId?: OrganizationId | null;
+  sourceSpaceId?: SpaceId | null;
+  targetUserId?: UserId | null;
+  targetOrganizationId?: OrganizationId | null;
+  targetSpaceId?: SpaceId | null;
 };
 
 export const validateUniqueInquiry = async (db: Db, params: UniqueInquiryParams, requestId?: string): Promise<void> => {

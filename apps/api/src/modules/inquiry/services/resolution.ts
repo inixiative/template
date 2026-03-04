@@ -1,4 +1,4 @@
-import type { Db, Prisma } from '@template/db';
+import type { Db, Prisma, UserId } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
@@ -11,7 +11,7 @@ export const resolveInquiry = async (
   inquiry: Inquiry,
   outcome: ResolutionOutcome,
   resolutionData: Record<string, unknown>,
-  resolverId: string,
+  resolverId: UserId,
 ): Promise<Inquiry> => {
   return db.txn(async () => {
     let approvalOutput: Record<string, unknown> = {};
