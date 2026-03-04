@@ -6,7 +6,7 @@ import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
-import { assertUniqueInquiry } from '#/modules/inquiry/validations/assertUniqueInquiry';
+import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const inquiryCreateController = makeController(inquiryCreateRoute, async (c, respond) => {
@@ -74,7 +74,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   }
 
   if (handler.unique) {
-    await assertUniqueInquiry(db, {
+    await validateUniqueInquiry(db, {
       type: body.type,
       sourceUserId,
       sourceOrganizationId,
