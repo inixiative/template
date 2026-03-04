@@ -39,6 +39,20 @@ run_self_tests() {
 
   local exit_code=0
 
+  case_dirs_for() {
+    local base_dir="$1"
+    local has_subdirs=0
+
+    while IFS= read -r dir; do
+      has_subdirs=1
+      printf '%s\n' "$dir"
+    done < <(find "$base_dir" -mindepth 1 -maxdepth 1 -type d | sort)
+
+    if [[ "$has_subdirs" -eq 0 ]]; then
+      printf '%s\n' "$base_dir"
+    fi
+  }
+
   for rule in "$RULE_DIR"/*.sh; do
     [[ -e "$rule" ]] || continue
     local rule_name
@@ -52,17 +66,25 @@ run_self_tests() {
       continue
     fi
 
-    echo "Self-test $(basename "$rule"): pass fixture"
-    if ! bash "$rule" "$pass_root"; then
-      echo "Expected pass but failed: $rule_name"
-      exit_code=1
-    fi
+    while IFS= read -r pass_case; do
+      local pass_case_name="${pass_case#$pass_root/}"
+      [[ "$pass_case_name" != "$pass_case" ]] || pass_case_name="default"
+      echo "Self-test $(basename "$rule"): pass fixture ($pass_case_name)"
+      if ! bash "$rule" "$pass_case"; then
+        echo "Expected pass but failed: $rule_name ($pass_case_name)"
+        exit_code=1
+      fi
+    done < <(case_dirs_for "$pass_root")
 
-    echo "Self-test $(basename "$rule"): fail fixture"
-    if bash "$rule" "$fail_root"; then
-      echo "Expected failure but passed: $rule_name"
-      exit_code=1
-    fi
+    while IFS= read -r fail_case; do
+      local fail_case_name="${fail_case#$fail_root/}"
+      [[ "$fail_case_name" != "$fail_case" ]] || fail_case_name="default"
+      echo "Self-test $(basename "$rule"): fail fixture ($fail_case_name)"
+      if bash "$rule" "$fail_case"; then
+        echo "Expected failure but passed: $rule_name ($fail_case_name)"
+        exit_code=1
+      fi
+    done < <(case_dirs_for "$fail_root")
   done
 
   if [[ "$exit_code" -ne 0 ]]; then

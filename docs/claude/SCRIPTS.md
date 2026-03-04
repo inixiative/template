@@ -218,6 +218,11 @@ Rule self-test fixtures live at:
 - `scripts/ci/rule-violations/<rule>/pass`
 - `scripts/ci/rule-violations/<rule>/fail`
 
+Each `pass`/`fail` folder can contain one or more case subfolders (run alphabetically), e.g.:
+- `scripts/ci/rule-violations/no-jest/fail/dependency`
+- `scripts/ci/rule-violations/no-jest/fail/import`
+- `scripts/ci/rule-violations/no-jest/fail/global`
+
 **no-jest.sh:**
 - Fails on Jest dependencies in `package.json`
 - Fails on Jest imports/global usage in source and tests
