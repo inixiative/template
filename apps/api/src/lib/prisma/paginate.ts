@@ -31,7 +31,7 @@ export const paginate = async <
   options?: {
     searchableFields?: readonly string[];
     where?: Record<string, any>;
-    orderBy?: Record<string, Prisma.SortOrder>;
+    orderBy?: Record<string, Prisma.SortOrder> | Record<string, Prisma.SortOrder>[];
     include?: Record<string, unknown>;
     omit?: Record<string, unknown>;
   },
@@ -51,7 +51,13 @@ export const paginate = async <
 
   const where = { ...options?.where, ...searchWhere };
 
-  const parsedOrderBy = rawOrderBy ? parseOrderBy(rawOrderBy) : options?.orderBy ? [options.orderBy] : [];
+  const parsedOrderBy = rawOrderBy
+    ? parseOrderBy(rawOrderBy)
+    : options?.orderBy
+      ? Array.isArray(options.orderBy)
+        ? options.orderBy
+        : [options.orderBy]
+      : [];
   if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
 
   const [data, total] = await Promise.all([

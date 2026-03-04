@@ -4,9 +4,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const respond500 = (c: Context<AppEnv>, error?: unknown) => {
   const errorMessage = error instanceof Error ? error.message : String(error);
-
-  return makeError({
-    status: 500,
-    message: errorMessage,
-  }).getResponse();
+  const err = makeError({ status: 500, message: errorMessage });
+  err.requestId = c.get('requestId');
+  return err.getResponse();
 };

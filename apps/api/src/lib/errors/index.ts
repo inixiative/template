@@ -1,1 +1,1 @@
-export { makeError } from './makeError';
+export { AppError, makeError } from './makeError';
