@@ -1,6 +1,7 @@
 import type { Db } from '@template/db';
-import { InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
+import { TERMINAL_STATUSES } from '#/modules/inquiry/validations/assertInquiryMutable';
 
 type UniqueInquiryParams = {
   type: InquiryType;
@@ -11,8 +12,6 @@ type UniqueInquiryParams = {
   targetOrganizationId?: string | null;
   targetSpaceId?: string | null;
 };
-
-const TERMINAL_STATUSES = [InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.canceled];
 
 export const assertUniqueInquiry = async (db: Db, params: UniqueInquiryParams, requestId?: string): Promise<void> => {
   const existing = await db.inquiry.findFirst({

@@ -6,7 +6,7 @@ import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
-import { assertUniqueInquiry } from '#/modules/inquiry/services/utils/assertUniqueInquiry';
+import { assertUniqueInquiry } from '#/modules/inquiry/validations/assertUniqueInquiry';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const inquiryCreateController = makeController(inquiryCreateRoute, async (c, respond) => {
