@@ -24,6 +24,7 @@ kanban
     FIN-002-financial-web3
     FEAT-013-encryption
     FEAT-014-ai-developer-experience
+    FEAT-015-ai-dashboard-generator
 ```
 
 ## Tickets
@@ -55,6 +56,7 @@ kanban
 
 **AI Developer Experience:**
 - [FEAT-014: AI Developer Experience](./FEAT-014-ai-developer-experience.md) - Skills, rules, agents, MCP servers for AI-native development
+- [FEAT-015: AI Dashboard Generator](./FEAT-015-ai-dashboard-generator.md) - Natural language → dashboard from component catalog via json-render
 
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
@@ -85,14 +87,14 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 16
+- **Total Backlog Items**: 17
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2
 - **Communication**: 1
 - **Infrastructure**: 5
 - **Security & Encryption**: 1
-- **AI Developer Experience**: 1
+- **AI Developer Experience**: 2
 - **Frontend Architecture**: 1
 - **API Reliability**: 1
 
@@ -110,4 +112,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-03-02_
+_Last Updated: 2026-03-04_

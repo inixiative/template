@@ -6,7 +6,7 @@ import { validatePermission } from '#/middleware/validations/validatePermission'
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({
-  content: z.record(z.unknown()).optional(),
+  content: z.record(z.string(), z.unknown()).optional(),
   status: z.enum([InquiryStatus.draft, InquiryStatus.sent]).optional(),
 });
 

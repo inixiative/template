@@ -12,7 +12,7 @@ import {
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, json, post } from '#tests/utils/request';
 
 type InquiryList = { data: Inquiry[]; pagination: unknown };
 
@@ -86,6 +86,71 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     const viewerFetch = createTestApp({ mockUser: viewer, mockOrganizationUsers: [viewerOu], mockSpaceUsers: [viewerSu], mount }).fetch;
     const response = await viewerFetch(get(`/api/v1/space/${space.id}/inquiries/sent`));
     expect(response.status).toBe(403);
+  });
+});
+
+describe('POST /api/v1/space/:id/inquiries', () => {
+  let fetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let admin: User;
+  let org: Organization;
+  let adminOu: OrganizationUser;
+  let space: Space;
+  let adminSu: SpaceUser;
+  let targetOrg: Organization;
+
+  beforeAll(async () => {
+    const { entity: u } = await createUser();
+    admin = u;
+    const { entity: o } = await createOrganization();
+    org = o;
+    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    adminOu = ou;
+    const { entity: s } = await createSpace({}, { organization: org });
+    space = s;
+    const { entity: su } = await createSpaceUser({ role: 'admin' }, { ...ouCtx, space });
+    adminSu = su;
+    const { entity: to } = await createOrganization();
+    targetOrg = to;
+
+    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOu], mockSpaceUsers: [adminSu], mount });
+    fetch = harness.fetch;
+    db = harness.db;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('creates an updateSpace inquiry targeting admin', async () => {
+    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
+      type: InquiryType.updateSpace,
+      targetModel: InquiryResourceModel.admin,
+      content: { spaceId: space.id },
+    }));
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.type).toBe(InquiryType.updateSpace);
+    expect(data.sourceModel).toBe(InquiryResourceModel.Space);
+    expect(data.sourceSpaceId).toBe(space.id);
+    expect(data.targetModel).toBe(InquiryResourceModel.admin);
+  });
+
+  it('creates a transferSpace inquiry targeting another organization', async () => {
+    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
+      type: InquiryType.transferSpace,
+      targetModel: InquiryResourceModel.Organization,
+      content: { spaceId: space.id, targetOrganizationId: targetOrg.id },
+    }));
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.type).toBe(InquiryType.transferSpace);
+    expect(data.sourceModel).toBe(InquiryResourceModel.Space);
+    expect(data.sourceSpaceId).toBe(space.id);
+    expect(data.targetModel).toBe(InquiryResourceModel.Organization);
+    expect(data.targetOrganizationId).toBe(targetOrg.id);
   });
 });
 

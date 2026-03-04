@@ -1,41 +1,28 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
-import type { User } from '@template/db/generated/client/client';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
+import type { Context } from 'hono';
+import { getResource, getResourceType } from '#/lib/context/getResource';
+import type { AppEnv } from '#/types/appEnv';
 
-type InquirySourceFields = {
-  sourceModel: InquiryResourceModel;
-  sourceUserId: UserId | null;
-  sourceOrganizationId: OrganizationId | null;
-  sourceSpaceId: SpaceId | null;
-};
+export type InquirySourceFields =
+  | { sourceModel: (typeof InquiryResourceModel)['User']; sourceUserId: UserId }
+  | { sourceModel: (typeof InquiryResourceModel)['Organization']; sourceOrganizationId: OrganizationId }
+  | { sourceModel: (typeof InquiryResourceModel)['Space']; sourceSpaceId: SpaceId }
+  | { sourceModel: (typeof InquiryResourceModel)['admin'] };
 
-export const resolveInquirySource = (
-  handler: InquiryHandler,
-  content: Record<string, unknown>,
-  user: User,
-): InquirySourceFields => {
-  const source = handler.sources[0];
-  if ('sourceOrganizationId' in source) {
-    return {
-      sourceModel: source.sourceModel,
-      sourceUserId: null,
-      sourceOrganizationId: content[source.sourceOrganizationId] as OrganizationId,
-      sourceSpaceId: null,
-    };
+export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields => {
+  const resourceType = getResourceType(c);
+
+  if (resourceType === 'organization') {
+    const org = getResource<'organization'>(c);
+    return { sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: org.id as OrganizationId };
   }
-  if ('sourceSpaceId' in source) {
-    return {
-      sourceModel: source.sourceModel,
-      sourceUserId: null,
-      sourceOrganizationId: null,
-      sourceSpaceId: content[source.sourceSpaceId] as SpaceId,
-    };
+
+  if (resourceType === 'space') {
+    const space = getResource<'space'>(c);
+    return { sourceModel: InquiryResourceModel.Space, sourceSpaceId: space.id as SpaceId };
   }
-  return {
-    sourceModel: source.sourceModel,
-    sourceUserId: source.sourceModel === InquiryResourceModel.User ? (user.id as UserId) : null,
-    sourceOrganizationId: null,
-    sourceSpaceId: null,
-  };
+
+  const user = c.get('user')!;
+  return { sourceModel: InquiryResourceModel.User, sourceUserId: user.id as UserId };
 };

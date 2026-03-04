@@ -17,7 +17,7 @@ type SanitizedSchema<T extends ZodSchema> = z.ZodObject<Omit<T['shape'], BaseSan
  */
 export const sanitizeRequestSchema = <T extends ZodSchema>(
   schema: T,
-  additionalSanitizeKeys: string[] = [],
+  additionalSanitizeKeys: readonly string[] = [],
 ): SanitizedSchema<T> => {
   const allSanitizeKeys = [...BASE_SANITIZE_KEYS, ...additionalSanitizeKeys];
   const sanitizedShape = omit(schema.shape, allSanitizeKeys);

@@ -1,53 +1,48 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
-import type { Context } from 'hono';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { AppEnv } from '#/types/appEnv';
+import type { Context } from 'hono';
+import { makeError } from '#/lib/errors';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
+import type { AppEnv } from '#/types/appEnv';
 
-type InquiryTargetFields = {
-  targetModel: InquiryResourceModel;
-  targetUserId: UserId | null;
-  targetOrganizationId: OrganizationId | null;
-  targetSpaceId: SpaceId | null;
-};
+export type InquiryTargetFields =
+  | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: UserId }
+  | { targetModel: (typeof InquiryResourceModel)['Organization']; targetOrganizationId: OrganizationId }
+  | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
+  | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
-type TargetBody = {
-  targetUserId?: string | null;
-  targetEmail?: string | null;
-};
-
-export const resolveInquiryTarget = async (
-  c: Context<AppEnv>,
-  handler: InquiryHandler,
-  content: Record<string, unknown>,
-  body: TargetBody,
-): Promise<InquiryTargetFields> => {
+export const resolveInquiryTarget = async (c: Context<AppEnv>, handler: InquiryHandler): Promise<InquiryTargetFields> => {
+  const db = c.get('db');
+  const body = (c.req as unknown as { valid: (key: string) => unknown }).valid('json') as Record<string, any>;
   const target = handler.targets[0];
+
   if (target.targetModel === InquiryResourceModel.User) {
-    const targetUserId: UserId | null = body.targetUserId
-      ? body.targetUserId as UserId
-      : body.targetEmail
-        ? (await findUserOrCreateGuest(c, { email: body.targetEmail })).id as UserId
-        : null;
-    return { targetModel: target.targetModel, targetUserId, targetOrganizationId: null, targetSpaceId: null };
+    if (body.targetUserId) {
+      const user = await db.user.findUnique({ where: { id: body.targetUserId } });
+      if (!user) throw makeError({ status: 404, message: 'Target user not found' });
+      return { targetModel: target.targetModel, targetUserId: user.id as UserId };
+    }
+    if (body.targetEmail) {
+      const user = await findUserOrCreateGuest(c, { email: body.targetEmail });
+      return { targetModel: target.targetModel, targetUserId: user.id as UserId };
+    }
+    throw makeError({ status: 422, message: 'targetUserId or targetEmail is required' });
   }
+
   if ('targetOrganizationId' in target) {
-    return {
-      targetModel: target.targetModel,
-      targetUserId: null,
-      targetOrganizationId: content[target.targetOrganizationId] as OrganizationId,
-      targetSpaceId: null,
-    };
+    const orgId = (body.content as Record<string, unknown>)?.[target.targetOrganizationId] as string;
+    const org = await db.organization.findUnique({ where: { id: orgId } });
+    if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
+    return { targetModel: target.targetModel, targetOrganizationId: org.id as OrganizationId };
   }
+
   if ('targetSpaceId' in target) {
-    return {
-      targetModel: target.targetModel,
-      targetUserId: null,
-      targetOrganizationId: null,
-      targetSpaceId: content[target.targetSpaceId] as SpaceId,
-    };
+    const spaceId = (body.content as Record<string, unknown>)?.[target.targetSpaceId] as string;
+    const space = await db.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw makeError({ status: 404, message: 'Target space not found' });
+    return { targetModel: target.targetModel, targetSpaceId: space.id as SpaceId };
   }
-  // admin
-  return { targetModel: target.targetModel, targetUserId: null, targetOrganizationId: null, targetSpaceId: null };
+
+  return { targetModel: target.targetModel };
 };

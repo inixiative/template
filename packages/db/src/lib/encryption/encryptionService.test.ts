@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach } from 'bun:test';
 import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
 import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 
