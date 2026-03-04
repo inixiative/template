@@ -5,7 +5,7 @@ import { searchableFieldsMiddleware } from '#/middleware/resources/searchableFie
 export const prepareMiddleware = (
   middleware: MiddlewareHandler | MiddlewareHandler[] | undefined,
   skipId = true,
-  searchableFields?: string[],
+  searchableFields?: readonly string[],
 ): MiddlewareHandler[] | undefined => {
   const middlewareArray = Array.isArray(middleware) ? middleware : middleware ? [middleware] : [];
   const resourceMiddleware = skipId ? [] : [resourceContextMiddleware()];

@@ -9,10 +9,10 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
   const inquiry = getResource<'inquiry'>(c);
 
   if (inquiry.status !== InquiryStatus.draft) {
-    throw makeError({ status: 400, message: 'Only draft inquiries can be sent', requestId: c.get('requestId') });
+    throw makeError({ status: 400, message: 'Only draft inquiries can be sent' });
   }
 
-  if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending', requestId: c.get('requestId') });
+  if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },

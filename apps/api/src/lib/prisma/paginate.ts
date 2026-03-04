@@ -29,8 +29,9 @@ export const paginate = async <
   c: Context<AppEnv>,
   delegate: T,
   options?: {
-    searchableFields?: string[];
+    searchableFields?: readonly string[];
     where?: Record<string, any>;
+    orderBy?: Record<string, Prisma.SortOrder>;
     include?: Record<string, unknown>;
     omit?: Record<string, unknown>;
   },
@@ -50,7 +51,7 @@ export const paginate = async <
 
   const where = { ...options?.where, ...searchWhere };
 
-  const parsedOrderBy = rawOrderBy ? parseOrderBy(rawOrderBy) : [];
+  const parsedOrderBy = rawOrderBy ? parseOrderBy(rawOrderBy) : options?.orderBy ? [options.orderBy] : [];
   if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
 
   const [data, total] = await Promise.all([

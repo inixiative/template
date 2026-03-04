@@ -14,6 +14,6 @@
       "@template/shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*", "../../packages/db/src/types/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

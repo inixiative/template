@@ -19,7 +19,7 @@ export const spaceUserCreateTokenController = makeController(spaceUserCreateToke
   const checkSpace = check(permix, rebacSchema, 'space', space, roleToStandardAction(body.role));
   // Option B: Only admins+ can create tokens (uses 'assign' rules)
   // const checkSpace = check(permix, rebacSchema, 'space', { ...hydrated.space, role: body.role }, 'assign');
-  if (!checkLeave || !checkSpace) throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
+  if (!checkLeave || !checkSpace) throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
 
   const token = await createToken(c, {
     name: body.name,

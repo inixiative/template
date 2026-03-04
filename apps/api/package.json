@@ -33,7 +33,7 @@
     "@template/permissions": "workspace:*",
     "@template/shared": "workspace:*",
     "better-auth": "^1.4.17",
-    "bullmq": "^5.67.3",
+    "bullmq": "^5.70.1",
     "consola": "^3.4.2",
     "hono": "^4.11.9",
     "ioredis": "^5.9.2",

@@ -30,7 +30,7 @@ export const resolveInquiry = async (
       where: { id: inquiry.id },
       data: {
         status,
-        resolution: { ...resolutionData, ...approvalOutput },
+        resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
       },
     });
   });

@@ -8,13 +8,12 @@ import { makeError } from '#/lib/errors';
  * This prevents permission bypass from corrupted database values or type assertions
  * and makes invalid roles immediately visible during development.
  */
-export const validateRole = (value: unknown, requestId = 'unknown'): Role => {
+export const validateRole = (value: unknown): Role => {
   if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
     return value as Role;
   }
   throw makeError({
     status: 500,
     message: `Invalid role value: ${JSON.stringify(value)}. Expected one of: ${Object.values(Role).join(', ')}`,
-    requestId,
   });
 };

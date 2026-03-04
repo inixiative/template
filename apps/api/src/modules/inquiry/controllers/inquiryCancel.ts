@@ -8,7 +8,7 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
   const db = c.get('db');
   const inquiry = getResource<'inquiry'>(c);
 
-  assertInquiryIsCancelable(inquiry, c.get('requestId'));
+  assertInquiryIsCancelable(inquiry);
 
   await db.inquiry.update({ where: { id: inquiry.id }, data: { status: InquiryStatus.canceled } });
 

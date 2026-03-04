@@ -1,8 +1,8 @@
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryRequestChangesRoute } from '#/modules/inquiry/routes/inquiryRequestChanges';
+import { assertInquiryIsResolvable } from '#/modules/inquiry/services/utils/validateInquiryStatus';
 
 export const inquiryRequestChangesController = makeController(inquiryRequestChangesRoute, async (c, respond) => {
   const user = c.get('user')!;
@@ -10,9 +10,7 @@ export const inquiryRequestChangesController = makeController(inquiryRequestChan
   const inquiry = getResource<'inquiry'>(c);
   const { explanation } = c.req.valid('json');
 
-  if (![InquiryStatus.sent, InquiryStatus.changesRequested].includes(inquiry.status)) {
-    throw makeError({ status: 400, message: 'Inquiry must be sent to request changes', requestId: c.get('requestId') });
-  }
+  assertInquiryIsResolvable(inquiry);
 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },

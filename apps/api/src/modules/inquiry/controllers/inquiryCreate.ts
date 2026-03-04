@@ -14,8 +14,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const user = c.get('user')!;
   const db = c.get('db');
   const permix = c.get('permix');
-  const requestId = c.get('requestId');
-  const { targetEmail, ...body } = c.req.valid('json');
+  const { targetEmail, resolution: _resolution, ...body } = c.req.valid('json');
 
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
@@ -32,7 +31,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   } as HydratedRecord);
 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) {
-    throw makeError({ status: 403, message: 'Access denied', requestId });
+    throw makeError({ status: 403, message: 'Access denied' });
   }
 
   if (handler.validate) {
@@ -40,7 +39,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   }
 
   if (handler.unique) {
-    await validateUniqueInquiry(db, { type: body.type, ...source, ...target }, requestId);
+    await validateUniqueInquiry(db, { type: body.type, ...source, ...target });
   }
 
   const inquiry = await db.inquiry.create({

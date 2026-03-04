@@ -2568,26 +2568,18 @@
         "many": true,
         "paginate": true,
         "admin": true,
-        "query": {
-          "_def": {
-            "unknownKeys": "strip",
-            "catchall": {
-              "_def": {
-                "typeName": "ZodNever"
-              },
-              "~standard": {
-                "version": 1,
-                "vendor": "zod"
-              }
-            },
-            "typeName": "ZodObject"
-          },
-          "~standard": {
-            "version": 1,
-            "vendor": "zod"
-          },
-          "_cached": null
-        },
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -2614,23 +2606,19 @@
           "inquiry"
         ],
         "description": "Retrieves a list of inquiries.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "name": "type",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "name": "status",
-            "in": "query"
-          },
           {
             "schema": {
               "type": "number",
@@ -2678,6 +2666,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -6703,6 +6713,18 @@
         "many": true,
         "skipId": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -6729,6 +6751,18 @@
         ],
         "operationId": "meReceivedManyInquiries",
         "description": "Retrieves a list of inquiries for a me.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -6777,6 +6811,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -7402,6 +7458,18 @@
         "many": true,
         "skipId": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -7428,6 +7496,18 @@
         ],
         "operationId": "meSentManyInquiries",
         "description": "Retrieves a list of inquiries for a me.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -7476,6 +7556,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -12931,6 +13033,18 @@
         "action": "received",
         "many": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -12957,6 +13071,18 @@
         ],
         "operationId": "organizationReceivedManyInquiries",
         "description": "Retrieves a list of inquiries for a organization.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -13023,6 +13149,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -13312,6 +13460,18 @@
         "action": "sent",
         "many": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -13338,6 +13498,18 @@
         ],
         "operationId": "organizationSentManyInquiries",
         "description": "Retrieves a list of inquiries for a organization.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -13404,6 +13576,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -17155,6 +17349,18 @@
         "action": "sent",
         "many": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -17181,6 +17387,18 @@
         ],
         "operationId": "spaceSentManyInquiries",
         "description": "Retrieves a list of inquiries for a space.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -17247,6 +17465,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -19145,6 +19385,18 @@
         "action": "received",
         "many": true,
         "paginate": true,
+        "searchableFields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "responseSchema": {
           "_def": {
             "unknownKeys": "strict",
@@ -19171,6 +19423,18 @@
         ],
         "operationId": "spaceReceivedManyInquiries",
         "description": "Retrieves a list of inquiries for a space.",
+        "x-searchable-fields": [
+          "type",
+          "status",
+          "sourceModel",
+          "targetModel",
+          "sourceUserId",
+          "sourceOrganizationId",
+          "sourceSpaceId",
+          "targetUserId",
+          "targetOrganizationId",
+          "targetSpaceId"
+        ],
         "parameters": [
           {
             "schema": {
@@ -19237,6 +19501,28 @@
             "required": false,
             "in": "query",
             "name": "orderBy"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search across all searchable fields",
+              "example": "john"
+            },
+            "required": false,
+            "in": "query",
+            "name": "search"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Search specific fields (allowed: type, status, sourceModel, targetModel, sourceUserId, sourceOrganizationId, sourceSpaceId, targetUserId, targetOrganizationId, targetSpaceId)"
+            },
+            "required": false,
+            "in": "query",
+            "name": "searchFields"
           }
         ],
         "responses": {
@@ -20851,7 +21137,7 @@
         },
         "operationId": "inquiryRequestChanges",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Requests changes from the source before the inquiry can be resolved.",
         "parameters": [
@@ -21207,7 +21493,7 @@
         },
         "operationId": "inquirySend",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Sends a draft inquiry to the target.",
         "parameters": [
@@ -21525,7 +21811,7 @@
       "patch": {
         "bodySchema": {
           "_def": {
-            "unknownKeys": "strict",
+            "unknownKeys": "strip",
             "catchall": {
               "_def": {
                 "typeName": "ZodNever"
@@ -21563,22 +21849,9 @@
           },
           "_cached": null
         },
-        "sanitizeKeys": [
-          "status",
-          "type",
-          "sentAt",
-          "resolution",
-          "sourceModel",
-          "sourceUserId",
-          "sourceOrganizationId",
-          "sourceSpaceId",
-          "targetModel",
-          "targetOrganizationId",
-          "targetSpaceId"
-        ],
         "operationId": "inquiryUpdate",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Updates an existing inquiry.",
         "parameters": [
@@ -21610,14 +21883,16 @@
                 "properties": {
                   "content": {
                     "type": "object",
-                    "description": "JSON value (string, number, boolean, object, or array)",
-                    "example": {
-                      "key": "value"
+                    "additionalProperties": {
+                      "nullable": true
                     }
                   },
-                  "targetUserId": {
+                  "status": {
                     "type": "string",
-                    "nullable": true
+                    "enum": [
+                      "draft",
+                      "sent"
+                    ]
                   }
                 }
               }
@@ -21918,10 +22193,10 @@
           },
           "_cached": null
         },
-        "tags": [
-          "Inquiries"
-        ],
         "operationId": "inquiryRead",
+        "tags": [
+          "inquiry"
+        ],
         "description": "Retrieves an existing inquiry.",
         "parameters": [
           {
@@ -22236,7 +22511,7 @@
       "delete": {
         "operationId": "inquiryDelete",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Cancels an inquiry. Only the source can cancel.",
         "parameters": [
@@ -22460,7 +22735,7 @@
         },
         "operationId": "inquiryResolve",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Resolves an inquiry as approved or denied.",
         "parameters": [
@@ -22490,7 +22765,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "outcome": {
+                  "status": {
                     "type": "string",
                     "enum": [
                       "approved",
@@ -22502,7 +22777,7 @@
                   }
                 },
                 "required": [
-                  "outcome"
+                  "status"
                 ]
               }
             }
@@ -22854,7 +23129,7 @@
         ],
         "operationId": "inquiryCreate",
         "tags": [
-          "Inquiries"
+          "inquiry"
         ],
         "description": "Creates a new inquiry.",
         "requestBody": {

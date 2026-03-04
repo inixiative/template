@@ -8,7 +8,7 @@ export const inquiryResolveController = makeController(inquiryResolveRoute, asyn
   const inquiry = getResource<'inquiry'>(c);
   const { status, ...resolutionData } = c.req.valid('json');
 
-  assertInquiryIsResolvable(inquiry, c.get('requestId'));
+  assertInquiryIsResolvable(inquiry);
 
   const resolved = await resolveInquiry(c, inquiry, status, resolutionData);
 

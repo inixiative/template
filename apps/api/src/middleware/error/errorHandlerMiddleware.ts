@@ -27,15 +27,12 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
 
   // Handle Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    const requestId = c.get('requestId') as string;
-
     // P2002 = unique constraint violation
     if (err.code === 'P2002') {
       const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
       return makeError({
         status: 409,
         message: `Resource already exists: ${target}`,
-        requestId,
       }).getResponse();
     }
     // P2025 = record not found
@@ -43,7 +40,6 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
       return makeError({
         status: 404,
         message: 'Resource not found',
-        requestId,
       }).getResponse();
     }
   }
@@ -60,7 +56,13 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
       });
     }
     if (process.env.NODE_ENV === 'test' && err.status >= 500) log.error('Error in handler:', err);
-    return err.getResponse();
+    const res = err.getResponse();
+    if (res.headers.get('content-type')?.includes('application/json')) {
+      const body = await res.json() as Record<string, unknown>;
+      body.requestId = c.get('requestId');
+      return new Response(JSON.stringify(body), { status: err.status, headers: { 'Content-Type': 'application/json' } });
+    }
+    return res;
   }
 
   // Capture all other errors to Sentry

@@ -55,5 +55,5 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
     }
   }
 
-  throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
+  throw makeError({ status: 403, message: 'Access denied' });
 });

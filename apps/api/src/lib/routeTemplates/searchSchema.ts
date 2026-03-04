@@ -18,7 +18,7 @@ export const advancedSearchSchema = z
     description: 'Search specific fields',
   });
 
-export const createAdvancedSearchSchema = (searchableFields: string[]) => {
+export const createAdvancedSearchSchema = (searchableFields: readonly string[]) => {
   return z
     .record(z.string(), z.string())
     .optional()

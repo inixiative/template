@@ -64,7 +64,7 @@ export const generatePresignedUrl = async (
   const user = c.get('user');
 
   if (!user) {
-    throw makeError({ status: 401, message: 'Authentication required', requestId: c.get('requestId') });
+    throw makeError({ status: 401, message: 'Authentication required' });
   }
 
   const { fileName, contentType, folder } = request;
@@ -74,7 +74,6 @@ export const generatePresignedUrl = async (
     throw makeError({
       status: 400,
       message: `Invalid content type. Allowed: ${ALLOWED_CONTENT_TYPES.join(', ')}`,
-      requestId: c.get('requestId'),
     });
   }
 
@@ -93,7 +92,7 @@ export const generatePresignedUrl = async (
 
   const bucket = process.env.S3_BUCKET_NAME;
   if (!bucket) {
-    throw makeError({ status: 500, message: 'S3 not configured', requestId: c.get('requestId') });
+    throw makeError({ status: 500, message: 'S3 not configured' });
   }
 
   const maxSize = MAX_FILE_SIZES[contentType] || 10 * 1024 * 1024;

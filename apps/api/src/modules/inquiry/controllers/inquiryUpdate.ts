@@ -1,3 +1,4 @@
+import { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
@@ -8,9 +9,9 @@ import { assertInquiryIsEditable } from '#/modules/inquiry/services/utils/valida
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const inquiry = getResource<'inquiry'>(c);
-  const data = c.req.valid('json');
+  const { content, ...rest } = c.req.valid('json');
 
-  assertInquiryIsEditable(inquiry, c.get('requestId'));
+  assertInquiryIsEditable(inquiry);
 
   const handler = inquiryHandlers[inquiry.type];
   if (handler.validate) await handler.validate(db, inquiry);
@@ -18,8 +19,9 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },
     data: {
-      ...data,
-      ...(data.status === InquiryStatus.sent && !inquiry.sentAt ? { sentAt: new Date() } : {}),
+      ...rest,
+      ...(content !== undefined && { content: content as Prisma.InputJsonValue }),
+      ...(rest.status === InquiryStatus.sent && !inquiry.sentAt ? { sentAt: new Date() } : {}),
     },
   });
 

@@ -10,8 +10,6 @@ type MakeErrorOptions = {
   guidance?: Guidance;
   /** Field-level validation errors */
   fieldErrors?: Record<string, string[]>;
-  /** Request ID from context */
-  requestId: string;
 };
 
 /**
@@ -36,7 +34,6 @@ export const makeError = (options: MakeErrorOptions): HTTPException => {
     message: options.message ?? meta.name,
     guidance: options.guidance ?? meta.guidance,
     fieldErrors: options.fieldErrors,
-    requestId: options.requestId,
   };
 
   return new HTTPException(status, {

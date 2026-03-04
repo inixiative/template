@@ -17,8 +17,8 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
 
   const resources = await findResources(db, accessor, lookup, id);
 
-  if (!resources.length) throw makeError({ status: 404, message: 'Resource not found', requestId: c.get('requestId') });
-  if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found', requestId: c.get('requestId') });
+  if (!resources.length) throw makeError({ status: 404, message: 'Resource not found' });
+  if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found' });
 
   c.set('resource', resources[0]);
   c.set('resourceType', accessor);

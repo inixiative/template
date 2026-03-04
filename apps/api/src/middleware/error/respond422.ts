@@ -4,8 +4,6 @@ import type { PublicZodIssue } from '#/middleware/error/types';
 import type { AppEnv } from '#/types/appEnv';
 
 export const respond422 = (c: Context<AppEnv>, issues: PublicZodIssue[]) => {
-  const requestId = c.get('requestId') as string;
-
   // Convert Zod issues to fieldErrors format
   const fieldErrors: Record<string, string[]> = {};
   for (const issue of issues) {
@@ -20,6 +18,5 @@ export const respond422 = (c: Context<AppEnv>, issues: PublicZodIssue[]) => {
     status: 422,
     message: 'Validation failed',
     fieldErrors,
-    requestId,
   }).getResponse();
 };

@@ -13,7 +13,7 @@ type UniqueInquiryParams = {
   targetSpaceId?: SpaceId | null;
 };
 
-export const validateUniqueInquiry = async (db: Db, params: UniqueInquiryParams, requestId?: string): Promise<void> => {
+export const validateUniqueInquiry = async (db: Db, params: UniqueInquiryParams): Promise<void> => {
   const existing = await db.inquiry.findFirst({
     where: {
       type: params.type,
@@ -28,6 +28,6 @@ export const validateUniqueInquiry = async (db: Db, params: UniqueInquiryParams,
   });
 
   if (existing) {
-    throw makeError({ status: 409, message: 'An open inquiry of this type already exists between these parties', requestId });
+    throw makeError({ status: 409, message: 'An open inquiry of this type already exists between these parties' });
   }
 };
