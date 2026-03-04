@@ -18,10 +18,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
 
   const handler = inquiryHandlers[body.type];
 
-  const parsedContent = handler.contentSchema.safeParse(body.content);
-  if (!parsedContent.success) {
-    throw makeError({ status: 400, message: 'Invalid content for this inquiry type', requestId });
-  }
+  const content = handler.contentSchema.parse(body.content);
 
   let sourceModel: InquiryResourceModel = InquiryResourceModel.User;
   let sourceUserId: string | null = user.id;
@@ -31,11 +28,11 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   if (body.type === InquiryType.inviteOrganizationUser || body.type === InquiryType.createSpace) {
     sourceModel = InquiryResourceModel.Organization;
     sourceUserId = null;
-    sourceOrganizationId = parsedContent.data.organizationId as string;
+    sourceOrganizationId = content.organizationId as string;
   } else if (body.type === InquiryType.updateSpace || body.type === InquiryType.transferSpace) {
     sourceModel = InquiryResourceModel.Space;
     sourceUserId = null;
-    sourceSpaceId = parsedContent.data.spaceId as string;
+    sourceSpaceId = content.spaceId as string;
   }
 
   const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
@@ -68,7 +65,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
       targetUserId: targetUserId ?? null,
       targetOrganizationId: null,
       targetSpaceId: null,
-      content: parsedContent.data,
+      content: content,
     } as Parameters<typeof handler.validate>[1];
     await handler.validate(db, partialInquiry);
   }
@@ -86,7 +83,7 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const inquiry = await db.inquiry.create({
     data: {
       ...body,
-      content: parsedContent.data,
+      content: content,
       sourceModel,
       sourceUserId,
       sourceOrganizationId,
