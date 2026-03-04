@@ -1,10 +1,11 @@
 import type { HydratedRecord } from '@template/db';
+import { hydrate } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
-import { assertInquiryPermission } from '#/modules/inquiry/services/utils/assertInquiryPermission';
 import { assertUniqueInquiry } from '#/modules/inquiry/services/utils/assertUniqueInquiry';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
@@ -40,24 +41,22 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
   const targetModel: InquiryResourceModel | null = targetUserId ? InquiryResourceModel.User : null;
 
-  await assertInquiryPermission(
-    db,
-    permix,
-    {
-      id: '',
-      type: body.type,
-      sourceModel,
-      sourceUserId,
-      sourceOrganizationId,
-      sourceSpaceId,
-      targetModel,
-      targetUserId: targetUserId ?? null,
-      targetOrganizationId: null,
-      targetSpaceId: null,
-    } as HydratedRecord,
-    'send',
-    requestId,
-  );
+  const partial = await hydrate(db, 'inquiry', {
+    id: '',
+    type: body.type,
+    sourceModel,
+    sourceUserId,
+    sourceOrganizationId,
+    sourceSpaceId,
+    targetModel,
+    targetUserId: targetUserId ?? null,
+    targetOrganizationId: null,
+    targetSpaceId: null,
+  } as HydratedRecord);
+
+  if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) {
+    throw makeError({ status: 403, message: 'Access denied', requestId });
+  }
 
   if (handler.validate) {
     const partialInquiry = {
