@@ -93,10 +93,19 @@ export const rebacSchema: RebacSchema = {
       // Send: who may create/initiate each inquiry type
       send: {
         any: [
-          // inviteOrganizationUser — org admin+ can invite
+          // inviteOrganizationUser: high roles (owner/admin) require own
           {
             all: [
               { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+              { rule: { field: 'content.role', operator: Operator.in, value: highRoles } },
+              { rel: 'sourceOrganization', action: 'own' },
+            ],
+          },
+          // inviteOrganizationUser: normal roles require manage
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+              { rule: { field: 'content.role', operator: Operator.notIn, value: highRoles } },
               { rel: 'sourceOrganization', action: 'manage' },
             ],
           },
@@ -117,30 +126,16 @@ export const rebacSchema: RebacSchema = {
         ],
       },
 
-      // Resolve: target decides (approve/deny)
+      // Resolve: target decides (approve/deny/requestChanges)
       // For User targets: self check passes. For admin targets (targetModel === admin),
       // self check fails for regular users — superadmin bypass handles it.
       resolve: {
         any: [
           { self: 'targetUserId' },
           { rel: 'targetOrganization', action: 'manage' },
+          { rel: 'targetSpace', action: 'manage' },
         ],
       },
-
-      // Request changes: same as resolve (target-side action)
-      requestChanges: 'resolve',
-
-      // Cancel: source retracts
-      cancel: {
-        any: [
-          { self: 'sourceUserId' },
-          { rel: 'sourceOrganization', action: 'manage' },
-          { rel: 'sourceSpace', action: 'manage' },
-        ],
-      },
-
-      // Update draft: same as cancel (source-side action)
-      update: 'cancel',
     },
   },
 };

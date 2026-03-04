@@ -6,6 +6,5 @@ import { Modules } from '#/modules/modules';
 export const inquiryReadRoute = readRoute({
   model: Modules.inquiry,
   responseSchema: InquiryModelSchema,
-  tags: ['Inquiries'],
   middleware: [validatePermission('read')],
 });

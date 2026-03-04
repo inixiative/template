@@ -7,7 +7,7 @@ export const meCreateTokenController = makeController(meCreateTokenRoute, async 
   const db = c.get('db');
   const body = c.req.valid('json');
 
-  const token = await createToken(db, {
+  const token = await createToken(c, {
     name: body.name,
     ownerModel: 'User',
     userId: user.id,

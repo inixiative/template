@@ -1,4 +1,4 @@
-import type { HydratedRecord, UserId } from '@template/db';
+import type { HydratedRecord } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -20,12 +20,13 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
 
-  const source = resolveInquirySource(handler.sources[0], content, user.id as UserId);
-  const target = await resolveInquiryTarget(db, handler.targets[0], content, { targetUserId: body.targetUserId as UserId, targetEmail });
+  const source = resolveInquirySource(handler, content, user);
+  const target = await resolveInquiryTarget(c, handler, content, { targetUserId: body.targetUserId, targetEmail });
 
   const partial = await hydrate(db, 'inquiry', {
     id: '',
     type: body.type,
+    content,
     ...source,
     ...target,
   } as HydratedRecord);

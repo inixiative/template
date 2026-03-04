@@ -11,14 +11,34 @@ const inquiryFactory = createFactory('Inquiry', {
     resolution: {},
   }),
   dependencies: {
+    sourceUser: {
+      modelName: 'User',
+      foreignKey: { id: 'sourceUserId' },
+      required: false,
+    },
     sourceOrganization: {
       modelName: 'Organization',
       foreignKey: { id: 'sourceOrganizationId' },
       required: false,
     },
+    sourceSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'sourceSpaceId' },
+      required: false,
+    },
     targetUser: {
       modelName: 'User',
       foreignKey: { id: 'targetUserId' },
+      required: false,
+    },
+    targetOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'targetOrganizationId' },
+      required: false,
+    },
+    targetSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'targetSpaceId' },
       required: false,
     },
   },

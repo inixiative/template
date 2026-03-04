@@ -1,18 +1,13 @@
-import { z } from '@hono/zod-openapi';
 import { InquiryModelSchema } from '@template/db/zod/models';
 import { readRoute } from '#/lib/routeTemplates';
+import { INQUIRY_SEARCHABLE_FIELDS } from '#/modules/inquiry/schemas/inquirySearchableFields';
 import { Modules } from '#/modules/modules';
-
-const querySchema = z.object({
-  type: z.string().optional(),
-  status: z.string().optional(),
-});
 
 export const adminInquiryReadManyRoute = readRoute({
   model: Modules.inquiry,
   many: true,
   paginate: true,
   admin: true,
-  query: querySchema,
+  searchableFields: INQUIRY_SEARCHABLE_FIELDS,
   responseSchema: InquiryModelSchema,
 });

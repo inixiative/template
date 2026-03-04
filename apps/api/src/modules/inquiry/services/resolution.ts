@@ -1,22 +1,25 @@
-import type { Db, Prisma, UserId } from '@template/db';
+import type { Prisma } from '@template/db';
+import type { Context } from 'hono';
 import { InquiryStatus } from '@template/db/generated/client/enums';
+import type { AppEnv } from '#/types/appEnv';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
 
 type Inquiry = Prisma.InquiryGetPayload<{}>;
-type ResolutionOutcome = 'approved' | 'denied';
+type ResolutionStatus = 'approved' | 'denied';
 
 export const resolveInquiry = async (
-  db: Db,
+  c: Context<AppEnv>,
   inquiry: Inquiry,
-  outcome: ResolutionOutcome,
+  status: ResolutionStatus,
   resolutionData: Record<string, unknown>,
-  resolverId: UserId,
 ): Promise<Inquiry> => {
+  const db = c.get('db');
+
   return db.txn(async () => {
     let approvalOutput: Record<string, unknown> = {};
 
-    if (outcome === InquiryStatus.approved) {
+    if (status === InquiryStatus.approved) {
       const handler = inquiryHandlers[inquiry.type];
       const content = inquiry.content as Record<string, unknown>;
       const merged = resolveContent(content, resolutionData, handler.resolutionSchema);
@@ -26,13 +29,8 @@ export const resolveInquiry = async (
     return db.inquiry.update({
       where: { id: inquiry.id },
       data: {
-        status: outcome,
-        resolution: {
-          ...resolutionData,
-          ...approvalOutput,
-          resolvedBy: resolverId,
-          resolvedAt: new Date().toISOString(),
-        },
+        status,
+        resolution: { ...resolutionData, ...approvalOutput },
       },
     });
   });

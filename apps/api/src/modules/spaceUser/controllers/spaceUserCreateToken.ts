@@ -21,7 +21,7 @@ export const spaceUserCreateTokenController = makeController(spaceUserCreateToke
   // const checkSpace = check(permix, rebacSchema, 'space', { ...hydrated.space, role: body.role }, 'assign');
   if (!checkLeave || !checkSpace) throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
 
-  const token = await createToken(db, {
+  const token = await createToken(c, {
     name: body.name,
     ownerModel: 'SpaceUser',
     userId: spaceUser.userId,

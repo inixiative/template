@@ -1,13 +1,18 @@
+import { z } from '@hono/zod-openapi';
 import { InquiryScalarSchema } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
+const bodySchema = z.object({
+  content: z.record(z.unknown()).optional(),
+  status: z.enum([InquiryStatus.draft, InquiryStatus.sent]).optional(),
+});
+
 export const inquiryUpdateRoute = updateRoute({
   model: Modules.inquiry,
-  bodySchema: InquiryScalarSchema.partial(),
+  bodySchema,
   responseSchema: InquiryScalarSchema,
-  sanitizeKeys: ['status', 'type', 'sentAt', 'resolution', 'sourceModel', 'sourceUserId', 'sourceOrganizationId', 'sourceSpaceId', 'targetModel', 'targetOrganizationId', 'targetSpaceId'],
-  tags: ['Inquiries'],
-  middleware: [validatePermission('update')],
+  middleware: [validatePermission('send')],
 });

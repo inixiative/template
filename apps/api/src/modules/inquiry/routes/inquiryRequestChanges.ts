@@ -14,7 +14,6 @@ export const inquiryRequestChangesRoute = actionRoute({
   method: 'post',
   bodySchema,
   responseSchema: InquiryModelSchema,
-  tags: ['Inquiries'],
   description: 'Requests changes from the source before the inquiry can be resolved.',
-  middleware: [validatePermission('requestChanges')],
+  middleware: [validatePermission('resolve')],
 });

@@ -27,7 +27,7 @@ export const organizationUserCreateTokenController = makeController(
     // const checkOrg = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: body.role }, 'assign');
     if (!checkLeave || !checkOrg) throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
 
-    const token = await createToken(db, {
+    const token = await createToken(c, {
       name: body.name,
       ownerModel: 'OrganizationUser',
       userId: orgUser.userId,

@@ -15,5 +15,4 @@ export const inquiryCreateRoute = createRoute({
   bodySchema,
   responseSchema: InquiryScalarSchema,
   sanitizeKeys: ['sentAt', 'resolution', 'sourceModel', 'sourceUserId', 'sourceOrganizationId', 'sourceSpaceId', 'targetModel', 'targetOrganizationId', 'targetSpaceId'],
-  tags: ['Inquiries'],
 });

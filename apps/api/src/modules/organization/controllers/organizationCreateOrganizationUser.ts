@@ -18,7 +18,7 @@ export const organizationCreateOrganizationUserController = makeController(
     if (!check(permix, rebacSchema, 'organization', { id: org.id, role: body.role }, 'assign'))
       throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
 
-    const userId = body.userId ?? (await findUserOrCreateGuest(db, { email: body.email!, name: body.name })).id;
+    const userId = body.userId ?? (await findUserOrCreateGuest(c, { email: body.email!, name: body.name })).id;
 
     const orgUser = await db.organizationUser.create({
       data: {

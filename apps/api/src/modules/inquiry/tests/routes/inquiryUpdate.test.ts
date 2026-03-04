@@ -57,11 +57,27 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect((data.content as any).role).toBe('admin');
   });
 
-  it('rejects updating a sent inquiry', async () => {
+  it('allows updating a sent inquiry', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
       status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }));
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects updating a resolved inquiry', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.approved,
       sourceModel: InquiryResourceModel.Organization,
       sourceOrganizationId: org.id,
       targetModel: InquiryResourceModel.User,

@@ -15,7 +15,7 @@ export const organizationCreateTokenController = makeController(organizationCrea
     throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
   }
 
-  const token = await createToken(db, {
+  const token = await createToken(c, {
     name: body.name,
     ownerModel: 'Organization',
     organizationId: org.id,

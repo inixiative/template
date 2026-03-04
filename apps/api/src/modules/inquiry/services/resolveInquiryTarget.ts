@@ -1,6 +1,8 @@
-import type { Db, OrganizationId, SpaceId, UserId } from '@template/db';
+import type { OrganizationId, SpaceId, UserId } from '@template/db';
+import type { Context } from 'hono';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { InquiryTargetMeta } from '#/modules/inquiry/handlers/types';
+import type { AppEnv } from '#/types/appEnv';
+import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 type InquiryTargetFields = {
@@ -10,20 +12,24 @@ type InquiryTargetFields = {
   targetSpaceId: SpaceId | null;
 };
 
-type TargetRequest = {
-  targetUserId?: UserId | null;
+type TargetBody = {
+  targetUserId?: string | null;
   targetEmail?: string | null;
 };
 
 export const resolveInquiryTarget = async (
-  db: Db,
-  target: InquiryTargetMeta,
+  c: Context<AppEnv>,
+  handler: InquiryHandler,
   content: Record<string, unknown>,
-  request: TargetRequest,
+  body: TargetBody,
 ): Promise<InquiryTargetFields> => {
+  const target = handler.targets[0];
   if (target.targetModel === InquiryResourceModel.User) {
-    const targetUserId = request.targetUserId
-      ?? (request.targetEmail ? (await findUserOrCreateGuest(db, { email: request.targetEmail })).id as UserId : null);
+    const targetUserId: UserId | null = body.targetUserId
+      ? body.targetUserId as UserId
+      : body.targetEmail
+        ? (await findUserOrCreateGuest(c, { email: body.targetEmail })).id as UserId
+        : null;
     return { targetModel: target.targetModel, targetUserId, targetOrganizationId: null, targetSpaceId: null };
   }
   if ('targetOrganizationId' in target) {

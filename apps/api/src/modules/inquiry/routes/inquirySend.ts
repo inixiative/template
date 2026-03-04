@@ -8,7 +8,6 @@ export const inquirySendRoute = actionRoute({
   action: 'send',
   method: 'post',
   responseSchema: InquiryModelSchema,
-  tags: ['Inquiries'],
   description: 'Sends a draft inquiry to the target.',
   middleware: [validatePermission('send')],
 });
