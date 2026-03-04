@@ -1,20 +1,22 @@
 import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySentRoute } from '#/modules/inquiry/routes/inquirySent';
-import { getUserOrganizationIds } from '#/modules/inquiry/services/access';
 
 export const inquirySentController = makeController(inquirySentRoute, async (c, respond) => {
   const user = c.get('user')!;
   const db = c.get('db');
   const { page = 1, pageSize = 20 } = c.req.valid('query');
 
-  const userOrgIds = await getUserOrganizationIds(db, user.id, [Role.owner, Role.admin]);
+  const organizationUsers = c.get('organizationUsers') ?? [];
+  const adminOrgIds = organizationUsers
+    .filter((ou) => [Role.owner, Role.admin].includes(ou.role as Role))
+    .map((ou) => ou.organizationId);
 
   const where = {
     OR: [
       { sourceModel: InquiryResourceModel.User, sourceUserId: user.id },
-      ...(userOrgIds.length > 0
-        ? [{ sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: { in: userOrgIds } }]
+      ...(adminOrgIds.length > 0
+        ? [{ sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: { in: adminOrgIds } }]
         : []),
     ],
   };

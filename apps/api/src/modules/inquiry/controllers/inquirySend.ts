@@ -1,12 +1,13 @@
+import type { HydratedRecord } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
-import { checkIsSource } from '#/modules/inquiry/services/access';
+import { assertInquiryPermission } from '#/modules/inquiry/services/utils/assertInquiryPermission';
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
-  const user = c.get('user')!;
   const db = c.get('db');
+  const permix = c.get('permix');
   const { id } = c.req.valid('param');
 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
@@ -19,8 +20,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
   const hasTarget = inquiry.targetModel && (inquiry.targetUserId || inquiry.targetOrganizationId);
   if (!hasTarget) throw makeError({ status: 400, message: 'Target must be set before sending', requestId: c.get('requestId') });
 
-  const isSource = await checkIsSource(db, inquiry, user.id);
-  if (!isSource) throw makeError({ status: 403, message: 'Only the source can send', requestId: c.get('requestId') });
+  await assertInquiryPermission(db, permix, inquiry as unknown as HydratedRecord, 'send', c.get('requestId'));
 
   const updated = await db.inquiry.update({
     where: { id },
