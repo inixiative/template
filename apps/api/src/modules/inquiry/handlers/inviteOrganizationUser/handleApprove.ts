@@ -5,10 +5,11 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 export const handleApprove = async (
   db: Db,
   inquiry: Inquiry,
-  resolvedContent: Record<string, unknown>,
+  _resolvedContent: Record<string, unknown>,
 ): Promise<void> => {
-  const organizationId = ((resolvedContent.organizationId as OrganizationId) ?? inquiry.sourceOrganizationId)!;
-  const role = (resolvedContent.role as Role) ?? 'member';
+  const content = inquiry.content as Record<string, unknown>;
+  const organizationId = (inquiry.sourceOrganizationId ?? content.organizationId) as OrganizationId;
+  const role = ((content.role as Role) ?? 'member');
   const userId = inquiry.targetUserId! as UserId;
 
   await db.organizationUser.create({

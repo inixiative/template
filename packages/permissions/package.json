@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
+    "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"
   },
@@ -18,7 +19,6 @@
     "permix": "^0.5.0"
   },
   "devDependencies": {
-    "@types/bull": "^4.10.4",
     "typescript": "^5.8.2"
   }
 }

@@ -6,15 +6,18 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "typeRoots": ["../../node_modules/@types"],
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
+      "@template/permissions": ["./src/index.ts"],
       "@template/permissions/*": ["./src/*"],
+      "@template/db": ["../db/src/index.ts"],
       "@template/db/*": ["../db/src/*"],
-      "@template/shared/*": ["../shared/src/*"],
-      "@template/ui/*": ["../ui/src/*"]
+      "@template/shared": ["../shared/src/index.ts"],
+      "@template/shared/*": ["../shared/src/*"]
     }
   },
   "include": ["src/**/*"],

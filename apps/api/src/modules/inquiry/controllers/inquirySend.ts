@@ -12,8 +12,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
     throw makeError({ status: 400, message: 'Only draft inquiries can be sent', requestId: c.get('requestId') });
   }
 
-  const hasTarget = inquiry.targetModel && (inquiry.targetUserId || inquiry.targetOrganizationId);
-  if (!hasTarget) throw makeError({ status: 400, message: 'Target must be set before sending', requestId: c.get('requestId') });
+  if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending', requestId: c.get('requestId') });
 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },

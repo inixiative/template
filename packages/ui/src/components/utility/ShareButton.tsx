@@ -10,19 +10,8 @@ export const ShareButton = ({ className }: ShareButtonProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
-    const url = window.location.href;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ url, title: 'Share this page' });
-        return;
-      } catch {
-        // Fall back to clipboard
-      }
-    }
-
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -39,15 +28,15 @@ export const ShareButton = ({ className }: ShareButtonProps) => {
       aria-label="Share this page"
     >
       {copied ? (
-        <>
+        <span className="flex items-center gap-1.5 text-xs">
           <Check className="h-4 w-4" />
-          <span className="text-xs">Copied!</span>
-        </>
+          Copied!
+        </span>
       ) : (
-        <>
+        <span className="flex items-center gap-1.5 text-xs">
           <Share2 className="h-4 w-4" />
-          <span className="text-xs">Share</span>
-        </>
+          Share
+        </span>
       )}
     </Button>
   );

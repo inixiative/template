@@ -102,6 +102,19 @@ describe('getModelRelations', () => {
     expect(tokensRel?.foreignKey).toBeNull();
   });
 
+  it('resolves named relations (e.g. @relation("InquirySource", fields: [...]))', () => {
+    const relations = getModelRelations('Inquiry');
+
+    const sourceOrgRel = relations.find((r) => r.relationName === 'sourceOrganization');
+    expect(sourceOrgRel).toBeDefined();
+    expect(sourceOrgRel?.targetModel).toBe('Organization');
+    expect(sourceOrgRel?.foreignKey).toEqual({ id: 'sourceOrganizationId' });
+
+    const targetUserRel = relations.find((r) => r.relationName === 'targetUser');
+    expect(targetUserRel).toBeDefined();
+    expect(targetUserRel?.foreignKey).toEqual({ id: 'targetUserId' });
+  });
+
   it('throws for unknown model', () => {
     expect(() => getModelRelations('NonExistentModel' as never)).toThrow();
   });

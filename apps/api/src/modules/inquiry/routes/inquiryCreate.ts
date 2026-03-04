@@ -4,12 +4,7 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
-const bodySchema = InquiryScalarSchema.omit({
-  sentAt: true,
-  sourceModel: true,
-  sourceUserId: true,
-  sourceOrganizationId: true,
-}).extend({
+const bodySchema = InquiryScalarSchema.extend({
   status: z.enum([InquiryStatus.draft, InquiryStatus.sent]).default(InquiryStatus.draft),
   targetUserId: z.string().uuid().optional(),
   targetEmail: z.string().email().optional(),
@@ -19,5 +14,6 @@ export const inquiryCreateRoute = createRoute({
   model: Modules.inquiry,
   bodySchema,
   responseSchema: InquiryScalarSchema,
+  sanitizeKeys: ['sentAt', 'resolution', 'sourceModel', 'sourceUserId', 'sourceOrganizationId', 'sourceSpaceId', 'targetModel', 'targetOrganizationId', 'targetSpaceId'],
   tags: ['Inquiries'],
 });

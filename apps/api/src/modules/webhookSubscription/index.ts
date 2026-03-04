@@ -1,15 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { autoRegisterAdminRoutes, autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import { validateActor } from '#/middleware/validations/validateActor';
-import { adminWebhookSubscriptionReadManyController } from '#/modules/webhookSubscription/controllers/adminWebhookSubscriptionReadMany';
-import { webhookSubscriptionDeleteController } from '#/modules/webhookSubscription/controllers/webhookSubscriptionDelete';
 import { webhookSubscriptionInfoController } from '#/modules/webhookSubscription/controllers/webhookSubscriptionInfo';
-import { webhookSubscriptionReadController } from '#/modules/webhookSubscription/controllers/webhookSubscriptionRead';
-import { webhookSubscriptionUpdateController } from '#/modules/webhookSubscription/controllers/webhookSubscriptionUpdate';
-import { webhookSubscriptionDeleteRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionDelete';
 import { webhookSubscriptionInfoRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionInfo';
-import { webhookSubscriptionReadRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionRead';
-import { adminWebhookSubscriptionReadManyRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionReadMany';
-import { webhookSubscriptionUpdateRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionUpdate';
 import type { AppEnv } from '#/types/appEnv';
 
 export const webhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
@@ -19,13 +12,9 @@ webhookSubscriptionRouter.openapi(webhookSubscriptionInfoRoute, webhookSubscript
 
 // Protected routes (create via /me or /organization submodels)
 webhookSubscriptionRouter.use('*', validateActor);
-webhookSubscriptionRouter.openapi(webhookSubscriptionReadRoute, webhookSubscriptionReadController);
-webhookSubscriptionRouter.openapi(webhookSubscriptionUpdateRoute, webhookSubscriptionUpdateController);
-webhookSubscriptionRouter.openapi(webhookSubscriptionDeleteRoute, webhookSubscriptionDeleteController);
 
-// Admin router
+await autoRegisterRoutes(webhookSubscriptionRouter, import.meta.dirname, { skip: ['webhookSubscriptionInfo'] });
+
 export const adminWebhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
-adminWebhookSubscriptionRouter.openapi(
-  adminWebhookSubscriptionReadManyRoute,
-  adminWebhookSubscriptionReadManyController,
-);
+
+await autoRegisterAdminRoutes(adminWebhookSubscriptionRouter, import.meta.dirname);

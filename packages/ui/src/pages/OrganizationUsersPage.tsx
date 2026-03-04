@@ -10,7 +10,7 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import type { Role } from '@template/db';
+import type { Role } from '@template/db/generated/client/enums';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';

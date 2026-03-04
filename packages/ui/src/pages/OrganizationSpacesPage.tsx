@@ -16,7 +16,7 @@ type OrganizationSpacesPageProps = {
 
 export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPageProps) => {
   const tenant = useAppStore((state) => state.tenant);
-  const authSpaces = useAppStore((state) => state.auth.spaces);
+  const authSpaceUsers = useAppStore((state) => state.auth.spaceUsers);
 
   const { data, isLoading } = useQuery({
     queryKey: organizationReadManySpacesQueryKey({ path: { id: organizationId } }),
@@ -34,7 +34,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
       key: 'role',
       label: 'Your Role',
       render: (space: Space) => {
-        const role = authSpaces?.[space.id]?.spaceUser?.role;
+        const role = authSpaceUsers?.[space.id]?.role;
         return <span className="capitalize">{role ?? '—'}</span>;
       },
     },

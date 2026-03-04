@@ -6,8 +6,11 @@
     "paths": {
       "#/*": ["./src/*"],
       "#tests/*": ["./tests/*"],
+      "@template/db": ["../../packages/db/src/index.ts"],
       "@template/db/*": ["../../packages/db/src/*"],
+      "@template/permissions": ["../../packages/permissions/src/index.ts"],
       "@template/permissions/*": ["../../packages/permissions/src/*"],
+      "@template/shared": ["../../packages/shared/src/index.ts"],
       "@template/shared/*": ["../../packages/shared/src/*"]
     }
   },

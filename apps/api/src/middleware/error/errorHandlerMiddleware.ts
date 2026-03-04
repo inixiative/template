@@ -14,10 +14,6 @@ import type { AppEnv } from '#/types/appEnv';
 export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) => {
   c.header('Cache-Control', 'no-store');
 
-  if (process.env.NODE_ENV === 'test') {
-    log.error('Error in handler:', err);
-  }
-
   // Handle Zod validation errors
   if (isZodError(err)) {
     return respond422(c, formatZodIssues(err));
@@ -63,6 +59,7 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
         },
       });
     }
+    if (process.env.NODE_ENV === 'test' && err.status >= 500) log.error('Error in handler:', err);
     return err.getResponse();
   }
 

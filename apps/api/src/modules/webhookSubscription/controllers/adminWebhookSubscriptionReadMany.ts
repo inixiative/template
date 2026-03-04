@@ -1,6 +1,6 @@
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { adminWebhookSubscriptionReadManyRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionReadMany';
+import { adminWebhookSubscriptionReadManyRoute } from '#/modules/webhookSubscription/routes/adminWebhookSubscriptionReadMany';
 
 export const adminWebhookSubscriptionReadManyController = makeController(
   adminWebhookSubscriptionReadManyRoute,

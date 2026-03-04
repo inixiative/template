@@ -10,7 +10,7 @@ const bodySchema = z.object({
 
 export const inquiryRequestChangesRoute = actionRoute({
   model: Modules.inquiry,
-  action: 'request-changes',
+  action: 'requestChanges',
   method: 'post',
   bodySchema,
   responseSchema: InquiryModelSchema,

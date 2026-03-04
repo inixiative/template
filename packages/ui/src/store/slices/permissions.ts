@@ -1,4 +1,5 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
+import type { Role } from '@template/db/generated/client/enums';
 import {
   createPermissions,
   type Entitlements,
@@ -9,7 +10,6 @@ import { isSuperadmin } from '@template/permissions/roles/shared';
 import { getUserPermissions } from '@template/permissions/roles/user';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import type { Role } from '@template/db/generated/client/enums';
 import type { StateCreator } from 'zustand';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
