@@ -1,13 +1,14 @@
-import type { HydratedRecord } from '@template/db';
+import type { HydratedRecord, UserId } from '@template/db';
 import { hydrate } from '@template/db';
-import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryCreateRoute } from '#/modules/inquiry/routes/inquiryCreate';
+import { resolveInquirySource } from '#/modules/inquiry/services/resolveInquirySource';
+import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
-import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const inquiryCreateController = makeController(inquiryCreateRoute, async (c, respond) => {
   const user = c.get('user')!;
@@ -19,43 +20,14 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
 
-  // Derive source fields from handler meta
-  let sourceModel: InquiryResourceModel = InquiryResourceModel.User;
-  let sourceUserId: string | null = user.id;
-  let sourceOrganizationId: string | null = null;
-  let sourceSpaceId: string | null = null;
-
-  const [source] = handler.sources;
-  if ('sourceOrganizationId' in source) {
-    sourceModel = source.sourceModel;
-    sourceUserId = null;
-    sourceOrganizationId = content[source.sourceOrganizationId] as string;
-  } else if ('sourceSpaceId' in source) {
-    sourceModel = source.sourceModel;
-    sourceUserId = null;
-    sourceSpaceId = content[source.sourceSpaceId] as string;
-  }
-
-  // Derive target fields from handler meta + request
-  const [target] = handler.targets;
-  const targetModel = target.targetModel;
-  const targetUserId = targetModel === InquiryResourceModel.User
-    ? (body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null))
-    : null;
-  const targetOrganizationId = 'targetOrganizationId' in target ? content[target.targetOrganizationId] as string : null;
-  const targetSpaceId = 'targetSpaceId' in target ? content[target.targetSpaceId] as string : null;
+  const source = resolveInquirySource(handler.sources[0], content, user.id as UserId);
+  const target = await resolveInquiryTarget(db, handler.targets[0], content, { targetUserId: body.targetUserId as UserId, targetEmail });
 
   const partial = await hydrate(db, 'inquiry', {
     id: '',
     type: body.type,
-    sourceModel,
-    sourceUserId,
-    sourceOrganizationId,
-    sourceSpaceId,
-    targetModel,
-    targetUserId: targetUserId ?? null,
-    targetOrganizationId,
-    targetSpaceId,
+    ...source,
+    ...target,
   } as HydratedRecord);
 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) {
@@ -63,44 +35,19 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   }
 
   if (handler.validate) {
-    const partialInquiry = {
-      sourceModel,
-      sourceUserId,
-      sourceOrganizationId,
-      sourceSpaceId,
-      targetModel,
-      targetUserId: targetUserId ?? null,
-      targetOrganizationId,
-      targetSpaceId,
-      content,
-    } as Parameters<typeof handler.validate>[1];
-    await handler.validate(db, partialInquiry);
+    await handler.validate(db, { ...source, ...target, content } as Parameters<typeof handler.validate>[1]);
   }
 
   if (handler.unique) {
-    await validateUniqueInquiry(db, {
-      type: body.type,
-      sourceUserId,
-      sourceOrganizationId,
-      sourceSpaceId,
-      targetUserId,
-      targetOrganizationId,
-      targetSpaceId,
-    }, requestId);
+    await validateUniqueInquiry(db, { type: body.type, ...source, ...target }, requestId);
   }
 
   const inquiry = await db.inquiry.create({
     data: {
       ...body,
       content,
-      sourceModel,
-      sourceUserId,
-      sourceOrganizationId,
-      sourceSpaceId,
-      targetModel,
-      targetUserId: targetUserId ?? null,
-      targetOrganizationId,
-      targetSpaceId,
+      ...source,
+      ...target,
       sentAt: body.status === InquiryStatus.sent ? new Date() : null,
     },
   });
