@@ -1,6 +1,6 @@
 import type { HydratedRecord } from '@template/db';
 import { hydrate } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -17,26 +17,31 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
   const { targetEmail, ...body } = c.req.valid('json');
 
   const handler = inquiryHandlers[body.type];
-
   const content = handler.contentSchema.parse(body.content);
 
+  // Derive source fields from handler meta
   let sourceModel: InquiryResourceModel = InquiryResourceModel.User;
   let sourceUserId: string | null = user.id;
   let sourceOrganizationId: string | null = null;
   let sourceSpaceId: string | null = null;
 
-  if (body.type === InquiryType.inviteOrganizationUser || body.type === InquiryType.createSpace) {
-    sourceModel = InquiryResourceModel.Organization;
+  const [source] = handler.sources;
+  if ('sourceOrganizationId' in source) {
+    sourceModel = source.sourceModel;
     sourceUserId = null;
-    sourceOrganizationId = content.organizationId as string;
-  } else if (body.type === InquiryType.updateSpace || body.type === InquiryType.transferSpace) {
-    sourceModel = InquiryResourceModel.Space;
+    sourceOrganizationId = content[source.sourceOrganizationId] as string;
+  } else if ('sourceSpaceId' in source) {
+    sourceModel = source.sourceModel;
     sourceUserId = null;
-    sourceSpaceId = content.spaceId as string;
+    sourceSpaceId = content[source.sourceSpaceId] as string;
   }
 
+  // Derive target fields from request + handler meta
   const targetUserId = body.targetUserId ?? (targetEmail ? (await findUserOrCreateGuest(db, { email: targetEmail })).id : null);
-  const targetModel: InquiryResourceModel | null = targetUserId ? InquiryResourceModel.User : null;
+  const [target] = handler.targets;
+  const targetModel = target.targetModel;
+  const targetOrganizationId = target && 'targetOrganizationId' in target ? content[target.targetOrganizationId] as string : null;
+  const targetSpaceId = target && 'targetSpaceId' in target ? content[target.targetSpaceId] as string : null;
 
   const partial = await hydrate(db, 'inquiry', {
     id: '',
@@ -47,8 +52,8 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
     sourceSpaceId,
     targetModel,
     targetUserId: targetUserId ?? null,
-    targetOrganizationId: null,
-    targetSpaceId: null,
+    targetOrganizationId,
+    targetSpaceId,
   } as HydratedRecord);
 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) {
@@ -63,9 +68,9 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
       sourceSpaceId,
       targetModel,
       targetUserId: targetUserId ?? null,
-      targetOrganizationId: null,
-      targetSpaceId: null,
-      content: content,
+      targetOrganizationId,
+      targetSpaceId,
+      content,
     } as Parameters<typeof handler.validate>[1];
     await handler.validate(db, partialInquiry);
   }
@@ -77,19 +82,23 @@ export const inquiryCreateController = makeController(inquiryCreateRoute, async 
       sourceOrganizationId,
       sourceSpaceId,
       targetUserId,
+      targetOrganizationId,
+      targetSpaceId,
     }, requestId);
   }
 
   const inquiry = await db.inquiry.create({
     data: {
       ...body,
-      content: content,
+      content,
       sourceModel,
       sourceUserId,
       sourceOrganizationId,
       sourceSpaceId,
       targetModel,
       targetUserId: targetUserId ?? null,
+      targetOrganizationId,
+      targetSpaceId,
       sentAt: body.status === InquiryStatus.sent ? new Date() : null,
     },
   });

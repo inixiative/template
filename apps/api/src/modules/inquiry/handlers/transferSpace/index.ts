@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 export const transferSpaceHandler: InquiryHandler = {
+  sources: [{ sourceModel: InquiryResourceModel.Space, sourceSpaceId: 'spaceId' }],
+  targets: [{ targetModel: InquiryResourceModel.Organization, targetOrganizationId: 'targetOrganizationId' }],
   contentSchema: z.object({
     spaceId: z.string(),
     targetOrganizationId: z.string(),
