@@ -13,5 +13,5 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   resolutionSchema: baseResolutionInputSchema,
   handleApprove,
   validate,
-  unique: true,
+  unique: 'targeted',
 };

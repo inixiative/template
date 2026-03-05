@@ -41,8 +41,11 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
   validate,
-  handleApprove: async (_db, _inquiry, _resolvedContent) => {
-    // TODO: implement updateSpace approval
+  handleApprove: async (db, inquiry, content) => {
+    await db.space.update({
+      where: { id: inquiry.sourceSpaceId as SpaceId },
+      data: content,
+    });
   },
-  unique: true,
+  unique: 'untargeted',
 };

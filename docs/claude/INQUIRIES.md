@@ -160,7 +160,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
   validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
   handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | void>;
-  unique?: boolean; // if true, validateInquiryPreCreate enforces one open inquiry per source+target+type
+  unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
 };
 ```
 
@@ -176,7 +176,10 @@ export const createSpaceHandler: InquiryHandler<SpaceContent, CreateSpaceResolut
 
 ### `unique` enforcement
 
-Setting `unique: true` on a handler is automatically enforced — no controller code needed. `validateInquiryPreCreate` reads the flag and calls `validateUniqueInquiry` only when set.
+Setting `unique` on a handler is automatically enforced — no controller code needed. `validateInquiryPreCreate` reads the flag and calls `validateUniqueInquiry`:
+
+- `'targeted'` — one open inquiry per source + target + type (e.g. you can't invite the same user twice)
+- `'untargeted'` — one open inquiry per source + type, regardless of target (e.g. a space can only have one open transfer, even to a different target org)
 
 ### `validate` — pre-create and pre-update checks
 
@@ -221,10 +224,10 @@ const { role } = resolvedContent; // always from original inquiry.content
 
 | Type | Source | Target | Unique | Side Effect |
 |------|--------|--------|--------|-------------|
-| `inviteOrganizationUser` | Organization | User | Yes | Creates `OrganizationUser` |
-| `createSpace` | Organization | admin | No | Creates `Space` (TODO) |
-| `updateSpace` | Space | admin | Yes | Updates `Space` (TODO) |
-| `transferSpace` | Space | Organization | Yes | Transfers `Space` (TODO) |
+| `inviteOrganizationUser` | Organization | User | `targeted` | Creates `OrganizationUser` |
+| `createSpace` | Organization | admin | — | Creates `Space` under source org |
+| `updateSpace` | Space | admin | `untargeted` | Updates `Space` with content fields |
+| `transferSpace` | Space | Organization | `untargeted` | Sets `Space.organizationId` to target org |
 
 **Send permissions by type:**
 
@@ -265,7 +268,7 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
    - If no computed fields, both can be the same schema
 3. Implement `handleApprove(db, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
 4. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
-5. Set `unique: true` if only one open inquiry should exist per source + target + type — enforcement is automatic
+5. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
 6. Register in `handlers/index.ts`
 7. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
 8. Run `bun run db:generate` in `packages/db/`

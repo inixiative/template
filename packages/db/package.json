@@ -18,7 +18,7 @@
     "./zod/*": "./src/generated/zod/schemas/*.ts"
   },
   "scripts": {
-    "test": "bun run --cwd ../.. with test api bun test --concurrency=1 src/test/",
+    "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1 src/test/",
     "db:generate": "PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 prisma generate > /dev/null 2>&1 && bun run scripts/generate-scalar-schemas.ts && bun run scripts/generate-permissions-relation-targets.ts && echo $(date) > .prisma-generated",
     "db:push": "prisma db push",
     "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",

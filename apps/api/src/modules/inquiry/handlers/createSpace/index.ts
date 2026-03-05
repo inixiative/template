@@ -46,9 +46,11 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema,
   validate,
-  handleApprove: async (_db, _inquiry, _resolvedContent) => {
-    // TODO: create Space, return { spaceId: space.id }
-    return {};
+  handleApprove: async (db, inquiry, content) => {
+    const space = await db.space.create({
+      data: { ...content, organizationId: inquiry.sourceOrganizationId as OrganizationId },
+    });
+    return { spaceId: space.id };
   },
   unique: false,
 };

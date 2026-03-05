@@ -10,7 +10,7 @@
     "start": "bun run src/index.ts",
     "start:worker": "bun run src/jobs/worker.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun",
-    "test": "bun run --cwd ../.. with test api bun test --concurrency=1",
+    "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd apps/api src/",
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "typecheck": "tsc --noEmit",

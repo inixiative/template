@@ -98,7 +98,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       })),
 
     navigatePreservingContext: (to) => {
-      const navigate = get().navigation.navigate!;
+      const navigate = get().navigation.navigate;
+      if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
@@ -110,7 +111,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
     },
 
     navigatePreservingSpoof: (to) => {
-      const navigate = get().navigation.navigate!;
+      const navigate = get().navigation.navigate;
+      if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
@@ -122,7 +124,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
     },
 
     navigatePreservingAll: (to) => {
-      const navigate = get().navigation.navigate!;
+      const navigate = get().navigation.navigate;
+      if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');

@@ -27,7 +27,7 @@
     "reset:db": "docker-compose down && docker-compose up -d --wait && bun run db:push && bun run db:seed --prime",
     "build": "bun run '--filter=*' build",
     "pretest": "bun run with test api bun run --cwd packages/db db:push:force",
-    "test": "bun run --filter=@template/permissions test && bun run --filter=@template/db test && bun run --filter=@template/email test && bun run --filter=api test",
+    "test": "bun run --cwd packages/permissions test && bun run --cwd packages/db test && bun run --cwd packages/email test && bun run --cwd apps/api test",
     "test:fe": "bun run generate:sdk && bun run generate:routes && bun run --filter=@template/shared test && bun test --concurrency=1 tests/frontend",
     "typecheck": "bun run '--filter=*' typecheck",
     "typecheck:fe": "bun run generate:routes && bun run --cwd apps/web typecheck && bun run --cwd apps/admin typecheck && bun run --cwd apps/superadmin typecheck",
