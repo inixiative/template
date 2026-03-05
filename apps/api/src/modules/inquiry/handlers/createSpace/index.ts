@@ -3,7 +3,7 @@ import { InquiryResourceModel, InquiryType } from '@template/db/generated/client
 import type { Db, OrganizationId } from '@template/db';
 import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
-import { TERMINAL_STATUSES } from '#/modules/inquiry/validations/validateInquiryMutable';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/services/utils/validateInquiryStatus';
 import { makeError } from '#/lib/errors';
 
 export const spaceContentSchema = z.object({
@@ -19,9 +19,9 @@ export type SpaceContent = z.infer<typeof spaceContentSchema>;
 type CreateSpaceContent = SpaceContent;
 type CreateSpaceResolution = z.infer<typeof resolutionSchema>;
 
-const validate = async (db: Db, inquiry: Inquiry): Promise<void> => {
+const validate = async (db: Db, inquiry: Inquiry, content: CreateSpaceContent): Promise<void> => {
   const organizationId = inquiry.sourceOrganizationId as OrganizationId;
-  const { slug } = inquiry.content as CreateSpaceContent;
+  const { slug } = content;
 
   const [existingSpace, existingInquiry] = await Promise.all([
     db.space.findFirst({ where: { organizationId, slug } }),
@@ -29,7 +29,7 @@ const validate = async (db: Db, inquiry: Inquiry): Promise<void> => {
       where: {
         type: InquiryType.createSpace,
         sourceOrganizationId: organizationId,
-        status: { notIn: TERMINAL_STATUSES },
+        status: { notIn: inquiryTerminalStatuses },
         content: { path: ['slug'], equals: slug },
       },
     }),

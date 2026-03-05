@@ -4,17 +4,18 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
-import { assertInquiryIsEditable } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { validateInquiryIsEditable } from '#/modules/inquiry/services/utils/validateInquiryStatus';
 
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const inquiry = getResource<'inquiry'>(c);
   const { content, ...rest } = c.req.valid('json');
 
-  assertInquiryIsEditable(inquiry);
+  validateInquiryIsEditable(inquiry);
 
   const handler = inquiryHandlers[inquiry.type];
-  if (handler.validate) await handler.validate(db, inquiry);
+  const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
+  if (handler.validate) await handler.validate(db, inquiry, effectiveContent);
 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },

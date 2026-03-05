@@ -1,6 +1,6 @@
 import { readRoute } from '#/lib/routeTemplates';
 import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
-import { INQUIRY_SEARCHABLE_FIELDS } from '#/modules/inquiry/schemas/inquirySearchableFields';
+import { inquirySearchableFields } from '#/modules/inquiry/schemas/inquirySearchableFields';
 import { Modules } from '#/modules/modules';
 
 export const adminInquiryReadManyRoute = readRoute({
@@ -8,6 +8,6 @@ export const adminInquiryReadManyRoute = readRoute({
   many: true,
   paginate: true,
   admin: true,
-  searchableFields: INQUIRY_SEARCHABLE_FIELDS,
+  searchableFields: inquirySearchableFields,
   responseSchema: inquiryResponseSchema,
 });

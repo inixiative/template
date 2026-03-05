@@ -1,17 +1,18 @@
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { Db, SpaceId } from '@template/db';
+import type { z } from 'zod';
 import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
-import { TERMINAL_STATUSES } from '#/modules/inquiry/validations/validateInquiryMutable';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/services/utils/validateInquiryStatus';
 import { makeError } from '#/lib/errors';
 
 const contentSchema = spaceContentSchema.partial();
 
-type UpdateSpaceContent = typeof contentSchema._type;
+type UpdateSpaceContent = z.infer<typeof contentSchema>;
 
-const validate = async (db: Db, inquiry: Inquiry): Promise<void> => {
-  const { slug } = inquiry.content as UpdateSpaceContent;
+const validate = async (db: Db, inquiry: Inquiry, content: UpdateSpaceContent): Promise<void> => {
+  const { slug } = content;
   if (!slug) return;
 
   const spaceId = inquiry.sourceSpaceId as SpaceId;
@@ -23,7 +24,7 @@ const validate = async (db: Db, inquiry: Inquiry): Promise<void> => {
       where: {
         type: InquiryType.updateSpace,
         sourceSpaceId: spaceId,
-        status: { notIn: TERMINAL_STATUSES },
+        status: { notIn: inquiryTerminalStatuses },
         content: { path: ['slug'], equals: slug },
       },
     }),

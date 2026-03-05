@@ -1,6 +1,7 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
+import { getValidatedBody } from '#/lib/context/getValidatedData';
 import { makeError } from '#/lib/errors';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
@@ -14,7 +15,7 @@ export type InquiryTargetFields =
 
 export const resolveInquiryTarget = async (c: Context<AppEnv>, handler: InquiryHandler): Promise<InquiryTargetFields> => {
   const db = c.get('db');
-  const body = (c.req as unknown as { valid: (key: string) => unknown }).valid('json') as Record<string, any>;
+  const body = getValidatedBody(c);
   const target = handler.targets[0];
 
   if (target.targetModel === InquiryResourceModel.User) {

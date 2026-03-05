@@ -1,5 +1,5 @@
 import { createRoute } from '#/lib/routeTemplates';
-import { inquiryCreateBodySchema, INQUIRY_CREATE_SANITIZE_KEYS } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
+import { inquiryCreateBodySchema, inquiryCreateSanitizeKeys } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
@@ -10,6 +10,6 @@ export const meCreateInquiryRoute = createRoute({
   skipId: true,
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquirySentResponseSchema,
-  sanitizeKeys: INQUIRY_CREATE_SANITIZE_KEYS,
+  sanitizeKeys: inquiryCreateSanitizeKeys,
   tags: [Tags.me, Tags.inquiry],
 });

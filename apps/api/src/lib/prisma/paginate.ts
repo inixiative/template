@@ -1,5 +1,6 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
 import type { Context } from 'hono';
+import { getValidatedQuery } from '#/lib/context/getValidatedData';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 import type { AppEnv } from '#/types/appEnv';
@@ -36,7 +37,7 @@ export const paginate = async <
     omit?: Record<string, unknown>;
   },
 ): Promise<PaginatedResult<R>> => {
-  const query = (c.req as unknown as { valid: (key: string) => unknown }).valid('query') as Record<string, any>;
+  const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
 
   const bracketQuery = (c.get('bracketQuery') ?? {}) as Record<string, any>;

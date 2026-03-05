@@ -1,6 +1,6 @@
 import { InquiryScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';
-import { inquiryCreateBodySchema, INQUIRY_CREATE_SANITIZE_KEYS } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
+import { inquiryCreateBodySchema, inquiryCreateSanitizeKeys } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
 import { Modules } from '#/modules/modules';
 
 export const adminInquiryCreateRoute = createRoute({
@@ -8,5 +8,5 @@ export const adminInquiryCreateRoute = createRoute({
   admin: true,
   bodySchema: inquiryCreateBodySchema,
   responseSchema: InquiryScalarSchema,
-  sanitizeKeys: INQUIRY_CREATE_SANITIZE_KEYS,
+  sanitizeKeys: inquiryCreateSanitizeKeys,
 });
