@@ -11,7 +11,7 @@ const contentSchema = spaceContentSchema.partial();
 
 type UpdateSpaceContent = z.infer<typeof contentSchema>;
 
-const validate = async (db: Db, inquiry: Inquiry, content: UpdateSpaceContent): Promise<void> => {
+const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceContent): Promise<void> => {
   const { slug } = content;
   if (!slug) return;
 

@@ -19,7 +19,7 @@ export type SpaceContent = z.infer<typeof spaceContentSchema>;
 type CreateSpaceContent = SpaceContent;
 type CreateSpaceResolution = z.infer<typeof resolutionSchema>;
 
-const validate = async (db: Db, inquiry: Inquiry, content: CreateSpaceContent): Promise<void> => {
+const validate = async (db: Db, inquiry: Partial<Inquiry>, content: CreateSpaceContent): Promise<void> => {
   const organizationId = inquiry.sourceOrganizationId as OrganizationId;
   const { slug } = content;
 
