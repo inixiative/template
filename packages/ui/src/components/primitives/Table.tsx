@@ -13,11 +13,17 @@ export type TableProps<T> = {
   keyExtractor: (item: T) => string;
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
+  noDataMessage?: string;
   show?: boolean | (() => boolean);
   pagination?: {
     currentPage: number;
     totalPages: number;
     onPageChange: (page: number) => void;
+  };
+  paginationLabels?: {
+    previous?: string;
+    next?: string;
+    pageSummary?: (currentPage: number, totalPages: number) => string;
   };
 };
 
@@ -27,18 +33,23 @@ export const Table = <T,>({
   keyExtractor,
   onRowClick,
   emptyMessage,
+  noDataMessage,
   show = true,
   pagination,
+  paginationLabels,
 }: TableProps<T>) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
+  const resolvedEmptyMessage = emptyMessage ?? noDataMessage ?? '';
+  const previousLabel = paginationLabels?.previous ?? 'Previous';
+  const nextLabel = paginationLabels?.next ?? 'Next';
+  const pageSummary =
+    paginationLabels?.pageSummary ??
+    ((currentPage: number, totalPages: number) => `Page ${currentPage} of ${totalPages}`);
+
   if (data.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        {emptyMessage || 'No data available'}
-      </div>
-    );
+    return <div className="text-center py-8 text-muted-foreground">{resolvedEmptyMessage}</div>;
   }
 
   return (
@@ -48,10 +59,7 @@ export const Table = <T,>({
           <thead className="bg-muted/50 border-b">
             <tr>
               {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className="text-left px-4 py-3 text-sm font-medium text-muted-foreground"
-                >
+                <th key={column.key} className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                   {column.label}
                 </th>
               ))}
@@ -66,7 +74,7 @@ export const Table = <T,>({
               >
                 {columns.map((column) => (
                   <td key={column.key} className="px-4 py-3 text-sm">
-                    {column.render ? column.render(item) : (item as any)[column.key]}
+                    {column.render ? column.render(item) : (item as Record<string, React.ReactNode>)[column.key]}
                   </td>
                 ))}
               </tr>
@@ -78,7 +86,7 @@ export const Table = <T,>({
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Page {pagination.currentPage} of {pagination.totalPages}
+            {pageSummary(pagination.currentPage, pagination.totalPages)}
           </div>
           <div className="flex gap-2">
             <Button
@@ -88,7 +96,7 @@ export const Table = <T,>({
               disabled={pagination.currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
+              {previousLabel}
             </Button>
             <Button
               variant="outline"
@@ -96,7 +104,7 @@ export const Table = <T,>({
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
               disabled={pagination.currentPage === pagination.totalPages}
             >
-              Next
+              {nextLabel}
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>

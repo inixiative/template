@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "lib": ["ES2022"],
-    "types": ["bun-types"],
+    "types": ["bun"],
     "noFallthroughCasesInSwitch": true
   },
   "exclude": ["node_modules", "dist", "_old", "tmp"]

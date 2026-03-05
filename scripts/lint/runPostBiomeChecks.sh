@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 CHECKS=(
   "./scripts/lint/checkImportAliases.sh"
   "./scripts/lint/checkGeneratedFiles.sh"
+  "./scripts/ds-check.sh"
 )
 
 for check in "${CHECKS[@]}"; do

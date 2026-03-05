@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["bun-types"],
+    "types": ["bun"],
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {

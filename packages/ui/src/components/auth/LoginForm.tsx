@@ -1,13 +1,16 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import { FormField } from '@template/ui/components/primitives/FormField';
 import { Input } from '@template/ui/components/primitives/Input';
-import { Label } from '@template/ui/components/primitives/Label';
-import { Chrome, Github, Shield, Key } from 'lucide-react';
-import { useState } from 'react';
-import { useSearch } from '@tanstack/react-router';
-import { useAppStore } from '@template/ui/store';
 import { useAuthProviders } from '@template/ui/hooks';
 import { toast } from '@template/ui/lib/toast';
+import { useAppStore } from '@template/ui/store';
+import { Chrome, Github, Key, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const providerIcons: Record<string, typeof Chrome> = {
   google: Chrome,
@@ -20,9 +23,19 @@ export type LoginFormProps = {
   onSignupClick?: () => void;
 };
 
+const loginSchema = z.object({
+  email: z.string().trim().email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
 export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,16 +44,31 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
   const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
   const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const handleEmailLogin = async (values: LoginValues) => {
     setError(undefined);
     setIsLoading(true);
 
     try {
-      await signIn({ type: 'email', email, password });
+      await signIn({
+        type: 'email',
+        email: values.email,
+        password: values.password,
+      });
       navigatePreservingContext(search.redirectTo || '/dashboard');
-    } catch (err: any) {
-      const message = err?.message || 'Log in failed. Please try again.';
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Log in failed. Please try again.');
       setError(message);
       toast.error(message);
     } finally {
@@ -60,8 +88,8 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
         provider,
         callbackURL: `${window.location.origin}/auth/callback`,
       });
-    } catch (err: any) {
-      const message = err?.message || 'OAuth log in failed. Please try again.';
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'OAuth log in failed. Please try again.');
       setError(message);
       toast.error(message);
       setIsLoading(false);
@@ -122,37 +150,20 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
             </>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
+          <form onSubmit={handleSubmit(handleEmailLogin)} className="space-y-4">
+            <FormField label="Email" error={errors.email?.message} required>
+              <Input type="email" placeholder="you@example.com" {...register('email')} disabled={isLoading} />
+            </FormField>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <FormField label="Password" error={errors.password?.message} required>
+              <Input type="password" {...register('password')} disabled={isLoading} />
+            </FormField>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Log In'}
             </Button>
 
-            {onSignupClick && (
+            {onSignupClick && !hideSignup && (
               <div className="text-center text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <button type="button" onClick={onSignupClick} className="text-primary hover:underline">
