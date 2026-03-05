@@ -140,12 +140,14 @@ The handler's `sources` config is checked by `validateInquiryHandler` to confirm
 
 ### Target
 
-`resolveInquiryTarget` resolves from the request body using the handler's `targets[0]` config:
+`resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
 
-- `targetModel: User` → looks up by `targetUserId` or creates a guest from `targetEmail`
-- `targetModel: Organization` → looks up `content[handler.targets[0].targetOrganizationId]`
-- `targetModel: Space` → looks up `content[handler.targets[0].targetSpaceId]`
+- `targetModel: User` → `targetUserId` OR `targetEmail` (creates guest if not found)
+- `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
+- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
 - `targetModel: admin` → no FK, just sets the model
+
+Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
 ## Handler Architecture
 
@@ -257,7 +259,7 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
 | `send` | Source-side permission (see handler table above) |
-| `resolve` | Target user (self), or manage on target org/space; superadmin bypass for `admin` targets |
+| `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
 
 ## Adding a New Handler
 
@@ -274,7 +276,7 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 8. Run `bun run db:generate` in `packages/db/`
 9. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`
 
-### Status utilities (`services/utils/validateInquiryStatus.ts`)
+### Status utilities (`validations/validateInquiryStatus.ts`)
 
 | Export | Used in | Meaning |
 |--------|---------|---------|

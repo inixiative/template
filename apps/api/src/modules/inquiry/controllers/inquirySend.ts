@@ -2,7 +2,7 @@ import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
-import { validateInquiryIsDraft } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {

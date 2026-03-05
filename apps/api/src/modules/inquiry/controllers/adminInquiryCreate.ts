@@ -20,7 +20,7 @@ export const adminInquiryCreateController = makeController(adminInquiryCreateRou
   const handler = inquiryHandlers[body.type];
   const content = handler.contentSchema.parse(body.content);
   validateInquiryHandler(handler, source.sourceModel, body.targetModel);
-  const target = await resolveInquiryTarget(c, handler);
+  const target = await resolveInquiryTarget(c);
 
   const partial = await hydrate(db, 'inquiry', { id: '', type: body.type, content, ...source, ...target } as HydratedRecord);
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, message: 'Access denied' });

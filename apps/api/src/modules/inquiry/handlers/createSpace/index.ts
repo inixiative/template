@@ -3,7 +3,7 @@ import { InquiryResourceModel, InquiryType } from '@template/db/generated/client
 import type { Db, OrganizationId } from '@template/db';
 import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 import { makeError } from '#/lib/errors';
 
 export const spaceContentSchema = z.object({
@@ -31,6 +31,7 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: CreateSpaceC
         sourceOrganizationId: organizationId,
         status: { notIn: inquiryTerminalStatuses },
         content: { path: ['slug'], equals: slug },
+        ...(inquiry.id && { id: { not: inquiry.id } }),
       },
     }),
   ]);
@@ -52,5 +53,4 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
     });
     return { spaceId: space.id };
   },
-  unique: false,
 };

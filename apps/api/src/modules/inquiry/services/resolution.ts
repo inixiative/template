@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { AppEnv } from '#/types/appEnv';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
+import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 
 type Inquiry = Prisma.InquiryGetPayload<{}>;
 type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';

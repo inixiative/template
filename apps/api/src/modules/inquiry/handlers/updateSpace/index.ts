@@ -4,7 +4,7 @@ import type { z } from 'zod';
 import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 import { makeError } from '#/lib/errors';
 
 const contentSchema = spaceContentSchema.partial();

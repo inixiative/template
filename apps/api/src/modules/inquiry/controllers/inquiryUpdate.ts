@@ -7,7 +7,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
-import { validateInquiryIsEditable } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
   const db = c.get('db');

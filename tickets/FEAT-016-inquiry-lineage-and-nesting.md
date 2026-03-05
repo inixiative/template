@@ -95,6 +95,30 @@ model Inquiry {
 
 ---
 
+## Auto-Approval Handler Setting
+
+Some inquiry types don't need manual review — they should approve immediately on create.
+
+**Proposed**: `autoApprove` on `InquiryHandler` is either a **function** or a **JSON condition object**:
+
+```ts
+// Option A: function — full flexibility, handler decides at runtime
+autoApprove?: (inquiry: Partial<Inquiry>, content: TContent) => boolean | Promise<boolean>
+
+// Option B: JSON rules/condition — declarative, inspectable, potentially user-configurable
+autoApprove?: Condition  // e.g. { field: 'sourceModel', op: 'eq', value: 'User' }
+```
+
+Function is simpler to implement; JSON rules open the door to admin-configurable auto-approval policies without deploys (ties into FEAT-003 feature flags or a future rules engine).
+
+When `autoApprove` evaluates to true, the create controller:
+1. Creates the inquiry as normal (audit trail preserved)
+2. Immediately calls `resolveInquiry(c, inquiry, 'approved', {})` in the same request
+
+**Open**: Should auto-approved inquiries skip the `send` permission check?
+
+---
+
 ## Related
 
 - **FEAT-001**: Inquiry system (core) — this extends it
