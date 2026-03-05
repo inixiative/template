@@ -119,6 +119,24 @@ When `autoApprove` evaluates to true, the create controller:
 
 ---
 
+## Handler Registry: Remove `as unknown as` Cast
+
+The handler registry currently uses `as unknown as InquiryHandler` to paper over a type mismatch between each handler's concrete generics and the widened registry map type. This means the registry loses per-handler type inference — content and resolution types are erased to `Record<string, unknown>`.
+
+**Goal**: tighten `InquiryHandler` generic constraints so the registry map entries infer correctly without the cast. Each handler should remain fully typed end-to-end from `contentSchema` through `handleApprove`.
+
+Likely approach: a `makeInquiryHandler` helper that preserves inference at definition site — zero runtime cost, no cast needed in the registry.
+
+```ts
+export const makeInquiryHandler = <TContent, TResolution, TResolutionInput>(
+  handler: InquiryHandler<TContent, TResolution, TResolutionInput>
+) => handler;
+```
+
+Each handler wraps in `makeInquiryHandler({ ... })` and types flow through to the registry.
+
+---
+
 ## Related
 
 - **FEAT-001**: Inquiry system (core) — this extends it
