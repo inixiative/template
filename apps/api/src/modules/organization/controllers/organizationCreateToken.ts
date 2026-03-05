@@ -12,10 +12,10 @@ export const organizationCreateTokenController = makeController(organizationCrea
   const body = c.req.valid('json');
 
   if (!check(permix, rebacSchema, 'organization', { ...org, role: body.role }, 'assign')) {
-    throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
+    throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
   }
 
-  const token = await createToken(db, {
+  const token = await createToken(c, {
     name: body.name,
     ownerModel: 'Organization',
     organizationId: org.id,

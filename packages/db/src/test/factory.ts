@@ -38,6 +38,7 @@ import type {
   FactoryConfig,
   ModelName,
   ModelOf,
+  Serialized,
 } from '@template/db/test/factoryTypes';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
@@ -47,17 +48,17 @@ import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
  * Converts Date fields to ISO strings for API compatibility
  * Recursively handles nested objects and arrays
  */
-const serializeEntity = (obj: unknown): unknown => {
+const serializeEntity = <T>(obj: T): Serialized<T> => {
   if (obj === null || obj === undefined) {
-    return obj;
+    return obj as Serialized<T>;
   }
 
   if (obj instanceof Date) {
-    return obj.toISOString();
+    return obj.toISOString() as Serialized<T>;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => serializeEntity(item));
+    return obj.map((item) => serializeEntity(item)) as Serialized<T>;
   }
 
   if (typeof obj === 'object') {
@@ -68,10 +69,10 @@ const serializeEntity = (obj: unknown): unknown => {
         result[key] = serializeEntity(value);
       }
     }
-    return result;
+    return result as Serialized<T>;
   }
 
-  return obj;
+  return obj as Serialized<T>;
 };
 
 const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
@@ -114,22 +115,24 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
     dependencies,
   });
 
-  const generate = async (
+  const generate = async <O extends Partial<CreateInputOf<K>> | undefined>(
     persist: boolean,
-    overrides?: Partial<CreateInputOf<K>>,
+    overrides?: O,
     context?: BuildContext,
-  ): Promise<BuildResult<K>> => {
+  ): Promise<BuildResult<K, O>> => {
     const ctx: BuildContext = context ?? {};
 
     const scalarFields: Record<string, unknown> = {};
     const relationFields: Record<string, unknown> = {};
 
     if (overrides) {
-      for (const key in overrides) {
+      const overrideEntries = overrides as Record<string, unknown>;
+      for (const key in overrideEntries) {
+        const overrideValue = overrideEntries[key];
         if (dependencies[key]) {
-          relationFields[key] = overrides[key as keyof typeof overrides];
+          relationFields[key] = overrideValue;
         } else {
-          scalarFields[key] = overrides[key as keyof typeof overrides];
+          scalarFields[key] = overrideValue;
         }
       }
     }
@@ -200,15 +203,15 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
     });
 
     // Type assertion needed because __serialize() is added at runtime
-    const entityWithSerialize = entity as ModelOf<K> & { __serialize(): unknown };
+    const entityWithSerialize = entity as BuildResult<K, O>['entity'];
 
     (ctx as Record<string, unknown>)[toAccessor(modelName)] = entityWithSerialize;
 
-    return { entity: entityWithSerialize, context: ctx };
+    return { entity: entityWithSerialize, context: ctx } as BuildResult<K, O>;
   };
 
   return {
     build: (overrides, context) => generate(false, overrides, context),
-    create: (overrides, context) => generate(true, overrides, context),
+    create: (overrides, context) => generate(true, overrides, context) as Promise<BuildResult<K>>,
   };
 };

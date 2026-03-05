@@ -3,7 +3,7 @@ import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation
 type BuildWhereOptions = {
   search?: string;
   searchFields?: Record<string, any>;
-  searchableFields?: string[];
+  searchableFields?: readonly string[];
   filters?: Record<string, any>;
 };
 
@@ -12,7 +12,7 @@ const fieldOperators = ['contains', 'equals', 'in', 'notIn', 'lt', 'lte', 'gt', 
 
 const validateAndTransformSearchFields = (
   obj: Record<string, any>,
-  searchableFields: string[],
+  searchableFields: readonly string[],
   prefix = '',
   autoContains = true,
   depth = 0,

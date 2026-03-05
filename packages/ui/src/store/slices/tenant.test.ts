@@ -1,6 +1,6 @@
 import { buildOrganization } from '@template/db/test';
 import { createTestStore } from '@template/ui/test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('tenant slice', () => {
   let store: ReturnType<typeof createTestStore>;
@@ -166,8 +166,13 @@ describe('tenant slice', () => {
 
   describe('setPage and clearPage', () => {
     it('should set page context', async () => {
-      const { entity: mockOrg } = await buildOrganization({ id: 'org-1', name: 'Page Org' });
-      const pageContext = { organization: mockOrg as any };
+      const { entity } = await buildOrganization({
+        id: 'org-1',
+        name: 'Page Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const mockOrg = entity.__serialize();
+      const pageContext = { organization: mockOrg };
 
       store.getState().tenant.setPage(pageContext);
 
@@ -176,11 +181,16 @@ describe('tenant slice', () => {
 
     it('should clear page context', async () => {
       // Set some page context first
-      const { entity: mockOrg } = await buildOrganization({ id: 'org-1', name: 'Page Org' });
+      const { entity } = await buildOrganization({
+        id: 'org-1',
+        name: 'Page Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const mockOrg = entity.__serialize();
       store.setState({
         tenant: {
           ...store.getState().tenant,
-          page: { organization: mockOrg as any },
+          page: { organization: mockOrg },
         },
       });
 
@@ -190,18 +200,28 @@ describe('tenant slice', () => {
     });
 
     it('should preserve tenant context when setting page', async () => {
-      const { entity: mockOrg } = await buildOrganization({ id: 'org-1', name: 'Test Org' });
+      const { entity: orgEntity } = await buildOrganization({
+        id: 'org-1',
+        name: 'Test Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const mockOrg = orgEntity.__serialize();
 
       store.setState({
         auth: {
           ...store.getState().auth,
-          organizations: { 'org-1': mockOrg as any },
+          organizations: { 'org-1': mockOrg },
         },
       });
 
       store.getState().tenant.setOrganization('org-1');
-      const { entity: pageOrg } = await buildOrganization({ id: 'page-org-1', name: 'Page Org' });
-      store.getState().tenant.setPage({ organization: pageOrg as any });
+      const { entity: pageOrgEntity } = await buildOrganization({
+        id: 'page-org-1',
+        name: 'Page Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const pageOrg = pageOrgEntity.__serialize();
+      store.getState().tenant.setPage({ organization: pageOrg });
 
       const { tenant } = store.getState();
       expect(tenant.context).toEqual({

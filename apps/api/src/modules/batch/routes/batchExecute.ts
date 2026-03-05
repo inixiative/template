@@ -7,13 +7,13 @@ const batchRequestSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
   path: z.string(),
   body: z.any().optional(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 const batchExecuteBodySchema = z.object({
   requests: z.array(z.array(batchRequestSchema)).max(10, 'Maximum 10 rounds allowed'),
   strategy: z.enum(batchExecutionStrategyEnum).default('allowFailures'),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 const batchResultSchema = z.object({

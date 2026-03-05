@@ -7,7 +7,7 @@ import type { AppEnv } from '#/types/appEnv';
 export const autoRegisterRoutes = async (
   router: OpenAPIHono<AppEnv>,
   moduleDir: string,
-  options?: { admin?: boolean },
+  options?: { admin?: boolean; skip?: string[] },
 ): Promise<void> => {
   const routesDir = resolve(moduleDir, 'routes');
   const controllersDir = resolve(moduleDir, 'controllers');
@@ -21,6 +21,7 @@ export const autoRegisterRoutes = async (
 
     if (prefix && !baseName.startsWith(prefix)) continue;
     if (!prefix && baseName.startsWith('admin')) continue;
+    if (options?.skip?.includes(baseName)) continue;
 
     const routeModule = await import(`${routesDir}/${file}`);
     const controllerModule = await import(`${controllersDir}/${file}`);

@@ -18,7 +18,7 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
       : [token.organizationId, 'organization' as AccessorName];
     const owner = await hydrate(db, ownerType, { id: ownerId! });
     if (!check(permix, rebacSchema, ownerType, { ...owner, role: token.role }, 'assign'))
-      throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
+      throw makeError({ status: 403, message: 'Access denied' });
   }
 
   await db.token.delete({ where: { id: token.id } });

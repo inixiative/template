@@ -16,7 +16,7 @@ export const spaceUserUpdateController = makeController(spaceUserUpdateRoute, as
   const targetRole = greaterRole(spaceUser.role, body.role);
 
   if (!check(permix, rebacSchema, 'space', { ...space, role: targetRole }, 'assign')) {
-    throw makeError({ status: 403, message: `Cannot assign ${targetRole} role`, requestId: c.get('requestId') });
+    throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
   }
 
   const updated = await db.spaceUser.update({

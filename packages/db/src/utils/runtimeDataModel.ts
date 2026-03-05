@@ -116,7 +116,8 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
   const schema = getInlineSchema();
   cachedRelationFks = new Map();
 
-  const modelRegex = /model\s+(\w+)\s*\{([^}]+)\}/g;
+  // Use \n} as end delimiter to avoid matching {} inside @default("{}")
+  const modelRegex = /model\s+(\w+)\s*\{([\s\S]*?)\n\}/g;
   let modelMatch;
 
   while ((modelMatch = modelRegex.exec(schema)) !== null) {
@@ -125,8 +126,8 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
 
     const fieldFks = new Map<string, RelationFkMapping>();
 
-    // Match: fieldName Type @relation(fields: [...], references: [...], ...)
-    const relationRegex = /(\w+)\s+\w+\??\s+@relation\s*\(\s*fields:\s*\[([^\]]+)\]\s*,\s*references:\s*\[([^\]]+)\]/g;
+    // Match: fieldName Type @relation(optional "name", fields: [...], references: [...], ...)
+    const relationRegex = /(\w+)\s+\w+\??\s+@relation\s*\(\s*(?:"[^"]*",\s*)?fields:\s*\[([^\]]+)\]\s*,\s*references:\s*\[([^\]]+)\]/g;
     let relMatch;
 
     while ((relMatch = relationRegex.exec(modelBody)) !== null) {

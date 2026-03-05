@@ -41,6 +41,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
     if (options?.mockUser) {
       c.set('user', options.mockUser);
       c.get('permix').setUserId(options.mockUser.id as any);
+      if (options.mockUser.platformRole === 'superadmin') c.get('permix').setSuperadmin(true);
     }
     if (options?.mockOrganizationUsers) {
       c.set('organizationUsers', options.mockOrganizationUsers);

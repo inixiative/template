@@ -23,7 +23,7 @@ export const errorSchema = z
     error: z.string(),
     message: z.string(),
     guidance: z.string(),
-    fieldErrors: z.record(z.array(z.string())).optional(),
+    fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
     requestId: z.string(),
   })
   .openapi('Error');

@@ -11,7 +11,7 @@
     "./render": "./src/render/index.ts"
   },
   "scripts": {
-    "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --concurrency=1 --cwd packages/email src/",
+    "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd packages/email src/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

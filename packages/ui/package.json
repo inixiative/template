@@ -42,10 +42,12 @@
     "typecheck": "tsc --noEmit",
     "ladle": "ladle serve",
     "ladle:build": "ladle build",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureApiClientIndex.ts && bun run generate:msw",
-    "generate:msw": "bun scripts/generateMswHandlers.ts"
+    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.json openapi-ts -f openapiTs.config.ts && bun scripts/ensure-api-client-index.ts && bun run generate:msw",
+    "generate:msw": "bun scripts/generate-msw-handlers.ts"
   },
   "dependencies": {
+    "@template/permissions": "workspace:*",
+    "@template/shared": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
     "@ariakit/react": "^0.4.17",
     "@hey-api/client-fetch": "^0.13.1",

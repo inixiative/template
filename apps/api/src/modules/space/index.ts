@@ -1,26 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { adminSpaceReadManyController } from '#/modules/space/controllers/adminSpaceReadMany';
-import { spaceCreateTokenController } from '#/modules/space/controllers/spaceCreateToken';
-import { spaceCreateWebhookSubscriptionController } from '#/modules/space/controllers/spaceCreateWebhookSubscription';
-import { spaceDeleteController } from '#/modules/space/controllers/spaceDelete';
-import { spaceReadController } from '#/modules/space/controllers/spaceRead';
-import { spaceReadManyCustomersController } from '#/modules/space/controllers/spaceReadManyCustomers';
-import { spaceReadManySpaceUsersController } from '#/modules/space/controllers/spaceReadManySpaceUsers';
-import { spaceReadManyTokensController } from '#/modules/space/controllers/spaceReadManyTokens';
-import { spaceReadManyWebhookSubscriptionsController } from '#/modules/space/controllers/spaceReadManyWebhookSubscriptions';
-import { spaceReadProtectedController } from '#/modules/space/controllers/spaceReadProtected';
-import { spaceUpdateController } from '#/modules/space/controllers/spaceUpdate';
-import { adminSpaceReadManyRoute } from '#/modules/space/routes/adminSpaceReadMany';
-import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
-import { spaceCreateWebhookSubscriptionRoute } from '#/modules/space/routes/spaceCreateWebhookSubscription';
-import { spaceDeleteRoute } from '#/modules/space/routes/spaceDelete';
-import { spaceReadRoute } from '#/modules/space/routes/spaceRead';
-import { spaceReadManyCustomersRoute } from '#/modules/space/routes/spaceReadManyCustomers';
-import { spaceReadManySpaceUsersRoute } from '#/modules/space/routes/spaceReadManySpaceUsers';
-import { spaceReadManyTokensRoute } from '#/modules/space/routes/spaceReadManyTokens';
-import { spaceReadManyWebhookSubscriptionsRoute } from '#/modules/space/routes/spaceReadManyWebhookSubscriptions';
-import { spaceReadProtectedRoute } from '#/modules/space/routes/spaceReadProtected';
-import { spaceUpdateRoute } from '#/modules/space/routes/spaceUpdate';
+import { autoRegisterRoutes, autoRegisterAdminRoutes } from '#/lib/utils/autoRegisterRoutes';
 import type { AppEnv } from '#/types/appEnv';
 
 export const spaceRouter = new OpenAPIHono<AppEnv>();
@@ -28,18 +7,9 @@ export const spaceRouter = new OpenAPIHono<AppEnv>();
 // Note: No validateActor middleware here - spaceRead is public
 // Protected routes use validatePermission middleware individually
 
-spaceRouter.openapi(spaceReadRoute, spaceReadController);
-spaceRouter.openapi(spaceReadProtectedRoute, spaceReadProtectedController);
-spaceRouter.openapi(spaceUpdateRoute, spaceUpdateController);
-spaceRouter.openapi(spaceDeleteRoute, spaceDeleteController);
-spaceRouter.openapi(spaceReadManySpaceUsersRoute, spaceReadManySpaceUsersController);
-spaceRouter.openapi(spaceReadManyTokensRoute, spaceReadManyTokensController);
-spaceRouter.openapi(spaceReadManyWebhookSubscriptionsRoute, spaceReadManyWebhookSubscriptionsController);
-spaceRouter.openapi(spaceReadManyCustomersRoute, spaceReadManyCustomersController);
-spaceRouter.openapi(spaceCreateTokenRoute, spaceCreateTokenController);
-spaceRouter.openapi(spaceCreateWebhookSubscriptionRoute, spaceCreateWebhookSubscriptionController);
+await autoRegisterRoutes(spaceRouter, import.meta.dirname);
 
 // Admin router (mounted under /api/admin/space)
 export const adminSpaceRouter = new OpenAPIHono<AppEnv>();
 
-adminSpaceRouter.openapi(adminSpaceReadManyRoute, adminSpaceReadManyController);
+await autoRegisterAdminRoutes(adminSpaceRouter, import.meta.dirname);

@@ -354,6 +354,17 @@ const modelName = getResourceType(c);        // ModelDelegate | null
 
 Accesses resources loaded by middleware for routes with `:id` parameter.
 
+#### getValidatedBody / getValidatedQuery
+
+```typescript
+import { getValidatedBody, getValidatedQuery } from '#/lib/context/getValidatedData';
+
+const body = getValidatedBody<MyBodyType>(c);   // typed validated JSON body
+const query = getValidatedQuery<MyQueryType>(c); // typed validated query params
+```
+
+Use in services and middleware that receive a generic `Context<AppEnv>` rather than the fully-typed route context from `makeController`. Avoids repeating the `(c.req as unknown as { valid: ... }).valid('json')` cast.
+
 #### isSuperadmin
 
 Two versions exist:

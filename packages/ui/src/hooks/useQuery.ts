@@ -6,7 +6,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { QueryKey } from '@tanstack/query-core';
+import type { QueryKey } from '@tanstack/react-query';
 
 /**
  * Re-export TanStack Query hooks with app-specific types.

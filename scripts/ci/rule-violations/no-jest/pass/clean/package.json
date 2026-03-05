@@ -1,0 +1,7 @@
+{
+  "name": "fixture-no-jest-pass",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

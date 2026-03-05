@@ -1,4 +1,4 @@
-import type { QueryKey } from '@tanstack/query-core';
+import type { QueryKey } from '@tanstack/react-query';
 import type { UseMutationOptions } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@template/ui/hooks/useQuery';

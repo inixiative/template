@@ -1,6 +1,8 @@
-import type { Db } from '@template/db';
+import type { Context } from 'hono';
+import type { AppEnv } from '#/types/appEnv';
 
-export const redactUser = async (db: Db, userId: string) => {
+export const redactUser = async (c: Context<AppEnv>, userId: string) => {
+  const db = c.get('db');
   const now = new Date();
 
   // Soft delete orgs where this user is the only member

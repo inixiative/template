@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Backlog
+    FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     INFRA-006-tenant-isolation-test-matrix
     INFRA-007-data-lifecycle-retention-export-delete
@@ -24,6 +25,7 @@ kanban
     FIN-002-financial-web3
     FEAT-013-encryption
     FEAT-014-ai-developer-experience
+    FEAT-015-ai-dashboard-generator
 ```
 
 ## Tickets
@@ -55,9 +57,14 @@ kanban
 
 **AI Developer Experience:**
 - [FEAT-014: AI Developer Experience](./FEAT-014-ai-developer-experience.md) - Skills, rules, agents, MCP servers for AI-native development
+- [FEAT-015: AI Dashboard Generator](./FEAT-015-ai-dashboard-generator.md) - Natural language → dashboard from component catalog via json-render
+
+**Inquiry System Extensions:**
+- [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md) - parentInquiryId, metadata JSON, migration-spawned inquiries, child inquiry resolution
 
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
+- API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
 
 **Frontend Architecture:**
 - [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
@@ -85,14 +92,14 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 16
+- **Total Backlog Items**: 18
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2
 - **Communication**: 1
 - **Infrastructure**: 5
 - **Security & Encryption**: 1
-- **AI Developer Experience**: 1
+- **AI Developer Experience**: 2
 - **Frontend Architecture**: 1
 - **API Reliability**: 1
 
@@ -110,4 +117,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-03-02_
+_Last Updated: 2026-03-04_

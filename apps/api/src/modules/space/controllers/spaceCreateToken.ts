@@ -14,10 +14,10 @@ export const spaceCreateTokenController = makeController(spaceCreateTokenRoute, 
   const hydrated = await hydrate(db, 'space', space);
 
   if (!check(permix, rebacSchema, 'space', { ...hydrated, role: body.role }, 'assign')) {
-    throw makeError({ status: 403, message: `Cannot create ${body.role} token`, requestId: c.get('requestId') });
+    throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
   }
 
-  const token = await createToken(db, {
+  const token = await createToken(c, {
     name: body.name,
     ownerModel: 'Space',
     organizationId: space.organizationId,

@@ -7,8 +7,11 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
+      "@template/db": ["../db/src/index.ts"],
       "@template/db/*": ["../db/src/*"],
+      "@template/permissions": ["../permissions/src/index.ts"],
       "@template/permissions/*": ["../permissions/src/*"],
+      "@template/shared": ["../shared/src/index.ts"],
       "@template/shared/*": ["../shared/src/*"],
       "@template/ui/test": ["./src/test/index.ts"],
       "@template/ui/test/*": ["./src/test/*"],

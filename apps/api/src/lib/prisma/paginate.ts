@@ -1,5 +1,6 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
 import type { Context } from 'hono';
+import { getValidatedQuery } from '#/lib/context/getValidatedData';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 import type { AppEnv } from '#/types/appEnv';
@@ -29,13 +30,14 @@ export const paginate = async <
   c: Context<AppEnv>,
   delegate: T,
   options?: {
-    searchableFields?: string[];
+    searchableFields?: readonly string[];
     where?: Record<string, any>;
+    orderBy?: Record<string, Prisma.SortOrder> | Record<string, Prisma.SortOrder>[];
     include?: Record<string, unknown>;
     omit?: Record<string, unknown>;
   },
 ): Promise<PaginatedResult<R>> => {
-  const query = (c.req as unknown as { valid: (key: string) => unknown }).valid('query') as Record<string, any>;
+  const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
 
   const bracketQuery = (c.get('bracketQuery') ?? {}) as Record<string, any>;
@@ -50,7 +52,13 @@ export const paginate = async <
 
   const where = { ...options?.where, ...searchWhere };
 
-  const parsedOrderBy = rawOrderBy ? parseOrderBy(rawOrderBy) : [];
+  const parsedOrderBy = rawOrderBy
+    ? parseOrderBy(rawOrderBy)
+    : options?.orderBy
+      ? Array.isArray(options.orderBy)
+        ? options.orderBy
+        : [options.orderBy]
+      : [];
   if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
 
   const [data, total] = await Promise.all([

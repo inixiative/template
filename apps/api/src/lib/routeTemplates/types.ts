@@ -15,10 +15,10 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   query?: ZodSchema;
   responseSchema?: ZodResponseSchema;
   bodySchema?: ZodSchema;
-  sanitizeKeys?: string[];
+  sanitizeKeys?: readonly string[];
   skipId?: boolean;
   many?: boolean;
   paginate?: boolean;
   admin?: boolean;
-  searchableFields?: string[];
+  searchableFields?: readonly string[];
 };

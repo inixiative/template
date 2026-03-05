@@ -5,9 +5,12 @@ import { useQuery } from '@template/ui/hooks/useQuery';
 
 type Model = 'organization' | 'space';
 
-const modelReaders = {
-  organization: organizationRead,
-  space: spaceRead,
+type LookupOptions = { path: { id: string }; query?: { lookup?: string } };
+type LookupReader = (options: LookupOptions & Record<string, unknown>) => Promise<unknown>;
+
+const modelReaders: Record<Model, LookupReader> = {
+  organization: organizationRead as LookupReader,
+  space: spaceRead as LookupReader,
 };
 
 export const useValidateUniqueness = (
@@ -28,16 +31,15 @@ export const useValidateUniqueness = (
 
       const { auth } = useAppStore.getState();
       const reader = modelReaders[model];
-      type ReaderOptions = Parameters<typeof reader>[0];
-      const params =
+      const params: LookupOptions =
         !field || field === 'id'
           ? { path: { id: value } }
-          : ({ path: { id: value }, query: { lookup: field } } as ReaderOptions);
+          : { path: { id: value }, query: { lookup: field } };
 
       // Use throwOnError: false so we can inspect response.status
       // (throwOnError: true throws the parsed JSON body which has no .status field)
       const result = await apiFetchInternal(
-        (requestOptions: ReaderOptions) => reader({ ...params, ...requestOptions }),
+        (requestOptions: LookupOptions) => reader({ ...params, ...requestOptions }),
         { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
       )() as any;
 

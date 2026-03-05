@@ -25,7 +25,7 @@ model Inquiry {
   sourceSpace        Space?        @relation("InquirySource", fields: [sourceSpaceId], references: [id], onDelete: Cascade)
 
   // Target (who receives/resolves) - fake polymorphism
-  targetModel          InquiryResourceModel?
+  targetModel          InquiryResourceModel
   targetUserId         String?       @db.VarChar(36)
   targetOrganizationId String?       @db.VarChar(36)
   targetSpaceId        String?       @db.VarChar(36)
@@ -59,8 +59,9 @@ enum InquiryType {
 enum InquiryStatus {
   draft
   sent
-  acknowledged
-  resolved
+  changesRequested
+  approved
+  denied
   canceled
 }
 

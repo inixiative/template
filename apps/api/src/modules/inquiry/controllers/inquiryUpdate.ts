@@ -1,33 +1,37 @@
-// @ts-nocheck
-
+import type { HydratedRecord, Prisma } from '@template/db';
+import { hydrate } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
-
+import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
+import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
-import { checkIsSource } from '#/modules/inquiry/services/access';
+import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
-  const user = c.get('user')!;
   const db = c.get('db');
-  const { id } = c.req.valid('param');
-  const data = c.req.valid('json');
+  const permix = c.get('permix');
+  const inquiry = getResource<'inquiry'>(c);
+  const { content, ...rest } = c.req.valid('json');
 
-  const inquiry = await db.inquiry.findUnique({ where: { id } });
+  validateInquiryIsEditable(inquiry);
 
-  if (!inquiry) {
-    throw makeError({ status: 404, message: 'Inquiry not found', requestId: c.get('requestId') });
-  }
+  const handler = inquiryHandlers[inquiry.type];
+  const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
+  if (handler.validate) await handler.validate(db, inquiry, effectiveContent);
 
-  if (inquiry.status !== 'draft') {
-    throw makeError({ status: 400, message: 'Only draft inquiries can be updated', requestId: c.get('requestId') });
-  }
+  const partial = await hydrate(db, 'inquiry', { ...inquiry, content: effectiveContent } as HydratedRecord);
+  if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, message: 'Access denied' });
 
-  const isSource = await checkIsSource(db, inquiry, user.id);
-  if (!isSource) {
-    throw makeError({ status: 403, message: 'Only the source can update', requestId: c.get('requestId') });
-  }
-
-  const updated = await db.inquiry.update({ where: { id }, data });
+  const updated = await db.inquiry.update({
+    where: { id: inquiry.id },
+    data: {
+      ...rest,
+      ...(content !== undefined && { content: content as Prisma.InputJsonValue }),
+      ...(rest.status === InquiryStatus.sent && !inquiry.sentAt ? { sentAt: new Date() } : {}),
+    },
+  });
 
   return respond.ok(updated);
 });

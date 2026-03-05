@@ -1,5 +1,5 @@
 import { createTestStore } from '@template/ui/test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('ui slice', () => {
   let store: ReturnType<typeof createTestStore>;
@@ -14,7 +14,7 @@ describe('ui slice', () => {
 
       expect(ui.theme).toBe('system');
       expect(ui.isLoading).toBe(false);
-      expect(ui.appName).toBe('Template');
+      expect(ui.appName).toBe('App');
       expect(ui.shortName).toBe('Template');
       expect(ui.description).toBe('TanStack Router + React Aria + Tailwind');
     });

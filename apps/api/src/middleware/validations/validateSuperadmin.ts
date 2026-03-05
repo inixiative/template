@@ -5,7 +5,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const validateSuperadmin = async (c: Context<AppEnv>, next: Next) => {
   if (c.get('user')?.platformRole !== 'superadmin') {
-    throw makeError({ status: 403, message: 'Superadmin access required', requestId: c.get('requestId') });
+    throw makeError({ status: 403, message: 'Superadmin access required' });
   }
   await next();
 };
