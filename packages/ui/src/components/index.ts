@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './compositions';
 export * from './layout';
 export * from './organizations';
 export * from './primitives';
