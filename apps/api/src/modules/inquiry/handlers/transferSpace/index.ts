@@ -1,17 +1,16 @@
 import { z } from 'zod';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
+import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 
-export const transferSpaceHandler: InquiryHandler = {
+type TransferSpaceContent = Record<string, never>;
+
+export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
   sources: [{ sourceModel: InquiryResourceModel.Space, sourceSpaceId: 'spaceId' }],
   targets: [{ targetModel: InquiryResourceModel.Organization, targetOrganizationId: 'targetOrganizationId' }],
-  contentSchema: z.object({
-    spaceId: z.string(),
-    targetOrganizationId: z.string(),
-  }),
-  resolutionSchema: z.object({
-    explanation: z.string().optional(),
-  }),
+  contentSchema: z.object({}),
+  resolutionInputSchema: baseResolutionInputSchema,
+  resolutionSchema: baseResolutionInputSchema,
   handleApprove: async (_db, _inquiry, _resolvedContent) => {
     // TODO: implement transferSpace approval
   },

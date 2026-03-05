@@ -1,5 +1,4 @@
 import { createRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquiryCreateBodySchema, INQUIRY_CREATE_SANITIZE_KEYS } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
@@ -11,6 +10,5 @@ export const spaceCreateInquiryRoute = createRoute({
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquirySentResponseSchema,
   sanitizeKeys: INQUIRY_CREATE_SANITIZE_KEYS,
-  middleware: [validatePermission('manage')],
   tags: [Tags.space, Tags.inquiry],
 });

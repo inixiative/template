@@ -21,8 +21,8 @@ export const resolveInquiry = async (
 
     if (status === InquiryStatus.approved) {
       const handler = inquiryHandlers[inquiry.type];
-      const content = inquiry.content as Record<string, unknown>;
-      const merged = resolveContent(content, resolutionData, handler.resolutionSchema);
+      const content = handler.contentSchema.parse(inquiry.content);
+      const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
       approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
     }
 

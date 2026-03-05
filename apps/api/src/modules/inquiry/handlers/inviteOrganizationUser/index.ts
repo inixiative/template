@@ -1,15 +1,16 @@
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
-import { baseResolutionSchema } from '#/modules/inquiry/handlers/schemas';
-import { inviteOrganizationUserContentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser/contentSchema';
+import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
+import { inviteOrganizationUserContentSchema, type InviteOrganizationUserContent } from '#/modules/inquiry/handlers/inviteOrganizationUser/contentSchema';
 import { handleApprove } from '#/modules/inquiry/handlers/inviteOrganizationUser/handleApprove';
 import { validate } from '#/modules/inquiry/handlers/inviteOrganizationUser/validate';
 
-export const inviteOrganizationUserHandler: InquiryHandler = {
+export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUserContent> = {
   sources: [{ sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: 'organizationId' }],
   targets: [{ targetModel: InquiryResourceModel.User }],
   contentSchema: inviteOrganizationUserContentSchema,
-  resolutionSchema: baseResolutionSchema,
+  resolutionInputSchema: baseResolutionInputSchema,
+  resolutionSchema: baseResolutionInputSchema,
   handleApprove,
   validate,
   unique: true,

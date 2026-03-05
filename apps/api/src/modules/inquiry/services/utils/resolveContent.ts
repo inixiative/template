@@ -5,9 +5,9 @@ const RESOLUTION_METADATA_KEYS = new Set(['resolvedBy', 'resolvedAt', 'explanati
 export const resolveContent = (
   content: Record<string, unknown>,
   resolution: Record<string, unknown>,
-  resolutionSchema: z.ZodTypeAny,
+  resolutionInputSchema: z.ZodTypeAny,
 ): Record<string, unknown> => {
-  const shape = (resolutionSchema as z.ZodObject<z.ZodRawShape>).shape ?? {};
+  const shape = (resolutionInputSchema as z.ZodObject<z.ZodRawShape>).shape ?? {};
   const allowedOverrideKeys = Object.keys(shape).filter((k) => !RESOLUTION_METADATA_KEYS.has(k));
 
   const overrides = Object.fromEntries(
