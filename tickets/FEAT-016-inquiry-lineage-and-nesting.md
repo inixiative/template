@@ -133,7 +133,15 @@ export const makeInquiryHandler = <TContent, TResolution, TResolutionInput>(
 ) => handler;
 ```
 
-Each handler wraps in `makeInquiryHandler({ ... })` and types flow through to the registry.
+Each handler wraps in `makeInquiryHandler({ ... })` — but this alone isn't enough if the registry is still `Record<InquiryType, InquiryHandler>` (that widens everything again).
+
+Also need the registry typed via a mapped type + `satisfies` to keep keys exhaustive and per-key generics intact:
+
+```ts
+const inquiryHandlers = { ... } satisfies Record<InquiryType, InquiryHandler<any, any, any>>;
+```
+
+With both changes, `as unknown as` can be removed and inference flows end-to-end from `contentSchema` through `handleApprove`.
 
 ---
 
