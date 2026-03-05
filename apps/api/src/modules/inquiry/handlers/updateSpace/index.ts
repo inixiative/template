@@ -35,7 +35,7 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceC
 };
 
 export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Space, sourceSpaceId: 'spaceId' }],
+  sources: [{ sourceModel: InquiryResourceModel.Space }],
   targets: [{ targetModel: InquiryResourceModel.admin }],
   contentSchema,
   resolutionInputSchema: baseResolutionInputSchema,

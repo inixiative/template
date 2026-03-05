@@ -6,7 +6,7 @@ import { handleApprove } from '#/modules/inquiry/handlers/inviteOrganizationUser
 import { validate } from '#/modules/inquiry/handlers/inviteOrganizationUser/validate';
 
 export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUserContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: 'organizationId' }],
+  sources: [{ sourceModel: InquiryResourceModel.Organization }],
   targets: [{ targetModel: InquiryResourceModel.User }],
   contentSchema: inviteOrganizationUserContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,

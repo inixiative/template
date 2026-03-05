@@ -6,8 +6,8 @@ import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 type TransferSpaceContent = Record<string, never>;
 
 export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
-  sources: [{ sourceModel: InquiryResourceModel.Space, sourceSpaceId: 'spaceId' }],
-  targets: [{ targetModel: InquiryResourceModel.Organization, targetOrganizationId: 'targetOrganizationId' }],
+  sources: [{ sourceModel: InquiryResourceModel.Space }],
+  targets: [{ targetModel: InquiryResourceModel.Organization }],
   contentSchema: z.object({}),
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
