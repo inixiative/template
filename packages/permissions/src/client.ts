@@ -20,7 +20,14 @@ export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 export const UserAction = { ...StandardAction } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 
-export type Action = UserAction | OrganizationAction | SpaceAction;
+export const InquiryAction = {
+  read: 'read',
+  send: 'send',
+  resolve: 'resolve',
+} as const;
+export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
+
+export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction;
 
 export type Entitlements = Record<string, boolean> | null;
 

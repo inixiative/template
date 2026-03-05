@@ -25,7 +25,7 @@ export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
   if (count === 1) await redis.expire(redisKey, 1); // 1 second window
 
   if (count > limit) {
-    throw makeError({ status: 429, message: 'Rate limit exceeded', requestId: c.get('requestId') });
+    throw makeError({ status: 429, message: 'Rate limit exceeded' });
   }
 
   await next();
@@ -53,7 +53,7 @@ export const rateLimit = (config: RateLimitConfig) => {
     if (count === 1) await redis.expire(redisKey, windowSec);
 
     if (count > max) {
-      throw makeError({ status: 429, message: 'Rate limit exceeded', requestId: c.get('requestId') });
+      throw makeError({ status: 429, message: 'Rate limit exceeded' });
     }
 
     await next();

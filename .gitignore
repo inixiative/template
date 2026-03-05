@@ -173,3 +173,6 @@ apps/web/app.config.timestamp_*.js
 
 # Init script scratch files
 scripts/init/test-*.ts
+
+# Generated OpenAPI artifact
+packages/ui/openapi.json

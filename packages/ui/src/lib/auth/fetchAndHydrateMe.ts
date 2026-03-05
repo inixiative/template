@@ -25,6 +25,7 @@ export const fetchAndHydrateMe = async (
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userData;
   const organizationsDict = keyBy(organizations || [], 'id');
   const spacesDict = keyBy(spaces || [], 'id');
+  const spaceUsersDict = keyBy(spaceUsers || [], 'spaceId');
 
   set((state) => ({
     auth: {
@@ -32,6 +33,7 @@ export const fetchAndHydrateMe = async (
       user,
       organizations: organizationsDict,
       spaces: spacesDict,
+      spaceUsers: spaceUsersDict,
       spoofingUserEmail: spoofingEmail && spoofedEmail ? spoofingEmail : null,
       isAuthenticated: true,
       isInitialized: true,

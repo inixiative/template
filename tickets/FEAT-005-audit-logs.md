@@ -1,7 +1,7 @@
 # FEAT-005: Audit Logs
 
 **Status**: 🆕 Not Started
-**Assignee**: Hernan
+**Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
 **Updated**: 2026-02-14

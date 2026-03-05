@@ -14,19 +14,21 @@
 
 ```bash
 bun test                          # Run all (from root)
-bun run '--filter=api' test         # Run API tests
-bun run '--filter=@template/db' test # Run DB package tests
+bun run --cwd apps/api test        # Run API tests only
+bun run --cwd packages/db test     # Run DB package tests only
+```
+
+### Concurrency
+
+DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. All packages that hit the database use a shared `registerTestTracker` singleton; concurrent file execution causes `cleanupTouchedTables` from one file to truncate tables used by another.
+
+```json
+"test": "bun run --cwd ../.. with test api bun test --max-concurrency=1"
 ```
 
 ### Environment Composition
 
-Each package's test script uses the `with` script to load environment variables:
-
-```json
-"test": "bun run --cwd ../.. with test api bun test"
-```
-
-This ensures tests run with `.env.test` files loaded. When adding a new package with tests, follow this pattern.
+Each package's test script uses the `with` script to load environment variables from `.env.test`. When adding a new package with DB-backed tests, follow this pattern and include `--max-concurrency=1`.
 
 ---
 
@@ -86,6 +88,32 @@ const { entity: user } = await createUser();
 ```
 
 Both have same signature: `(overrides?, context?) => Promise<{ entity, context }>`
+
+### Serialization for API/UI-Shaped Assertions
+
+Factory entities include a runtime `__serialize()` helper that converts `Date` fields to ISO strings (recursively).
+
+Use it when asserting against API/SDK-shaped types (which use string timestamps):
+
+```typescript
+const { entity } = await buildOrganization({ id: 'org-1', name: 'Test Org' });
+const organization = entity.__serialize();
+
+store.getState().tenant.setPage({ organization });
+```
+
+This keeps cross-system factory usage while matching frontend/API type contracts.
+
+When a factory override provides a non-null Date for a nullable field, inferred serialization reflects that narrowing:
+
+```typescript
+const { entity } = await buildOrganization({
+  deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+});
+
+const organization = entity.__serialize();
+// organization.deletedAt is inferred as string here (not string | null)
+```
 
 ### Basic Usage
 
@@ -327,11 +355,14 @@ import { createTestApp } from '#tests/createTestApp';
 const harness = createTestApp({
   mockUser: user,                    // Authenticated as this user
   mockOrganizationUsers: [orgUser],  // User's org memberships
+  mockSpaceUsers: [spaceUser],       // User's space memberships
   mount: [(app) => app.route('/api/v1/user', userRouter)],
 });
 
 const { fetch, db } = harness;
 ```
+
+If `mockUser.platformRole === 'superadmin'`, the test harness automatically calls `permix.setSuperadmin(true)`, enabling the superadmin bypass on all permission checks. Use this to test `resolve` on admin-targeted inquiries or any route that requires superadmin.
 
 ---
 

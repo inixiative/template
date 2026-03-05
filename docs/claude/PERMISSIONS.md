@@ -468,7 +468,7 @@ export const rebacSchema: RebacSchema = {
 | Rule | Meaning | Example |
 |------|---------|---------|
 | `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
-| `{ rel, action }` | Delegate to related resource | `{ rel: 'organization', action: 'own' }` |
+| `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
 | `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
 | `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
 | `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
@@ -479,8 +479,25 @@ export const rebacSchema: RebacSchema = {
 
 1. **Same-resource inheritance**: `manage: 'own'` means "to manage, check if user can own"
 2. **Relation delegation**: `own: { rel: 'organization', action: 'own' }` means "to own a Space, check if user owns its Organization"
-3. **Chain resolution**: Rules can chain (read → operate → manage → own)
-4. **Cycle detection**: Prevents infinite loops
+3. **Dot-path traversal**: `rel` supports dot-notation for multi-hop chains. `{ rel: 'sourceSpace.organization', action: 'own' }` traverses `inquiry.sourceSpace` then `.organization`, resolving the final model type at each step. Useful when you want to explicitly bypass intermediate delegation and assert on a specific ancestor.
+4. **Chain resolution**: Rules can chain (read → operate → manage → own)
+5. **Cycle detection**: Prevents infinite loops
+
+### Dot-path vs. Single-hop Delegation
+
+These two rules look similar but behave differently:
+
+```typescript
+// Single-hop on space: checks space.own, which delegates to organization.own
+// → space owner OR org owner passes (delegation chain runs)
+{ rel: 'sourceSpace', action: 'own' }
+
+// Dot-path to organization: jumps directly to the organization record, checks own there
+// → only org owner passes (the space record is never checked, only traversed)
+{ rel: 'sourceSpace.organization', action: 'own' }
+```
+
+Use dot-path when you want a stricter check that bypasses intermediate delegation. In the inquiry schema, `updateSpace` uses single-hop (space owner or org owner can update), while `transferSpace` uses dot-path (org owner only can transfer).
 
 ### Example: Space Permission Check
 

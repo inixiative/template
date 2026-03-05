@@ -17,7 +17,7 @@ import { cacheKey } from '@template/db';
 
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
-export const CACHE_REFERENCE: CacheReference = {
+export const cacheReference: CacheReference = {
   User: (r) => [cacheKey('user', r.id), cacheKey('user', { email: r.email })],
 
   Session: (r) => [cacheKey('session', r.id), cacheKey('session', { userId: r.userId }, [], true)],
@@ -67,7 +67,7 @@ export const CACHE_REFERENCE: CacheReference = {
 };
 
 export const fetchCacheKeys = (model: Prisma.ModelName, record: Record<string, unknown>): string[] => {
-  const fn = CACHE_REFERENCE[model] as ((r: Record<string, unknown>) => string[]) | undefined;
+  const fn = cacheReference[model] as ((r: Record<string, unknown>) => string[]) | undefined;
   if (!fn) return [];
   return fn(record);
 };

@@ -7,6 +7,7 @@ generator zod {
   provider             = "prisma-zod-generator"
   output               = "../../src/generated/zod"
   showModelDescription = false
+  zodImportTarget      = "v4"
 }
 
 datasource db {

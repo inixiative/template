@@ -74,4 +74,91 @@ export const rebacSchema: RebacSchema = {
       own: { rel: 'organization', action: 'own' },
     },
   },
+
+  inquiry: {
+    actions: {
+      // Read: source or target can read their own inquiry
+      read: {
+        any: [
+          { self: 'sourceUserId' },
+          { rel: 'sourceOrganization', action: 'manage' },
+          { rel: 'sourceSpace', action: 'manage' },
+          { self: 'targetUserId' },
+          { rel: 'targetOrganization', action: 'manage' },
+          { rel: 'targetSpace', action: 'manage' },
+        ],
+      },
+
+      // Send: who may create/initiate each inquiry type
+      send: {
+        any: [
+          // inviteOrganizationUser: high roles (owner/admin) require own
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+              { rule: { field: 'content.role', operator: Operator.in, value: highRoles } },
+              { rel: 'sourceOrganization', action: 'own' },
+            ],
+          },
+          // inviteOrganizationUser: normal roles require manage
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+              { rule: { field: 'content.role', operator: Operator.notIn, value: highRoles } },
+              { rel: 'sourceOrganization', action: 'manage' },
+            ],
+          },
+          // createSpace — org owner only
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['createSpace'] } },
+              { rel: 'sourceOrganization', action: 'own' },
+            ],
+          },
+          // updateSpace — space owner or org owner (sourceSpace.own delegates to org.own)
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['updateSpace'] } },
+              { rel: 'sourceSpace', action: 'own' },
+            ],
+          },
+          // transferSpace — org owner only (explicit 2-hop traversal bypasses direct space.own)
+          {
+            all: [
+              { rule: { field: 'type', operator: Operator.in, value: ['transferSpace'] } },
+              { rel: 'sourceSpace.organization', action: 'own' },
+            ],
+          },
+        ],
+      },
+
+      // Resolve: target decides (approve/deny/requestChanges)
+      // For User targets: self check passes. For admin targets (targetModel === admin),
+      // self check fails for regular users — superadmin bypass handles it.
+      resolve: {
+        any: [
+          { self: 'targetUserId' },
+          {
+            any: [
+              // transferSpace — target org owner only
+              {
+                all: [
+                  { rule: { field: 'type', operator: Operator.in, value: ['transferSpace'] } },
+                  { rel: 'targetOrganization', action: 'own' },
+                ],
+              },
+              // all other types — target org manager
+              {
+                all: [
+                  { rule: { field: 'type', operator: Operator.notIn, value: ['transferSpace'] } },
+                  { rel: 'targetOrganization', action: 'manage' },
+                ],
+              },
+            ],
+          },
+          { rel: 'targetSpace', action: 'manage' },
+        ],
+      },
+    },
+  },
 };

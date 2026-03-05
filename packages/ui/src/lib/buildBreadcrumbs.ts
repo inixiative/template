@@ -1,7 +1,7 @@
 import type { RouteMatch } from '@template/ui/lib/findRoute';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 
-export type Breadcrumb = {
+type Breadcrumb = {
   label: string;
   href: string;
 };

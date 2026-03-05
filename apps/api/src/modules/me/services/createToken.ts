@@ -1,6 +1,7 @@
-import type { Db } from '@template/db';
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import type { Context } from 'hono';
 import { createHash, randomBytes } from 'crypto';
+import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   User: 'user',
@@ -20,7 +21,8 @@ type CreateTokenParams = {
   expiresAt?: Date;
 };
 
-export const createToken = async (db: Db, params: CreateTokenParams) => {
+export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
+  const db = c.get('db');
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;

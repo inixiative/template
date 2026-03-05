@@ -18,8 +18,8 @@ type TransformUnknown<T> = unknown extends T ? Cast<T, Prisma.NullableJsonNullVa
 
 // Transform all properties in an object type
 type TransformShape<S> = {
-  [K in keyof S]: S[K] extends z.ZodType<infer Output, infer Def, infer Input>
-    ? z.ZodType<TransformUnknown<Output>, Def, TransformUnknown<Input>>
+  [K in keyof S]: S[K] extends z.ZodType<infer Output, infer Input>
+    ? z.ZodType<TransformUnknown<Output>, TransformUnknown<Input>>
     : S[K];
 };
 
@@ -75,7 +75,7 @@ export const buildRequest = <const T extends RouteArgs>(
     params,
     query,
     bodySchema,
-    sanitizeKeys = [],
+    sanitizeKeys = [] as readonly string[],
     skipId = false,
     paginate = false,
     many = false,

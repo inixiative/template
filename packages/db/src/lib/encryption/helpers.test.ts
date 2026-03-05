@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
 import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
 import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 

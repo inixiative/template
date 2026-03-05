@@ -8,8 +8,8 @@ const AuthProviderCreateBodySchema = z.object({
   type: AuthProviderTypeSchema,
   provider: z.string(),
   name: z.string(),
-  config: z.record(z.any()),
-  secrets: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
+  secrets: z.record(z.string(), z.any()),
 });
 
 export const organizationCreateAuthProviderRoute = createRoute({

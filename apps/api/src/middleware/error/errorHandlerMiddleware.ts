@@ -3,7 +3,7 @@ import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { makeError } from '#/lib/errors';
+import { AppError, makeError } from '#/lib/errors';
 import { ResponseValidationError } from '#/lib/utils/makeController';
 import { formatZodIssues } from '#/middleware/error/formatZodIssues';
 import { isZodError } from '#/middleware/error/isZodError';
@@ -14,67 +14,34 @@ import type { AppEnv } from '#/types/appEnv';
 export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) => {
   c.header('Cache-Control', 'no-store');
 
-  if (process.env.NODE_ENV === 'test') {
-    log.error('Error in handler:', err);
-  }
-
-  // Handle Zod validation errors
   if (isZodError(err)) {
     return respond422(c, formatZodIssues(err));
   }
 
-  // Handle response validation errors (controller returned invalid data)
   if (err instanceof ResponseValidationError) {
     log.error('Response validation failed:', err.zodError);
     return respond500(c, err);
   }
 
-  // Handle Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    const requestId = c.get('requestId') as string;
-
-    // P2002 = unique constraint violation
     if (err.code === 'P2002') {
       const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
-      return makeError({
-        status: 409,
-        message: `Resource already exists: ${target}`,
-        requestId,
-      }).getResponse();
+      return makeError({ status: 409, message: `Resource already exists: ${target}` }).getResponse();
     }
-    // P2025 = record not found
-    if (err.code === 'P2025') {
-      return makeError({
-        status: 404,
-        message: 'Resource not found',
-        requestId,
-      }).getResponse();
-    }
+    if (err.code === 'P2025') return makeError({ status: 404, message: 'Resource not found' }).getResponse();
   }
 
-  // Handle HTTP exceptions (including makeError results)
   if (err instanceof HTTPException) {
     if (err.status >= 500) {
-      Sentry.captureException(err, {
-        extra: {
-          statusCode: err.status,
-          path: c.req.path,
-          method: c.req.method,
-        },
-      });
+      Sentry.captureException(err, { extra: { statusCode: err.status, path: c.req.path, method: c.req.method } });
+      if (process.env.NODE_ENV === 'test') log.error('Error in handler:', err);
+      if (err instanceof AppError) err.requestId = c.get('requestId');
     }
     return err.getResponse();
   }
 
-  // Capture all other errors to Sentry
   if (process.env.NODE_ENV !== 'test') {
-    Sentry.captureException(err, {
-      extra: {
-        path: c.req.path,
-        method: c.req.method,
-      },
-    });
+    Sentry.captureException(err, { extra: { path: c.req.path, method: c.req.method } });
   }
-
   return respond500(c, err);
 };

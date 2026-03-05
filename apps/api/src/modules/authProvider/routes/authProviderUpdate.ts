@@ -8,8 +8,8 @@ import { Modules } from '#/modules/modules';
 const AuthProviderUpdateBodySchema = z.object({
   name: z.string().optional(),
   enabled: z.boolean().optional(),
-  config: z.record(z.any()).optional(),
-  secrets: z.record(z.any()).optional(),
+  config: z.record(z.string(), z.any()).optional(),
+  secrets: z.record(z.string(), z.any()).optional(),
 });
 
 export const authProviderUpdateRoute = updateRoute({

@@ -8,21 +8,48 @@ export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection
 
 export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 
+export type Serialized<T> =
+  T extends Date ? string
+  : T extends Array<infer U> ? Array<Serialized<U>>
+  : T extends object ? { [K in keyof T]: Serialized<T[K]> }
+  : T;
+
+type Defined<T> = Exclude<T, undefined>;
+
+type ApplyOverrides<Base, Overrides> = Overrides extends object
+  ? {
+      [K in keyof Base]: K extends keyof Overrides
+        ? Defined<Overrides[K]> extends never
+          ? Base[K]
+          : Defined<Overrides[K]> extends Base[K]
+            ? Defined<Overrides[K]>
+            : Base[K]
+        : Base[K];
+    }
+  : Base;
+
+export type ModelWithOverrides<K extends ModelName, O extends Partial<CreateInputOf<K>> | undefined = undefined> =
+  ApplyOverrides<ModelOf<K>, O>;
+
 export type BuildContext = {
   [K in ModelName as Uncapitalize<K>]?: ModelOf<K>;
 };
 
-export type BuildResult<K extends ModelName> = {
-  entity: ModelOf<K> & {
-    __serialize(): unknown;
+export type BuildResult<K extends ModelName, O extends Partial<CreateInputOf<K>> | undefined = undefined> = {
+  entity: ModelWithOverrides<K, O> & {
+    __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
   context: BuildContext;
 };
 
 // Typed result - extends BuildContext with guaranteed dependencies
-export type TypedBuildResult<K extends ModelName, Deps extends ModelName[]> = {
-  entity: ModelOf<K> & {
-    __serialize(): unknown;
+export type TypedBuildResult<
+  K extends ModelName,
+  Deps extends ModelName[],
+  O extends Partial<CreateInputOf<K>> | undefined = undefined,
+> = {
+  entity: ModelWithOverrides<K, O> & {
+    __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
   context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
 };
@@ -46,6 +73,9 @@ export type FactoryConfig<K extends ModelName> = {
 };
 
 export type Factory<K extends ModelName> = {
-  build: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
+  build: <O extends Partial<CreateInputOf<K>> | undefined = undefined>(
+    overrides?: O,
+    context?: BuildContext,
+  ) => Promise<BuildResult<K, O>>;
   create: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
 };

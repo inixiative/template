@@ -20,9 +20,9 @@ export const organizationUserDeleteController = makeController(organizationUserD
     { id: orgUser.organizationId as OrganizationId, role: orgUser.role },
     'assign',
   );
-  if (!canLeave && !canAssign) throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
+  if (!canLeave && !canAssign) throw makeError({ status: 403, message: 'Access denied' });
   if (orgUser.role === Role.owner)
-    await validateNotLastOwner(db, orgUser.organizationId as OrganizationId, c.get('requestId'));
+    await validateNotLastOwner(db, orgUser.organizationId as OrganizationId);
 
   await db.organizationUser.delete({ where: { id: orgUser.id } });
 

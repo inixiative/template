@@ -1,4 +1,4 @@
-import type { QueryKey } from '@tanstack/query-core';
+import type { QueryKey } from '@tanstack/react-query';
 import { type AppEventPayload, useAppEvents } from '@template/ui/hooks/useAppEvents';
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@template/ui/store';

@@ -3,10 +3,9 @@ import { meRedactRoute } from '#/modules/me/routes/meRedact';
 import { redactUser } from '#/modules/user/services/redactUser';
 
 export const meRedactController = makeController(meRedactRoute, async (c, respond) => {
-  const db = c.get('db');
   const user = c.get('user')!;
 
-  await redactUser(db, user.id);
+  await redactUser(c, user.id);
 
   return respond.noContent();
 });

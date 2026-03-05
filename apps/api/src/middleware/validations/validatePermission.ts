@@ -27,7 +27,7 @@ export const validatePermission = makeMiddleware<Action>((action) => async (c, n
   const hydrated = await hydrate(db, resourceType, resource as { id: string });
 
   if (!check(permix, rebacSchema, resourceType, hydrated, action)) {
-    throw makeError({ status: 403, message: 'Access denied', requestId: c.get('requestId') });
+    throw makeError({ status: 403, message: 'Access denied' });
   }
 
   await next();

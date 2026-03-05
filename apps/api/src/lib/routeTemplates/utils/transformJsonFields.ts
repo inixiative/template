@@ -26,26 +26,25 @@ const InputJsonValueSchema: z.ZodType<unknown> = z
  * Handles nullable and optional variants.
  */
 export const transformJsonFields = (shape: Record<string, z.ZodTypeAny>): Record<string, z.ZodTypeAny> => {
-  return mapValues(shape, (field) => {
-    if (field instanceof z.ZodUnknown) {
-      return InputJsonValueSchema;
+  const replaceUnknown = (field: z.ZodTypeAny): z.ZodTypeAny => {
+    if (field instanceof z.ZodUnknown) return InputJsonValueSchema;
+
+    if (field instanceof z.ZodOptional) {
+      const inner = field.unwrap() as z.ZodTypeAny;
+      const transformed = replaceUnknown(inner);
+      return transformed === inner ? field : transformed.optional();
     }
-    if (field instanceof z.ZodNullable && field._def.innerType instanceof z.ZodUnknown) {
-      return InputJsonValueSchema.nullable();
+
+    if (field instanceof z.ZodNullable) {
+      const inner = field.unwrap() as z.ZodTypeAny;
+      const transformed = replaceUnknown(inner);
+      return transformed === inner ? field : transformed.nullable();
     }
-    if (field instanceof z.ZodOptional && field._def.innerType instanceof z.ZodUnknown) {
-      return InputJsonValueSchema.optional();
-    }
-    if (field instanceof z.ZodOptional && field._def.innerType instanceof z.ZodNullable) {
-      if (field._def.innerType._def.innerType instanceof z.ZodUnknown) {
-        return InputJsonValueSchema.nullable().optional();
-      }
-    }
-    if (field instanceof z.ZodNullable && field._def.innerType instanceof z.ZodOptional) {
-      if (field._def.innerType._def.innerType instanceof z.ZodUnknown) {
-        return InputJsonValueSchema.optional().nullable();
-      }
-    }
+
     return field;
+  };
+
+  return mapValues(shape, (field) => {
+    return replaceUnknown(field);
   });
 };

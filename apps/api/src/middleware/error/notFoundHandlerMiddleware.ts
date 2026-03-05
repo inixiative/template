@@ -7,6 +7,5 @@ export const notFoundHandlerMiddleware = (c: Context<AppEnv>) => {
   return makeError({
     status: 404,
     message: `Route ${c.req.method} ${c.req.path} not found`,
-    requestId: c.get('requestId'),
   }).getResponse();
 };

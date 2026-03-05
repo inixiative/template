@@ -27,7 +27,7 @@ export type AppVars = {
   requestId: string;
   resource: unknown;
   resourceType: string | null;
-  searchableFields: string[] | null;
+  searchableFields: readonly string[] | null;
   bracketQuery: Record<string, any>;
 };
 
