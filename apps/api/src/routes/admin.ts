@@ -1,5 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
+import { adminAuditLogRouter } from '#/modules/admin/auditLog';
 import { adminCacheRouter } from '#/modules/admin/cache';
 import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { adminJobRouter } from '#/modules/admin/job';
@@ -14,6 +15,7 @@ export const adminRouter = new OpenAPIHono<AppEnv>();
 
 adminRouter.use('*', validateSuperadmin);
 
+adminRouter.route('/auditLog', adminAuditLogRouter);
 adminRouter.route('/authProvider', adminAuthProviderRouter);
 adminRouter.route('/cache', adminCacheRouter);
 adminRouter.route('/cronJob', adminCronJobRouter);

@@ -11,6 +11,7 @@
     "./generated/client/models": "./src/generated/client/models.ts",
     "./generated/client/enums": "./src/generated/client/enums.ts",
     "./lib/encryption/*": "./src/lib/encryption/*",
+    "./lib/hooks": "./src/lib/hooks/index.ts",
     "./test": "./src/test/index.ts",
     "./test/*": "./src/test/*",
     "./zod": "./src/generated/zod/schemas/index.ts",

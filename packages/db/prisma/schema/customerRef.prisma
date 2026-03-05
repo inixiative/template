@@ -23,6 +23,7 @@ model CustomerRef {
   providerSpaceId      String?       @db.VarChar(36)
 
   providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
 
   @@index([customerModel])
   @@index([customerUserId])

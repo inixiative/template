@@ -26,6 +26,7 @@ model EmailComponent {
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  auditLogs    AuditLog[]
 
   @@unique([slug, locale, ownerModel, organizationId, spaceId])
   @@index([ownerModel])

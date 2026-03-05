@@ -18,6 +18,7 @@ model CronJob {
 
   createdById String?  @db.VarChar(36)
   createdBy   User?    @relation(fields: [createdById], references: [id])
+  auditLogs AuditLog[]
 
   @@index([enabled])
   @@index([handler])

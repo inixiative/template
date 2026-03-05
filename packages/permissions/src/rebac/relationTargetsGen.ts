@@ -3,29 +3,56 @@ import type { AccessorName } from '@template/db';
 
 export const relationTargets: Partial<Record<AccessorName, Partial<Record<string, AccessorName>>>> = {
   "account": {
+    "auditLogs": "auditLog",
     "user": "user"
   },
+  "auditLog": {
+    "actorSpoofUser": "user",
+    "actorToken": "token",
+    "actorUser": "user",
+    "organization": "organization",
+    "space": "space",
+    "subjectAccount": "account",
+    "subjectAuthProvider": "authProvider",
+    "subjectCronJob": "cronJob",
+    "subjectCustomerRef": "customerRef",
+    "subjectEmailComponent": "emailComponent",
+    "subjectEmailTemplate": "emailTemplate",
+    "subjectInquiry": "inquiry",
+    "subjectOrganizationUser": "organizationUser",
+    "subjectSession": "session",
+    "subjectSpaceUser": "spaceUser",
+    "subjectToken": "token",
+    "subjectUser": "user",
+    "subjectVerification": "verification"
+  },
   "authProvider": {
+    "auditLogs": "auditLog",
     "organization": "organization"
   },
   "cronJob": {
+    "auditLogs": "auditLog",
     "createdBy": "user"
   },
   "customerRef": {
+    "auditLogs": "auditLog",
     "customerOrganization": "organization",
     "customerSpace": "space",
     "customerUser": "user",
     "providerSpace": "space"
   },
   "emailComponent": {
+    "auditLogs": "auditLog",
     "organization": "organization",
     "space": "space"
   },
   "emailTemplate": {
+    "auditLogs": "auditLog",
     "organization": "organization",
     "space": "space"
   },
   "inquiry": {
+    "auditLogs": "auditLog",
     "sourceOrganization": "organization",
     "sourceSpace": "space",
     "sourceUser": "user",
@@ -34,6 +61,7 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     "targetUser": "user"
   },
   "organization": {
+    "auditLogs": "auditLog",
     "authProviders": "authProvider",
     "emailComponents": "emailComponent",
     "emailTemplates": "emailTemplate",
@@ -47,15 +75,18 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     "webhookSubscriptions": "webhookSubscription"
   },
   "organizationUser": {
+    "auditLogs": "auditLog",
     "organization": "organization",
     "spaceUsers": "spaceUser",
     "tokens": "token",
     "user": "user"
   },
   "session": {
+    "auditLogs": "auditLog",
     "user": "user"
   },
   "space": {
+    "auditLogs": "auditLog",
     "customerRefs": "customerRef",
     "emailComponents": "emailComponent",
     "emailTemplates": "emailTemplate",
@@ -68,6 +99,7 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     "webhookSubscriptions": "webhookSubscription"
   },
   "spaceUser": {
+    "auditLogs": "auditLog",
     "organization": "organization",
     "organizationUser": "organizationUser",
     "space": "space",
@@ -75,6 +107,8 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     "user": "user"
   },
   "token": {
+    "auditLogsAsActor": "auditLog",
+    "auditLogsAsSubject": "auditLog",
     "organization": "organization",
     "organizationUser": "organizationUser",
     "space": "space",
@@ -83,6 +117,9 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
   },
   "user": {
     "accounts": "account",
+    "auditLogsAsActor": "auditLog",
+    "auditLogsAsSpoofActor": "auditLog",
+    "auditLogsAsSubject": "auditLog",
     "cronJobsCreated": "cronJob",
     "inquiriesReceived": "inquiry",
     "inquiriesSent": "inquiry",
@@ -92,6 +129,9 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     "spaceUsers": "spaceUser",
     "tokens": "token",
     "webhookSubscriptions": "webhookSubscription"
+  },
+  "verification": {
+    "auditLogs": "auditLog"
   },
   "webhookEvent": {
     "webhookSubscription": "webhookSubscription"

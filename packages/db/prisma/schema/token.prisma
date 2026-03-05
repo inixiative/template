@@ -23,6 +23,8 @@ model Token {
   organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
   space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  auditLogsAsActor   AuditLog[] @relation("AuditLogActorToken")
+  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectToken")
 
   // Permissions (for org-owned tokens)
   role         Role @default(member)

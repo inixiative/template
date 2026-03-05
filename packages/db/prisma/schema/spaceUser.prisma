@@ -24,6 +24,7 @@ model SpaceUser {
     space            Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
     tokens           Token[]
+    auditLogs        AuditLog[] @relation("AuditLogSubjectSpaceUser")
 
     @@unique([organizationId, spaceId, userId])
     @@index([userId])
