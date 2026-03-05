@@ -13,12 +13,10 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
 
   if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 
-  const updated = await db.txn(() =>
-    db.inquiry.update({
-      where: { id: inquiry.id },
-      data: { status: InquiryStatus.sent, sentAt: new Date() },
-    }),
-  );
+  const updated = await db.inquiry.update({
+    where: { id: inquiry.id },
+    data: { status: InquiryStatus.sent, sentAt: new Date() },
+  });
 
   return respond.ok(updated);
 });
