@@ -26,7 +26,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
     adminOrgUser = ou;
 
     const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
@@ -47,14 +47,14 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       sourceOrganizationId: org.id,
       targetModel: InquiryResourceModel.User,
       targetUserId: invitee.id,
-      content: { organizationId: org.id, role: 'member' },
+      content: { organizationId: org.id, role: 'owner' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }));
+    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }));
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
-    expect((data.content as any).role).toBe('admin');
+    expect((data.content as any).role).toBe('member');
   });
 
   it('allows updating a sent inquiry', async () => {
@@ -66,11 +66,31 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       sourceOrganizationId: org.id,
       targetModel: InquiryResourceModel.User,
       targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'owner' },
+    });
+
+    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }));
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects role elevation via content update', async () => {
+    const { entity: adminUser } = await createUser();
+    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+    const adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }));
-    expect(response.status).toBe(200);
+    const response = await adminFetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }));
+    expect(response.status).toBe(403);
   });
 
   it('rejects updating a resolved inquiry', async () => {

@@ -104,11 +104,11 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
     adminOu = ou;
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
-    const { entity: su } = await createSpaceUser({ role: 'admin' }, { ...ouCtx, space });
+    const { entity: su } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space });
     adminSu = su;
     const { entity: to } = await createOrganization();
     targetOrg = to;
@@ -141,7 +141,8 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
       type: InquiryType.transferSpace,
       targetModel: InquiryResourceModel.Organization,
-      content: { spaceId: space.id, targetOrganizationId: targetOrg.id },
+      targetOrganizationId: targetOrg.id,
+      content: {},
     }));
     const { data } = await json<Inquiry>(response);
 
