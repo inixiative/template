@@ -875,6 +875,64 @@ export const getServiceDomain = async (
 };
 
 /**
+ * Create a Railway service from a Docker image.
+ *
+ * Steps:
+ *   1. serviceCreate — creates an empty service in the project
+ *   2. serviceInstanceUpdate — sets the Docker image source on the given environment
+ *
+ * ⚠ ServiceInstanceUpdateInput.source shape for images is `{ image }` by analogy
+ *   with `{ repo }` used for GitHub connections — verify against Railway schema if issues arise.
+ */
+export const createImageService = async (
+	projectId: string,
+	environmentId: string,
+	serviceName: string,
+	image: string
+): Promise<{ serviceId: string }> => {
+	// Step 1: Create empty service
+	const createMutation = `
+		mutation ServiceCreate($input: ServiceCreateInput!) {
+			serviceCreate(input: $input) {
+				id
+			}
+		}
+	`;
+
+	const createData = await railwayGraphQLUser<{ serviceCreate: { id: string } }>(
+		createMutation,
+		{ input: { projectId, name: serviceName } }
+	);
+
+	const serviceId = createData.serviceCreate.id;
+
+	// Step 2: Set Docker image source on the staging environment instance
+	const updateMutation = `
+		mutation ServiceInstanceUpdate(
+			$serviceId: String!,
+			$environmentId: String!,
+			$input: ServiceInstanceUpdateInput!
+		) {
+			serviceInstanceUpdate(
+				serviceId: $serviceId,
+				environmentId: $environmentId,
+				input: $input
+			)
+		}
+	`;
+
+	await railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(updateMutation, {
+		serviceId,
+		environmentId,
+		input: {
+			source: { image },
+		},
+	});
+
+	return { serviceId };
+};
+
+/**
  * Set up Infisical integration for automatic environment variable syncing
  * Railway will pull variables from Infisical automatically
  */

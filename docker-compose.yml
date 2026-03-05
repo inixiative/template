@@ -28,3 +28,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  muninndb:
+    image: ghcr.io/scrypster/muninndb:latest
+    container_name: ${PROJECT_NAME:-template}_muninndb
+    restart: unless-stopped
+    environment:
+      MUNINNDB_DATA: /data
+      MUNINN_LOCAL_EMBED: "1"
+    ports:
+      - "8475:8475"   # REST API
+      - "8476:8476"   # Admin UI
+      - "8750:8750"   # MCP server
+    volumes:
+      - ./volumes/muninndb:/data   # bind mount — survives docker compose down -v
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8475/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

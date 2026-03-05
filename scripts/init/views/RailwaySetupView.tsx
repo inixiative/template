@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
@@ -10,8 +12,9 @@ import { OrgSelector, type Organization } from '../components/OrgSelector';
 import { updateConfigField, clearAllProgress, clearConfigError } from '../utils/configHelpers';
 import { setupRailway } from '../tasks/railwaySetup';
 import { setSecret, getSecret } from '../tasks/infisicalSetup';
+import { getGitUserEmail, ensureLocalActorMemory } from '../tasks/muninndbSetup';
 
-type ViewState = 'status' | 'workspace-select' | 'token-input' | 'github-prompt';
+type ViewState = 'status' | 'workspace-select' | 'token-input' | 'github-prompt' | 'actor-email-confirm';
 type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
 
 type RailwaySetupViewProps = {
@@ -39,9 +42,11 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
 		return 'new';
 	}
 
-	// Complete if all steps done
-	const allSteps = Object.values(progress);
-	if (allSteps.every((v) => v === true)) {
+	// Complete if all Railway steps AND all Muninn steps are done
+	const railwayAllDone = Object.values(progress).every((v) => v === true);
+	const muninnProgress = config.muninndb?.progress;
+	const muninnAllDone = !muninnProgress || Object.values(muninnProgress).every((v) => v === true);
+	if (railwayAllDone && muninnAllDone) {
 		return 'complete';
 	}
 
@@ -56,7 +61,7 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 	}
 
 	const { progress, workspaceId, projectId, prodApiServiceId, stagingApiServiceId, prodWorkerServiceId, stagingWorkerServiceId, prodRedisServiceId, stagingRedisServiceId } = config.railway;
-	return [
+	const items: Array<{ label: string; completed: boolean }> = [
 		{
 			label: workspaceId ? `Workspace selected: ${workspaceId}` : 'Workspace selected',
 			completed: progress.selectWorkspace
@@ -166,6 +171,42 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
 			completed: progress.verifyDeployment
 		},
 	];
+
+	// Muninn shared memory vault steps (added after core Railway services)
+	const muninnProgress = config.muninndb?.progress;
+	const muninnServiceId = config.muninndb?.railwayServiceId;
+	if (muninnProgress) {
+		items.push(
+			{
+				label: muninnServiceId
+					? `Muninn service created: ${muninnServiceId}`
+					: 'Muninn service created',
+				completed: muninnProgress.createService,
+			},
+			{
+				label: 'Muninn service configured',
+				completed: muninnProgress.configureService,
+			},
+			{
+				label: 'Muninn service deployed',
+				completed: muninnProgress.deployService,
+			},
+			{
+				label: 'Muninn service healthy',
+				completed: muninnProgress.waitForHealth,
+			},
+			{
+				label: 'Muninn secrets stored in Infisical',
+				completed: muninnProgress.storeSecrets,
+			},
+			{
+				label: 'Muninn team vault seeded',
+				completed: muninnProgress.seedTeamVault,
+			}
+		);
+	}
+
+	return items;
 };
 
 export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, onCancel }) => {
@@ -176,6 +217,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 	const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
 	const [workspaceToken, setWorkspaceToken] = useState('');
 	const [storingToken, setStoringToken] = useState(false);
+	const [actorEmail, setActorEmail] = useState('');
+	const [detectedEmail, setDetectedEmail] = useState('');
 
 	// Derive setup state from config
 	const setupState = useMemo(
@@ -254,6 +297,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 			await clearAllProgress('railway');
 			await clearConfigError('railway');
 
+			// Also clear Muninn progress so it re-provisions on the new Railway project
+			await updateConfigField('muninndb', 'railwayServiceId', '');
+			await updateConfigField('muninndb', 'serviceUrl', '');
+			await clearAllProgress('muninndb');
+			await clearConfigError('muninndb');
+
 			// Refresh config
 			await syncConfig();
 
@@ -321,6 +370,18 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		try {
 			await setupRailway(workspaceId, syncConfig);
 			await syncConfig();
+
+			// After Railway + Muninn are provisioned, wire up local actor memory
+			const memoryFile = join(process.cwd(), '.claude', 'memory.local.json');
+			if (!existsSync(memoryFile)) {
+				const email = await getGitUserEmail();
+				setDetectedEmail(email);
+				setActorEmail(email);
+				setRunning(false);
+				setViewState('actor-email-confirm');
+				return;
+			}
+
 			setRunning(false);
 		} catch (error) {
 			// Check if this is the GitHub setup required error
@@ -363,6 +424,34 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		}
 	};
 
+	const handleActorEmailConfirm = async () => {
+		if (!config || !actorEmail.trim()) return;
+
+		const infisicalProjectId = config.infisical.projectId;
+		const sharedBaseUrl = config.muninndb?.serviceUrl || '';
+		const sharedMcpUrl = sharedBaseUrl ? `${sharedBaseUrl}/mcp` : '';
+
+		let teamToken = '';
+		try {
+			teamToken = getSecret('MUNINN_TEAM_TOKEN', {
+				projectId: infisicalProjectId,
+				environment: 'staging',
+				path: '/api',
+			}) || '';
+		} catch {
+			// Secret may not exist if Muninn instance needs no auth
+		}
+
+		await ensureLocalActorMemory(
+			actorEmail.trim(),
+			sharedMcpUrl,
+			config.muninndb?.vaultName || 'team',
+			teamToken
+		);
+
+		setViewState('status');
+	};
+
 	const handleTokenSubmit = async () => {
 		if (!config || !workspaceToken.trim()) return;
 
@@ -402,9 +491,9 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 		await runSetup(workspaceId);
 	};
 
-	// Handle escape in token input
+	// Handle escape in token input or actor email confirm
 	useInput((input, key) => {
-		if (viewState === 'token-input' && key.escape) {
+		if ((viewState === 'token-input' || viewState === 'actor-email-confirm') && key.escape) {
 			onCancel();
 		}
 	});
@@ -419,6 +508,48 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 			onCancel();
 		}
 	});
+
+	// Actor email confirm view
+	if (viewState === 'actor-email-confirm') {
+		return (
+			<Box flexDirection="column" padding={1}>
+				<Text bold>Configure AI Memory Actor</Text>
+
+				<Box marginTop={1}>
+					<Text>
+						Your personal vault will be created using your git email as the actor ID.
+					</Text>
+				</Box>
+
+				{detectedEmail ? (
+					<Box marginTop={1}>
+						<Text>Detected git email: <Text color="cyan">{detectedEmail}</Text></Text>
+					</Box>
+				) : (
+					<Box marginTop={1}>
+						<Text color="yellow">No git email detected. Enter your email below.</Text>
+					</Box>
+				)}
+
+				<Box marginTop={1}>
+					<Text>Email (press Enter to confirm or edit first):</Text>
+				</Box>
+
+				<Box marginTop={1}>
+					<Text>Email: </Text>
+					<TextInput
+						value={actorEmail}
+						onChange={setActorEmail}
+						onSubmit={handleActorEmailConfirm}
+					/>
+				</Box>
+
+				<Box marginTop={1}>
+					<Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+				</Box>
+			</Box>
+		);
+	}
 
 	// Token input view
 	if (viewState === 'token-input') {

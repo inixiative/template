@@ -173,3 +173,8 @@ apps/web/app.config.timestamp_*.js
 
 # Init script scratch files
 scripts/init/test-*.ts
+
+# MuninnDB — local memory vault
+.mcp.json
+.claude/memory.local.json
+volumes/muninndb/

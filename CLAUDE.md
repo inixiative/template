@@ -207,6 +207,22 @@ Task tracking with Mermaid kanban boards and markdown tickets. See [tickets/READ
 - Ticket templates and categories
 - Individual assignee boards
 
+## AI Memory System (MuninnDB)
+
+Two MCP-connected memory stores. Use both intelligently:
+
+| Store | MCP server | Write when |
+|-------|-----------|------------|
+| Local | `muninndb-local` | Session context, in-progress debugging, draft ideas |
+| Team | `muninndb-team` | Architecture decisions, resolved bugs, validated conventions |
+
+**Read order**: query `muninndb-team` first for reusable prior context, `muninndb-local` for current session.
+**Write discipline**: only promote to `muninndb-team` once a pattern or finding is validated.
+
+Local admin UI: http://localhost:8476
+Setup: `bun run init` → Railway Setup (Muninn provisions automatically as part of Railway setup)
+New dev onboarding: if Railway is already provisioned, run `bun run init` → Railway Setup to generate `.mcp.json`.
+
 ## AI Workspace
 
 Write detailed investigation outputs, reports, and analysis to `/tmp/AI_WORKSPACE/`. This keeps verbose outputs out of the conversation while preserving them for review.
