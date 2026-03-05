@@ -92,6 +92,20 @@ export type ProjectConfig = {
 		};
 		error: string;
 	};
+	muninndb: {
+		railwayServiceId: string;
+		serviceUrl: string;
+		vaultName: string;
+		progress: {
+			createService: boolean;
+			configureService: boolean;
+			deployService: boolean;
+			waitForHealth: boolean;
+			storeSecrets: boolean;
+			seedTeamVault: boolean;
+		};
+		error: string;
+	};
 	vercel: {
 		teamId: string;
 		teamName: string;

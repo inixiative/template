@@ -1,0 +1,13 @@
+{
+	"mcpServers": {
+		"muninndb-local": {
+			"type": "http",
+			"url": "http://localhost:8750/mcp"
+		},
+		"muninndb-team": {
+			"type": "http",
+			"url": "https://REPLACE_WITH_RAILWAY_URL/mcp",
+			"headers": { "Authorization": "Bearer REPLACE_WITH_TEAM_TOKEN" }
+		}
+	}
+}

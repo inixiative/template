@@ -21,6 +21,7 @@ import {
 	updateServiceInstanceConfig,
 } from '../api/railway';
 import { setSecret, getSecret } from './infisicalSetup';
+import { setupMuninnShared } from './muninndbSetup';
 import { createRailwayConnection, ensureRailwaySync } from '../api/infisicalRailway';
 import { retryWithTimeout } from '../utils/retry';
 import {
@@ -737,6 +738,9 @@ export const setupRailway = async (
 			await setProgressComplete('railway', 'verifyDeployment');
 			await onStepComplete?.();
 		}
+
+		// Provision shared MuninnDB memory vault on Railway staging
+		await setupMuninnShared(projectId, stagingEnv.id, infisicalProjectId, onStepComplete);
 
 		// Fetch final URLs from Infisical (source of truth)
 		const prodApiUrl = getSecret('API_URL', {

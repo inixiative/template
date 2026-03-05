@@ -90,6 +90,20 @@ export const projectConfig = {
 		},
 		"error": ""
 	},
+	"muninndb": {
+		"railwayServiceId": "",
+		"serviceUrl": "",
+		"vaultName": "team",
+		"progress": {
+			"createService": false,
+			"configureService": false,
+			"deployService": false,
+			"waitForHealth": false,
+			"storeSecrets": false,
+			"seedTeamVault": false
+		},
+		"error": ""
+	},
 	"vercel": {
 		"teamId": "",
 		"teamName": "",
