@@ -152,12 +152,32 @@ Read docs based on task type:
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
 
-## 11. Tickets and AI Workspace
+## 11. AI Memory System (MuninnDB)
+
+Two MCP-connected memory stores. Use both intelligently:
+
+| Store    | MCP server           | Write when |
+|----------|---------------------|------------|
+| Template | `muninndb_template` | Golden rules shipped with the template (read-only at runtime) |
+| Team     | `muninndb_team`     | Project-specific decisions, resolved bugs, validated conventions |
+| Local    | `muninndb_local`    | Session context, in-progress debugging, draft ideas |
+
+**Read order**: `muninndb_template` → `muninndb_team` → `muninndb_local`.
+**Write discipline**: only promote to `muninndb_team` once a pattern or finding is validated.
+
+Local: `docker compose up muninndb` — REST (8475), admin UI (8476), MCP (8750). Handled by `bun run setup`.
+Shared: provisioned on Railway via `bun run init` → Railway Setup.
+New dev onboarding: `bun run init` → Railway Setup generates `.mcp.json`.
+
+See `AI/agents/_muninndb.md` for full connection details per agent.
+See `AI/agents/_claude.md` and `AI/agents/_codex.md` for agent-specific startup sequences.
+
+## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
 - Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
 
-## 12. Change Checklist
+## 13. Change Checklist
 
 1. Confirm pattern in nearby modules.
 2. Implement minimal fix with existing utilities/types.
