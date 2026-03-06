@@ -309,12 +309,17 @@ The hook auto-detects all foreign key fields from the Prisma schema and strips t
 ```typescript
 // hooks/immutableFields/registry.ts
 export const ImmutableFieldsOverrides = {
-  SomeModel: {
-    exclude: ['categoryId'],  // Allow this FK to change
-    include: ['status'],      // Make this non-FK immutable
-  }
+  // Space.organizationId is normally immutable (it's a FK) but must be
+  // updatable for the transferSpace inquiry handler
+  Space: { exclude: ['organizationId'] },
+
+  // Other examples:
+  // SomeModel: { exclude: ['categoryId'] },  // Allow this FK to change
+  // SomeModel: { include: ['status'] },      // Make this non-FK immutable
 };
 ```
+
+**Important:** When a new inquiry handler needs to update a FK field (e.g. moving a resource between owners), add an `exclude` override here. The silent-strip behavior would otherwise make the `handleApprove` update a no-op with a 200 response, with no error.
 
 Supports dot notation for JSON paths: `'entitlements.canInvite'`
 

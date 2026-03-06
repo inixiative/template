@@ -1,4 +1,4 @@
-export const INQUIRY_SEARCHABLE_FIELDS = [
+export const inquirySearchableFields = [
   'type',
   'status',
   'sourceModel',

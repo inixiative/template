@@ -1,4 +1,5 @@
 import type { Context, Hono } from 'hono';
+import { getValidatedBody } from '#/lib/context/getValidatedData';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';
 import { failOnRound } from '#/modules/batch/services/strategies/failOnRound';
 import { transactionAll } from '#/modules/batch/services/strategies/transactionAll';
@@ -26,11 +27,11 @@ export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => 
     requests: rounds,
     strategy,
     headers: sharedHeaders = {},
-  } = (c.req as unknown as { valid: (key: string) => unknown }).valid('json') as {
+  } = getValidatedBody<{
     requests: BatchRequest[][];
     strategy: string;
     headers?: Record<string, string>;
-  };
+  }>(c);
   const totalRequests = rounds.reduce((sum: number, round: BatchRequest[]) => sum + round.length, 0);
   const timeout = calculateTimeout(totalRequests);
 

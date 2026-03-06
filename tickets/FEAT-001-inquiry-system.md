@@ -1,9 +1,9 @@
 # FEAT-001: Inquiry System
 
-**Status**: ✅ Complete (core)
+**Status**: ✅ Complete
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-03-04
+**Updated**: 2026-03-05
 
 ---
 
@@ -39,13 +39,22 @@ Shared schemas with relation includes:
 - `inquirySentResponseSchema` — targets only (sent lists, create response)
 - `inquiryReceivedResponseSchema` — sources only (received lists)
 
-## Remaining / TODO
+## What Shipped (Redesign — 2026-03-05)
 
-- `createSpace` handler `handleApprove` — actually create the space
-- `updateSpace` handler `handleApprove` — actually update the space
-- `transferSpace` handler `handleApprove` — actually transfer the space
+- `handleApprove` implemented for all 4 types (`inviteOrganizationUser`, `createSpace`, `updateSpace`, `transferSpace`)
+- `unique` field changed from `boolean` to `'targeted' | 'untargeted'` enum
+- `resolveInquiryTarget` — removed `handler` param, uses `body.targetModel` directly; added org slug + space slug as alt lookups
+- `inquiryCreateBodySchema` — added `targetOrganizationSlug`, `targetSpaceSlug`
+- `validateInquiryStatus` + `resolveContent` moved out of `services/utils/` — validators → `validations/`, resolveContent → `services/`
+- `inviteOrganizationUser` handler consolidated from 4 files into single `index.ts`
+- ReBAC `resolve` rule — `transferSpace` now requires target org `own` (not just `manage`)
+- `Space.organizationId` excluded from immutable fields hook to allow `transferSpace` to update it
+- FEAT-016 stub ticket created for lineage, nesting, metadata, and auto-approval ideas
+
+## Remaining
+
 - Email notifications when inquiry is sent / resolved (blocked by COMM-001)
-- Audit log integration for status change history (replaces metadata in resolution)
+- Audit log integration for status change history (blocked by FEAT-005)
 
 ## Related
 

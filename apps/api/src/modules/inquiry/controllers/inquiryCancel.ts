@@ -2,13 +2,13 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryCancelRoute } from '#/modules/inquiry/routes/inquiryCancel';
-import { assertInquiryIsCancelable } from '#/modules/inquiry/services/utils/validateInquiryStatus';
+import { validateInquiryIsCancelable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryCancelController = makeController(inquiryCancelRoute, async (c, respond) => {
   const db = c.get('db');
   const inquiry = getResource<'inquiry'>(c);
 
-  assertInquiryIsCancelable(inquiry);
+  validateInquiryIsCancelable(inquiry);
 
   await db.inquiry.update({ where: { id: inquiry.id }, data: { status: InquiryStatus.canceled } });
 

@@ -1,7 +1,7 @@
 import type { Db, OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import { TERMINAL_STATUSES } from '#/modules/inquiry/validations/validateInquiryMutable';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 type UniqueInquiryParams = {
   type: InquiryType;
@@ -17,7 +17,7 @@ export const validateUniqueInquiry = async (db: Db, params: UniqueInquiryParams)
   const existing = await db.inquiry.findFirst({
     where: {
       type: params.type,
-      status: { notIn: TERMINAL_STATUSES },
+      status: { notIn: inquiryTerminalStatuses },
       ...(params.sourceUserId !== undefined && { sourceUserId: params.sourceUserId }),
       ...(params.sourceOrganizationId !== undefined && { sourceOrganizationId: params.sourceOrganizationId }),
       ...(params.sourceSpaceId !== undefined && { sourceSpaceId: params.sourceSpaceId }),

@@ -8,9 +8,11 @@ export const inquiryCreateBodySchema = InquiryScalarSchema.omit({ resolution: tr
   targetOrganizationId: z.string().optional(),
   targetSpaceId: z.string().optional(),
   targetEmail: z.string().email().optional(),
+  targetOrganizationSlug: z.string().optional(),
+  targetSpaceSlug: z.string().optional(),
 });
 
-export const INQUIRY_CREATE_SANITIZE_KEYS = [
+export const inquiryCreateSanitizeKeys = [
   'sentAt',
   'sourceModel',
   'sourceUserId',

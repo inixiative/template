@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { AppEnv } from '#/types/appEnv';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { resolveContent } from '#/modules/inquiry/services/utils/resolveContent';
+import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 
 type Inquiry = Prisma.InquiryGetPayload<{}>;
 type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';
@@ -21,8 +21,8 @@ export const resolveInquiry = async (
 
     if (status === InquiryStatus.approved) {
       const handler = inquiryHandlers[inquiry.type];
-      const content = inquiry.content as Record<string, unknown>;
-      const merged = resolveContent(content, resolutionData, handler.resolutionSchema);
+      const content = handler.contentSchema.parse(inquiry.content);
+      const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
       approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
     }
 

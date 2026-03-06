@@ -9,7 +9,7 @@ import { meCreateInquiryRoute } from '#/modules/me/routes/meCreateInquiry';
 import { resolveInquirySource } from '#/modules/inquiry/services/resolveInquirySource';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateInquiryHandler } from '#/modules/inquiry/validations/validateInquiryHandler';
-import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
+import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
 
 export const meCreateInquiryController = makeController(meCreateInquiryRoute, async (c, respond) => {
   const db = c.get('db');
@@ -20,13 +20,12 @@ export const meCreateInquiryController = makeController(meCreateInquiryRoute, as
   const content = handler.contentSchema.parse(body.content);
   const source = resolveInquirySource(c);
   validateInquiryHandler(handler, source.sourceModel, body.targetModel);
-  const target = await resolveInquiryTarget(c, handler);
+  const target = await resolveInquiryTarget(c);
 
   const partial = await hydrate(db, 'inquiry', { id: '', type: body.type, content, ...source, ...target } as HydratedRecord);
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, message: 'Access denied' });
 
-  if (handler.validate) await handler.validate(db, { ...source, ...target, content } as Parameters<typeof handler.validate>[1]);
-  if (handler.unique) await validateUniqueInquiry(db, { type: body.type, ...source, ...target });
+  await validateInquiryPreCreate(db, handler, body.type, source, target, content);
 
   const inquiry = await db.inquiry.create({
     data: { ...body, content: content as Prisma.InputJsonValue, ...source, ...target, sentAt: body.status === InquiryStatus.sent ? new Date() : null },

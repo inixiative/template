@@ -24,9 +24,6 @@ export const InquiryAction = {
   read: 'read',
   send: 'send',
   resolve: 'resolve',
-  requestChanges: 'requestChanges',
-  cancel: 'cancel',
-  update: 'update',
 } as const;
 export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 

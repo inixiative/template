@@ -140,62 +140,96 @@ The handler's `sources` config is checked by `validateInquiryHandler` to confirm
 
 ### Target
 
-`resolveInquiryTarget` resolves from the request body using the handler's `targets[0]` config:
+`resolveInquiryTarget` resolves from `body.targetModel` (already validated by `validateInquiryHandler`):
 
-- `targetModel: User` → looks up by `targetUserId` or creates a guest from `targetEmail`
-- `targetModel: Organization` → looks up `content[handler.targets[0].targetOrganizationId]`
-- `targetModel: Space` → looks up `content[handler.targets[0].targetSpaceId]`
+- `targetModel: User` → `targetUserId` OR `targetEmail` (creates guest if not found)
+- `targetModel: Organization` → `targetOrganizationId` OR `targetOrganizationSlug`
+- `targetModel: Space` → `targetSpaceId` OR `targetOrganizationSlug` + `targetSpaceSlug` (space slugs are org-scoped)
 - `targetModel: admin` → no FK, just sets the model
+
+Slug-based lookups are useful when callers know human-readable identifiers rather than UUIDs.
 
 ## Handler Architecture
 
 Every inquiry type maps to a handler registered in `handlers/index.ts`.
 
 ```typescript
-type InquiryHandler = {
-  sources: SourceConfig[];           // valid source models for this type
-  targets: TargetConfig[];           // how to resolve the target
-  contentSchema: ZodSchema;          // parsed and stored in inquiry.content
-  resolutionSchema: ZodSchema;       // validated on resolve; can override content fields
-  validate?: (db, inquiry) => Promise<void>;  // pre-create business-rule checks
-  handleApprove: (db, inquiry, resolvedContent) => Promise<Record<string, unknown>>;
-  unique: boolean;                   // enforce one open inquiry per source + target + type
+type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
+  sources: InquirySourceMeta[];
+  targets: InquiryTargetMeta[];
+  contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
+  resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
+  resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
+  validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
+  handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | void>;
+  unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
 };
 ```
 
-### resolvedContent and the Override Pattern
-
-On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution payload:
+All three type params default to `BaseResolution` (`{ explanation?: string }`), so simple handlers need no generics:
 
 ```typescript
-const merged = resolveContent(content, resolutionData, handler.resolutionSchema);
-// Only keys declared in resolutionSchema (minus metadata keys) can override content
+// No generics needed — uses defaults
+export const simpleHandler: InquiryHandler = { ... };
+
+// Typed handler with custom content and resolution
+export const createSpaceHandler: InquiryHandler<SpaceContent, CreateSpaceResolution> = { ... };
 ```
 
-**Opt-in to allow resolver overrides** by declaring the field in `resolutionSchema`:
+### `unique` enforcement
+
+Setting `unique` on a handler is automatically enforced — no controller code needed. `validateInquiryPreCreate` reads the flag and calls `validateUniqueInquiry`:
+
+- `'targeted'` — one open inquiry per source + target + type (e.g. you can't invite the same user twice)
+- `'untargeted'` — one open inquiry per source + type, regardless of target (e.g. a space can only have one open transfer, even to a different target org)
+
+### `validate` — pre-create and pre-update checks
+
+`validate(db, inquiry, content)` receives the **parsed, typed content** directly (not `inquiry.content`). The `inquiry` argument carries source/target FK fields needed for DB lookups. This is called:
+
+- **On create** — before the DB write, with the incoming content
+- **On update** — with the effective post-update content (incoming `content` merged over stored `inquiry.content`)
+
 ```typescript
-// createSpace handler — admin can rename the space on approval
-const createSpaceResolutionSchema = z.object({
-  explanation: z.string().optional(),
-  name: z.string().optional(),  // ← declared → admin can override the requested name
+// createSpace handler
+const validate = async (db, inquiry, content: SpaceContent) => {
+  const { slug } = content; // typed — no cast needed
+  const [existingSpace, existingInquiry] = await Promise.all([
+    db.space.findFirst({ where: { organizationId: inquiry.sourceOrganizationId, slug } }),
+    db.inquiry.findFirst({ where: { type: InquiryType.createSpace, status: { notIn: inquiryTerminalStatuses }, content: { path: ['slug'], equals: slug } } }),
+  ]);
+  if (existingSpace) throw makeError({ status: 409, message: 'A space with this slug already exists' });
+  if (existingInquiry) throw makeError({ status: 409, message: 'An open request already exists for this slug' });
+};
+```
+
+### `resolvedContent` and the Override Pattern
+
+On approval, `handleApprove` receives `resolvedContent` — the **merge** of `inquiry.content` with any override fields from the resolution body. Only keys declared in `resolutionInputSchema` can flow into `resolvedContent`. `explanation` is always excluded (resolution-only metadata), so it never overrides content fields.
+
+**Opt-in to allow resolver overrides** by declaring the field in `resolutionInputSchema`:
+```typescript
+// createSpace — admin can rename the space at approval time
+const resolutionInputSchema = baseResolutionInputSchema.extend({
+  name: z.string().optional(), // ← declared → flows into resolvedContent
 });
 ```
 
-**Opt-out to lock the field** by omitting it from `resolutionSchema`:
+**Opt-out to lock the field** by omitting it from `resolutionInputSchema`:
 ```typescript
-// inviteOrganizationUser — invitee cannot change the role they're offered
-// 'role' is NOT in resolutionSchema, so it never reaches resolvedContent
-const role = (inquiry.content as { role?: string }).role ?? 'member';
+// inviteOrganizationUser — role is locked; resolver cannot change it
+// 'role' is NOT in resolutionInputSchema, so it never reaches resolvedContent
+const { role } = resolvedContent; // always from original inquiry.content
 ```
 
 ### Current Handlers
 
 | Type | Source | Target | Unique | Side Effect |
 |------|--------|--------|--------|-------------|
-| `inviteOrganizationUser` | Organization | User | Yes | Creates `OrganizationUser` |
-| `createSpace` | Organization | admin | No | Creates `Space` (TODO) |
-| `updateSpace` | Space | admin | Yes | Updates `Space` (TODO) |
-| `transferSpace` | Space | Organization | Yes | Transfers `Space` (TODO) |
+| `inviteOrganizationUser` | Organization | User | `targeted` | Creates `OrganizationUser` |
+| `createSpace` | Organization | admin | — | Creates `Space` under source org |
+| `updateSpace` | Space | admin | `untargeted` | Updates `Space` with content fields |
+| `transferSpace` | Space | Organization | `untargeted` | Sets `Space.organizationId` to target org |
 
 **Send permissions by type:**
 
@@ -225,15 +259,40 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
 | `send` | Source-side permission (see handler table above) |
-| `resolve` | Target user (self), or manage on target org/space; superadmin bypass for `admin` targets |
+| `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
 
 ## Adding a New Handler
 
-1. Create `handlers/<type>/index.ts` implementing `InquiryHandler`
-2. Add `contentSchema` (stored on create) and `resolutionSchema` (validated on resolve)
-3. Implement `handleApprove(db, inquiry, resolvedContent)` — return `{}` or output merged into `resolution`
-4. Add `validate` if you need pre-create uniqueness or business-rule checks
-5. Register in `handlers/index.ts`
-6. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
-7. Run `bun run db:generate` in `packages/db/`
-8. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`
+1. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
+2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve)
+   - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
+   - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
+   - If no computed fields, both can be the same schema
+3. Implement `handleApprove(db, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+4. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
+5. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
+6. Register in `handlers/index.ts`
+7. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
+8. Run `bun run db:generate` in `packages/db/`
+9. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`
+
+### Status utilities (`validations/validateInquiryStatus.ts`)
+
+| Export | Used in | Meaning |
+|--------|---------|---------|
+| `inquiryTerminalStatuses` | Prisma `status: { notIn: ... }` queries | `[approved, denied, canceled]` — closed states |
+| `validateInquiryIsEditable` | update controller | draft, sent, or changesRequested |
+| `validateInquiryIsDraft` | send controller | must be draft to send |
+| `validateInquiryIsResolvable` | resolve controller | sent or changesRequested |
+| `validateInquiryIsCancelable` | cancel controller | not yet in a terminal state |
+
+### Create route permission pattern
+
+Create routes do **not** use `validatePermission` middleware. Permissions are checked granularly inside the controller via ReBAC after synthesizing the inquiry partial:
+
+```typescript
+const partial = await hydrate(db, 'inquiry', { id: '', type, content, ...source, ...target });
+if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, ... });
+```
+
+This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high role requires `own`, not just `manage`) without redundant middleware.

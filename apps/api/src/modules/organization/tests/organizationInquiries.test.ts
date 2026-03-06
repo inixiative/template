@@ -301,7 +301,7 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
     const response = await ownerFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
       type: InquiryType.createSpace,
       targetModel: InquiryResourceModel.admin,
-      content: { organizationId: org.id, name: 'My New Space' },
+      content: { name: 'My New Space', slug: 'my-new-space' },
     }));
     const { data } = await json<Inquiry>(response);
 
@@ -316,7 +316,7 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
     const response = await adminFetch(post(`/api/v1/organization/${org.id}/inquiries`, {
       type: InquiryType.createSpace,
       targetModel: InquiryResourceModel.admin,
-      content: { organizationId: org.id, name: 'My New Space' },
+      content: { name: 'My New Space', slug: 'my-new-space-2' },
     }));
 
     expect(response.status).toBe(403);

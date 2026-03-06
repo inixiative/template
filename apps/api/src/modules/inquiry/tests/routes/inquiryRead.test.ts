@@ -38,7 +38,7 @@ describe('GET /api/v1/inquiry/:id', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('reads own inquiry', async () => {
+  it('source can read own inquiry', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -55,6 +55,44 @@ describe('GET /api/v1/inquiry/:id', () => {
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(inquiry.id);
+  });
+
+  it('target can read inquiry sent to them', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
+    const response = await targetFetch(get(`/api/v1/inquiry/${inquiry.id}`));
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.id).toBe(inquiry.id);
+  });
+
+  it('unrelated user cannot read inquiry', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: stranger } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
+    const response = await strangerFetch(get(`/api/v1/inquiry/${inquiry.id}`));
+    expect(response.status).toBe(403);
   });
 
   it('returns 404 for unknown id', async () => {

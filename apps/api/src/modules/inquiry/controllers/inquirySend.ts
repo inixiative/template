@@ -1,16 +1,15 @@
-import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
+import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
   const db = c.get('db');
   const inquiry = getResource<'inquiry'>(c);
 
-  if (inquiry.status !== InquiryStatus.draft) {
-    throw makeError({ status: 400, message: 'Only draft inquiries can be sent' });
-  }
+  validateInquiryIsDraft(inquiry);
 
   if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 

@@ -138,7 +138,24 @@ export const rebacSchema: RebacSchema = {
       resolve: {
         any: [
           { self: 'targetUserId' },
-          { rel: 'targetOrganization', action: 'manage' },
+          {
+            any: [
+              // transferSpace — target org owner only
+              {
+                all: [
+                  { rule: { field: 'type', operator: Operator.in, value: ['transferSpace'] } },
+                  { rel: 'targetOrganization', action: 'own' },
+                ],
+              },
+              // all other types — target org manager
+              {
+                all: [
+                  { rule: { field: 'type', operator: Operator.notIn, value: ['transferSpace'] } },
+                  { rel: 'targetOrganization', action: 'manage' },
+                ],
+              },
+            ],
+          },
           { rel: 'targetSpace', action: 'manage' },
         ],
       },

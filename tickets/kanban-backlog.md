@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Backlog
+    FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     INFRA-006-tenant-isolation-test-matrix
     INFRA-007-data-lifecycle-retention-export-delete
@@ -58,6 +59,9 @@ kanban
 - [FEAT-014: AI Developer Experience](./FEAT-014-ai-developer-experience.md) - Skills, rules, agents, MCP servers for AI-native development
 - [FEAT-015: AI Dashboard Generator](./FEAT-015-ai-dashboard-generator.md) - Natural language → dashboard from component catalog via json-render
 
+**Inquiry System Extensions:**
+- [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md) - parentInquiryId, metadata JSON, migration-spawned inquiries, child inquiry resolution
+
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
@@ -88,7 +92,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 17
+- **Total Backlog Items**: 18
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2

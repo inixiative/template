@@ -1,10 +1,12 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
+import { getValidatedBody } from '#/lib/context/getValidatedData';
 import { makeError } from '#/lib/errors';
-import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 import type { AppEnv } from '#/types/appEnv';
+
+const nullTargetFields = { targetUserId: null, targetOrganizationId: null, targetSpaceId: null };
 
 export type InquiryTargetFields =
   | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: UserId }
@@ -12,37 +14,51 @@ export type InquiryTargetFields =
   | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
-export const resolveInquiryTarget = async (c: Context<AppEnv>, handler: InquiryHandler): Promise<InquiryTargetFields> => {
+export const resolveInquiryTarget = async (c: Context<AppEnv>): Promise<InquiryTargetFields> => {
   const db = c.get('db');
-  const body = (c.req as unknown as { valid: (key: string) => unknown }).valid('json') as Record<string, any>;
-  const target = handler.targets[0];
+  const body = getValidatedBody(c);
+  const targetModel: InquiryResourceModel = body.targetModel;
 
-  if (target.targetModel === InquiryResourceModel.User) {
+  if (targetModel === InquiryResourceModel.User) {
     if (body.targetUserId) {
-      const user = await db.user.findUnique({ where: { id: body.targetUserId } });
+      const user = await db.user.findUnique({ where: { id: body.targetUserId as UserId } });
       if (!user) throw makeError({ status: 404, message: 'Target user not found' });
-      return { targetModel: target.targetModel, targetUserId: user.id as UserId };
+      return { ...nullTargetFields, targetModel, targetUserId: user.id as UserId };
     }
     if (body.targetEmail) {
-      const user = await findUserOrCreateGuest(c, { email: body.targetEmail });
-      return { targetModel: target.targetModel, targetUserId: user.id as UserId };
+      const user = await findUserOrCreateGuest(c, { email: body.targetEmail as string });
+      return { ...nullTargetFields, targetModel, targetUserId: user.id as UserId };
     }
     throw makeError({ status: 422, message: 'targetUserId or targetEmail is required' });
   }
 
-  if ('targetOrganizationId' in target) {
-    const orgId = (body.content as Record<string, unknown>)?.[target.targetOrganizationId] as string;
-    const org = await db.organization.findUnique({ where: { id: orgId } });
-    if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
-    return { targetModel: target.targetModel, targetOrganizationId: org.id as OrganizationId };
+  if (targetModel === InquiryResourceModel.Organization) {
+    if (body.targetOrganizationId) {
+      const org = await db.organization.findUnique({ where: { id: body.targetOrganizationId as OrganizationId } });
+      if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
+      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
+    }
+    if (body.targetOrganizationSlug) {
+      const org = await db.organization.findUnique({ where: { slug: body.targetOrganizationSlug as string } });
+      if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
+      return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
+    }
+    throw makeError({ status: 422, message: 'targetOrganizationId or targetOrganizationSlug is required' });
   }
 
-  if ('targetSpaceId' in target) {
-    const spaceId = (body.content as Record<string, unknown>)?.[target.targetSpaceId] as string;
-    const space = await db.space.findUnique({ where: { id: spaceId } });
-    if (!space) throw makeError({ status: 404, message: 'Target space not found' });
-    return { targetModel: target.targetModel, targetSpaceId: space.id as SpaceId };
+  if (targetModel === InquiryResourceModel.Space) {
+    if (body.targetSpaceId) {
+      const space = await db.space.findUnique({ where: { id: body.targetSpaceId as SpaceId } });
+      if (!space) throw makeError({ status: 404, message: 'Target space not found' });
+      return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
+    }
+    if (body.targetOrganizationSlug && body.targetSpaceSlug) {
+      const space = await db.space.findFirst({ where: { slug: body.targetSpaceSlug as string, organization: { slug: body.targetOrganizationSlug as string } } });
+      if (!space) throw makeError({ status: 404, message: 'Target space not found' });
+      return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
+    }
+    throw makeError({ status: 422, message: 'targetSpaceId or targetOrganizationSlug + targetSpaceSlug is required' });
   }
 
-  return { targetModel: target.targetModel };
+  return { ...nullTargetFields, targetModel };
 };

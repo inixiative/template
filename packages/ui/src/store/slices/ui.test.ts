@@ -14,7 +14,7 @@ describe('ui slice', () => {
 
       expect(ui.theme).toBe('system');
       expect(ui.isLoading).toBe(false);
-      expect(ui.appName).toBe('Template');
+      expect(ui.appName).toBe('App');
       expect(ui.shortName).toBe('Template');
       expect(ui.description).toBe('TanStack Router + React Aria + Tailwind');
     });

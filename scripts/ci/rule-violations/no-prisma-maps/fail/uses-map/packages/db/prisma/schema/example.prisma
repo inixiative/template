@@ -1,0 +1,6 @@
+model Example {
+  id String @id @map("id_col")
+  name String
+
+  @@map("example_table")
+}
