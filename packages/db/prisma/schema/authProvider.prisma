@@ -33,6 +33,8 @@ model AuthProvider {
   // Audit
   createdBy String?
 
+  auditLogs AuditLog[]
+
   @@unique([organizationId, provider, type])
   @@index([organizationId])
   @@index([type])

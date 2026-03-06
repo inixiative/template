@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
+import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -30,6 +31,7 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
+apiRouter.use('*', auditActorMiddleware);
 
 // Admin Routes (superadmin only - see routes/admin.ts)
 apiRouter.route('/admin', adminRouter);

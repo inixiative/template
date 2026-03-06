@@ -17,6 +17,7 @@ model OrganizationUser {
     user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
     spaceUsers     SpaceUser[]
     tokens         Token[]
+    auditLogs      AuditLog[]  @relation("AuditLogSubjectOrganizationUser")
 
     @@unique([organizationId, userId])
     @@index([userId])

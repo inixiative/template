@@ -1,0 +1,107 @@
+// ============================================================================
+// AUDIT LOG - Immutable record of all database mutations
+// ============================================================================
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  // Actor — who made the change
+  actorUserId      String? @db.VarChar(36)
+  actorUser        User?   @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorSpoofUserId String? @db.VarChar(36)
+  actorSpoofUser   User?   @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
+  actorTokenId     String? @db.VarChar(36)
+  actorToken       Token?  @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
+  ipAddress        String?
+  userAgent        String?
+
+  // What happened
+  action       AuditAction
+  subjectModel AuditSubjectModel
+
+  // State before/after — after filtering+redaction
+  before  Json?
+  after   Json?
+  changes Json?
+
+  // Context for org/space filtering
+  organizationId String?       @db.VarChar(36)
+  organization   Organization? @relation("AuditLogOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  spaceId        String?       @db.VarChar(36)
+  space          Space?        @relation("AuditLogSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  // Subject — false polymorphism (governed by subjectModel; only one active per row)
+  // Simple FKs
+  subjectUserId           String?         @db.VarChar(36)
+  subjectUser             User?           @relation("AuditLogSubjectUser", fields: [subjectUserId], references: [id], onDelete: Cascade)
+  subjectAccountId        String?         @db.VarChar(36)
+  subjectAccount          Account?        @relation(fields: [subjectAccountId], references: [id], onDelete: Cascade)
+  subjectSessionId        String?         @db.VarChar(36)
+  subjectSession          Session?        @relation(fields: [subjectSessionId], references: [id], onDelete: Cascade)
+  subjectVerificationId   String?         @db.VarChar(36)
+  subjectVerification     Verification?   @relation(fields: [subjectVerificationId], references: [id], onDelete: Cascade)
+  subjectInquiryId        String?         @db.VarChar(36)
+  subjectInquiry          Inquiry?        @relation(fields: [subjectInquiryId], references: [id], onDelete: Cascade)
+  subjectTokenId          String?         @db.VarChar(36)
+  subjectToken            Token?          @relation("AuditLogSubjectToken", fields: [subjectTokenId], references: [id], onDelete: Cascade)
+  subjectAuthProviderId   String?         @db.VarChar(36)
+  subjectAuthProvider     AuthProvider?   @relation(fields: [subjectAuthProviderId], references: [id], onDelete: Cascade)
+  subjectCronJobId        String?         @db.VarChar(36)
+  subjectCronJob          CronJob?        @relation(fields: [subjectCronJobId], references: [id], onDelete: Cascade)
+  subjectEmailTemplateId  String?         @db.VarChar(36)
+  subjectEmailTemplate    EmailTemplate?  @relation(fields: [subjectEmailTemplateId], references: [id], onDelete: Cascade)
+  subjectEmailComponentId String?         @db.VarChar(36)
+  subjectEmailComponent   EmailComponent? @relation(fields: [subjectEmailComponentId], references: [id], onDelete: Cascade)
+  subjectCustomerRefId    String?         @db.VarChar(36)
+  subjectCustomerRef      CustomerRef?    @relation(fields: [subjectCustomerRefId], references: [id], onDelete: Cascade)
+  // Composite FKs — reuse organizationId/spaceId context fields
+  subjectOrganizationUser OrganizationUser? @relation("AuditLogSubjectOrganizationUser", fields: [organizationId, subjectUserId], references: [organizationId, userId], onDelete: Cascade)
+  subjectSpaceUser        SpaceUser?        @relation("AuditLogSubjectSpaceUser", fields: [organizationId, spaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+
+  @@index([actorUserId])
+  @@index([actorSpoofUserId])
+  @@index([subjectModel])
+  @@index([createdAt])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([subjectUserId])
+  @@index([subjectAccountId])
+  @@index([subjectSessionId])
+  @@index([subjectVerificationId])
+  @@index([subjectInquiryId])
+  @@index([subjectTokenId])
+  @@index([subjectAuthProviderId])
+  @@index([subjectCronJobId])
+  @@index([subjectEmailTemplateId])
+  @@index([subjectEmailComponentId])
+  @@index([subjectCustomerRefId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+}
+
+enum AuditSubjectModel {
+  User
+  Organization
+  OrganizationUser
+  Space
+  SpaceUser
+  Token
+  AuthProvider
+  Inquiry
+  Account
+  Session
+  Verification
+  CronJob
+  EmailTemplate
+  EmailComponent
+  CustomerRef
+}

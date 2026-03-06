@@ -28,6 +28,9 @@ model User {
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   providerRefs         CustomerRef[]         @relation("providerRefs")
+  auditLogsAsActor      AuditLog[] @relation("AuditLogActorUser")
+  auditLogsAsSpoofActor AuditLog[] @relation("AuditLogActorSpoofUser")
+  auditLogsAsSubject    AuditLog[] @relation("AuditLogSubjectUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

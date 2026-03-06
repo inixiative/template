@@ -33,6 +33,7 @@ model Space {
   providerRefs         CustomerRef[]         @relation("providerRefs")
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  auditLogs AuditLog[] @relation("AuditLogSpace")
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])
