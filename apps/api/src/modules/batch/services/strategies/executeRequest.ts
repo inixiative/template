@@ -2,6 +2,24 @@ import type { Hono } from 'hono';
 import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
 
+const parseResponseBody = async (response: Response): Promise<unknown> => {
+  if (response.status === 204 || response.status === 205 || response.status === 304) {
+    return null;
+  }
+
+  const contentLength = response.headers.get('content-length');
+  if (contentLength === '0') {
+    return null;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+
+  return JSON.parse(text);
+};
+
 export const executeRequest = async (
   app: Hono<AppEnv>,
   request: BatchRequest,
@@ -41,7 +59,7 @@ export const executeRequest = async (
   const testRequest = new Request(url, init);
 
   const response = await app.fetch(testRequest);
-  const responseBody = await response.json();
+  const responseBody = await parseResponseBody(response);
 
   const result: RequestResult = {
     status: response.status,
