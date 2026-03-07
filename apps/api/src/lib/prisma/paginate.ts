@@ -1,14 +1,20 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
-import type { Context } from 'hono';
-import { getValidatedQuery } from '#/lib/context/getValidatedData';
+import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
-import type { AppEnv } from '#/types/appEnv';
 
 type PaginationParams = {
   page?: number;
   pageSize?: number;
   orderBy?: Record<string, Prisma.SortOrder>[];
+};
+
+type PaginationQuery = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  searchFields?: Record<string, any>;
+  orderBy?: string[];
 };
 
 type PaginationResult = {
@@ -25,9 +31,10 @@ type PaginatedResult<T> = {
 
 export const paginate = async <
   T extends AnyDelegate,
-  R = Result<T, Args<T, 'findMany'> & object, 'findMany'>[number],
+  TItem = Result<T, Args<T, 'findMany'> & object, 'findMany'>[number],
+  C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
 >(
-  c: Context<AppEnv>,
+  c: C,
   delegate: T,
   options?: {
     searchableFields?: readonly string[];
@@ -36,7 +43,7 @@ export const paginate = async <
     include?: Record<string, unknown>;
     omit?: Record<string, unknown>;
   },
-): Promise<PaginatedResult<R>> => {
+): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
 

@@ -246,6 +246,9 @@ export const updateProjectSettings = async (
 		rootDirectory?: string;
 		buildCommand?: string | null;
 		framework?: string | null;
+		git?: {
+			deploymentEnabled?: Record<string, boolean>;
+		};
 	}
 ): Promise<void> => {
 	const endpoint = `/v10/projects/${projectId}?teamId=${teamId}`;
