@@ -127,6 +127,13 @@ Use focused checks first:
 - `bun run --cwd <workspace> typecheck`
 - `bun run --cwd <workspace> test`
 
+Canonical completion rule:
+
+- For code changes, do not declare the task complete after only scoped checks unless the user explicitly narrowed validation.
+- After focused checks pass, run `bun run check` as the repo-level final verification command.
+- `bun run check` is the canonical full sweep: Biome/lint, monorepo typecheck, backend/package tests, frontend tests, and CI rules.
+- Do not substitute a partial subset of those checks and report the work as fully validated.
+
 If cross-package types/imports changed, typecheck each affected workspace.
 
 CI rule runner:
