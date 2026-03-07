@@ -12,8 +12,14 @@ bun install
 docker-compose up -d
 "$ROOT_DIR/scripts/db/wait-postgres.sh"
 "$ROOT_DIR/scripts/db/wait-redis.sh"
+
+echo "Generating database client..."
 bun run db:generate
+
+echo "Pushing database schema..."
 bun run with local api bun run db:push
-bun run with local api bun run db:seed 2>/dev/null || true
+
+echo "Seeding database..."
+bun run with local api bun run db:seed
 
 echo "Setup complete. Run: bun run local"
