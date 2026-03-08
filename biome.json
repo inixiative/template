@@ -89,7 +89,13 @@
       }
     },
     {
-      "includes": ["apps/**/app/**/index.ts", "apps/**/app/**/index.tsx", "apps/api/src/**/index.ts", "packages/**/src/**/index.ts", "packages/**/src/**/index.tsx"],
+      "includes": [
+        "apps/**/app/**/index.ts",
+        "apps/**/app/**/index.tsx",
+        "apps/api/src/**/index.ts",
+        "packages/**/src/**/index.ts",
+        "packages/**/src/**/index.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -100,6 +106,16 @@
     },
     {
       "includes": ["apps/**/app/routes/**", "**/app/routes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.stories.tsx"],
       "linter": {
         "rules": {
           "style": {
@@ -126,6 +142,7 @@
         "**/app.config.ts",
         "**/prisma.config.ts",
         "**/openapiTs.config.ts",
+        "apps/**/app/ssr.tsx",
         "**/apps/**/app/ssr.tsx"
       ],
       "linter": {
