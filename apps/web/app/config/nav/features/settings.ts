@@ -1,6 +1,6 @@
 import type { NavItem } from '@template/ui/components';
 import { getContextParams } from '@template/ui/lib';
-import { Settings, User, Key, Webhook, ShieldCheck } from 'lucide-react';
+import { Key, Settings, ShieldCheck, User, Webhook } from 'lucide-react';
 
 export const settingsItem: NavItem = {
   label: 'Settings',
@@ -12,22 +12,19 @@ export const settingsItem: NavItem = {
       label: 'Profile',
       path: '/profile',
       icon: User,
-      access: (permissions, context) =>
-        permissions.check(...getContextParams(context), 'manage'),
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'manage'),
     },
     {
       label: 'Tokens',
       path: '/tokens',
       icon: Key,
-      access: (permissions, context) =>
-        permissions.check(...getContextParams(context), 'operate'),
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
       label: 'Webhooks',
       path: '/webhooks',
       icon: Webhook,
-      access: (permissions, context) =>
-        permissions.check(...getContextParams(context), 'operate'),
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
       label: 'Auth Providers',

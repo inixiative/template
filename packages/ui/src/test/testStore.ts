@@ -6,13 +6,13 @@
  */
 
 import { QueryClient } from '@tanstack/react-query';
-import { createStore, type StateCreator } from 'zustand';
+import { createAuthSlice } from '@template/ui/store/slices/auth';
+import { createNavigationSlice } from '@template/ui/store/slices/navigation';
+import { createTenantSlice } from '@template/ui/store/slices/tenant';
+import { createUISlice } from '@template/ui/store/slices/ui';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
-import { createTenantSlice } from '@template/ui/store/slices/tenant';
-import { createNavigationSlice } from '@template/ui/store/slices/navigation';
-import { createUISlice } from '@template/ui/store/slices/ui';
-import { createAuthSlice } from '@template/ui/store/slices/auth';
+import { createStore, type StateCreator } from 'zustand';
 
 /**
  * Test-friendly permissions slice that doesn't import runtime dependencies
@@ -45,7 +45,6 @@ const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlic
     },
   };
 };
-
 
 /**
  * Creates a test store with test-friendly slice implementations

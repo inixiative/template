@@ -1,6 +1,7 @@
 /**@jsdom*/
-import { createTestStore } from '@template/ui/test';
+
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { createTestStore } from '@template/ui/test';
 
 describe('navigation slice', () => {
   let store: ReturnType<typeof createTestStore>;
@@ -94,9 +95,7 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreservingContext('/dashboard');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [
-        { to: string; search?: Record<string, string> },
-      ];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
       expect(arg.to.startsWith('/dashboard')).toBe(true);
       expect(arg.to.includes('?')).toBe(false);
     });
@@ -108,9 +107,7 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreservingContext('/dashboard#section');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [
-        { to: string; search?: Record<string, string> },
-      ];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
       expect(arg.to).toContain('/dashboard#section');
     });
   });
@@ -146,9 +143,7 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreservingSpoof('/dashboard');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [
-        { to: string; search?: Record<string, string> },
-      ];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
       expect(arg.to.startsWith('/dashboard')).toBe(true);
       expect(arg.search?.spoof).toBe('admin@example.com');
     });

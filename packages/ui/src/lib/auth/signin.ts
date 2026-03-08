@@ -1,6 +1,6 @@
-import { createAuthClient } from 'better-auth/client';
 import { setToken } from '@template/ui/lib/auth/token';
 import type { AuthMethod, EmailAuthMethod, OAuthAuthMethod, SamlAuthMethod } from '@template/ui/lib/auth/types';
+import { createAuthClient } from 'better-auth/client';
 
 const getAuthClient = () => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';

@@ -16,9 +16,6 @@ import type {
   UISlice,
 } from './types';
 
-// Export all types from centralized types folder
-export * from './types';
-
 // Export slice creators
 export { createAuthSlice } from '@template/ui/store/slices/auth';
 export { createClientSlice } from '@template/ui/store/slices/client';
@@ -26,6 +23,8 @@ export { createNavigationSlice } from '@template/ui/store/slices/navigation';
 export { createPermissionsSlice } from '@template/ui/store/slices/permissions';
 export { createTenantSlice } from '@template/ui/store/slices/tenant';
 export { createUISlice } from '@template/ui/store/slices/ui';
+// Export all types from centralized types folder
+export * from './types';
 
 export const useAppStore = create<AppStore>()(
   devtools(

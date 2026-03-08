@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { setToken } from '@template/ui/lib/auth/token';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
+import { setToken } from '@template/ui/lib/auth/token';
 import { useAppStore } from '@template/ui/store';
+import { useEffect } from 'react';
 
 export const Route = createFileRoute('/_public/auth/callback')({
   component: AuthCallbackPage,

@@ -1,8 +1,9 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  type OrganizationUpdateData,
   organizationProtected,
   organizationProtectedQueryKey,
   organizationUpdate,
-  type OrganizationUpdateData,
 } from '@template/ui/apiClient';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
@@ -11,7 +12,6 @@ import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 export const OrganizationProfilePage = () => {
@@ -22,7 +22,8 @@ export const OrganizationProfilePage = () => {
   const { data, isLoading } = useQuery({
     queryKey: organizationProtectedQueryKey({ path: { id: organizationId } }),
     queryFn: apiQuery((opts: Parameters<typeof organizationProtected>[0]) =>
-      organizationProtected({ ...opts, path: { id: organizationId } })),
+      organizationProtected({ ...opts, path: { id: organizationId } }),
+    ),
   });
 
   const profile = data?.data;
@@ -61,9 +62,7 @@ export const OrganizationProfilePage = () => {
           header={
             <div className="px-6 py-4 border-b">
               <h1 className="text-2xl font-bold">Profile</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage your organization settings and preferences
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Manage your organization settings and preferences</p>
             </div>
           }
         >

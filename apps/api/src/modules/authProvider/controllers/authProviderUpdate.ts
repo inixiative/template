@@ -4,33 +4,30 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderUpdateRoute } from '#/modules/authProvider/routes/authProviderUpdate';
 
-export const authProviderUpdateController = makeController(
-  authProviderUpdateRoute,
-  async (c, respond) => {
-    const db = c.get('db');
-    const authProvider = getResource<'authProvider'>(c);
-    const { secrets, ...body } = c.req.valid('json');
+export const authProviderUpdateController = makeController(authProviderUpdateRoute, async (c, respond) => {
+  const db = c.get('db');
+  const authProvider = getResource<'authProvider'>(c);
+  const { secrets, ...body } = c.req.valid('json');
 
-    let encryptedData = {};
+  let encryptedData = {};
 
-    if (!isEmpty(secrets)) {
-      encryptedData = await encryptField('authProvider', 'secrets', {
-        ...authProvider,
-        ...body,
-        secrets,
-      });
-    }
-
-    const updated = await db.authProvider.update({
-      where: { id: authProvider.id },
-      data: {
-        ...body,
-        ...encryptedData,
-      },
+  if (!isEmpty(secrets)) {
+    encryptedData = await encryptField('authProvider', 'secrets', {
+      ...authProvider,
+      ...body,
+      secrets,
     });
+  }
 
-    const { encryptedSecrets, encryptedSecretsMetadata, encryptedSecretsKeyVersion, ...safeProvider } = updated;
+  const updated = await db.authProvider.update({
+    where: { id: authProvider.id },
+    data: {
+      ...body,
+      ...encryptedData,
+    },
+  });
 
-    return respond.ok(safeProvider);
-  },
-);
+  const { encryptedSecrets, encryptedSecretsMetadata, encryptedSecretsKeyVersion, ...safeProvider } = updated;
+
+  return respond.ok(safeProvider);
+});

@@ -1,6 +1,3 @@
-import { Fragment } from 'react';
-import { cn } from '@template/ui/lib/utils';
-import { useBreadcrumbs } from '@template/ui/hooks';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,6 +6,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@template/ui/components/primitives/Breadcrumb';
+import { useBreadcrumbs } from '@template/ui/hooks';
+import { cn } from '@template/ui/lib/utils';
+import { Fragment } from 'react';
 
 export type BreadcrumbsProps = {
   className?: string;
@@ -33,7 +33,10 @@ export const Breadcrumbs = ({ className }: BreadcrumbsProps) => {
                 ) : (
                   <BreadcrumbLink
                     href={item.href}
-                    onClick={(e) => { e.preventDefault(); onNavigate(item.href); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onNavigate(item.href);
+                    }}
                   >
                     {item.label}
                   </BreadcrumbLink>

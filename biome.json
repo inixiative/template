@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.14/schema.json",
+  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
@@ -37,7 +37,19 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/_old", "!**/.next", "!**/*.gen.ts", "!**/generated", "!tmp"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/_old",
+      "!**/.next",
+      "!**/.turbo",
+      "!**/*.gen.ts",
+      "!**/*.gen.json",
+      "!**/*.generated.ts",
+      "!**/generated",
+      "!tmp"
+    ]
   },
   "overrides": [
     {
@@ -89,7 +101,13 @@
       }
     },
     {
-      "includes": ["apps/**/app/**/index.ts", "apps/**/app/**/index.tsx", "apps/api/src/**/index.ts", "packages/**/src/**/index.ts", "packages/**/src/**/index.tsx"],
+      "includes": [
+        "apps/**/app/**/index.ts",
+        "apps/**/app/**/index.tsx",
+        "apps/api/src/**/index.ts",
+        "packages/**/src/**/index.ts",
+        "packages/**/src/**/index.tsx"
+      ],
       "linter": {
         "rules": {
           "style": {

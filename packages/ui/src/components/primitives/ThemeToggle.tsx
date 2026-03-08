@@ -1,7 +1,7 @@
-import type { Theme } from '@template/ui/store/types/ui';
-import { useAppStore } from '@template/ui/store';
-import { Label } from '@template/ui/components/primitives/Label';
 import { Button } from '@template/ui/components/primitives/Button';
+import { Label } from '@template/ui/components/primitives/Label';
+import { useAppStore } from '@template/ui/store';
+import type { Theme } from '@template/ui/store/types/ui';
 
 export type ThemeToggleProps = Record<string, never>;
 

@@ -1,8 +1,8 @@
 import { db, type HydratedRecord, hydrate } from '@template/db';
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceUserCreateTokenRoute } from '#/modules/spaceUser/routes/spaceUserCreateToken';

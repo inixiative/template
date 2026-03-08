@@ -5,9 +5,9 @@
  * that depend on Zustand store or other context.
  */
 
-import type { ReactNode } from 'react';
 import type { AppStore } from '@template/ui/store/types';
 import { createTestStore } from '@template/ui/test/testStore';
+import type { ReactNode } from 'react';
 
 /**
  * Creates a test wrapper component with store context
@@ -104,7 +104,7 @@ export const cleanupDOMEnvironment = () => {
     // Clear any custom CSS properties set by tests
     if (document.documentElement?.style) {
       const properties = Array.from(document.documentElement.style);
-      properties.forEach(prop => {
+      properties.forEach((prop) => {
         if (prop.startsWith('--')) {
           document.documentElement.style.removeProperty(prop);
         }

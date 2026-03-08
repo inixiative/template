@@ -19,4 +19,3 @@ export const getOrgPermissions = (role: Role, orgId: OrganizationId, entitlement
     actions: { ...baseActions, ...entitlements },
   };
 };
-

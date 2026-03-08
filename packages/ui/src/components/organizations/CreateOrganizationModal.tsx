@@ -1,5 +1,5 @@
-import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';
 import { Button, Input, Label, Modal, SlugInput } from '@template/ui/components';
+import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { memo, useState } from 'react';
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { usePageMeta } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 
 const DashboardPage = () => {
   const context = useAppStore((state) => state.tenant.context);

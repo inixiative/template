@@ -52,7 +52,7 @@ export const log: ConsolaInstance = new Proxy(baseConsola, {
         // Prepend timestamp and automatic scopes to message
         const scopes = getLogScopes();
         if (scopes.length > 0) {
-          const scopeStr = scopes.map(s => `[${s}]`).join(' ');
+          const scopeStr = scopes.map((s) => `[${s}]`).join(' ');
           return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}] ${scopeStr}`, ...args);
         }
 

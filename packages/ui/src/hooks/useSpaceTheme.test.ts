@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
 import type { SpaceTheme } from '@template/ui/types';
 
@@ -59,7 +59,9 @@ describe('useSpaceTheme', () => {
     }
 
     expect(document.documentElement.style.getPropertyValue('--space-logo')).toBe('url(https://example.com/logo.png)');
-    expect(document.documentElement.style.getPropertyValue('--space-logoDark')).toBe('url(https://example.com/logo-dark.png)');
+    expect(document.documentElement.style.getPropertyValue('--space-logoDark')).toBe(
+      'url(https://example.com/logo-dark.png)',
+    );
   });
 
   it('should not set CSS variables for undefined properties', () => {
@@ -100,7 +102,7 @@ describe('useSpaceTheme', () => {
 
     // Clear theme (simulate null)
     const allKeys = theme ? Object.keys(theme) : [];
-    allKeys.forEach(key => {
+    allKeys.forEach((key) => {
       document.documentElement.style.removeProperty(`--space-${key}`);
     });
 
@@ -134,7 +136,7 @@ describe('useSpaceTheme', () => {
 
     // Clear all previous variables
     const allKeys1 = theme1 ? Object.keys(theme1) : [];
-    allKeys1.forEach(key => {
+    allKeys1.forEach((key) => {
       document.documentElement.style.removeProperty(`--space-${key}`);
     });
 

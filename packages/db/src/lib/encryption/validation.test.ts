@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { cleanupTouchedTables, createAuthProvider, registerTestTracker } from '@template/db/test';
 import { db } from '@template/db';
 import { validateEncryptionVersions } from '@template/db/lib/encryption/validation';
+import { cleanupTouchedTables, createAuthProvider, registerTestTracker } from '@template/db/test';
 
 describe('validateEncryptionVersions', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');

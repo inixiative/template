@@ -1,6 +1,6 @@
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { buildOrganization } from '@template/db/test';
 import { createTestStore } from '@template/ui/test';
-import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('tenant slice', () => {
   let store: ReturnType<typeof createTestStore>;

@@ -20,6 +20,14 @@ export const authProviderUpdateRoute = updateRoute({
     encryptedSecretsMetadata: true,
     encryptedSecretsKeyVersion: true,
   }),
-  sanitizeKeys: ['organizationId', 'createdBy', 'type', 'provider', 'encryptedSecrets', 'encryptedSecretsMetadata', 'encryptedSecretsKeyVersion'],
+  sanitizeKeys: [
+    'organizationId',
+    'createdBy',
+    'type',
+    'provider',
+    'encryptedSecrets',
+    'encryptedSecretsMetadata',
+    'encryptedSecretsKeyVersion',
+  ],
   middleware: [validateActor, validatePermission('own')],
 });

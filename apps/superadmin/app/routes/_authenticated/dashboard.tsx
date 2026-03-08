@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { usePageMeta } from '@template/ui/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
+import { usePageMeta } from '@template/ui/hooks';
 
 const DashboardPage = () => {
   const { title, description } = usePageMeta();

@@ -121,7 +121,7 @@ ui/src/components/
 ```
 
 **OpenAPI client:**
-- Auto-generated from API spec (`openapi.json`)
+- Auto-generated from API spec (`openapi.gen.json`)
 - Type-safe API calls
 - Located in `apiClient/`
 
@@ -222,8 +222,14 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 **Special cases:**
 
 - `packages/db` includes `@template/db-test/*` → `./test/*` for test utilities
-- `packages/shared` includes `@template/shared/openapi.json` → `./openapi.json` for API spec
+- `packages/ui` includes `@template/ui/openapi.gen.json` → `./openapi.gen.json` for API spec
 - Apps use `#/*` → `./src/*` for internal imports instead of `@template/`
+
+**Generated file convention:**
+
+- Template-owned generated artifacts should include `.gen.` in the filename, for example `routeTree.gen.ts`, `prismaMap.gen.ts`, or `openapi.local.gen.json`.
+- These files should be ignored by git, search, and lint inputs via the repo-wide `*.gen.*` rules.
+- Prisma-owned generator internals under `packages/db/src/generated/**` are the exception; do not rename upstream Prisma outputs just to fit this convention.
 
 **Why this matters:**
 

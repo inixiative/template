@@ -1,7 +1,7 @@
-import { useAppStore } from '@template/ui/store';
-import { cn } from '@template/ui/lib/utils';
-import { Menu } from 'lucide-react';
 import { ShareButton } from '@template/ui/components/utility/ShareButton';
+import { cn } from '@template/ui/lib/utils';
+import { useAppStore } from '@template/ui/store';
+import { Menu } from 'lucide-react';
 
 export type HeaderProps = {
   onMenuClick?: () => void;
@@ -33,9 +33,7 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
         )}
         {logo}
       </div>
-      <div className="flex items-center gap-2">
-        {context && context.type !== 'public' && <ShareButton />}
-      </div>
+      <div className="flex items-center gap-2">{context && context.type !== 'public' && <ShareButton />}</div>
     </header>
   );
 };

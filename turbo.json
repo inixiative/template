@@ -6,51 +6,27 @@
     // ============================================
 
     "db:generate": {
-      "inputs": [
-        "prisma/schema.prisma",
-        "scripts/generateScalarSchemas.ts"
-      ],
-      "outputs": [
-        "src/generated/**",
-        ".prisma-generated"
-      ],
+      "inputs": ["prisma/schema.prisma", "scripts/generateScalarSchemas.ts"],
+      "outputs": ["src/generated/**", ".prisma.gen"],
       "cache": true
     },
 
     "generate:openapi": {
       "dependsOn": ["^db:generate"],
-      "inputs": [
-        "src/**/*.ts",
-        "!src/**/*.test.ts",
-        "scripts/generateOpenApiSpec.ts"
-      ],
-      "outputs": [
-        "openapi.local.json",
-        "../../packages/shared/openapi.json"
-      ],
+      "inputs": ["src/**/*.ts", "!src/**/*.test.ts", "scripts/generateOpenApiSpec.ts"],
+      "outputs": ["openapi.local.gen.json", "../../packages/ui/openapi.gen.json"],
       "cache": true
     },
 
     "generate:sdk": {
       "dependsOn": ["^generate:openapi"],
-      "inputs": [
-        "openapi.json",
-        "openapiTs.config.ts",
-        "scripts/generateMswHandlers.ts"
-      ],
-      "outputs": [
-        "src/apiClient/**/*.gen.ts",
-        "src/test/mocks/handlers.gen.ts"
-      ],
+      "inputs": ["openapi.gen.json", "openapiTs.config.ts", "scripts/generateMswHandlers.ts"],
+      "outputs": ["src/apiClient/**/*.gen.ts", "src/test/mocks/handlers.gen.ts"],
       "cache": true
     },
 
     "generate:routes": {
-      "inputs": [
-        "app/routes/**/*.tsx",
-        "app/routes/**/*.ts",
-        "scripts/generateRouteTree.ts"
-      ],
+      "inputs": ["app/routes/**/*.tsx", "app/routes/**/*.ts", "scripts/generateRouteTree.ts"],
       "outputs": ["app/routeTree.gen.ts"],
       "cache": true
     },
@@ -69,8 +45,8 @@
         "app/**/*.ts",
         "app/**/*.tsx",
         "!src/**/*.test.ts",
-        "!openapi.local.json",
-        "!openapi.json",
+        "!openapi.local.gen.json",
+        "!openapi.gen.json",
         "!app/routeTree.gen.ts",
         // Watch workspace deps but exclude generated files
         "../../packages/db/src/**/*.ts",
@@ -120,25 +96,14 @@
 
     "typecheck": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "src/**/*.ts",
-        "src/**/*.tsx",
-        "app/**/*.ts",
-        "app/**/*.tsx",
-        "tsconfig.json"
-      ],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "app/**/*.ts", "app/**/*.tsx", "tsconfig.json"],
       "outputs": [".tsbuildinfo"],
       "cache": true
     },
 
     "test": {
       "dependsOn": ["^build"],
-      "inputs": [
-        "src/**/*.ts",
-        "src/**/*.tsx",
-        "**/*.test.ts",
-        "**/*.test.tsx"
-      ],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "**/*.test.ts", "**/*.test.tsx"],
       "outputs": ["coverage/**"],
       "cache": true
     },

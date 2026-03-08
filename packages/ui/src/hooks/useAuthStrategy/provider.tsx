@@ -6,9 +6,9 @@ import type {
   EmbedMessage,
   PendingAuthCallback,
 } from '@template/ui/hooks/useAuthStrategy/types';
-import { createContext, type ReactNode, useCallback, useEffect, useRef } from 'react';
-import { useAppStore } from '@template/ui/store';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
+import { useAppStore } from '@template/ui/store';
+import { createContext, type ReactNode, useCallback, useEffect, useRef } from 'react';
 
 export const AuthStrategyContext = createContext<AuthStrategyContextType | null>(null);
 

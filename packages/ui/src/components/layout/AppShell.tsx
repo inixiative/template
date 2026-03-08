@@ -1,10 +1,10 @@
-import { useAppStore } from '@template/ui/store';
 import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
 import { cn } from '@template/ui/lib/utils';
+import { useAppStore } from '@template/ui/store';
 import { HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,11 +14,7 @@ export type AppShellProps = {
   children: React.ReactNode;
 };
 
-export const AppShell = ({
-  onSupport,
-  lockedContext = false,
-  children,
-}: AppShellProps) => {
+export const AppShell = ({ onSupport, lockedContext = false, children }: AppShellProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (

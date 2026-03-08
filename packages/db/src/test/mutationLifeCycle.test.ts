@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import { DbAction, executeHooks, HookTiming, registerDbHook, type HookOptions } from '@template/db/extensions/mutationLifeCycle';
+import {
+  DbAction,
+  executeHooks,
+  type HookOptions,
+  HookTiming,
+  registerDbHook,
+} from '@template/db/extensions/mutationLifeCycle';
 
 // Mock logger - the proxy makes direct spying difficult
 const mockWarn = mock(() => {});

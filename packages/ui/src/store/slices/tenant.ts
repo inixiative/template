@@ -1,6 +1,6 @@
-import type { StateCreator } from 'zustand';
 import type { AppStore } from '@template/ui/store/types';
 import type { PageContext, TenantSlice } from '@template/ui/store/types/tenant';
+import type { StateCreator } from 'zustand';
 
 export const createTenantSlice: StateCreator<AppStore, [], [], TenantSlice> = (set, get) => ({
   tenant: {

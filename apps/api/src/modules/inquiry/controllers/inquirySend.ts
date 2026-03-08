@@ -1,9 +1,9 @@
-import { makeError } from '#/lib/errors';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
-import { InquiryStatus } from '@template/db/generated/client/enums';
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
   const db = c.get('db');

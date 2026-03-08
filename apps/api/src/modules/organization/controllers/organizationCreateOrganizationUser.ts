@@ -1,6 +1,6 @@
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
 import { validateOrganizationCreateOrganizationUserBody } from '#/modules/organization/validations/organizationCreateOrganizationUserBody';

@@ -1,8 +1,8 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Context } from 'hono';
-import { makeError } from '#/lib/errors';
 import { getS3Client } from '#/lib/clients/s3';
+import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
 
 // Max file sizes by MIME type (in bytes)

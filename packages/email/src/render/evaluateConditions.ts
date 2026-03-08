@@ -3,8 +3,8 @@
  */
 
 import { type Condition, check } from '@inixiative/json-rules';
-import { isLocal, isTest } from '@template/shared/utils';
 import type { Variables } from '@template/email/render/interpolate';
+import { isLocal, isTest } from '@template/shared/utils';
 
 /**
  * Flatten variables into dot-notation accessible object for json-rules.

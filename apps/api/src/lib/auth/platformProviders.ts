@@ -8,10 +8,7 @@ export interface PlatformProvider {
 export function getPlatformProviders(): PlatformProvider[] {
   const providers: PlatformProvider[] = [];
 
-  if (
-    process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET
-  ) {
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     providers.push({
       type: 'oauth',
       provider: 'google',
@@ -20,10 +17,7 @@ export function getPlatformProviders(): PlatformProvider[] {
     });
   }
 
-  if (
-    process.env.GITHUB_CLIENT_ID &&
-    process.env.GITHUB_CLIENT_SECRET
-  ) {
+  if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
     providers.push({
       type: 'oauth',
       provider: 'github',

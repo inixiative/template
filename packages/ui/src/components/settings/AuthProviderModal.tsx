@@ -1,5 +1,5 @@
-import { Button, Input, Label, Modal } from '@template/ui/components';
 import type { OrganizationCreateAuthProviderData } from '@template/ui/apiClient';
+import { Button, Input, Label, Modal } from '@template/ui/components';
 import { memo, useState } from 'react';
 
 type AuthProviderFormData = OrganizationCreateAuthProviderData['body'];
@@ -43,11 +43,7 @@ export const AuthProviderModal = memo(
     };
 
     return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        title={provider ? 'Edit Auth Provider' : 'Add Auth Provider'}
-      >
+      <Modal isOpen={isOpen} onClose={onClose} title={provider ? 'Edit Auth Provider' : 'Add Auth Provider'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="provider-type">Type</Label>
@@ -89,11 +85,7 @@ export const AuthProviderModal = memo(
             <>
               <div className="space-y-2">
                 <Label htmlFor="client-id">Client ID</Label>
-                <Input
-                  id="client-id"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                />
+                <Input id="client-id" value={clientId} onChange={(e) => setClientId(e.target.value)} />
               </div>
 
               <div className="space-y-2">

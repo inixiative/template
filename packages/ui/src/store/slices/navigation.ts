@@ -1,9 +1,9 @@
 import type { UseNavigateResult } from '@tanstack/react-router';
-import type { StateCreator } from 'zustand';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import type { RouteMatch } from '@template/ui/lib/findRoute';
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
+import type { StateCreator } from 'zustand';
 
 export type NavigationSlice = {
   navigation: {

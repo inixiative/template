@@ -1,5 +1,5 @@
-import { useAppStore } from '@template/ui/store';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { useAppStore } from '@template/ui/store';
 
 /**
  * Extracts the parameter type from a function
@@ -13,9 +13,7 @@ type FunctionParams<TFn> = TFn extends (params: infer P) => any ? P : never;
  *
  * Generic over the SDK function type to preserve full type safety.
  */
-export const apiMutation = <TFn extends (opts: any) => Promise<any>>(
-  fn: TFn,
-) => {
+export const apiMutation = <TFn extends (opts: any) => Promise<any>>(fn: TFn) => {
   return async (vars?: FunctionParams<TFn>) => {
     const { auth } = useAppStore.getState();
 

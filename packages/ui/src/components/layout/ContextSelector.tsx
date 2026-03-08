@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useAppStore } from '@template/ui/store';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +7,9 @@ import {
   DropdownMenuTrigger,
 } from '@template/ui/components/primitives/DropdownMenu';
 import { cn } from '@template/ui/lib/utils';
+import { useAppStore } from '@template/ui/store';
 import { Boxes, Building2, Check, ChevronDown, ChevronsUpDown, ChevronUp, Settings, User } from 'lucide-react';
+import { useState } from 'react';
 
 export type ContextType = 'user' | 'organization' | 'space' | 'public';
 
@@ -37,11 +37,7 @@ export type ContextSelectorProps = {
   className?: string;
 };
 
-export const ContextSelector = ({
-  onManageOrganizations,
-  locked = false,
-  className,
-}: ContextSelectorProps) => {
+export const ContextSelector = ({ onManageOrganizations, locked = false, className }: ContextSelectorProps) => {
   // Read from Zustand store
   const tenant = useAppStore((state) => state.tenant);
   const auth = useAppStore((state) => state.auth);
@@ -60,9 +56,9 @@ export const ContextSelector = ({
   // Generate label from context
   const currentLabel =
     current.type === 'organization'
-      ? current.organization?.name ?? 'Organization'
+      ? (current.organization?.name ?? 'Organization')
       : current.type === 'space'
-        ? current.space?.name ?? 'Space'
+        ? (current.space?.name ?? 'Space')
         : current.type === 'user'
           ? 'Personal'
           : 'Public';
@@ -155,7 +151,9 @@ export const ContextSelector = ({
                   <div className="pl-6 py-1 space-y-1">
                     {spaces.map((space) => {
                       const isCurrentSpace =
-                        current.organization?.id === org.id && current.space?.id === space.id && current.type === 'space';
+                        current.organization?.id === org.id &&
+                        current.space?.id === space.id &&
+                        current.type === 'space';
 
                       return (
                         <DropdownMenuItem

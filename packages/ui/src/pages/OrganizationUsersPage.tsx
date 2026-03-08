@@ -1,3 +1,4 @@
+import type { Role } from '@template/db/generated/client/enums';
 import {
   type OrganizationCreateOrganizationUserData,
   type OrganizationCreateOrganizationUserResponses,
@@ -8,14 +9,13 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/ui/apiClient';
-import { apiMutation } from '@template/ui/lib/apiMutation';
-import { apiQuery } from '@template/ui/lib/apiQuery';
-import type { Role } from '@template/db/generated/client/enums';
+import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
+import { apiMutation } from '@template/ui/lib/apiMutation';
+import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { Trash2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,21 +34,27 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const { data, isLoading } = useQuery({
     queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
     queryFn: apiQuery((requestOptions: Parameters<typeof organizationReadManyUsers>[0]) =>
-      organizationReadManyUsers({ ...requestOptions, path: { id: organizationId } })),
+      organizationReadManyUsers({ ...requestOptions, path: { id: organizationId } }),
+    ),
   });
   const users = data?.data ?? [];
 
   const deleteMutation = useOptimisticListMutation<OrganizationUser, Omit<OrganizationUserDeleteData, 'url'>>({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationUserDelete>[0]) =>
-      organizationUserDelete(requestOptions)),
+      organizationUserDelete(requestOptions),
+    ),
     queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
     operation: 'delete',
   });
 
-  const createMutation = useOptimisticListMutation<OrganizationUser, Omit<OrganizationCreateOrganizationUserData, 'url'>>({
+  const createMutation = useOptimisticListMutation<
+    OrganizationUser,
+    Omit<OrganizationCreateOrganizationUserData, 'url'>
+  >({
     mutationFn: async (vars) => {
       const result = await apiMutation((requestOptions: Parameters<typeof organizationCreateOrganizationUser>[0]) =>
-        organizationCreateOrganizationUser(requestOptions))(vars);
+        organizationCreateOrganizationUser(requestOptions),
+      )(vars);
       // Special case: API returns { user, ...organizationUser } but we need { ...user, organizationUser }
       const { user, ...organizationUser } = result.data!;
       return { data: { ...user, organizationUser }, request: result.request, response: result.response };
@@ -71,9 +77,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'role',
       label: 'Role',
-      render: (orgUser: OrganizationUser) => (
-        <span className="capitalize">{orgUser.organizationUser.role}</span>
-      ),
+      render: (orgUser: OrganizationUser) => <span className="capitalize">{orgUser.organizationUser.role}</span>,
     },
     {
       key: 'createdAt',

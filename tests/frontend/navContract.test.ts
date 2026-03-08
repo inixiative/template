@@ -51,11 +51,7 @@ describe('frontend nav contract', () => {
 
   it('admin nav paths resolve to generated route targets', () => {
     const routeTargets = getRouteTargetsFromRouteTree(resolve(process.cwd(), 'apps/admin/app/routeTree.gen.ts'));
-    const navPaths = flattenNavPaths([
-      ...adminNavConfig.user,
-      ...adminNavConfig.organization,
-      ...adminNavConfig.space,
-    ]);
+    const navPaths = flattenNavPaths([...adminNavConfig.user, ...adminNavConfig.organization, ...adminNavConfig.space]);
 
     // Deduplicate paths (same path can appear in multiple contexts)
     const uniquePaths = [...new Set(navPaths)];

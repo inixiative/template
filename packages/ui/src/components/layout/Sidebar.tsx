@@ -1,10 +1,10 @@
 import { useLocation } from '@tanstack/react-router';
+import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 import { findRoute } from '@template/ui/lib/findRoute';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 
 export type SidebarProps = {
   className?: string;

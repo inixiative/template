@@ -1,5 +1,5 @@
-import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
 import type { Db } from '@template/db/clientTypes';
+import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 
 export const validateEncryptionVersions = async (db: Db) => {
@@ -32,9 +32,7 @@ export const validateEncryptionVersions = async (db: Db) => {
 
       // Validate keys are different (prevent accidental same-key rotation)
       if (previousKey && currentKey === previousKey) {
-        errors.push(
-          `${modelName}.${fields.encryptedField}: Current and previous keys must be different`,
-        );
+        errors.push(`${modelName}.${fields.encryptedField}: Current and previous keys must be different`);
       }
 
       const distinctVersions = await (db[modelConfig.model] as unknown as RuntimeDelegate).findMany({

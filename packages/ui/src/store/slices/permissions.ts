@@ -1,19 +1,16 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
-import {
-  createPermissions,
-  type Entitlements,
-} from '@template/permissions/client';
-import { getOrgPermissions } from '@template/permissions/roles/organization';
-import { getSpacePermissions } from '@template/permissions/roles/space';
-import { isSuperadmin } from '@template/permissions/roles/shared';
-import { getUserPermissions } from '@template/permissions/roles/user';
+import { createPermissions, type Entitlements } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import type { StateCreator } from 'zustand';
+import { getOrgPermissions } from '@template/permissions/roles/organization';
+import { isSuperadmin } from '@template/permissions/roles/shared';
+import { getSpacePermissions } from '@template/permissions/roles/space';
+import { getUserPermissions } from '@template/permissions/roles/user';
+import type { MeReadResponses } from '@template/ui/apiClient';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { StateCreator } from 'zustand';
 
 type UserWithRelations = MeReadResponses[200]['data'];
 

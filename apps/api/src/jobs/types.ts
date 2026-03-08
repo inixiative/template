@@ -37,10 +37,7 @@ export type JobData<TPayload = unknown> = {
 
 export type JobHandlerArgs<TPayload = void> = [TPayload] extends [void] ? [] : [payload: TPayload];
 
-export type JobHandler<TPayload = void> = (
-  ctx: WorkerContext,
-  ...args: JobHandlerArgs<TPayload>
-) => Promise<void>;
+export type JobHandler<TPayload = void> = (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>;
 
 export type JobOptions = {
   priority?: number;

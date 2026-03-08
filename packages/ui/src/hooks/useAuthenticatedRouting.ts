@@ -1,10 +1,17 @@
 import { useLocation } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
-import { useAppStore } from '@template/ui/store';
-import { applyAuthorizedContext, hasContextChanged, resolveAuthorizedContext } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
-import { parseRoutingSearchParams, syncStoreFromSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/querySync';
+import {
+  applyAuthorizedContext,
+  hasContextChanged,
+  resolveAuthorizedContext,
+} from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
+import {
+  parseRoutingSearchParams,
+  syncStoreFromSearchParams,
+} from '@template/ui/hooks/useAuthenticatedRouting/querySync';
 import { buildSearchParamUpdates, replaceUrlSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
 import { findRoute } from '@template/ui/lib/findRoute';
+import { useAppStore } from '@template/ui/store';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Handles all routing logic for authenticated layouts:
@@ -75,7 +82,14 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
 
     if (hasContextChanged(tenant.context, authorizedContext))
       applyAuthorizedContext({ tenant, context: authorizedContext });
-  }, [navConfig, pathname, tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id, auth.spoofUserEmail]);
+  }, [
+    navConfig,
+    pathname,
+    tenant.context.type,
+    tenant.context.organization?.id,
+    tenant.context.space?.id,
+    auth.spoofUserEmail,
+  ]);
 
   // Auto-navigate to dashboard when context changes on same page
   const previousPathname = useRef('');

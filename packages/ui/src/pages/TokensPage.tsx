@@ -1,30 +1,30 @@
 import {
-  meReadManyTokens,
-  meReadManyTokensQueryKey,
+  type MeCreateTokenData,
   type MeReadManyTokensResponse,
   meCreateToken,
-  organizationReadManyTokens,
-  organizationReadManyTokensQueryKey,
+  meReadManyTokens,
+  meReadManyTokensQueryKey,
+  type OrganizationCreateTokenData,
   type OrganizationReadManyTokensResponse,
   organizationCreateToken,
-  spaceReadManyTokens,
-  spaceReadManyTokensQueryKey,
+  organizationReadManyTokens,
+  organizationReadManyTokensQueryKey,
+  type SpaceCreateTokenData,
   type SpaceReadManyTokensResponse,
   spaceCreateToken,
-  tokenDelete,
-  type MeCreateTokenData,
-  type OrganizationCreateTokenData,
-  type SpaceCreateTokenData,
+  spaceReadManyTokens,
+  spaceReadManyTokensQueryKey,
   type TokenDeleteData,
+  tokenDelete,
 } from '@template/ui/apiClient';
+import { Button, Table } from '@template/ui/components';
+import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
+import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
-import { MasterDetailLayout, DetailPanel } from '@template/ui/components/layout';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { Button, Table } from '@template/ui/components';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -48,13 +48,15 @@ export const TokensPage = () => {
     organization: {
       queryKey: organizationReadManyTokensQueryKey({ path: { id: contextId! } }),
       queryFn: apiQuery((opts: Parameters<typeof organizationReadManyTokens>[0]) =>
-        organizationReadManyTokens({ ...opts, path: { id: contextId! } })),
+        organizationReadManyTokens({ ...opts, path: { id: contextId! } }),
+      ),
       createFn: organizationCreateToken,
     },
     space: {
       queryKey: spaceReadManyTokensQueryKey({ path: { id: contextId! } }),
       queryFn: apiQuery((opts: Parameters<typeof spaceReadManyTokens>[0]) =>
-        spaceReadManyTokens({ ...opts, path: { id: contextId! } })),
+        spaceReadManyTokens({ ...opts, path: { id: contextId! } }),
+      ),
       createFn: spaceCreateToken,
     },
   }[context.type];
@@ -78,12 +80,18 @@ export const TokensPage = () => {
   const createMutation = useOptimisticListMutation<Token, CreateData>({
     mutationFn: async (vars) => {
       if (context.type === 'user') {
-        return apiMutation((opts: Parameters<typeof meCreateToken>[0]) => meCreateToken(opts))(vars as Omit<MeCreateTokenData, 'url'>);
+        return apiMutation((opts: Parameters<typeof meCreateToken>[0]) => meCreateToken(opts))(
+          vars as Omit<MeCreateTokenData, 'url'>,
+        );
       }
       if (context.type === 'organization') {
-        return apiMutation((opts: Parameters<typeof organizationCreateToken>[0]) => organizationCreateToken(opts))(vars as Omit<OrganizationCreateTokenData, 'url'>);
+        return apiMutation((opts: Parameters<typeof organizationCreateToken>[0]) => organizationCreateToken(opts))(
+          vars as Omit<OrganizationCreateTokenData, 'url'>,
+        );
       }
-      return apiMutation((opts: Parameters<typeof spaceCreateToken>[0]) => spaceCreateToken(opts))(vars as Omit<SpaceCreateTokenData, 'url'>);
+      return apiMutation((opts: Parameters<typeof spaceCreateToken>[0]) => spaceCreateToken(opts))(
+        vars as Omit<SpaceCreateTokenData, 'url'>,
+      );
     },
     queryKey: endpoints.queryKey,
     operation: 'create',
@@ -99,9 +107,7 @@ export const TokensPage = () => {
       key: 'createdAt',
       label: 'Created',
       render: (item: Token) => (
-        <span className="text-muted-foreground">
-          {new Date(item.createdAt).toLocaleDateString()}
-        </span>
+        <span className="text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
       ),
     },
     {
@@ -118,11 +124,7 @@ export const TokensPage = () => {
       label: '',
       render: (item: Token) => (
         <div className="flex justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
-          >
+          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -131,9 +133,7 @@ export const TokensPage = () => {
   ];
 
   const handleCreate = (data: Pick<MeCreateTokenData['body'], 'name' | 'role'>) => {
-    const payload = context.type === 'user'
-      ? { body: data }
-      : { path: { id: contextId! }, body: data };
+    const payload = context.type === 'user' ? { body: data } : { path: { id: contextId! }, body: data };
     createMutation.mutate(payload);
     setIsModalOpen(false);
   };
@@ -174,11 +174,7 @@ export const TokensPage = () => {
         }
       />
 
-      <CreateTokenModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreate}
-      />
+      <CreateTokenModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
     </>
   );
 };

@@ -4,9 +4,4 @@ import { dashboardItem } from '#/config/nav/features/dashboard';
 import { organizationsItem } from '#/config/nav/features/organizations';
 import { settingsItem } from '#/config/nav/features/settings';
 
-export const userContext: NavItem[] = [
-  dashboardItem,
-  organizationsItem,
-  communicationsItem,
-  settingsItem,
-];
+export const userContext: NavItem[] = [dashboardItem, organizationsItem, communicationsItem, settingsItem];

@@ -1,5 +1,4 @@
-import type { QueryKey } from '@tanstack/react-query';
-import type { UseMutationOptions } from '@tanstack/react-query';
+import type { QueryKey, UseMutationOptions } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@template/ui/hooks/useQuery';
 
@@ -87,10 +86,7 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void, 
  * individual items without modifying the list (e.g., for detail views that
  * need to optimistically show cached data while fetching fresh updates).
  */
-export const useOptimisticListMutation = <
-  TItem extends { id: string },
-  TVariables = unknown,
->(options: {
+export const useOptimisticListMutation = <TItem extends { id: string }, TVariables = unknown>(options: {
   mutationFn: (variables: TVariables) => Promise<{ data: TItem | void; request: Request; response: Response }>;
   queryKey: QueryKey;
   /** 'create' | 'update' | 'delete' - matches controller naming. TODO: Add 'lookup' for fetching individual items */

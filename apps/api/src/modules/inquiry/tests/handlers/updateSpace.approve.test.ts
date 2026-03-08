@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, Space } from '@template/db';
-import { PlatformRole } from '@template/db/generated/client/enums';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,

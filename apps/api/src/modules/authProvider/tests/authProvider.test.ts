@@ -2,12 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { AuthProvider, Organization, OrganizationUser, User } from '@template/db';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createAuthProvider, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
-import { authProviderRouter, adminAuthProviderRouter } from '#/modules/authProvider';
+import {
+  cleanupTouchedTables,
+  createAuthProvider,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
+import { adminAuthProviderRouter, authProviderRouter } from '#/modules/authProvider';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, json, patch, post } from '#tests/utils/request';
-
 
 describe('AuthProvider Endpoints', () => {
   let superadminFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -95,12 +100,15 @@ describe('AuthProvider Endpoints', () => {
 
   describe('GET /api/admin/authProvider', () => {
     it('returns all auth providers for superadmin', async () => {
-      await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'test-oauth',
-        name: 'Test OAuth',
-        config: { clientId: 'test-client' },
-      }, { organization: org });
+      await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'test-oauth',
+          name: 'Test OAuth',
+          config: { clientId: 'test-client' },
+        },
+        { organization: org },
+      );
 
       const response = await superadminFetch(get('/api/admin/authProvider?page=1&pageSize=10'));
       const { data, pagination } = await json(response);
@@ -114,17 +122,23 @@ describe('AuthProvider Endpoints', () => {
     it('filters by organizationId', async () => {
       const { entity: otherOrg } = await createOrganization();
 
-      await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'org-provider',
-        name: 'Org Provider',
-      }, { organization: org });
+      await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'org-provider',
+          name: 'Org Provider',
+        },
+        { organization: org },
+      );
 
-      await createAuthProvider({
-        type: AuthProviderType.SAML,
-        provider: 'other-provider',
-        name: 'Other Provider',
-      }, { organization: otherOrg });
+      await createAuthProvider(
+        {
+          type: AuthProviderType.SAML,
+          provider: 'other-provider',
+          name: 'Other Provider',
+        },
+        { organization: otherOrg },
+      );
 
       const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
       const { data } = await json(response);
@@ -134,12 +148,15 @@ describe('AuthProvider Endpoints', () => {
     });
 
     it('omits encrypted fields', async () => {
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'secure-provider',
-        name: 'Secure Provider',
-        config: { clientId: 'id' },
-      }, { organization: org });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'secure-provider',
+          name: 'Secure Provider',
+          config: { clientId: 'id' },
+        },
+        { organization: org },
+      );
 
       const response = await superadminFetch(get('/api/admin/authProvider?organizationId=' + org.id));
       const { data, pagination } = await json(response);
@@ -154,12 +171,15 @@ describe('AuthProvider Endpoints', () => {
 
   describe('GET /api/v1/organization/:id/authProvider', () => {
     it('returns platform and org providers', async () => {
-      await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'custom-oauth',
-        name: 'Custom OAuth',
-        config: { clientId: 'custom-client' },
-      }, { organization: org });
+      await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'custom-oauth',
+          name: 'Custom OAuth',
+          config: { clientId: 'custom-client' },
+        },
+        { organization: org },
+      );
 
       const response = await userFetch(get(`/api/v1/organization/${org.id}/authProvider`));
       const { data } = await json(response);
@@ -189,21 +209,24 @@ describe('AuthProvider Endpoints', () => {
     });
 
     it('returns config without encrypted secrets', async () => {
-      await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'google',
-        name: 'Google OAuth',
-        config: {
-          clientId: 'oauth-client-id',
-          domains: ['example.com'],
+      await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'google',
+          name: 'Google OAuth',
+          config: {
+            clientId: 'oauth-client-id',
+            domains: ['example.com'],
+          },
         },
-      }, { organization: org });
+        { organization: org },
+      );
 
       const response = await userFetch(get(`/api/v1/organization/${org.id}/authProvider`));
       const { data } = await json(response);
 
       expect(response.status).toBe(200);
-      const provider = data.organization.find(p => p.provider === 'google');
+      const provider = data.organization.find((p) => p.provider === 'google');
       expect(provider).toBeDefined();
       expect(provider!.config).toEqual({
         clientId: 'oauth-client-id',
@@ -278,12 +301,15 @@ describe('AuthProvider Endpoints', () => {
 
   describe('PATCH /api/v1/authProvider/:id', () => {
     it('updates auth provider and re-encrypts secrets', async () => {
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'google-workspace',
-        name: 'Google Workspace',
-        config: { clientId: 'old-id' },
-      }, { organization: org });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'google-workspace',
+          name: 'Google Workspace',
+          config: { clientId: 'old-id' },
+        },
+        { organization: org },
+      );
 
       const response = await userFetch(
         patch(`/api/v1/authProvider/${provider.id}`, {
@@ -303,12 +329,15 @@ describe('AuthProvider Endpoints', () => {
     });
 
     it('allows partial updates', async () => {
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.SAML,
-        provider: 'okta-sso',
-        name: 'Okta SSO',
-        config: { metadataUrl: 'https://old.com' },
-      }, { organization: org });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.SAML,
+          provider: 'okta-sso',
+          name: 'Okta SSO',
+          config: { metadataUrl: 'https://old.com' },
+        },
+        { organization: org },
+      );
 
       const response = await userFetch(
         patch(`/api/v1/authProvider/${provider.id}`, {
@@ -324,11 +353,14 @@ describe('AuthProvider Endpoints', () => {
 
     it('rejects update without permission', async () => {
       const { entity: otherOrg } = await createOrganization();
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'other-provider',
-        name: 'Other Provider',
-      }, { organization: otherOrg });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'other-provider',
+          name: 'Other Provider',
+        },
+        { organization: otherOrg },
+      );
 
       const response = await userFetch(
         patch(`/api/v1/authProvider/${provider.id}`, {
@@ -342,11 +374,14 @@ describe('AuthProvider Endpoints', () => {
 
   describe('DELETE /api/v1/authProvider/:id', () => {
     it('deletes auth provider', async () => {
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'to-delete',
-        name: 'To Delete',
-      }, { organization: org });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'to-delete',
+          name: 'To Delete',
+        },
+        { organization: org },
+      );
 
       const response = await userFetch(del(`/api/v1/authProvider/${provider.id}`));
       expect(response.status).toBe(204);
@@ -357,11 +392,14 @@ describe('AuthProvider Endpoints', () => {
 
     it('rejects delete without permission', async () => {
       const { entity: otherOrg } = await createOrganization();
-      const { entity: provider } = await createAuthProvider({
-        type: AuthProviderType.OAUTH,
-        provider: 'protected',
-        name: 'Protected',
-      }, { organization: otherOrg });
+      const { entity: provider } = await createAuthProvider(
+        {
+          type: AuthProviderType.OAUTH,
+          provider: 'protected',
+          name: 'Protected',
+        },
+        { organization: otherOrg },
+      );
 
       const response = await userFetch(del(`/api/v1/authProvider/${provider.id}`));
       expect(response.status).toBe(403);

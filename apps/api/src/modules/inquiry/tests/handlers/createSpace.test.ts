@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization } from '@template/db';
+import type { Inquiry, Organization } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -12,7 +12,6 @@ import {
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
-import type { Inquiry } from '@template/db';
 
 const mount = [(app: any) => app.route('/api/v1/organization', organizationRouter)];
 
@@ -39,11 +38,13 @@ describe('handler: createSpace — validate', () => {
   it('rejects if a space with that slug already exists', async () => {
     await createSpace({ slug: 'existing-slug' }, { organization: org });
 
-    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
-      type: InquiryType.createSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { name: 'My Space', slug: 'existing-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.createSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { name: 'My Space', slug: 'existing-slug' },
+      }),
+    );
 
     expect(response.status).toBe(409);
   });
@@ -58,21 +59,25 @@ describe('handler: createSpace — validate', () => {
       content: { name: 'My Space', slug: 'pending-slug' },
     });
 
-    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
-      type: InquiryType.createSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { name: 'My Space', slug: 'pending-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.createSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { name: 'My Space', slug: 'pending-slug' },
+      }),
+    );
 
     expect(response.status).toBe(409);
   });
 
   it('allows creating a createSpace inquiry with a unique slug', async () => {
-    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, {
-      type: InquiryType.createSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { name: 'My Space', slug: 'brand-new-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.createSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { name: 'My Space', slug: 'brand-new-slug' },
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(201);

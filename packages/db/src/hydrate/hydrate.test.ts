@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import { fetchOne } from '@template/db/hydrate/fetchOne';
+import { hydrate } from '@template/db/hydrate/hydrate';
 import {
   cleanupTouchedTables,
   createOrganizationUser,
@@ -8,8 +10,6 @@ import {
   createUser,
   registerTestTracker,
 } from '@template/db/test';
-import { fetchOne } from '@template/db/hydrate/fetchOne';
-import { hydrate } from '@template/db/hydrate/hydrate';
 
 describe('hydrate', () => {
   beforeEach(() => {

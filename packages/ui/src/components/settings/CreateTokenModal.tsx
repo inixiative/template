@@ -48,12 +48,7 @@ export const CreateTokenModal = memo(
 
           <div className="space-y-2">
             <Label htmlFor="token-role">Role</Label>
-            <Select
-              id="token-role"
-              value={role}
-              onChange={setRole}
-              options={tokenRoleOptions}
-            />
+            <Select id="token-role" value={role} onChange={setRole} options={tokenRoleOptions} />
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

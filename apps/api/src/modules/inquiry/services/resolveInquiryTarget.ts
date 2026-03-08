@@ -62,7 +62,9 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
       return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
     }
     if (body.targetOrganizationSlug && body.targetSpaceSlug) {
-      const space = await db.space.findFirst({ where: { slug: body.targetSpaceSlug as string, organization: { slug: body.targetOrganizationSlug as string } } });
+      const space = await db.space.findFirst({
+        where: { slug: body.targetSpaceSlug as string, organization: { slug: body.targetOrganizationSlug as string } },
+      });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
       return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
     }

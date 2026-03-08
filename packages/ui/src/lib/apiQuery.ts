@@ -1,6 +1,6 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import { useAppStore } from '@template/ui/store';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { useAppStore } from '@template/ui/store';
 
 /**
  * Store-aware API wrapper for TanStack Query queries.
@@ -9,9 +9,7 @@ import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
  *
  * Generic over the SDK function type to preserve full type safety.
  */
-export const apiQuery = <TFn extends (opts: any) => Promise<any>>(
-  fn: TFn,
-) => {
+export const apiQuery = <TFn extends (opts: any) => Promise<any>>(fn: TFn) => {
   return async (context: QueryFunctionContext) => {
     const { auth } = useAppStore.getState();
 

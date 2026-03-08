@@ -8,9 +8,7 @@ import type { TenantContext } from '@template/ui/store/types/tenant';
  * Public context has no record, so it falls back to an empty object.
  * User context uses auth.user from store as source of truth.
  */
-export const getContextParams = (
-  context: TenantContext,
-): readonly [AccessorName, HydratedRecord] => {
+export const getContextParams = (context: TenantContext): readonly [AccessorName, HydratedRecord] => {
   if (context.type === 'organization' && context.organization) {
     return ['organization', context.organization as unknown as HydratedRecord];
   }

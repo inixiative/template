@@ -3,10 +3,10 @@ import {
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/ui/apiClient';
-import { apiQuery } from '@template/ui/lib/apiQuery';
-import { useQuery } from '@template/ui/hooks';
-import { useAppStore } from '@template/ui/store';
 import { Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { useQuery } from '@template/ui/hooks';
+import { apiQuery } from '@template/ui/lib/apiQuery';
+import { useAppStore } from '@template/ui/store';
 
 type Space = OrganizationReadManySpacesResponse['data'][number];
 
@@ -21,7 +21,8 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
   const { data, isLoading } = useQuery({
     queryKey: organizationReadManySpacesQueryKey({ path: { id: organizationId } }),
     queryFn: apiQuery((requestOptions: Parameters<typeof organizationReadManySpaces>[0]) =>
-      organizationReadManySpaces({ ...requestOptions, path: { id: organizationId } })),
+      organizationReadManySpaces({ ...requestOptions, path: { id: organizationId } }),
+    ),
   });
   const spaces = data?.data ?? [];
 

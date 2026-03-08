@@ -1,6 +1,6 @@
 import { SignupForm } from '@template/ui/components/auth/SignupForm';
-import { useAppStore } from '@template/ui/store';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
+import { useAppStore } from '@template/ui/store';
 
 export const SignupPage = () => {
   const getStore = useAppStore.getState;

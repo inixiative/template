@@ -1,4 +1,4 @@
-import { getQueryMetadataByOperation, type EnumFilter } from '@template/ui/lib/getQueryMetadata';
+import { type EnumFilter, getQueryMetadataByOperation } from '@template/ui/lib/getQueryMetadata';
 
 export type SearchMode = 'combined' | 'field';
 

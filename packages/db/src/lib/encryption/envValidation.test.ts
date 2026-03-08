@@ -9,7 +9,9 @@ describe('encryptionKeySchema', () => {
 
   it('rejects key that is not 32 bytes', () => {
     const shortKey = Buffer.from('tooshort', 'utf8').toString('base64');
-    expect(() => encryptionKeySchema.parse(shortKey)).toThrow('Encryption key must be valid base64-encoded 32-byte key');
+    expect(() => encryptionKeySchema.parse(shortKey)).toThrow(
+      'Encryption key must be valid base64-encoded 32-byte key',
+    );
   });
 
   it('rejects invalid base64', () => {

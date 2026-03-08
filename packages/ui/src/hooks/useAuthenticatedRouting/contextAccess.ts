@@ -1,7 +1,7 @@
+import type { RoutingContextResolutionInput } from '@template/ui/hooks/useAuthenticatedRouting/types';
 import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import type { AppStore } from '@template/ui/store/types';
 import type { TenantContext } from '@template/ui/store/types/tenant';
-import type { RoutingContextResolutionInput } from '@template/ui/hooks/useAuthenticatedRouting/types';
 
 export type ApplyAuthorizedContextInput = {
   tenant: AppStore['tenant'];

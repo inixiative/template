@@ -1,12 +1,12 @@
-import {
-  useQuery as tanstackUseQuery,
-  useMutation as tanstackUseMutation,
-  type UseQueryOptions,
-  type UseMutationOptions,
-  type UseQueryResult,
-  type UseMutationResult,
-} from '@tanstack/react-query';
 import type { QueryKey } from '@tanstack/react-query';
+import {
+  useMutation as tanstackUseMutation,
+  useQuery as tanstackUseQuery,
+  type UseMutationOptions,
+  type UseMutationResult,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 /**
  * Re-export TanStack Query hooks with app-specific types.
@@ -23,12 +23,7 @@ export const useQuery = <
   return tanstackUseQuery(options);
 };
 
-export const useMutation = <
-  TData = unknown,
-  TError = Error,
-  TVariables = void,
-  TContext = unknown,
->(
+export const useMutation = <TData = unknown, TError = Error, TVariables = void, TContext = unknown>(
   options: UseMutationOptions<TData, TError, TVariables, TContext>,
 ): UseMutationResult<TData, TError, TVariables, TContext> => {
   return tanstackUseMutation(options);

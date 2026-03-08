@@ -1,5 +1,5 @@
-import { LogScope, log } from '@template/shared/logger';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
+import { LogScope, log } from '@template/shared/logger';
 
 export const createConsoleClient = (): EmailClient => {
   return {

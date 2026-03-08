@@ -1,13 +1,13 @@
+import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
-import { Chrome, Github, Shield, Key } from 'lucide-react';
-import { useState } from 'react';
-import { useSearch } from '@tanstack/react-router';
-import { useAppStore } from '@template/ui/store';
 import { useAuthProviders } from '@template/ui/hooks';
 import { toast } from '@template/ui/lib/toast';
+import { useAppStore } from '@template/ui/store';
+import { Chrome, Github, Key, Shield } from 'lucide-react';
+import { useState } from 'react';
 
 const providerIcons: Record<string, typeof Chrome> = {
   google: Chrome,
@@ -70,7 +70,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
 
   const enabledProviders = providers?.filter((p) => p.enabled) || [];
   const showProviders = enabledProviders.length > 0;
-  const displayError = providerError ? 'Unable to load authentication providers. You can still sign up with email and password.' : error;
+  const displayError = providerError
+    ? 'Unable to load authentication providers. You can still sign up with email and password.'
+    : error;
 
   return (
     <Card className="w-full shadow-lg border-border/50">
@@ -83,7 +85,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
       <CardContent>
         <div className="space-y-4">
           {displayError && (
-            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">{displayError}</div>
+            <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
+              {displayError}
+            </div>
           )}
 
           {showProviders && (
