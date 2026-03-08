@@ -4,6 +4,7 @@ import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test'
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
+import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 
@@ -22,6 +23,7 @@ describe('POST /api/v1/batch/execute', () => {
         (app) => app.route('/api/v1/batch', batchRouter),
         (app) => app.route('/api/v1/me', meRouter),
         (app) => app.route('/api/v1/organization', organizationRouter),
+        (app) => app.route('/api/v1/token', tokenRouter),
       ],
     });
     fetch = harness.fetch;
@@ -99,6 +101,33 @@ describe('POST /api/v1/batch/execute', () => {
       expect(data.batch[0][0].status).toBe(201);
       expect(data.batch[1][0].status).toBe(200);
       expect(data.batch[1][0].body.data.slug).toBe(`test-org-${seq}`);
+    });
+
+    it('treats 204 responses as successful empty results', async () => {
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/me/tokens',
+                body: { name: `Delete Me ${Date.now()}`, role: 'owner' },
+              },
+            ],
+            [{ method: 'DELETE', path: '/api/v1/token/<<0.0.body.data.id>>' }],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await json(response);
+
+      expect(response.status).toBe(200);
+      expect(data.batch[0][0].status).toBe(201);
+      expect(data.batch[1][0].status).toBe(204);
+      expect(data.batch[1][0].error).toBeUndefined();
+      expect(data.batch[1][0].body).toBeNull();
+      expect(data.summary.failedRequests).toBe(0);
     });
 
     it('applies shared headers to all requests', async () => {
@@ -473,6 +502,31 @@ describe('POST /api/v1/batch/execute', () => {
       expect(response.status).toBe(200);
       expect(data.batch[1][0].status).toBe(500);
       expect(data.batch[1][0].error).toContain('Invalid round reference');
+    });
+
+    it('rejects interpolation that targets an empty 204 body', async () => {
+      const response = await fetch(
+        post('/api/v1/batch/execute', {
+          requests: [
+            [
+              {
+                method: 'POST',
+                path: '/api/v1/me/tokens',
+                body: { name: `Empty Body Source ${Date.now()}`, role: 'owner' },
+              },
+            ],
+            [{ method: 'DELETE', path: '/api/v1/token/<<0.0.body.data.id>>' }],
+            [{ method: 'GET', path: '/api/v1/me/<<1.0.body.data.id>>' }],
+          ],
+          strategy: 'allowFailures',
+        }),
+      );
+
+      const { data } = await json(response);
+      expect(response.status).toBe(200);
+      expect(data.batch[1][0].status).toBe(204);
+      expect(data.batch[2][0].status).toBe(500);
+      expect(data.batch[2][0].error).toContain("field 'body.data.id' does not exist");
     });
 
     it('rejects absolute URLs', async () => {

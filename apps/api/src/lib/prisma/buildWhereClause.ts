@@ -1,28 +1,32 @@
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   search?: string;
-  searchFields?: Record<string, any>;
+  searchFields?: BracketQueryRecord;
   searchableFields?: readonly string[];
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 };
 
 const relationOperators = ['some', 'every', 'none', 'is', 'isNot'];
 const fieldOperators = ['contains', 'equals', 'in', 'notIn', 'lt', 'lte', 'gt', 'gte', 'startsWith', 'endsWith', 'not'];
 
+const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const validateAndTransformSearchFields = (
-  obj: Record<string, any>,
+  obj: BracketQueryRecord,
   searchableFields: readonly string[],
   prefix = '',
   autoContains = true,
   depth = 0,
-): any => {
+): BracketQueryRecord => {
   // Prevent stack overflow from deeply nested or circular queries
   if (depth > 10) {
     throw new Error('Search query nesting too deep (max 10 levels)');
   }
 
-  const result: Record<string, any> = {};
+  const result: BracketQueryRecord = {};
 
   for (const [key, value] of Object.entries(obj)) {
     const currentPath = prefix ? `${prefix}.${key}` : key;
@@ -49,18 +53,13 @@ const validateAndTransformSearchFields = (
       const hasFieldOperator = keys.some((k) => fieldOperators.includes(k));
 
       if (hasRelationOperator) {
-        result[key] = {};
+        const relationValue: BracketQueryRecord = {};
         for (const [opKey, opValue] of Object.entries(value)) {
-          if (relationOperators.includes(opKey) && typeof opValue === 'object') {
-            result[key][opKey] = validateAndTransformSearchFields(
-              opValue as Record<string, any>,
-              searchableFields,
-              currentPath,
-              false,
-              depth + 1,
-            );
+          if (relationOperators.includes(opKey) && isBracketQueryRecord(opValue)) {
+            relationValue[opKey] = validateAndTransformSearchFields(opValue, searchableFields, currentPath, false, depth + 1);
           }
         }
+        result[key] = relationValue;
       } else if (hasFieldOperator) {
         if (!validatePathNotation(currentPath)) {
           throw new Error(`Invalid search field: ${currentPath}`);
@@ -78,9 +77,9 @@ const validateAndTransformSearchFields = (
   return result;
 };
 
-export const buildWhereClause = (options: BuildWhereOptions): any => {
+export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
   const { search, searchFields, searchableFields = [], filters = {} } = options;
-  const conditions: any[] = [];
+  const conditions: Record<string, unknown>[] = [];
 
   if (search && searchableFields.length) {
     const searchConditions = searchableFields.map((field) => {

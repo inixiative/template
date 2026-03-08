@@ -1,4 +1,5 @@
 import { db } from '@template/db';
+import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions } from '@template/permissions';
 import { logScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
@@ -6,12 +7,13 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { AppEnv } from '#/types/appEnv';
 
 export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   const batchId = c.req.header('x-batch-id');
-  let batchContext;
+  let batchContext: ReturnType<typeof getBatchContextFn>;
   if (batchId) {
     const { getBatchContext } = await import('#/modules/batch/services/batchRegistry');
     batchContext = getBatchContext(batchId);
@@ -38,7 +40,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     const user = batchContext.baseContext.get('user');
     if (user) {
       const permix = c.get('permix');
-      permix.setUserId(user.id as any);
+      permix.setUserId(user.id as UserId);
       if (isSuperadmin(c)) permix.setSuperadmin(true);
 
       await setupUserPermissions(c);

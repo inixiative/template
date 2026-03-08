@@ -1,4 +1,5 @@
 import type { Db, Prisma } from '@template/db';
+import type { RouteConfig } from '@hono/zod-openapi';
 import type {
   Organization,
   OrganizationUser,
@@ -10,6 +11,7 @@ import type {
 import type { Permix } from '@template/permissions';
 import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
+import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
   app: Hono<AppEnv>;
@@ -27,8 +29,9 @@ export type AppVars = {
   requestId: string;
   resource: unknown;
   resourceType: string | null;
+  routeConfig: RouteConfig | null;
   searchableFields: readonly string[] | null;
-  bracketQuery: Record<string, any>;
+  bracketQuery: BracketQueryRecord;
 };
 
 export type AppEnv = {

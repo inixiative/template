@@ -147,9 +147,17 @@ export const setupVercel = async (
 
 		// Step 7: Configure Web branches
 		if (!(await isComplete('vercel', 'configureWebBranches'))) {
-			// Note: Vercel automatically uses 'main' as production branch
-			// Custom 'staging' environment tracks 'staging' branch
-			// Preview deployments work automatically for all other branches
+			const webProjectId = projectConfig.vercel.webProjectId!;
+
+			await updateProjectSettings(webProjectId, teamId, {
+				git: {
+					deploymentEnabled: {
+						'*': false,
+						main: true
+					}
+				}
+			});
+
 			await markComplete('vercel', 'configureWebBranches');
 			await syncConfig();
 		}
@@ -281,6 +289,17 @@ export const setupVercel = async (
 
 		// Step 15: Configure Admin branches
 		if (!(await isComplete('vercel', 'configureAdminBranches'))) {
+			const adminProjectId = projectConfig.vercel.adminProjectId!;
+
+			await updateProjectSettings(adminProjectId, teamId, {
+				git: {
+					deploymentEnabled: {
+						'*': false,
+						main: true
+					}
+				}
+			});
+
 			await markComplete('vercel', 'configureAdminBranches');
 			await syncConfig();
 		}
@@ -412,6 +431,17 @@ export const setupVercel = async (
 
 		// Step 23: Configure Superadmin branches
 		if (!(await isComplete('vercel', 'configureSuperadminBranches'))) {
+			const superadminProjectId = projectConfig.vercel.superadminProjectId!;
+
+			await updateProjectSettings(superadminProjectId, teamId, {
+				git: {
+					deploymentEnabled: {
+						'*': false,
+						main: true
+					}
+				}
+			});
+
 			await markComplete('vercel', 'configureSuperadminBranches');
 			await syncConfig();
 		}
