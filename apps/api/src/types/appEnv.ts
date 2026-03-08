@@ -11,6 +11,7 @@ import type {
 import type { Permix } from '@template/permissions';
 import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
+import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
   app: Hono<AppEnv>;
@@ -30,7 +31,7 @@ export type AppVars = {
   resourceType: string | null;
   routeConfig: RouteConfig | null;
   searchableFields: readonly string[] | null;
-  bracketQuery: Record<string, any>;
+  bracketQuery: BracketQueryRecord;
 };
 
 export type AppEnv = {

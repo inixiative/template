@@ -2,18 +2,13 @@ import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
-
-type PaginationParams = {
-  page?: number;
-  pageSize?: number;
-  orderBy?: Record<string, Prisma.SortOrder>[];
-};
+import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
   page?: number;
   pageSize?: number;
   search?: string;
-  searchFields?: Record<string, any>;
+  searchFields?: BracketQueryRecord;
   orderBy?: string[];
 };
 
@@ -48,6 +43,9 @@ type PaginatedResult<T> = {
   pagination: PaginationResult;
 };
 
+const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 export const paginate = async <
   T extends AnyDelegate,
   TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
@@ -61,8 +59,8 @@ export const paginate = async <
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
   const { searchableFields: explicitSearchableFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
 
-  const bracketQuery = (c.get('bracketQuery') ?? {}) as Record<string, any>;
-  const searchFields = bracketQuery.searchFields ?? query.searchFields;
+  const bracketQuery = c.get('bracketQuery');
+  const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;

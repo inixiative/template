@@ -2,18 +2,20 @@ import type { Context, Input } from 'hono';
 import type { InputToDataByTarget, ValidationTargets } from 'hono/types';
 import type { AppEnv } from '#/types/appEnv';
 
-type ContextOut<C extends Context<any, any, any>> = C extends Context<any, any, infer I>
+type EmptyInputOut = Record<never, never>;
+
+type ContextOut<C extends Context<AppEnv, string, Input>> = C extends Context<AppEnv, string, infer I>
   ? I extends { out: infer O }
     ? O extends Input['out']
       ? O
-      : {}
-    : {}
-  : {};
+      : EmptyInputOut
+    : EmptyInputOut
+  : EmptyInputOut;
 
 export type ValidatedContext<TTarget extends keyof ValidationTargets, TData = unknown> = Context<
   AppEnv,
-  any,
-  { out: Record<TTarget, TData> }
+  string,
+  Input & { out: Record<TTarget, TData> }
 >;
 
 export function getValidatedBody<C extends ValidatedContext<'json', unknown>>(
