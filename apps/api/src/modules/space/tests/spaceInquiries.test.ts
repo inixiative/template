@@ -33,7 +33,10 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: admin, organization: org },
+    );
     adminOu = ou;
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
@@ -42,7 +45,12 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     const { entity: other } = await createSpace({}, { organization: org });
     otherSpace = other;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOu], mockSpaceUsers: [adminSu], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOu],
+      mockSpaceUsers: [adminSu],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -80,10 +88,18 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
 
   it('returns 403 for non-owner', async () => {
     const { entity: viewer } = await createUser();
-    const { entity: viewerOu, context: viewerOuCtx } = await createOrganizationUser({ role: 'member' }, { user: viewer, organization: org });
+    const { entity: viewerOu, context: viewerOuCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { user: viewer, organization: org },
+    );
     const { entity: viewerSu } = await createSpaceUser({ role: 'viewer' }, { ...viewerOuCtx, space });
 
-    const viewerFetch = createTestApp({ mockUser: viewer, mockOrganizationUsers: [viewerOu], mockSpaceUsers: [viewerSu], mount }).fetch;
+    const viewerFetch = createTestApp({
+      mockUser: viewer,
+      mockOrganizationUsers: [viewerOu],
+      mockSpaceUsers: [viewerSu],
+      mount,
+    }).fetch;
     const response = await viewerFetch(get(`/api/v1/space/${space.id}/inquiries/sent`));
     expect(response.status).toBe(403);
   });
@@ -104,7 +120,10 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: admin, organization: org },
+    );
     adminOu = ou;
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
@@ -113,7 +132,12 @@ describe('POST /api/v1/space/:id/inquiries', () => {
     const { entity: to } = await createOrganization();
     targetOrg = to;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOu], mockSpaceUsers: [adminSu], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOu],
+      mockSpaceUsers: [adminSu],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -123,11 +147,13 @@ describe('POST /api/v1/space/:id/inquiries', () => {
   });
 
   it('creates an updateSpace inquiry targeting admin', async () => {
-    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
-      type: InquiryType.updateSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { spaceId: space.id },
-    }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { spaceId: space.id },
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(201);
@@ -138,12 +164,14 @@ describe('POST /api/v1/space/:id/inquiries', () => {
   });
 
   it('creates a transferSpace inquiry targeting another organization', async () => {
-    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
-      type: InquiryType.transferSpace,
-      targetModel: InquiryResourceModel.Organization,
-      targetOrganizationId: targetOrg.id,
-      content: {},
-    }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.transferSpace,
+        targetModel: InquiryResourceModel.Organization,
+        targetOrganizationId: targetOrg.id,
+        content: {},
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(201);
@@ -170,7 +198,10 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     owner = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: org },
+    );
     ownerOu = ou;
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
@@ -179,7 +210,12 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     const { entity: other } = await createSpace({}, { organization: org });
     otherSpace = other;
 
-    const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [ownerOu], mockSpaceUsers: [ownerSu], mount });
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [ownerOu],
+      mockSpaceUsers: [ownerSu],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });

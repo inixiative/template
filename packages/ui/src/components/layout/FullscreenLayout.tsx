@@ -1,6 +1,6 @@
-import { ArrowLeft } from 'lucide-react';
 import { Button } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';
+import { ArrowLeft } from 'lucide-react';
 
 export const FullscreenLayout = ({ children }: { children: React.ReactNode }) => {
   const { navigatePreservingContext } = useAppStore((state) => state.navigation);
@@ -17,9 +17,7 @@ export const FullscreenLayout = ({ children }: { children: React.ReactNode }) =>
           <ArrowLeft className="h-5 w-5" />
         </Button>
       </div>
-      <div className="h-full w-full">
-        {children}
-      </div>
+      <div className="h-full w-full">{children}</div>
     </div>
   );
 };

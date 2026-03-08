@@ -15,7 +15,7 @@
       "@template/shared/*": ["../shared/src/*"],
       "@template/ui/test": ["./src/test/index.ts"],
       "@template/ui/test/*": ["./src/test/*"],
-      "@template/ui/openapi.json": ["./openapi.json"],
+      "@template/ui/openapi.gen.json": ["./openapi.gen.json"],
       "@template/ui/*": ["./src/*"]
     }
   },

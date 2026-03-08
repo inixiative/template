@@ -1,6 +1,6 @@
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
-import type { Context } from 'hono';
 import { createHash, randomBytes } from 'crypto';
+import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {

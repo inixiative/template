@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { Role, InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Db, OrganizationId, UserId } from '@template/db';
+import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
+import { z } from 'zod';
 import { makeError } from '#/lib/errors';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';

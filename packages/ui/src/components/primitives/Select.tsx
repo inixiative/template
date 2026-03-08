@@ -1,6 +1,6 @@
-import { cn } from '@template/ui/lib/utils';
 import type { SelectOption } from '@template/ui/lib/enumOptions';
-import * as React from 'react';
+import { cn } from '@template/ui/lib/utils';
+import type * as React from 'react';
 
 type SelectProps<TValue extends string = string> = Omit<
   React.SelectHTMLAttributes<HTMLSelectElement>,

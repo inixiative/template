@@ -1,8 +1,8 @@
-import { Role } from '@template/db/generated/client/enums';
 import type { OrganizationId } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserDeleteRoute } from '#/modules/organizationUser/routes/organizationUserDelete';
@@ -21,8 +21,7 @@ export const organizationUserDeleteController = makeController(organizationUserD
     'assign',
   );
   if (!canLeave && !canAssign) throw makeError({ status: 403, message: 'Access denied' });
-  if (orgUser.role === Role.owner)
-    await validateNotLastOwner(db, orgUser.organizationId as OrganizationId);
+  if (orgUser.role === Role.owner) await validateNotLastOwner(db, orgUser.organizationId as OrganizationId);
 
   await db.organizationUser.delete({ where: { id: orgUser.id } });
 

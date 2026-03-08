@@ -1,8 +1,8 @@
+import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
+import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
+import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
-import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
-import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
@@ -31,11 +31,7 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
         return staleRecords.map((record: Record<string, unknown>) => async () => {
           try {
             const decryptRecord = record as DecryptFieldInput<typeof modelName, typeof keyName>;
-            const decrypted = await decryptField(
-              modelName,
-              keyName,
-              decryptRecord,
-            );
+            const decrypted = await decryptField(modelName, keyName, decryptRecord);
             const recordWithData = { ...record, [keyName]: decrypted };
             const encryptedData = await encryptField(modelName, keyName, recordWithData);
 
@@ -49,7 +45,9 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
 
             return updated.length > 0;
           } catch (error) {
-            log(`Failed to rotate ${modelName} record ${record.id}: ${error instanceof Error ? error.message : String(error)}`);
+            log(
+              `Failed to rotate ${modelName} record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
             return false;
           }
         });
@@ -65,8 +63,6 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
   log(`Rotation complete: ${successCount}/${allRotations.length} records rotated successfully`);
 
   if (failedCount > 0) {
-    throw new Error(
-      `Rotation incomplete: ${failedCount}/${allRotations.length} records failed to rotate`,
-    );
+    throw new Error(`Rotation incomplete: ${failedCount}/${allRotations.length} records failed to rotate`);
   }
 });

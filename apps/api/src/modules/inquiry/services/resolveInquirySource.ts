@@ -17,7 +17,11 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
 
   if (resourceType === 'organization') {
     const org = getResource<'organization'>(c);
-    return { ...nullSourceFields, sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: org.id as OrganizationId };
+    return {
+      ...nullSourceFields,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id as OrganizationId,
+    };
   }
 
   if (resourceType === 'space') {

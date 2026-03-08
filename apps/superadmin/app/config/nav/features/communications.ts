@@ -1,5 +1,5 @@
 import type { NavItem } from '@template/ui/components';
-import { getContextParams} from '@template/ui/lib';
+import { getContextParams } from '@template/ui/lib';
 import { Mail } from 'lucide-react';
 
 export const communicationsItem: NavItem = {

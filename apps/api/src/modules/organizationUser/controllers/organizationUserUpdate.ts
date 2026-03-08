@@ -1,9 +1,9 @@
-import { Role } from '@template/db/generated/client/enums';
 import type { OrganizationId } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 import { greaterRole } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';

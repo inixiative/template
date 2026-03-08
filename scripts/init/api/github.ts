@@ -10,18 +10,18 @@ const execAsync = promisify(exec);
  * @returns true if app is installed, false otherwise
  */
 export const isAppInstalled = async (org: string, appSlug: string): Promise<boolean> => {
-	try {
-		const { stdout } = await execAsync(
-			`gh api /orgs/${org}/installations --jq '.installations[] | select(.app_slug == "${appSlug}") | .id'`,
-			{ encoding: 'utf-8' }
-		);
+  try {
+    const { stdout } = await execAsync(
+      `gh api /orgs/${org}/installations --jq '.installations[] | select(.app_slug == "${appSlug}") | .id'`,
+      { encoding: 'utf-8' },
+    );
 
-		// If we get an installation ID, app is installed
-		return stdout.trim() !== '';
-	} catch (error) {
-		// If command fails, assume not installed
-		return false;
-	}
+    // If we get an installation ID, app is installed
+    return stdout.trim() !== '';
+  } catch (error) {
+    // If command fails, assume not installed
+    return false;
+  }
 };
 
 /**
@@ -31,17 +31,17 @@ export const isAppInstalled = async (org: string, appSlug: string): Promise<bool
  * @returns installation ID if found, null otherwise
  */
 export const getAppInstallationId = async (org: string, appSlug: string): Promise<string | null> => {
-	try {
-		const { stdout } = await execAsync(
-			`gh api /orgs/${org}/installations --jq '.installations[] | select(.app_slug == "${appSlug}") | .id'`,
-			{ encoding: 'utf-8' }
-		);
+  try {
+    const { stdout } = await execAsync(
+      `gh api /orgs/${org}/installations --jq '.installations[] | select(.app_slug == "${appSlug}") | .id'`,
+      { encoding: 'utf-8' },
+    );
 
-		const installationId = stdout.trim();
-		return installationId !== '' ? installationId : null;
-	} catch (error) {
-		return null;
-	}
+    const installationId = stdout.trim();
+    return installationId !== '' ? installationId : null;
+  } catch (error) {
+    return null;
+  }
 };
 
 /**
@@ -50,15 +50,18 @@ export const getAppInstallationId = async (org: string, appSlug: string): Promis
  * @returns array of installed apps with id and slug
  */
 export const listInstalledApps = async (org: string): Promise<Array<{ id: string; slug: string }>> => {
-	try {
-		const { stdout } = await execAsync(
-			`gh api /orgs/${org}/installations --jq '.installations[] | {id: .id, slug: .app_slug}'`,
-			{ encoding: 'utf-8' }
-		);
+  try {
+    const { stdout } = await execAsync(
+      `gh api /orgs/${org}/installations --jq '.installations[] | {id: .id, slug: .app_slug}'`,
+      { encoding: 'utf-8' },
+    );
 
-		const lines = stdout.trim().split('\n').filter(line => line);
-		return lines.map(line => JSON.parse(line));
-	} catch (error) {
-		return [];
-	}
+    const lines = stdout
+      .trim()
+      .split('\n')
+      .filter((line) => line);
+    return lines.map((line) => JSON.parse(line));
+  } catch (error) {
+    return [];
+  }
 };

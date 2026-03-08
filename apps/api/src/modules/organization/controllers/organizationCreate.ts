@@ -17,7 +17,7 @@ export const organizationCreateController = makeController(organizationCreateRou
       },
     },
     include: {
-      organizationUsers: true
+      organizationUsers: true,
     },
   });
 

@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
-import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
 import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 
 describe('encryption helpers', () => {

@@ -1,6 +1,6 @@
-import { configSchema, Generator } from '@tanstack/router-generator';
 import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { configSchema, Generator } from '@tanstack/router-generator';
 
 const root = resolve(process.cwd());
 const generatedRouteTree = './app/routeTree.gen.ts';

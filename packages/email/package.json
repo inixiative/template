@@ -15,12 +15,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^1.1.2",
+    "@inixiative/json-rules": "^1.2.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "lodash-es": "^4.17.23",
     "mjml": "^4.18.0",
-    "resend": "^6.9.1"
+    "resend": "^6.9.3"
   },
   "devDependencies": {
     "@types/mjml": "^4.7.4"

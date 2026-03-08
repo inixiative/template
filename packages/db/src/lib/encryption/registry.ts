@@ -1,6 +1,6 @@
-import { upperFirst } from 'lodash-es';
 import type { AuthProvider } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
+import { upperFirst } from 'lodash-es';
 
 export const ENCRYPTED_MODELS = {
   authProvider: {
@@ -8,8 +8,7 @@ export const ENCRYPTED_MODELS = {
     keys: {
       secrets: {
         envPrefix: 'AUTH_PROVIDER_SECRETS',
-        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) =>
-          `authProvider:${r.id}:${r.organizationId}`,
+        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) => `authProvider:${r.id}:${r.organizationId}`,
       },
     },
   } satisfies EncryptedModelConfig<'authProvider'>,

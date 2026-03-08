@@ -56,7 +56,13 @@ const validateAndTransformSearchFields = (
         const relationValue: BracketQueryRecord = {};
         for (const [opKey, opValue] of Object.entries(value)) {
           if (relationOperators.includes(opKey) && isBracketQueryRecord(opValue)) {
-            relationValue[opKey] = validateAndTransformSearchFields(opValue, searchableFields, currentPath, false, depth + 1);
+            relationValue[opKey] = validateAndTransformSearchFields(
+              opValue,
+              searchableFields,
+              currentPath,
+              false,
+              depth + 1,
+            );
           }
         }
         result[key] = relationValue;

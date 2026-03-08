@@ -2,15 +2,15 @@
  * Save coordinator - resolves variants, rewrites MJML, saves.
  */
 
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { db } from '@template/db';
-import { validateMjml } from '@template/email/validations/validateMjml';
+import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { SaveContext } from '@template/email/render/types';
+import { validateMjml } from '@template/email/validations/validateMjml';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
   mjml: string;

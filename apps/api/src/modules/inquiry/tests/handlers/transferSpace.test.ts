@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, Space, SpaceUser } from '@template/db';
-import { PlatformRole, InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -10,8 +10,8 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
-import { spaceRouter } from '#/modules/space';
 import { inquiryRouter } from '#/modules/inquiry';
+import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
@@ -29,7 +29,10 @@ describe('handler: transferSpace', () => {
     const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: org },
+    );
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
     const { entity: su } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space });
@@ -38,11 +41,19 @@ describe('handler: transferSpace', () => {
     const { entity: to2 } = await createOrganization();
     targetOrg2 = to2;
 
-    const ownerHarness = createTestApp({ mockUser: owner, mockOrganizationUsers: [ou], mockSpaceUsers: [su], mount: [(app: any) => app.route('/api/v1/space', spaceRouter)] });
+    const ownerHarness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [ou],
+      mockSpaceUsers: [su],
+      mount: [(app: any) => app.route('/api/v1/space', spaceRouter)],
+    });
     ownerFetch = ownerHarness.fetch;
     db = ownerHarness.db;
 
-    adminFetch = createTestApp({ mockUser: superadmin, mount: [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)] }).fetch;
+    adminFetch = createTestApp({
+      mockUser: superadmin,
+      mount: [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)],
+    }).fetch;
   });
 
   afterAll(async () => {
@@ -60,12 +71,14 @@ describe('handler: transferSpace', () => {
       content: {},
     });
 
-    const response = await ownerFetch(post(`/api/v1/space/${space.id}/inquiries`, {
-      type: InquiryType.transferSpace,
-      targetModel: InquiryResourceModel.Organization,
-      targetOrganizationId: targetOrg2.id,
-      content: {},
-    }));
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.transferSpace,
+        targetModel: InquiryResourceModel.Organization,
+        targetOrganizationId: targetOrg2.id,
+        content: {},
+      }),
+    );
 
     expect(response.status).toBe(409);
   });

@@ -1,0 +1,9 @@
+.turbo/
+node_modules/
+dist/
+.next/
+**/*.gen.ts
+**/*.gen.json
+**/*.generated.ts
+**/.prisma.gen
+**/.sdk.gen

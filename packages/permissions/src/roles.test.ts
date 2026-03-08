@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { greaterRole, intersectEntitlements, isSuperadmin, lesserRole, roleHierarchy } from '@template/permissions/roles/shared';
+import {
+  greaterRole,
+  intersectEntitlements,
+  isSuperadmin,
+  lesserRole,
+  roleHierarchy,
+} from '@template/permissions/roles/shared';
 
 describe('isSuperadmin', () => {
   it('returns true for superadmin', () => {

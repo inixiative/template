@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';

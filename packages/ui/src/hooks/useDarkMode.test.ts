@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
 
 describe('useDarkMode', () => {

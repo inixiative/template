@@ -1,11 +1,11 @@
-import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { Db, SpaceId } from '@template/db';
+import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
-import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
-import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 import { makeError } from '#/lib/errors';
+import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
+import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
+import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 const contentSchema = spaceContentSchema.partial();
 
@@ -31,7 +31,8 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceC
   ]);
 
   if (existingSpace) throw makeError({ status: 409, message: 'A space with this slug already exists' });
-  if (existingInquiry) throw makeError({ status: 409, message: 'An open request to update this space to this slug already exists' });
+  if (existingInquiry)
+    throw makeError({ status: 409, message: 'An open request to update this space to this slug already exists' });
 };
 
 export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {

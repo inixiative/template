@@ -1,16 +1,18 @@
 import { z } from '@hono/zod-openapi';
-import { readRoute } from '#/lib/routeTemplates';
-import { Modules } from '#/modules/modules';
 import { AuthProviderScalarSchema } from '@template/db';
+import { readRoute } from '#/lib/routeTemplates';
 import { PlatformProviderSchema } from '#/modules/authProvider/schemas/authProviderSchemas';
+import { Modules } from '#/modules/modules';
 
 const AuthProvidersResponseSchema = z.object({
   platform: z.array(PlatformProviderSchema),
-  organization: z.array(AuthProviderScalarSchema.omit({
-    encryptedSecrets: true,
-    encryptedSecretsMetadata: true,
-    encryptedSecretsKeyVersion: true,
-  })),
+  organization: z.array(
+    AuthProviderScalarSchema.omit({
+      encryptedSecrets: true,
+      encryptedSecretsMetadata: true,
+      encryptedSecretsKeyVersion: true,
+    }),
+  ),
 });
 
 export const organizationReadAuthProviderRoute = readRoute({

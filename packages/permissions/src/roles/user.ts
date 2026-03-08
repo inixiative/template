@@ -22,4 +22,3 @@ export const getUserPermissions = (
     actions: { ...baseActions, ...entitlements },
   };
 };
-

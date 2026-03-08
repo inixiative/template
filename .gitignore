@@ -168,11 +168,11 @@ apps/web/app.config.timestamp_*.js
 **/.tanstack/
 **/routeTree.gen.ts
 **/*.gen.ts
+**/*.gen.json
 **/*.generated.ts
+**/.prisma.gen
+**/.sdk.gen
 .vercel
 
 # Init script scratch files
 scripts/init/test-*.ts
-
-# Generated OpenAPI artifact
-packages/ui/openapi.json

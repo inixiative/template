@@ -1,5 +1,5 @@
-import { lowerFirst, upperFirst } from 'lodash-es';
 import { Prisma } from '@template/db/generated/client/client';
+import { lowerFirst, upperFirst } from 'lodash-es';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

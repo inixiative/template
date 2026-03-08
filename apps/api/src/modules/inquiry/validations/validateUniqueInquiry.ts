@@ -1,5 +1,5 @@
 import type { Db, OrganizationId, SpaceId, UserId } from '@template/db';
-import { InquiryType } from '@template/db/generated/client/enums';
+import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 

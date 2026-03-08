@@ -4,13 +4,14 @@ import type { AppEnv } from '#/types/appEnv';
 
 type EmptyInputOut = Record<never, never>;
 
-type ContextOut<C extends Context<AppEnv, string, Input>> = C extends Context<AppEnv, string, infer I>
-  ? I extends { out: infer O }
-    ? O extends Input['out']
-      ? O
+type ContextOut<C extends Context<AppEnv, string, Input>> =
+  C extends Context<AppEnv, string, infer I>
+    ? I extends { out: infer O }
+      ? O extends Input['out']
+        ? O
+        : EmptyInputOut
       : EmptyInputOut
-    : EmptyInputOut
-  : EmptyInputOut;
+    : EmptyInputOut;
 
 export type ValidatedContext<TTarget extends keyof ValidationTargets, TData = unknown> = Context<
   AppEnv,

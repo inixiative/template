@@ -1,6 +1,6 @@
-import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
+import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 
 type ModelName = keyof typeof ENCRYPTED_MODELS;
 type KeyName<M extends ModelName> = keyof (typeof ENCRYPTED_MODELS)[M]['keys'] & string;
@@ -29,10 +29,7 @@ const getKeyringFromEnv = (envPrefix: string): EncryptionKeyring => {
   };
 };
 
-export const encryptField = async <
-  M extends ModelName,
-  K extends KeyName<M>,
->(
+export const encryptField = async <M extends ModelName, K extends KeyName<M>>(
   modelName: M,
   keyName: K,
   record: Record<K, unknown> & Record<string, unknown>,
@@ -55,10 +52,7 @@ export const encryptField = async <
   } as EncryptedFieldPayload<K>;
 };
 
-export const decryptField = async <
-  M extends ModelName,
-  K extends KeyName<M>,
->(
+export const decryptField = async <M extends ModelName, K extends KeyName<M>>(
   modelName: M,
   keyName: K,
   record: EncryptedFieldPayload<K> & Record<string, unknown>,
@@ -75,12 +69,15 @@ export const decryptField = async <
   const version = record[fields.versionField] as number;
   const metadata = record[fields.metadataField] as { iv: string; authTag: string };
 
-  return service.decrypt({
-    ciphertext,
-    version,
-    iv: metadata.iv,
-    authTag: metadata.authTag,
-  }, aad);
+  return service.decrypt(
+    {
+      ciphertext,
+      version,
+      iv: metadata.iv,
+      authTag: metadata.authTag,
+    },
+    aad,
+  );
 };
 
 export type DecryptFieldInput<

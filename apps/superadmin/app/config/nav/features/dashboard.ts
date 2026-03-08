@@ -1,5 +1,5 @@
 import type { NavItem } from '@template/ui/components';
-import { getContextParams} from '@template/ui/lib';
+import { getContextParams } from '@template/ui/lib';
 import { Home } from 'lucide-react';
 
 export const dashboardItem: NavItem = {

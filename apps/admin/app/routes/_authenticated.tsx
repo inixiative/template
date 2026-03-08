@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { useAuthenticatedRouting } from '@template/ui/hooks';
 import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';
+import { useAuthenticatedRouting } from '@template/ui/hooks';
 import { requireAuth } from '#/guards';
 
 const AuthenticatedLayout = () => {
@@ -8,9 +8,7 @@ const AuthenticatedLayout = () => {
 
   return (
     <AppShell>
-      <ErrorBoundary>
-        {isAuthorized ? <Outlet /> : <Unauthorized />}
-      </ErrorBoundary>
+      <ErrorBoundary>{isAuthorized ? <Outlet /> : <Unauthorized />}</ErrorBoundary>
     </AppShell>
   );
 };

@@ -23,7 +23,7 @@ export {
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)
-export * from './generated/zod/scalarSchemas';
+export * from './generated/zod/scalarSchemas.gen';
 // Enum schemas and other zod types (from prisma-zod-generator)
 export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';

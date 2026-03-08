@@ -1,5 +1,5 @@
 import type { NavItem } from '@template/ui/components';
-import { Settings, User, Key, Webhook } from 'lucide-react';
+import { Key, Settings, User, Webhook } from 'lucide-react';
 
 export const settingsItem: NavItem = {
   label: 'Settings',

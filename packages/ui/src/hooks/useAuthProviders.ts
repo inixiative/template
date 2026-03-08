@@ -1,10 +1,10 @@
-import { useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useSearch } from '@tanstack/react-router';
 import {
-  authProviderReadMany,
-  organizationReadAuthProvider,
   type AuthProviderReadManyResponses,
+  authProviderReadMany,
   type OrganizationReadAuthProviderResponses,
+  organizationReadAuthProvider,
 } from '@template/ui/apiClient';
 import { apiQuery } from '@template/ui/lib';
 
@@ -26,7 +26,8 @@ export const useAuthProviders = () => {
   const organizationQuery = useQuery({
     queryKey: ['authProviders', 'org', organizationId ?? ''],
     queryFn: apiQuery((opts: Parameters<typeof organizationReadAuthProvider>[0]) =>
-      organizationReadAuthProvider({ ...opts, path: { id: organizationId! } })),
+      organizationReadAuthProvider({ ...opts, path: { id: organizationId! } }),
+    ),
     enabled: !!organizationId,
     retry: 2,
   });

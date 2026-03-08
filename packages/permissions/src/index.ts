@@ -4,7 +4,6 @@
  */
 
 export { Role } from '@template/db/generated/client/enums';
-export type { PermissionsCheck } from './types';
 // Client
 export {
   type Action,
@@ -23,7 +22,6 @@ export {
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type { ActionRule, ModelPermission, RebacSchema, RelationCheck, RuleCheck } from './rebac/types';
-
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
@@ -36,8 +34,8 @@ export {
   roleHierarchy,
   roleToStandardAction,
 } from './roles/shared';
-
 // Space permissions
 export { getSpacePermissions, spaceRoles } from './roles/space';
 // User permissions
 export { getUserPermissions, userRoles } from './roles/user';
+export type { PermissionsCheck } from './types';

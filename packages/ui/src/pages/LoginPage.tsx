@@ -1,6 +1,6 @@
 import { LoginForm } from '@template/ui/components/auth/LoginForm';
-import { useAppStore } from '@template/ui/store';
 import { navigateToSignup } from '@template/ui/lib/routeRedirect';
+import { useAppStore } from '@template/ui/store';
 
 type LoginPageProps = {
   hideSignup?: boolean;

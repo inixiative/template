@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
 import { buildBreadcrumbs } from '@template/ui/lib';
 import { useAppStore } from '@template/ui/store';
+import { useMemo } from 'react';
 
 /**
  * Hook to generate breadcrumbs for the current page.

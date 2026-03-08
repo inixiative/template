@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
-import { InquiryModelSchema } from '@template/db/zod/models';
 import { InquiryStatus } from '@template/db/generated/client/enums';
+import { InquiryModelSchema } from '@template/db/zod/models';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';

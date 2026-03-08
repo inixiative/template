@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import type { Account, Organization, Space, Token, User } from '@template/db/generated/client/client';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
-import { seeds } from '../../prisma/seeds';
 import type { SeedFile } from '../../prisma/seed';
-import type { User, Account, Organization, Space, Token } from '@template/db/generated/client/client';
+import { seeds } from '../../prisma/seeds';
 
 describe('Seed System', () => {
   describe('UUID Validation', () => {

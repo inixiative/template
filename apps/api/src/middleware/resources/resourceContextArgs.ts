@@ -11,7 +11,7 @@ export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
       targetUser: true,
       targetOrganization: true,
       targetSpace: true,
-    }
+    },
   },
   webhookSubscription: {
     include: {
@@ -23,13 +23,13 @@ export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
 export type ResourcePayloadMap = {
   inquiry: Prisma.InquiryGetPayload<{
     include: {
-      sourceUser: true,
-      sourceOrganization: true,
-      sourceSpace: true,
-      targetUser: true,
-      targetOrganization: true,
-      targetSpace: true,
-    }
+      sourceUser: true;
+      sourceOrganization: true;
+      sourceSpace: true;
+      targetUser: true;
+      targetOrganization: true;
+      targetSpace: true;
+    };
   }>;
   webhookSubscription: Prisma.WebhookSubscriptionGetPayload<{
     include: { webhookEvents: { take: 10; orderBy: { createdAt: 'desc' } } };

@@ -1,8 +1,8 @@
-import { getResource } from '#/lib/context/getResource';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { getPlatformProviders } from '#/lib/auth/platformProviders';
+import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadAuthProviderRoute } from '#/modules/organization/routes/organizationReadAuthProvider';
-import { check, rebacSchema } from '@template/permissions/rebac';
 
 export const organizationReadAuthProviderController = makeController(
   organizationReadAuthProviderRoute,

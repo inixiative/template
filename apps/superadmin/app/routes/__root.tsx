@@ -1,8 +1,8 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
 import { useDarkMode, useLanguage, usePageMeta, useThemePersistence } from '@template/ui/hooks';
-import { useLayoutEffect } from 'react';
 import { useAppStore } from '@template/ui/store';
+import { useLayoutEffect } from 'react';
 import { navConfig } from '#/config/nav';
 
 const RootComponent = () => {

@@ -34,11 +34,7 @@ export const Table = <T,>({
   if (!shouldShow) return null;
 
   if (data.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        {emptyMessage || 'No data available'}
-      </div>
-    );
+    return <div className="text-center py-8 text-muted-foreground">{emptyMessage || 'No data available'}</div>;
   }
 
   return (
@@ -48,10 +44,7 @@ export const Table = <T,>({
           <thead className="bg-muted/50 border-b">
             <tr>
               {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className="text-left px-4 py-3 text-sm font-medium text-muted-foreground"
-                >
+                <th key={column.key} className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
                   {column.label}
                 </th>
               ))}

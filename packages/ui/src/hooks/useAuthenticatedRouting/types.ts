@@ -1,6 +1,6 @@
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
-import type { TenantContext, PageContext } from '@template/ui/store/types/tenant';
 import type { AppStore } from '@template/ui/store/types';
+import type { PageContext, TenantContext } from '@template/ui/store/types/tenant';
 
 export type RoutingSearchParams = {
   organizationId: string | null;

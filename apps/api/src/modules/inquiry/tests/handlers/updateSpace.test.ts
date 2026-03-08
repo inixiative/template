@@ -28,7 +28,10 @@ describe('handler: updateSpace — validate', () => {
     const { entity: owner } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou, context: ouCtx } = await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+    const { entity: ou, context: ouCtx } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: org },
+    );
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
     const { entity: su } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space });
@@ -37,7 +40,12 @@ describe('handler: updateSpace — validate', () => {
     freshSpace = fs;
     const { entity: fsu } = await createSpaceUser({ role: 'owner' }, { ...ouCtx, space: freshSpace });
 
-    const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [ou], mockSpaceUsers: [spaceUser, fsu], mount });
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [ou],
+      mockSpaceUsers: [spaceUser, fsu],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -49,11 +57,13 @@ describe('handler: updateSpace — validate', () => {
   it('rejects if another space in the org already has that slug', async () => {
     await createSpace({ slug: 'taken-slug' }, { organization: org });
 
-    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
-      type: InquiryType.updateSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { slug: 'taken-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { slug: 'taken-slug' },
+      }),
+    );
 
     expect(response.status).toBe(409);
   });
@@ -68,22 +78,26 @@ describe('handler: updateSpace — validate', () => {
       content: { slug: 'pending-update-slug' },
     });
 
-    const response = await fetch(post(`/api/v1/space/${space.id}/inquiries`, {
-      type: InquiryType.updateSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { slug: 'pending-update-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { slug: 'pending-update-slug' },
+      }),
+    );
 
     expect(response.status).toBe(409);
   });
 
   it('allows creating an updateSpace inquiry with a unique slug', async () => {
     // Use a fresh space so no prior open updateSpace inquiry blocks the unique check
-    const response = await fetch(post(`/api/v1/space/${freshSpace.id}/inquiries`, {
-      type: InquiryType.updateSpace,
-      targetModel: InquiryResourceModel.admin,
-      content: { slug: 'totally-new-slug' },
-    }));
+    const response = await fetch(
+      post(`/api/v1/space/${freshSpace.id}/inquiries`, {
+        type: InquiryType.updateSpace,
+        targetModel: InquiryResourceModel.admin,
+        content: { slug: 'totally-new-slug' },
+      }),
+    );
 
     expect(response.status).toBe(201);
   });

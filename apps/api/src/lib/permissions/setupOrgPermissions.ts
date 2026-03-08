@@ -7,8 +7,8 @@ import {
   type Role,
 } from '@template/permissions';
 import type { Context } from 'hono';
-import type { AppEnv } from '#/types/appEnv';
 import { validateRole } from '#/lib/permissions/validateRole';
+import type { AppEnv } from '#/types/appEnv';
 
 /**
  * Set up permissions for user's orgs at auth time.
@@ -52,9 +52,7 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   // User token or session → all orgs (with token restrictions if present)
   for (const orgUser of orgUsers) {
     const orgId = orgUser.organizationId as OrganizationId;
-    const role = token
-      ? lesserRole(validateRole(orgUser.role), validateRole(token.role))
-      : validateRole(orgUser.role);
+    const role = token ? lesserRole(validateRole(orgUser.role), validateRole(token.role)) : validateRole(orgUser.role);
     const entitlements = token
       ? intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements)
       : (orgUser.entitlements as Entitlements);

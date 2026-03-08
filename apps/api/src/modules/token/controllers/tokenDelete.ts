@@ -1,8 +1,8 @@
 import type { AccessorName } from '@template/db';
 import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { makeError } from '#/lib/errors';
 import { getResource } from '#/lib/context/getResource';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { tokenDeleteRoute } from '#/modules/token/routes/tokenDelete';
 

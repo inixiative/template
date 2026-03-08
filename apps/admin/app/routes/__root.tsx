@@ -1,8 +1,8 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
 import { useDarkMode, useLanguage, usePageMeta, useSpaceTheme, useThemePersistence } from '@template/ui/hooks';
-import { useLayoutEffect } from 'react';
 import { useAppStore } from '@template/ui/store';
+import { useLayoutEffect } from 'react';
 import { navConfig } from '#/config/nav';
 
 const RootComponent = () => {
@@ -26,12 +26,12 @@ const RootComponent = () => {
 
   // TODO: Remove mock theme once database schema is ready
   const mockSpaceTheme = {
-    primary: "262 80% 46%",      // Purple
-    secondary: "142 76% 46%",    // Green
-    tertiary: "199 89% 48%",     // Blue
-    quaternary: "174 72% 56%",   // Teal
-    accent: "38 92% 50%",        // Orange
-    logo: "https://via.placeholder.com/200x50/8b5cf6/ffffff?text=AdminLogo",
+    primary: '262 80% 46%', // Purple
+    secondary: '142 76% 46%', // Green
+    tertiary: '199 89% 48%', // Blue
+    quaternary: '174 72% 56%', // Teal
+    accent: '38 92% 50%', // Orange
+    logo: 'https://via.placeholder.com/200x50/8b5cf6/ffffff?text=AdminLogo',
   };
 
   const spaceTheme = pageSpace ? mockSpaceTheme : null;

@@ -1,22 +1,22 @@
 import {
+  type AuthProviderDeleteData,
+  type AuthProviderUpdateData,
+  authProviderDelete,
+  authProviderUpdate,
   type OrganizationCreateAuthProviderData,
   type OrganizationReadAuthProviderResponses,
   organizationCreateAuthProvider,
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
-  type AuthProviderDeleteData,
-  type AuthProviderUpdateData,
-  authProviderDelete,
-  authProviderUpdate,
 } from '@template/ui/apiClient';
+import { Badge, Button, Table } from '@template/ui/components';
+import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
+import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
-import { MasterDetailLayout, DetailPanel } from '@template/ui/components/layout';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
-import { Badge, Button, Table } from '@template/ui/components';
-import { Trash2, Plus, Pencil } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type AuthProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];
@@ -29,7 +29,8 @@ export const OrganizationAuthProvidersPage = () => {
   const { data, isLoading } = useQuery({
     queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
     queryFn: apiQuery((requestOptions: Parameters<typeof organizationReadAuthProvider>[0]) =>
-      organizationReadAuthProvider({ ...requestOptions, path: { id: organizationId! } })),
+      organizationReadAuthProvider({ ...requestOptions, path: { id: organizationId! } }),
+    ),
     enabled: !!organizationId,
   });
 
@@ -37,21 +38,24 @@ export const OrganizationAuthProvidersPage = () => {
 
   const deleteMutation = useOptimisticListMutation<AuthProvider, Omit<AuthProviderDeleteData, 'url'>>({
     mutationFn: apiMutation((requestOptions: Parameters<typeof authProviderDelete>[0]) =>
-      authProviderDelete(requestOptions)),
+      authProviderDelete(requestOptions),
+    ),
     queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
     operation: 'delete',
   });
 
   const createMutation = useOptimisticListMutation<AuthProvider, Omit<OrganizationCreateAuthProviderData, 'url'>>({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreateAuthProvider>[0]) =>
-      organizationCreateAuthProvider(requestOptions)),
+      organizationCreateAuthProvider(requestOptions),
+    ),
     queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
     operation: 'create',
   });
 
   const updateMutation = useOptimisticListMutation<AuthProvider, Omit<AuthProviderUpdateData, 'url'>>({
     mutationFn: apiMutation((requestOptions: Parameters<typeof authProviderUpdate>[0]) =>
-      authProviderUpdate(requestOptions)),
+      authProviderUpdate(requestOptions),
+    ),
     queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
     operation: 'update',
   });
@@ -78,9 +82,7 @@ export const OrganizationAuthProvidersPage = () => {
     {
       key: 'type',
       label: 'Type',
-      render: (item: AuthProvider) => (
-        <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>
-      ),
+      render: (item: AuthProvider) => <span className="text-muted-foreground">{getTypeLabel(item.type)}</span>,
     },
     {
       key: 'provider',
@@ -91,9 +93,7 @@ export const OrganizationAuthProvidersPage = () => {
       key: 'status',
       label: 'Status',
       render: (item: AuthProvider) => (
-        <Badge variant={item.enabled ? 'default' : 'secondary'}>
-          {item.enabled ? 'Enabled' : 'Disabled'}
-        </Badge>
+        <Badge variant={item.enabled ? 'default' : 'secondary'}>{item.enabled ? 'Enabled' : 'Disabled'}</Badge>
       ),
     },
     {
@@ -111,11 +111,7 @@ export const OrganizationAuthProvidersPage = () => {
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
-          >
+          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>

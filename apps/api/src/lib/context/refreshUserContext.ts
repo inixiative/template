@@ -1,7 +1,7 @@
 import type { Db } from '@template/db';
 import type { Context } from 'hono';
-import { makeError } from '#/lib/errors';
 import { setUserContext } from '#/lib/context/setUserContext';
+import { makeError } from '#/lib/errors';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 

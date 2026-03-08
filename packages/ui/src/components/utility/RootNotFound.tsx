@@ -1,5 +1,5 @@
-import { useAppStore } from '@template/ui/store';
 import { NotFound } from '@template/ui/components/utility/NotFound';
+import { useAppStore } from '@template/ui/store';
 
 type RootNotFoundProps = {
   title?: string;
@@ -8,7 +8,7 @@ type RootNotFoundProps = {
 
 export const RootNotFound = ({
   title = 'Page not found',
-  description = 'This route does not exist.'
+  description = 'This route does not exist.',
 }: RootNotFoundProps = {}) => {
   const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
 
@@ -17,11 +17,6 @@ export const RootNotFound = ({
   };
 
   return (
-    <NotFound
-      title={title}
-      description={description}
-      actionLabel="Go to dashboard"
-      onAction={handleGoToDashboard}
-    />
+    <NotFound title={title} description={description} actionLabel="Go to dashboard" onAction={handleGoToDashboard} />
   );
 };

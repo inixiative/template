@@ -1,5 +1,5 @@
 import type { Db, Prisma } from '@template/db';
-import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import type { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
 import type { BaseResolution } from '#/modules/inquiry/handlers/schemas';
 

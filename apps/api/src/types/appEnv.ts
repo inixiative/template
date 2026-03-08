@@ -1,5 +1,5 @@
-import type { Db, Prisma } from '@template/db';
 import type { RouteConfig } from '@hono/zod-openapi';
+import type { Db, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,

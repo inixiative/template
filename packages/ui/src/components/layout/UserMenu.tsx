@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useAppStore } from '@template/ui/store';
 import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/primitives/Avatar';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
@@ -12,7 +10,9 @@ import {
 } from '@template/ui/components/primitives/DropdownMenu';
 import { Input } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
+import { useAppStore } from '@template/ui/store';
 import { LogOut, Settings, ShieldAlert, User } from 'lucide-react';
+import { useState } from 'react';
 
 export type UserMenuProps = {
   className?: string;
@@ -58,7 +58,7 @@ export const UserMenu = ({ className }: UserMenuProps) => {
             <div
               className={cn('text-xs truncate', isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground')}
             >
-              {isSpoofing ? 'Spoofing' : user?.email ?? ''}
+              {isSpoofing ? 'Spoofing' : (user?.email ?? '')}
             </div>
           </div>
         </div>

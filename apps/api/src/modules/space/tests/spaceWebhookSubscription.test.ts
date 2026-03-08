@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, Space, SpaceUser, User, WebhookSubscription } from '@template/db';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser, createSpace, createWebhookSubscription, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createWebhookSubscription,
+  getNextSeq,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';

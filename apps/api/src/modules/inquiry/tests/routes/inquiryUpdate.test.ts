@@ -50,7 +50,9 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'owner' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }));
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -69,7 +71,9 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'owner' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }));
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }),
+    );
     expect(response.status).toBe(200);
   });
 
@@ -89,7 +93,9 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await adminFetch(patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }));
+    const response = await adminFetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }),
+    );
     expect(response.status).toBe(403);
   });
 

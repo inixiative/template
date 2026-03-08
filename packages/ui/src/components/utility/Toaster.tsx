@@ -8,11 +8,5 @@ import { Toaster as SonnerToaster } from 'sonner';
  * Uses app-level CSS color variables (--error, --success, --warning, --info)
  */
 export const Toaster = () => {
-  return (
-    <SonnerToaster
-      position="top-right"
-      closeButton
-      richColors
-    />
-  );
+  return <SonnerToaster position="top-right" closeButton richColors />;
 };

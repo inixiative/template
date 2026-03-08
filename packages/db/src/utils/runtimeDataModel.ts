@@ -9,10 +9,10 @@
  * to extract @relation(fields: [...], references: [...]) for composite FKs.
  */
 
+import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -127,7 +127,8 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
     const fieldFks = new Map<string, RelationFkMapping>();
 
     // Match: fieldName Type @relation(optional "name", fields: [...], references: [...], ...)
-    const relationRegex = /(\w+)\s+\w+\??\s+@relation\s*\(\s*(?:"[^"]*",\s*)?fields:\s*\[([^\]]+)\]\s*,\s*references:\s*\[([^\]]+)\]/g;
+    const relationRegex =
+      /(\w+)\s+\w+\??\s+@relation\s*\(\s*(?:"[^"]*",\s*)?fields:\s*\[([^\]]+)\]\s*,\s*references:\s*\[([^\]]+)\]/g;
     let relMatch;
 
     while ((relMatch = relationRegex.exec(modelBody)) !== null) {

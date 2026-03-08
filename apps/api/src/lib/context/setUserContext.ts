@@ -1,10 +1,10 @@
+import type { UserWithRelations } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';
 import { isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
-import type { UserWithRelations } from '@template/db';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {

@@ -7,8 +7,8 @@ import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { adminInquiryCreateRoute } from '#/modules/inquiry/routes/adminInquiryCreate';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
-import { validateInquiryHandler } from '#/modules/inquiry/validations/validateInquiryHandler';
 import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
+import { validateInquiryHandler } from '#/modules/inquiry/validations/validateInquiryHandler';
 
 const source = { sourceModel: InquiryResourceModel.admin };
 
@@ -22,8 +22,15 @@ export const adminInquiryCreateController = makeController(adminInquiryCreateRou
   validateInquiryHandler(handler, source.sourceModel, body.targetModel);
   const target = await resolveInquiryTarget(c);
 
-  const partial = await hydrate(db, 'inquiry', { id: '', type: body.type, content, ...source, ...target } as HydratedRecord);
-  if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ status: 403, message: 'Access denied' });
+  const partial = await hydrate(db, 'inquiry', {
+    id: '',
+    type: body.type,
+    content,
+    ...source,
+    ...target,
+  } as HydratedRecord);
+  if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
+    throw makeError({ status: 403, message: 'Access denied' });
 
   await validateInquiryPreCreate(db, handler, body.type, source, target, content);
 

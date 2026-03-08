@@ -2,8 +2,8 @@
  * Cascade lookup for components: Space → Org → default (based on context)
  */
 
-import type { EmailComponent } from '@template/db/generated/client/client';
 import { db } from '@template/db';
+import type { EmailComponent } from '@template/db/generated/client/client';
 import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
 import type { SaveContext } from '@template/email/render/types';
 

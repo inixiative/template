@@ -928,7 +928,7 @@ API client is auto-generated from OpenAPI spec:
 
 ```bash
 cd packages/ui
-bun run generate:api  # Generates apiClient/ from openapi.json
+bun run generate:sdk  # Generates apiClient/ from openapi.gen.json
 ```
 
 **Location:** `packages/ui/src/apiClient/`

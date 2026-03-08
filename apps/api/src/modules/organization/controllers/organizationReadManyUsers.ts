@@ -1,4 +1,4 @@
-import { Prisma } from '@template/db';
+import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';

@@ -7,8 +7,8 @@ import {
   type Role,
 } from '@template/permissions';
 import type { Context } from 'hono';
-import type { AppEnv } from '#/types/appEnv';
 import { validateRole } from '#/lib/permissions/validateRole';
+import type { AppEnv } from '#/types/appEnv';
 
 /**
  * Set up permissions for user's spaces at auth time.
@@ -22,11 +22,7 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   // Space token → single space, token permissions only
   if (token?.ownerModel === 'Space' && token.spaceId) {
     await permix.setup(
-      getSpacePermissions(
-        validateRole(token.role),
-        token.spaceId as SpaceId,
-        token.entitlements as Entitlements,
-      ),
+      getSpacePermissions(validateRole(token.role), token.spaceId as SpaceId, token.entitlements as Entitlements),
     );
     return;
   }

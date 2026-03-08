@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
 
 const pureDir = join(import.meta.dir, '../src/generated/zod/schemas/variants/pure');
-const outFile = join(import.meta.dir, '../src/generated/zod/scalarSchemas.ts');
+const outFile = join(import.meta.dir, '../src/generated/zod/scalarSchemas.gen.ts');
 const indexFile = join(import.meta.dir, '../src/generated/zod/schemas/variants/pure/index.ts');
 
 const files = readdirSync(pureDir).filter((f) => f.endsWith('.pure.ts'));
@@ -47,9 +47,15 @@ writeFileSync(outFile, output);
 
 // Update the pure index to re-export scalar schemas
 let indexContent = readFileSync(indexFile, 'utf-8');
-const exportLine = "export * from '../../../scalarSchemas';";
+const oldExportLine = "export * from '../../../scalarSchemas';";
+const exportLine = "export * from '../../../scalarSchemas.gen';";
+
+if (indexContent.includes(oldExportLine)) {
+  indexContent = indexContent.replace(oldExportLine, exportLine);
+}
+
 if (!indexContent.includes(exportLine)) {
-  indexContent = indexContent.trimEnd() + '\n' + exportLine + '\n';
+  indexContent = `${indexContent.trimEnd()}\n${exportLine}\n`;
   writeFileSync(indexFile, indexContent);
 }
 

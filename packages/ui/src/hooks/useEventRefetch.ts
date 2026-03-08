@@ -1,7 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query';
 import { type AppEventPayload, useAppEvents } from '@template/ui/hooks/useAppEvents';
-import { useEffect, useRef } from 'react';
 import { useAppStore } from '@template/ui/store';
+import { useEffect, useRef } from 'react';
 
 type EventMatcher = string | RegExp | ((event: AppEventPayload) => boolean);
 

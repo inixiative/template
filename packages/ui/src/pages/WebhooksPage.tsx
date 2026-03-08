@@ -1,29 +1,29 @@
 import {
-  meReadManyWebhookSubscriptions,
-  meReadManyWebhookSubscriptionsQueryKey,
+  type MeCreateWebhookSubscriptionData,
   type MeReadManyWebhookSubscriptionsResponse,
   meCreateWebhookSubscription,
-  organizationReadManyWebhookSubscriptions,
-  organizationReadManyWebhookSubscriptionsQueryKey,
+  meReadManyWebhookSubscriptions,
+  meReadManyWebhookSubscriptionsQueryKey,
+  type OrganizationCreateWebhookSubscriptionData,
   type OrganizationReadManyWebhookSubscriptionsResponse,
   organizationCreateWebhookSubscription,
-  spaceReadManyWebhookSubscriptions,
-  spaceReadManyWebhookSubscriptionsQueryKey,
+  organizationReadManyWebhookSubscriptions,
+  organizationReadManyWebhookSubscriptionsQueryKey,
+  type SpaceCreateWebhookSubscriptionData,
   type SpaceReadManyWebhookSubscriptionsResponse,
   spaceCreateWebhookSubscription,
-  webhookSubscriptionDelete,
-  type MeCreateWebhookSubscriptionData,
-  type OrganizationCreateWebhookSubscriptionData,
-  type SpaceCreateWebhookSubscriptionData,
+  spaceReadManyWebhookSubscriptions,
+  spaceReadManyWebhookSubscriptionsQueryKey,
   type WebhookSubscriptionDeleteData,
+  webhookSubscriptionDelete,
 } from '@template/ui/apiClient';
+import { Button, Table } from '@template/ui/components';
+import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { MasterDetailLayout, DetailPanel } from '@template/ui/components/layout';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { Button, Table } from '@template/ui/components';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -44,19 +44,22 @@ export const WebhooksPage = () => {
         return {
           queryKey: meReadManyWebhookSubscriptionsQueryKey(),
           queryFn: apiQuery((opts: Parameters<typeof meReadManyWebhookSubscriptions>[0]) =>
-            meReadManyWebhookSubscriptions(opts)),
+            meReadManyWebhookSubscriptions(opts),
+          ),
         };
       case 'organization':
         return {
           queryKey: organizationReadManyWebhookSubscriptionsQueryKey({ path: { id: organizationId! } }),
           queryFn: apiQuery((opts: Parameters<typeof organizationReadManyWebhookSubscriptions>[0]) =>
-            organizationReadManyWebhookSubscriptions({ ...opts, path: { id: organizationId! } })),
+            organizationReadManyWebhookSubscriptions({ ...opts, path: { id: organizationId! } }),
+          ),
         };
       case 'space':
         return {
           queryKey: spaceReadManyWebhookSubscriptionsQueryKey({ path: { id: spaceId! } }),
           queryFn: apiQuery((opts: Parameters<typeof spaceReadManyWebhookSubscriptions>[0]) =>
-            spaceReadManyWebhookSubscriptions({ ...opts, path: { id: spaceId! } })),
+            spaceReadManyWebhookSubscriptions({ ...opts, path: { id: spaceId! } }),
+          ),
         };
     }
   })();
@@ -84,15 +87,17 @@ export const WebhooksPage = () => {
     mutationFn: async (vars) => {
       switch (context.type) {
         case 'user':
-          return apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) => meCreateWebhookSubscription(opts))(
-            vars as Omit<MeCreateWebhookSubscriptionData, 'url'>,
-          );
+          return apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) =>
+            meCreateWebhookSubscription(opts),
+          )(vars as Omit<MeCreateWebhookSubscriptionData, 'url'>);
         case 'organization':
           return apiMutation((opts: Parameters<typeof organizationCreateWebhookSubscription>[0]) =>
-            organizationCreateWebhookSubscription(opts))(vars as Omit<OrganizationCreateWebhookSubscriptionData, 'url'>);
+            organizationCreateWebhookSubscription(opts),
+          )(vars as Omit<OrganizationCreateWebhookSubscriptionData, 'url'>);
         case 'space':
           return apiMutation((opts: Parameters<typeof spaceCreateWebhookSubscription>[0]) =>
-            spaceCreateWebhookSubscription(opts))(vars as Omit<SpaceCreateWebhookSubscriptionData, 'url'>);
+            spaceCreateWebhookSubscription(opts),
+          )(vars as Omit<SpaceCreateWebhookSubscriptionData, 'url'>);
       }
     },
     queryKey: endpoints.queryKey,
@@ -108,17 +113,13 @@ export const WebhooksPage = () => {
     {
       key: 'model',
       label: 'Model',
-      render: (item: WebhookSubscription) => (
-        <span className="text-muted-foreground">{item.model}</span>
-      ),
+      render: (item: WebhookSubscription) => <span className="text-muted-foreground">{item.model}</span>,
     },
     {
       key: 'createdAt',
       label: 'Created',
       render: (item: WebhookSubscription) => (
-        <span className="text-muted-foreground">
-          {new Date(item.createdAt).toLocaleDateString()}
-        </span>
+        <span className="text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
       ),
     },
     {
@@ -126,11 +127,7 @@ export const WebhooksPage = () => {
       label: '',
       render: (item: WebhookSubscription) => (
         <div className="flex justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
-          >
+          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>

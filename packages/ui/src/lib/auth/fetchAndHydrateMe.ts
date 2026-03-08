@@ -1,7 +1,7 @@
-import { meRead, type MeReadResponses } from '@template/ui/apiClient';
-import { keyBy } from 'lodash-es';
-import type { AppStore } from '@template/ui/store/types';
+import { type MeReadResponses, meRead } from '@template/ui/apiClient';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import type { AppStore } from '@template/ui/store/types';
+import { keyBy } from 'lodash-es';
 
 type MeData = MeReadResponses[200]['data'];
 

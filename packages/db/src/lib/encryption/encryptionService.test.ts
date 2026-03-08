@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
 import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 
@@ -24,7 +24,9 @@ describe('EncryptionService', () => {
 
     it('rejects keyring with invalid current key length', () => {
       const shortKey = Buffer.from('short', 'utf8').toString('base64');
-      expect(() => new EncryptionService({ currentVersion: 1, currentKey: shortKey })).toThrow('Key must be exactly 32 bytes');
+      expect(() => new EncryptionService({ currentVersion: 1, currentKey: shortKey })).toThrow(
+        'Key must be exactly 32 bytes',
+      );
     });
 
     it('rejects keyring with invalid previous key length', () => {

@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
 import { useAppStore } from '@template/ui/store';
 import type { PageContext } from '@template/ui/store/types/tenant';
+import { useEffect, useMemo } from 'react';
 
 /**
  * Sets page title and meta description from cached route match.
@@ -25,9 +25,7 @@ export const usePageMeta = (): { title: string; description: string } => {
     let title;
     if (currentRouteMatch.item.title) {
       const titleValue = currentRouteMatch.item.title;
-      title = typeof titleValue === 'function'
-        ? titleValue(context, pageContext)
-        : titleValue;
+      title = typeof titleValue === 'function' ? titleValue(context, pageContext) : titleValue;
     } else {
       // Fallback to breadcrumb chain
       const labels = currentRouteMatch.chain.map((item) => {
@@ -51,9 +49,7 @@ export const usePageMeta = (): { title: string; description: string } => {
     let description = appDescription;
     if (currentRouteMatch.item.description) {
       const descriptionValue = currentRouteMatch.item.description;
-      description = typeof descriptionValue === 'function'
-        ? descriptionValue(context, pageContext)
-        : descriptionValue;
+      description = typeof descriptionValue === 'function' ? descriptionValue(context, pageContext) : descriptionValue;
     }
 
     return { title, description };

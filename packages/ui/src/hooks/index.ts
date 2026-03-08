@@ -1,5 +1,6 @@
 export { type AppEventPayload, useAppEvents } from './useAppEvents';
-export { useAuthProviders, type AuthProvider } from './useAuthProviders';
+export { useAuthenticatedRouting } from './useAuthenticatedRouting';
+export { type AuthProvider, useAuthProviders } from './useAuthProviders';
 export {
   AuthStrategyProvider,
   detectAuthStrategy,
@@ -10,10 +11,9 @@ export {
   isEmbedded,
   useAuthStrategy,
 } from './useAuthStrategy';
-export { useAuthenticatedRouting } from './useAuthenticatedRouting';
 export { useBreadcrumbs } from './useBreadcrumbs';
-export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useDarkMode } from './useDarkMode';
+export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
 export { useLanguage } from './useLanguage';
 export { useMediaQuery } from './useMediaQuery';

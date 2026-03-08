@@ -75,6 +75,6 @@ export const createPermissions = (): Permix => {
       userId = id;
     },
     getUserId: () => userId,
-    getJSON: () => permix.getJSON() as Record<string, Record<string, boolean>> | null,
+    getJSON: () => permix.dehydrate() as Record<string, Record<string, boolean>>,
   };
 };

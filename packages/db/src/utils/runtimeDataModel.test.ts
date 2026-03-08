@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { clearRuntimeCaches, getAccessorRelations, getModelRelations, getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
+import {
+  clearRuntimeCaches,
+  getAccessorRelations,
+  getModelRelations,
+  getRuntimeDataModel,
+} from '@template/db/utils/runtimeDataModel';
 
 describe('getRuntimeDataModel', () => {
   beforeEach(() => {

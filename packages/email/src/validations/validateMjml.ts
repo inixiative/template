@@ -2,8 +2,8 @@
  * Validate MJML syntax. Throws MjmlValidationError if invalid.
  */
 
-import mjml2html from 'mjml';
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
+import mjml2html from 'mjml';
 
 export const validateMjml = (mjml: string): void => {
   const result = mjml2html(mjml, { validationLevel: 'soft' });

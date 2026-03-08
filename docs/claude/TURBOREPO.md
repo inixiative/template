@@ -115,13 +115,15 @@ Generated files are excluded from task inputs to prevent infinite regeneration l
   "local": {
     "inputs": [
       "src/**/*.ts",
-      "!openapi.local.json",  // ❌ Don't watch generated OpenAPI spec
+      "!openapi.local.gen.json",  // ❌ Don't watch generated OpenAPI spec
       "../../packages/shared/src/**/*.ts",
       "!../../packages/shared/src/apiClient/**"  // ❌ Don't watch generated SDK
     ]
   }
 }
 ```
+
+Template-owned generated files should use `.gen.` in the filename so they can be ignored consistently by git, lint, search, and task inputs. Keep Prisma-owned generated internals separate from this rule unless the upstream generator already emits `.gen.` names.
 
 ## Caching
 

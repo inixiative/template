@@ -1,5 +1,5 @@
-import type { TenantContext } from '@template/ui/store/types/tenant';
 import type { RoutingSearchParams, UrlSearchParamUpdates } from '@template/ui/hooks/useAuthenticatedRouting/types';
+import type { TenantContext } from '@template/ui/store/types/tenant';
 
 export type BuildSearchParamUpdatesInput = {
   searchParams: RoutingSearchParams;
@@ -21,7 +21,10 @@ export const buildSearchParamUpdates = ({
   } else if (context.type === 'organization' && context.organization?.id !== searchParams.organizationId) {
     updates.org = context.organization!.id;
     updates.space = null;
-  } else if ((context.type === 'user' || context.type === 'public') && (searchParams.organizationId || searchParams.spaceId)) {
+  } else if (
+    (context.type === 'user' || context.type === 'public') &&
+    (searchParams.organizationId || searchParams.spaceId)
+  ) {
     updates.org = null;
     updates.space = null;
   }

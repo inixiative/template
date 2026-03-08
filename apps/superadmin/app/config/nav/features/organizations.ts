@@ -1,5 +1,5 @@
 import type { NavItem } from '@template/ui/components';
-import { getContextParams} from '@template/ui/lib';
+import { getContextParams } from '@template/ui/lib';
 import { Building2 } from 'lucide-react';
 
 export const organizationsItem: NavItem = {

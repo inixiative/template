@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { autoRegisterRoutes, autoRegisterAdminRoutes } from '#/lib/utils/autoRegisterRoutes';
+import { autoRegisterAdminRoutes, autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import type { AppEnv } from '#/types/appEnv';
 
 export const spaceRouter = new OpenAPIHono<AppEnv>();

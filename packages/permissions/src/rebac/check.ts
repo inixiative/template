@@ -1,9 +1,20 @@
 import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord } from '@template/db';
-import { isNil } from 'lodash-es';
 import type { Action, Permix } from '@template/permissions/client';
-import { relationTargets } from '@template/permissions/rebac/relationTargetsGen';
+import { prismaMap } from '@template/permissions/rebac/prismaMap.gen';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
+import { isNil, lowerFirst, upperFirst } from 'lodash-es';
+
+const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: string): AccessorName | null => {
+  const modelEntry = prismaMap[upperFirst(sourceAccessor) as keyof typeof prismaMap];
+  if (!modelEntry) return null;
+
+  const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[relationName];
+  if (!field || field.kind !== 'object') return null;
+  if (!field.type) return null;
+
+  return lowerFirst(field.type) as AccessorName;
+};
 
 /**
  * Check if permix grants access via ReBAC schema traversal.
@@ -43,7 +54,7 @@ export const check = (
     for (const segment of segments) {
       const related = current[segment] as HydratedRecord | null | undefined;
       if (!related) return false;
-      const targetModel = relationTargets[currentModel]?.[segment];
+      const targetModel = getRelationTargetAccessor(currentModel, segment);
       if (!targetModel) return false;
       current = related;
       currentModel = targetModel;

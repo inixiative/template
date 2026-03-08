@@ -1,8 +1,8 @@
-import { z } from 'zod';
-import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { OrganizationId, SpaceId } from '@template/db';
-import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
+import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { z } from 'zod';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
+import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 type TransferSpaceContent = Record<string, never>;
 

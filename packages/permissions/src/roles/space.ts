@@ -10,11 +10,7 @@ export const spaceRoles = {
   viewer: { space: { read: true } },
 } as const;
 
-export const getSpacePermissions = (
-  role: Role,
-  spaceId: SpaceId,
-  entitlements?: Entitlements,
-): PermissionEntry => {
+export const getSpacePermissions = (role: Role, spaceId: SpaceId, entitlements?: Entitlements): PermissionEntry => {
   const baseActions = spaceRoles[role].space;
   return {
     resource: 'space',
@@ -22,4 +18,3 @@ export const getSpacePermissions = (
     actions: { ...baseActions, ...entitlements },
   };
 };
-

@@ -1,9 +1,8 @@
-import { CreateTokenModal } from '@template/ui/components';
+import { Button, Card, CardContent, CardHeader, CardTitle, CreateTokenModal, Table } from '@template/ui/components';
 import { checkPermission } from '@template/ui/hooks';
-import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { useAppStore } from '@template/ui/store';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAppStore } from '@template/ui/store';
 
 type Token = {
   id: string;

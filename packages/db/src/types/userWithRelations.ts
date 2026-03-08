@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
 import {
   OrganizationScalarSchema,
@@ -6,7 +5,8 @@ import {
   SpaceScalarSchema,
   SpaceUserScalarSchema,
   UserScalarSchema,
-} from '@template/db/generated/zod/scalarSchemas';
+} from '@template/db/generated/zod/scalarSchemas.gen';
+import { z } from 'zod';
 
 export type UserWithRelations = User & {
   organizationUsers: OrganizationUser[];

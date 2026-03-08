@@ -1,7 +1,7 @@
+import type { RoutingSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/types';
 import type { SearchInput } from '@template/ui/lib/searchParams';
 import { readSearchParam } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
-import type { RoutingSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/types';
 
 export type SyncStoreFromSearchParamsInput = {
   searchParams: RoutingSearchParams;

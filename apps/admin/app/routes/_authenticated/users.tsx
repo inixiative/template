@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { OrganizationUsersPage } from '@template/ui/pages';
 import { Unauthorized } from '@template/ui/components';
+import { OrganizationUsersPage } from '@template/ui/pages';
 import { useAppStore } from '@template/ui/store';
 
 export const Route = createFileRoute('/_authenticated/users')({

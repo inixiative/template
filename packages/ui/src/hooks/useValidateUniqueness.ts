@@ -1,7 +1,7 @@
 import { organizationRead, spaceRead } from '@template/ui/apiClient';
+import { useQuery } from '@template/ui/hooks/useQuery';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import { useAppStore } from '@template/ui/store';
-import { useQuery } from '@template/ui/hooks/useQuery';
 
 type Model = 'organization' | 'space';
 
@@ -32,16 +32,14 @@ export const useValidateUniqueness = (
       const { auth } = useAppStore.getState();
       const reader = modelReaders[model];
       const params: LookupOptions =
-        !field || field === 'id'
-          ? { path: { id: value } }
-          : { path: { id: value }, query: { lookup: field } };
+        !field || field === 'id' ? { path: { id: value } } : { path: { id: value }, query: { lookup: field } };
 
       // Use throwOnError: false so we can inspect response.status
       // (throwOnError: true throws the parsed JSON body which has no .status field)
-      const result = await apiFetchInternal(
+      const result = (await apiFetchInternal(
         (requestOptions: LookupOptions) => reader({ ...params, ...requestOptions }),
         { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
-      )() as any;
+      )()) as any;
 
       if (result?.response?.status === 404) {
         return { available: true, existingId: undefined };

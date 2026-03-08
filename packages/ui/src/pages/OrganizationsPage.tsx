@@ -7,13 +7,13 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/ui/apiClient';
-import { apiMutation } from '@template/ui/lib/apiMutation';
-import { apiQuery } from '@template/ui/lib/apiQuery';
+import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
+import { apiMutation } from '@template/ui/lib/apiMutation';
+import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -28,18 +28,24 @@ export const OrganizationsPage = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: meReadManyOrganizationsQueryKey(),
-    queryFn: apiQuery((requestOptions: Parameters<typeof meReadManyOrganizations>[0]) => meReadManyOrganizations(requestOptions)),
+    queryFn: apiQuery((requestOptions: Parameters<typeof meReadManyOrganizations>[0]) =>
+      meReadManyOrganizations(requestOptions),
+    ),
   });
   const organizations = data?.data ?? [];
 
   const deleteMutation = useOptimisticListMutation<Organization, Omit<OrganizationDeleteData, 'url'>>({
-    mutationFn: apiMutation((requestOptions: Parameters<typeof organizationDelete>[0]) => organizationDelete(requestOptions)),
+    mutationFn: apiMutation((requestOptions: Parameters<typeof organizationDelete>[0]) =>
+      organizationDelete(requestOptions),
+    ),
     queryKey: meReadManyOrganizationsQueryKey(),
     operation: 'delete',
   });
 
   const createMutation = useOptimisticListMutation<Organization, Omit<OrganizationCreateData, 'url'>>({
-    mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreate>[0]) => organizationCreate(requestOptions)),
+    mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreate>[0]) =>
+      organizationCreate(requestOptions),
+    ),
     queryKey: meReadManyOrganizationsQueryKey(),
     operation: 'create',
     optimisticExtras: { organizationUser: { role: 'owner' } } as any,

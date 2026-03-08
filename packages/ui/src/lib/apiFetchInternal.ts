@@ -1,5 +1,5 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import { createClient, type Client } from '@template/ui/apiClient/client';
+import { type Client, createClient } from '@template/ui/apiClient/client';
 import { getToken } from '@template/ui/lib/auth/token';
 
 /**
@@ -17,11 +17,14 @@ export type ExtractSuccess<T> = T extends { data: infer D; error?: never }
  * Unwraps nested API response types at compile time
  * { data: { data: X, pagination: Y } } -> { data: X, pagination: Y }
  */
-type UnwrapResponse<T> = ExtractSuccess<T> extends { data: infer DataObj }
-  ? DataObj extends { data: infer InnerData }
-    ? Omit<ExtractSuccess<T>, 'data'> & { data: InnerData } & (DataObj extends { pagination: infer P } ? { pagination: P } : unknown)
-    : ExtractSuccess<T>
-  : ExtractSuccess<T>;
+type UnwrapResponse<T> =
+  ExtractSuccess<T> extends { data: infer DataObj }
+    ? DataObj extends { data: infer InnerData }
+      ? Omit<ExtractSuccess<T>, 'data'> & { data: InnerData } & (DataObj extends { pagination: infer P }
+            ? { pagination: P }
+            : unknown)
+      : ExtractSuccess<T>
+    : ExtractSuccess<T>;
 
 /**
  * Overloaded return type for apiFetch that works with both queries and mutations
@@ -40,8 +43,9 @@ export type ClientInjectedOptions = {
   throwOnError?: boolean;
 };
 
-export type RequestOptionsFor<TVariables extends Record<string, unknown> | void> =
-  TVariables extends void ? ClientInjectedOptions : TVariables & ClientInjectedOptions;
+export type RequestOptionsFor<TVariables extends Record<string, unknown> | void> = TVariables extends void
+  ? ClientInjectedOptions
+  : TVariables & ClientInjectedOptions;
 
 /**
  * Internal API fetch function that doesn't depend on the store.
@@ -57,7 +61,7 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     token?: string | null;
     spoofUserEmail?: string | null;
     throwOnError?: boolean;
-  }
+  },
 ): ApiFetchFunction<T, TVariables> => {
   const implementation = async (contextOrVars?: QueryFunctionContext | TVariables): Promise<UnwrapResponse<T>> => {
     const headers: Record<string, string> = {};
@@ -90,11 +94,9 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
 
     // Detect React Query context and extract variables from queryKey
     const isQueryContext = (contextOrVars as QueryFunctionContext)?.queryKey !== undefined;
-    const vars = (
-      isQueryContext
-        ? (contextOrVars as QueryFunctionContext).queryKey[1]
-        : contextOrVars
-    ) as TVariables | undefined;
+    const vars = (isQueryContext ? (contextOrVars as QueryFunctionContext).queryKey[1] : contextOrVars) as
+      | TVariables
+      | undefined;
 
     const mergedOptions = {
       ...((vars ?? {}) as Record<string, unknown>),

@@ -1,4 +1,4 @@
-import { HTTP_ERROR_MAP, type Guidance, type HttpErrorCode } from '@template/shared/errors';
+import { type Guidance, HTTP_ERROR_MAP, type HttpErrorCode } from '@template/shared/errors';
 import { HTTPException } from 'hono/http-exception';
 
 type MakeErrorOptions = {

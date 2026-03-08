@@ -1,13 +1,13 @@
+import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
-import { Chrome, Github, Shield, Key } from 'lucide-react';
-import { useState } from 'react';
-import { useSearch } from '@tanstack/react-router';
-import { useAppStore } from '@template/ui/store';
 import { useAuthProviders } from '@template/ui/hooks';
 import { toast } from '@template/ui/lib/toast';
+import { useAppStore } from '@template/ui/store';
+import { Chrome, Github, Key, Shield } from 'lucide-react';
+import { useState } from 'react';
 
 const providerIcons: Record<string, typeof Chrome> = {
   google: Chrome,

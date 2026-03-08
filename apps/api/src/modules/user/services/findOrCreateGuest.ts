@@ -1,7 +1,7 @@
 import type { User } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
-import type { AppEnv } from '#/types/appEnv';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
+import type { AppEnv } from '#/types/appEnv';
 
 type GuestParams = {
   email: string;

@@ -12,7 +12,9 @@ type StatusCodesFromRoute<TRoute extends RouteConfig> = TRoute extends { respons
 type TypedResponders<TRoute extends RouteConfig, T> = (200 extends StatusCodesFromRoute<TRoute>
   ? { ok: (data: T, metadata?: ResponseMetadata) => TypedResponse }
   : EmptyRecord) &
-  (201 extends StatusCodesFromRoute<TRoute> ? { created: (data: T, location?: string) => TypedResponse } : EmptyRecord) &
+  (201 extends StatusCodesFromRoute<TRoute>
+    ? { created: (data: T, location?: string) => TypedResponse }
+    : EmptyRecord) &
   (204 extends StatusCodesFromRoute<TRoute> ? { noContent: () => TypedResponse } : EmptyRecord);
 
 type ResponderBag<T> = {

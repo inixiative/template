@@ -7,8 +7,8 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
-import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
+import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
 
 export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
@@ -31,7 +31,16 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     c.set('app', batchContext.baseContext.get('app'));
 
     // Deep clone mutable context to prevent mutation leakage between batch sub-requests
-    const keysToClone = ['user', 'session', 'organizationUsers', 'organizations', 'spaceUsers', 'spaces', 'token', 'spoofedBy'] as const;
+    const keysToClone = [
+      'user',
+      'session',
+      'organizationUsers',
+      'organizations',
+      'spaceUsers',
+      'spaces',
+      'token',
+      'spoofedBy',
+    ] as const;
     for (const key of keysToClone) {
       const value = batchContext.baseContext.get(key);
       c.set(key, value ? structuredClone(value) : null);

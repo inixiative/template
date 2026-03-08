@@ -1,6 +1,6 @@
 import type { MeReadResponses } from '@template/ui/apiClient';
-import { createAuthClient } from 'better-auth/client';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
+import type { createAuthClient } from 'better-auth/client';
 
 type BetterAuthClient = ReturnType<typeof createAuthClient>;
 

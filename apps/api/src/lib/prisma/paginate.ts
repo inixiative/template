@@ -1,6 +1,6 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
-import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
+import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 

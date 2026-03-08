@@ -49,7 +49,12 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: InquiryStatus.changesRequested, explanation: 'Please change the role' }));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        status: InquiryStatus.changesRequested,
+        explanation: 'Please change the role',
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);

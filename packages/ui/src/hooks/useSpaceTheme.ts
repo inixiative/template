@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
 import type { SpaceTheme } from '@template/ui/types';
+import { useEffect, useRef } from 'react';
 
 const themeUrls = ['logo', 'logoDark', 'favicon'];
 

@@ -2,11 +2,14 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 
-export const inquiryTerminalStatuses: InquiryStatus[] = [InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.canceled];
+export const inquiryTerminalStatuses: InquiryStatus[] = [
+  InquiryStatus.approved,
+  InquiryStatus.denied,
+  InquiryStatus.canceled,
+];
 
 export const validateInquiryIsDraft = (inquiry: Inquiry): void => {
-  if (inquiry.status !== InquiryStatus.draft)
-    throw makeError({ status: 400, message: 'Inquiry must be a draft' });
+  if (inquiry.status !== InquiryStatus.draft) throw makeError({ status: 400, message: 'Inquiry must be a draft' });
 };
 
 // draft | sent | changesRequested — can still be acted on by the source

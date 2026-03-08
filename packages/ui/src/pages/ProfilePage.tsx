@@ -1,5 +1,5 @@
-import { SpaceProfilePage } from '@template/ui/pages/SpaceProfilePage';
 import { OrganizationProfilePage } from '@template/ui/pages/OrganizationProfilePage';
+import { SpaceProfilePage } from '@template/ui/pages/SpaceProfilePage';
 import { UserProfilePage } from '@template/ui/pages/UserProfilePage';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';

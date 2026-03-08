@@ -17,7 +17,7 @@ export const organizationReadManyInquiriesReceivedController = makeController(
         status: { not: InquiryStatus.draft },
       },
       orderBy: { createdAt: 'desc' },
-    include: { sourceUser: true, sourceOrganization: true, sourceSpace: true },
+      include: { sourceUser: true, sourceOrganization: true, sourceSpace: true },
     });
 
     return respond.ok(data, { pagination });

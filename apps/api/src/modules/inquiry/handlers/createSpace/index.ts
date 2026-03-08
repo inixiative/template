@@ -1,10 +1,10 @@
-import { z } from 'zod';
-import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { Db, OrganizationId } from '@template/db';
-import type { InquiryHandler, Inquiry } from '#/modules/inquiry/handlers/types';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
-import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
+import { z } from 'zod';
 import { makeError } from '#/lib/errors';
+import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
+import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
+import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const spaceContentSchema = z.object({
   name: z.string(),
@@ -37,7 +37,8 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: CreateSpaceC
   ]);
 
   if (existingSpace) throw makeError({ status: 409, message: 'A space with this slug already exists' });
-  if (existingInquiry) throw makeError({ status: 409, message: 'An open request to create a space with this slug already exists' });
+  if (existingInquiry)
+    throw makeError({ status: 409, message: 'An open request to create a space with this slug already exists' });
 };
 
 export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceResolution> = {
