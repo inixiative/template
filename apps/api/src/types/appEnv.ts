@@ -1,4 +1,5 @@
 import type { Db, Prisma } from '@template/db';
+import type { RouteConfig } from '@hono/zod-openapi';
 import type {
   Organization,
   OrganizationUser,
@@ -27,6 +28,7 @@ export type AppVars = {
   requestId: string;
   resource: unknown;
   resourceType: string | null;
+  routeConfig: RouteConfig | null;
   searchableFields: readonly string[] | null;
   bracketQuery: Record<string, any>;
 };

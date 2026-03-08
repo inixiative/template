@@ -28,6 +28,8 @@ export const makeController = <R extends RouteConfig, T>(
   handler: (c: RouteContext<R, AppEnv>, respond: TypedResponders<R, T>) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
   const impl = (c: RouteContext<R, AppEnv>) => {
+    c.set('routeConfig', route);
+
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};
 
