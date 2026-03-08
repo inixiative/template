@@ -34,7 +34,6 @@ model AuthProvider {
   createdBy String?
 
   auditLogs AuditLog[]
-
   @@unique([organizationId, provider, type])
   @@index([organizationId])
   @@index([type])

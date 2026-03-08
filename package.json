@@ -45,6 +45,7 @@
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
     "generate:sdk": "bun run with local api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
     "lint": "biome check . && bun run lint:postBiome",
     "lint:postBiome": "./scripts/lint/run-post-biome-checks.sh",
     "lint:imports": "./scripts/lint/check-import-aliases.sh",

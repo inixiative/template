@@ -411,7 +411,7 @@ Other metadata (totals, aggregates, etc.) can be added the same way via the seco
 
 Use `paginate()` for list endpoints. It automatically handles search, filters, orderBy, and pagination from context.
 
-**New signature** (context-based):
+**Canonical pattern**:
 ```typescript
 import { paginate } from '#/lib/prisma/paginate';
 
@@ -431,6 +431,10 @@ const { data, pagination } = await paginate(c, db.token, {
 
 return respond.ok(data, { pagination });
 ```
+
+If you need relation data, pass `include` in the options first. In many cases that is enough. For more complex relation payloads, an explicit `paginate<Delegate, Item>` item type is still acceptable.
+
+`paginate()` expects a route-typed controller context from `makeController()`, so validated query params stay typed all the way through the helper.
 
 **What paginate() handles automatically:**
 - Reads `page`, `pageSize` from query params
@@ -644,16 +648,13 @@ readRoute({
 
 **In controller**:
 ```typescript
-import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
+const { deleted } = c.req.valid('query');
 
-const { orderBy } = c.req.valid('query');
-const parsedOrderBy = orderBy ? parseOrderBy(orderBy) : [{ createdAt: 'desc' }];
-
-const { data, pagination } = await paginate(
-  db.user,
-  { where, orderBy: parsedOrderBy },
-  { page, pageSize }
-);
+const { data, pagination } = await paginate(c, db.organization, {
+  where: {
+    deletedAt: deleted === 'true' ? { not: null } : deleted === 'false' ? null : undefined,
+  },
+});
 ```
 
 **Path notation** - Supports nested fields up to 5 levels deep:

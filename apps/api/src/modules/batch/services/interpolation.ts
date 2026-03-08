@@ -51,6 +51,9 @@ const navigateFieldPath = (obj: any, path: string): any => {
     if (FORBIDDEN_KEYS.includes(part)) {
       throw new Error(`Forbidden field access: ${part}`);
     }
+    if (result === null || result === undefined) {
+      return undefined;
+    }
     if (!Object.hasOwn(result, part)) {
       return undefined;
     }

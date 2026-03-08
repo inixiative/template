@@ -1,12 +1,19 @@
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import type { Context } from 'hono';
-import { getValidatedBody } from '#/lib/context/getValidatedData';
+import { getValidatedBody, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { makeError } from '#/lib/errors';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
-import type { AppEnv } from '#/types/appEnv';
 
 const nullTargetFields = { targetUserId: null, targetOrganizationId: null, targetSpaceId: null };
+type InquiryTargetBody = {
+  targetModel: InquiryResourceModel;
+  targetUserId?: string;
+  targetOrganizationId?: string;
+  targetSpaceId?: string;
+  targetEmail?: string;
+  targetOrganizationSlug?: string;
+  targetSpaceSlug?: string;
+};
 
 export type InquiryTargetFields =
   | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: UserId }
@@ -14,7 +21,9 @@ export type InquiryTargetFields =
   | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
-export const resolveInquiryTarget = async (c: Context<AppEnv>): Promise<InquiryTargetFields> => {
+export const resolveInquiryTarget = async <C extends ValidatedContext<'json', InquiryTargetBody>>(
+  c: C,
+): Promise<InquiryTargetFields> => {
   const db = c.get('db');
   const body = getValidatedBody(c);
   const targetModel: InquiryResourceModel = body.targetModel;

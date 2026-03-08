@@ -1,14 +1,34 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
-import type { Context } from 'hono';
-import { getValidatedQuery } from '#/lib/context/getValidatedData';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
-import type { AppEnv } from '#/types/appEnv';
+import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
-type PaginationParams = {
+type PaginationQuery = {
   page?: number;
   pageSize?: number;
-  orderBy?: Record<string, Prisma.SortOrder>[];
+  search?: string;
+  searchFields?: BracketQueryRecord;
+  orderBy?: string[];
+};
+
+type FindManyArgs<T extends AnyDelegate> = Args<T, 'findMany'> & object;
+type FindManyWhere<T extends AnyDelegate> = FindManyArgs<T> extends { where?: infer W } ? W : never;
+type FindManyOrderBy<T extends AnyDelegate> = FindManyArgs<T> extends { orderBy?: infer O } ? O : never;
+type FindManyInclude<T extends AnyDelegate> = FindManyArgs<T> extends { include?: infer I } ? I : never;
+type FindManyOmit<T extends AnyDelegate> = FindManyArgs<T> extends { omit?: infer O } ? O : never;
+type FindManySelect<T extends AnyDelegate> = FindManyArgs<T> extends { select?: infer S } ? S : never;
+type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: infer C } ? C : never;
+type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
+type PaginateOptions<T extends AnyDelegate> = {
+  searchableFields?: readonly string[];
+  where?: FindManyWhere<T>;
+  orderBy?: FindManyOrderBy<T>;
+  include?: FindManyInclude<T>;
+  omit?: FindManyOmit<T>;
+  select?: FindManySelect<T>;
+  cursor?: FindManyCursor<T>;
+  distinct?: FindManyDistinct<T>;
 };
 
 type PaginationResult = {
@@ -23,54 +43,55 @@ type PaginatedResult<T> = {
   pagination: PaginationResult;
 };
 
+const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 export const paginate = async <
   T extends AnyDelegate,
-  R = Result<T, Args<T, 'findMany'> & object, 'findMany'>[number],
+  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
 >(
-  c: Context<AppEnv>,
+  c: C,
   delegate: T,
-  options?: {
-    searchableFields?: readonly string[];
-    where?: Record<string, any>;
-    orderBy?: Record<string, Prisma.SortOrder> | Record<string, Prisma.SortOrder>[];
-    include?: Record<string, unknown>;
-    omit?: Record<string, unknown>;
-  },
-): Promise<PaginatedResult<R>> => {
+  options?: PaginateOptions<T>,
+): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
+  const { searchableFields: explicitSearchableFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
 
-  const bracketQuery = (c.get('bracketQuery') ?? {}) as Record<string, any>;
-  const searchFields = bracketQuery.searchFields ?? query.searchFields;
+  const bracketQuery = c.get('bracketQuery');
+  const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
   const contextSearchableFields = c.get('searchableFields');
-  const searchableFields = contextSearchableFields ?? options?.searchableFields;
+  const searchableFields = contextSearchableFields ?? explicitSearchableFields;
 
   const searchWhere = searchableFields?.length
     ? buildWhereClause({ search, searchFields, searchableFields, filters: {} })
     : {};
 
-  const where = { ...options?.where, ...searchWhere };
+  const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
+  const where = { ...baseWhere, ...searchWhere } as FindManyWhere<T>;
 
-  const parsedOrderBy = rawOrderBy
+  const parsedOrderBy: Record<string, Prisma.SortOrder>[] = rawOrderBy
     ? parseOrderBy(rawOrderBy)
-    : options?.orderBy
-      ? Array.isArray(options.orderBy)
-        ? options.orderBy
-        : [options.orderBy]
+    : findManyOptions.orderBy
+      ? Array.isArray(findManyOptions.orderBy)
+        ? ([...findManyOptions.orderBy] as Record<string, Prisma.SortOrder>[])
+        : [findManyOptions.orderBy as Record<string, Prisma.SortOrder>]
       : [];
   if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
 
+  const paginatedArgs = {
+    ...findManyOptions,
+    where,
+    orderBy: parsedOrderBy,
+    take: pageSize,
+    skip: (page - 1) * pageSize,
+  } as unknown as FindManyArgs<T>;
+
   const [data, total] = await Promise.all([
-    delegate.findMany({
-      where,
-      orderBy: parsedOrderBy,
-      include: options?.include,
-      omit: options?.omit,
-      take: pageSize,
-      skip: (page - 1) * pageSize,
-    } as unknown as Args<T, 'findMany'>),
-    delegate.count({ where }),
+    delegate.findMany(paginatedArgs) as Promise<TItem[]>,
+    delegate.count({ where } as Args<T, 'count'>),
   ]);
 
   return {

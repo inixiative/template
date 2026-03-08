@@ -4,20 +4,40 @@ import { ZodError, type ZodSchema } from 'zod';
 import { type ResponseMetadata, ResponseMetadataSchema } from '#/lib/routeTemplates/responseMetadata';
 import type { AppEnv } from '#/types/appEnv';
 
+type EmptyRecord = Record<never, never>;
 type StatusCodesFromRoute<TRoute extends RouteConfig> = TRoute extends { responses: infer R }
   ? keyof R & number
   : never;
 
 type TypedResponders<TRoute extends RouteConfig, T> = (200 extends StatusCodesFromRoute<TRoute>
   ? { ok: (data: T, metadata?: ResponseMetadata) => TypedResponse }
-  : {}) &
-  (201 extends StatusCodesFromRoute<TRoute> ? { created: (data: T, location?: string) => TypedResponse } : {}) &
-  (204 extends StatusCodesFromRoute<TRoute> ? { noContent: () => TypedResponse } : {});
+  : EmptyRecord) &
+  (201 extends StatusCodesFromRoute<TRoute> ? { created: (data: T, location?: string) => TypedResponse } : EmptyRecord) &
+  (204 extends StatusCodesFromRoute<TRoute> ? { noContent: () => TypedResponse } : EmptyRecord);
 
 type ResponderBag<T> = {
   ok?: (data: T, metadata?: ResponseMetadata) => TypedResponse;
   created?: (data: T, location?: string) => TypedResponse;
   noContent?: () => TypedResponse;
+};
+
+type JsonResponseSchema = {
+  shape: {
+    data: ZodSchema<unknown>;
+  };
+};
+
+type JsonResponseDefinition = {
+  content: {
+    'application/json': {
+      schema: JsonResponseSchema;
+    };
+  };
+};
+
+type JsonResponseBody = {
+  data: unknown;
+  pagination?: ResponseMetadata['pagination'];
 };
 
 // Extract the context type from RouteHandler
@@ -28,18 +48,20 @@ export const makeController = <R extends RouteConfig, T>(
   handler: (c: RouteContext<R, AppEnv>, respond: TypedResponders<R, T>) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
   const impl = (c: RouteContext<R, AppEnv>) => {
+    c.set('routeConfig', route);
+
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};
 
     if (statusCodes.includes(200) && route.responses?.[200]) {
-      const response = route.responses[200] as { content: { 'application/json': { schema: any } } };
+      const response = route.responses[200] as unknown as JsonResponseDefinition;
       const responseSchema = response.content['application/json'].schema;
       if (!responseSchema) throw new Error('Route declares 200 response but missing schema');
       responders.ok = (data: T, metadata?: ResponseMetadata) => {
         const dataSchema = responseSchema.shape.data;
         const validatedData = parseResponseOrThrow500(dataSchema, data);
 
-        const responseObj: any = { data: validatedData };
+        const responseObj: JsonResponseBody = { data: validatedData };
 
         if (metadata) {
           const validatedMetadata = parseResponseOrThrow500(ResponseMetadataSchema, metadata);
@@ -54,7 +76,7 @@ export const makeController = <R extends RouteConfig, T>(
     }
 
     if (statusCodes.includes(201) && route.responses?.[201]) {
-      const response = route.responses[201] as { content: { 'application/json': { schema: any } } };
+      const response = route.responses[201] as unknown as JsonResponseDefinition;
       const responseSchema = response.content['application/json'].schema;
       if (!responseSchema) throw new Error('Route declares 201 response but missing schema');
       responders.created = (data: T, location?: string) => {
