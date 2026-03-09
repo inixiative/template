@@ -1,0 +1,120 @@
+// ============================================================================
+// AUDIT LOG - Immutable record of all database mutations
+// ============================================================================
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  // Actor — who made the change
+  actorUserId      String? @db.VarChar(36)
+  actorUser        User?   @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorSpoofUserId String? @db.VarChar(36)
+  actorSpoofUser   User?   @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
+  actorTokenId     String? @db.VarChar(36)
+  actorToken       Token?  @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
+  ipAddress        String?
+  userAgent        String?
+
+  // What happened
+  action       AuditAction
+  subjectModel AuditSubjectModel
+
+  // State before/after — after filtering+redaction
+  before  Json?
+  after   Json?
+  changes Json?
+
+  // Context for org/space filtering
+  contextOrganizationId String?       @db.VarChar(36)
+  contextOrganization   Organization? @relation("AuditLogContextOrganization", fields: [contextOrganizationId], references: [id], onDelete: SetNull)
+  contextSpaceId        String?       @db.VarChar(36)
+  contextSpace          Space?        @relation("AuditLogContextSpace", fields: [contextSpaceId], references: [id], onDelete: SetNull)
+
+  // Causal lineage
+  sourceInquiryId String?  @db.VarChar(36)
+  sourceInquiry   Inquiry? @relation("AuditLogSourceInquiry", fields: [sourceInquiryId], references: [id], onDelete: SetNull)
+
+  // Subject — false polymorphism (governed by subjectModel; only one active per row)
+  subjectOrganizationId String?       @db.VarChar(36)
+  subjectOrganization   Organization? @relation("AuditLogSubjectOrganization", fields: [subjectOrganizationId], references: [id], onDelete: SetNull)
+  subjectSpaceId        String?       @db.VarChar(36)
+  subjectSpace          Space?        @relation("AuditLogSubjectSpace", fields: [subjectSpaceId], references: [id], onDelete: SetNull)
+
+  // Simple FKs
+  subjectUserId           String?         @db.VarChar(36)
+  subjectUser             User?           @relation("AuditLogSubjectUser", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  subjectAccountId        String?         @db.VarChar(36)
+  subjectAccount          Account?        @relation(fields: [subjectAccountId], references: [id], onDelete: SetNull)
+  subjectSessionId        String?         @db.VarChar(36)
+  subjectSession          Session?        @relation(fields: [subjectSessionId], references: [id], onDelete: SetNull)
+  subjectVerificationId   String?         @db.VarChar(36)
+  subjectVerification     Verification?   @relation(fields: [subjectVerificationId], references: [id], onDelete: SetNull)
+  subjectInquiryId        String?         @db.VarChar(36)
+  subjectInquiry          Inquiry?        @relation("AuditLogSubjectInquiry", fields: [subjectInquiryId], references: [id], onDelete: SetNull)
+  subjectTokenId          String?         @db.VarChar(36)
+  subjectToken            Token?          @relation("AuditLogSubjectToken", fields: [subjectTokenId], references: [id], onDelete: SetNull)
+  subjectAuthProviderId   String?         @db.VarChar(36)
+  subjectAuthProvider     AuthProvider?   @relation(fields: [subjectAuthProviderId], references: [id], onDelete: SetNull)
+  subjectCronJobId        String?         @db.VarChar(36)
+  subjectCronJob          CronJob?        @relation(fields: [subjectCronJobId], references: [id], onDelete: SetNull)
+  subjectEmailTemplateId  String?         @db.VarChar(36)
+  subjectEmailTemplate    EmailTemplate?  @relation(fields: [subjectEmailTemplateId], references: [id], onDelete: SetNull)
+  subjectEmailComponentId String?         @db.VarChar(36)
+  subjectEmailComponent   EmailComponent? @relation(fields: [subjectEmailComponentId], references: [id], onDelete: SetNull)
+  subjectCustomerRefId    String?         @db.VarChar(36)
+  subjectCustomerRef      CustomerRef?    @relation(fields: [subjectCustomerRefId], references: [id], onDelete: SetNull)
+  // Composite FKs
+  subjectOrganizationUser OrganizationUser? @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
+  subjectSpaceUser        SpaceUser?        @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([actorSpoofUserId])
+  @@index([actorTokenId])
+  @@index([subjectModel])
+  @@index([createdAt])
+  @@index([contextOrganizationId])
+  @@index([contextSpaceId])
+  @@index([sourceInquiryId])
+  @@index([subjectOrganizationId])
+  @@index([subjectSpaceId])
+  @@index([subjectUserId])
+  @@index([subjectAccountId])
+  @@index([subjectSessionId])
+  @@index([subjectVerificationId])
+  @@index([subjectInquiryId])
+  @@index([subjectTokenId])
+  @@index([subjectAuthProviderId])
+  @@index([subjectCronJobId])
+  @@index([subjectEmailTemplateId])
+  @@index([subjectEmailComponentId])
+  @@index([subjectCustomerRefId])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+}
+
+enum AuditSubjectModel {
+  User
+  Organization
+  OrganizationUser
+  Space
+  SpaceUser
+  Token
+  AuthProvider
+  Inquiry
+  Account
+  Session
+  Verification
+  CronJob
+  EmailTemplate
+  EmailComponent
+  CustomerRef
+}

@@ -30,6 +30,7 @@ model AuthProvider {
   encryptedSecretsMetadata   Json // { iv, authTag }
   encryptedSecretsKeyVersion Int // 1, 2, 3, etc.
 
+  auditLogs AuditLog[]
   @@unique([organizationId, provider, type])
   @@index([organizationId])
   @@index([type])

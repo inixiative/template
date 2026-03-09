@@ -1,3 +1,4 @@
+export * from './auditLogFactory';
 export * from './authProviderFactory';
 export * from './cronJobFactory';
 export * from './customerRefFactory';

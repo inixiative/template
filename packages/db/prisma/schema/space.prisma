@@ -30,9 +30,11 @@ model Space {
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
   customerRefs         CustomerRef[]         @relation("customerRefs")
-  providerRefs         CustomerRef[]         @relation("providerRefs")
-  inquiriesSent        Inquiry[]             @relation("InquirySource")
-  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  providerRefs         CustomerRef[] @relation("providerRefs")
+  inquiriesSent        Inquiry[]     @relation("InquirySource")
+  inquiriesReceived    Inquiry[]     @relation("InquiryTarget")
+  auditLogsAsContext   AuditLog[]    @relation("AuditLogContextSpace")
+  auditLogsAsSubject   AuditLog[]    @relation("AuditLogSubjectSpace")
 
   @@unique([organizationId, slug])
   @@unique([organizationId, id])

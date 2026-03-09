@@ -1,8 +1,8 @@
 import { z } from '@hono/zod-openapi';
-import { InquiryScalarSchema } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z.object({
@@ -13,6 +13,6 @@ const bodySchema = z.object({
 export const inquiryUpdateRoute = updateRoute({
   model: Modules.inquiry,
   bodySchema,
-  responseSchema: InquiryScalarSchema,
+  responseSchema: inquiryResponseSchema,
   middleware: [validatePermission('send')],
 });

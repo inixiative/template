@@ -50,6 +50,9 @@ export const ModelIdType = {
 
   // Auth Providers
   AuthProvider: 'AuthProvider',
+
+  // Audit
+  AuditLog: 'AuditLog',
 } as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -91,6 +94,9 @@ export type CronJobId = Id<typeof ModelIdType.CronJob>;
 // Auth Providers
 export type AuthProviderId = Id<typeof ModelIdType.AuthProvider>;
 
+// Audit
+export type AuditLogId = Id<typeof ModelIdType.AuditLog>;
+
 // ─────────────────────────────────────────────────────────────
 // Constructor functions (cast raw strings to typed IDs)
 // ─────────────────────────────────────────────────────────────
@@ -129,3 +135,6 @@ export const cronJobId = (id: string): CronJobId => id as CronJobId;
 
 // Auth Providers
 export const authProviderId = (id: string): AuthProviderId => id as AuthProviderId;
+
+// Audit
+export const auditLogId = (id: string): AuditLogId => id as AuditLogId;

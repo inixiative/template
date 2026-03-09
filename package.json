@@ -76,6 +76,7 @@
     "ioredis": "5.10.0"
   },
   "dependencies": {
+    "@inixiative/json-rules": "^1.2.0",
     "autoprefixer": "^10.4.27",
     "ink": "^6.8.0",
     "ink-select-input": "^6.2.0",

@@ -6,6 +6,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { attachInquiryAuditLogs, includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -25,7 +26,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  const updated = await db.inquiry.update({
+  await db.inquiry.update({
     where: { id: inquiry.id },
     data: {
       ...rest,
@@ -34,5 +35,10 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     },
   });
 
-  return respond.ok(updated);
+  const updated = await db.inquiry.findUniqueOrThrow({
+    where: { id: inquiry.id },
+    include: includeInquiryResponse,
+  });
+
+  return respond.ok(await attachInquiryAuditLogs(db, updated));
 });

@@ -1,6 +1,7 @@
 import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
+import { attachInquiryAuditLogList, includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
 import { meReadManyInquiriesReceivedRoute } from '#/modules/me/routes/meReadManyInquiriesReceived';
 
 export const meReadManyInquiriesReceivedController = makeController(
@@ -16,9 +17,9 @@ export const meReadManyInquiriesReceivedController = makeController(
         status: { not: InquiryStatus.draft },
       },
       orderBy: { createdAt: 'desc' },
-      include: { sourceUser: true, sourceOrganization: true, sourceSpace: true },
+      include: includeInquiryReceived,
     });
 
-    return respond.ok(data, { pagination });
+    return respond.ok(await attachInquiryAuditLogList(db, data), { pagination });
   },
 );
