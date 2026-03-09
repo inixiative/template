@@ -1,13 +1,15 @@
+import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { auditLogReadManyRoute } from '#/modules/admin/auditLog/routes/auditLogReadMany';
+import { includeAuditLogResponse } from '#/modules/admin/auditLog/schemas/auditLogResponseSchema';
 
 export const auditLogReadManyController = makeController(auditLogReadManyRoute, async (c, respond) => {
   const db = c.get('db');
 
-  const auditLogs = await db.auditLog.findMany({
+  const { data, pagination } = await paginate(c, db.auditLog, {
+    include: includeAuditLogResponse,
     orderBy: { createdAt: 'desc' },
-    take: 100,
   });
 
-  return respond.ok(auditLogs);
+  return respond.ok(data, { pagination });
 });

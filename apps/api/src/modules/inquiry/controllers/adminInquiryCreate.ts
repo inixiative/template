@@ -5,6 +5,7 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { attachInquiryAuditLogs, includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { adminInquiryCreateRoute } from '#/modules/inquiry/routes/adminInquiryCreate';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
@@ -42,7 +43,8 @@ export const adminInquiryCreateController = makeController(adminInquiryCreateRou
       ...target,
       sentAt: body.status === InquiryStatus.sent ? new Date() : null,
     },
+    include: includeInquirySent,
   });
 
-  return respond.created(inquiry);
+  return respond.created(await attachInquiryAuditLogs(db, inquiry));
 });

@@ -13,6 +13,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     actorTokenId: token?.id ?? null,
     ipAddress: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
     userAgent: c.req.header('user-agent') ?? null,
+    sourceInquiryId: null,
   };
 
   return auditActorContext.run(actor, () => next());

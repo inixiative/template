@@ -1,57 +1,51 @@
-import { filterIgnoredFields, redactSensitiveFields } from '@template/db/lib/hooks';
+import { filterIgnoredFields, getPolymorphismConfig, redactSensitiveFields } from '@template/db';
 import { isEqual } from 'lodash-es';
 
-/** Maps model name → subject FK field(s) on AuditLog */
-export const MODEL_TO_SUBJECT_FK: Partial<Record<string, string | string[]>> = {
-  User: 'subjectUserId',
-  Organization: 'organizationId',
-  OrganizationUser: ['organizationId', 'subjectUserId'],
-  Space: 'spaceId',
-  SpaceUser: ['organizationId', 'spaceId', 'subjectUserId'],
-  Token: 'subjectTokenId',
-  AuthProvider: 'subjectAuthProviderId',
-  Inquiry: 'subjectInquiryId',
-  Account: 'subjectAccountId',
-  Session: 'subjectSessionId',
-  Verification: 'subjectVerificationId',
-  CronJob: 'subjectCronJobId',
-  EmailTemplate: 'subjectEmailTemplateId',
-  EmailComponent: 'subjectEmailComponentId',
-  CustomerRef: 'subjectCustomerRefId',
+const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
+  switch (field) {
+    case 'subjectOrganizationId':
+      return model === 'Organization' ? record.id : record.organizationId;
+    case 'subjectSpaceId':
+      return model === 'Space' ? record.id : record.spaceId;
+    case 'subjectUserId':
+      return model === 'User' ? record.id : record.userId;
+    default:
+      return record.id;
+  }
 };
 
-/**
- * Build the subject FK fields for a record.
- * For composite FK models (OrganizationUser, SpaceUser), reads multiple fields from the record.
- * For single FK models, uses record.id.
- */
+export const buildContextFkFields = (model: string, record: Record<string, unknown>): Record<string, unknown> => {
+  if (model === 'Organization') {
+    return { contextOrganizationId: record.id ?? null, contextSpaceId: null };
+  }
+
+  if (model === 'Space') {
+    return {
+      contextOrganizationId: record.organizationId ?? null,
+      contextSpaceId: record.id ?? null,
+    };
+  }
+
+  return {
+    contextOrganizationId: record.organizationId ?? null,
+    contextSpaceId: record.spaceId ?? null,
+  };
+};
+
 export const buildSubjectFkFields = (
   model: string,
   record: Record<string, unknown>,
 ): Record<string, unknown> => {
-  const fk = MODEL_TO_SUBJECT_FK[model];
-  if (!fk) return {};
+  const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find((axis) => axis.field === 'subjectModel');
+  const fkFields = subjectAxis?.fkMap[model as keyof typeof subjectAxis.fkMap];
+  if (!fkFields?.length) return {};
 
-  if (model === 'OrganizationUser') {
-    return {
-      organizationId: record.organizationId,
-      subjectUserId: record.userId,
-    };
+  const subjectFields: Record<string, unknown> = {};
+  for (const field of fkFields) {
+    const value = getSubjectFieldValue(model, field, record);
+    if (value !== undefined) subjectFields[field] = value;
   }
-  if (model === 'SpaceUser') {
-    return {
-      organizationId: record.organizationId,
-      spaceId: record.spaceId,
-      subjectUserId: record.userId,
-    };
-  }
-  if (model === 'Organization') {
-    return { organizationId: record.id };
-  }
-  if (model === 'Space') {
-    return { spaceId: record.id };
-  }
-  return { [fk as string]: record.id };
+  return subjectFields;
 };
 
 export const processAuditData = (model: string, data: Record<string, unknown>): Record<string, unknown> => {

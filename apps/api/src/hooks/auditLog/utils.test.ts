@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
   describe('processAuditData', () => {
@@ -41,28 +41,32 @@ describe('auditLog/utils', () => {
       expect(result).toEqual({ subjectUserId: 'user-123' });
     });
 
-    it('returns organizationId for Organization model using record.id', () => {
+    it('returns subjectOrganizationId for Organization model using record.id', () => {
       const record = { id: 'org-123', name: 'Acme' };
       const result = buildSubjectFkFields('Organization', record);
-      expect(result).toEqual({ organizationId: 'org-123' });
+      expect(result).toEqual({ subjectOrganizationId: 'org-123' });
     });
 
-    it('returns spaceId for Space model using record.id', () => {
+    it('returns subjectSpaceId for Space model using record.id', () => {
       const record = { id: 'space-123', name: 'My Space', organizationId: 'org-456' };
       const result = buildSubjectFkFields('Space', record);
-      expect(result).toEqual({ spaceId: 'space-123' });
+      expect(result).toEqual({ subjectSpaceId: 'space-123' });
     });
 
     it('returns composite FK fields for OrganizationUser', () => {
       const record = { id: 'ou-123', organizationId: 'org-456', userId: 'user-789' };
       const result = buildSubjectFkFields('OrganizationUser', record);
-      expect(result).toEqual({ organizationId: 'org-456', subjectUserId: 'user-789' });
+      expect(result).toEqual({ subjectOrganizationId: 'org-456', subjectUserId: 'user-789' });
     });
 
     it('returns composite FK fields for SpaceUser', () => {
       const record = { id: 'su-123', organizationId: 'org-456', spaceId: 'space-789', userId: 'user-321' };
       const result = buildSubjectFkFields('SpaceUser', record);
-      expect(result).toEqual({ organizationId: 'org-456', spaceId: 'space-789', subjectUserId: 'user-321' });
+      expect(result).toEqual({
+        subjectOrganizationId: 'org-456',
+        subjectSpaceId: 'space-789',
+        subjectUserId: 'user-321',
+      });
     });
 
     it('returns subjectTokenId for Token model', () => {
@@ -87,6 +91,27 @@ describe('auditLog/utils', () => {
       const record = { id: 'x-123' };
       const result = buildSubjectFkFields('UnknownModel', record);
       expect(result).toEqual({});
+    });
+  });
+
+  describe('buildContextFkFields', () => {
+    it('uses record.id as contextOrganizationId for Organization', () => {
+      const result = buildContextFkFields('Organization', { id: 'org-123' });
+      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: null });
+    });
+
+    it('uses organizationId plus record.id for Space', () => {
+      const result = buildContextFkFields('Space', { id: 'space-123', organizationId: 'org-123' });
+      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123' });
+    });
+
+    it('passes through organizationId and spaceId for composite members', () => {
+      const result = buildContextFkFields('SpaceUser', {
+        organizationId: 'org-123',
+        spaceId: 'space-123',
+        userId: 'user-123',
+      });
+      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123' });
     });
   });
 

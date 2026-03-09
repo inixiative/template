@@ -6,6 +6,7 @@ export type AuditActor = {
   actorTokenId: string | null;
   ipAddress: string | null;
   userAgent: string | null;
+  sourceInquiryId: string | null;
 };
 
 const store = new AsyncLocalStorage<AuditActor>();

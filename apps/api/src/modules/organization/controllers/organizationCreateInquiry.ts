@@ -5,6 +5,7 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { attachInquiryAuditLogs, includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { resolveInquirySource } from '#/modules/inquiry/services/resolveInquirySource';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
@@ -39,14 +40,14 @@ export const organizationCreateInquiryController = makeController(
     const inquiry = await db.inquiry.create({
       data: {
         ...body,
-        content: content as Prisma.InputJsonValue,
-        ...source,
-        ...target,
-        sentAt: body.status === InquiryStatus.sent ? new Date() : null,
-      },
-      include: { targetUser: true, targetOrganization: true, targetSpace: true },
+      content: content as Prisma.InputJsonValue,
+      ...source,
+      ...target,
+      sentAt: body.status === InquiryStatus.sent ? new Date() : null,
+    },
+      include: includeInquirySent,
     });
 
-    return respond.created(inquiry);
+    return respond.created(await attachInquiryAuditLogs(db, inquiry));
   },
 );

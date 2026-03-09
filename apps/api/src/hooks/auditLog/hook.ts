@@ -1,16 +1,29 @@
-import type { HookOptions, ManyAction, SingleAction } from '@template/db';
+import type { HookOptions, ManyAction, Prisma, SingleAction } from '@template/db';
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '#/lib/auditActorContext';
 import { isAuditEnabled } from '#/hooks/auditLog/constants/enabledModels';
-import { buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { auditActorContext } from '#/lib/auditActorContext';
 
-const dbActionToAuditAction = (dbAction: DbAction, hasPrevious: boolean): AuditAction => {
-  if (dbAction === DbAction.upsert) return hasPrevious ? AuditAction.update : AuditAction.create;
+const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
+  previous?.deletedAt == null && record?.deletedAt != null;
+
+const dbActionToAuditAction = (
+  dbAction: DbAction,
+  record: Record<string, unknown>,
+  previous?: Record<string, unknown>,
+): AuditAction => {
+  if (dbAction === DbAction.upsert) {
+    if (!previous) return AuditAction.create;
+    return isSoftDeleteTransition(previous, record) ? AuditAction.delete : AuditAction.update;
+  }
   if (dbAction === DbAction.createManyAndReturn) return AuditAction.create;
-  if (dbAction === DbAction.updateManyAndReturn) return AuditAction.update;
+  if (dbAction === DbAction.update || dbAction === DbAction.updateManyAndReturn) {
+    return isSoftDeleteTransition(previous, record) ? AuditAction.delete : AuditAction.update;
+  }
+  if (dbAction === DbAction.create) return AuditAction.create;
   if (dbAction === DbAction.deleteMany) return AuditAction.delete;
-  return dbAction as unknown as AuditAction;
+  return AuditAction.delete;
 };
 
 const isManyAction = (action: DbAction): action is ManyAction =>
@@ -21,7 +34,7 @@ const buildAuditEntry = (
   action: AuditAction,
   record: Record<string, unknown>,
   previous?: Record<string, unknown>,
-) => {
+): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.get();
 
   const processedAfter = action !== AuditAction.delete ? processAuditData(model, record) : undefined;
@@ -30,6 +43,8 @@ const buildAuditEntry = (
     action === AuditAction.update && processedBefore && processedAfter
       ? computeDiff(model, previous!, record)
       : undefined;
+
+  if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
 
   return {
     action,
@@ -42,8 +57,8 @@ const buildAuditEntry = (
     actorTokenId: actor?.actorTokenId ?? null,
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
-    organizationId: (record.organizationId as string | null) ?? null,
-    spaceId: (record.spaceId as string | null) ?? null,
+    sourceInquiryId: actor?.sourceInquiryId ?? null,
+    ...buildContextFkFields(model, record),
     ...buildSubjectFkFields(model, record),
   };
 };
@@ -62,9 +77,10 @@ export const registerAuditLogHook = () => {
   registerDbHook('auditLog', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action: dbAction } = options;
 
+    if (model === 'AuditLog') return;
     if (!isAuditEnabled(model)) return;
 
-    const entries: ReturnType<typeof buildAuditEntry>[] = [];
+    const entries: NonNullable<ReturnType<typeof buildAuditEntry>>[] = [];
 
     if (isManyAction(dbAction)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
@@ -74,19 +90,29 @@ export const registerAuditLogHook = () => {
 
       for (const record of results) {
         const prev = previousById.get(record.id);
-        entries.push(buildAuditEntry(model as AuditSubjectModel, dbActionToAuditAction(dbAction, !!prev), record, prev));
+        const entry = buildAuditEntry(
+          model as AuditSubjectModel,
+          dbActionToAuditAction(dbAction, record, prev),
+          record,
+          prev,
+        );
+        if (entry) entries.push(entry);
       }
     } else {
       const { result, previous } = options as HookOptions & { action: SingleAction };
       const record = result as Record<string, unknown> & { id: string };
       const prev = previous as Record<string, unknown> | undefined;
-      entries.push(buildAuditEntry(model as AuditSubjectModel, dbActionToAuditAction(dbAction, !!prev), record, prev));
+      const entry = buildAuditEntry(
+        model as AuditSubjectModel,
+        dbActionToAuditAction(dbAction, record, prev),
+        record,
+        prev,
+      );
+      if (entry) entries.push(entry);
     }
 
     if (entries.length === 0) return;
 
-    db.onCommit(async () => {
-      await db.auditLog.createMany({ data: entries as any });
-    });
+    await db.auditLog.createMany({ data: entries });
   });
 };
