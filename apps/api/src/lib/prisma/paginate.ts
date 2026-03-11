@@ -66,7 +66,7 @@ export const paginate = async <
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
 
-  const skipFieldValidation = isSuperadmin(c) || c.get('organizationUsers')?.some((ou) => ou.role === 'admin' || ou.role === 'owner') || false;
+  const skipFieldValidation = isSuperadmin(c);
 
   const searchWhere = searchableFields?.length || skipFieldValidation
     ? buildWhereClause({ search, searchFields, searchableFields, skipFieldValidation, filters: {} })
