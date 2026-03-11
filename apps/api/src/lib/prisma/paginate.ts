@@ -1,5 +1,6 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
+import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
@@ -65,8 +66,12 @@ export const paginate = async <
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
 
+  const contextAdminSearchableFields = c.get('adminSearchableFields');
+  const isAdmin = isSuperadmin(c) || c.get('organizationUsers')?.some((ou) => ou.role === 'admin' || ou.role === 'owner');
+  const adminSearchableFields = isAdmin && contextAdminSearchableFields?.length ? contextAdminSearchableFields : undefined;
+
   const searchWhere = searchableFields?.length
-    ? buildWhereClause({ search, searchFields, searchableFields, filters: {} })
+    ? buildWhereClause({ search, searchFields, searchableFields, adminSearchableFields, filters: {} })
     : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

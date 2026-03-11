@@ -265,6 +265,105 @@ describe('buildWhereClause', () => {
     });
   });
 
+  describe('adminSearchableFields', () => {
+    it('allows fields under admin relation prefix when adminSearchableFields provided', () => {
+      const result = buildWhereClause({
+        searchFields: { user: { name: 'john' } },
+        searchableFields: ['status'],
+        adminSearchableFields: ['user'],
+      });
+
+      expect(result).toEqual({
+        AND: [{ user: { name: { contains: 'john', mode: 'insensitive' } } }],
+      });
+    });
+
+    it('blocks fields under admin relation prefix when adminSearchableFields not provided', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: { user: { name: 'john' } },
+          searchableFields: ['status'],
+        }),
+      ).toThrow("Field 'user.name' is not searchable");
+    });
+
+    it('allows relation operators on admin relations', () => {
+      const result = buildWhereClause({
+        searchFields: {
+          posts: {
+            some: {
+              title: 'hello',
+            },
+          },
+        },
+        searchableFields: ['name'],
+        adminSearchableFields: ['posts'],
+      });
+
+      expect(result).toEqual({
+        AND: [{ posts: { some: { title: 'hello' } } }],
+      });
+    });
+
+    it('blocks relation operators on non-admin non-searchable relations', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: {
+            posts: {
+              some: {
+                title: 'hello',
+              },
+            },
+          },
+          searchableFields: ['name'],
+        }),
+      ).toThrow("Relation 'posts' is not searchable");
+    });
+
+    it('allows nested admin relation fields with operators', () => {
+      const result = buildWhereClause({
+        searchFields: {
+          user: {
+            email: { contains: '@example.com' },
+          },
+        },
+        searchableFields: ['name'],
+        adminSearchableFields: ['user'],
+      });
+
+      expect(result).toEqual({
+        AND: [{ user: { email: { contains: '@example.com' } } }],
+      });
+    });
+
+    it('still allows regular searchableFields alongside adminSearchableFields', () => {
+      const result = buildWhereClause({
+        searchFields: { name: 'john', user: { email: 'test' } },
+        searchableFields: ['name'],
+        adminSearchableFields: ['user'],
+      });
+
+      expect(result).toEqual({
+        AND: [
+          { name: { contains: 'john', mode: 'insensitive' } },
+          { user: { email: { contains: 'test', mode: 'insensitive' } } },
+        ],
+      });
+    });
+
+    it('does not use admin fields for simple search (search param)', () => {
+      const result = buildWhereClause({
+        search: 'test',
+        searchableFields: ['name'],
+        adminSearchableFields: ['user'],
+      });
+
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: 'test', mode: 'insensitive' } }] }],
+      });
+    });
+  });
+
   describe('validation', () => {
     it('throws error for invalid path notation in searchable fields', () => {
       expect(() =>
