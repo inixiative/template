@@ -265,12 +265,12 @@ describe('buildWhereClause', () => {
     });
   });
 
-  describe('adminSearchableFields', () => {
-    it('allows fields under admin relation prefix when adminSearchableFields provided', () => {
+  describe('skipFieldValidation (admin bypass)', () => {
+    it('allows any valid field at any depth when skipFieldValidation is true', () => {
       const result = buildWhereClause({
         searchFields: { user: { name: 'john' } },
         searchableFields: ['status'],
-        adminSearchableFields: ['user'],
+        skipFieldValidation: true,
       });
 
       expect(result).toEqual({
@@ -278,7 +278,7 @@ describe('buildWhereClause', () => {
       });
     });
 
-    it('blocks fields under admin relation prefix when adminSearchableFields not provided', () => {
+    it('blocks non-whitelisted fields when skipFieldValidation is false', () => {
       expect(() =>
         buildWhereClause({
           searchFields: { user: { name: 'john' } },
@@ -287,25 +287,29 @@ describe('buildWhereClause', () => {
       ).toThrow("Field 'user.name' is not searchable");
     });
 
-    it('allows relation operators on admin relations', () => {
+    it('allows any relation with any operator when skipFieldValidation is true', () => {
       const result = buildWhereClause({
         searchFields: {
           posts: {
             some: {
-              title: 'hello',
+              author: {
+                is: {
+                  email: { contains: '@example.com' },
+                },
+              },
             },
           },
         },
-        searchableFields: ['name'],
-        adminSearchableFields: ['posts'],
+        searchableFields: [],
+        skipFieldValidation: true,
       });
 
       expect(result).toEqual({
-        AND: [{ posts: { some: { title: 'hello' } } }],
+        AND: [{ posts: { some: { author: { is: { email: { contains: '@example.com' } } } } } }],
       });
     });
 
-    it('blocks relation operators on non-admin non-searchable relations', () => {
+    it('blocks relation operators on non-whitelisted relations when skipFieldValidation is false', () => {
       expect(() =>
         buildWhereClause({
           searchFields: {
@@ -320,42 +324,36 @@ describe('buildWhereClause', () => {
       ).toThrow("Relation 'posts' is not searchable");
     });
 
-    it('allows nested admin relation fields with operators', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          user: {
-            email: { contains: '@example.com' },
-          },
-        },
-        searchableFields: ['name'],
-        adminSearchableFields: ['user'],
-      });
-
-      expect(result).toEqual({
-        AND: [{ user: { email: { contains: '@example.com' } } }],
-      });
+    it('still validates path notation even when skipFieldValidation is true', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: { '../admin': 'test' },
+          searchableFields: [],
+          skipFieldValidation: true,
+        }),
+      ).toThrow('Invalid search field');
     });
 
-    it('still allows regular searchableFields alongside adminSearchableFields', () => {
+    it('works with empty searchableFields when skipFieldValidation is true', () => {
       const result = buildWhereClause({
-        searchFields: { name: 'john', user: { email: 'test' } },
-        searchableFields: ['name'],
-        adminSearchableFields: ['user'],
+        searchFields: { name: 'john', email: { endsWith: '@example.com' } },
+        searchableFields: [],
+        skipFieldValidation: true,
       });
 
       expect(result).toEqual({
         AND: [
           { name: { contains: 'john', mode: 'insensitive' } },
-          { user: { email: { contains: 'test', mode: 'insensitive' } } },
+          { email: { endsWith: '@example.com' } },
         ],
       });
     });
 
-    it('does not use admin fields for simple search (search param)', () => {
+    it('simple search still uses only searchableFields even with skipFieldValidation', () => {
       const result = buildWhereClause({
         search: 'test',
         searchableFields: ['name'],
-        adminSearchableFields: ['user'],
+        skipFieldValidation: true,
       });
 
       expect(result).toEqual({

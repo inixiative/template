@@ -21,5 +21,4 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   paginate?: boolean;
   admin?: boolean;
   searchableFields?: readonly string[];
-  adminSearchableFields?: readonly string[];
 };

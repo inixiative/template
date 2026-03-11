@@ -66,12 +66,10 @@ export const paginate = async <
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
 
-  const contextAdminSearchableFields = c.get('adminSearchableFields');
-  const isAdmin = isSuperadmin(c) || c.get('organizationUsers')?.some((ou) => ou.role === 'admin' || ou.role === 'owner');
-  const adminSearchableFields = isAdmin && contextAdminSearchableFields?.length ? contextAdminSearchableFields : undefined;
+  const skipFieldValidation = isSuperadmin(c) || c.get('organizationUsers')?.some((ou) => ou.role === 'admin' || ou.role === 'owner') || false;
 
-  const searchWhere = searchableFields?.length
-    ? buildWhereClause({ search, searchFields, searchableFields, adminSearchableFields, filters: {} })
+  const searchWhere = searchableFields?.length || skipFieldValidation
+    ? buildWhereClause({ search, searchFields, searchableFields, skipFieldValidation, filters: {} })
     : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

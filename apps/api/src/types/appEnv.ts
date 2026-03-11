@@ -31,7 +31,6 @@ export type AppVars = {
   resourceType: string | null;
   routeConfig: RouteConfig | null;
   searchableFields: readonly string[] | null;
-  adminSearchableFields: readonly string[] | null;
   bracketQuery: BracketQueryRecord;
 };
 

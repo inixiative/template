@@ -5,7 +5,7 @@ type BuildWhereOptions = {
   search?: string;
   searchFields?: BracketQueryRecord;
   searchableFields?: readonly string[];
-  adminSearchableFields?: readonly string[];
+  skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
 };
 
@@ -15,35 +15,14 @@ const fieldOperators = ['contains', 'equals', 'in', 'notIn', 'lt', 'lte', 'gt', 
 const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isFieldAllowed = (
-  path: string,
-  searchableFields: readonly string[],
-  adminSearchableFields?: readonly string[],
-): boolean => {
-  if (searchableFields.includes(path)) return true;
-  if (adminSearchableFields?.some((prefix) => path === prefix || path.startsWith(`${prefix}.`))) return true;
-  return false;
-};
-
-const isRelationAllowed = (
-  path: string,
-  searchableFields: readonly string[],
-  adminSearchableFields?: readonly string[],
-): boolean => {
-  if (searchableFields.some((f) => f === path || f.startsWith(`${path}.`))) return true;
-  if (adminSearchableFields?.some((prefix) => path === prefix || path.startsWith(`${prefix}.`) || prefix.startsWith(`${path}.`))) return true;
-  return false;
-};
-
 const validateAndTransformSearchFields = (
   obj: BracketQueryRecord,
   searchableFields: readonly string[],
-  adminSearchableFields?: readonly string[],
+  skipFieldValidation: boolean,
   prefix = '',
   autoContains = true,
   depth = 0,
 ): BracketQueryRecord => {
-  // Prevent stack overflow from deeply nested or circular queries
   if (depth > 10) {
     throw new Error('Search query nesting too deep (max 10 levels)');
   }
@@ -57,7 +36,7 @@ const validateAndTransformSearchFields = (
       if (!validatePathNotation(currentPath)) {
         throw new Error(`Invalid search field: ${currentPath}`);
       }
-      if (!isFieldAllowed(currentPath, searchableFields, adminSearchableFields)) {
+      if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       result[key] = autoContains ? { contains: value, mode: 'insensitive' as const } : value;
@@ -65,7 +44,7 @@ const validateAndTransformSearchFields = (
       if (!validatePathNotation(currentPath)) {
         throw new Error(`Invalid search field: ${currentPath}`);
       }
-      if (!isFieldAllowed(currentPath, searchableFields, adminSearchableFields)) {
+      if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       result[key] = value;
@@ -75,7 +54,7 @@ const validateAndTransformSearchFields = (
       const hasFieldOperator = keys.some((k) => fieldOperators.includes(k));
 
       if (hasRelationOperator) {
-        if (!isRelationAllowed(currentPath, searchableFields, adminSearchableFields)) {
+        if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
           throw new Error(`Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
         }
         const relationValue: BracketQueryRecord = {};
@@ -84,7 +63,7 @@ const validateAndTransformSearchFields = (
             relationValue[opKey] = validateAndTransformSearchFields(
               opValue,
               searchableFields,
-              adminSearchableFields,
+              skipFieldValidation,
               currentPath,
               false,
               depth + 1,
@@ -96,12 +75,12 @@ const validateAndTransformSearchFields = (
         if (!validatePathNotation(currentPath)) {
           throw new Error(`Invalid search field: ${currentPath}`);
         }
-        if (!isFieldAllowed(currentPath, searchableFields, adminSearchableFields)) {
+        if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
           throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
         }
         result[key] = value;
       } else {
-        result[key] = validateAndTransformSearchFields(value, searchableFields, adminSearchableFields, currentPath, autoContains, depth + 1);
+        result[key] = validateAndTransformSearchFields(value, searchableFields, skipFieldValidation, currentPath, autoContains, depth + 1);
       }
     }
   }
@@ -110,7 +89,7 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { search, searchFields, searchableFields = [], adminSearchableFields, filters = {} } = options;
+  const { search, searchFields, searchableFields = [], skipFieldValidation = false, filters = {} } = options;
   const conditions: Record<string, unknown>[] = [];
 
   if (search && searchableFields.length) {
@@ -127,8 +106,8 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     conditions.push({ OR: searchConditions });
   }
 
-  if (searchFields && searchableFields.length) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, adminSearchableFields);
+  if (searchFields && (searchableFields.length || skipFieldValidation)) {
+    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation);
     for (const [key, value] of Object.entries(transformed)) {
       conditions.push({ [key]: value });
     }
