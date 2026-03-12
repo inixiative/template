@@ -493,38 +493,42 @@ readRoute({
   many: true,
   paginate: true,
   responseSchema: OrganizationSchema,
-  searchableFields: searchable([
-    'name', 'slug', 'description',
-    { members: ['role', { user: ['name', 'email'] }] },
-  ]),
-  // Expands to: ['name', 'slug', 'description', 'members.role', 'members.user.name', 'members.user.email']
+  searchableFields: searchable({
+    organization: [
+      'name', 'slug', 'description',
+      { organizationUsers: ['role', { user: ['name', 'email'] }] },
+    ],
+  }),
+  // Expands to: ['name', 'slug', 'description', 'organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
 });
 ```
 
-**`searchable()` helper** - generates dot-notation paths from a compact nested format:
+**`searchable()` helper** - validates fields against Prisma schema and generates dot-notation paths:
 ```typescript
 import { searchable } from '#/lib/prisma/searchable';
 
-// Plain strings pass through
-searchable(['name', 'slug'])
+// Takes { model: fields[] } — model key is validated against Prisma schema
+searchable({ organization: ['name', 'slug'] })
 // → ['name', 'slug']
 
-// Objects expand relation fields
-searchable([{ user: ['name', 'email'] }])
-// → ['user.name', 'user.email']
+// Objects expand relation fields (validated as relations in Prisma)
+searchable({ organization: [{ organizationUsers: ['role'] }] })
+// → ['organizationUsers.role']
 
 // Single string value
-searchable([{ user: 'name' }])
-// → ['user.name']
+searchable({ organization: [{ organizationUsers: 'role' }] })
+// → ['organizationUsers.role']
 
 // Nested relations
-searchable([{ posts: ['title', { author: ['name', 'email'] }] }])
-// → ['posts.title', 'posts.author.name', 'posts.author.email']
+searchable({ organization: [{ organizationUsers: ['role', { user: ['name', 'email'] }] }] })
+// → ['organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
 
 // Object value (shorthand for single nested relation)
-searchable([{ user: { profile: ['name', 'avatar'] } }])
-// → ['user.profile.name', 'user.profile.avatar']
+searchable({ organization: [{ organizationUsers: { user: ['name', 'email'] } }] })
+// → ['organizationUsers.user.name', 'organizationUsers.user.email']
 ```
+
+**Note:** Admin routes do not define `searchableFields` — superadmins bypass the whitelist via `skipFieldValidation` and can search any valid Prisma field.
 
 **Controller** (simplified):
 ```typescript
@@ -628,12 +632,13 @@ When using relation filters, explicitly whitelist nested fields. Use `searchable
 import { searchable } from '#/lib/prisma/searchable';
 
 // Route definition
-searchableFields: searchable([
-  'name',                                    // Direct field
-  'slug',                                    // Direct field
-  { posts: ['status', 'title', { author: ['name'] }] },  // Relation fields
-  { members: ['role'] },                     // Relation field
-])
+searchableFields: searchable({
+  organization: [
+    'name',                                    // Direct field
+    'slug',                                    // Direct field
+    { organizationUsers: ['role', { user: ['name'] }] },  // Relation fields
+  ],
+})
 // Expands to: ['name', 'slug', 'posts.status', 'posts.title', 'posts.author.name', 'members.role']
 
 // Allowed queries:
@@ -704,24 +709,26 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ## Frontend Metadata
 
-Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables.
+Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables. Only tenant routes define `searchableFields` — admin routes omit them since superadmins bypass the whitelist.
 
 ### OpenAPI Extensions
 
 Routes with `searchableFields` automatically include OpenAPI extensions:
 
 ```typescript
-// Route definition
+// Route definition (tenant route)
 readRoute({
-  model: Modules.space,
+  model: Modules.me,
+  submodel: Modules.inquiry,
+  action: 'sent',
   many: true,
   paginate: true,
-  responseSchema: SpaceScalarSchema,
-  searchableFields: ['name', 'slug'],
+  responseSchema: inquirySentResponseSchema,
+  searchableFields: inquirySearchableFields,
 });
 
 // Generated OpenAPI spec includes:
-// "x-searchable-fields": ["name", "slug"]
+// "x-searchable-fields": ["type", "status", ...]
 ```
 
 ### Extracting Metadata
@@ -729,19 +736,15 @@ readRoute({
 Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
 
 ```typescript
-import { getQueryMetadata, useQueryMetadata } from '@template/shared';
-
-// By path
-const meta = getQueryMetadata('/api/admin/space', 'get');
-// => { searchableFields: ['name', 'slug'] }
+import { getQueryMetadata, useQueryMetadata } from '@template/ui/lib';
 
 // By operation ID (recommended)
-const meta = getQueryMetadataByOperation('adminSpaceReadMany');
+const meta = getQueryMetadataByOperation('meReadManyOrganizations');
 
 // In React component
-function SpacesTable() {
-  const meta = useQueryMetadata('adminSpaceReadMany');
-  // Use meta.searchableFields
+function OrganizationsTable() {
+  const meta = useQueryMetadata('meReadManyOrganizations');
+  // Use meta.searchableFields, meta.orderableFields, meta.enumFilters
 }
 ```
 
@@ -750,16 +753,16 @@ function SpacesTable() {
 Use `makeDataTableConfig()` to create table configurations:
 
 ```typescript
-import { makeDataTableConfig, useDataTableConfig } from '@template/shared';
+import { makeDataTableConfig, useDataTableConfig } from '@template/ui/lib';
 
 // Standalone
-const config = makeDataTableConfig('adminSpaceReadMany', {
+const config = makeDataTableConfig('meReadManyOrganizations', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
 });
 
 // In React component
-function SpacesTable() {
-  const config = useDataTableConfig('adminSpaceReadMany');
+function OrganizationsTable() {
+  const config = useDataTableConfig('meReadManyOrganizations');
 
   return (
     <DataTable

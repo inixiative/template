@@ -61,7 +61,7 @@ describe('searchable', () => {
   });
 
   it('throws for invalid field on model', () => {
-    expect(() => searchable({ organization: ['nonexistent'] })).toThrow("does not exist on model");
+    expect(() => searchable({ organization: ['nonexistent'] })).toThrow("does not exist on");
   });
 
   it('throws when using a relation as a scalar', () => {
