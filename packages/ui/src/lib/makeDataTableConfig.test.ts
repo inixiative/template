@@ -2,11 +2,17 @@ import { describe, expect, it } from 'bun:test';
 import { makeDataTableConfig } from '@template/ui/lib/makeDataTableConfig';
 
 describe('makeDataTableConfig', () => {
-  it('extracts searchable fields from x-searchable-fields', () => {
+  it('returns empty searchable fields for admin routes without explicit whitelist', () => {
     const config = makeDataTableConfig('adminOrganizationReadMany');
 
-    expect(config.searchableFields).toContain('name');
-    expect(config.searchableFields).toContain('slug');
+    expect(config.searchableFields).toEqual([]);
+  });
+
+  it('extracts searchable fields from x-searchable-fields', () => {
+    const config = makeDataTableConfig('adminInquiryReadMany');
+
+    expect(config.searchableFields).toContain('type');
+    expect(config.searchableFields).toContain('status');
   });
 
   it('auto-detects orderable fields from response schema (recursive)', () => {
