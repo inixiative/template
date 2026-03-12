@@ -34,5 +34,5 @@ export const searchable = (input: SearchableInput): readonly string[] => {
   const [modelKey, fields] = entries[0];
   const modelName = isModelName(modelKey) ? modelKey : toModelName(modelKey);
   if (!modelName) throw new Error(`searchable: '${modelKey}' is not a valid Prisma model name`);
-  return flatten(fields, modelName as string);
+  return flatten(fields, modelName);
 };
