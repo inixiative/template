@@ -3,7 +3,7 @@ import { type ModelName, getRuntimeDataModel, isModelName, toModelName } from '@
 type SearchableEntry = string | { [relation: string]: SearchableEntry | SearchableEntry[] };
 type SearchableInput = { [model: string]: SearchableEntry[] };
 
-const validateField = (modelName: string, fieldName: string): { kind: 'scalar' | 'object' | 'enum'; type: string } => {
+const validateField = (modelName: ModelName, fieldName: string): { kind: 'scalar' | 'object' | 'enum'; type: string } => {
   const dataModel = getRuntimeDataModel();
   const model = dataModel.models[modelName];
   if (!model) throw new Error(`searchable: model '${modelName}' not found in Prisma schema`);
@@ -12,7 +12,7 @@ const validateField = (modelName: string, fieldName: string): { kind: 'scalar' |
   return { kind: field.kind, type: field.type };
 };
 
-const flatten = (entries: SearchableEntry[], modelName: string, prefix = ''): string[] =>
+const flatten = (entries: SearchableEntry[], modelName: ModelName, prefix = ''): string[] =>
   entries.flatMap((entry) => {
     if (typeof entry === 'string') {
       const field = validateField(modelName, entry);
@@ -24,7 +24,7 @@ const flatten = (entries: SearchableEntry[], modelName: string, prefix = ''): st
       if (field.kind !== 'object') throw new Error(`searchable: '${relation}' on '${modelName}' is not a relation`);
       const path = prefix ? `${prefix}.${relation}` : relation;
       const children = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [value];
-      return flatten(children, field.type, path);
+      return flatten(children, field.type as ModelName, path);
     });
   });
 
