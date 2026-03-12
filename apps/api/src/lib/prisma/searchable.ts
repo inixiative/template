@@ -28,7 +28,7 @@ const flatten = (entries: SearchableEntry[], modelName: string, prefix = ''): st
     });
   });
 
-export const searchable = (input: SearchableInput): string[] => {
+export const searchable = (input: SearchableInput): readonly string[] => {
   const entries = Object.entries(input);
   if (entries.length !== 1) throw new Error('searchable: must provide exactly one model as root key');
   const [modelKey, fields] = entries[0];
