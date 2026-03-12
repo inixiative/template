@@ -7,10 +7,8 @@ const validateField = (modelName: string, fieldName: string): { kind: 'scalar' |
   const dataModel = getRuntimeDataModel();
   const model = dataModel.models[modelName];
   if (!model) throw new Error(`searchable: model '${modelName}' not found in Prisma schema`);
-
   const field = model.fields.find((f) => f.name === fieldName);
   if (!field) throw new Error(`searchable: field '${fieldName}' does not exist on model '${modelName}'`);
-
   return { kind: field.kind, type: field.type };
 };
 
@@ -24,25 +22,17 @@ const flatten = (entries: SearchableEntry[], modelName: string, prefix = ''): st
     return Object.entries(entry).flatMap(([relation, value]) => {
       const field = validateField(modelName, relation);
       if (field.kind !== 'object') throw new Error(`searchable: '${relation}' on '${modelName}' is not a relation`);
-
       const path = prefix ? `${prefix}.${relation}` : relation;
-      const targetModel = field.type;
-      if (typeof value === 'string') {
-        validateField(targetModel, value);
-        return [`${path}.${value}`];
-      }
-      if (Array.isArray(value)) return flatten(value, targetModel, path);
-      return flatten([value], targetModel, path);
+      const children = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [value];
+      return flatten(children, field.type, path);
     });
   });
 
 export const searchable = (input: SearchableInput): string[] => {
   const entries = Object.entries(input);
   if (entries.length !== 1) throw new Error('searchable: must provide exactly one model as root key');
-
   const [modelKey, fields] = entries[0];
   const modelName = isModelName(modelKey) ? modelKey : toModelName(modelKey);
   if (!modelName) throw new Error(`searchable: '${modelKey}' is not a valid Prisma model name`);
-
   return flatten(fields, modelName as string);
 };

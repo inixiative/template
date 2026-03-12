@@ -23,6 +23,10 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return respond500(c, err);
   }
 
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    return makeError({ status: 400, message: 'Invalid query parameters' }).getResponse();
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       const target = (err.meta?.target as string[])?.join(', ') || 'unknown';

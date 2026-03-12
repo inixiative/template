@@ -12,5 +12,4 @@ export const adminOrganizationReadManyRoute = readRoute({
     deleted: z.enum(['true', 'false', 'all']).default('false'),
   }),
   responseSchema: OrganizationScalarSchema,
-  searchableFields: ['name', 'slug'],
 });
