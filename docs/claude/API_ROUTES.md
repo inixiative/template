@@ -486,13 +486,44 @@ GET /api/v1/items?searchFields[comments][none][flagged]=true
 
 **Route definition** (new way):
 ```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
 readRoute({
   model: Modules.organization,
   many: true,
   paginate: true,
   responseSchema: OrganizationSchema,
-  searchableFields: ['name', 'slug', 'description'],  // Auto-injects search & searchFields
+  searchableFields: searchable([
+    'name', 'slug', 'description',
+    { members: ['role', { user: ['name', 'email'] }] },
+  ]),
+  // Expands to: ['name', 'slug', 'description', 'members.role', 'members.user.name', 'members.user.email']
 });
+```
+
+**`searchable()` helper** - generates dot-notation paths from a compact nested format:
+```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
+// Plain strings pass through
+searchable(['name', 'slug'])
+// → ['name', 'slug']
+
+// Objects expand relation fields
+searchable([{ user: ['name', 'email'] }])
+// → ['user.name', 'user.email']
+
+// Single string value
+searchable([{ user: 'name' }])
+// → ['user.name']
+
+// Nested relations
+searchable([{ posts: ['title', { author: ['name', 'email'] }] }])
+// → ['posts.title', 'posts.author.name', 'posts.author.email']
+
+// Object value (shorthand for single nested relation)
+searchable([{ user: { profile: ['name', 'avatar'] } }])
+// → ['user.profile.name', 'user.profile.avatar']
 ```
 
 **Controller** (simplified):
@@ -533,10 +564,11 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 **Security:**
 - Only fields in `searchableFields` can be searched (whitelist validation with full paths)
+- **Superadmin bypass**: Users with `platformRole: 'superadmin'` skip the whitelist and can search any valid field at any depth. Path notation validation still applies.
 - Path notation is validated to prevent injection (camelCase enforced, rejects snake_case)
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
 - Supports nested relation fields (e.g., `posts.status`, `posts.author.name`)
-- Relation fields must be explicitly whitelisted to prevent unauthorized access
+- Relation fields must be explicitly whitelisted to prevent unauthorized access (non-superadmin)
 - Depth limit (10 levels) prevents stack overflow from deeply nested queries
 - Routes without `searchableFields` gracefully ignore search parameters (no crash)
 
@@ -590,32 +622,36 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields:
+When using relation filters, explicitly whitelist nested fields. Use `searchable()` for compact notation:
 
 ```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
 // Route definition
-searchableFields: [
-  'name',                    // Direct field
-  'slug',                    // Direct field
-  'posts.status',            // Relation field (explicit)
-  'posts.title',             // Relation field (explicit)
-  'posts.author.name',       // Nested relation (explicit)
-  'members.role'             // Relation field
-]
+searchableFields: searchable([
+  'name',                                    // Direct field
+  'slug',                                    // Direct field
+  { posts: ['status', 'title', { author: ['name'] }] },  // Relation fields
+  { members: ['role'] },                     // Relation field
+])
+// Expands to: ['name', 'slug', 'posts.status', 'posts.title', 'posts.author.name', 'members.role']
 
 // Allowed queries:
 ?searchFields[posts][some][status]=published        // ✓ posts.status whitelisted
 ?searchFields[posts][some][title]=test              // ✓ posts.title whitelisted
 ?searchFields[posts][some][author][name]=John       // ✓ posts.author.name whitelisted
 
-// Rejected queries:
+// Rejected queries (non-superadmin):
 ?searchFields[posts][some][secretField]=hack        // ✗ posts.secretField not whitelisted
 ?searchFields[posts][some][author][email]=test      // ✗ posts.author.email not whitelisted
+
+// Superadmin: all valid fields allowed regardless of whitelist
 ```
 
 **Validation:**
-- Full path must be in `searchableFields` array
-- Use dot notation: `posts.status`, not hierarchical objects
+- Full path must be in `searchableFields` array (non-superadmin users)
+- Superadmin (`platformRole: 'superadmin'`) bypasses the whitelist entirely
+- Use `searchable()` helper for compact relation field definitions
 - Relation operators (`some`, `every`, `none`) are automatically supported
 - Error thrown for non-whitelisted fields (not silently ignored)
 
