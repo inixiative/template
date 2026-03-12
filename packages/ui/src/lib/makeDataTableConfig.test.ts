@@ -8,11 +8,10 @@ describe('makeDataTableConfig', () => {
     expect(config.searchableFields).toEqual([]);
   });
 
-  it('extracts searchable fields from x-searchable-fields', () => {
+  it('returns empty searchable fields for all admin routes', () => {
     const config = makeDataTableConfig('adminInquiryReadMany');
 
-    expect(config.searchableFields).toContain('type');
-    expect(config.searchableFields).toContain('status');
+    expect(config.searchableFields).toEqual([]);
   });
 
   it('auto-detects orderable fields from response schema (recursive)', () => {
