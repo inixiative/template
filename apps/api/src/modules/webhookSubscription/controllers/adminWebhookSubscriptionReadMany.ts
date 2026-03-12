@@ -9,7 +9,6 @@ export const adminWebhookSubscriptionReadManyController = makeController(
     const { ownerModel, userId, organizationId, model, isActive } = c.req.valid('query');
 
     const { data, pagination } = await paginate(c, db.webhookSubscription, {
-      searchableFields: ['url', 'model'],
       where: {
         ...(ownerModel && { ownerModel }),
         ...(userId && { userId }),
