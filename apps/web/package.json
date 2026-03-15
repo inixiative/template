@@ -37,7 +37,7 @@
     "postcss": "^8.5.8",
     "tailwindcss": "*",
     "typescript": "*",
-    "vite": "*",
+    "vite": "^7.0.0",
     "vite-plugin-node-polyfills": "^0.25.0",
     "vite-tsconfig-paths": "*"
   }
