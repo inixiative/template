@@ -67,7 +67,7 @@ export const initializeWorker = async (): Promise<void> => {
               job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
               throw error;
             }
-          }),
+          }, 'worker'),
         ),
       );
     },

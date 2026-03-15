@@ -79,6 +79,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   if (batchContext) {
     await next();
   } else {
-    await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
+    await logScope('api', () => logScope(requestId, () => db.scope(requestId, next, 'api')));
   }
 };
