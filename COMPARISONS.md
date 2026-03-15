@@ -98,8 +98,16 @@ Prisma 7 + PostgreSQL 18 with: automatic transaction merging via AsyncLocalStora
 | Hydration with N+1 prevention | **Yes** (PendingMap) | `include` (no dedup) | No | Eager loading | Eager loading | `populate` with N+1 problems that surface at scale |
 | Split schema (file per model) | **Yes** | **Native** (v6.7+) | Schema-as-code | Entities | Models | Entities |
 | UUID v7 (DB-generated) | **Yes** (`uuidv7()`) | Manual | Manual | Manual | Manual | Manual |
-| False polymorphism with CHECK constraints | **Yes** | Manual SQL | Manual SQL | Manual SQL | Manual SQL | Manual SQL |
+| False polymorphism with CHECK constraints + FK enforcement | **Yes** | Manual SQL | Manual SQL | Manual SQL | Manual SQL | Manual SQL |
 | Blocked unsafe operations | **Yes** (forces `AndReturn`) | No | N/A | No | No | No |
+
+### False polymorphism
+
+Prisma has no native polymorphism support. Rails does (`belongs_to :commentable, polymorphic: true`), but Rails-style polymorphism uses `(modelType, modelId)` composite columns — no FK constraint, meaning orphaned references are silent and common, and the query planner gets no type information.
+
+The template uses explicit FK columns per related type instead. This gives you: real FK constraints enforced at the DB level, typed indexes that are ~2x faster than composite `(type, id)` indexes because the planner knows exactly what it's joining, and no runtime type discrimination in application code. Prisma happens to handle these explicit FK queries well, so you get the schema clarity without losing query ergonomics.
+
+It's not a workaround for a missing Prisma feature — it's a pattern that's strictly better than what Rails offers for the common case, filling a gap that Prisma doesn't address at all.
 
 ### The gap no one fills
 **No existing ORM provides transaction-aware hooks that execute inside the transaction, roll back on failure, AND defer side effects to post-commit.** This is the exact problem that causes webhooks to fire on rolled-back financial transactions. Every ORM either fires "after" hooks before commit (risking phantom side effects) or has no hook system at all. Only Sequelize has native `afterCommit`, but it doesn't have transaction-aware entity hooks.
@@ -233,6 +241,8 @@ No other REST framework provides this depth of flexible URL-native querying.
 
 ### The batch API
 Four execution strategies — `transactionAll`, `transactionPerRound`, `allowFailures`, `failOnRound` — with result interpolation (`<<0.0.data.id>>` references output from previous rounds). Most batch APIs (Google, Facebook, Microsoft 365) offer at most two modes (atomic vs non-atomic). The template's four strategies plus interpolation are ahead of industry standard.
+
+The real problem this solves isn't round trips — it's the code people write to avoid them. Without a batching primitive, teams collapse multiple operations into fat multi-responsibility endpoints: `createUserAndSendEmailAndUpdateOrgAndNotify()`. These endpoints are untestable, unpredictable, and impossible to reason about. They exist purely to avoid making six calls from the client. The batch API lets you keep endpoints small and atomic — each does one thing — and compose them at the call site instead of inside the handler. That's the architectural benefit. The round trip reduction is a side effect.
 
 ### Honest assessment
 The API layer is the most opinionated part of the template. The route templates eliminate boilerplate but enforce a specific CRUD-oriented pattern. Teams that need non-CRUD endpoints use `actionRoute`, which is flexible but less structured. The response validation (throwing 500 if your response doesn't match the schema) is strict — some teams may find this too aggressive for development velocity.
