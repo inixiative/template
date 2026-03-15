@@ -70,8 +70,14 @@ Permify-powered unified RBAC + ABAC + ReBAC with Google Zanzibar-style relations
 ### The gap no one fills
 The Permify + json-rules combination is unique. No dedicated authorization service offers runtime JSON-based policy changes without code deployment. Most use their own DSL (Permify's schema language, SpiceDB's DSL, Oso's Polar). The template's approach lets you change authorization rules by updating JSON in the database — no redeploy needed.
 
+More importantly: every other permission system requires you to **sync your data into their model**. User created? Push a relationship tuple to SpiceDB. Role changed? Sync it. Tenant switched? Update the graph. You now have two sources of truth and an eventual consistency problem between them.
+
+This template's rules evaluate against data that already exists in your database. No sync layer, no drift, no state where permissions say yes but the record doesn't exist. And because json-rules compiles to Prisma via `toPrisma()`, you can invert the question entirely: instead of "does user X have permission Y?", you can ask **"give me every user who has permission Y on resource Z"** — as a composable Prisma query, paginated, joined with anything, inside a single transaction. No other permission system can do this. SpiceDB, OpenFGA, and Permify can answer point lookups; they cannot generate the query set of entitled actors in a form you can compose with the rest of your data layer.
+
+Practical examples: notify every user entitled to see a space when it changes, bulk-migrate every actor with a given role, find all admins across orgs with a specific entitlement. With SpiceDB you'd fetch all subjects, then query your DB separately, then reconcile — two round trips, no transaction, pagination is a nightmare. Here it's one query.
+
 ### Honest assessment
-The permission system is comprehensive. The 10-minute Redis cache TTL means permission changes can take up to 10 minutes to propagate — SpiceDB's ZedTokens offer tunable consistency, which is more sophisticated. The template trades precision for simplicity here.
+The permission system is comprehensive. The Redis cache is event-driven via the db hook — a permission change triggers cache invalidation immediately, making the TTL a safety net rather than the primary expiry mechanism. The json-rules approach trades the power of a dedicated authorization DSL for compactness and composability with the rest of the stack. For most SaaS products, that's the right trade.
 
 ---
 
@@ -219,9 +225,11 @@ The template's pseudo-GraphQL filtering deserves special attention:
 ?searchFields[tags][some][name]=urgent
 ```
 
-This gives you GraphQL-like flexible querying over REST without GraphQL's complexity (no schema stitching, no N+1 resolver traps, no subscription awkwardness). Eleven field operators (`contains`, `equals`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `startsWith`, `endsWith`, `not`) plus five relation operators (`some`, `every`, `none`, `is`, `isNot`) with 10-level nesting depth. Non-superadmin requests validate against declared `searchableFields`.
+Eleven field operators (`contains`, `equals`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `startsWith`, `endsWith`, `not`) plus five relation operators (`some`, `every`, `none`, `is`, `isNot`) with 10-level nesting depth. Non-superadmin requests validate against declared `searchableFields`.
 
-No other REST framework provides this. The closest alternative is adopting GraphQL itself.
+**This is not a GraphQL alternative — it's better than GraphQL for most SaaS use cases.** GraphQL queries are POST request bodies. They are not in the URL, cannot be shared as links, cannot be bookmarked, and are not human-readable in logs or network tools. Bracket query state lives entirely in the URL — a filtered, sorted, paginated dashboard view can be shared as a link, bookmarked, deep-linked from an email, and replayed exactly. For a SaaS product where users navigate filtered data views, that matters every day. GraphQL's advantages (colocated queries, field-level selection) apply to product UIs fetching nested data; they don't apply to admin dashboards, list views, or any context where the query is driven by user-controlled filters.
+
+No other REST framework provides this depth of flexible URL-native querying.
 
 ### The batch API
 Four execution strategies — `transactionAll`, `transactionPerRound`, `allowFailures`, `failOnRound` — with result interpolation (`<<0.0.data.id>>` references output from previous rounds). Most batch APIs (Google, Facebook, Microsoft 365) offer at most two modes (atomic vs non-atomic). The template's four strategies plus interpolation are ahead of industry standard.
