@@ -41,6 +41,7 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   contentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
+  defaultExpirationDays: 90,
   validate,
   handleApprove: async (db, inquiry, content) => {
     await db.space.update({

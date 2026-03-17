@@ -6,6 +6,7 @@ import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { adminInquiryCreateRoute } from '#/modules/inquiry/routes/adminInquiryCreate';
+import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
 import { validateInquiryHandler } from '#/modules/inquiry/validations/validateInquiryHandler';
@@ -41,6 +42,7 @@ export const adminInquiryCreateController = makeController(adminInquiryCreateRou
       ...source,
       ...target,
       sentAt: body.status === InquiryStatus.sent ? new Date() : null,
+      expiresAt: body.status === InquiryStatus.sent ? computeExpiresAt(body.type) : null,
     },
   });
 

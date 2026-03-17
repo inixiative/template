@@ -18,6 +18,7 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
   unique: 'targeted',
+  defaultExpirationDays: 30,
 
   validate: async (db: Db, inquiry: Partial<Inquiry>, _content: InviteOrganizationUserContent) => {
     const organizationId = inquiry.sourceOrganizationId! as OrganizationId;

@@ -44,6 +44,10 @@ model Inquiry {
   @@index([targetSpaceId])
   @@index([type, status])
 
+  expiresAt DateTime?
+
+  @@index([expiresAt])
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

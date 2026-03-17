@@ -5,6 +5,7 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquirySource } from '#/modules/inquiry/services/resolveInquirySource';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
 import { validateInquiryPreCreate } from '#/modules/inquiry/services/validateInquiryPreCreate';
@@ -41,6 +42,7 @@ export const meCreateInquiryController = makeController(meCreateInquiryRoute, as
       ...source,
       ...target,
       sentAt: body.status === InquiryStatus.sent ? new Date() : null,
+      expiresAt: body.status === InquiryStatus.sent ? computeExpiresAt(body.type) : null,
     },
     include: { targetUser: true, targetOrganization: true, targetSpace: true },
   });

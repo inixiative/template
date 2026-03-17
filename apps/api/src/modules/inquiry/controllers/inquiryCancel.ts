@@ -10,7 +10,7 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
 
   validateInquiryIsCancelable(inquiry);
 
-  await db.inquiry.update({ where: { id: inquiry.id }, data: { status: InquiryStatus.canceled } });
+  await db.inquiry.update({ where: { id: inquiry.id }, data: { status: InquiryStatus.canceled, expiresAt: null } });
 
   return respond.noContent();
 });

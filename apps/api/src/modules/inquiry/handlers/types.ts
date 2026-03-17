@@ -18,4 +18,5 @@ export type InquiryHandler<
   handleApprove(db: Db, inquiry: Inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | void>;
   validate?(db: Db, inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   unique?: 'targeted' | 'untargeted';
+  defaultExpirationDays?: number;
 };
