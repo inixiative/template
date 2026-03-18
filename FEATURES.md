@@ -10,7 +10,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - **🟡 In Progress** - Actively being developed, partial implementation exists
 - **🟣 Coming Soon** - Planned work with tickets (see Coming Soon section for full roadmap)
 
-**Looking for something specific?** Use browser search (Cmd+F / Ctrl+F) to find features by keyword.
+**Looking for something specific?** Use browser search (Cmd+F / Ctrl+F) to find features by keyword. For a side-by-side comparison against managed services and open-source alternatives, see [COMPARISONS.md](./COMPARISONS.md).
 
 ---
 

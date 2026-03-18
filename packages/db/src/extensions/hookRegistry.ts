@@ -24,21 +24,24 @@ type HookOptionsBase = {
   args: unknown;
 };
 
-type SingleHookOptions = HookOptionsBase & {
+// T is the model's record shape. Defaults to Record<string, unknown> for
+// hooks that don't care about the specific model type. Use a narrower type
+// when registering model-specific hooks to avoid manual casting inside the hook.
+type SingleHookOptions<T = Record<string, unknown>> = HookOptionsBase & {
   action: SingleAction;
-  result?: Record<string, unknown>;
-  previous?: Record<string, unknown>;
+  result?: T;
+  previous?: T;
 };
 
-type ManyHookOptions = HookOptionsBase & {
+type ManyHookOptions<T = Record<string, unknown>> = HookOptionsBase & {
   action: ManyAction;
-  result?: Record<string, unknown>[];
-  previous?: Record<string, unknown>[];
+  result?: T[];
+  previous?: T[];
 };
 
-export type HookOptions = SingleHookOptions | ManyHookOptions;
+export type HookOptions<T = Record<string, unknown>> = SingleHookOptions<T> | ManyHookOptions<T>;
 
-export type HookFunction = (options: HookOptions) => Promise<void>;
+export type HookFunction<T = Record<string, unknown>> = (options: HookOptions<T>) => Promise<void>;
 
 const registeredHooks: {
   [model: string]: {
@@ -50,12 +53,12 @@ const registeredHooks: {
 
 const hookRegistry = new Set<string>();
 
-export const registerDbHook = (
+export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
   model: string | '*',
   timing: HookTiming,
   actions: DbAction[],
-  hook: HookFunction,
+  hook: HookFunction<T>,
 ) => {
   if (hookRegistry.has(name)) {
     log.warn(`Hook '${name}' already registered - skipping duplicate`, LogScope.hook);
@@ -75,7 +78,7 @@ export const registerDbHook = (
 
   for (const action of actions) {
     registeredHooks[model][timing][action] ??= [];
-    registeredHooks[model][timing][action]!.push(hook);
+    registeredHooks[model][timing][action]!.push(hook as HookFunction);
   }
 };
 

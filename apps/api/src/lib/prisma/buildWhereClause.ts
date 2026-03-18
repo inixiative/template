@@ -5,6 +5,7 @@ type BuildWhereOptions = {
   search?: string;
   searchFields?: BracketQueryRecord;
   searchableFields?: readonly string[];
+  skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
 };
 
@@ -17,11 +18,11 @@ const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is Br
 const validateAndTransformSearchFields = (
   obj: BracketQueryRecord,
   searchableFields: readonly string[],
+  skipFieldValidation: boolean,
   prefix = '',
   autoContains = true,
   depth = 0,
 ): BracketQueryRecord => {
-  // Prevent stack overflow from deeply nested or circular queries
   if (depth > 10) {
     throw new Error('Search query nesting too deep (max 10 levels)');
   }
@@ -35,7 +36,7 @@ const validateAndTransformSearchFields = (
       if (!validatePathNotation(currentPath)) {
         throw new Error(`Invalid search field: ${currentPath}`);
       }
-      if (!searchableFields.includes(currentPath)) {
+      if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       result[key] = autoContains ? { contains: value, mode: 'insensitive' as const } : value;
@@ -43,7 +44,7 @@ const validateAndTransformSearchFields = (
       if (!validatePathNotation(currentPath)) {
         throw new Error(`Invalid search field: ${currentPath}`);
       }
-      if (!searchableFields.includes(currentPath)) {
+      if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       result[key] = value;
@@ -53,12 +54,16 @@ const validateAndTransformSearchFields = (
       const hasFieldOperator = keys.some((k) => fieldOperators.includes(k));
 
       if (hasRelationOperator) {
+        if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
+          throw new Error(`Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
+        }
         const relationValue: BracketQueryRecord = {};
         for (const [opKey, opValue] of Object.entries(value)) {
           if (relationOperators.includes(opKey) && isBracketQueryRecord(opValue)) {
             relationValue[opKey] = validateAndTransformSearchFields(
               opValue,
               searchableFields,
+              skipFieldValidation,
               currentPath,
               false,
               depth + 1,
@@ -70,12 +75,12 @@ const validateAndTransformSearchFields = (
         if (!validatePathNotation(currentPath)) {
           throw new Error(`Invalid search field: ${currentPath}`);
         }
-        if (!searchableFields.includes(currentPath)) {
+        if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
           throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
         }
         result[key] = value;
       } else {
-        result[key] = validateAndTransformSearchFields(value, searchableFields, currentPath, autoContains, depth + 1);
+        result[key] = validateAndTransformSearchFields(value, searchableFields, skipFieldValidation, currentPath, autoContains, depth + 1);
       }
     }
   }
@@ -84,7 +89,7 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { search, searchFields, searchableFields = [], filters = {} } = options;
+  const { search, searchFields, searchableFields = [], skipFieldValidation = false, filters = {} } = options;
   const conditions: Record<string, unknown>[] = [];
 
   if (search && searchableFields.length) {
@@ -101,8 +106,8 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     conditions.push({ OR: searchConditions });
   }
 
-  if (searchFields && searchableFields.length) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields);
+  if (searchFields && (searchableFields.length || skipFieldValidation)) {
+    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation);
     for (const [key, value] of Object.entries(transformed)) {
       conditions.push({ [key]: value });
     }

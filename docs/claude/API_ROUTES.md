@@ -486,14 +486,49 @@ GET /api/v1/items?searchFields[comments][none][flagged]=true
 
 **Route definition** (new way):
 ```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
 readRoute({
   model: Modules.organization,
   many: true,
   paginate: true,
   responseSchema: OrganizationSchema,
-  searchableFields: ['name', 'slug', 'description'],  // Auto-injects search & searchFields
+  searchableFields: searchable({
+    organization: [
+      'name', 'slug', 'description',
+      { organizationUsers: ['role', { user: ['name', 'email'] }] },
+    ],
+  }),
+  // Expands to: ['name', 'slug', 'description', 'organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
 });
 ```
+
+**`searchable()` helper** - validates fields against Prisma schema and generates dot-notation paths:
+```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
+// Takes { model: fields[] } — model key is validated against Prisma schema
+searchable({ organization: ['name', 'slug'] })
+// → ['name', 'slug']
+
+// Objects expand relation fields (validated as relations in Prisma)
+searchable({ organization: [{ organizationUsers: ['role'] }] })
+// → ['organizationUsers.role']
+
+// Single string value
+searchable({ organization: [{ organizationUsers: 'role' }] })
+// → ['organizationUsers.role']
+
+// Nested relations
+searchable({ organization: [{ organizationUsers: ['role', { user: ['name', 'email'] }] }] })
+// → ['organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
+
+// Object value (shorthand for single nested relation)
+searchable({ organization: [{ organizationUsers: { user: ['name', 'email'] } }] })
+// → ['organizationUsers.user.name', 'organizationUsers.user.email']
+```
+
+**Note:** Admin routes do not define `searchableFields` — superadmins bypass the whitelist via `skipFieldValidation` and can search any valid Prisma field.
 
 **Controller** (simplified):
 ```typescript
@@ -533,10 +568,11 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 **Security:**
 - Only fields in `searchableFields` can be searched (whitelist validation with full paths)
+- **Superadmin bypass**: Users with `platformRole: 'superadmin'` skip the whitelist and can search any valid field at any depth. Path notation validation still applies.
 - Path notation is validated to prevent injection (camelCase enforced, rejects snake_case)
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
 - Supports nested relation fields (e.g., `posts.status`, `posts.author.name`)
-- Relation fields must be explicitly whitelisted to prevent unauthorized access
+- Relation fields must be explicitly whitelisted to prevent unauthorized access (non-superadmin)
 - Depth limit (10 levels) prevents stack overflow from deeply nested queries
 - Routes without `searchableFields` gracefully ignore search parameters (no crash)
 
@@ -590,32 +626,37 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields:
+When using relation filters, explicitly whitelist nested fields. Use `searchable()` for compact notation:
 
 ```typescript
+import { searchable } from '#/lib/prisma/searchable';
+
 // Route definition
-searchableFields: [
-  'name',                    // Direct field
-  'slug',                    // Direct field
-  'posts.status',            // Relation field (explicit)
-  'posts.title',             // Relation field (explicit)
-  'posts.author.name',       // Nested relation (explicit)
-  'members.role'             // Relation field
-]
+searchableFields: searchable({
+  organization: [
+    'name',                                    // Direct field
+    'slug',                                    // Direct field
+    { organizationUsers: ['role', { user: ['name'] }] },  // Relation fields
+  ],
+})
+// Expands to: ['name', 'slug', 'posts.status', 'posts.title', 'posts.author.name', 'members.role']
 
 // Allowed queries:
 ?searchFields[posts][some][status]=published        // ✓ posts.status whitelisted
 ?searchFields[posts][some][title]=test              // ✓ posts.title whitelisted
 ?searchFields[posts][some][author][name]=John       // ✓ posts.author.name whitelisted
 
-// Rejected queries:
+// Rejected queries (non-superadmin):
 ?searchFields[posts][some][secretField]=hack        // ✗ posts.secretField not whitelisted
 ?searchFields[posts][some][author][email]=test      // ✗ posts.author.email not whitelisted
+
+// Superadmin: all valid fields allowed regardless of whitelist
 ```
 
 **Validation:**
-- Full path must be in `searchableFields` array
-- Use dot notation: `posts.status`, not hierarchical objects
+- Full path must be in `searchableFields` array (non-superadmin users)
+- Superadmin (`platformRole: 'superadmin'`) bypasses the whitelist entirely
+- Use `searchable()` helper for compact relation field definitions
 - Relation operators (`some`, `every`, `none`) are automatically supported
 - Error thrown for non-whitelisted fields (not silently ignored)
 
@@ -668,24 +709,26 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ## Frontend Metadata
 
-Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables.
+Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables. Only tenant routes define `searchableFields` — admin routes omit them since superadmins bypass the whitelist.
 
 ### OpenAPI Extensions
 
 Routes with `searchableFields` automatically include OpenAPI extensions:
 
 ```typescript
-// Route definition
+// Route definition (tenant route)
 readRoute({
-  model: Modules.space,
+  model: Modules.me,
+  submodel: Modules.inquiry,
+  action: 'sent',
   many: true,
   paginate: true,
-  responseSchema: SpaceScalarSchema,
-  searchableFields: ['name', 'slug'],
+  responseSchema: inquirySentResponseSchema,
+  searchableFields: inquirySearchableFields,
 });
 
 // Generated OpenAPI spec includes:
-// "x-searchable-fields": ["name", "slug"]
+// "x-searchable-fields": ["type", "status", ...]
 ```
 
 ### Extracting Metadata
@@ -693,19 +736,15 @@ readRoute({
 Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
 
 ```typescript
-import { getQueryMetadata, useQueryMetadata } from '@template/shared';
-
-// By path
-const meta = getQueryMetadata('/api/admin/space', 'get');
-// => { searchableFields: ['name', 'slug'] }
+import { getQueryMetadata, useQueryMetadata } from '@template/ui/lib';
 
 // By operation ID (recommended)
-const meta = getQueryMetadataByOperation('adminSpaceReadMany');
+const meta = getQueryMetadataByOperation('meReadManyOrganizations');
 
 // In React component
-function SpacesTable() {
-  const meta = useQueryMetadata('adminSpaceReadMany');
-  // Use meta.searchableFields
+function OrganizationsTable() {
+  const meta = useQueryMetadata('meReadManyOrganizations');
+  // Use meta.searchableFields, meta.orderableFields, meta.enumFilters
 }
 ```
 
@@ -714,16 +753,16 @@ function SpacesTable() {
 Use `makeDataTableConfig()` to create table configurations:
 
 ```typescript
-import { makeDataTableConfig, useDataTableConfig } from '@template/shared';
+import { makeDataTableConfig, useDataTableConfig } from '@template/ui/lib';
 
 // Standalone
-const config = makeDataTableConfig('adminSpaceReadMany', {
+const config = makeDataTableConfig('meReadManyOrganizations', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
 });
 
 // In React component
-function SpacesTable() {
-  const config = useDataTableConfig('adminSpaceReadMany');
+function OrganizationsTable() {
+  const config = useDataTableConfig('meReadManyOrganizations');
 
   return (
     <DataTable

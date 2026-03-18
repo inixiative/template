@@ -13,5 +13,4 @@ export const adminSpaceReadManyRoute = readRoute({
     organizationId: z.string().optional(),
   }),
   responseSchema: SpaceScalarSchema,
-  searchableFields: ['name', 'slug'],
 });

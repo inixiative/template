@@ -265,6 +265,103 @@ describe('buildWhereClause', () => {
     });
   });
 
+  describe('skipFieldValidation (admin bypass)', () => {
+    it('allows any valid field at any depth when skipFieldValidation is true', () => {
+      const result = buildWhereClause({
+        searchFields: { user: { name: 'john' } },
+        searchableFields: ['status'],
+        skipFieldValidation: true,
+      });
+
+      expect(result).toEqual({
+        AND: [{ user: { name: { contains: 'john', mode: 'insensitive' } } }],
+      });
+    });
+
+    it('blocks non-whitelisted fields when skipFieldValidation is false', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: { user: { name: 'john' } },
+          searchableFields: ['status'],
+        }),
+      ).toThrow("Field 'user.name' is not searchable");
+    });
+
+    it('allows any relation with any operator when skipFieldValidation is true', () => {
+      const result = buildWhereClause({
+        searchFields: {
+          posts: {
+            some: {
+              author: {
+                is: {
+                  email: { contains: '@example.com' },
+                },
+              },
+            },
+          },
+        },
+        searchableFields: [],
+        skipFieldValidation: true,
+      });
+
+      expect(result).toEqual({
+        AND: [{ posts: { some: { author: { is: { email: { contains: '@example.com' } } } } } }],
+      });
+    });
+
+    it('blocks relation operators on non-whitelisted relations when skipFieldValidation is false', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: {
+            posts: {
+              some: {
+                title: 'hello',
+              },
+            },
+          },
+          searchableFields: ['name'],
+        }),
+      ).toThrow("Relation 'posts' is not searchable");
+    });
+
+    it('still validates path notation even when skipFieldValidation is true', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: { '../admin': 'test' },
+          searchableFields: [],
+          skipFieldValidation: true,
+        }),
+      ).toThrow('Invalid search field');
+    });
+
+    it('works with empty searchableFields when skipFieldValidation is true', () => {
+      const result = buildWhereClause({
+        searchFields: { name: 'john', email: { endsWith: '@example.com' } },
+        searchableFields: [],
+        skipFieldValidation: true,
+      });
+
+      expect(result).toEqual({
+        AND: [
+          { name: { contains: 'john', mode: 'insensitive' } },
+          { email: { endsWith: '@example.com' } },
+        ],
+      });
+    });
+
+    it('simple search still uses only searchableFields even with skipFieldValidation', () => {
+      const result = buildWhereClause({
+        search: 'test',
+        searchableFields: ['name'],
+        skipFieldValidation: true,
+      });
+
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: 'test', mode: 'insensitive' } }] }],
+      });
+    });
+  });
+
   describe('validation', () => {
     it('throws error for invalid path notation in searchable fields', () => {
       expect(() =>

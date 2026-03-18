@@ -15,7 +15,9 @@ bun run local
 
 ## Features
 
-See [FEATURES.md](./FEATURES.md) for the complete feature catalog.
+See [FEATURES.md](./FEATURES.md) for the complete feature catalog — what's built, what's in progress, and what's planned.
+
+If you're evaluating the template or wondering how it stacks up against managed services and open-source alternatives, [COMPARISONS.md](./COMPARISONS.md) breaks down each system side-by-side and explains what gaps it fills that nothing off-the-shelf covers.
 
 ## Documentation
 

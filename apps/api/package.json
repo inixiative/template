@@ -48,6 +48,7 @@
     "@types/pluralize": "^0.0.33",
     "@types/stripe": "^8.0.417",
     "ioredis-mock": "^8.13.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "undici-types": "^7.24.3"
   }
 }
