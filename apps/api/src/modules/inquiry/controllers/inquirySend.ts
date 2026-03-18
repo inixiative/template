@@ -2,6 +2,7 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -14,9 +15,14 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
 
   if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 
-  const updated = await db.inquiry.update({
+  await db.inquiry.update({
     where: { id: inquiry.id },
     data: { status: InquiryStatus.sent, sentAt: new Date(), expiresAt: computeExpiresAt(inquiry.type) },
+  });
+
+  const updated = await db.inquiry.findUniqueOrThrow({
+    where: { id: inquiry.id },
+    include: includeInquiryResponse,
   });
 
   return respond.ok(updated);

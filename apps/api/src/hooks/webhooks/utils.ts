@@ -1,9 +1,12 @@
-import type { FlexibleRef, WebhookModel } from '@template/db';
-import { isEqual, omit } from 'lodash-es';
-import { webhookEnabledModels } from '#/hooks/webhooks/constants/enabledModels';
-import { webhookIgnoredFields } from '#/hooks/webhooks/constants/ignoredFields';
-import { webhookModelSubscribers } from '#/hooks/webhooks/constants/ownerAllowedModels';
-import { webhookRelatedModels } from '#/hooks/webhooks/constants/relatedModels';
+import {
+  filterIgnoredFields,
+  type FlexibleRef,
+  type WebhookModel,
+  webhookEnabledModels,
+  webhookModelSubscribers,
+  webhookRelatedModels,
+} from '@template/db';
+import { isEqual } from 'lodash-es';
 
 let __enabledModelsSet = new Set<WebhookModel>(webhookEnabledModels);
 
@@ -25,18 +28,8 @@ export const getRelatedWebhookRefs = (model: string): FlexibleRef[] | null => {
   return refs?.length ? refs : null;
 };
 
-export const getIgnoredFields = (model: string): string[] => {
-  const global = webhookIgnoredFields._global ?? [];
-  const modelSpecific = webhookIgnoredFields[model] ?? [];
-  return [...global, ...modelSpecific];
-};
-
 export const getModelSubscribers = (model: string): string[] => {
   return webhookModelSubscribers[model as keyof typeof webhookModelSubscribers] ?? [];
-};
-
-export const selectRelevantFields = <T extends Record<string, unknown>>(model: string, data: T): Partial<T> => {
-  return omit(data, getIgnoredFields(model)) as Partial<T>;
 };
 
 export const isNoOpUpdate = <T extends Record<string, unknown>>(
@@ -46,8 +39,8 @@ export const isNoOpUpdate = <T extends Record<string, unknown>>(
 ): boolean => {
   if (!previousData) return false;
 
-  const current = selectRelevantFields(model, currentData);
-  const previous = selectRelevantFields(model, previousData);
+  const current = filterIgnoredFields(model, currentData);
+  const previous = filterIgnoredFields(model, previousData);
 
   return isEqual(current, previous);
 };

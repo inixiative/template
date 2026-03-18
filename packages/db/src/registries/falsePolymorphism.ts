@@ -172,6 +172,31 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
   },
+
+  AuditLog: {
+    axes: [
+      {
+        field: 'subjectModel',
+        fkMap: {
+          User: ['subjectUserId'],
+          Organization: ['subjectOrganizationId'],
+          OrganizationUser: ['subjectOrganizationId', 'subjectUserId'],
+          Space: ['subjectSpaceId'],
+          SpaceUser: ['subjectOrganizationId', 'subjectSpaceId', 'subjectUserId'],
+          Token: ['subjectTokenId'],
+          AuthProvider: ['subjectAuthProviderId'],
+          Inquiry: ['subjectInquiryId'],
+          Account: ['subjectAccountId'],
+          Session: ['subjectSessionId'],
+          Verification: ['subjectVerificationId'],
+          CronJob: ['subjectCronJobId'],
+          EmailTemplate: ['subjectEmailTemplateId'],
+          EmailComponent: ['subjectEmailComponentId'],
+          CustomerRef: ['subjectCustomerRefId'],
+        },
+      },
+    ],
+  },
 };
 
 // Helper to get config for a model

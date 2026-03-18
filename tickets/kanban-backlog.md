@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Backlog
+    FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     INFRA-006-tenant-isolation-test-matrix
@@ -52,6 +53,9 @@ kanban
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 
+**Audit & Compliance:**
+- [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
+
 **Security & Encryption:**
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
 
@@ -92,12 +96,13 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 18
+- **Total Backlog Items**: 19
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2
 - **Communication**: 1
 - **Infrastructure**: 5
+- **Audit & Compliance**: 1
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
 - **Frontend Architecture**: 1

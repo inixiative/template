@@ -34,6 +34,8 @@ model Inquiry {
   targetUser         User?         @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetOrganization Organization? @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
   targetSpace        Space?        @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
+  auditLogsAsSubject AuditLog[]    @relation("AuditLogSubjectInquiry")
+  auditLogsAsSource  AuditLog[]    @relation("AuditLogSourceInquiry")
 
   @@index([sourceModel])
   @@index([sourceUserId])

@@ -2,6 +2,7 @@ import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
+import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { organizationReadManyInquiriesSentRoute } from '#/modules/organization/routes/organizationReadManyInquiriesSent';
 
 export const organizationReadManyInquiriesSentController = makeController(
@@ -13,7 +14,7 @@ export const organizationReadManyInquiriesSentController = makeController(
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: { sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: org.id },
       orderBy: { createdAt: 'desc' },
-      include: { targetUser: true, targetOrganization: true, targetSpace: true },
+      include: includeInquirySent,
     });
 
     return respond.ok(data, { pagination });

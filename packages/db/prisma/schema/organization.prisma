@@ -23,6 +23,8 @@ model Organization {
   spaces               Space[]
   providerRefs         CustomerRef[]         @relation("providerRefs")
   authProviders        AuthProvider[]
+  auditLogsAsContext   AuditLog[] @relation("AuditLogContextOrganization")
+  auditLogsAsSubject   AuditLog[] @relation("AuditLogSubjectOrganization")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

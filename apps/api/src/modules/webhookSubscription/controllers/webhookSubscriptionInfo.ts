@@ -1,4 +1,4 @@
-import { webhookOwnerAllowedModels } from '#/hooks/webhooks/constants/ownerAllowedModels';
+import { webhookOwnerAllowedModels } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionInfoRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionInfo';
 

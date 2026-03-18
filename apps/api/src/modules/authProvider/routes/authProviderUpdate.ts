@@ -22,7 +22,6 @@ export const authProviderUpdateRoute = updateRoute({
   }),
   sanitizeKeys: [
     'organizationId',
-    'createdBy',
     'type',
     'provider',
     'encryptedSecrets',

@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  getIgnoredFields,
   getRelatedWebhookRefs,
   isNoOpUpdate,
   isWebhookEnabled,
-  selectRelevantFields,
 } from '#/hooks/webhooks/utils';
 
 describe('webhook utils', () => {
@@ -35,76 +33,6 @@ describe('webhook utils', () => {
     it('returns null for models without related mappings', () => {
       expect(getRelatedWebhookRefs('NonExistent')).toBe(null);
       expect(getRelatedWebhookRefs('Session')).toBe(null);
-    });
-  });
-
-  describe('getIgnoredFields', () => {
-    it('includes global ignored fields for any model', () => {
-      const fields = getIgnoredFields('SomeModel');
-      expect(fields).toContain('updatedAt');
-    });
-
-    it('includes model-specific ignored fields', () => {
-      const tokenFields = getIgnoredFields('Token');
-      expect(tokenFields).toContain('updatedAt');
-      expect(tokenFields).toContain('lastUsedAt');
-
-      const userFields = getIgnoredFields('User');
-      expect(userFields).toContain('updatedAt');
-      expect(userFields).toContain('lastLoginAt');
-    });
-
-    it('returns only global fields for models without specific config', () => {
-      const fields = getIgnoredFields('Organization');
-      expect(fields).toEqual(['updatedAt']);
-    });
-  });
-
-  describe('selectRelevantFields', () => {
-    it('strips global ignored fields', () => {
-      const data = {
-        id: '123',
-        name: 'Test',
-        updatedAt: new Date(),
-      };
-
-      const result = selectRelevantFields('Organization', data);
-
-      expect(result).toEqual({ id: '123', name: 'Test' });
-      expect(result).not.toHaveProperty('updatedAt');
-    });
-
-    it('strips model-specific ignored fields', () => {
-      const data = {
-        id: '123',
-        name: 'Test Token',
-        lastUsedAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const result = selectRelevantFields('Token', data);
-
-      expect(result).toEqual({ id: '123', name: 'Test Token' });
-      expect(result).not.toHaveProperty('lastUsedAt');
-      expect(result).not.toHaveProperty('updatedAt');
-    });
-
-    it('preserves fields not in ignored list', () => {
-      const data = {
-        id: '123',
-        email: 'test@example.com',
-        name: 'Test User',
-        createdAt: new Date('2024-01-01'),
-        updatedAt: new Date('2024-01-02'),
-      };
-
-      const result = selectRelevantFields('User', data);
-
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('email');
-      expect(result).toHaveProperty('name');
-      expect(result).toHaveProperty('createdAt');
-      expect(result).not.toHaveProperty('updatedAt');
     });
   });
 

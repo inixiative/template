@@ -2,6 +2,7 @@ import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/clie
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
+import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
 import { organizationReadManyInquiriesReceivedRoute } from '#/modules/organization/routes/organizationReadManyInquiriesReceived';
 
 export const organizationReadManyInquiriesReceivedController = makeController(
@@ -17,7 +18,7 @@ export const organizationReadManyInquiriesReceivedController = makeController(
         status: { not: InquiryStatus.draft },
       },
       orderBy: { createdAt: 'desc' },
-      include: { sourceUser: true, sourceOrganization: true, sourceSpace: true },
+      include: includeInquiryReceived,
     });
 
     return respond.ok(data, { pagination });

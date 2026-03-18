@@ -1,8 +1,8 @@
 import type { FlexibleRef, HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, db, HookTiming, isFalsePolymorphismRef, registerDbHook } from '@template/db';
+import { DbAction, db, filterIgnoredFields, HookTiming, isFalsePolymorphismRef, registerDbHook } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
-import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled, selectRelevantFields } from '#/hooks/webhooks/utils';
+import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled } from '#/hooks/webhooks/utils';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -60,8 +60,8 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: selectRelevantFields(model, resultData),
-    previousData: previousData ? selectRelevantFields(model, previousData) : undefined,
+    data: filterIgnoredFields(model, resultData),
+    previousData: previousData ? filterIgnoredFields(model, previousData) : undefined,
     timestamp: new Date().toISOString(),
   };
 

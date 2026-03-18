@@ -1,6 +1,7 @@
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
+import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
@@ -17,25 +18,37 @@ export const resolveInquiry = async (
 ): Promise<Inquiry> => {
   const db = c.get('db');
 
-  return db.txn(async () => {
-    let approvalOutput: Record<string, unknown> = {};
+  const actor = auditActorContext.get() ?? {
+    actorUserId: null,
+    actorSpoofUserId: null,
+    actorTokenId: null,
+    actorJobName: null,
+    ipAddress: null,
+    userAgent: null,
+    sourceInquiryId: null,
+  };
 
-    if (status === InquiryStatus.approved) {
-      const handler = inquiryHandlers[inquiry.type];
-      const content = handler.contentSchema.parse(inquiry.content);
-      const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-      approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
-    }
+  return auditActorContext.run({ ...actor, sourceInquiryId: inquiry.id }, () =>
+    db.txn(async () => {
+      let approvalOutput: Record<string, unknown> = {};
 
-    const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(inquiry.type) : null;
+      if (status === InquiryStatus.approved) {
+        const handler = inquiryHandlers[inquiry.type];
+        const content = handler.contentSchema.parse(inquiry.content);
+        const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
+        approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
+      }
 
-    return db.inquiry.update({
-      where: { id: inquiry.id },
-      data: {
-        status,
-        resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
-        expiresAt,
-      },
-    });
-  });
+      const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(inquiry.type) : null;
+
+      return db.inquiry.update({
+        where: { id: inquiry.id },
+        data: {
+          status,
+          resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
+          expiresAt,
+        },
+      });
+    }),
+  );
 };
