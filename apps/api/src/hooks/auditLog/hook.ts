@@ -1,7 +1,7 @@
 import type { HookOptions, ManyAction, Prisma, SingleAction } from '@template/db';
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { isAuditEnabled } from '#/hooks/auditLog/constants/enabledModels';
+import { isAuditEnabled } from '@template/db';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
 import { auditActorContext } from '#/lib/auditActorContext';
 
