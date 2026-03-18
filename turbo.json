@@ -6,27 +6,27 @@
     // ============================================
 
     "db:generate": {
-      "inputs": ["prisma/schema.prisma", "scripts/generateScalarSchemas.ts"],
+      "inputs": ["prisma/schema.prisma", "scripts/generate-scalar-schemas.ts"],
       "outputs": ["src/generated/**", ".prisma.gen"],
       "cache": true
     },
 
     "generate:openapi": {
       "dependsOn": ["^db:generate"],
-      "inputs": ["src/**/*.ts", "!src/**/*.test.ts", "scripts/generateOpenApiSpec.ts"],
+      "inputs": ["src/**/*.ts", "!src/**/*.test.ts", "scripts/generate-openapi-spec.ts"],
       "outputs": ["openapi.local.gen.json", "../../packages/ui/openapi.gen.json"],
       "cache": true
     },
 
     "generate:sdk": {
       "dependsOn": ["^generate:openapi"],
-      "inputs": ["openapi.gen.json", "openapiTs.config.ts", "scripts/generateMswHandlers.ts"],
+      "inputs": ["openapi.gen.json", "openapiTs.config.ts", "scripts/generate-msw-handlers.ts"],
       "outputs": ["src/apiClient/**/*.gen.ts", "src/test/mocks/handlers.gen.ts"],
       "cache": true
     },
 
     "generate:routes": {
-      "inputs": ["app/routes/**/*.tsx", "app/routes/**/*.ts", "scripts/generateRouteTree.ts"],
+      "inputs": ["app/routes/**/*.tsx", "app/routes/**/*.ts", "scripts/generate-route-tree.ts"],
       "outputs": ["app/routeTree.gen.ts"],
       "cache": true
     },
