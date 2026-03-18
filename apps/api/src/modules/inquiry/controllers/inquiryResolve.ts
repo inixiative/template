@@ -1,12 +1,9 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
-import { attachInquiryAuditLogs, includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryResolveRoute } from '#/modules/inquiry/routes/inquiryResolve';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
-import {
-  validateInquiryIsResolvable,
-  validateInquiryNotExpired,
-} from '#/modules/inquiry/validations/validateInquiryStatus';
+import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryResolveController = makeController(inquiryResolveRoute, async (c, respond) => {
   const db = c.get('db');
@@ -14,7 +11,6 @@ export const inquiryResolveController = makeController(inquiryResolveRoute, asyn
   const { status, ...resolutionData } = c.req.valid('json');
 
   validateInquiryIsResolvable(inquiry);
-  validateInquiryNotExpired(inquiry);
 
   await resolveInquiry(c, inquiry, status, resolutionData);
   const resolved = await db.inquiry.findUniqueOrThrow({
@@ -22,5 +18,5 @@ export const inquiryResolveController = makeController(inquiryResolveRoute, asyn
     include: includeInquiryResponse,
   });
 
-  return respond.ok(await attachInquiryAuditLogs(db, resolved));
+  return respond.ok(normalizeInquiry(resolved));
 });

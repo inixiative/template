@@ -1,5 +1,19 @@
-import type { Db, Prisma } from '@template/db';
+import type { Prisma } from '@template/db';
 import { includeAuditLogResponse } from '#/modules/admin/auditLog/schemas/auditLogResponseSchema';
+
+type AuditLogEntry = Prisma.AuditLogGetPayload<{ include: typeof includeAuditLogResponse }>;
+
+export const normalizeInquiry = <T>(
+  inquiry: T,
+): Omit<T, 'auditLogsAsSubject'> & { auditLogs: AuditLogEntry[] } => {
+  const { auditLogsAsSubject, ...rest } = inquiry as T & { auditLogsAsSubject?: AuditLogEntry[] };
+  return { ...(rest as Omit<T, 'auditLogsAsSubject'>), auditLogs: auditLogsAsSubject ?? [] };
+};
+
+const includeAuditLogNested = {
+  include: includeAuditLogResponse,
+  orderBy: { id: 'asc' },
+} as const satisfies Prisma.AuditLogFindManyArgs;
 
 export const includeInquiryResponse = {
   sourceUser: true,
@@ -8,71 +22,19 @@ export const includeInquiryResponse = {
   targetUser: true,
   targetOrganization: true,
   targetSpace: true,
+  auditLogsAsSubject: includeAuditLogNested,
 } as const satisfies Prisma.InquiryInclude;
 
 export const includeInquirySent = {
   targetUser: true,
   targetOrganization: true,
   targetSpace: true,
+  auditLogsAsSubject: includeAuditLogNested,
 } as const satisfies Prisma.InquiryInclude;
 
 export const includeInquiryReceived = {
   sourceUser: true,
   sourceOrganization: true,
   sourceSpace: true,
+  auditLogsAsSubject: includeAuditLogNested,
 } as const satisfies Prisma.InquiryInclude;
-
-type InquiryWithId = { id: string };
-type AuditLogWithActors = Prisma.AuditLogGetPayload<{ include: typeof includeAuditLogResponse }>;
-
-const dedupeAuditLogs = (auditLogs: AuditLogWithActors[]) => {
-  const seen = new Set<string>();
-  return auditLogs.filter((auditLog) => {
-    if (seen.has(auditLog.id)) return false;
-    seen.add(auditLog.id);
-    return true;
-  });
-};
-
-export const attachInquiryAuditLogs = async <T extends InquiryWithId>(db: Db, inquiry: T) => {
-  const auditLogs = await db.auditLog.findMany({
-    where: {
-      OR: [{ sourceInquiryId: inquiry.id }, { subjectInquiryId: inquiry.id }],
-    },
-    include: includeAuditLogResponse,
-    orderBy: { id: 'asc' },
-  });
-
-  return {
-    ...inquiry,
-    auditLogs: dedupeAuditLogs(auditLogs),
-  };
-};
-
-export const attachInquiryAuditLogList = async <T extends InquiryWithId>(db: Db, inquiries: T[]) => {
-  if (inquiries.length === 0) return [];
-
-  const inquiryIds = inquiries.map((inquiry) => inquiry.id);
-  const requestedIds = new Set(inquiryIds);
-  const auditLogs = await db.auditLog.findMany({
-    where: {
-      OR: [{ sourceInquiryId: { in: inquiryIds } }, { subjectInquiryId: { in: inquiryIds } }],
-    },
-    include: includeAuditLogResponse,
-    orderBy: { id: 'asc' },
-  });
-
-  const auditLogsByInquiryId = new Map<string, AuditLogWithActors[]>();
-  for (const auditLog of auditLogs) {
-    const relatedInquiryIds = new Set([auditLog.sourceInquiryId, auditLog.subjectInquiryId].filter(Boolean));
-    for (const inquiryId of relatedInquiryIds) {
-      if (!requestedIds.has(inquiryId)) continue;
-      auditLogsByInquiryId.set(inquiryId, [...(auditLogsByInquiryId.get(inquiryId) ?? []), auditLog]);
-    }
-  }
-
-  return inquiries.map((inquiry) => ({
-    ...inquiry,
-    auditLogs: dedupeAuditLogs(auditLogsByInquiryId.get(inquiry.id) ?? []),
-  }));
-};

@@ -13,6 +13,7 @@ model AuditLog {
   actorSpoofUser   User?   @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
   actorTokenId     String? @db.VarChar(36)
   actorToken       Token?  @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
+  actorJobName     String?
   ipAddress        String?
   userAgent        String?
 

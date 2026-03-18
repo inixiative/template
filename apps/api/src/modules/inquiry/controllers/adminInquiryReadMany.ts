@@ -1,6 +1,6 @@
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { attachInquiryAuditLogList, includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
 import { adminInquiryReadManyRoute } from '#/modules/inquiry/routes/adminInquiryReadMany';
 
 export const adminInquiryReadManyController = makeController(adminInquiryReadManyRoute, async (c, respond) => {
@@ -10,5 +10,5 @@ export const adminInquiryReadManyController = makeController(adminInquiryReadMan
     include: includeInquiryResponse,
   });
 
-  return respond.ok(await attachInquiryAuditLogList(db, data), { pagination });
+  return respond.ok(data.map(normalizeInquiry), { pagination });
 });

@@ -17,6 +17,7 @@ export const validateInquiryIsEditable = (inquiry: Inquiry): void => {
   const editable: InquiryStatus[] = [InquiryStatus.draft, InquiryStatus.sent, InquiryStatus.changesRequested];
   if (!editable.includes(inquiry.status as InquiryStatus))
     throw makeError({ status: 400, message: 'Inquiry cannot be updated in its current state' });
+  validateInquiryNotExpired(inquiry);
 };
 
 // sent | changesRequested — can be resolved or have changes requested
@@ -24,6 +25,7 @@ export const validateInquiryIsResolvable = (inquiry: Inquiry): void => {
   const resolvable: InquiryStatus[] = [InquiryStatus.sent, InquiryStatus.changesRequested];
   if (!resolvable.includes(inquiry.status as InquiryStatus))
     throw makeError({ status: 400, message: 'Inquiry must be sent or changes requested' });
+  validateInquiryNotExpired(inquiry);
 };
 
 // expiresAt is in the past

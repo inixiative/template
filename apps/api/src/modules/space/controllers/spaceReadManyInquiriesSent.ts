@@ -2,7 +2,7 @@ import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { attachInquiryAuditLogList, includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquirySent, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
 import { spaceReadManyInquiriesSentRoute } from '#/modules/space/routes/spaceReadManyInquiriesSent';
 
 export const spaceReadManyInquiriesSentController = makeController(
@@ -17,6 +17,6 @@ export const spaceReadManyInquiriesSentController = makeController(
       include: includeInquirySent,
     });
 
-    return respond.ok(await attachInquiryAuditLogList(db, data), { pagination });
+    return respond.ok(data.map(normalizeInquiry), { pagination });
   },
 );

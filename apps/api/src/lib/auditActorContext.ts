@@ -4,6 +4,7 @@ export type AuditActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
   actorTokenId: string | null;
+  actorJobName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;

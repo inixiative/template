@@ -11,6 +11,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     actorUserId: user?.id ?? null,
     actorSpoofUserId: spoofedBy?.id ?? null,
     actorTokenId: token?.id ?? null,
+    actorJobName: null,
     ipAddress: c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? null,
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,

@@ -2,7 +2,7 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
-import { attachInquiryAuditLogs, includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -25,5 +25,5 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
     include: includeInquiryResponse,
   });
 
-  return respond.ok(await attachInquiryAuditLogs(db, updated));
+  return respond.ok(normalizeInquiry(updated));
 });
