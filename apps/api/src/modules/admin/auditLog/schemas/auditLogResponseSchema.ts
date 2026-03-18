@@ -7,7 +7,7 @@ import {
   UserScalarSchema,
 } from '@template/db';
 
-const auditActorTokenSchema = TokenScalarSchema.omit({ keyHash: true });
+const auditActorTokenSchema = TokenScalarSchema.omit({ keyHash: true }).strip();
 
 export const includeAuditLogResponse = {
   actorUser: true,

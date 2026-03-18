@@ -1,6 +1,6 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryReadRoute } from '#/modules/inquiry/routes/inquiryRead';
 
 export const inquiryReadController = makeController(inquiryReadRoute, async (c, respond) => {
@@ -10,5 +10,5 @@ export const inquiryReadController = makeController(inquiryReadRoute, async (c, 
     where: { id: inquiry.id },
     include: includeInquiryResponse,
   });
-  return respond.ok(normalizeInquiry(hydratedInquiry));
+  return respond.ok(hydratedInquiry);
 });

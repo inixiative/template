@@ -5,7 +5,7 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquirySent, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquirySource } from '#/modules/inquiry/services/resolveInquirySource';
 import { resolveInquiryTarget } from '#/modules/inquiry/services/resolveInquiryTarget';
@@ -50,6 +50,6 @@ export const organizationCreateInquiryController = makeController(
     include: includeInquirySent,
     });
 
-    return respond.created(normalizeInquiry(inquiry));
+    return respond.created(inquiry);
   },
 );

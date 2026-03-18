@@ -1,6 +1,6 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryResolveRoute } from '#/modules/inquiry/routes/inquiryResolve';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
 import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -18,5 +18,5 @@ export const inquiryResolveController = makeController(inquiryResolveRoute, asyn
     include: includeInquiryResponse,
   });
 
-  return respond.ok(normalizeInquiry(resolved));
+  return respond.ok(resolved);
 });

@@ -2,7 +2,7 @@ import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/clie
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeInquiryReceived, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
 import { spaceReadManyInquiriesReceivedRoute } from '#/modules/space/routes/spaceReadManyInquiriesReceived';
 
 export const spaceReadManyInquiriesReceivedController = makeController(
@@ -21,6 +21,6 @@ export const spaceReadManyInquiriesReceivedController = makeController(
       include: includeInquiryReceived,
     });
 
-    return respond.ok(data.map(normalizeInquiry), { pagination });
+    return respond.ok(data, { pagination });
   },
 );

@@ -6,7 +6,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquiryResponse, normalizeInquiry } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
@@ -40,5 +40,5 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     include: includeInquiryResponse,
   });
 
-  return respond.ok(normalizeInquiry(updated));
+  return respond.ok(updated);
 });
