@@ -54,8 +54,13 @@ const validateAndTransformSearchFields = (
       const hasFieldOperator = keys.some((k) => fieldOperators.includes(k));
 
       if (hasRelationOperator) {
-        if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
-          throw new Error(`Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
+        if (
+          !skipFieldValidation &&
+          !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))
+        ) {
+          throw new Error(
+            `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
+          );
         }
         const relationValue: BracketQueryRecord = {};
         for (const [opKey, opValue] of Object.entries(value)) {
@@ -80,7 +85,14 @@ const validateAndTransformSearchFields = (
         }
         result[key] = value;
       } else {
-        result[key] = validateAndTransformSearchFields(value, searchableFields, skipFieldValidation, currentPath, autoContains, depth + 1);
+        result[key] = validateAndTransformSearchFields(
+          value,
+          searchableFields,
+          skipFieldValidation,
+          currentPath,
+          autoContains,
+          depth + 1,
+        );
       }
     }
   }

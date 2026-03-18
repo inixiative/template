@@ -4,10 +4,11 @@ import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
-export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, baseRequest, baseContext, timeout) => {
+export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, baseRequest, baseContext, _timeout) => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, db as any, baseContext);
+  registerBatch(batchId, db, baseContext);
 
+  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
   const results: any[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   let completedRounds = 0;

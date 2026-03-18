@@ -9,10 +9,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { json, patch } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
 describe('PATCH /api/v1/inquiry/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -56,7 +56,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
-    expect((data.content as any).role).toBe('member');
+    expect((data.content as Record<string, unknown>).role).toBe('member');
   });
 
   it('allows updating a sent inquiry', async () => {

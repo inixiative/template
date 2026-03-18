@@ -73,11 +73,11 @@ describe('EncryptionService', () => {
     });
 
     it('throws on null plaintext', async () => {
-      await expect(service.encrypt(null as any, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
+      await expect(service.encrypt(null, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
     });
 
     it('throws on undefined plaintext', async () => {
-      await expect(service.encrypt(undefined as any, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
+      await expect(service.encrypt(undefined, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
     });
 
     it('throws on empty string plaintext', async () => {

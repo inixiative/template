@@ -12,8 +12,8 @@ type SpaceUser = MeData['spaceUsers'][number];
 
 export type AuthStrategy = { type: 'login' } | { type: 'embed'; parentOrigin?: string };
 
-export type SignInCredentials = Record<string, any>;
-export type SignUpCredentials = Record<string, any>;
+export type SignInCredentials = Record<string, unknown>;
+export type SignUpCredentials = Record<string, unknown>;
 
 export type AuthSlice = {
   auth: {

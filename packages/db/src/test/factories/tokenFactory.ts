@@ -1,7 +1,7 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { faker } from '@faker-js/faker';
 import { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
-import { createHash, randomBytes } from 'crypto';
 
 const tokenFactory = createFactory('Token', {
   defaults: () => {

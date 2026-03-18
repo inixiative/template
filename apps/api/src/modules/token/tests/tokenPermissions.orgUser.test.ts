@@ -1,16 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createOrganization,
-  createOrganizationUser,
-  createToken,
-  createUser,
-} from '@template/db/test';
+import { cleanupTouchedTables, createOrganization, createOrganizationUser, createToken } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
-import { del, json, post } from '#tests/utils/request';
+import { del, post } from '#tests/utils/request';
 
 describe('OrganizationUser Token Permissions', () => {
   let db: ReturnType<typeof createTestApp>['db'];
@@ -23,8 +17,8 @@ describe('OrganizationUser Token Permissions', () => {
   let adminOrgUser: OrganizationUser;
   let memberUser: User;
   let memberOrgUser: OrganizationUser;
-  let viewerUser: User;
-  let viewerOrgUser: OrganizationUser;
+  let _viewerUser: User;
+  let _viewerOrgUser: OrganizationUser;
 
   beforeAll(async () => {
     const { entity: o } = await createOrganization();
@@ -44,8 +38,8 @@ describe('OrganizationUser Token Permissions', () => {
     memberUser = c3.user;
 
     const { entity: ou4, context: c4 } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
-    viewerOrgUser = ou4;
-    viewerUser = c4.user;
+    _viewerOrgUser = ou4;
+    _viewerUser = c4.user;
 
     db = createTestApp().db;
   });

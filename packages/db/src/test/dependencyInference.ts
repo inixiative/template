@@ -1,12 +1,12 @@
-import * as zodSchemas from '@template/db/generated/zod/schemas/objects';
+import * as zodSchemasNs from '@template/db/generated/zod/schemas/objects';
 import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes';
 import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 import type { ZodObject, ZodTypeAny } from 'zod';
 
-const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null => {
-  const schemaKey = `${modelName}CreateInputObjectSchema` as keyof typeof zodSchemas;
-  return (zodSchemas[schemaKey] as ZodObject<Record<string, ZodTypeAny>>) ?? null;
-};
+const zodSchemas = zodSchemasNs as Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined>;
+
+const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
+  zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;
 
 /**
  * Infer dependencies from Prisma runtimeDataModel.

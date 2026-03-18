@@ -9,10 +9,12 @@ import { useAppStore } from '@template/ui/store';
  *
  * Generic over the SDK function type to preserve full type safety.
  */
+// biome-ignore lint/suspicious/noExplicitAny: generic constraint — any required to match any SDK function signature
 export const apiQuery = <TFn extends (opts: any) => Promise<any>>(fn: TFn) => {
   return async (context: QueryFunctionContext) => {
     const { auth } = useAppStore.getState();
 
+    // biome-ignore lint/suspicious/noExplicitAny: TFn variables type not narrowable without any
     return apiFetchInternal<Awaited<ReturnType<TFn>>, any>(fn, {
       spoofUserEmail: auth.spoofUserEmail,
     })(context);

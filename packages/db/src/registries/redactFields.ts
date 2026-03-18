@@ -4,8 +4,8 @@
  */
 export const HOOK_REDACT_FIELDS: Record<string, string[]> = {
   Account: ['password'],
-  Token: ['value', 'hashedValue'],
-  AuthProvider: ['secrets', 'secretsVersion', 'secretsEncryptedBy', 'secretsEncryptedAt', 'secretsAuthTag'],
+  Token: ['keyHash'],
+  AuthProvider: ['encryptedSecrets', 'encryptedSecretsMetadata', 'encryptedSecretsKeyVersion'],
 };
 
 export const getRedactFields = (model: string): string[] => HOOK_REDACT_FIELDS[model] ?? [];

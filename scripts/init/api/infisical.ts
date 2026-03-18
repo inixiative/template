@@ -70,23 +70,26 @@ export const getOrganizationId = (): string => {
 /**
  * List all organizations user has access to
  */
-export const listOrganizations = async (): Promise<any[]> => {
-  const response = await infisicalFetch<any>('/v1/organization');
-  return response.organizations || [];
+type InfisicalOrgListResponse = { organizations?: InfisicalOrganization[] };
+type InfisicalOrganization = { id: string; name: string; slug: string };
+
+export const listOrganizations = async (): Promise<InfisicalOrganization[]> => {
+  const response = await infisicalFetch<InfisicalOrgListResponse>('/v1/organization');
+  return response.organizations ?? [];
 };
 
 /**
  * Get organization details including slug
  */
-export const getOrganization = async (organizationId: string): Promise<any> => {
-  return await infisicalFetch(`/v1/organization/${organizationId}`);
+export const getOrganization = async (organizationId: string): Promise<InfisicalOrganization> => {
+  return await infisicalFetch<InfisicalOrganization>(`/v1/organization/${organizationId}`);
 };
 
 /**
  * Update project/workspace slug
  */
-export const updateProjectSlug = async (projectId: string, slug: string): Promise<any> => {
-  return await infisicalFetch(`/v2/workspace/${projectId}`, {
+export const updateProjectSlug = async (projectId: string, slug: string): Promise<void> => {
+  await infisicalFetch(`/v2/workspace/${projectId}`, {
     method: 'PATCH',
     body: JSON.stringify({ slug }),
   });
@@ -99,18 +102,23 @@ export const upsertProject = async (name: string): Promise<InfisicalProject> => 
   const orgId = getOrganizationId();
 
   // Check if exists
-  const listResponse = await infisicalFetch<any>(`/v2/organizations/${orgId}/workspaces`);
-  const existing = listResponse.workspaces?.find((p: any) => p.name === name);
+  const listResponse = await infisicalFetch<{ workspaces?: InfisicalProject[] }>(
+    `/v2/organizations/${orgId}/workspaces`,
+  );
+  const existing = listResponse.workspaces?.find((p) => p.name === name);
   if (existing) return existing;
 
   // Create new with explicit slug to avoid random suffix
-  const createResponse = await infisicalFetch<any>('/v2/workspace', {
-    method: 'POST',
-    body: JSON.stringify({
-      projectName: name,
-      slug: name, // Explicitly set slug to prevent random suffix
-    }),
-  });
+  const createResponse = await infisicalFetch<{ workspace?: InfisicalProject; project?: InfisicalProject }>(
+    '/v2/workspace',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        projectName: name,
+        slug: name, // Explicitly set slug to prevent random suffix
+      }),
+    },
+  );
 
   return createResponse.workspace || createResponse.project;
 };
@@ -174,8 +182,8 @@ export const updateEnvironment = async (
 /**
  * Get full project details including environment IDs
  */
-export const getProject = async (projectId: string): Promise<any> => {
-  return await infisicalFetch(`/v1/workspace/${projectId}`);
+export const getProject = async (projectId: string): Promise<InfisicalProject> => {
+  return await infisicalFetch<InfisicalProject>(`/v1/workspace/${projectId}`);
 };
 
 /**
@@ -186,7 +194,7 @@ export const createFolder = async (
   environment: string,
   name: string,
   path: string = '/',
-): Promise<any> => {
+): Promise<unknown> => {
   try {
     return await infisicalFetch('/v2/folders', {
       method: 'POST',

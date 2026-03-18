@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
 
 const inputDir = join(import.meta.dir, '../src/generated/zod/schemas/variants/input');
@@ -46,10 +46,8 @@ const schemaBuilds = modelNames
   .map((m) => {
     const rel = modelRelations[m];
     const lines: string[] = [];
-    if (inputModelSet.has(m))
-      lines.push(`export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)};`);
-    if (pureModelSet.has(m))
-      lines.push(`export const ${m}ScalarSchema = ${m}ModelSchema${omit(rel)};`);
+    if (inputModelSet.has(m)) lines.push(`export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)};`);
+    if (pureModelSet.has(m)) lines.push(`export const ${m}ScalarSchema = ${m}ModelSchema${omit(rel)};`);
     return lines.join('\n');
   })
   .join('\n');

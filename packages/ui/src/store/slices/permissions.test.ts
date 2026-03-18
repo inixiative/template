@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
+import type { MeReadResponses } from '@template/ui/apiClient';
 import { createTestStore } from '@template/ui/test';
+
+type UserWithRelations = MeReadResponses[200]['data'];
 
 describe('permissions slice', () => {
   let store: ReturnType<typeof createTestStore>;
@@ -54,7 +57,7 @@ describe('permissions slice', () => {
           },
         ],
         spaceUsers: [],
-      } as any;
+      } as unknown as UserWithRelations;
 
       // Setup should complete without throwing
       await store.getState().permissions.setup(mockUser);
@@ -65,7 +68,7 @@ describe('permissions slice', () => {
       const mockUser = {
         id: 'user-1',
         email: 'test@example.com',
-      } as any;
+      } as unknown as UserWithRelations;
 
       await store.getState().permissions.setup(mockUser);
       expect(true).toBe(true);
@@ -76,7 +79,7 @@ describe('permissions slice', () => {
         id: 'user-1',
         email: 'superadmin@example.com',
         isSuperadmin: true,
-      } as any;
+      } as unknown as UserWithRelations;
 
       await store.getState().permissions.setup(mockSuperadminUser);
       expect(true).toBe(true);
@@ -100,7 +103,7 @@ describe('permissions slice', () => {
             entitlements: {},
           },
         ],
-      } as any;
+      } as unknown as UserWithRelations;
 
       await store.getState().permissions.setup(mockUser);
       expect(true).toBe(true);

@@ -28,9 +28,9 @@ describe('SpaceUser Token Permissions', () => {
   let memberUser: User;
   let memberOrgUser: OrganizationUser;
   let memberSpaceUser: SpaceUser;
-  let viewerUser: User;
-  let viewerOrgUser: OrganizationUser;
-  let viewerSpaceUser: SpaceUser;
+  let _viewerUser: User;
+  let _viewerOrgUser: OrganizationUser;
+  let _viewerSpaceUser: SpaceUser;
 
   beforeAll(async () => {
     // Create org and space first
@@ -60,10 +60,10 @@ describe('SpaceUser Token Permissions', () => {
     memberSpaceUser = su3;
 
     const { entity: ou4, context: c4 } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
-    viewerOrgUser = ou4;
-    viewerUser = c4.user;
+    _viewerOrgUser = ou4;
+    _viewerUser = c4.user;
     const { entity: su4 } = await createSpaceUser({ role: 'viewer' }, { ...c4, space });
-    viewerSpaceUser = su4;
+    _viewerSpaceUser = su4;
 
     db = createTestApp().db;
   });
@@ -193,7 +193,7 @@ describe('SpaceUser Token Permissions', () => {
 
     it('member cannot delete another member token', async () => {
       // Create another member - pass full context
-      const { entity: otherMemberOrgUser, context: otherCtx } = await createOrganizationUser(
+      const { entity: _otherMemberOrgUser, context: otherCtx } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
       );

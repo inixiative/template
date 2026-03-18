@@ -65,7 +65,8 @@ const extractBlocks = (input: string): Block[] => {
   const blocks: Block[] = [];
   OPEN_TAG.lastIndex = 0;
 
-  let match;
+  let match: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop idiom
   while ((match = OPEN_TAG.exec(input)) !== null) {
     const slug = match[1];
     const start = match.index;
@@ -90,8 +91,10 @@ const findClose = (input: string, slug: string, from: number): number => {
   open.lastIndex = from;
   close.lastIndex = from;
 
-  let m;
+  let m: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop idiom
   while ((m = open.exec(input))) pos.push({ p: m.index, o: true });
+  // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop idiom
   while ((m = close.exec(input))) pos.push({ p: m.index, o: false });
   pos.sort((a, b) => a.p - b.p);
 

@@ -22,7 +22,7 @@ export const usePageMeta = (): { title: string; description: string } => {
     }
 
     // Handle custom title or fallback to breadcrumbs
-    let title;
+    let title: string;
     if (currentRouteMatch.item.title) {
       const titleValue = currentRouteMatch.item.title;
       title = typeof titleValue === 'function' ? titleValue(context, pageContext) : titleValue;
@@ -65,7 +65,7 @@ export const usePageMeta = (): { title: string; description: string } => {
       document.head.appendChild(descriptionMeta);
     }
     descriptionMeta.setAttribute('content', description);
-  }, [title, description]);
+  }, [title, description, appName]);
 
   return { title, description };
 };

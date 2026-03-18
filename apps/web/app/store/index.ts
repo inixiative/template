@@ -1,8 +1,8 @@
 import {
-  type ClientSlice,
   type AuthSlice,
-  createClientSlice,
+  type ClientSlice,
   createAuthSlice,
+  createClientSlice,
   createNavigationSlice,
   createPermissionsSlice,
   createTenantSlice,

@@ -14,9 +14,9 @@ describe('mapRefs', () => {
     const { map } = mapRefs(input);
 
     expect(Object.keys(map)).toEqual(['header']);
-    expect(map['header']).toHaveLength(1);
-    expect(map['header'][0].mjml).toBe('<mj-section><mj-text>Hello</mj-text></mj-section>');
-    expect(map['header'][0].refs).toEqual([]);
+    expect(map.header).toHaveLength(1);
+    expect(map.header[0].mjml).toBe('<mj-section><mj-text>Hello</mj-text></mj-section>');
+    expect(map.header[0].refs).toEqual([]);
   });
 
   it('extracts nested components', () => {
@@ -35,12 +35,12 @@ describe('mapRefs', () => {
     expect(Object.keys(map).sort()).toEqual(['header', 'logo']);
 
     // Header has cleaned content with empty logo ref (tagged)
-    expect(map['header'][0].mjml).toContain('{{#component:logo:0}}{{/component:logo:0}}');
-    expect(map['header'][0].refs).toEqual(['logo:0']);
+    expect(map.header[0].mjml).toContain('{{#component:logo:0}}{{/component:logo:0}}');
+    expect(map.header[0].refs).toEqual(['logo:0']);
 
     // Logo has its actual content
-    expect(map['logo'][0].mjml).toBe('<mj-image src="logo.png" />');
-    expect(map['logo'][0].refs).toEqual([]);
+    expect(map.logo[0].mjml).toBe('<mj-image src="logo.png" />');
+    expect(map.logo[0].refs).toEqual([]);
   });
 
   it('extracts multiple instances of same slug with different content', () => {
@@ -55,9 +55,9 @@ describe('mapRefs', () => {
 
     const { map, mjml } = mapRefs(input);
 
-    expect(map['button']).toHaveLength(2);
-    expect(map['button'][0].mjml).toBe('<mj-button>Click Me</mj-button>');
-    expect(map['button'][1].mjml).toBe('<mj-button>Submit</mj-button>');
+    expect(map.button).toHaveLength(2);
+    expect(map.button[0].mjml).toBe('<mj-button>Click Me</mj-button>');
+    expect(map.button[1].mjml).toBe('<mj-button>Submit</mj-button>');
 
     // Verify variant tags in output
     expect(mjml).toContain('{{#component:button:0}}');
@@ -78,8 +78,8 @@ describe('mapRefs', () => {
 
     const { map, mjml } = mapRefs(input);
 
-    expect(map['divider']).toHaveLength(1);
-    expect(map['divider'][0].mjml).toBe('<mj-divider />');
+    expect(map.divider).toHaveLength(1);
+    expect(map.divider[0].mjml).toBe('<mj-divider />');
 
     // Both occurrences get :0 since content is identical
     const matches = mjml.match(/\{\{#component:divider:0\}\}/g);
@@ -106,14 +106,14 @@ describe('mapRefs', () => {
     expect(Object.keys(map).sort()).toEqual(['inner', 'middle', 'outer']);
 
     // Outer refs middle (tagged)
-    expect(map['outer'][0].refs).toEqual(['middle:0']);
+    expect(map.outer[0].refs).toEqual(['middle:0']);
 
     // Middle refs inner (tagged)
-    expect(map['middle'][0].refs).toEqual(['inner:0']);
+    expect(map.middle[0].refs).toEqual(['inner:0']);
 
     // Inner has no refs
-    expect(map['inner'][0].refs).toEqual([]);
-    expect(map['inner'][0].mjml).toBe('<p>Deep</p>');
+    expect(map.inner[0].refs).toEqual([]);
+    expect(map.inner[0].mjml).toBe('<p>Deep</p>');
   });
 
   it('handles sibling components', () => {
@@ -126,9 +126,9 @@ describe('mapRefs', () => {
     const { map, mjml } = mapRefs(input);
 
     expect(Object.keys(map).sort()).toEqual(['content', 'footer', 'header']);
-    expect(map['header'][0].mjml).toBe('<header/>');
-    expect(map['content'][0].mjml).toBe('<main/>');
-    expect(map['footer'][0].mjml).toBe('<footer/>');
+    expect(map.header[0].mjml).toBe('<header/>');
+    expect(map.content[0].mjml).toBe('<main/>');
+    expect(map.footer[0].mjml).toBe('<footer/>');
 
     // All tagged :0
     expect(mjml).toContain('{{#component:header:0}}');
@@ -148,9 +148,9 @@ describe('mapRefs', () => {
     const { map, mjml } = mapRefs(input);
 
     // Two variants: inner has content, outer has ref to inner
-    expect(map['box']).toHaveLength(2);
-    expect(map['box'][0].mjml).toBe('<div>Inner</div>');
-    expect(map['box'][1].refs).toEqual(['box:0']);
+    expect(map.box).toHaveLength(2);
+    expect(map.box[0].mjml).toBe('<div>Inner</div>');
+    expect(map.box[1].refs).toEqual(['box:0']);
 
     expect(mjml).toContain('{{#component:box:0}}');
     expect(mjml).toContain('{{#component:box:1}}');
@@ -167,9 +167,9 @@ describe('mapRefs', () => {
     const input = '{{#component:empty}}{{/component:empty}}';
     const { map, mjml } = mapRefs(input);
 
-    expect(map['empty']).toHaveLength(1);
-    expect(map['empty'][0].mjml).toBe('');
-    expect(map['empty'][0].refs).toEqual([]);
+    expect(map.empty).toHaveLength(1);
+    expect(map.empty[0].mjml).toBe('');
+    expect(map.empty[0].refs).toEqual([]);
     expect(mjml).toBe('{{#component:empty:0}}{{/component:empty:0}}');
   });
 

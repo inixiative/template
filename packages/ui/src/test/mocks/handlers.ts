@@ -15,7 +15,7 @@ const customHandlers = [
   http.post('*/auth/sign-in/email', async ({ request }) => {
     const body = await request.json();
     const { entity: user } = await buildUser({
-      email: (body as any).email,
+      email: (body as { email: string }).email,
     });
 
     return HttpResponse.json({

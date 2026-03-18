@@ -87,20 +87,20 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void, 
  * need to optimistically show cached data while fetching fresh updates).
  */
 export const useOptimisticListMutation = <TItem extends { id: string }, TVariables = unknown>(options: {
-  mutationFn: (variables: TVariables) => Promise<{ data: TItem | void; request: Request; response: Response }>;
+  mutationFn: (variables: TVariables) => Promise<{ data: TItem | undefined; request: Request; response: Response }>;
   queryKey: QueryKey;
   /** 'create' | 'update' | 'delete' - matches controller naming. TODO: Add 'lookup' for fetching individual items */
   operation: 'create' | 'update' | 'delete';
   /** Extra fields merged into the optimistic item on create (e.g. derived fields the API would normally compute) */
   optimisticExtras?: Partial<TItem>;
   mutationOptions?: Omit<
-    UseMutationOptions<TItem | void, Error, TVariables, { previousData: TItem[] | undefined }>,
+    UseMutationOptions<TItem | undefined, Error, TVariables, { previousData: TItem[] | undefined }>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
 }) => {
   const { operation, optimisticExtras, mutationFn, ...rest } = options;
 
-  return useOptimisticMutation<TItem | void, Error, TVariables, TItem[]>({
+  return useOptimisticMutation<TItem | undefined, Error, TVariables, TItem[]>({
     ...rest,
     mutationFn: async (variables) => {
       const result = await mutationFn(variables);
@@ -109,7 +109,7 @@ export const useOptimisticListMutation = <TItem extends { id: string }, TVariabl
     optimisticUpdate: (currentData, variables) => {
       // Cache may be a plain array or a wrapped { data: TItem[], ... } shape
       const isWrapped = currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
-      const list: TItem[] = (isWrapped ? (currentData as any).data : currentData) ?? [];
+      const list: TItem[] = (isWrapped ? (currentData as { data: TItem[] }).data : currentData) ?? [];
 
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;

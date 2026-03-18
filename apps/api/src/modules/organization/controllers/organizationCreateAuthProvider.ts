@@ -1,6 +1,5 @@
 import { db, organizationId } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
-import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateAuthProviderRoute } from '#/modules/organization/routes/organizationCreateAuthProvider';

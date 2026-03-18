@@ -1,6 +1,6 @@
-import { writeFileSync } from 'fs';
-import { join } from 'path';
-import { isModelName, toAccessor, type AccessorName } from '../src/utils/modelNames';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { type AccessorName, isModelName, toAccessor } from '../src/utils/modelNames';
 import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
 
 const outFile = join(import.meta.dir, '../../permissions/src/rebac/relationTargetsGen.ts');

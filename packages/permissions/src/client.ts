@@ -65,6 +65,8 @@ export const createPermissions = (): Permix => {
         const key = id ? `${resource}:${id}` : resource;
         accumulated[key] = { ...actions };
       }
+      // TODO: make this typesafe — PermixSetup requires all actions present but ActionState is Partial
+      // biome-ignore lint/suspicious/noExplicitAny: PermixSetup<> requires exhaustive actions; ActionState is Partial which TypeScript can't reconcile without widening
       await permix.setup(accumulated as any);
     },
     setSuperadmin: (value) => {

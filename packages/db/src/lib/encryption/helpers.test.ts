@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
-import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 
 describe('encryption helpers', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');

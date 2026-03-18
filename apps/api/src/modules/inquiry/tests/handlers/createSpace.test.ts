@@ -10,10 +10,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/organization', organizationRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/organization', organizationRouter)];
 
 describe('handler: createSpace — validate', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

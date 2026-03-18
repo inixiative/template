@@ -14,22 +14,22 @@ describe('GET /api/admin/organization', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
   let superadmin: User;
-  let orgA: Organization;
-  let orgB: Organization;
-  let orgC: Organization;
+  let _orgA: Organization;
+  let _orgB: Organization;
+  let _orgC: Organization;
 
   beforeAll(async () => {
     const { entity: sa } = await createUser({ platformRole: PlatformRole.superadmin });
     superadmin = sa;
 
     const { entity: a } = await createOrganization({ name: 'Apple Inc' });
-    orgA = a;
+    _orgA = a;
 
     const { entity: b } = await createOrganization({ name: 'Banana Corp' });
-    orgB = b;
+    _orgB = b;
 
     const { entity: c } = await createOrganization({ name: 'Cherry LLC' });
-    orgC = c;
+    _orgC = c;
 
     const harness = createTestApp({
       mockUser: superadmin,

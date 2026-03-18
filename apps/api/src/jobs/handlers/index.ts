@@ -1,5 +1,5 @@
-import { cleanStaleWebhooks } from '#/jobs/handlers/cleanStaleWebhooks';
 import { cleanStaleAuditLogs } from '#/jobs/handlers/cleanStaleAuditLogs';
+import { cleanStaleWebhooks } from '#/jobs/handlers/cleanStaleWebhooks';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
 import { type SendWebhookPayload, sendWebhook } from '#/jobs/handlers/sendWebhook';
 import type { JobHandler } from '#/jobs/types';
@@ -15,9 +15,9 @@ export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName
 
 export type JobPayloads = {
   sendWebhook: SendWebhookPayload;
-  rotateEncryptionKeys: void;
-  cleanStaleWebhooks: void;
-  cleanStaleAuditLogs: void;
+  rotateEncryptionKeys: undefined;
+  cleanStaleWebhooks: undefined;
+  cleanStaleAuditLogs: undefined;
 };
 
 export type JobHandlers = {

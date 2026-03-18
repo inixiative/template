@@ -8,6 +8,7 @@ import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
+import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -38,36 +39,45 @@ export const initializeWorker = async (): Promise<void> => {
       const scopeId = `${job.name}:${job.id}`;
       await logScope(LogScope.worker, () =>
         logScope(scopeId, () =>
-          db.scope(scopeId, async () => {
-            // Helper that logs to both stdout and BullBoard
-            const jobLog = (message: string) => {
-              log.info(message);
-              job.log(message);
-            };
+          db.scope(
+            scopeId,
+            async () => {
+              // Helper that logs to both stdout and BullBoard
+              const jobLog = (message: string) => {
+                log.info(message);
+                job.log(message);
+              };
 
-            const ctx: WorkerContext = {
-              db,
-              queue,
-              job,
-              log: jobLog,
-            };
+              const ctx: WorkerContext = {
+                db,
+                queue,
+                job,
+                log: jobLog,
+              };
 
-            jobLog(`Processing job ${job.name} (${job.id})`);
+              jobLog(`Processing job ${job.name} (${job.id})`);
 
-            try {
-              const payload = (job.data as { payload?: unknown }).payload;
-              if (payload === undefined) {
-                await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-              } else {
-                await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(ctx, payload);
+              try {
+                const payload = (job.data as { payload?: unknown }).payload;
+                await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
+                  if (payload === undefined) {
+                    await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+                  } else {
+                    await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
+                      ctx,
+                      payload,
+                    );
+                  }
+                });
+                jobLog(`Completed job ${job.name} (${job.id})`);
+              } catch (error) {
+                log.error(`Failed job ${job.name} (${job.id}):`, error);
+                job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
+                throw error;
               }
-              jobLog(`Completed job ${job.name} (${job.id})`);
-            } catch (error) {
-              log.error(`Failed job ${job.name} (${job.id}):`, error);
-              job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
-              throw error;
-            }
-          }, 'worker'),
+            },
+            'worker',
+          ),
         ),
       );
     },

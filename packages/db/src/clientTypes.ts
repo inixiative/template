@@ -11,7 +11,7 @@ export type DbMethods = {
   txn: <T>(fn: () => Promise<T>, options?: { timeout?: number }) => Promise<T>;
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) => void;
   getScopeId: () => string | null;
-  getScopeContext: () => ScopeContext | null;
+  getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
 };
 

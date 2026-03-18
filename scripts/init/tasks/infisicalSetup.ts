@@ -1,5 +1,4 @@
 import { exec, execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import {
   createFolder,
@@ -18,7 +17,7 @@ import {
   setProgressComplete,
   updateConfigField,
 } from '../utils/configHelpers';
-import { getProjectConfig, getProjectConfigPath } from '../utils/getProjectConfig';
+import { getProjectConfig } from '../utils/getProjectConfig';
 
 const execAsync = promisify(exec);
 
@@ -64,7 +63,7 @@ export const setupInfisical = async (
 
       // Handle nested response structure
       const selectedOrg = response.organization || response;
-      const orgName = selectedOrg.name || 'Unknown';
+      const _orgName = selectedOrg.name || 'Unknown';
       const orgSlug = selectedOrg.slug || selectedOrgId;
 
       organizationId = selectedOrg.id || selectedOrgId;
@@ -91,7 +90,7 @@ export const setupInfisical = async (
       try {
         await updateProjectSlug(projectId, configProjectName);
         // Suppressed for TUI: console.log(`    ✓ Updated slug to: ${configProjectName}`);
-      } catch (error) {
+      } catch (_error) {
         // Suppressed for TUI: console.log('    ⚠ Could not update slug (may already be correct)');
       }
 
@@ -117,7 +116,9 @@ export const setupInfisical = async (
       try {
         // Get full project details to find dev environment ID
         const projectDetails = await getProject(projectId);
-        const devEnv = projectDetails.workspace?.environments?.find((e: any) => e.slug === 'dev');
+        const devEnv = projectDetails.workspace?.environments?.find(
+          (e: { slug: string; id: string }) => e.slug === 'dev',
+        );
 
         if (devEnv) {
           await updateEnvironment(projectId, devEnv.id, { name: 'Root', slug: 'root' });
@@ -125,7 +126,7 @@ export const setupInfisical = async (
         } else {
           // Suppressed for TUI: console.log('    ⚠ Dev environment not found (may already be renamed)');
         }
-      } catch (error) {
+      } catch (_error) {
         // Suppressed for TUI: console.log('    ⚠ Could not rename dev environment:', error instanceof Error ? error.message : error);
       }
 

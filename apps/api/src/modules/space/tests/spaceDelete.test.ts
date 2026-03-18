@@ -7,7 +7,7 @@ import { createTestApp } from '#tests/createTestApp';
 import { del } from '#tests/utils/request';
 
 describe('DELETE /api/v1/space/:id', () => {
-  let fetch: ReturnType<typeof createTestApp>['fetch'];
+  let _fetch: ReturnType<typeof createTestApp>['fetch'];
   let testDb: ReturnType<typeof createTestApp>['db'];
   let user: User;
   let org: Organization;
@@ -39,7 +39,7 @@ describe('DELETE /api/v1/space/:id', () => {
       mockSpaceUsers: [spaceUser],
       mount: [(app) => app.route('/api/v1/space', spaceRouter)],
     });
-    fetch = harness.fetch;
+    _fetch = harness.fetch;
     testDb = harness.db;
   });
 

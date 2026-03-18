@@ -11,10 +11,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/space', spaceRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/space', spaceRouter)];
 
 describe('handler: updateSpace — validate', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

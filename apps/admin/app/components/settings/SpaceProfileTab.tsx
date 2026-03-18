@@ -1,6 +1,6 @@
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@template/ui/components';
 
-export const SpaceProfileTab = ({ spaceId }: { spaceId: string }) => {
+export const SpaceProfileTab = ({ spaceId: _spaceId }: { spaceId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>

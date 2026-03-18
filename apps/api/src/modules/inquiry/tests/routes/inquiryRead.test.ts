@@ -9,10 +9,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
 describe('GET /api/v1/inquiry/:id', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

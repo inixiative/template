@@ -1,6 +1,6 @@
 import {
-  filterIgnoredFields,
   type FlexibleRef,
+  filterIgnoredFields,
   type WebhookModel,
   webhookEnabledModels,
   webhookModelSubscribers,

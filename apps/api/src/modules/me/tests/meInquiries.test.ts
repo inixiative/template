@@ -3,12 +3,12 @@ import type { Inquiry, User } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createInquiry, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
 type InquiryList = { data: Inquiry[]; pagination: unknown };
 
-const mount = [(app: any) => app.route('/api/v1/me', meRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/me', meRouter)];
 
 describe('GET /api/v1/me/inquiries/sent', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

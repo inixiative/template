@@ -19,7 +19,7 @@ type InfisicalSetupViewProps = {
 };
 
 const detectSetupState = (config: ProjectConfig): SetupState => {
-  const { progress, configProjectName, projectId } = config.infisical;
+  const { progress, configProjectName, projectId: _projectId } = config.infisical;
   const currentProjectName = config.project.name;
 
   // Stale if project name changed
@@ -234,7 +234,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
           const isPending = !isCompleted && !isInProgress;
 
           return (
-            <Box key={i}>
+            <Box key={item.label}>
               {isCompleted && <Text color="green">✓ {item.label}</Text>}
               {isInProgress && (
                 <Text color="cyan">

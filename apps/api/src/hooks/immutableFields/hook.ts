@@ -10,7 +10,12 @@ const stripFromObject = (obj: Record<string, unknown>, model: ModelName): void =
 
 const processArgs = (args: unknown, model: ModelName): void => {
   if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) return args.forEach((item) => processArgs(item, model));
+  if (Array.isArray(args)) {
+    args.forEach((item) => {
+      processArgs(item, model);
+    });
+    return;
+  }
 
   const record = args as Record<string, unknown>;
 

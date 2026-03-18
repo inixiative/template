@@ -50,6 +50,7 @@ export const SettingsLayout = ({
               return (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => handleTabChange(tab.id)}
                   className={cn(
                     'flex items-center gap-2 px-1 pb-3 border-b-2 transition-colors text-sm font-medium',

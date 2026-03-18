@@ -185,7 +185,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
             name: team.name,
           })),
         );
-      } catch (err) {
+      } catch (_err) {
         setTeams([]);
       } finally {
         setLoadingTeams(false);
@@ -215,7 +215,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   });
 
   // Handle input on GitHub prompt view
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (viewState !== 'github-prompt') return;
 
     if (key.return) {
@@ -426,7 +426,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
           const isPending = !isCompleted && !isInProgress;
 
           return (
-            <Box key={i} marginLeft={2}>
+            <Box key={item.label} marginLeft={2}>
               {isCompleted && <Text color="green">✓ {item.label}</Text>}
               {isInProgress && (
                 <Text color="cyan">

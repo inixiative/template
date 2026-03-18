@@ -3,11 +3,8 @@ import {
   createBranch,
   createDatabase,
   createRole,
-  createServiceToken,
-  deleteBranch,
   getBranch,
   getDatabase,
-  type PlanetScalePassword,
   renameBranch,
   updateDatabaseSettings,
 } from '../api/planetscale';
@@ -24,8 +21,10 @@ const initPrismaMigrationTable = async (connectionString: string): Promise<void>
       stdio: 'pipe',
       timeout: 30000,
     });
-  } catch (error: any) {
-    throw new Error(`Failed to initialize Prisma migration table: ${error.message}`);
+  } catch (error) {
+    throw new Error(
+      `Failed to initialize Prisma migration table: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 };
 
@@ -87,8 +86,8 @@ export const setupPlanetScale = async (
     // Variables to hold intermediate results
     let organization = config.planetscale.organization;
     const region = config.planetscale.region;
-    let database = config.planetscale.database;
-    const tokenId = config.planetscale.tokenId;
+    let _database = config.planetscale.database;
+    const _tokenId = config.planetscale.tokenId;
 
     // Step 0: Store organization and mark selected
     if (!(await isProgressComplete('planetscale', 'selectOrg'))) {
@@ -117,19 +116,19 @@ export const setupPlanetScale = async (
     // IMPORTANT: Before production launch, upgrade to multi-replica plan for HA:
     //   pscale database upgrade-plan <database> --org <org> --plan multi
     //   This provides Primary + 2 replicas with 99.99% SLA
-    let dbResult;
+    let _dbResult: Awaited<ReturnType<typeof getDatabase>> | undefined;
     if (!(await isProgressComplete('planetscale', 'createDB'))) {
       try {
-        dbResult = await createDatabase(organization, databaseName, region);
+        _dbResult = await createDatabase(organization, databaseName, region);
       } catch (error) {
         // Database might already exist
         if (error instanceof Error && error.message.includes('already exists')) {
-          dbResult = await getDatabase(organization, databaseName);
+          _dbResult = await getDatabase(organization, databaseName);
         } else {
           throw error;
         }
       }
-      database = databaseName;
+      _database = databaseName;
 
       // Save database name to config immediately so it shows in UI
       await updateConfigField('planetscale', 'database', databaseName);
@@ -137,7 +136,7 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Database already created, just fetch it
-      dbResult = await getDatabase(organization, databaseName);
+      _dbResult = await getDatabase(organization, databaseName);
     }
 
     // Step 4: Wait for database initial provisioning
@@ -163,10 +162,10 @@ export const setupPlanetScale = async (
     }
 
     // Step 6: Create staging branch (from prod)
-    let stagingBranch;
+    let _stagingBranch: Awaited<ReturnType<typeof getBranch>> | undefined;
     if (!(await isProgressComplete('planetscale', 'createStagingBranch'))) {
       try {
-        stagingBranch = await retryWithTimeout(() => createBranch(organization, databaseName, 'staging', 'prod'), {
+        _stagingBranch = await retryWithTimeout(() => createBranch(organization, databaseName, 'staging', 'prod'), {
           maxRetries: 100,
           delayMs: 3000,
           retryCondition: (error) => {
@@ -179,7 +178,7 @@ export const setupPlanetScale = async (
         });
       } catch (error) {
         if (error instanceof Error && error.message.includes('already exists')) {
-          stagingBranch = await getBranch(organization, databaseName, 'staging');
+          _stagingBranch = await getBranch(organization, databaseName, 'staging');
         } else {
           throw error;
         }
@@ -188,13 +187,13 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Staging branch already created, just fetch it
-      stagingBranch = await getBranch(organization, databaseName, 'staging');
+      _stagingBranch = await getBranch(organization, databaseName, 'staging');
     }
 
     // Step 7: Create passwords (connection strings)
     // Suppressed for TUI: console.log('  • Creating connection passwords...');
-    let productionPassword;
-    let stagingPassword;
+    let productionPassword: Awaited<ReturnType<typeof createRole>> | undefined;
+    let stagingPassword: Awaited<ReturnType<typeof createRole>> | undefined;
 
     if (!(await isProgressComplete('planetscale', 'createPasswords'))) {
       // Production branch role (Postgres uses roles, not passwords)

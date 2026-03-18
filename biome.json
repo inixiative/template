@@ -9,6 +9,9 @@
         "noForEach": "off",
         "useArrowFunction": "error"
       },
+      "correctness": {
+        "useExhaustiveDependencies": "warn"
+      },
       "style": {
         "noNonNullAssertion": "off",
         "noDefaultExport": "error",
@@ -48,7 +51,9 @@
       "!**/*.gen.json",
       "!**/*.generated.ts",
       "!**/generated",
-      "!tmp"
+      "!tmp",
+      "!packages/shared/styles/theme.css",
+      "!scripts/ci/rule-violations/**"
     ]
   },
   "overrides": [
@@ -117,7 +122,13 @@
       }
     },
     {
-      "includes": ["apps/**/app/routes/**", "**/app/routes/**"],
+      "includes": [
+        "apps/**/app/routes/**",
+        "**/app/routes/**",
+        "**/scripts/**",
+        "**/tests/mocks/**",
+        "project.config.template-internal.ts"
+      ],
       "linter": {
         "rules": {
           "style": {
@@ -144,7 +155,7 @@
         "**/app.config.ts",
         "**/prisma.config.ts",
         "**/openapiTs.config.ts",
-        "**/apps/**/app/ssr.tsx"
+        "**/app/ssr.tsx"
       ],
       "linter": {
         "rules": {

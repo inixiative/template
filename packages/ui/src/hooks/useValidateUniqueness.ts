@@ -39,7 +39,7 @@ export const useValidateUniqueness = (
       const result = (await apiFetchInternal(
         (requestOptions: LookupOptions) => reader({ ...params, ...requestOptions }),
         { spoofUserEmail: auth.spoofUserEmail, throwOnError: false },
-      )()) as any;
+      )()) as { response?: { status: number }; error?: unknown; data?: { data?: { id: string } } | { id: string } };
 
       if (result?.response?.status === 404) {
         return { available: true, existingId: undefined };

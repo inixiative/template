@@ -92,7 +92,7 @@ export const checkInfisicalSession = (): InfisicalSession => {
       loggedIn: !!sessionId,
       user: sessionId ? `Session ${sessionId.substring(0, 8)}...` : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -115,7 +115,7 @@ export const checkInfisicalSessionAsync = async (): Promise<InfisicalSession> =>
       loggedIn: !!sessionId,
       user: sessionId ? `Session ${sessionId.substring(0, 8)}...` : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -140,7 +140,7 @@ export const checkPlanetScaleSession = (): InfisicalSession => {
       loggedIn: isLoggedIn,
       user: isLoggedIn ? 'Authenticated' : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -160,7 +160,7 @@ export const checkPlanetScaleSessionAsync = async (): Promise<InfisicalSession> 
       loggedIn: isLoggedIn,
       user: isLoggedIn ? 'Authenticated' : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -185,7 +185,7 @@ export const checkVercelSession = (): InfisicalSession => {
       loggedIn: isLoggedIn,
       user: isLoggedIn ? output : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -206,7 +206,7 @@ export const checkVercelSessionAsync = async (): Promise<InfisicalSession> => {
       loggedIn: isLoggedIn,
       user: isLoggedIn ? output : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -232,7 +232,7 @@ export const checkRailwaySession = (): InfisicalSession => {
       loggedIn: isLoggedIn,
       user: isLoggedIn ? output.split('\n')[0] : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -253,7 +253,7 @@ export const checkRailwaySessionAsync = async (): Promise<InfisicalSession> => {
       loggedIn: isLoggedIn,
       user: isLoggedIn ? output.split('\n')[0] : undefined,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Not logged in',
@@ -284,7 +284,8 @@ export const checkGitHubSessionAsync = async (): Promise<InfisicalSession> => {
   } catch (error) {
     // gh auth status exits with non-zero if not authenticated
     // But it may print to stderr, check the error output
-    const errorOutput = error instanceof Error && 'stderr' in error ? String((error as any).stderr) : '';
+    const errorOutput =
+      error instanceof Error && 'stderr' in error ? String((error as { stderr: unknown }).stderr) : '';
 
     if (errorOutput.toLowerCase().includes('logged in')) {
       const userMatch = errorOutput.match(/Logged in to .+ as (.+?) \(/);
@@ -312,7 +313,7 @@ export const checkDockerRunningAsync = async (): Promise<InfisicalSession> => {
       loggedIn: true,
       user: 'Running',
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       loggedIn: false,
       error: 'Docker daemon not running',

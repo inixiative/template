@@ -3,7 +3,7 @@ import { makeError } from '#/lib/errors';
 import type { PublicZodIssue } from '#/middleware/error/types';
 import type { AppEnv } from '#/types/appEnv';
 
-export const respond422 = (c: Context<AppEnv>, issues: PublicZodIssue[]) => {
+export const respond422 = (_c: Context<AppEnv>, issues: PublicZodIssue[]) => {
   // Convert Zod issues to fieldErrors format
   const fieldErrors: Record<string, string[]> = {};
   for (const issue of issues) {

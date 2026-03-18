@@ -10,9 +10,23 @@ export type AuditActor = {
   sourceInquiryId: string | null;
 };
 
+export const nullAuditActor: AuditActor = {
+  actorUserId: null,
+  actorSpoofUserId: null,
+  actorTokenId: null,
+  actorJobName: null,
+  ipAddress: null,
+  userAgent: null,
+  sourceInquiryId: null,
+};
+
 const store = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
-  run: <T>(actor: AuditActor, fn: () => T): T => store.run(actor, fn),
-  get: (): AuditActor | null => store.getStore() ?? null,
+  scope: <T>(actor: AuditActor, fn: () => T): T => store.run(actor, fn),
+  getScope: (): AuditActor | null => store.getStore() ?? null,
+  extend: (partial: Partial<AuditActor>): void => {
+    const current = store.getStore();
+    if (current) Object.assign(current, partial);
+  },
 };

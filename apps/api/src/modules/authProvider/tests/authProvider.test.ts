@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { z } from '@hono/zod-openapi';
-import type { AuthProvider, Organization, OrganizationUser, User } from '@template/db';
+import type { Organization, OrganizationUser, User } from '@template/db';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -158,8 +157,8 @@ describe('AuthProvider Endpoints', () => {
         { organization: org },
       );
 
-      const response = await superadminFetch(get('/api/admin/authProvider?organizationId=' + org.id));
-      const { data, pagination } = await json(response);
+      const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
+      const { data, pagination: _pagination } = await json(response);
 
       const found = data.find((p) => p.id === provider.id);
       expect(found).toBeDefined();

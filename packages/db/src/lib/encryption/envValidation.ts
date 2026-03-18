@@ -13,7 +13,7 @@ export const encryptionKeySchema = z.string().refine(
 );
 
 export const createEncryptionEnvRefinement = (versionField: string, previousKeyField: string) => {
-  return (data: Record<string, any>, ctx: z.RefinementCtx) => {
+  return (data: Record<string, unknown>, ctx: z.RefinementCtx) => {
     const version = data[versionField];
     const previousKey = data[previousKeyField];
 

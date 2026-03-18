@@ -1,11 +1,13 @@
+import { createHash } from 'node:crypto';
 import { cache, cacheKey, upsertCache } from '@template/db';
-import { createHash } from 'crypto';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
+
+const TOKEN_CACHE_TTL = 60 * 10;
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const db = c.get('db');
@@ -51,13 +53,14 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
             },
           },
         }),
-      60 * 10, // 10-minute TTL to balance performance with security (revoked tokens re-checked)
+      TOKEN_CACHE_TTL, // 10-minute TTL to balance performance with security (revoked tokens re-checked)
     );
 
     if (!token) return next();
 
-    if (token.user) upsertCache(cacheKey('user', token.user.id), token.user);
-    if (token.organization) upsertCache(cacheKey('organization', token.organization.id), token.organization);
+    if (token.user) upsertCache(cacheKey('user', token.user.id), token.user, { ttl: TOKEN_CACHE_TTL });
+    if (token.organization)
+      upsertCache(cacheKey('organization', token.organization.id), token.organization, { ttl: TOKEN_CACHE_TTL });
     if (token.organizationUser)
       upsertCache(
         cacheKey('organizationUser', {
@@ -65,8 +68,9 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
           userId: token.organizationUser.userId,
         }),
         token.organizationUser,
+        { ttl: TOKEN_CACHE_TTL },
       );
-    if (token.space) upsertCache(cacheKey('space', token.space.id), token.space);
+    if (token.space) upsertCache(cacheKey('space', token.space.id), token.space, { ttl: TOKEN_CACHE_TTL });
     if (token.spaceUser)
       upsertCache(
         cacheKey('spaceUser', {
@@ -75,6 +79,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
           userId: token.spaceUser.userId,
         }),
         token.spaceUser,
+        { ttl: TOKEN_CACHE_TTL },
       );
 
     // Update lastUsedAt (fire and forget, don't block request)

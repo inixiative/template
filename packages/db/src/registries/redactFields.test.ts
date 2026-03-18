@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { redactSensitiveFields, getRedactFields, HOOK_REDACT_FIELDS } from '@template/db/registries';
+import { getRedactFields, HOOK_REDACT_FIELDS, redactSensitiveFields } from '@template/db/registries';
 
 describe('redactFields', () => {
   describe('HOOK_REDACT_FIELDS', () => {

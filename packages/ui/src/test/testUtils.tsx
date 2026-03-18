@@ -13,7 +13,7 @@ import type { ReactNode } from 'react';
  * Creates a test wrapper component with store context
  */
 export const createTestWrapper = (initialState?: Partial<AppStore>) => {
-  const store = createTestStore(initialState);
+  const _store = createTestStore(initialState);
 
   return ({ children }: { children: ReactNode }) => {
     // For now, just return children directly
@@ -67,7 +67,7 @@ export const setupDOMEnvironment = () => {
       },
     };
 
-    (globalThis as any).document = {
+    (globalThis as Record<string, unknown>).document = {
       documentElement: {
         classList: classListMock,
         style: styleMock,
@@ -76,7 +76,7 @@ export const setupDOMEnvironment = () => {
       appendChild: () => {},
     };
 
-    (globalThis as any).window = {
+    (globalThis as Record<string, unknown>).window = {
       matchMedia: () => ({
         matches: false,
         media: '',
@@ -110,7 +110,7 @@ export const cleanupDOMEnvironment = () => {
         }
       });
     }
-  } catch (e) {
+  } catch (_e) {
     // Ignore cleanup errors in mock environment
   }
 };

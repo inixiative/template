@@ -14,6 +14,7 @@ export const transactionAll: StrategyExecutor = async (
 ) => {
   const batchId = crypto.randomUUID();
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
+  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
   const results: any[][] = [];
   let completedRounds = 0;
   let successfulRequests = 0;
@@ -22,7 +23,7 @@ export const transactionAll: StrategyExecutor = async (
   try {
     await db.txn(
       async () => {
-        registerBatch(batchId, db as any, baseContext);
+        registerBatch(batchId, db, baseContext);
 
         try {
           for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
@@ -68,7 +69,7 @@ export const transactionAll: StrategyExecutor = async (
         status: 'success' as const,
       },
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       batch: results,
       summary: {

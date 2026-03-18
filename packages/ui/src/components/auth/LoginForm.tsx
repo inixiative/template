@@ -20,7 +20,7 @@ export type LoginFormProps = {
   onSignupClick?: () => void;
 };
 
-export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
+export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
@@ -39,8 +39,8 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
     try {
       await signIn({ type: 'email', email, password });
       navigatePreservingContext(search.redirectTo || '/dashboard');
-    } catch (err: any) {
-      const message = err?.message || 'Log in failed. Please try again.';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Log in failed. Please try again.';
       setError(message);
       toast.error(message);
     } finally {
@@ -60,8 +60,8 @@ export const LoginForm = ({ hideSignup, onSignupClick }: LoginFormProps) => {
         provider,
         callbackURL: `${window.location.origin}/auth/callback`,
       });
-    } catch (err: any) {
-      const message = err?.message || 'OAuth log in failed. Please try again.';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'OAuth log in failed. Please try again.';
       setError(message);
       toast.error(message);
       setIsLoading(false);

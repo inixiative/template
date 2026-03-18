@@ -149,7 +149,7 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
 
   try {
     // Bust import cache with timestamp to get fresh config
-    const module = await import(configPath + '?t=' + Date.now());
+    const module = await import(`${configPath}?t=${Date.now()}`);
     return module.projectConfig;
   } catch (error) {
     throw new Error(

@@ -98,6 +98,7 @@ describe('rules hook', () => {
     it('pass: cross-field rule validated against merged state', async () => {
       setRulesCache('User', {
         if: { field: 'emailVerified', operator: Operator.equals, value: true },
+        // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
         then: { field: 'name', operator: Operator.notEmpty, value: true, error: 'verified users need name' },
       });
 

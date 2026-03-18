@@ -1,4 +1,4 @@
-import { type ModelName, getRuntimeDataModel, isModelName, toModelName } from '@template/db';
+import { getRuntimeDataModel, isModelName, type ModelName, toModelName } from '@template/db';
 
 type SearchableEntry = string | { [relation: string]: SearchableEntry | SearchableEntry[] };
 type SearchableInput = { [model: string]: SearchableEntry[] };
@@ -15,7 +15,8 @@ const flatten = (entry: SearchableEntry | SearchableEntry[], modelName: ModelNam
   if (Array.isArray(entry)) return entry.flatMap((e) => flatten(e, modelName, prefix));
   if (typeof entry === 'string') {
     const field = getField(modelName, entry);
-    if (field.kind === 'object') throw new Error(`searchable: '${entry}' on '${modelName}' is a relation — use { ${entry}: [...] } syntax`);
+    if (field.kind === 'object')
+      throw new Error(`searchable: '${entry}' on '${modelName}' is a relation — use { ${entry}: [...] } syntax`);
     return [prefix ? `${prefix}.${entry}` : entry];
   }
   return Object.entries(entry).flatMap(([relation, value]) => {

@@ -2,6 +2,7 @@ import { AuditSubjectModel } from '@template/db/generated/client/enums';
 
 export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.User,
+  AuditSubjectModel.Account,
   AuditSubjectModel.Organization,
   AuditSubjectModel.OrganizationUser,
   AuditSubjectModel.Space,
@@ -10,6 +11,8 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.AuthProvider,
   AuditSubjectModel.Inquiry,
   AuditSubjectModel.CustomerRef,
+  AuditSubjectModel.EmailTemplate,
+  AuditSubjectModel.EmailComponent,
 ];
 
 export const isAuditEnabled = (model: string): model is AuditSubjectModel =>

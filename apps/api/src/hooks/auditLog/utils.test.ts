@@ -25,11 +25,10 @@ describe('auditLog/utils', () => {
       expect(result.providerId).toBe('email');
     });
 
-    it('redacts sensitive Token fields', () => {
-      const data = { id: '1', name: 'tok', value: 'tok_secret', hashedValue: 'hash' };
+    it('redacts keyHash on Token', () => {
+      const data = { id: '1', name: 'tok', keyHash: 'sha256-hash' };
       const result = processAuditData('Token', data);
-      expect(result.value).toBe('[REDACTED]');
-      expect(result.hashedValue).toBe('[REDACTED]');
+      expect(result.keyHash).toBe('[REDACTED]');
       expect(result.name).toBe('tok');
     });
   });
@@ -119,31 +118,32 @@ describe('auditLog/utils', () => {
     it('returns empty object when before and after are the same', () => {
       const before = { id: '1', name: 'test', status: 'active' };
       const after = { id: '1', name: 'test', status: 'active' };
-      const diff = computeDiff('Organization', before, after);
+      const diff = computeDiff(before, after);
       expect(diff).toEqual({});
     });
 
     it('returns changed fields with before/after values', () => {
       const before = { id: '1', name: 'old-name', status: 'active' };
       const after = { id: '1', name: 'new-name', status: 'active' };
-      const diff = computeDiff('Organization', before, after);
+      const diff = computeDiff(before, after);
       expect(diff).toEqual({
         name: { before: 'old-name', after: 'new-name' },
       });
     });
 
-    it('excludes ignored fields like updatedAt from diff', () => {
+    it('does not include unchanged fields', () => {
       const before = { id: '1', name: 'test', updatedAt: new Date('2020-01-01') };
       const after = { id: '1', name: 'test', updatedAt: new Date('2021-01-01') };
-      const diff = computeDiff('Organization', before, after);
-      expect(diff).not.toHaveProperty('updatedAt');
-      expect(diff).toEqual({});
+      // computeDiff is a pure diff — caller should pass pre-processed (filtered) data
+      const diff = computeDiff(before, after);
+      expect(diff).toHaveProperty('updatedAt');
+      // the caller (buildAuditEntry) passes processAuditData output which strips updatedAt first
     });
 
     it('handles multiple changed fields', () => {
       const before = { id: '1', name: 'old', slug: 'old-slug' };
       const after = { id: '1', name: 'new', slug: 'new-slug' };
-      const diff = computeDiff('Organization', before, after);
+      const diff = computeDiff(before, after);
       expect(Object.keys(diff)).toHaveLength(2);
       expect(diff.name).toEqual({ before: 'old', after: 'new' });
       expect(diff.slug).toEqual({ before: 'old-slug', after: 'new-slug' });
@@ -152,23 +152,22 @@ describe('auditLog/utils', () => {
     it('handles added fields (present in after, absent in before)', () => {
       const before = { id: '1', name: 'test' };
       const after = { id: '1', name: 'test', description: 'new desc' };
-      const diff = computeDiff('Organization', before, after);
+      const diff = computeDiff(before, after);
       expect(diff.description).toEqual({ before: undefined, after: 'new desc' });
     });
 
     it('handles removed fields (present in before, absent in after)', () => {
       const before = { id: '1', name: 'test', description: 'old desc' };
       const after = { id: '1', name: 'test' };
-      const diff = computeDiff('Organization', before, after);
+      const diff = computeDiff(before, after);
       expect(diff.description).toEqual({ before: 'old desc', after: undefined });
     });
 
-    it('redacts sensitive fields in diff values', () => {
-      const before = { id: '1', password: 'old-pass', providerId: 'email' };
-      const after = { id: '1', password: 'new-pass', providerId: 'email' };
-      const diff = computeDiff('Account', before, after);
-      // password changes but after redaction both become [REDACTED], so no diff
-      expect(diff).not.toHaveProperty('password');
+    it('uses deep equality for object fields', () => {
+      const before = { id: '1', meta: { a: 1, b: 2 } };
+      const after = { id: '1', meta: { a: 1, b: 2 } };
+      const diff = computeDiff(before, after);
+      expect(diff).toEqual({});
     });
   });
 });

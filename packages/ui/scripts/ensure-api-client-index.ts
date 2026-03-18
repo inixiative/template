@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const indexFile = join(import.meta.dir, '../src/apiClient/index.ts');
 const exportLine = "export * from './@tanstack/react-query.gen';";

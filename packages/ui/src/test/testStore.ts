@@ -6,38 +6,41 @@
  */
 
 import { QueryClient } from '@tanstack/react-query';
+import type { Permix } from '@template/permissions/client';
 import { createAuthSlice } from '@template/ui/store/slices/auth';
 import { createNavigationSlice } from '@template/ui/store/slices/navigation';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
-import { createStore, type StateCreator } from 'zustand';
+import { createStore, type StateCreator, type StoreApi } from 'zustand';
 
 /**
  * Test-friendly permissions slice that doesn't import runtime dependencies
  */
-const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (set, get) => {
-  let mockPermix = {
-    setUserId: () => {},
-    setSuperadmin: () => {},
+const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (set, _get) => {
+  const makeMockPermix = (): Permix => ({
+    check: () => false,
     setup: async () => {},
-  };
+    setSuperadmin: () => {},
+    isSuperadmin: () => false,
+    setUserId: () => {},
+    getUserId: () => null,
+    getJSON: () => null,
+  });
+
+  let mockPermix = makeMockPermix();
 
   return {
     permissions: {
-      permix: mockPermix as any,
+      permix: mockPermix,
       check: () => false,
       clear: () => {
-        mockPermix = {
-          setUserId: () => {},
-          setSuperadmin: () => {},
-          setup: async () => {},
-        };
+        mockPermix = makeMockPermix();
         set((state) => ({
           permissions: {
             ...state.permissions,
-            permix: mockPermix as any,
+            permix: mockPermix,
           },
         }));
       },
@@ -60,19 +63,19 @@ export const createTestStore = (initialState?: Partial<AppStore>) => {
     }),
 
     // Auth slice (real implementation)
-    ...createAuthSlice(set, get, {} as any),
+    ...createAuthSlice(set, get, {} as StoreApi<AppStore>),
 
     // Tenant slice (real implementation)
-    ...createTenantSlice(set, get, {} as any),
+    ...createTenantSlice(set, get, {} as StoreApi<AppStore>),
 
     // Permissions slice (test version)
-    ...createTestPermissionsSlice(set, get, {} as any),
+    ...createTestPermissionsSlice(set, get, {} as StoreApi<AppStore>),
 
     // Navigation slice (real implementation)
-    ...createNavigationSlice(set, get, {} as any),
+    ...createNavigationSlice(set, get, {} as StoreApi<AppStore>),
 
     // UI slice (real implementation)
-    ...createUISlice(set, get, {} as any),
+    ...createUISlice(set, get, {} as StoreApi<AppStore>),
 
     // Apply initial state overrides
     ...initialState,

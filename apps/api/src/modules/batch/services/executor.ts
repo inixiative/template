@@ -1,4 +1,4 @@
-import type { Context, Hono } from 'hono';
+import type { Context } from 'hono';
 import { getValidatedBody } from '#/lib/context/getValidatedData';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';
 import { failOnRound } from '#/modules/batch/services/strategies/failOnRound';

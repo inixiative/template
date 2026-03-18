@@ -17,7 +17,11 @@ export const parseRoutingSearchParams = (search: SearchInput): RoutingSearchPara
   };
 };
 
-export const syncStoreFromSearchParams = ({ searchParams, tenant, auth }: SyncStoreFromSearchParamsInput): void => {
+export const syncStoreFromSearchParams = ({
+  searchParams,
+  tenant,
+  auth: _auth,
+}: SyncStoreFromSearchParamsInput): void => {
   if (searchParams.spaceId && tenant.context.space?.id !== searchParams.spaceId) {
     tenant.setSpace(searchParams.spaceId);
   } else if (searchParams.organizationId && tenant.context.organization?.id !== searchParams.organizationId) {

@@ -18,7 +18,8 @@ model Inquiry {
   content    Json @default("{}")    // type-specific payload, set on create
   resolution Json @default("{}")    // set on resolve (approved/denied)
 
-  sentAt DateTime?
+  sentAt    DateTime?  // set once on first send; not cleared when moved back to draft
+  expiresAt DateTime?  // set on send via computeExpiresAt(type); cleared when moved back to draft
 
   // Source (who sends) — fake polymorphism
   sourceModel          InquiryResourceModel  // admin | User | Organization | Space
@@ -249,9 +250,15 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 
 | Schema | Relations included | Used on |
 |--------|--------------------|---------|
-| `inquiryResponseSchema` | All 6 (sources + targets) | Single read, admin list |
-| `inquirySentResponseSchema` | Targets only | Sent lists, create response |
-| `inquiryReceivedResponseSchema` | Sources only | Received lists |
+| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read, mutations (update/send/resolve), admin list |
+| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response |
+| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists |
+
+The list schemas intentionally omit the opposite side's relations to reduce payload size — the sender only needs target data, the receiver only needs source data.
+
+### Standardized includes
+
+All singleton mutation endpoints (update, send, resolve) use `includeInquiryResponse` directly in the Prisma call — one DB round-trip, no separate refetch. The resource context middleware also loads inquiries with `includeInquiryResponse` so `GET /inquiry/:id` needs no DB call at all.
 
 ## Permissions (ReBAC)
 

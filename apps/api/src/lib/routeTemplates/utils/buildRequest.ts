@@ -7,6 +7,9 @@ import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
 import { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
 
+// biome-ignore lint/complexity/noBannedTypes: Zod generic requires {}
+type ZodAnyObject = z.ZodObject<{}>;
+
 // Base system fields that get sanitized from body schemas
 type BaseSanitizeKey = 'id' | 'uuid' | 'createdAt' | 'updatedAt' | 'deletedAt';
 
@@ -39,7 +42,7 @@ type ParamsType<T extends RouteArgs> = T['params'] extends ZodSchema
   ? T['params']
   : NeedsId<T> extends true
     ? typeof idParamsSchema
-    : z.ZodObject<{}>;
+    : ZodAnyObject;
 
 type PaginateShape = (typeof paginateRequestSchema)['shape'];
 
@@ -52,7 +55,7 @@ type QueryType<T extends RouteArgs> = T['paginate'] extends true
     : typeof paginateRequestSchema
   : T['query'] extends ZodSchema
     ? T['query']
-    : z.ZodObject<{}>;
+    : ZodAnyObject;
 
 type RequestWithBody<T extends RouteArgs> = {
   params: ParamsType<T>;

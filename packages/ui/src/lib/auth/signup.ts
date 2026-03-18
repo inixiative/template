@@ -56,6 +56,6 @@ export const signUp = async (method: AuthMethod): Promise<void> => {
     case 'saml':
       return signUpWithSaml(method);
     default:
-      throw new Error(`Unsupported auth method: ${(method as any).type}`);
+      throw new Error(`Unsupported auth method: ${(method as { type: string }).type}`);
   }
 };

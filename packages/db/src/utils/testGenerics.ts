@@ -17,10 +17,10 @@ type Result<M extends ModelName, Op extends Operation> = Prisma.TypeMap['model']
 // Test 1: Literal types resolve correctly
 // ─────────────────────────────────────────────────────────────────────────────
 type UserFindManyArgs = Args<'User', 'findMany'>;
-type UserCreateResult = Result<'User', 'create'>;
+type _UserCreateResult = Result<'User', 'create'>;
 
 // Verify: does UserFindManyArgs have 'where' with 'email'?
-const testArgs: UserFindManyArgs = { where: { email: { contains: 'test' } } };
+const _testArgs: UserFindManyArgs = { where: { email: { contains: 'test' } } };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 2: Generic function with mapped types
@@ -32,11 +32,11 @@ declare function query<M extends ModelName, Op extends Operation>(
 ): Promise<Result<M, Op>>;
 
 // Does inference work?
-const testQuery = async () => {
-  const users = await query('User', 'findMany', { where: { email: 'x' } });
+const _testQuery = async () => {
+  const _users = await query('User', 'findMany', { where: { email: 'x' } });
   //    ^? Should be User[] (Result<'User', 'findMany'>)
 
-  const user = await query('User', 'create', { data: { name: 'Test', email: 'x' } });
+  const _user = await query('User', 'create', { data: { name: 'Test', email: 'x' } });
   //    ^? Should be User (Result<'User', 'create'>)
 };
 
@@ -52,7 +52,7 @@ declare function findMany<M extends ModelName>(
 
 // Can we call with db.user and get inference?
 declare const db: PrismaClient;
-const testDelegate = async () => {
-  const users = await findMany(db.user, { where: { email: 'test' } });
+const _testDelegate = async () => {
+  const _users = await findMany(db.user, { where: { email: 'test' } });
   //    ^? Should preserve User type
 };

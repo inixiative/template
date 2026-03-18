@@ -2,7 +2,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@template/ui/components/primitives/DropdownMenu';
@@ -136,6 +135,8 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
             // 2+ spaces: accordion — use plain div for toggle so dropdown stays open
             return (
               <div key={org.id}>
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: accordion toggle inside DropdownMenu, keyboard navigation handled by parent */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: accordion toggle inside DropdownMenu, keyboard navigation handled by parent */}
                 <div
                   onClick={() => toggleOrg(org.id)}
                   className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"

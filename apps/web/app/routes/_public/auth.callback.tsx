@@ -30,11 +30,11 @@ function AuthCallbackPage() {
         localStorage.removeItem('authRedirectTo');
 
         navigate({ to: redirectTo });
-      } catch (error: any) {
+      } catch (error) {
         console.error('OAuth callback failed:', error);
         navigate({
           to: '/login',
-          search: { error: error.message || 'Authentication failed' },
+          search: { error: error instanceof Error ? error.message : 'Authentication failed' },
         });
       }
     };

@@ -9,10 +9,10 @@
  * to extract @relation(fields: [...], references: [...]) for composite FKs.
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -118,8 +118,9 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
 
   // Use \n} as end delimiter to avoid matching {} inside @default("{}")
   const modelRegex = /model\s+(\w+)\s*\{([\s\S]*?)\n\}/g;
-  let modelMatch;
+  let modelMatch: RegExpExecArray | null;
 
+  // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop idiom
   while ((modelMatch = modelRegex.exec(schema)) !== null) {
     const modelName = modelMatch[1];
     const modelBody = modelMatch[2];
@@ -129,8 +130,9 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
     // Match: fieldName Type @relation(optional "name", fields: [...], references: [...], ...)
     const relationRegex =
       /(\w+)\s+\w+\??\s+@relation\s*\(\s*(?:"[^"]*",\s*)?fields:\s*\[([^\]]+)\]\s*,\s*references:\s*\[([^\]]+)\]/g;
-    let relMatch;
+    let relMatch: RegExpExecArray | null;
 
+    // biome-ignore lint/suspicious/noAssignInExpressions: regex exec loop idiom
     while ((relMatch = relationRegex.exec(modelBody)) !== null) {
       const fieldName = relMatch[1];
       const fields = relMatch[2].split(',').map((s) => s.trim());

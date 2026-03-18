@@ -1,7 +1,6 @@
 import type { Role } from '@template/db/generated/client/enums';
 import {
   type OrganizationCreateOrganizationUserData,
-  type OrganizationCreateOrganizationUserResponses,
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,
   organizationCreateOrganizationUser,
@@ -29,7 +28,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
-  const queryClient = useAppStore((state) => state.client);
+  const _queryClient = useAppStore((state) => state.client);
 
   const { data, isLoading } = useQuery({
     queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),

@@ -18,7 +18,7 @@ export const isAppInstalled = async (org: string, appSlug: string): Promise<bool
 
     // If we get an installation ID, app is installed
     return stdout.trim() !== '';
-  } catch (error) {
+  } catch (_error) {
     // If command fails, assume not installed
     return false;
   }
@@ -39,7 +39,7 @@ export const getAppInstallationId = async (org: string, appSlug: string): Promis
 
     const installationId = stdout.trim();
     return installationId !== '' ? installationId : null;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 };
@@ -61,7 +61,7 @@ export const listInstalledApps = async (org: string): Promise<Array<{ id: string
       .split('\n')
       .filter((line) => line);
     return lines.map((line) => JSON.parse(line));
-  } catch (error) {
+  } catch (_error) {
     return [];
   }
 };

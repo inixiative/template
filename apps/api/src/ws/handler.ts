@@ -1,4 +1,4 @@
-import { LogScope, log } from '@template/shared/logger';
+import { log } from '@template/shared/logger';
 import type { Server } from 'bun';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
 

@@ -16,7 +16,9 @@
     "./test/*": "./src/test/*",
     "./zod": "./src/generated/zod/schemas/index.ts",
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
-    "./zod/*": "./src/generated/zod/schemas/*.ts"
+    "./zod/*": "./src/generated/zod/schemas/*.ts",
+    "./prisma/seed": "./prisma/seed.ts",
+    "./prisma/seeds": "./prisma/seeds/index.ts"
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1 src/test/",

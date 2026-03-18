@@ -1,11 +1,5 @@
 import type { SpaceId } from '@template/db';
-import {
-  type Entitlements,
-  getSpacePermissions,
-  intersectEntitlements,
-  lesserRole,
-  type Role,
-} from '@template/permissions';
+import { type Entitlements, getSpacePermissions, intersectEntitlements, lesserRole } from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';

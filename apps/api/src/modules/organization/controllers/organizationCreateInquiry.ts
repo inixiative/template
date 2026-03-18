@@ -41,13 +41,13 @@ export const organizationCreateInquiryController = makeController(
     const inquiry = await db.inquiry.create({
       data: {
         ...body,
-      content: content as Prisma.InputJsonValue,
-      ...source,
-      ...target,
-      sentAt: body.status === InquiryStatus.sent ? new Date() : null,
-      expiresAt: body.status === InquiryStatus.sent ? computeExpiresAt(body.type) : null,
-    },
-    include: includeInquirySent,
+        content: content as Prisma.InputJsonValue,
+        ...source,
+        ...target,
+        sentAt: body.status === InquiryStatus.sent ? new Date() : null,
+        expiresAt: body.status === InquiryStatus.sent ? computeExpiresAt(body.type) : null,
+      },
+      include: includeInquirySent,
     });
 
     return respond.created(inquiry);

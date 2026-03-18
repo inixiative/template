@@ -11,12 +11,12 @@ import {
   createUser,
 } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
 type InquiryList = { data: Inquiry[]; pagination: unknown };
 
-const mount = [(app: any) => app.route('/api/v1/space', spaceRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/space', spaceRouter)];
 
 describe('GET /api/v1/space/:id/inquiries/sent', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

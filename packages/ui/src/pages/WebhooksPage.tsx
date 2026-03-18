@@ -33,7 +33,7 @@ type WebhookSubscription =
   | SpaceReadManyWebhookSubscriptionsResponse['data'][number];
 
 export const WebhooksPage = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [_isModalOpen, setIsModalOpen] = useState(false);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const organizationId = context.organization?.id;
   const spaceId = context.space?.id;
@@ -146,7 +146,7 @@ export const WebhooksPage = () => {
     }
   };
 
-  const handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
+  const _handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
     const payload = buildCreatePayload(data);
     createMutation.mutate(payload);
     setIsModalOpen(false);

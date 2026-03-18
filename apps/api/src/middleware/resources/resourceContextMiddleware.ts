@@ -27,7 +27,7 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
 };
 
 const findResources = async (db: Db, accessor: AccessorName, lookup: string, id: string) => {
-  const delegate = db[accessor] as { findMany: Function } | undefined;
+  const delegate = db[accessor] as { findMany: (...args: unknown[]) => Promise<unknown[]> } | undefined;
   if (!delegate?.findMany) return [];
 
   return delegate.findMany({

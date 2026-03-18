@@ -18,7 +18,7 @@ export const validateEncryptionVersions = async (db: Db) => {
       }
 
       const currentVersion = parseInt(versionStr, 10);
-      if (isNaN(currentVersion)) {
+      if (Number.isNaN(currentVersion)) {
         errors.push(`${modelName}.${fields.encryptedField}: Invalid version number: ${versionStr}`);
         continue;
       }

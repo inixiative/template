@@ -5,6 +5,7 @@ const INTERPOLATION_PATTERN_GLOBAL = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/g;
 const MALFORMED_PATTERN_REGEX = /<<[^>]*>>/g;
 
 type InterpolationContext = {
+  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
   results: any[][];
   currentRound?: number;
 };
@@ -44,6 +45,7 @@ const validateInterpolationSyntax = (value: string): void => {
 
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 
+// biome-ignore lint/suspicious/noExplicitAny: dynamic field navigation on heterogeneous batch results
 const navigateFieldPath = (obj: any, path: string): any => {
   const parts = path.split('.');
   let result = obj;
@@ -62,6 +64,7 @@ const navigateFieldPath = (obj: any, path: string): any => {
   return result;
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: recursive JSON-like value — can be string, array, object, or primitive
 export const interpolateValue = (value: any, context: InterpolationContext): any => {
   if (typeof value === 'string') {
     validateInterpolationSyntax(value);
@@ -117,6 +120,7 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
   }
 
   if (value !== null && typeof value === 'object') {
+    // biome-ignore lint/suspicious/noExplicitAny: accumulating interpolated values of heterogeneous types
     const result: Record<string, any> = {};
     for (const [key, val] of Object.entries(value)) {
       result[key] = interpolateValue(val, context);
@@ -127,6 +131,7 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
   return value;
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: batch request has dynamic shape — path/body/headers vary per endpoint
 export const interpolateRequest = (request: any, context: InterpolationContext): any => {
   return {
     ...request,

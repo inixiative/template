@@ -1,10 +1,10 @@
 # INFRA-009: Adapter Primitive — Swappable External Services
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-03-14
-**Updated**: 2026-03-14
+**Updated**: 2026-03-18
 
 ---
 
@@ -40,10 +40,10 @@ Application code never imports a provider SDK directly. It imports the interface
 | System | Has Interface? | Has Adapter Pattern? | Hard-coded To |
 |--------|---------------|---------------------|---------------|
 | Email | **Yes** (`EmailClient`) | **Yes** (Resend, Console) | — |
+| Error Monitoring | **Yes** (`ErrorReporter`) | **Yes** (Sentry, Console) | — |
 | Logger | No | No | Consola |
 | File Storage | No | No | AWS S3 |
 | Payments | No | No | Stripe |
-| Error Monitoring | No | No | Sentry |
 | Secrets | N/A (deployment tool) | N/A | Infisical |
 
 ---
@@ -130,8 +130,8 @@ Init script then: installs chosen SDK, sets env vars, removes unused provider pa
 
 ## Implementation Order
 
-- [ ] Define the base adapter primitive (interface + factory + config pattern)
-- [ ] Error monitoring — smallest surface area, proves the pattern
+- [x] Define the base adapter primitive — `makeAdapterRouter` + `makeAdapterRegistry` in `packages/shared/src/adapter/`
+- [x] Error monitoring — `apps/api/src/lib/errorReporter/` with `sentryReporter` + `consoleReporter`, wired via `makeAdapterRouter`
 - [ ] Logger — highest-value swap, most debated choice
 - [ ] File storage — removes AWS dependency for development
 - [ ] Email additions — interface exists, just add providers
@@ -148,9 +148,9 @@ Init script then: installs chosen SDK, sets env vars, removes unused provider pa
 
 ## Definition of Done
 
-- [ ] Adapter pattern documented with canonical example
+- [x] Adapter pattern implemented — `makeAdapterRouter` (env-keyed) + `makeAdapterRegistry` (named map) in `@template/shared/adapter`
 - [ ] Logger adapter (consola + pino minimum)
-- [ ] Error monitoring adapter (sentry + console minimum)
+- [x] Error monitoring adapter — `sentryReporter` + `consoleReporter`; PR environments included
 - [ ] File storage adapter (s3 + local minimum)
 - [ ] Init script presents adapter choices during setup
 - [ ] All existing email adapters tested and confirmed working

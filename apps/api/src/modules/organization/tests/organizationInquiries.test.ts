@@ -9,12 +9,12 @@ import {
   createUser,
 } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
 type InquiryList = { data: Inquiry[]; pagination: unknown };
 
-const mount = [(app: any) => app.route('/api/v1/organization', organizationRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/organization', organizationRouter)];
 
 describe('GET /api/v1/organization/:id/inquiries/sent', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];

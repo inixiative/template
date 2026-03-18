@@ -71,6 +71,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
       <div key={item.label}>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => fullPath && navigatePreservingContext(fullPath)}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
@@ -86,6 +87,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
           </button>
           {hasChildren && (
             <button
+              type="button"
               onClick={() => toggleItem(item.label)}
               className="p-2 hover:bg-accent/50 rounded-md transition-colors"
             >

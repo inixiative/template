@@ -60,7 +60,7 @@ export const markComplete = async <S extends ProgressSection>(
   action: ProgressActions[S],
 ): Promise<void> => {
   const config = await getProjectConfig();
-  (config[section] as any).progress[action] = true;
+  (config[section] as { progress: Record<string, boolean> }).progress[action] = true;
   await writeProjectConfig(config);
 };
 
@@ -72,7 +72,7 @@ export const isComplete = async <S extends ProgressSection>(
   action: ProgressActions[S],
 ): Promise<boolean> => {
   const config = await getProjectConfig();
-  return (config[section] as any).progress[action] === true;
+  return (config[section] as { progress: Record<string, boolean> }).progress[action] === true;
 };
 
 /**
@@ -80,7 +80,7 @@ export const isComplete = async <S extends ProgressSection>(
  */
 export const clearProgress = async (section: ProgressSection): Promise<void> => {
   const config = await getProjectConfig();
-  const progress = (config[section] as any).progress;
+  const progress = (config[section] as { progress: Record<string, boolean> }).progress;
   for (const key in progress) {
     progress[key] = false;
   }
@@ -92,7 +92,7 @@ export const clearProgress = async (section: ProgressSection): Promise<void> => 
  */
 export const setError = async (section: ProgressSection, message: string): Promise<void> => {
   const config = await getProjectConfig();
-  (config[section] as any).error = message;
+  (config[section] as { error: string }).error = message;
   await writeProjectConfig(config);
 };
 

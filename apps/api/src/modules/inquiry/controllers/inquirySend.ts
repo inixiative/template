@@ -15,13 +15,9 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
 
   if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 
-  await db.inquiry.update({
+  const updated = await db.inquiry.update({
     where: { id: inquiry.id },
     data: { status: InquiryStatus.sent, sentAt: new Date(), expiresAt: computeExpiresAt(inquiry.type) },
-  });
-
-  const updated = await db.inquiry.findUniqueOrThrow({
-    where: { id: inquiry.id },
     include: includeInquiryResponse,
   });
 

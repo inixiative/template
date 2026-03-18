@@ -1,4 +1,4 @@
-import type { FlexibleRef, HookOptions, ManyAction, SingleAction } from '@template/db';
+import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import { DbAction, db, filterIgnoredFields, HookTiming, isFalsePolymorphismRef, registerDbHook } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';

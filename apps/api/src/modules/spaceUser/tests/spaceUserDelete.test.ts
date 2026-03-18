@@ -48,7 +48,7 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
   });
 
   it('deletes the spaceUser', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+    const { entity: _memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
     );

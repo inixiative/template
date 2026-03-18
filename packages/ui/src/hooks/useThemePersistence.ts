@@ -10,7 +10,7 @@ export const useThemePersistence = () => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
     if (savedTheme) setTheme(savedTheme);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setTheme]);
 
   // Persist theme changes to localStorage
   useEffect(() => {

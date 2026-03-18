@@ -58,7 +58,7 @@ describe('POST /api/admin/user/:id/redact', () => {
   });
 
   it('soft deletes orgs where user is only member', async () => {
-    const { entity: orgUser, context } = await createOrganizationUser();
+    const { entity: _orgUser, context } = await createOrganizationUser();
     const org = context.organization;
     const targetUser = context.user;
 

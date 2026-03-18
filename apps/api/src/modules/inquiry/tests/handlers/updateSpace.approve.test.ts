@@ -10,10 +10,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
 describe('handler: updateSpace — approve', () => {
   let db: ReturnType<typeof createTestApp>['db'];

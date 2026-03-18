@@ -28,11 +28,13 @@ export const listTeams = async (): Promise<VercelTeam[]> => {
       return [];
     }
 
-    const teams: VercelTeam[] = (result.teams || []).map((team: any) => ({
-      id: team.id,
-      name: team.name,
-      slug: team.slug,
-    }));
+    const teams: VercelTeam[] = ((result.teams ?? []) as Array<{ id: string; name: string; slug: string }>).map(
+      (team) => ({
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+      }),
+    );
 
     return teams;
   } catch (error) {
@@ -50,7 +52,7 @@ export const createProject = async (projectName: string, teamId?: string): Promi
     const { stdout, stderr } = await execAsync(`vercel project add ${projectName} ${teamFlag}`, { encoding: 'utf-8' });
 
     // Vercel outputs to stderr: "> Success! Project <name> added (<team>) [time]"
-    const output = stdout + stderr;
+    const _output = stdout + stderr;
 
     // Now get the project ID using inspect command
     const projectInfo = await getProject(projectName, teamId);
@@ -88,8 +90,8 @@ const getVercelToken = async (): Promise<string> => {
 const vercelAPI = async (
   endpoint: string,
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
-  body?: any,
-): Promise<any> => {
+  body?: unknown,
+): Promise<Record<string, unknown>> => {
   const token = await getVercelToken();
   const url = `https://api.vercel.com${endpoint}`;
 
@@ -107,7 +109,7 @@ const vercelAPI = async (
  * Check GitHub integrations for the team
  * Note: This endpoint doesn't support teamId - returns all integrations for the authenticated user
  */
-export const checkGitHubIntegration = async (): Promise<any> => {
+export const checkGitHubIntegration = async (): Promise<unknown> => {
   try {
     const endpoint = `/v1/integrations/git-namespaces?provider=github`;
 
@@ -131,11 +133,13 @@ export const findGitHubNamespace = async (orgName: string): Promise<string | nul
   }
 
   // Find the namespace that matches the org
-  const namespace = integrations.find((ns: any) => ns.name?.toLowerCase() === orgName.toLowerCase());
+  const namespace = integrations.find(
+    (ns: unknown) => (ns as { name?: string }).name?.toLowerCase() === orgName.toLowerCase(),
+  );
 
   console.log('🔍 Found namespace for', orgName, ':', namespace);
 
-  return namespace?.id?.toString() || null;
+  return (namespace as { id?: unknown } | undefined)?.id?.toString() ?? null;
 };
 
 /**
@@ -239,7 +243,8 @@ export const updateProjectSettings = async (
   const result = await vercelAPI(endpoint, 'PATCH', settings);
 
   if (result.error) {
-    throw new Error(`Failed to update project settings: ${result.error.message}`);
+    const msg = result.error instanceof Error ? result.error.message : String(result.error);
+    throw new Error(`Failed to update project settings: ${msg}`);
   }
 };
 
@@ -265,10 +270,11 @@ export const createCustomEnvironment = async (
   });
 
   if (result.error) {
-    throw new Error(`Failed to create custom environment: ${result.error.message}`);
+    const msg = result.error instanceof Error ? result.error.message : String(result.error);
+    throw new Error(`Failed to create custom environment: ${msg}`);
   }
 
-  return result.id;
+  return result.id as string;
 };
 
 /**
@@ -326,7 +332,7 @@ export const getProject = async (projectName: string, teamId?: string): Promise<
       name: nameMatch ? nameMatch[1] : projectName,
       framework: null,
     };
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 };

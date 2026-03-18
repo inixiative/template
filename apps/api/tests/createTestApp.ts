@@ -1,7 +1,7 @@
 import '#tests/mocks/queue';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db } from '@template/db';
-import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
+import type { OrganizationUser, SpaceUser, User, UserId } from '@template/db/generated/client/client';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -15,7 +15,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 registerTestTracker();
 
-type MountFn = (app: OpenAPIHono<AppEnv>) => void;
+export type MountFn = (app: OpenAPIHono<AppEnv>) => void;
 
 type CreateTestAppOptions = {
   mockUser?: User | null;
@@ -40,7 +40,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
   app.use('*', async (c, next) => {
     if (options?.mockUser) {
       c.set('user', options.mockUser);
-      c.get('permix').setUserId(options.mockUser.id as any);
+      c.get('permix').setUserId(options.mockUser.id as UserId);
       if (options.mockUser.platformRole === 'superadmin') c.get('permix').setSuperadmin(true);
     }
     if (options?.mockOrganizationUsers) {

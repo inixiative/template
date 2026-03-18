@@ -27,7 +27,7 @@ const matchEvent = (event: AppEventPayload, matcher: EventMatcher): boolean => {
   if (typeof matcher === 'string') {
     // Support wildcards: "user.*" matches "user.signedUp", "user.updated", etc.
     if (matcher.includes('*')) {
-      const pattern = new RegExp('^' + matcher.replace(/\*/g, '.*') + '$');
+      const pattern = new RegExp(`^${matcher.replace(/\*/g, '.*')}$`);
       return pattern.test(event.type);
     }
     return event.type === matcher;

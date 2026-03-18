@@ -3,11 +3,12 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import type { AppEnv } from '#/types/appEnv';
 
-type Inquiry = Prisma.InquiryGetPayload<{}>;
 type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';
 
 export const resolveInquiry = async (
@@ -18,18 +19,10 @@ export const resolveInquiry = async (
 ): Promise<Inquiry> => {
   const db = c.get('db');
 
-  const actor = auditActorContext.get() ?? {
-    actorUserId: null,
-    actorSpoofUserId: null,
-    actorTokenId: null,
-    actorJobName: null,
-    ipAddress: null,
-    userAgent: null,
-    sourceInquiryId: null,
-  };
+  auditActorContext.extend({ sourceInquiryId: inquiry.id });
 
-  return auditActorContext.run({ ...actor, sourceInquiryId: inquiry.id }, () =>
-    db.txn(async () => {
+  try {
+    return await db.txn(async () => {
       let approvalOutput: Record<string, unknown> = {};
 
       if (status === InquiryStatus.approved) {
@@ -48,7 +41,10 @@ export const resolveInquiry = async (
           resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
           expiresAt,
         },
+        include: includeInquiryResponse,
       });
-    }),
-  );
+    });
+  } finally {
+    auditActorContext.extend({ sourceInquiryId: null });
+  }
 };

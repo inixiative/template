@@ -7,10 +7,12 @@ import { getToken } from '@template/ui/lib/auth/token';
  * When throwOnError is true, the error case never happens (it throws instead)
  * So we extract only the success variant from: { data: X } | { error: Y }
  */
-export type ExtractSuccess<T> = T extends { data: infer D; error?: never }
+export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
   ? T
-  : T extends { data: any } | { error: any }
-    ? Extract<T, { data: any }>
+  : // biome-ignore lint/suspicious/noExplicitAny: conditional type discriminant — any is required for union narrowing
+    T extends { data: any } | { error: any }
+    ? // biome-ignore lint/suspicious/noExplicitAny: conditional type discriminant — any is required for union narrowing
+      Extract<T, { data: any }>
     : T;
 
 /**
@@ -43,7 +45,7 @@ export type ClientInjectedOptions = {
   throwOnError?: boolean;
 };
 
-export type RequestOptionsFor<TVariables extends Record<string, unknown> | void> = TVariables extends void
+export type RequestOptionsFor<TVariables extends Record<string, unknown> | undefined> = TVariables extends void
   ? ClientInjectedOptions
   : TVariables & ClientInjectedOptions;
 
@@ -55,7 +57,7 @@ export type RequestOptionsFor<TVariables extends Record<string, unknown> | void>
  * - QueryFunctionContext: Extracts variables from queryKey[1]
  * - Direct vars: Uses them as-is
  */
-export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | void = void>(
+export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | undefined = void>(
   fn: (requestOptions: RequestOptionsFor<TVariables>) => Promise<T>,
   options?: {
     token?: string | null;
@@ -71,7 +73,7 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     const throwOnError = options?.throwOnError ?? true;
 
     const token = options?.token ?? getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (options?.spoofUserEmail) headers['x-spoof-user-email'] = options.spoofUserEmail;
 
     const scopedClient = createClient({
@@ -83,6 +85,7 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     // Hono generates :id style paths in the OpenAPI spec, but hey-api's
     // defaultPathSerializer only handles {id} style. Fix all parametric endpoints.
     scopedClient.interceptors.request.use((request, opts) => {
+      // biome-ignore lint/suspicious/noExplicitAny: hey-api interceptor opts type is not publicly typed
       const path = (opts as any).path as Record<string, unknown> | undefined;
       if (!path) return request;
       let url = request.url;

@@ -1,5 +1,5 @@
 import { getLogScopes, LogScope } from '@template/shared/logger/scope';
-import { isLocal, isProd, isTest } from '@template/shared/utils/env';
+import { isLocal, isTest } from '@template/shared/utils/env';
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
@@ -46,17 +46,23 @@ export const log: ConsolaInstance = new Proxy(baseConsola, {
         if (hasManualScope) {
           // Prepend both timestamp and scope to message
           const scope = lastArg as string;
-          return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}] [${scope}]`, ...args.slice(0, -1));
+          return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(
+            `[${time}] [${scope}]`,
+            ...args.slice(0, -1),
+          );
         }
 
         // Prepend timestamp and automatic scopes to message
         const scopes = getLogScopes();
         if (scopes.length > 0) {
           const scopeStr = scopes.map((s) => `[${s}]`).join(' ');
-          return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}] ${scopeStr}`, ...args);
+          return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(
+            `[${time}] ${scopeStr}`,
+            ...args,
+          );
         }
 
-        return (logger[prop as keyof ConsolaInstance] as Function)(`[${time}]`, ...args);
+        return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(`[${time}]`, ...args);
       };
     }
 

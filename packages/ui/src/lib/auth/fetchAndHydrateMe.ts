@@ -3,7 +3,7 @@ import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { AppStore } from '@template/ui/store/types';
 import { keyBy } from 'lodash-es';
 
-type MeData = MeReadResponses[200]['data'];
+type _MeData = MeReadResponses[200]['data'];
 
 export const fetchAndHydrateMe = async (
   set: (partial: AppStore | Partial<AppStore> | ((state: AppStore) => AppStore | Partial<AppStore>)) => void,

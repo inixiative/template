@@ -2,8 +2,10 @@ import '#tests/mocks/queue';
 import { mock } from 'bun:test';
 import { db } from '@template/db';
 import type { Job } from 'bullmq';
+import { jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import type { WorkerContext } from '#/jobs/types';
+import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
 export const createMockJob = (overrides?: Partial<Job>): Job =>
   ({
@@ -23,9 +25,25 @@ export const createMockJob = (overrides?: Partial<Job>): Job =>
     ...overrides,
   }) as Job;
 
-export const createTestWorker = (jobOverrides?: Partial<Job>): WorkerContext => ({
-  db,
-  queue,
-  job: createMockJob(jobOverrides),
-  log: () => {},
-});
+export const createTestWorker = (
+  jobOverrides?: Partial<Job>,
+): WorkerContext & { run: (payload?: unknown) => Promise<void> } => {
+  const job = createMockJob(jobOverrides);
+  const ctx: WorkerContext = { db, queue, job, log: () => {} };
+
+  const run = (payload?: unknown): Promise<void> =>
+    db.scope(
+      `${job.name}:${job.id}`,
+      () =>
+        auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, () => {
+          const handler = jobHandlers[job.name as keyof typeof jobHandlers] as (
+            ctx: WorkerContext,
+            payload?: unknown,
+          ) => Promise<void>;
+          return payload === undefined ? handler(ctx) : handler(ctx, payload);
+        }),
+      'worker',
+    );
+
+  return { ...ctx, run };
+};

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, Space } from '@template/db';
+import type { Organization } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -9,10 +9,10 @@ import {
   createUser,
 } from '@template/db/test';
 import { inquiryRouter } from '#/modules/inquiry';
-import { createTestApp } from '#tests/createTestApp';
-import { json, post } from '#tests/utils/request';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
+import { post } from '#tests/utils/request';
 
-const mount = [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)];
+const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
 describe('handler: createSpace — approve', () => {
   let db: ReturnType<typeof createTestApp>['db'];

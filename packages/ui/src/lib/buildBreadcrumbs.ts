@@ -9,7 +9,7 @@ type Breadcrumb = {
 export const buildBreadcrumbs = (
   match: RouteMatch,
   context: TenantContext,
-  pageContext?: Record<string, any>,
+  pageContext?: Record<string, unknown>,
   spoofUserEmail?: string | null,
 ): Breadcrumb[] => {
   const breadcrumbs: Breadcrumb[] = [];

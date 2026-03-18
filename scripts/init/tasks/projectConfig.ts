@@ -43,7 +43,7 @@ export const renameProject = (oldName: string, newName: string): void => {
   const rootPkgPath = join(process.cwd(), 'package.json');
   const rootPkg = JSON.parse(readFileSync(rootPkgPath, 'utf-8'));
   rootPkg.name = newName;
-  writeFileSync(rootPkgPath, JSON.stringify(rootPkg, null, 2) + '\n', 'utf-8');
+  writeFileSync(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
 
   // 2. Update workspace packages
   console.log('  • Updating workspace packages...');
@@ -58,8 +58,8 @@ export const renameProject = (oldName: string, newName: string): void => {
         try {
           const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
           pkg.name = pkg.name.replace(`@${fromName}/`, `@${newName}/`);
-          writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
-        } catch (error) {
+          writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+        } catch (_error) {
           // Package.json might not exist, skip
         }
       }
@@ -75,7 +75,7 @@ export const renameProject = (oldName: string, newName: string): void => {
         `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\///@${newName}\\//g' {} +`,
         { stdio: 'pipe' },
       );
-    } catch (error) {
+    } catch (_error) {
       // Continue even if some replacements fail
     }
   }
@@ -89,7 +89,7 @@ export const renameProject = (oldName: string, newName: string): void => {
     readme = readme.replace(new RegExp(`# ${oldName}`, 'gi'), `# ${newName}`);
     readme = readme.replace(new RegExp(`\\b${oldName}\\b`, 'g'), newName);
     writeFileSync(readmePath, readme, 'utf-8');
-  } catch (error) {
+  } catch (_error) {
     // README might not exist
   }
 
@@ -109,7 +109,7 @@ export const renameProject = (oldName: string, newName: string): void => {
       let content = readFileSync(tsconfigPath, 'utf-8');
       content = content.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
       writeFileSync(tsconfigPath, content, 'utf-8');
-    } catch (error) {
+    } catch (_error) {
       // Config might not exist
     }
   }

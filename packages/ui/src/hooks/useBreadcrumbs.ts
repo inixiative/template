@@ -1,12 +1,14 @@
 import { buildBreadcrumbs } from '@template/ui/lib';
 import { useAppStore } from '@template/ui/store';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+
+type Breadcrumb = ReturnType<typeof buildBreadcrumbs>[number];
 
 /**
  * Hook to generate breadcrumbs for the current page.
  * Gets route match and context from store automatically.
  */
-export const useBreadcrumbs = (): { items: any[]; onNavigate: (href: string) => void } => {
+export const useBreadcrumbs = (): { items: Breadcrumb[]; onNavigate: (href: string) => void } => {
   const currentRouteMatch = useAppStore((state) => state.navigation.currentRouteMatch);
   const context = useAppStore((state) => state.tenant.context);
   const pageContext = useAppStore((state) => state.tenant.page);
@@ -18,7 +20,7 @@ export const useBreadcrumbs = (): { items: any[]; onNavigate: (href: string) => 
     [currentRouteMatch, context, pageContext, spoofUserEmail],
   );
 
-  const onNavigate = (href: string) => navigatePreservingContext(href);
+  const onNavigate = useCallback((href: string) => navigatePreservingContext(href), [navigatePreservingContext]);
 
-  return useMemo(() => ({ items, onNavigate }), [items, navigatePreservingContext]);
+  return useMemo(() => ({ items, onNavigate }), [items, onNavigate]);
 };

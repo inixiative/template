@@ -1,10 +1,10 @@
 # FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: TBD
 **Priority**: High
 **Created**: 2026-03-08
-**Updated**: 2026-03-08
+**Updated**: 2026-03-18
 
 ---
 
@@ -26,30 +26,28 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 
 ### Audit Data Model
 
-- [ ] Split `contextOrganizationId` / `contextSpaceId` from subject FK fields on `AuditLog`
-- [ ] Add explicit `subjectOrganizationId` / `subjectSpaceId` where needed
+- [x] Split `contextOrganizationId` / `contextSpaceId` (org/space context) from `subjectOrganizationId` / `subjectSpaceId` (the record's own FK fields) — both sets present in schema
 - [ ] Remove cascade semantics from audit relations so audit rows can outlive deleted subjects
 - [ ] Review whether some audit references should be plain scalar IDs instead of relational FKs
 
 ### Audit Capture Semantics
 
-- [ ] Move audit writes into the mutation transaction instead of `db.onCommit()`
-- [ ] Detect soft deletes (`deletedAt: null -> timestamp`) and record them as `delete`
-- [ ] Keep `update` semantics for restore/nullification until a dedicated restore action is introduced
-- [ ] Keep `AuditLog` explicitly excluded from audit hooks to avoid recursion
+- [ ] Move audit writes into the mutation transaction instead of writing after commit
+- [x] Detect soft deletes (`deletedAt: null → timestamp`) and record them as `delete` action — implemented in `isSoftDeleteTransition()`
+- [x] `update` semantics used for restore/nullification (no dedicated restore action yet)
+- [x] `AuditLog` explicitly excluded from audit hooks (no recursion)
 
 ### Registry and Source of Truth Cleanup
 
-- [ ] Replace `MODEL_TO_SUBJECT_FK` with logic derived from the false-polymorphism registry
-- [ ] Keep only the minimal record-field remapping needed for composite subjects
-- [ ] Narrow `AUDIT_ENABLED_MODELS` to the first-pass high-signal model set
+- [x] `buildSubjectFkFields()` derives subject FK identity from the audit-enabled model's record fields — no separate registry needed
+- [x] `AUDIT_ENABLED_MODELS` narrowed to high-signal models: User, Organization, OrganizationUser, Space, SpaceUser, Token, AuthProvider, Account, EmailTemplate, EmailComponent
 
 ### Inquiry Lineage
 
-- [ ] Add `sourceInquiryId` or equivalent causal linkage to audit rows
-- [ ] Thread inquiry resolution context through async storage so audit hooks can read it
-- [ ] Preserve resolver identity as the audit actor while separately recording inquiry causality
-- [ ] Expose audit log includes on inquiry reads where useful
+- [x] `sourceInquiryId` field on `AuditLog` schema
+- [x] `auditActorContext` carries `sourceInquiryId` through ALS — inquiry resolution sets it before DB mutations
+- [x] Resolver identity is the audit actor; `sourceInquiryId` records causality separately
+- [x] `auditLogsAsSubject` relation exposed on inquiry reads via `includeInquiryResponse` (loaded by resource context middleware — no extra DB call)
 
 ### Admin Explorer
 

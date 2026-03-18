@@ -20,9 +20,11 @@ const joinNavPath = (parentPath: string | null, path: string): string => {
   return `${parentPath}${path}`;
 };
 
-const flattenNavPaths = (items: Array<{ path?: string; items?: any[] }>): string[] => {
+type FlatNavItem = { path?: string; items?: FlatNavItem[] };
+
+const flattenNavPaths = (items: FlatNavItem[]): string[] => {
   const paths: string[] = [];
-  const visit = (itemList: Array<{ path?: string; items?: any[] }>, parentPath: string | null = null) => {
+  const visit = (itemList: FlatNavItem[], parentPath: string | null = null) => {
     if (!itemList) return;
     for (const item of itemList) {
       const resolvedPath = item.path ? joinNavPath(parentPath, item.path) : parentPath;

@@ -1,6 +1,6 @@
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@template/ui/components';
 
-export const OrganizationProfileTab = ({ organizationId }: { organizationId: string }) => {
+export const OrganizationProfileTab = ({ organizationId: _organizationId }: { organizationId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>

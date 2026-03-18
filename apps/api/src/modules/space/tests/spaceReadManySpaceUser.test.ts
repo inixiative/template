@@ -57,7 +57,7 @@ describe('GET /api/v1/space/:id/spaceUsers', () => {
   });
 
   it('returns multiple space users', async () => {
-    const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
+    const { entity: _memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
     );

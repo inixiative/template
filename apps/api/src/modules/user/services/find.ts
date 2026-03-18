@@ -1,6 +1,6 @@
 import type { Db, UserWithRelations } from '@template/db';
 import { cache, cacheKey, upsertCache } from '@template/db';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes

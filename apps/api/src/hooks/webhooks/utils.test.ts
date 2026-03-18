@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  getRelatedWebhookRefs,
-  isNoOpUpdate,
-  isWebhookEnabled,
-} from '#/hooks/webhooks/utils';
+import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled } from '#/hooks/webhooks/utils';
 
 describe('webhook utils', () => {
   describe('isWebhookEnabled', () => {

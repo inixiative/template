@@ -36,12 +36,19 @@ export type Result<T, A, Op extends Operation> = Prisma.Result<T, A, Op>;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Base constraint for delegates with specific operations
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasFindFirst = { findFirst: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasFindUnique = { findUnique: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasFindMany = { findMany: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasCreate = { create: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasUpdate = { update: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasDelete = { delete: (args: any) => Promise<any> };
+// biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasCount = { count: (args?: any) => Promise<any> };
 
 /** Any Prisma delegate that supports standard read operations */

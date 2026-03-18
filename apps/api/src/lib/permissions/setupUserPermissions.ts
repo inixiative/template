@@ -1,5 +1,5 @@
 import type { UserId } from '@template/db';
-import { type Entitlements, getUserPermissions, Role } from '@template/permissions';
+import { type Entitlements, getUserPermissions } from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';

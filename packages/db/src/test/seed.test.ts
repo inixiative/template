@@ -1,13 +1,13 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import type { Account, Organization, Space, Token, User } from '@template/db/generated/client/client';
+import type { SeedFile } from '@template/db/prisma/seed';
+import { seeds } from '@template/db/prisma/seeds';
 import { validate as isUUID, version as uuidVersion } from 'uuid';
-import type { SeedFile } from '../../prisma/seed';
-import { seeds } from '../../prisma/seeds';
 
 describe('Seed System', () => {
   describe('UUID Validation', () => {
     test('all seed IDs are valid UUIDs', () => {
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           const id = record.id as string;
           expect(isUUID(id)).toBe(true);
@@ -16,7 +16,7 @@ describe('Seed System', () => {
     });
 
     test('all seed IDs are UUIDv7', () => {
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           const id = record.id as string;
           const version = uuidVersion(id);
@@ -29,7 +29,7 @@ describe('Seed System', () => {
       const idSet = new Set<string>();
       const duplicates: string[] = [];
 
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           const id = record.id as string;
           if (idSet.has(id)) {
@@ -53,7 +53,7 @@ describe('Seed System', () => {
     });
 
     test('all seed records have id field', () => {
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           expect(record).toHaveProperty('id');
           expect(typeof record.id).toBe('string');
@@ -165,7 +165,7 @@ describe('Seed System', () => {
       // All prime seeds should use the pattern: 01936d42-8c4a-7000-8000-...
       const pattern = /^01936d42-8c4a-7000-8000-/;
 
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           if (record.prime) {
             const id = record.id as string;
@@ -180,7 +180,7 @@ describe('Seed System', () => {
       //                              ^    ^
       //                           version variant
 
-      for (const { model, records } of seeds) {
+      for (const { model: _model, records } of seeds) {
         for (const record of records) {
           const id = record.id as string;
           const parts = id.split('-');

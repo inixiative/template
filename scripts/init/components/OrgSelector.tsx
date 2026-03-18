@@ -28,7 +28,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
   onCancel,
 }) => {
   // Handle Esc to cancel
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onCancel();
     }

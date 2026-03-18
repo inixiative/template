@@ -12,7 +12,7 @@ describe('ThemeToggle', () => {
   });
 
   it('should call onChange with selected theme', () => {
-    const onChange = mock((theme: Theme) => {});
+    const onChange = mock((_theme: Theme) => {});
     const selectedTheme: Theme = 'dark';
 
     onChange(selectedTheme);

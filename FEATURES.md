@@ -2,7 +2,7 @@
 
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
-**Last Updated:** 2026-03-03
+**Last Updated:** 2026-03-18
 
 ## How to Read This
 
@@ -191,7 +191,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
 
-- ✅ **18 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customer, cronJob, emailTemplate, emailComponent, appEvent
+- ✅ **18 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -352,7 +352,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - 🟣 **Rate Limiting** - Redis infrastructure in place for sliding window rate limits. Implementation pending (ticket INFRA-002 dependency)
-- 🟣 **Audit Logs** - Structured logging captures all mutations. Formal audit log model with queryable history not yet implemented
+- 🟡 **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 12 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job, admin API, and UI pending (ticket FEAT-005)
 
 ---
 
@@ -373,10 +373,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **Standardized Request/Approval/Audit Primitive** - Instead of building ad-hoc handlers for every common org action (invite user, create space, transfer ownership, request access), the Inquiry system provides a unified pattern: create a request, route it for approval, execute the resolution, and log the interaction. Every team reinvents this — having it as a first-class primitive means consistent behavior, audit trails, and extensibility across all org workflows.
 
-- 🟡 **Core API** - CRUD operations and state machine (draft → sent → acknowledged → resolved/canceled) exist. Resolution logic being refactored to match current schema
-- 🟡 **Resolution Actions** - Approved inquiries execute their side effects (create org membership, provision space, etc.). Refactoring in progress
-- ✅ **Polymorphic Ownership** - False polymorphism pattern supports inquiries owned by Users, Organizations, or Spaces. Source and target can be any resource type
-- ✅ **Status Tracking** - Full state machine with transitions, timestamps, and resolution metadata (outcome, explanation, resolvedBy, resolvedAt)
+- ✅ **Core API** - Full CRUD with state machine (draft → sent → changesRequested → approved/denied/canceled). Resource context middleware loads inquiry with all includes — singleton reads and mutations are single DB round-trips
+- ✅ **Resolution Actions** - Approved inquiries execute handler side effects (org membership, space creation, space transfer). Resolution runs in transaction; actor context set before mutations for audit lineage
+- ✅ **Polymorphic Ownership** - False polymorphism pattern. Source and target each support User, Organization, Space, or admin. Validated by falsePolymorphism hook
+- ✅ **Status Tracking** - Full state machine. `sentAt` set once on first send (historical). `expiresAt` set on send via `computeExpiresAt(type)`, cleared when moved back to draft
+- ✅ **Audit Lineage** - `sourceInquiryId` set in actor context during resolution so all side-effect mutations link back to the causal inquiry
 - 🟡 **UI and flow completion** (ticket FEAT-001) - Invitation flow, approval UI, and onboarding integrations in progress
 
 ---
@@ -556,7 +557,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **OpenTelemetry Integration** - OTLP-compatible distributed tracing and metrics ready to use. Auto-instruments HTTP requests (excluding `/health`) and Prisma queries when `OTEL_EXPORTER_OTLP_ENDPOINT` configured. Sends to any OTLP backend (BetterStack, Datadog, Honeycomb, etc.). Skipped in local/test to avoid performance overhead. Dynamic imports ensure zero cost when disabled
 
-- 🟡 **Sentry Error Tracking** - Error tracking scaffolded via `@sentry/bun` imports in error middleware, but not fully configured. Would capture 5xx errors and unhandled exceptions when `SENTRY_ENABLED=true` and `SENTRY_DSN` set. Part of broader observability platform decision
+- ✅ **Error Reporter Adapter** - `errorReporter` singleton via adapter pattern (`makeAdapterRouter`). Sentry adapter used in prod/staging/pr when `SENTRY_ENABLED=true` and `SENTRY_DSN` set; console adapter used everywhere else. Error middleware routes all 5xx exceptions through the adapter — swapping providers requires no application code changes (ticket INFRA-009)
 
 ### Environment & Secrets
 
@@ -588,7 +589,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Coming Soon
 
-- 🟣 **Observability Platform Decision** (ticket INFRA-009) - Evaluate Sentry, Datadog, Betterstack, New Relic, or build internal. Centralizes error tracking, APM, logs, and metrics. Blocking decision for full production readiness
+- 🟡 **Adapter Primitives** (ticket INFRA-009) - `makeAdapterRouter` + `makeAdapterRegistry` in `@template/shared/adapter` are the base primitive. Error reporter adapter shipped. Logger adapter (consola/pino), file storage (S3/local), and payments (Stripe/Square) pending
 
 - 🟣 **Product Analytics** (ticket INFRA-010) - User behavior tracking for product decisions. Evaluating OpenPanel, Mixpanel, or internal solution. Track page views, feature usage, funnels, retention
 
@@ -658,7 +659,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
   - Shared Packages: ~20,000 lines
 - **Tests:** 93 test files across packages and API (backend focused, frontend tests minimal)
 - **API Endpoints:** 70+ documented REST endpoints with OpenAPI specs
-- **Database Models:** 18 Prisma models with full relations and hooks
+- **Database Models:** 18 Prisma models with full relations and hooks (auditLog, customerRef included)
 - **Frontend Hooks:** 20+ custom hooks for common patterns
 - **UI Components:** 50+ Shadcn UI components with variants
 

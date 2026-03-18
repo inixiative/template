@@ -46,7 +46,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
         await auth.setSpoof(searchParams.spoofEmail);
       }
     })();
-  }, [search]);
+  }, [search, auth, tenant]);
 
   // Update URL when context or spoof changes
   useEffect(() => {
@@ -58,7 +58,14 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
     });
 
     if (updates) replaceUrlSearchParams(updates);
-  }, [tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id, auth.spoofUserEmail]);
+  }, [
+    tenant.context.type,
+    tenant.context.organization?.id,
+    tenant.context.space?.id,
+    auth.spoofUserEmail,
+    search,
+    tenant.context,
+  ]);
 
   // Check permissions and fallback to valid context
   useEffect(() => {
@@ -82,14 +89,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
 
     if (hasContextChanged(tenant.context, authorizedContext))
       applyAuthorizedContext({ tenant, context: authorizedContext });
-  }, [
-    navConfig,
-    pathname,
-    tenant.context.type,
-    tenant.context.organization?.id,
-    tenant.context.space?.id,
-    auth.spoofUserEmail,
-  ]);
+  }, [navConfig, pathname, tenant, auth.organizations, permissions, setCurrentRouteMatch]);
 
   // Auto-navigate to dashboard when context changes on same page
   const previousPathname = useRef('');
@@ -108,7 +108,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
 
     if (pathname === previousPathname.current) navigatePreservingContext('/dashboard');
     previousPathname.current = pathname;
-  }, [tenant.context.type, tenant.context.organization?.id, tenant.context.space?.id]);
+  }, [tenant.context.type, navigatePreservingContext, pathname]);
 
   return { isAuthorized };
 };

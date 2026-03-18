@@ -1,13 +1,15 @@
 import { exec } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { existsSync, readFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
 import { getSecret, setSecret } from '../tasks/infisicalSetup';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { retryWithTimeout } from '../utils/retry';
 
 const execAsync = promisify(exec);
+
+const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
 const RAILWAY_API = 'https://backboard.railway.app/graphql/v2';
 const RAILWAY_CONFIG_PATH = join(homedir(), '.railway', 'config.json');
@@ -70,7 +72,7 @@ export const getRailwayUserToken = async (): Promise<string> => {
     if (token) {
       return token;
     }
-  } catch (error) {
+  } catch (_error) {
     // Token not in Infisical, try Railway CLI config
   }
 
@@ -85,7 +87,7 @@ export const getRailwayUserToken = async (): Promise<string> => {
         setSecret(projectId, 'root', 'RAILWAY_USER_TOKEN', token);
         return token;
       }
-    } catch (error) {
+    } catch (_error) {
       // Fall through to error
     }
   }
@@ -116,7 +118,7 @@ export const getRailwayWorkspaceToken = async (): Promise<string> => {
     if (token) {
       return token;
     }
-  } catch (error) {
+  } catch (_error) {
     // Not found
   }
 
@@ -132,7 +134,7 @@ export const getRailwayWorkspaceToken = async (): Promise<string> => {
 const railwayGraphQLWithToken = async <T>(
   token: string,
   query: string,
-  variables?: Record<string, any>,
+  variables?: Record<string, unknown>,
 ): Promise<T> => {
   const response = await fetch(RAILWAY_API, {
     method: 'POST',
@@ -156,19 +158,19 @@ const railwayGraphQLWithToken = async <T>(
 
   // GraphQL errors are returned in the response
   if (result.errors && result.errors.length > 0) {
-    const errorMessages = result.errors.map((e: any) => e.message).join(', ');
+    const errorMessages = (result.errors as Array<{ message: string }>).map((e) => e.message).join(', ');
     throw new Error(`Railway GraphQL error: ${errorMessages}`);
   }
 
   return result.data as T;
 };
 
-const railwayGraphQLUser = async <T>(query: string, variables?: Record<string, any>): Promise<T> => {
+const railwayGraphQLUser = async <T>(query: string, variables?: Record<string, unknown>): Promise<T> => {
   const token = await getRailwayUserToken();
   return railwayGraphQLWithToken<T>(token, query, variables);
 };
 
-const railwayGraphQLWorkspace = async <T>(query: string, variables?: Record<string, any>): Promise<T> => {
+const _railwayGraphQLWorkspace = async <T>(query: string, variables?: Record<string, unknown>): Promise<T> => {
   const token = await getRailwayWorkspaceToken();
   return railwayGraphQLWithToken<T>(token, query, variables);
 };
@@ -182,7 +184,7 @@ export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
     const { stdout } = await execAsync('railway whoami --json', { encoding: 'utf-8' });
     const data = JSON.parse(stdout.trim());
     return data.workspaces || [];
-  } catch (error) {
+  } catch (_error) {
     // If CLI fails, return empty array
     return [];
   }
@@ -224,7 +226,7 @@ export const createProject = async (workspaceId: string, name: string): Promise<
  * Get serviceInstance ID with retry logic to handle provisioning delay
  * Railway needs time to provision serviceInstance after service creation
  */
-const getServiceInstanceId = async (serviceId: string, environmentId: string): Promise<string> => {
+const _getServiceInstanceId = async (serviceId: string, environmentId: string): Promise<string> => {
   return retryWithTimeout(
     async () => {
       const query = `
@@ -420,7 +422,7 @@ export const getProjectVolumes = async (projectId: string): Promise<Array<{ id: 
  */
 export const getServiceVolume = async (
   projectId: string,
-  serviceName: string,
+  _serviceName: string,
 ): Promise<{ id: string; name: string } | null> => {
   // Get all volumes for the project
   const volumes = await getProjectVolumes(projectId);
@@ -461,12 +463,12 @@ export const renameVolume = async (volumeId: string, name: string): Promise<void
  */
 export const createService = async (
   projectId: string,
-  environmentId: string,
+  _environmentId: string,
   environmentName: string,
   name: string,
 ): Promise<RailwayService> => {
   // Link to environment first
-  await execAsync(`railway environment link ${environmentName}`, {
+  await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
     encoding: 'utf-8',
     cwd: process.cwd(),
     env: {
@@ -475,8 +477,6 @@ export const createService = async (
     },
   });
 
-  // Escape special characters to prevent command injection
-  const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const escapedName = escapeName(name);
 
   // Create service without repo linkage; GitHub connect happens in explicit connect step.
@@ -544,7 +544,7 @@ export const createEnvironment = async (
   try {
     // Build command - duplicate from source if provided
     const duplicateFlag = sourceEnvironmentId ? `--duplicate ${sourceEnvironmentId}` : '';
-    const { stdout } = await execAsync(`railway environment new "${name}" ${duplicateFlag} --json`, {
+    const { stdout } = await execAsync(`railway environment new "${escapeName(name)}" ${duplicateFlag} --json`, {
       encoding: 'utf-8',
       cwd: process.cwd(),
       env: {
@@ -580,7 +580,7 @@ export const createEnvironment = async (
  */
 export const deleteEnvironment = async (projectId: string, environmentName: string): Promise<void> => {
   try {
-    await execAsync(`railway environment delete "${environmentName}" --yes --json`, {
+    await execAsync(`railway environment delete "${escapeName(environmentName)}" --yes --json`, {
       encoding: 'utf-8',
       cwd: process.cwd(),
       env: {
@@ -625,7 +625,7 @@ export const createRedis = async (
 ): Promise<RailwayRedis> => {
   try {
     // Step 1: Link to the environment
-    await execAsync(`railway environment link ${environmentName}`, {
+    await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
       encoding: 'utf-8',
       cwd: process.cwd(),
       env: {
@@ -674,7 +674,7 @@ export const createRedis = async (
  */
 export const getRedisUrl = async (
   serviceId: string,
-  environmentId: string,
+  _environmentId: string,
   environmentName: string,
   projectId: string,
 ): Promise<string> => {

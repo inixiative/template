@@ -1,4 +1,4 @@
-export const buildNestedPath = (path: string, value: any): Record<string, any> => {
+export const buildNestedPath = (path: string, value: unknown): Record<string, unknown> => {
   const parts = path.split('.');
 
   if (parts.length === 1) {

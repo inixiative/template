@@ -11,7 +11,7 @@ type Identifier = string | Record<string, string>;
 // ISO 8601 date regex for reviver
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
 
-const dateReviver = (_key: string, value: any): any => {
+const dateReviver = (_key: string, value: unknown): unknown => {
   if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
     return new Date(value);
   }

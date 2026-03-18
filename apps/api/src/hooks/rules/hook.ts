@@ -20,14 +20,21 @@ const validateData = (data: Record<string, unknown>, model: ModelName): void => 
 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
   if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) return args.forEach((item) => processCreateArgs(item, model));
+  if (Array.isArray(args)) {
+    args.forEach((item) => {
+      processCreateArgs(item, model);
+    });
+    return;
+  }
 
   const record = args as Record<string, unknown>;
 
   // Validate data at this level
   if (record.data && typeof record.data === 'object') {
     if (Array.isArray(record.data)) {
-      record.data.forEach((d) => validateData(d as Record<string, unknown>, model));
+      record.data.forEach((d) => {
+        validateData(d as Record<string, unknown>, model);
+      });
     } else {
       validateData(record.data as Record<string, unknown>, model);
     }
@@ -62,7 +69,12 @@ const processCreateArgs = (args: unknown, model: ModelName): void => {
 
 const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<string, unknown>): void => {
   if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) return args.forEach((item) => processUpdateArgs(item, model));
+  if (Array.isArray(args)) {
+    args.forEach((item) => {
+      processUpdateArgs(item, model);
+    });
+    return;
+  }
 
   const record = args as Record<string, unknown>;
   const data = record.data as Record<string, unknown> | undefined;

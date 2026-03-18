@@ -8,6 +8,7 @@ import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
+import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
@@ -26,17 +27,21 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  await db.inquiry.update({
+  const statusFields: { sentAt?: Date; expiresAt?: Date | null } = {};
+  if (rest.status === InquiryStatus.sent && !inquiry.sentAt) {
+    statusFields.sentAt = new Date();
+    statusFields.expiresAt = computeExpiresAt(inquiry.type);
+  } else if (rest.status === InquiryStatus.draft) {
+    statusFields.expiresAt = null;
+  }
+
+  const updated = await db.inquiry.update({
     where: { id: inquiry.id },
     data: {
       ...rest,
       ...(content !== undefined && { content: content as Prisma.InputJsonValue }),
-      ...(rest.status === InquiryStatus.sent && !inquiry.sentAt ? { sentAt: new Date() } : {}),
+      ...statusFields,
     },
-  });
-
-  const updated = await db.inquiry.findUniqueOrThrow({
-    where: { id: inquiry.id },
     include: includeInquiryResponse,
   });
 

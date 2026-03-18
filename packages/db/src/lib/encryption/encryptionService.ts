@@ -63,7 +63,7 @@ export class EncryptionService {
     };
   }
 
-  async decrypt(encrypted: EncryptedFieldData, aad: string): Promise<any> {
+  async decrypt(encrypted: EncryptedFieldData, aad: string): Promise<unknown> {
     const key = encrypted.version === this.keyring.currentVersion ? this.keyring.currentKey : this.keyring.previousKey;
 
     const decipher = crypto.createDecipheriv(

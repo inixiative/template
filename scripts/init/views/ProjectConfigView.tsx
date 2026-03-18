@@ -26,7 +26,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   const [error, setError] = useState<string | null>(null);
 
   // Handle escape and enter keys
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape && viewState !== 'executing' && viewState !== 'complete') {
       onCancel();
     } else if (key.return && viewState === 'complete') {

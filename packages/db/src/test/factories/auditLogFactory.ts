@@ -12,6 +12,26 @@ const auditLogFactory = createFactory('AuditLog', {
       foreignKey: { id: 'actorUserId' },
       required: false,
     },
+    actorSpoofUser: {
+      modelName: 'User',
+      foreignKey: { id: 'actorSpoofUserId' },
+      required: false,
+    },
+    actorToken: {
+      modelName: 'Token',
+      foreignKey: { id: 'actorTokenId' },
+      required: false,
+    },
+    contextOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'contextOrganizationId' },
+      required: false,
+    },
+    contextSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'contextSpaceId' },
+      required: false,
+    },
   },
 });
 

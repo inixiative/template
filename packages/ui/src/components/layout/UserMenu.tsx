@@ -11,7 +11,7 @@ import {
 import { Input } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { LogOut, Settings, ShieldAlert, User } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 export type UserMenuProps = {

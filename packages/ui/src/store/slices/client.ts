@@ -64,8 +64,6 @@ const handleApiError = (error: unknown, getStore: () => AppStore) => {
         },
       });
       break;
-
-    case 'contactSupport':
     default:
       // Persistent error toast with support link
       toast.error(message, {

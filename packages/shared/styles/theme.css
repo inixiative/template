@@ -118,10 +118,6 @@
   --info: var(--info-3);
   --info-foreground: 0 0% 100%;
 
-  /* UI - App Theme */
-  --app-accent: 210 40% 96.1%;
-  --app-accent-foreground: 222.2 47.4% 11.2%;
-
   /* App Theme - Accent (with shades) */
   --app-accent-1: 210 40% 98%;
   --app-accent-2: 210 40% 90%;
@@ -269,10 +265,6 @@
   --info-4: 199 69% 68%;
   --info: var(--info-3);
   --info-foreground: 0 0% 100%;
-
-  /* UI - App Theme */
-  --app-accent: 217.2 32.6% 17.5%;
-  --app-accent-foreground: 210 40% 98%;
 
   /* UI - Space Theme */
   --space-accent: var(--app-accent);

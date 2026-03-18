@@ -14,6 +14,7 @@ export const useDebounce = <T>(value: T, delay: number = 300): T => {
   return debouncedValue;
 };
 
+// biome-ignore lint/suspicious/noExplicitAny: generic callback constraint — any[] required to match any function signature
 export const useDebouncedCallback = <T extends (...args: any[]) => any>(callback: T, delay: number = 300): T => {
   const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
 

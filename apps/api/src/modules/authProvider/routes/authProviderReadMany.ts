@@ -1,4 +1,3 @@
-import { z } from '@hono/zod-openapi';
 import { readRoute } from '#/lib/routeTemplates';
 import { PlatformProviderSchema } from '#/modules/authProvider/schemas/authProviderSchemas';
 import { Modules } from '#/modules/modules';

@@ -52,6 +52,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
 
   // Add OpenAPI extensions for frontend metadata
   if (searchableFields?.length) {
+    // biome-ignore lint/suspicious/noExplicitAny: non-standard OpenAPI extension field not typed by @hono/zod-openapi
     (route as any)['x-searchable-fields'] = searchableFields;
   }
 

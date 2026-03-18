@@ -21,7 +21,7 @@ type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number]
 
 export const OrganizationsPage = () => {
   const permissions = useAppStore((state) => state.permissions);
-  const queryClient = useAppStore((state) => state.client);
+  const _queryClient = useAppStore((state) => state.client);
   const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
   const refreshMe = useAppStore((state) => state.auth.refreshMe);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -48,7 +48,7 @@ export const OrganizationsPage = () => {
     ),
     queryKey: meReadManyOrganizationsQueryKey(),
     operation: 'create',
-    optimisticExtras: { organizationUser: { role: 'owner' } } as any,
+    optimisticExtras: { organizationUser: { role: 'owner' } as Organization['organizationUser'] },
     mutationOptions: {
       onSuccess: () => refreshMe(),
     },
@@ -97,7 +97,7 @@ export const OrganizationsPage = () => {
         },
       },
     ],
-    [permissions],
+    [permissions, deleteMutation.mutate],
   );
 
   const handleCreate = (name: string, slug: string) => {

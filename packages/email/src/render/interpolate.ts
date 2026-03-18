@@ -1,4 +1,5 @@
 import { evaluateConditions } from '@template/email/render/evaluateConditions';
+// biome-ignore lint/suspicious/noShadowRestrictedNames: lodash escape is the intended import
 import { escape, isNil } from 'lodash-es';
 
 /**

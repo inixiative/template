@@ -18,7 +18,7 @@ const RootComponent = () => {
     setNavigate(navigate);
     setNavConfig(navConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate, setNavConfig, setNavigate]);
 
   usePageMeta();
   useLanguage();

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
+import type { UserId } from '@template/db/generated/client/client';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import type { RebacSchema } from '@template/permissions/rebac/types';
@@ -452,13 +453,13 @@ describe('rebac check', () => {
     };
 
     it('grants access when userId matches current user', () => {
-      permix.setUserId('user-123' as any);
+      permix.setUserId('user-123' as UserId);
       const record = { id: 'ou-1', userId: 'user-123' };
       expect(check(permix, schema, 'organizationUser', record, 'read')).toBe(true);
     });
 
     it('denies access when userId does not match', () => {
-      permix.setUserId('user-123' as any);
+      permix.setUserId('user-123' as UserId);
       const record = { id: 'ou-1', userId: 'other-user' };
       expect(check(permix, schema, 'session', record, 'read')).toBe(false);
     });
@@ -472,7 +473,7 @@ describe('rebac check', () => {
     it('works with any - self OR org permission', async () => {
       // User has org read permission but is not the user on the record
       await permix.setup({ resource: 'organization', id: 'org-1', actions: { read: true } });
-      permix.setUserId('different-user' as any);
+      permix.setUserId('different-user' as UserId);
       const record = {
         id: 'ou-1',
         userId: 'user-123',
@@ -482,7 +483,7 @@ describe('rebac check', () => {
     });
 
     it('self check uses specified field', () => {
-      permix.setUserId('user-123' as any);
+      permix.setUserId('user-123' as UserId);
       const sessionRecord = { id: 's-1', userId: 'user-123' };
       const otherRecord = { id: 's-2', userId: 'other-user' };
       expect(check(permix, schema, 'session', sessionRecord, 'delete')).toBe(true);
@@ -626,7 +627,7 @@ describe('rebac check', () => {
 
     it('returns false for undefined model', () => {
       const record = { id: 'unknown-1' };
-      expect(check(permix, schema, 'unknownModel' as any, record, 'own')).toBe(false);
+      expect(check(permix, schema, 'unknownModel' as unknown as keyof RebacSchema, record, 'own')).toBe(false);
     });
 
     it('returns false for undefined action', async () => {
@@ -696,8 +697,8 @@ describe('rebac check', () => {
         organization: { actions: { own: { rel: 'parentSpace', action: 'own' } } },
         space: { actions: { own: { rel: 'organization', action: 'own' } } },
       };
-      const space: any = { id: 'space-1' };
-      const org: any = { id: 'org-1', parentSpace: space };
+      const space: Record<string, unknown> = { id: 'space-1' };
+      const org: Record<string, unknown> = { id: 'org-1', parentSpace: space };
       space.organization = org;
 
       expect(() => check(permix, cyclicSchema, 'space', space, 'own')).toThrow(/Cycle detected/);

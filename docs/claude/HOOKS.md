@@ -60,6 +60,7 @@ Located in `apps/api/src/hooks/`:
 
 | Hook | Purpose |
 |------|---------|
+| `auditLog` | Immutable audit trail of all mutations |
 | `cache` | Cache invalidation on mutations |
 | `webhooks` | Webhook delivery on mutations |
 | `immutableFields` | Prevents FK field updates |
@@ -67,6 +68,78 @@ Located in `apps/api/src/hooks/`:
 | `falsePolymorphism` | Type enum + FK validation |
 
 All registered via `registerHooks()` in entry points.
+
+---
+
+## Audit Log
+
+Automatic, tamper-evident record of all database mutations for enabled models.
+
+### Enabling Audit for a Model
+
+```typescript
+// packages/db/src/registries/auditEnabledModels.ts
+export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
+  AuditSubjectModel.User,
+  AuditSubjectModel.Organization,
+  // ...
+];
+```
+
+### Data Captured
+
+| Field | Description |
+|-------|-------------|
+| `action` | `create`, `update`, or `delete` |
+| `subjectModel` | Which model was mutated |
+| `before` / `after` | Full record state (filtered + redacted) |
+| `changes` | Field-level diff for updates only |
+| `actorUserId` | Who triggered the mutation |
+| `actorSpoofUserId` | Admin acting on behalf of a user |
+| `actorTokenId` | API token used |
+| `actorJobName` | Background job name (if triggered by a job) |
+| `ipAddress` / `userAgent` | Request metadata |
+| `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
+| `contextOrganizationId` / `contextSpaceId` | Org/space context of the record |
+
+### Field Processing Pipeline
+
+Before storing, each record goes through:
+
+1. **Ignore fields** — strip noise fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`) that don't represent meaningful changes
+2. **Redact fields** — replace sensitive values with `[REDACTED]` (passwords, token hashes, auth secrets)
+3. **Diff** — for updates, compute which fields actually changed (after filtering/redacting)
+
+If an update produces an empty diff (only ignored/redacted fields changed), no audit log is written.
+
+### Soft Delete Detection
+
+If a mutation transitions `deletedAt` from `null` to a timestamp, it is recorded as a `delete` action regardless of the underlying `DbAction`.
+
+### Registries
+
+```typescript
+// packages/db/src/registries/auditEnabledModels.ts — opt-in models
+// packages/db/src/registries/redactFields.ts — sensitive fields per model
+// packages/db/src/registries/ignoreFields.ts — noise fields per model (shared with webhooks/cache)
+```
+
+### Actor Context
+
+Actor info is set in async-local storage before the mutation:
+
+```typescript
+import { auditActorContext } from '#/lib/auditActorContext';
+
+auditActorContext.set({
+  actorUserId: user.id,
+  actorSpoofUserId: spoofUser?.id,
+  actorTokenId: token?.id,
+  ipAddress: c.req.header('x-forwarded-for'),
+  userAgent: c.req.header('user-agent'),
+  sourceInquiryId: inquiry?.id,
+});
+```
 
 ---
 

@@ -27,6 +27,8 @@ export const ResponsiveDrawer = ({
   if (isDesktop) {
     return (
       <>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, keyboard access via close button */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay, keyboard access via close button */}
         <div className="fixed inset-0 bg-black/50 z-40 transition-opacity" onClick={onClose} />
         <div
           className={cn(
@@ -38,6 +40,7 @@ export const ResponsiveDrawer = ({
           <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b bg-background">
             {title && <h2 className="text-lg font-semibold">{title}</h2>}
             <button
+              type="button"
               onClick={onClose}
               className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
               aria-label="Close drawer"

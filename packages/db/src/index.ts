@@ -47,6 +47,8 @@ export {
 export * from './registries';
 // Typed model IDs (phantom types for compile-time safety)
 export * from './typedModelIds';
+// biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
+export type PrismaBaseArgs = {};
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';

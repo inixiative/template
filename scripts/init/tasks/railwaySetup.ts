@@ -16,7 +16,6 @@ import {
   isServiceConnectedToGitHub,
   renameService,
   renameVolume,
-  setEnvironmentVariables,
   triggerServiceDeployment,
   updateServiceInstanceConfig,
 } from '../api/railway';
@@ -126,14 +125,8 @@ export const setupRailway = async (
 
     // Step 3: Create Railway project
     if (!(await isProgressComplete('railway', 'createProject'))) {
-      try {
-        const project = await createProject(workspaceId, configProjectName);
-        projectId = project.id;
-      } catch (error) {
-        // Project might already exist - for now, just throw
-        // TODO: Handle existing project scenario
-        throw error;
-      }
+      const project = await createProject(workspaceId, configProjectName);
+      projectId = project.id;
 
       await updateConfigField('railway', 'projectId', projectId);
       await setProgressComplete('railway', 'createProject');
@@ -157,7 +150,7 @@ export const setupRailway = async (
 
           // Store in Infisical for reference
           setSecret(infisicalProjectId, 'root', 'RAILWAY_PROD_ENVIRONMENT_ID', prodEnv.id);
-        } catch (error) {
+        } catch (_error) {
           // Ignore if already exists
         }
       } else {
@@ -171,7 +164,7 @@ export const setupRailway = async (
       if (productionEnv) {
         try {
           await deleteEnvironment(projectId, 'production');
-        } catch (error) {
+        } catch (_error) {
           // Ignore if already deleted
         }
       }
@@ -197,7 +190,7 @@ export const setupRailway = async (
 
           // Store in Infisical for reference
           setSecret(infisicalProjectId, 'root', 'RAILWAY_STAGING_ENVIRONMENT_ID', stagingEnv.id);
-        } catch (error) {
+        } catch (_error) {
           // Ignore if already exists
         }
       } else {

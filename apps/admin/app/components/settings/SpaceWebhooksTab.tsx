@@ -1,6 +1,6 @@
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 
-export const SpaceWebhooksTab = ({ spaceId }: { spaceId: string }) => {
+export const SpaceWebhooksTab = ({ spaceId: _spaceId }: { spaceId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>

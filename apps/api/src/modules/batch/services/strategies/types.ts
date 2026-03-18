@@ -4,13 +4,13 @@ import type { AppEnv } from '#/types/appEnv';
 export type BatchRequest = {
   method: string;
   path: string;
-  body?: any;
+  body?: unknown;
   headers?: Record<string, string>;
 };
 
 export type RequestResult = {
   status: number;
-  body: any;
+  body: unknown;
   error?: string;
 };
 

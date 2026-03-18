@@ -1,8 +1,8 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
+import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
-import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';

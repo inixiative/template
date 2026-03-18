@@ -7,11 +7,12 @@ export const createMockS3Client = () => {
   const uploads: Map<string, { contentType: string; metadata: Record<string, string> }> = new Map();
 
   return {
+    // biome-ignore lint/suspicious/noExplicitAny: mock stub accepts any S3Command variant
     send: async (command: any) => {
       const commandName = command.constructor?.name || 'UnknownCommand';
 
       if (commandName === 'PutObjectCommand') {
-        const { Bucket, Key, ContentType, Metadata } = command.input;
+        const { Bucket: _Bucket, Key, ContentType, Metadata } = command.input;
         uploads.set(Key, { contentType: ContentType, metadata: Metadata || {} });
         return { ETag: `"mock-etag-${Date.now()}"` };
       }
@@ -20,6 +21,7 @@ export const createMockS3Client = () => {
         const { Key } = command.input;
         if (!uploads.has(Key)) {
           const error = new Error('NoSuchKey');
+          // biome-ignore lint/suspicious/noExplicitAny: setting non-standard name property on Error
           (error as any).name = 'NoSuchKey';
           throw error;
         }

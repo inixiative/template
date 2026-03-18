@@ -1,7 +1,7 @@
+import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
 import { Eye, EyeOff } from 'lucide-react';
 import * as React from 'react';
-import { Input, type InputProps } from './Input';
 
 export type PasswordInputProps = Omit<InputProps, 'type'>;
 

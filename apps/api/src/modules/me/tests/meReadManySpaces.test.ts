@@ -42,9 +42,9 @@ describe('GET /me/spaces', () => {
 
   it('returns user spaces with membership info', async () => {
     // createSpaceUser auto-creates: User, Organization, OrganizationUser, Space
-    const { entity: spaceUser, context } = await createSpaceUser({ role: Role.admin }, { user });
+    const { entity: _spaceUser, context } = await createSpaceUser({ role: Role.admin }, { user });
     const space = context.space!;
-    const org = context.organization!;
+    const _org = context.organization!;
 
     const response = await fetch(get('/api/v1/me/spaces'));
     const { data } = await json<ReadManySpacesResponse>(response);

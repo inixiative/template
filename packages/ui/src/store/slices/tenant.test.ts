@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { buildOrganization } from '@template/db/test';
+import type { MeReadResponses } from '@template/ui/apiClient';
 import { createTestStore } from '@template/ui/test';
+
+type MeData = MeReadResponses[200]['data'];
+type Organization = MeData['organizations'][number];
+type Space = MeData['spaces'][number];
 
 describe('tenant slice', () => {
   let store: ReturnType<typeof createTestStore>;
@@ -85,7 +90,7 @@ describe('tenant slice', () => {
     });
 
     it('should set context to organization when it exists', () => {
-      const mockOrg = { id: 'org-1', name: 'Test Org' } as any;
+      const mockOrg = { id: 'org-1', name: 'Test Org' } as unknown as Organization;
 
       store.setState({
         auth: {
@@ -126,7 +131,7 @@ describe('tenant slice', () => {
     });
 
     it('should return false when organization for space does not exist', () => {
-      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as any;
+      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as unknown as Space;
 
       store.setState({
         auth: {
@@ -142,8 +147,8 @@ describe('tenant slice', () => {
     });
 
     it('should set context to space when it and its organization exist', () => {
-      const mockOrg = { id: 'org-1', name: 'Test Org' } as any;
-      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as any;
+      const mockOrg = { id: 'org-1', name: 'Test Org' } as unknown as Organization;
+      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as unknown as Space;
 
       store.setState({
         auth: {

@@ -1,5 +1,5 @@
+import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import * as React from 'react';
-import { Input, type InputProps } from './Input';
 
 export interface SlugInputProps extends Omit<InputProps, 'onChange' | 'type'> {
   onChange?: (value: string) => void;

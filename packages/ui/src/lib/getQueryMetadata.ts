@@ -16,6 +16,7 @@ export type QueryMetadata = {
  * Extract orderable fields from schema recursively.
  * Excludes arrays, includes nested objects with dot notation.
  */
+// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<any> = new Set()): string[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
     return [];
@@ -27,6 +28,7 @@ const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<a
   const properties = schema.properties || {};
 
   for (const [key, prop] of Object.entries(properties)) {
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
     const propSchema = prop as any;
     const fieldPath = prefix ? `${prefix}.${key}` : key;
 
@@ -47,6 +49,7 @@ const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<a
 /**
  * Extract enum filters from schema recursively.
  */
+// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> = new Set()): EnumFilter[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
     return [];
@@ -58,6 +61,7 @@ const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> 
   const properties = schema.properties || {};
 
   for (const [key, prop] of Object.entries(properties)) {
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
     const propSchema = prop as any;
     const fieldPath = prefix ? `${prefix}.${key}` : key;
 
@@ -80,6 +84,7 @@ const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> 
 /**
  * Get response schema for an operation.
  */
+// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const getResponseSchema = (operation: any): any => {
   const response200 = operation.responses?.['200'];
   if (!response200) return null;
@@ -102,6 +107,7 @@ const getResponseSchema = (operation: any): any => {
   // Resolve $ref
   if (schema.$ref) {
     const refPath = schema.$ref.replace('#/', '').split('/');
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
     let resolved: any = openApiSpec;
     for (const part of refPath) {
       resolved = resolved[part];
@@ -125,6 +131,7 @@ const getResponseSchema = (operation: any): any => {
  * // }
  */
 export const getQueryMetadata = (path: string, method: string = 'get'): QueryMetadata => {
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
   const spec = openApiSpec as any;
   const operation = spec.paths?.[path]?.[method.toLowerCase()];
 
@@ -149,10 +156,13 @@ export const getQueryMetadata = (path: string, method: string = 'get'): QueryMet
  * // => { searchableFields: ['name', 'slug'], orderableFields: [...], ... }
  */
 export const getQueryMetadataByOperation = (operationId: string): QueryMetadata => {
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
   const spec = openApiSpec as any;
 
   for (const [path, pathItem] of Object.entries(spec.paths || {})) {
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
     for (const [method, operation] of Object.entries(pathItem as any)) {
+      // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
       const op = operation as any;
       if (op.operationId === operationId) {
         return getQueryMetadata(path, method);

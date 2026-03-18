@@ -1,5 +1,4 @@
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, ThemeToggle } from '@template/ui/components';
-import { useAppStore } from '@template/ui/store';
 
 export const UserProfileTab = () => {
   return (

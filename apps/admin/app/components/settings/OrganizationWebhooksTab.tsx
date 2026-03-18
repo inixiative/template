@@ -1,6 +1,6 @@
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 
-export const OrganizationWebhooksTab = ({ organizationId }: { organizationId: string }) => {
+export const OrganizationWebhooksTab = ({ organizationId: _organizationId }: { organizationId: string }) => {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>

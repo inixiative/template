@@ -41,7 +41,7 @@ export const otelSDK = new NodeSDK({
 });
 
 // Helper to create spans manually for Elysia
-export const createSpan = (name: string, fn: () => any) => {
+export const createSpan = (name: string, fn: () => unknown) => {
   const tracer = trace.getTracer(serviceName, serviceVersion);
   return tracer.startActiveSpan(name, async (span: import('@opentelemetry/api').Span) => {
     try {

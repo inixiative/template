@@ -2,7 +2,6 @@
 import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from 'ink';
-import React from 'react';
 import { App } from './app.js';
 
 // Copy .env.init.example to .env.init if it doesn't exist

@@ -212,7 +212,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
             name: workspace.name,
           })),
         );
-      } catch (err) {
+      } catch (_err) {
         setWorkspaces([]);
       } finally {
         setLoadingWorkspaces(false);
@@ -316,7 +316,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
         environment: 'root',
       });
       hasToken = !!token;
-    } catch (error) {
+    } catch (_error) {
       // Token doesn't exist
       hasToken = false;
     }
@@ -416,14 +416,14 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   };
 
   // Handle escape in token input
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (viewState === 'token-input' && key.escape) {
       onCancel();
     }
   });
 
   // Handle input on GitHub prompt view
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (viewState !== 'github-prompt') return;
 
     if (key.return) {
@@ -566,7 +566,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
           const isPending = !isCompleted && !isInProgress;
 
           return (
-            <Box key={i} marginLeft={2}>
+            <Box key={item.label} marginLeft={2}>
               {isCompleted && <Text color="green">✓ {item.label}</Text>}
               {isInProgress && (
                 <Text color="cyan">

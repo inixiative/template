@@ -24,6 +24,7 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
       <div className="flex items-center gap-4">
         {onMenuClick && (
           <button
+            type="button"
             onClick={onMenuClick}
             className="lg:hidden p-2 hover:bg-accent rounded-md transition-colors"
             aria-label="Toggle menu"

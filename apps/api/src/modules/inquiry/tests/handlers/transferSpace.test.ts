@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, Space, SpaceUser } from '@template/db';
+import type { Organization, Space } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -45,14 +45,14 @@ describe('handler: transferSpace', () => {
       mockUser: owner,
       mockOrganizationUsers: [ou],
       mockSpaceUsers: [su],
-      mount: [(app: any) => app.route('/api/v1/space', spaceRouter)],
+      mount: [(app) => app.route('/api/v1/space', spaceRouter)],
     });
     ownerFetch = ownerHarness.fetch;
     db = ownerHarness.db;
 
     adminFetch = createTestApp({
       mockUser: superadmin,
-      mount: [(app: any) => app.route('/api/v1/inquiry', inquiryRouter)],
+      mount: [(app) => app.route('/api/v1/inquiry', inquiryRouter)],
     }).fetch;
   });
 

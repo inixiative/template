@@ -32,10 +32,7 @@ export const buildContextFkFields = (model: string, record: Record<string, unkno
   };
 };
 
-export const buildSubjectFkFields = (
-  model: string,
-  record: Record<string, unknown>,
-): Record<string, unknown> => {
+export const buildSubjectFkFields = (model: string, record: Record<string, unknown>): Record<string, unknown> => {
   const subjectAxis = getPolymorphismConfig('AuditLog')?.axes.find((axis) => axis.field === 'subjectModel');
   const fkFields = subjectAxis?.fkMap[model as keyof typeof subjectAxis.fkMap];
   if (!fkFields?.length) return {};
@@ -54,17 +51,14 @@ export const processAuditData = (model: string, data: Record<string, unknown>): 
 };
 
 export const computeDiff = (
-  model: string,
   before: Record<string, unknown>,
   after: Record<string, unknown>,
 ): Record<string, { before: unknown; after: unknown }> => {
-  const processedBefore = processAuditData(model, before);
-  const processedAfter = processAuditData(model, after);
   const diff: Record<string, { before: unknown; after: unknown }> = {};
-  const allKeys = new Set([...Object.keys(processedBefore), ...Object.keys(processedAfter)]);
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
   for (const key of allKeys) {
-    if (!isEqual(processedBefore[key], processedAfter[key])) {
-      diff[key] = { before: processedBefore[key], after: processedAfter[key] };
+    if (!isEqual(before[key], after[key])) {
+      diff[key] = { before: before[key], after: after[key] };
     }
   }
   return diff;

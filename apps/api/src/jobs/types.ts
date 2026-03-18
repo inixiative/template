@@ -35,7 +35,7 @@ export type JobData<TPayload = unknown> = {
   dedupeKey?: string;
 };
 
-export type JobHandlerArgs<TPayload = void> = [TPayload] extends [void] ? [] : [payload: TPayload];
+export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined] ? [] : [payload: TPayload];
 
 export type JobHandler<TPayload = void> = (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>;
 

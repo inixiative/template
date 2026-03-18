@@ -123,7 +123,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       try {
         const orgs = await listOrganizations();
         setOrganizations(orgs);
-      } catch (err) {
+      } catch (_err) {
         setOrganizations([]);
       } finally {
         setLoadingOrgs(false);
@@ -186,7 +186,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
       // Try to use existing org from config first
       const existingOrg = config.planetscale.organization;
-      const existingRegion = config.planetscale.region;
+      const _existingRegion = config.planetscale.region;
 
       if (existingOrg && existingOrg.trim() !== '') {
         // Have org in config - check what's missing
@@ -348,7 +348,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       await syncConfig();
 
       setRunning(false);
-    } catch (err) {
+    } catch (_err) {
       // Error is already persisted by setupPlanetScale via setError
       // Return to status view and refresh to show error
       setViewState('status');
@@ -569,7 +569,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
           const isPending = !isCompleted && !isInProgress;
 
           return (
-            <Box key={i}>
+            <Box key={item.label}>
               {isCompleted && <Text color="green">✓ {item.label}</Text>}
               {isInProgress && (
                 <Text color="cyan">

@@ -1,6 +1,5 @@
 import { readdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppEnv } from '#/types/appEnv';
 

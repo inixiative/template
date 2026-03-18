@@ -4,7 +4,6 @@ import path from 'node:path';
 import { isAppInstalled } from '../api/github';
 import { createVercelConnection, ensureVercelSync } from '../api/infisicalVercel';
 import {
-  addEnvVar,
   checkGitHubIntegration,
   createCustomEnvironment,
   createProject,
@@ -12,9 +11,8 @@ import {
   updateProjectSettings,
 } from '../api/vercel';
 import { updateConfigField } from '../utils/configHelpers';
-import type { ProjectConfig } from '../utils/getProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
-import { getSecret, setSecret } from './infisicalSetup';
+import { setSecret } from './infisicalSetup';
 
 /**
  * Get or create Vercel connection in Infisical (idempotent)

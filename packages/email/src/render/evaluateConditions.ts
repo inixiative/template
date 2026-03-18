@@ -29,18 +29,18 @@ const flattenVariables = (variables: Variables): Record<string, unknown> => {
 const findJsonEnd = (str: string, start: number): number => {
   let depth = 0;
   let inString = false;
-  let escape = false;
+  let inEscape = false;
 
   for (let i = start; i < str.length; i++) {
     const ch = str[i];
 
-    if (escape) {
-      escape = false;
+    if (inEscape) {
+      inEscape = false;
       continue;
     }
 
     if (ch === '\\' && inString) {
-      escape = true;
+      inEscape = true;
       continue;
     }
 

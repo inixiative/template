@@ -12,7 +12,7 @@ type PlanetScaleOrganization = {
   slug?: string;
 };
 
-type PlanetScaleDatabase = {
+export type PlanetScaleDatabase = {
   id: string;
   name: string;
   region: string;
@@ -20,7 +20,7 @@ type PlanetScaleDatabase = {
   updated_at: string;
 };
 
-type PlanetScaleBranch = {
+export type PlanetScaleBranch = {
   id: string;
   name: string;
   region: string;
@@ -95,13 +95,9 @@ const planetscaleFetch = async <T>(endpoint: string, options: RequestInit = {}):
  */
 export const listOrganizations = async (): Promise<PlanetScaleOrganization[]> => {
   const { stdout } = await execAsync('pscale org list --format json', { encoding: 'utf-8' });
-  const orgs = JSON.parse(stdout);
+  const orgs = JSON.parse(stdout) as Array<{ name: string; slug?: string }>;
 
-  // Map CLI response to our Organization type
-  return orgs.map((org: any) => ({
-    name: org.name,
-    slug: org.slug,
-  }));
+  return orgs.map((org) => ({ name: org.name, slug: org.slug }));
 };
 
 /**
@@ -111,11 +107,16 @@ export const listRegions = async (organizationName: string): Promise<PlanetScale
   const { stdout } = await execAsync(`pscale region list --org ${organizationName} --format json`, {
     encoding: 'utf-8',
   });
-  const regions = JSON.parse(stdout);
+  const regions = JSON.parse(stdout) as Array<{
+    id?: string;
+    slug: string;
+    display_name?: string;
+    name?: string;
+    enabled?: boolean;
+  }>;
 
-  // Map CLI response to our Region type
   return regions
-    .map((region: any) => ({
+    .map((region) => ({
       id: region.id || region.slug,
       slug: region.slug,
       display_name: region.display_name || region.name,
@@ -128,8 +129,7 @@ export const listRegions = async (organizationName: string): Promise<PlanetScale
  * Get organization details
  */
 export const getOrganization = async (orgName: string): Promise<PlanetScaleOrganization> => {
-  const response = await planetscaleFetch<any>(`/organizations/${orgName}`);
-  return response;
+  return await planetscaleFetch<PlanetScaleOrganization>(`/organizations/${orgName}`);
 };
 
 /**
@@ -183,7 +183,7 @@ export const updateDatabaseSettings = async (
     default_branch?: string;
   },
 ): Promise<void> => {
-  await planetscaleFetch<any>(`/organizations/${organizationName}/databases/${databaseName}`, {
+  await planetscaleFetch<PlanetScaleDatabase>(`/organizations/${organizationName}/databases/${databaseName}`, {
     method: 'PATCH',
     body: JSON.stringify(settings),
   });
@@ -193,8 +193,10 @@ export const updateDatabaseSettings = async (
  * List databases in an organization
  */
 export const listDatabases = async (organizationName: string): Promise<PlanetScaleDatabase[]> => {
-  const response = await planetscaleFetch<any>(`/organizations/${organizationName}/databases`);
-  return response.data || [];
+  const response = await planetscaleFetch<{ data?: PlanetScaleDatabase[] }>(
+    `/organizations/${organizationName}/databases`,
+  );
+  return response.data ?? [];
 };
 
 /**
@@ -235,8 +237,10 @@ export const getBranch = async (
  * List branches for a database
  */
 export const listBranches = async (organizationName: string, databaseName: string): Promise<PlanetScaleBranch[]> => {
-  const response = await planetscaleFetch<any>(`/organizations/${organizationName}/databases/${databaseName}/branches`);
-  return response.data || [];
+  const response = await planetscaleFetch<{ data?: PlanetScaleBranch[] }>(
+    `/organizations/${organizationName}/databases/${databaseName}/branches`,
+  );
+  return response.data ?? [];
 };
 
 /**
@@ -307,10 +311,10 @@ export const listPasswords = async (
   databaseName: string,
   branchName: string,
 ): Promise<PlanetScalePassword[]> => {
-  const response = await planetscaleFetch<any>(
+  const response = await planetscaleFetch<{ data?: PlanetScalePassword[] }>(
     `/organizations/${organizationName}/databases/${databaseName}/branches/${branchName}/passwords`,
   );
-  return response.data || [];
+  return response.data ?? [];
 };
 
 /**
@@ -339,16 +343,13 @@ export const renameBranch = async (
   branchName: string,
   newName: string,
 ): Promise<PlanetScaleBranch> => {
-  const response = await planetscaleFetch<any>(
+  return await planetscaleFetch<PlanetScaleBranch>(
     `/organizations/${organizationName}/databases/${databaseName}/branches/${branchName}`,
     {
       method: 'PATCH',
-      body: JSON.stringify({
-        new_name: newName,
-      }),
+      body: JSON.stringify({ new_name: newName }),
     },
   );
-  return response;
 };
 
 /**

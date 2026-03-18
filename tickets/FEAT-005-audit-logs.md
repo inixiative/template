@@ -1,10 +1,10 @@
 # FEAT-005: Audit Logs
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-02-14
+**Updated**: 2026-03-18
 
 ---
 
@@ -74,11 +74,11 @@ model AuditLog {
 ```
 
 **Tasks:**
-- [ ] Create `packages/db/prisma/schema/auditLog.prisma`
-- [ ] Add `AuditLogId` to `packages/db/src/typedModelIds.ts`
-- [ ] Run `bun run db:generate && bun run db:push`
-- [ ] Create factory: `packages/db/src/test/factories/auditLogFactory.ts`
-- [ ] Export factory from `packages/db/src/test/factories/index.ts`
+- [x] Create `packages/db/prisma/schema/auditLog.prisma`
+- [x] Add `AuditLogId` to `packages/db/src/typedModelIds.ts`
+- [x] Run `bun run db:generate && bun run db:push`
+- [x] Create factory: `packages/db/src/test/factories/auditLogFactory.ts` (with all optional FK dependencies)
+- [x] Export factory from `packages/db/src/test/factories/index.ts`
 
 ---
 
@@ -216,14 +216,13 @@ export const isAuditEnabled = (model: string): boolean => {
 ```
 
 **Tasks:**
-- [ ] Create `packages/db/src/lib/hooks/ignoreFields.ts`
-- [ ] Create `packages/db/src/lib/hooks/redactFields.ts`
-- [ ] Create `packages/db/src/lib/hooks/index.ts`
-- [ ] Export from `packages/db/src/index.ts`
-- [ ] Create `apps/api/src/hooks/auditLog/constants/enabledModels.ts`
-- [ ] Update webhooks to use shared utilities
-- [ ] Write tests for utilities: `packages/db/src/lib/hooks/ignoreFields.test.ts`
-- [ ] Write tests for utilities: `packages/db/src/lib/hooks/redactFields.test.ts`
+- [x] `packages/db/src/registries/ignoreFields.ts` (shared — used by webhooks, cache, audit)
+- [x] `packages/db/src/registries/redactFields.ts` (shared — Token field corrected to `keyHash` only)
+- [x] Exported from `packages/db/src/index.ts`
+- [x] `packages/db/src/registries/auditEnabledModels.ts` — includes User, Organization, OrganizationUser, Space, SpaceUser, Token, AuthProvider, Account, EmailTemplate, EmailComponent
+- [ ] Update webhooks to use shared utilities (still using own copy)
+- [ ] Write tests for utilities: `packages/db/src/registries/ignoreFields.test.ts`
+- [x] Write tests for utilities: `packages/db/src/registries/redactFields.test.ts`
 
 ---
 
@@ -244,18 +243,17 @@ export const isAuditEnabled = (model: string): boolean => {
 - Skip logging for AuditLog model itself (no recursion)
 
 **Implementation Checklist:**
-- [ ] Create `apps/api/src/hooks/auditLog/hook.ts`
-- [ ] Implement `registerAuditLogHook()`
-- [ ] Check `isAuditEnabled(model)` before logging
-- [ ] Apply field processing pipeline:
-  1. Filter ignored fields using `filterIgnoredFields()`
-  2. Redact sensitive fields using `redactSensitiveFields()`
-  3. Compute diff for updates (after filtering/redacting)
-- [ ] Extract actor from request context (userId, spoofUserId, tokenId, IP, userAgent)
-- [ ] Use `db.onCommit()` for async writes
-- [ ] Skip recursion (don't log AuditLog mutations)
-- [ ] Handle both single and many actions
-- [ ] Extract organizationId/spaceId from records when available
+- [x] `apps/api/src/hooks/auditLog/hook.ts` — `registerAuditLogHook()`
+- [x] `isAuditEnabled(model)` guard
+- [x] Field processing pipeline: filterIgnoredFields → redactSensitiveFields → computeDiff
+- [x] processAuditData called once per record; computeDiff receives pre-processed data (no double-processing)
+- [x] Actor extracted from `auditActorContext` ALS
+- [x] AuditLog model excluded from hook (no recursion)
+- [x] Both single and many actions handled
+- [x] Soft delete detection: `deletedAt: null → timestamp` recorded as `delete` action
+- [x] Empty diff guard: update with no meaningful changes produces no audit row
+- [x] `sourceInquiryId` threaded through actor context for inquiry-driven mutations
+- [ ] Move audit writes into transaction (currently writes after commit — see FEAT-017)
 
 **File**: `apps/api/src/hooks/auditLog/utils.ts`
 
@@ -299,9 +297,8 @@ export const computeDiff = (
 ```
 
 **Tasks:**
-- [ ] Create `apps/api/src/hooks/auditLog/utils.ts`
-- [ ] Implement `processAuditData()` - combines filter + redact
-- [ ] Implement `computeDiff()` using `processAuditData()`
+- [x] `apps/api/src/hooks/auditLog/utils.ts` — `processAuditData()`, `computeDiff()`, `buildContextFkFields()`, `buildSubjectFkFields()`
+- [x] `computeDiff()` takes pre-processed data (pure diff, no internal processAuditData call)
 - [ ] Write tests: `apps/api/src/hooks/auditLog/utils.test.ts`
 
 **File**: `apps/api/src/hooks/index.ts`
@@ -319,8 +316,8 @@ export const registerHooks = () => {
 ```
 
 **Tasks:**
-- [ ] Register audit log hook in `apps/api/src/hooks/index.ts`
-- [ ] Test hook fires on mutations
+- [x] Register audit log hook in `apps/api/src/hooks/index.ts`
+- [ ] Integration test: hook fires on mutations
 
 ---
 

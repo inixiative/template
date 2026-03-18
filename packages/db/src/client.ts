@@ -28,7 +28,8 @@ const createClient = (): Db => {
 
 const dbMethods = {
   get raw() {
-    return (__raw ??= createClient());
+    if (!__raw) __raw = createClient();
+    return __raw;
   },
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
@@ -99,7 +100,7 @@ const dbMethods = {
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
-  getScopeContext: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
+  getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.txn,
 };

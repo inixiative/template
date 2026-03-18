@@ -57,22 +57,22 @@ describe('searchable', () => {
   });
 
   it('throws for invalid model name', () => {
-    expect(() => searchable({ notAModel: ['name'] })).toThrow("not a valid Prisma model");
+    expect(() => searchable({ notAModel: ['name'] })).toThrow('not a valid Prisma model');
   });
 
   it('throws for invalid field on model', () => {
-    expect(() => searchable({ organization: ['nonexistent'] })).toThrow("does not exist on");
+    expect(() => searchable({ organization: ['nonexistent'] })).toThrow('does not exist on');
   });
 
   it('throws when using a relation as a scalar', () => {
-    expect(() => searchable({ organization: ['organizationUsers'] })).toThrow("is a relation");
+    expect(() => searchable({ organization: ['organizationUsers'] })).toThrow('is a relation');
   });
 
   it('throws when using a scalar as a relation', () => {
-    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow("is not a relation");
+    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow('is not a relation');
   });
 
   it('throws for multiple root keys', () => {
-    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow("exactly one model");
+    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow('exactly one model');
   });
 });

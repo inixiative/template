@@ -10,11 +10,12 @@ export const allowFailures: StrategyExecutor = async (
   sharedHeaders,
   baseRequest,
   baseContext,
-  timeout,
+  _timeout,
 ) => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, db as any, baseContext);
+  registerBatch(batchId, db, baseContext);
 
+  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
   const results: any[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   let successfulRequests = 0;

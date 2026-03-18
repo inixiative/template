@@ -1,7 +1,6 @@
-import type { HookOptions, ManyAction, Prisma, SingleAction } from '@template/db';
-import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import type { HookOptions, ManyAction, SingleAction } from '@template/db';
+import { DbAction, db, HookTiming, isAuditEnabled, Prisma, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { isAuditEnabled } from '@template/db';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
 import { auditActorContext } from '#/lib/auditActorContext';
 
@@ -35,13 +34,13 @@ const buildAuditEntry = (
   record: Record<string, unknown>,
   previous?: Record<string, unknown>,
 ): Prisma.AuditLogCreateManyInput | null => {
-  const actor = auditActorContext.get();
+  const actor = auditActorContext.getScope();
 
   const processedAfter = action !== AuditAction.delete ? processAuditData(model, record) : undefined;
   const processedBefore = previous ? processAuditData(model, previous) : undefined;
   const changes =
     action === AuditAction.update && processedBefore && processedAfter
-      ? computeDiff(model, previous!, record)
+      ? computeDiff(processedBefore, processedAfter)
       : undefined;
 
   if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
@@ -49,9 +48,9 @@ const buildAuditEntry = (
   return {
     action,
     subjectModel: model,
-    before: processedBefore ?? null,
-    after: processedAfter ?? null,
-    changes: changes ?? null,
+    before: (processedBefore as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+    after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+    changes: (changes as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,
@@ -114,6 +113,6 @@ export const registerAuditLogHook = () => {
 
     if (entries.length === 0) return;
 
-    await db.auditLog.createMany({ data: entries });
+    await db.auditLog.createManyAndReturn({ data: entries });
   });
 };

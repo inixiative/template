@@ -11,9 +11,9 @@ describe('GET /api/admin/space', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   let org1: Organization;
   let org2: Organization;
-  let space1: Space;
+  let _space1: Space;
   let space2: Space;
-  let space3: Space;
+  let _space3: Space;
 
   beforeAll(async () => {
     const { entity: o1 } = await createOrganization();
@@ -22,11 +22,11 @@ describe('GET /api/admin/space', () => {
     org2 = o2;
 
     const { entity: s1 } = await createSpace({ name: 'Alpha Space' }, { organization: org1 });
-    space1 = s1;
+    _space1 = s1;
     const { entity: s2 } = await createSpace({ name: 'Beta Space' }, { organization: org1 });
     space2 = s2;
     const { entity: s3 } = await createSpace({ name: 'Gamma Space' }, { organization: org2 });
-    space3 = s3;
+    _space3 = s3;
 
     const harness = createTestApp({
       mockSuperadmin: true,

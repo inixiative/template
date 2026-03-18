@@ -1,6 +1,9 @@
 /**@jsdom*/
 
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import type { UseNavigateResult } from '@tanstack/react-router';
+import type { NavConfig, NavItem } from '@template/ui/components/layout/navigationTypes';
+import type { RouteMatch } from '@template/ui/lib/findRoute';
 import { createTestStore } from '@template/ui/test';
 
 describe('navigation slice', () => {
@@ -34,7 +37,7 @@ describe('navigation slice', () => {
     it('should set the navigate function', () => {
       const mockNavigate = mock(() => {});
 
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       expect(store.getState().navigation.navigate).toBeDefined();
       expect(typeof store.getState().navigation.navigate).toBe('function');
@@ -43,7 +46,7 @@ describe('navigation slice', () => {
 
   describe('setNavConfig', () => {
     it('should set the nav config', () => {
-      const mockConfig = { items: [] } as any;
+      const mockConfig: NavConfig = { user: [], organization: [], space: [] };
 
       store.getState().navigation.setNavConfig(mockConfig);
 
@@ -53,7 +56,7 @@ describe('navigation slice', () => {
 
   describe('setCurrentRouteMatch', () => {
     it('should set the current route match', () => {
-      const mockMatch = { path: '/dashboard', params: {} } as any;
+      const mockMatch = { fullPath: '/dashboard', params: {}, item: {} as NavItem, chain: [] } as RouteMatch;
 
       store.getState().navigation.setCurrentRouteMatch(mockMatch);
 
@@ -61,7 +64,7 @@ describe('navigation slice', () => {
     });
 
     it('should allow setting to null', () => {
-      const mockMatch = { path: '/dashboard', params: {} } as any;
+      const mockMatch = { fullPath: '/dashboard', params: {}, item: {} as NavItem, chain: [] } as RouteMatch;
 
       store.getState().navigation.setCurrentRouteMatch(mockMatch);
       expect(store.getState().navigation.currentRouteMatch).toBe(mockMatch);
@@ -81,7 +84,7 @@ describe('navigation slice', () => {
 
     it('should call navigate when set', () => {
       const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       store.getState().navigation.navigatePreservingContext('/dashboard');
 
@@ -90,7 +93,7 @@ describe('navigation slice', () => {
 
     it('should parse path without search params', () => {
       const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       store.getState().navigation.navigatePreservingContext('/dashboard');
 
@@ -102,7 +105,7 @@ describe('navigation slice', () => {
 
     it('should handle paths with hash', () => {
       const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       store.getState().navigation.navigatePreservingContext('/dashboard#section');
 
@@ -122,7 +125,7 @@ describe('navigation slice', () => {
 
     it('should call navigate when set', () => {
       const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       store.getState().navigation.navigatePreservingSpoof('/dashboard');
 
@@ -131,7 +134,7 @@ describe('navigation slice', () => {
 
     it('should preserve spoof from auth state', () => {
       const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as any);
+      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
       store.setState({
         auth: {

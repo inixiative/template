@@ -342,10 +342,7 @@ describe('buildWhereClause', () => {
       });
 
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'john', mode: 'insensitive' } },
-          { email: { endsWith: '@example.com' } },
-        ],
+        AND: [{ name: { contains: 'john', mode: 'insensitive' } }, { email: { endsWith: '@example.com' } }],
       });
     });
 
