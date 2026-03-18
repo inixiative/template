@@ -1,8 +1,9 @@
-import * as Sentry from '@sentry/bun';
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
+import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { errorReporter } from '#/lib/errorReporter';
 import { AppError, makeError } from '#/lib/errors';
 import { ResponseValidationError } from '#/lib/utils/makeController';
 import { formatZodIssues } from '#/middleware/error/formatZodIssues';
@@ -37,15 +38,13 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
 
   if (err instanceof HTTPException) {
     if (err.status >= 500) {
-      Sentry.captureException(err, { extra: { statusCode: err.status, path: c.req.path, method: c.req.method } });
-      if (process.env.NODE_ENV === 'test') log.error('Error in handler:', err);
+      errorReporter.captureException(err, { extra: { statusCode: err.status, path: c.req.path, method: c.req.method } });
+      if (isTest) log.error('Error in handler:', err);
       if (err instanceof AppError) err.requestId = c.get('requestId');
     }
     return err.getResponse();
   }
 
-  if (process.env.NODE_ENV !== 'test') {
-    Sentry.captureException(err, { extra: { path: c.req.path, method: c.req.method } });
-  }
+  errorReporter.captureException(err, { extra: { path: c.req.path, method: c.req.method } });
   return respond500(c, err);
 };

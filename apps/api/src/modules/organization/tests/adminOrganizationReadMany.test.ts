@@ -82,15 +82,13 @@ describe('GET /api/admin/organization', () => {
     expect(data.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('filters by simple search', async () => {
-    const response = await fetch(get('/api/admin/organization?search=apple'));
+  it('filters by name field search', async () => {
+    const response = await fetch(get('/api/admin/organization?searchFields[name]=apple'));
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
-    expect(
-      data.every((org) => org.name.toLowerCase().includes('apple') || org.slug.toLowerCase().includes('apple')),
-    ).toBe(true);
+    expect(data.every((org) => org.name.toLowerCase().includes('apple'))).toBe(true);
   });
 
   it('filters by advanced search on specific field', async () => {
@@ -102,19 +100,17 @@ describe('GET /api/admin/organization', () => {
     expect(data.every((org) => org.name.toLowerCase().includes('banana'))).toBe(true);
   });
 
-  it('combines search with filters', async () => {
-    const response = await fetch(get('/api/admin/organization?search=cherry&deleted=false'));
+  it('combines searchFields with filters', async () => {
+    const response = await fetch(get('/api/admin/organization?searchFields[name]=cherry&deleted=false'));
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
     expect(data.length).toBeGreaterThan(0);
-    expect(
-      data.every((org) => org.name.toLowerCase().includes('cherry') || org.slug.toLowerCase().includes('cherry')),
-    ).toBe(true);
+    expect(data.every((org) => org.name.toLowerCase().includes('cherry'))).toBe(true);
   });
 
-  it('combines orderBy with search', async () => {
-    const response = await fetch(get('/api/admin/organization?search=a&orderBy=name:asc'));
+  it('combines orderBy with searchFields', async () => {
+    const response = await fetch(get('/api/admin/organization?searchFields[name]=a&orderBy=name:asc'));
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
@@ -123,12 +119,12 @@ describe('GET /api/admin/organization', () => {
     expect(names).toEqual(sortedNames);
   });
 
-  it('rejects invalid searchFields (not in searchableFields whitelist)', async () => {
+  it('rejects invalid searchFields (not a valid db field)', async () => {
     const response = await fetch(get('/api/admin/organization?searchFields[invalidField]=test'));
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
     const { message } = await response.json();
-    expect(message).toContain("Field 'invalidField' is not searchable");
+    expect(message).toContain('Invalid query parameters');
   });
 
   it('filters by multiple valid searchFields', async () => {

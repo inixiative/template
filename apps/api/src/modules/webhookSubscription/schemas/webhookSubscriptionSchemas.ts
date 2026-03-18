@@ -1,6 +1,6 @@
-import { WebhookSubscriptionScalarSchema } from '@template/db';
+import { WebhookSubscriptionScalarInputSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 
-export const webhookSubscriptionCreateBodySchema = WebhookSubscriptionScalarSchema.pick({
+export const webhookSubscriptionCreateBodySchema = WebhookSubscriptionScalarInputSchema.pick({
   model: true,
   url: true,
 });

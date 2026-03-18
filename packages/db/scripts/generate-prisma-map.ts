@@ -24,4 +24,3 @@ export const prismaMap = ${JSON.stringify(sortedPrismaMap, null, 2)} as const;
 `;
 
 writeFileSync(outFile, output);
-console.log(`Generated Prisma map: ${outFile}`);

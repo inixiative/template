@@ -1,4 +1,4 @@
-import { OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
+import { OrganizationScalarInputSchema, OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';
 import { validateUser } from '#/middleware/validations/validateUser';
 import { Modules } from '#/modules/modules';
@@ -9,7 +9,7 @@ const responseSchema = OrganizationScalarSchema.extend({
 
 export const organizationCreateRoute = createRoute({
   model: Modules.organization,
-  bodySchema: OrganizationScalarSchema.pick({ name: true, slug: true }),
+  bodySchema: OrganizationScalarInputSchema.pick({ name: true, slug: true }),
   responseSchema,
   middleware: [validateUser],
 });

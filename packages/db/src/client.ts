@@ -5,7 +5,6 @@ import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLife
 import { PrismaClient } from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
-import { Pool } from 'pg';
 
 type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -21,8 +20,7 @@ const store = new AsyncLocalStorage<StoreData>();
 let __raw: Db | null = null;
 
 const createClient = (): Db => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter, log: ['error'] });
   // You would add read replicas here via additional $extends
   return prisma.$extends(mutationLifeCycleExtension()) as unknown as Db;
