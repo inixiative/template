@@ -26,6 +26,12 @@ export const validateInquiryIsResolvable = (inquiry: Inquiry): void => {
     throw makeError({ status: 400, message: 'Inquiry must be sent or changes requested' });
 };
 
+// expiresAt is in the past
+export const validateInquiryNotExpired = (inquiry: Inquiry): void => {
+  if (inquiry.expiresAt && inquiry.expiresAt < new Date())
+    throw makeError({ status: 410, message: 'Inquiry has expired' });
+};
+
 // not yet resolved or canceled
 export const validateInquiryIsCancelable = (inquiry: Inquiry): void => {
   const terminal: InquiryStatus[] = [InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.canceled];

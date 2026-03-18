@@ -2,6 +2,7 @@ import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -26,11 +27,14 @@ export const resolveInquiry = async (
       approvalOutput = (await handler.handleApprove(db, inquiry, merged)) ?? {};
     }
 
+    const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(inquiry.type) : null;
+
     return db.inquiry.update({
       where: { id: inquiry.id },
       data: {
         status,
         resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
+        expiresAt,
       },
     });
   });

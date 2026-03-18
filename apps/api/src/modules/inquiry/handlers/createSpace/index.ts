@@ -47,6 +47,7 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   contentSchema: spaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema,
+  defaultExpirationDays: 90,
   validate,
   handleApprove: async (db, inquiry, content) => {
     const space = await db.space.create({
