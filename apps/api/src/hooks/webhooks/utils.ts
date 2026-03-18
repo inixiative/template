@@ -1,9 +1,12 @@
-import type { FlexibleRef, WebhookModel } from '@template/db';
+import {
+  type FlexibleRef,
+  type WebhookModel,
+  webhookEnabledModels,
+  webhookIgnoredFields,
+  webhookModelSubscribers,
+  webhookRelatedModels,
+} from '@template/db';
 import { isEqual, omit } from 'lodash-es';
-import { webhookEnabledModels } from '#/hooks/webhooks/constants/enabledModels';
-import { webhookIgnoredFields } from '#/hooks/webhooks/constants/ignoredFields';
-import { webhookModelSubscribers } from '#/hooks/webhooks/constants/ownerAllowedModels';
-import { webhookRelatedModels } from '#/hooks/webhooks/constants/relatedModels';
 
 let __enabledModelsSet = new Set<WebhookModel>(webhookEnabledModels);
 
