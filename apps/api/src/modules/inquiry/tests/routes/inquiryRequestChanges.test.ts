@@ -61,6 +61,27 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
     expect(data.status).toBe(InquiryStatus.changesRequested);
   });
 
+  it('rejects requesting changes on an expired inquiry', async () => {
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: targetUser.id,
+      content: { organizationId: org.id, role: 'member' },
+      expiresAt: new Date('2020-01-01'),
+    });
+
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        status: InquiryStatus.changesRequested,
+        explanation: 'Too late',
+      }),
+    );
+    expect(response.status).toBe(410);
+  });
+
   it('resets expiresAt when changes are requested', async () => {
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,

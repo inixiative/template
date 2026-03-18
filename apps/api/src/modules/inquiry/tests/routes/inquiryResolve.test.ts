@@ -75,7 +75,7 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.status).toBe(InquiryStatus.denied);
   });
 
-  it('rejects resolving an expired inquiry', async () => {
+  it('rejects resolving an expired inquiry with approved', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -90,6 +90,24 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    expect(response.status).toBe(410);
+  });
+
+  it('rejects resolving an expired inquiry with denied', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+      expiresAt: new Date('2020-01-01'),
+    });
+
+    const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
+    const response = await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
     expect(response.status).toBe(410);
   });
 

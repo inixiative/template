@@ -54,6 +54,26 @@ describe('DELETE /api/v1/inquiry/:id', () => {
     expect(response.status).toBe(204);
   });
 
+  it('clears expiresAt when canceling an expiring inquiry', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+      expiresAt: new Date('2099-01-01'),
+    });
+
+    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}`));
+    expect(response.status).toBe(204);
+
+    const updated = await db.inquiry.findUnique({ where: { id: inquiry.id } });
+    expect(updated?.expiresAt).toBeNull();
+  });
+
   it('rejects canceling an already resolved inquiry', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({

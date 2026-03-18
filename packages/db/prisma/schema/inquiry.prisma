@@ -7,6 +7,7 @@ model Inquiry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sentAt    DateTime?
+  expiresAt DateTime?
 
   type   InquiryType
   status InquiryStatus @default(draft)
@@ -43,9 +44,6 @@ model Inquiry {
   @@index([targetOrganizationId])
   @@index([targetSpaceId])
   @@index([type, status])
-
-  expiresAt DateTime?
-
   @@index([expiresAt])
 
   // ==========================================================================
