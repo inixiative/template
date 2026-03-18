@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { filterIgnoredFields, getIgnoreFields, HOOK_IGNORE_FIELDS } from '@template/db/lib/hooks';
+import { filterIgnoredFields, getIgnoreFields, HOOK_IGNORE_FIELDS } from '@template/db/registries';
 
 describe('ignoreFields', () => {
   describe('HOOK_IGNORE_FIELDS', () => {
