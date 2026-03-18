@@ -87,7 +87,6 @@ export type { RuntimeDataModel, RuntimeField, RuntimeModel } from './utils/runti
 export { getModelRelations, getRuntimeDataModel } from './utils/runtimeDataModel';
 
 // Hook shared utilities (ignore fields, redact fields)
-export * from './lib/hooks';
 
 // For model types: import from @template/db/client or @template/db/models
 // For runtime enum values: import from @template/db/enums
