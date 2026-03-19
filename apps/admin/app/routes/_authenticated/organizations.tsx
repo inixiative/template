@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { OrganizationsPage } from '@template/ui/pages';
+import { redirectPreservingContext } from '@template/ui/lib';
 
 export const Route = createFileRoute('/_authenticated/organizations')({
-  component: OrganizationsPage,
+  beforeLoad: (context) => {
+    if (context.location.pathname === '/organizations') {
+      redirectPreservingContext(context, '/organizations/mine');
+    }
+  },
 });

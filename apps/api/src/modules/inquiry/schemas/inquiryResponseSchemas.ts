@@ -10,18 +10,18 @@ export const inquiryResponseSchema = InquiryScalarSchema.extend({
   targetOrganization: OrganizationScalarSchema.nullable(),
   targetSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),
-});
+}).openapi('InquiryItem');
 
 export const inquirySentResponseSchema = InquiryScalarSchema.extend({
   targetUser: UserScalarSchema.nullable(),
   targetOrganization: OrganizationScalarSchema.nullable(),
   targetSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),
-});
+}).openapi('InquirySentItem');
 
 export const inquiryReceivedResponseSchema = InquiryScalarSchema.extend({
   sourceUser: UserScalarSchema.nullable(),
   sourceOrganization: OrganizationScalarSchema.nullable(),
   sourceSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),
-});
+}).openapi('InquiryReceivedItem');

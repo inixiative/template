@@ -78,6 +78,26 @@ describe('POST /api/v1/inquiry/:id/send', () => {
     expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('returns target relations but not source relations in response', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const { data } = await json<Record<string, unknown>>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.targetUser).toBeDefined();
+    expect(data.sourceOrganization).toBeUndefined();
+  });
+
   it('rejects sending an already sent inquiry', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({

@@ -5,4 +5,8 @@ export const organizationsItem: NavItem = {
   label: 'Organizations',
   path: '/organizations',
   icon: Building2,
+  items: [
+    { label: 'My Organizations', path: '/mine' },
+    { label: 'Invitations', path: '/invitations' },
+  ],
 };

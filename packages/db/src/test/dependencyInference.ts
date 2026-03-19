@@ -3,7 +3,7 @@ import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes
 import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 import type { ZodObject, ZodTypeAny } from 'zod';
 
-const zodSchemas = zodSchemasNs as Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined>;
+const zodSchemas = zodSchemasNs as unknown as Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined>;
 
 const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
   zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;

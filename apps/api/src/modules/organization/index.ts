@@ -7,7 +7,7 @@ export const organizationRouter = new OpenAPIHono<AppEnv>();
 
 organizationRouter.use('*', validateActor);
 
-await autoRegisterRoutes(organizationRouter, import.meta.dirname);
+await autoRegisterRoutes(organizationRouter, import.meta.dirname, { skip: ['organizationCreateOrganizationUser'] });
 
 export const adminOrganizationRouter = new OpenAPIHono<AppEnv>();
 

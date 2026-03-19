@@ -1,0 +1,91 @@
+import { type InquirySentItem, organizationSentManyInquiries, organizationSentManyInquiriesQueryKey } from '@template/ui/apiClient';
+import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { InquirySourceControls } from '@template/ui/components/inquiries';
+import { useQuery } from '@template/ui/hooks';
+import { apiQuery } from '@template/ui/lib/apiQuery';
+import type { InquiryStatus } from '@template/ui/lib/inquiryQueryKeys';
+
+const STATUS_COLORS: Record<InquiryStatus, string> = {
+  draft: 'bg-gray-100 text-gray-700',
+  sent: 'bg-blue-100 text-blue-700',
+  changesRequested: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-green-100 text-green-700',
+  denied: 'bg-red-100 text-red-700',
+  canceled: 'bg-gray-100 text-gray-700',
+};
+
+type OrganizationSpaceApplicationsPageProps = {
+  organizationId: string;
+};
+
+export const OrganizationSpaceApplicationsPage = ({ organizationId }: OrganizationSpaceApplicationsPageProps) => {
+  const { data } = useQuery({
+    queryKey: organizationSentManyInquiriesQueryKey({ path: { id: organizationId } }),
+    queryFn: apiQuery((opts: Parameters<typeof organizationSentManyInquiries>[0]) =>
+      organizationSentManyInquiries({ ...opts, path: { id: organizationId } }),
+    ),
+  });
+
+  const applications = (data?.data ?? []).filter((inq) => inq.type === 'createSpace');
+
+  const columns = [
+    {
+      key: 'name',
+      label: 'Space Name',
+      render: (inq: InquirySentItem) => {
+        const content = inq.content as { name?: string; slug?: string } | null | undefined;
+        return content?.name ?? '—';
+      },
+    },
+    {
+      key: 'slug',
+      label: 'Slug',
+      render: (inq: InquirySentItem) => {
+        const content = inq.content as { name?: string; slug?: string } | null | undefined;
+        return content?.slug ?? '—';
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (inq: InquirySentItem) => {
+        const isExpired = inq.expiresAt && new Date(inq.expiresAt) < new Date();
+        const label = isExpired ? 'expired' : inq.status;
+        const color = isExpired ? STATUS_COLORS.canceled : STATUS_COLORS[inq.status];
+        return (
+          <Badge className={color}>
+            <span className="capitalize">{label}</span>
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'sentAt',
+      label: 'Sent',
+      render: (inq: InquirySentItem) => (inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'),
+    },
+    {
+      key: 'actions',
+      label: '',
+      render: (inq: InquirySentItem) => <InquirySourceControls inquiry={inq} />,
+    },
+  ];
+
+  return (
+    <div className="p-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Space Applications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table
+            columns={columns}
+            data={applications}
+            keyExtractor={(inq) => inq.id}
+            emptyMessage="No space applications"
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

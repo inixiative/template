@@ -1,6 +1,6 @@
 import type { NavItem } from '@template/ui/components';
 import { getContextParams } from '@template/ui/lib';
-import { Key, Settings, ShieldCheck, User, Webhook } from 'lucide-react';
+import { ArrowRightLeft, Key, RefreshCw, Settings, ShieldCheck, User, Webhook } from 'lucide-react';
 
 export const settingsItem: NavItem = {
   label: 'Settings',
@@ -32,6 +32,20 @@ export const settingsItem: NavItem = {
       icon: ShieldCheck,
       access: (permissions, context) =>
         !!context.organization && permissions.check(...getContextParams(context), 'own'),
+    },
+    {
+      label: 'Update',
+      path: '/update',
+      icon: RefreshCw,
+      access: (permissions, context) => !!context.space && permissions.check(...getContextParams(context), 'manage'),
+    },
+    {
+      label: 'Transfer',
+      path: '/transfer',
+      icon: ArrowRightLeft,
+      access: (permissions, context) =>
+        !!context.space && !!context.organization &&
+        permissions.check(...getContextParams({ type: 'organization', organization: context.organization }), 'own'),
     },
   ],
 };

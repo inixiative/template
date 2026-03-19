@@ -1,9 +1,8 @@
-import type { Role } from '@template/db/generated/client/enums';
+import { useMutation } from '@tanstack/react-query';
 import {
-  type OrganizationCreateOrganizationUserData,
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,
-  organizationCreateOrganizationUser,
+  organizationCreateInquiry,
   organizationReadManyUsers,
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
@@ -11,6 +10,7 @@ import {
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
+import type { HydratedRecord } from '@template/db';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -24,10 +24,30 @@ type OrganizationUsersPageProps = {
   organizationId: string;
 };
 
+const ALL_INVITE_ROLES = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'owner', label: 'Owner' },
+];
+
 export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageProps) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
+
+  // Filter roles to only those the current actor can invite via inquiry.send permission.
+  // REBAC checks content.role against highRoles to determine if own vs manage is required.
+  const inviteRoles = ALL_INVITE_ROLES.filter(({ value }) =>
+    checkPermission(permissions, 'inquiry', {
+      id: '',
+      type: 'inviteOrganizationUser',
+      content: { role: value },
+      sourceOrganization: { id: organizationId } as HydratedRecord,
+      sourceOrganizationId: organizationId,
+      sourceSpaceId: '',
+      targetOrganizationId: '',
+    } as unknown as HydratedRecord, 'send'),
+  );
   const _queryClient = useAppStore((state) => state.client);
 
   const { data, isLoading } = useQuery({
@@ -46,20 +66,8 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     operation: 'delete',
   });
 
-  const createMutation = useOptimisticListMutation<
-    OrganizationUser,
-    Omit<OrganizationCreateOrganizationUserData, 'url'>
-  >({
-    mutationFn: async (vars) => {
-      const result = await apiMutation((requestOptions: Parameters<typeof organizationCreateOrganizationUser>[0]) =>
-        organizationCreateOrganizationUser(requestOptions),
-      )(vars);
-      // Special case: API returns { user, ...organizationUser } but we need { ...user, organizationUser }
-      const { user, ...organizationUser } = result.data!;
-      return { data: { ...user, organizationUser }, request: result.request, response: result.response };
-    },
-    queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
-    operation: 'create',
+  const inviteMutation = useMutation({
+    mutationFn: apiMutation((vars: Parameters<typeof organizationCreateInquiry>[0]) => organizationCreateInquiry(vars)),
   });
 
   const columns = [
@@ -106,9 +114,15 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   ];
 
   const handleInvite = (email: string, role: string) => {
-    createMutation.mutate({
+    inviteMutation.mutate({
       path: { id: organizationId },
-      body: { email, role: role as Role },
+      body: {
+        type: 'inviteOrganizationUser',
+        status: 'sent',
+        content: { email, role },
+        targetModel: 'User',
+        targetEmail: email,
+      },
     });
     setIsInviteModalOpen(false);
   };
@@ -130,7 +144,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
             </div>
             <Button
               onClick={() => setIsInviteModalOpen(true)}
-              show={organization ? checkPermission(permissions, 'organization', organization, 'assign') : false}
+              show={inviteRoles.length > 0}
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Invite User
@@ -152,6 +166,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
         onClose={() => setIsInviteModalOpen(false)}
         onSubmit={handleInvite}
         title="Invite User to Organization"
+        roles={inviteRoles}
       />
     </>
   );

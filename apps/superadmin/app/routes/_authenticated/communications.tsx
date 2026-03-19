@@ -1,15 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ComingSoon } from '@template/ui/components';
-
-const CommunicationsPage = () => {
-  return (
-    <ComingSoon
-      title="Platform Communications"
-      description="Platform-wide email templates and notification settings are not wired yet."
-    />
-  );
-};
+import { redirectPreservingContext } from '@template/ui/lib';
 
 export const Route = createFileRoute('/_authenticated/communications')({
-  component: CommunicationsPage,
+  beforeLoad: (context) => {
+    if (context.location.pathname === '/communications') {
+      redirectPreservingContext(context, '/communications/inquiries/platform');
+    }
+  },
 });

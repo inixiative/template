@@ -43,6 +43,8 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   resolutionSchema: baseResolutionInputSchema,
   defaultExpirationDays: 90,
   validate,
+  autoApprove: async () => false,
+
   handleApprove: async (db, inquiry, content) => {
     await db.space.update({
       where: { id: inquiry.sourceSpaceId as SpaceId },

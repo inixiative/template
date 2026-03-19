@@ -7,4 +7,8 @@ export const spacesItem: NavItem = {
   path: '/spaces',
   icon: FolderKanban,
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    { label: 'Applications', path: '/applications' },
+    { label: 'Incoming Transfers', path: '/incomingTransfers' },
+  ],
 };

@@ -59,7 +59,7 @@ export const Table = <T,>({
               >
                 {columns.map((column) => (
                   <td key={column.key} className="px-4 py-3 text-sm">
-                    {column.render ? column.render(item) : (item as Record<string, unknown>)[column.key]}
+                    {column.render ? column.render(item) : ((item as Record<string, unknown>)[column.key] as React.ReactNode)}
                   </td>
                 ))}
               </tr>

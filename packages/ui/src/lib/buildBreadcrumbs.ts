@@ -42,7 +42,7 @@ export const buildBreadcrumbs = (
     if (item.breadcrumbLabel && pageContext) {
       const recordKey = Object.keys(pageContext).find((key) => item.label.toLowerCase().includes(key.toLowerCase()));
       if (recordKey && pageContext[recordKey]) {
-        label = item.breadcrumbLabel(pageContext[recordKey]);
+        label = item.breadcrumbLabel(pageContext[recordKey] as Record<string, unknown>);
       }
     }
 
