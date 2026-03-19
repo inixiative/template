@@ -1,4 +1,8 @@
-import { type InquiryReceivedItem, meReceivedManyInquiries, meReceivedManyInquiriesQueryKey } from '@template/ui/apiClient';
+import {
+  type InquiryReceivedItem,
+  meReceivedManyInquiries,
+  meReceivedManyInquiriesQueryKey,
+} from '@template/ui/apiClient';
 import { Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';

@@ -1,4 +1,8 @@
-import { type InquirySentItem, organizationSentManyInquiries, organizationSentManyInquiriesQueryKey } from '@template/ui/apiClient';
+import {
+  type InquirySentItem,
+  organizationSentManyInquiries,
+  organizationSentManyInquiriesQueryKey,
+} from '@template/ui/apiClient';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';

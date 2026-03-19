@@ -1,7 +1,7 @@
 import {
+  type AdminInquiryReadManyResponses,
   adminInquiryReadMany,
   adminInquiryReadManyQueryKey,
-  type AdminInquiryReadManyResponses,
 } from '@template/ui/apiClient';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { useQuery } from '@template/ui/hooks';

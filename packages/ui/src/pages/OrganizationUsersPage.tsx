@@ -1,4 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
+import type { HydratedRecord } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 import {
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,
@@ -10,7 +12,6 @@ import {
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
-import type { HydratedRecord } from '@template/db';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -24,12 +25,6 @@ type OrganizationUsersPageProps = {
   organizationId: string;
 };
 
-const ALL_INVITE_ROLES = [
-  { value: 'member', label: 'Member' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'owner', label: 'Owner' },
-];
-
 export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageProps) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const permissions = useAppStore((state) => state.permissions);
@@ -37,16 +32,21 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
 
   // Filter roles to only those the current actor can invite via inquiry.send permission.
   // REBAC checks content.role against highRoles to determine if own vs manage is required.
-  const inviteRoles = ALL_INVITE_ROLES.filter(({ value }) =>
-    checkPermission(permissions, 'inquiry', {
-      id: '',
-      type: 'inviteOrganizationUser',
-      content: { role: value },
-      sourceOrganization: { id: organizationId } as HydratedRecord,
-      sourceOrganizationId: organizationId,
-      sourceSpaceId: '',
-      targetOrganizationId: '',
-    } as unknown as HydratedRecord, 'send'),
+  const inviteRoles = (Object.values(Role) as Role[]).filter((role) =>
+    checkPermission(
+      permissions,
+      'inquiry',
+      {
+        id: '',
+        type: 'inviteOrganizationUser',
+        content: { role },
+        sourceOrganization: { id: organizationId } as HydratedRecord,
+        sourceOrganizationId: organizationId,
+        sourceSpaceId: '',
+        targetOrganizationId: '',
+      } as unknown as HydratedRecord,
+      'send',
+    ),
   );
   const _queryClient = useAppStore((state) => state.client);
 
@@ -127,7 +127,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     setIsInviteModalOpen(false);
   };
 
-  const organization = tenant.context.organization;
+  const _organization = tenant.context.organization;
 
   if (isLoading) {
     return <div className="p-8">Loading...</div>;
@@ -142,10 +142,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               <CardTitle>Organization Users</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">Manage users and their roles in this organization</p>
             </div>
-            <Button
-              onClick={() => setIsInviteModalOpen(true)}
-              show={inviteRoles.length > 0}
-            >
+            <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
               <UserPlus className="h-4 w-4 mr-2" />
               Invite User
             </Button>

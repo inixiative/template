@@ -18,12 +18,11 @@ import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@templat
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { INQUIRY_STATUS_COLORS, INQUIRY_TYPE_LABELS, type InquiryStatus, type InquiryType } from '@template/ui/lib/inquiryQueryKeys';
+import { INQUIRY_STATUS_COLORS, INQUIRY_TYPE_LABELS, type InquiryStatus } from '@template/ui/lib/inquiryQueryKeys';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
 
 type Row = InquirySentItem | InquiryReceivedItem;
-
 
 const getEntityLabel = (inq: Row, direction: 'sent' | 'received'): string => {
   if (direction === 'received') {

@@ -22,7 +22,7 @@
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1 src/test/",
-    "db:generate": "PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 prisma generate > /dev/null 2>&1 && bun run scripts/generate-scalar-schemas.ts && bun run scripts/generate-prisma-map.ts && echo $(date) > .prisma.gen",
+    "db:generate": "PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 prisma generate > /dev/null 2>&1 && bun run scripts/generateScalarSchemas.ts && bun run scripts/generatePrismaMap.ts && echo $(date) > .prisma.gen",
     "db:push": "prisma db push",
     "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",
     "db:migrate": "prisma migrate dev",

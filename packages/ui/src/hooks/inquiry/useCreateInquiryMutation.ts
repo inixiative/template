@@ -1,9 +1,9 @@
 import type { QueryKey } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
+import { useInquirySendEffects } from '@template/ui/hooks/inquiry/useInquirySendEffects';
+import { useMutation } from '@template/ui/hooks/useQuery';
 import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
 import { sourceMutations } from '@template/ui/lib/inquiryQueryKeys';
-import { useMutation } from '@template/ui/hooks/useQuery';
-import { useInquirySendEffects } from '@template/ui/hooks/inquiry/useInquirySendEffects';
 
 type CreateVars = {
   inquiry: Omit<InquiryMeta, 'id'>;

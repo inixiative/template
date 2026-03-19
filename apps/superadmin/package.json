@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "local": "vite",
-    "generate:routes": "bun ./scripts/generate-route-tree.ts",
+    "generate:routes": "bun ./scripts/generateRouteTree.ts",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "biome check app",

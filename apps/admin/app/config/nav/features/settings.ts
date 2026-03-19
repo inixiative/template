@@ -44,7 +44,8 @@ export const settingsItem: NavItem = {
       path: '/transfer',
       icon: ArrowRightLeft,
       access: (permissions, context) =>
-        !!context.space && !!context.organization &&
+        !!context.space &&
+        !!context.organization &&
         permissions.check(...getContextParams({ type: 'organization', organization: context.organization }), 'own'),
     },
   ],

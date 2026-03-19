@@ -1,3 +1,12 @@
+export {
+  useCancelInquiryMutation,
+  useCreateInquiryMutation,
+  useInquiryResolutionEffects,
+  useInquirySendEffects,
+  useResolveInquiryMutation,
+  useSendInquiryMutation,
+  useUpdateInquiryMutation,
+} from './inquiry';
 export { type AppEventPayload, useAppEvents } from './useAppEvents';
 export { useAuthenticatedRouting } from './useAuthenticatedRouting';
 export { type AuthProvider, useAuthProviders } from './useAuthProviders';
@@ -15,21 +24,12 @@ export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
-export {
-  useCancelInquiryMutation,
-  useCreateInquiryMutation,
-  useInquiryResolutionEffects,
-  useInquirySendEffects,
-  useResolveInquiryMutation,
-  useSendInquiryMutation,
-  useUpdateInquiryMutation,
-} from './inquiry';
+export { useInquiryPermission } from './useInquiryPermission';
 export { useLanguage } from './useLanguage';
 export { useMediaQuery } from './useMediaQuery';
 export { useOptimisticListMutation, useOptimisticMutation } from './useOptimisticMutation';
 export { usePageMeta } from './usePageMeta';
 export { checkPermission, usePermission } from './usePermission';
-export { useInquiryPermission } from './useInquiryPermission';
 export { useMutation, useQuery } from './useQuery';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useThemePersistence } from './useThemePersistence';

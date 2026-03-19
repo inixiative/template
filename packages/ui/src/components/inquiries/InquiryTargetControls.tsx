@@ -2,8 +2,7 @@ import type { InquiryReceivedItem } from '@template/ui/apiClient';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';
 import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
-
-const TERMINAL_STATUSES = ['approved', 'denied', 'canceled'];
+import { isTerminalInquiry } from '@template/ui/lib/inquiryQueryKeys';
 
 type InquiryTargetControlsProps = {
   inquiry: InquiryReceivedItem;
@@ -12,11 +11,11 @@ type InquiryTargetControlsProps = {
 
 export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetControlsProps) => {
   const resolveMutation = useResolveInquiryMutation();
-  const hasPermission = useInquiryPermission(inquiry, 'resolve');
+  const hasPermission = useInquiryPermission(inquiry, 'resolve', 'target');
 
-  const isExpired = !!inquiry.expiresAt && new Date(inquiry.expiresAt) < new Date();
-  const isTerminal = TERMINAL_STATUSES.includes(inquiry.status) || isExpired;
+  const isTerminal = isTerminalInquiry(inquiry);
   const canResolve = !isTerminal && (inquiry.status === 'sent' || inquiry.status === 'changesRequested');
+  const isPersistedInquiry = !!inquiry.id && inquiry.id !== '__optimistic__';
 
   return (
     <div className="flex justify-end gap-2">
@@ -24,7 +23,7 @@ export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetCon
         variant="outline"
         size={size}
         show={canResolve}
-        disabled={!hasPermission}
+        disabled={!isPersistedInquiry || !hasPermission}
         onClick={() => resolveMutation.mutate({ inquiry, status: 'approved' })}
       >
         Approve
@@ -33,7 +32,7 @@ export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetCon
         variant="outline"
         size={size}
         show={canResolve}
-        disabled={!hasPermission}
+        disabled={!isPersistedInquiry || !hasPermission}
         onClick={() => resolveMutation.mutate({ inquiry, status: 'denied' })}
       >
         Decline

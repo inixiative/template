@@ -27,6 +27,13 @@ export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = 
   expired: 'bg-gray-100 text-gray-700',
 };
 
+export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
+
+export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
+  if (INQUIRY_TERMINAL_STATUSES.includes(inq.status)) return true;
+  if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
+  return false;
+};
 
 export type InquiryMeta = {
   id: string;
@@ -49,7 +56,5 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   inviteOrganizationUser: (_inq) => [meReceivedManyInquiriesQueryKey()],
   createSpace: (_inq) => [],
   updateSpace: (_inq) => [],
-  transferSpace: (inq) => [
-    organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } }),
-  ],
+  transferSpace: (inq) => [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })],
 };

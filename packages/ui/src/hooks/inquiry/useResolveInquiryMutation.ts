@@ -1,11 +1,11 @@
 import type { QueryKey } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { inquiryResolve } from '@template/ui/apiClient';
+import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
+import { useMutation } from '@template/ui/hooks/useQuery';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
 import { targetMutations } from '@template/ui/lib/inquiryQueryKeys';
-import { useMutation } from '@template/ui/hooks/useQuery';
-import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
 
 type ResolveVars = {
   inquiry: InquiryMeta;

@@ -1,36 +1,14 @@
-import {
-  type InquirySentItem,
-  spaceCreateInquiry,
-  spaceSentManyInquiries,
-  spaceSentManyInquiriesQueryKey,
-} from '@template/ui/apiClient';
+import type { HydratedRecord } from '@template/db';
+import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/ui/apiClient';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
-import type { HydratedRecord } from '@template/db';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import type { InquiryStatus } from '@template/ui/lib/inquiryQueryKeys';
+import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiryQueryKeys';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { useState } from 'react';
-
-const STATUS_COLORS: Record<InquiryStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  sent: 'bg-blue-100 text-blue-700',
-  changesRequested: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  denied: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-700',
-};
-
-const TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
-
-const isTerminal = (inq: InquirySentItem): boolean => {
-  if (TERMINAL_STATUSES.includes(inq.status)) return true;
-  if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
-  return false;
-};
 
 export const SpaceTransferInquiryPage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
@@ -48,7 +26,7 @@ export const SpaceTransferInquiryPage = () => {
   });
 
   const allInquiries = (data?.data ?? []).filter((inq) => inq.type === 'transferSpace');
-  const activeInquiry = allInquiries.find((inq) => !isTerminal(inq));
+  const activeInquiry = allInquiries.find((inq) => !isTerminalInquiry(inq));
 
   const createMutation = useCreateInquiryMutation();
 
@@ -108,7 +86,7 @@ export const SpaceTransferInquiryPage = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">Status</span>
-              <Badge className={STATUS_COLORS[activeInquiry.status]}>
+              <Badge className={INQUIRY_STATUS_COLORS[activeInquiry.status]}>
                 <span className="capitalize">{activeInquiry.status}</span>
               </Badge>
             </div>
