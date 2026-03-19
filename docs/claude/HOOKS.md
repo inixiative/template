@@ -375,6 +375,15 @@ Nested updates log a warning (can't fetch previous for each nested record withou
 
 ## Immutable Fields
 
+### **Global fields are always immutable**
+
+`id` and `createdAt` are always stripped from updates across all models, regardless of the registry.
+
+```typescript
+// hooks/immutableFields/registry.ts
+const GLOBAL_IMMUTABLE_FIELDS = ['id', 'createdAt'] as const;
+```
+
 ### **FK fields are automatically immutable**
 
 The hook auto-detects all foreign key fields from the Prisma schema and strips them from update data. You don't need to register FK fields manually.

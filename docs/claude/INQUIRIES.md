@@ -19,7 +19,7 @@ model Inquiry {
   resolution Json @default("{}")    // set on resolve (approved/denied)
 
   sentAt    DateTime?  // set once on first send; not cleared when moved back to draft
-  expiresAt DateTime?  // set on send via computeExpiresAt(type); cleared when moved back to draft
+  expiresAt DateTime?  // set on send via computeExpiresAt(type); reset on changesRequested; cleared on terminal status or when moved back to draft
 
   // Source (who sends) — fake polymorphism
   sourceModel          InquiryResourceModel  // admin | User | Organization | Space
@@ -88,7 +88,7 @@ Each source context has its own create endpoint. The source fields (`sourceModel
 | Method | Path | Permission | Description |
 |--------|------|------------|-------------|
 | `GET` | `/api/v1/inquiry/:id` | `read` | Get a single inquiry (all 6 relations included) |
-| `PATCH` | `/api/v1/inquiry/:id` | `send` | Update `content` or `status` (draft only) |
+| `PATCH` | `/api/v1/inquiry/:id` | `send` | Update `content` or `status` (draft, sent, or changesRequested) |
 | `POST` | `/api/v1/inquiry/:id/send` | `send` | Send a draft inquiry |
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
 | `DELETE` | `/api/v1/inquiry/:id` | `send` | Cancel (source only) |
@@ -162,8 +162,10 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
   validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | void>;
+  handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
+  autoApprove(db, inquiry): Promise<boolean>;    // called after send; return true to skip human review; default: async () => false
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
+  defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
 };
 ```
 
@@ -225,12 +227,14 @@ const { role } = resolvedContent; // always from original inquiry.content
 
 ### Current Handlers
 
-| Type | Source | Target | Unique | Side Effect |
-|------|--------|--------|--------|-------------|
-| `inviteOrganizationUser` | Organization | User | `targeted` | Creates `OrganizationUser` |
-| `createSpace` | Organization | admin | — | Creates `Space` under source org |
-| `updateSpace` | Space | admin | `untargeted` | Updates `Space` with content fields |
-| `transferSpace` | Space | Organization | `untargeted` | Sets `Space.organizationId` to target org |
+| Type | Source | Target | Unique | Expiry | Side Effect |
+|------|--------|--------|--------|--------|-------------|
+| `inviteOrganizationUser` | Organization | User | `targeted` | 30 days | Creates `OrganizationUser` |
+| `createSpace` | Organization | admin | — | — | Creates `Space` under source org |
+| `updateSpace` | Space | admin | `untargeted` | — | Updates `Space` with content fields |
+| `transferSpace` | Space | Organization | `untargeted` | — | Sets `Space.organizationId` to target org |
+
+All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
 
 **Send permissions by type:**
 
@@ -250,22 +254,30 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 
 | Schema | Relations included | Used on |
 |--------|--------------------|---------|
-| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read, mutations (update/send/resolve), admin list |
-| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response |
-| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists |
+| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read (`GET /inquiry/:id`), admin list |
+| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response, update, send |
+| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists, resolve |
 
-The list schemas intentionally omit the opposite side's relations to reduce payload size — the sender only needs target data, the receiver only needs source data.
+The schemas are chosen to return only the relations the current side needs — source-side mutations (update, send) include target data; target-side mutations (resolve) include source data; admin/read endpoints include all 6.
 
 ### Standardized includes
 
-All singleton mutation endpoints (update, send, resolve) use `includeInquiryResponse` directly in the Prisma call — one DB round-trip, no separate refetch. The resource context middleware also loads inquiries with `includeInquiryResponse` so `GET /inquiry/:id` needs no DB call at all.
+Each mutation uses the include that matches what its caller needs:
+
+| Endpoint | Prisma include | Why |
+|----------|---------------|-----|
+| `PATCH /inquiry/:id` | `includeInquirySent` | Source is editing; only targets relevant |
+| `POST /inquiry/:id/send` | `includeInquirySent` | Source is sending; only targets relevant |
+| `POST /inquiry/:id/resolve` | `includeInquiryReceived` | Target is resolving; only sources relevant |
+| `GET /inquiry/:id` | `includeInquiryResponse` | Preloaded by resource context middleware — no extra DB call |
+| Admin list | `includeInquiryResponse` | All relations for full audit view |
 
 ## Permissions (ReBAC)
 
 | Action | Who can perform it |
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
-| `send` | Source-side permission (see handler table above) |
+| `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ self: 'sourceUserId' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
 | `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
 
 ## Adding a New Handler
@@ -276,12 +288,14 @@ All singleton mutation endpoints (update, send, resolve) use `includeInquiryResp
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
 3. Implement `handleApprove(db, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
-4. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
-5. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
-6. Register in `handlers/index.ts`
-7. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
-8. Run `bun run db:generate` in `packages/db/`
-9. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`
+4. Implement `autoApprove(db, inquiry)` — called immediately after send; return `true` to resolve as approved without human review. Omit if not needed (the type system requires it; default `async () => false` satisfies it). Future: organizations may configure this via JSON rules stored on the organization record.
+5. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
+6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.
+7. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
+8. Register in `handlers/index.ts`
+9. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
+10. Run `bun run db:generate` in `packages/db/`
+11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `self: 'sourceUserId'` rule block so the source user can cancel/edit/re-send from any context.
 
 ### Status utilities (`validations/validateInquiryStatus.ts`)
 
@@ -303,3 +317,92 @@ if (!check(permix, rebacSchema, 'inquiry', partial, 'send')) throw makeError({ s
 ```
 
 This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high role requires `own`, not just `manage`) without redundant middleware.
+
+## Frontend
+
+### Constants and utilities (`packages/ui/src/lib/inquiryQueryKeys.ts`)
+
+```typescript
+// Backend terminal statuses — does NOT include expiry
+export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
+
+// Frontend terminal check — also treats past-expiresAt as terminal
+export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
+  if (INQUIRY_TERMINAL_STATUSES.includes(inq.status)) return true;
+  if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
+  return false;
+};
+
+// Tailwind class string per status (+ synthetic 'expired' key)
+export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string>;
+
+// Human-readable labels per type
+export const INQUIRY_TYPE_LABELS: Record<InquiryType, string>;
+```
+
+`isTerminalInquiry` differs from `inquiryTerminalStatuses` (backend): the frontend also treats an expired inquiry as terminal so controls disable immediately without a server round-trip.
+
+### Query key invalidation maps
+
+```typescript
+// Keys to invalidate when the SOURCE side mutates (cancel/delete)
+export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+
+// Keys to invalidate when the TARGET side mutates (resolve/approve/deny)
+export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]>;
+```
+
+Each handler that resolves in a list (e.g. `transferSpace` received by an org) must add the relevant query key to `targetMutations` so the list refetches after approval.
+
+### `useInquiryPermission`
+
+```typescript
+// packages/ui/src/hooks/useInquiryPermission.ts
+useInquiryPermission(
+  inquiry: InquirySentItem | InquiryReceivedItem,
+  action: ActionRule,
+  side: 'source' | 'target',
+): boolean
+```
+
+Side-aware permission check. `side` determines which side of the inquiry the current tenant context fills:
+
+- `'source'` — fills `sourceOrganization` / `sourceSpace` from tenant context (used in sent-list views)
+- `'target'` — fills `targetOrganization` / `targetSpace` from tenant context (used in received-list views)
+
+The inquiry object carries the other side's FK data. This is needed because inquiries only partially hydrate relations in list responses (sent = targets only, received = sources only).
+
+### UI Components
+
+#### `InquirySourceControls`
+
+```typescript
+// packages/ui/src/components/inquiries/InquirySourceControls.tsx
+<InquirySourceControls inquiry={InquirySentItem} size? onEdit? />
+```
+
+Renders Edit / Send / Cancel buttons for the source side. Buttons are conditionally shown based on `isTerminalInquiry` and status:
+- **Edit** — visible when not terminal and `onEdit` is provided
+- **Send** — visible when status is `draft` or `changesRequested`
+- **Cancel** — visible when not terminal and status is `sent` or `draft`
+
+All buttons are disabled when `useInquiryPermission(inquiry, 'send', 'source')` is false.
+
+#### `InquiryTargetControls`
+
+```typescript
+// packages/ui/src/components/inquiries/InquiryTargetControls.tsx
+<InquiryTargetControls inquiry={InquiryReceivedItem} size? />
+```
+
+Renders Approve / Decline buttons. Visible when not terminal and status is `sent` or `changesRequested`. Disabled when `useInquiryPermission(inquiry, 'resolve', 'target')` is false.
+
+### Pages
+
+| Page | Location | Description |
+|------|----------|-------------|
+| `InquiriesPage` | `packages/ui/src/pages/InquiriesPage.tsx` | Received inquiries for current user/org context |
+| `AdminInquiriesPage` | `packages/ui/src/pages/AdminInquiriesPage.tsx` | Admin view — all inquiries paginated |
+| `SpaceUpdateInquiryPage` | `packages/ui/src/pages/SpaceUpdateInquiryPage.tsx` | Draft/edit/send a `updateSpace` inquiry |
+| `SpaceTransferInquiryPage` | `packages/ui/src/pages/SpaceTransferInquiryPage.tsx` | Draft/edit/send a `transferSpace` inquiry |
+| `OrganizationSentInvitationsPage` | `packages/ui/src/pages/OrganizationSentInvitationsPage.tsx` | Sent `inviteOrganizationUser` inquiries with status badges |
