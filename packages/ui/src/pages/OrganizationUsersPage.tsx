@@ -48,7 +48,6 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
       'send',
     ),
   );
-  const _queryClient = useAppStore((state) => state.client);
 
   const { data, isLoading } = useQuery({
     queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),

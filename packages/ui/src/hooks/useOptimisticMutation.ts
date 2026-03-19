@@ -87,7 +87,9 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void, 
  * need to optimistically show cached data while fetching fresh updates).
  */
 export const useOptimisticListMutation = <TItem extends { id: string }, TVariables = unknown>(options: {
-  mutationFn: (variables: TVariables) => Promise<{ data: TItem | undefined | void; request: Request; response: Response }>;
+  mutationFn: (
+    variables: TVariables,
+  ) => Promise<{ data: TItem | undefined | void; request: Request; response: Response }>;
   queryKey: QueryKey;
   /** 'create' | 'update' | 'delete' - matches controller naming. TODO: Add 'lookup' for fetching individual items */
   operation: 'create' | 'update' | 'delete';

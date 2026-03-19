@@ -45,8 +45,9 @@ export type ClientInjectedOptions = {
   throwOnError?: boolean;
 };
 
-export type RequestOptionsFor<TVariables extends Record<string, unknown> | undefined | void> =
-  TVariables extends void ? ClientInjectedOptions : TVariables & ClientInjectedOptions;
+export type RequestOptionsFor<TVariables extends Record<string, unknown> | undefined | void> = TVariables extends void
+  ? ClientInjectedOptions
+  : TVariables & ClientInjectedOptions;
 
 /**
  * Internal API fetch function that doesn't depend on the store.

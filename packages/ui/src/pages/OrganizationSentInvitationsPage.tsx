@@ -7,16 +7,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@templat
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import type { InquiryStatus } from '@template/ui/lib/inquiryQueryKeys';
-
-const STATUS_COLORS: Record<InquiryStatus, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  sent: 'bg-blue-100 text-blue-700',
-  changesRequested: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  denied: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-700',
-};
+import { INQUIRY_STATUS_COLORS } from '@template/ui/lib/inquiryQueryKeys';
 
 type OrganizationSentInvitationsPageProps = {
   organizationId: string;
@@ -55,7 +46,7 @@ export const OrganizationSentInvitationsPage = ({ organizationId }: Organization
       render: (inq: InquirySentItem) => {
         const isExpired = inq.expiresAt && new Date(inq.expiresAt) < new Date();
         const label = isExpired ? 'expired' : inq.status;
-        const color = isExpired ? STATUS_COLORS.canceled : STATUS_COLORS[inq.status];
+        const color = isExpired ? INQUIRY_STATUS_COLORS.expired : INQUIRY_STATUS_COLORS[inq.status];
         return (
           <Badge className={color}>
             <span className="capitalize">{label}</span>

@@ -95,10 +95,7 @@ export const rebacSchema: RebacSchema = {
           // Source user can act on their own inquiry (cancel, edit, re-send)
           // Add type strings here when user-sourced inquiry types exist
           {
-            all: [
-              { rule: { field: 'type', operator: Operator.in, value: [] } },
-              { self: 'sourceUserId' },
-            ],
+            all: [{ rule: { field: 'type', operator: Operator.in, value: [] } }, { self: 'sourceUserId' }],
           },
           // inviteOrganizationUser: high roles (owner/admin) require own
           {
