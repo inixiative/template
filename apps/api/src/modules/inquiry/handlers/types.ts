@@ -15,7 +15,7 @@ export type InquiryHandler<
   contentSchema: z.ZodType<TContent>;
   resolutionInputSchema: z.ZodType<TResolutionInput>;
   resolutionSchema: z.ZodType<TResolution>;
-  handleApprove(db: Db, inquiry: Inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined>;
+  handleApprove(db: Db, inquiry: Inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
   validate?(db: Db, inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   /**
    * Called immediately after an inquiry is sent. Return true to automatically

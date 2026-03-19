@@ -45,7 +45,7 @@ export type ClientInjectedOptions = {
   throwOnError?: boolean;
 };
 
-export type RequestOptionsFor<TVariables extends Record<string, unknown> | undefined | undefined> =
+export type RequestOptionsFor<TVariables extends Record<string, unknown> | undefined | void> =
   TVariables extends void ? ClientInjectedOptions : TVariables & ClientInjectedOptions;
 
 /**
@@ -56,7 +56,7 @@ export type RequestOptionsFor<TVariables extends Record<string, unknown> | undef
  * - QueryFunctionContext: Extracts variables from queryKey[1]
  * - Direct vars: Uses them as-is
  */
-export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | undefined | undefined = void>(
+export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | undefined | void = void>(
   fn: (requestOptions: RequestOptionsFor<TVariables>) => Promise<T>,
   options?: {
     token?: string | null;

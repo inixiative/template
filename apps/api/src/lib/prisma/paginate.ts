@@ -77,7 +77,7 @@ export const paginate = async <
   const where = { ...baseWhere, ...searchWhere } as FindManyWhere<T>;
 
   const parsedOrderBy: Record<string, Prisma.SortOrder>[] = rawOrderBy
-    ? parseOrderBy(rawOrderBy)
+    ? (parseOrderBy(rawOrderBy) as Record<string, Prisma.SortOrder>[])
     : findManyOptions.orderBy
       ? Array.isArray(findManyOptions.orderBy)
         ? ([...findManyOptions.orderBy] as Record<string, Prisma.SortOrder>[])

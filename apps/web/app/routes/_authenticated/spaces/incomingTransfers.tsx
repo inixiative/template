@@ -3,7 +3,7 @@ import { Unauthorized } from '@template/ui/components';
 import { OrganizationIncomingTransfersPage } from '@template/ui/pages';
 import { useAppStore } from '@template/ui/store';
 
-export const Route = createFileRoute('/_authenticated/spaces/incoming-transfers')({
+export const Route = createFileRoute('/_authenticated/spaces/incomingTransfers')({
   component: SpacesIncomingTransfersPage,
 });
 

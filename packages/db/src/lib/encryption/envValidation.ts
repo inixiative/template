@@ -17,7 +17,7 @@ export const createEncryptionEnvRefinement = (versionField: string, previousKeyF
     const version = data[versionField];
     const previousKey = data[previousKeyField];
 
-    if (version > 1 && !previousKey) {
+    if ((version as number) > 1 && !previousKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [previousKeyField],

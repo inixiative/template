@@ -14,7 +14,7 @@
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "typecheck": "tsc --noEmit",
-    "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.gen.json bun run ./scripts/generate-openapi-spec.ts && cp ./openapi.local.gen.json ../../packages/ui/openapi.gen.json"
+    "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.gen.json bun run ./scripts/generateOpenapiSpec.ts && cp ./openapi.local.gen.json ../../packages/ui/openapi.gen.json"
   },
   "dependencies": {
     "@bull-board/api": "^6.20.3",

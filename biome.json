@@ -5,6 +5,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "suspicious": {
+        "noConfusingVoidType": "off"
+      },
       "complexity": {
         "noForEach": "off",
         "useArrowFunction": "error"
