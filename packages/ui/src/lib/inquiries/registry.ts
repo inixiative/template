@@ -1,5 +1,5 @@
 import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClient';
-import type { InquiryType } from '@template/ui/lib/inquiryQueryKeys';
+import type { InquiryType } from '@template/ui/lib/inquiries/queryKeys';
 import type { ComponentType } from 'react';
 
 export type InquirySourceInterface = {

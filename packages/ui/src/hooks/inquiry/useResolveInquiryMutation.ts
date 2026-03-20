@@ -2,8 +2,8 @@ import { inquiryResolve } from '@template/ui/apiClient';
 import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
-import { targetMutations } from '@template/ui/lib/inquiryQueryKeys';
+import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
+import { targetMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 type ResolveVars = {
   inquiry: InquiryMeta;

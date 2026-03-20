@@ -5,9 +5,7 @@ export * from './checkContextPermission';
 export * from './enumOptions';
 export * from './findRoute';
 export { getContextParams } from './getContextParams';
-export * from './inquiryRegistry';
-// side-effect: registers all inquiry types at import time
-import './inquiryRegistrations.tsx';
+export * from './inquiries';
 
 export * from './makeContextQueries';
 export * from './makeDataTableConfig';

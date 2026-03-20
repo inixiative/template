@@ -16,8 +16,8 @@ import {
   type InquiryStatus,
   inquiryFiltersToSearchFields,
   mergeInquiryFilters,
-} from '@template/ui/lib/inquiryQueryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
+} from '@template/ui/lib/inquiries/queryKeys';
+import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
 import { useMemo, useState } from 'react';
 
 type Inquiry = AdminInquiryReadManyResponses[200]['data'][number];

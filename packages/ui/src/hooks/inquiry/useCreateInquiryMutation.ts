@@ -1,6 +1,6 @@
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
-import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
-import { sourceMutations } from '@template/ui/lib/inquiryQueryKeys';
+import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
+import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 type CreateVars = {
   inquiry: Omit<InquiryMeta, 'id'>;

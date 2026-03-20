@@ -41,15 +41,29 @@ export type InquiryFilters = {
   includeExpired?: boolean;
 };
 
-// External filters are hard constraints — internal UI controls can only narrow further.
-// External wins on any field it specifies.
+const mergeBoundedArray = <T>(external: T[] | undefined, internal: T[] | undefined): T[] | undefined => {
+  if (!external) return internal;
+  if (!internal || internal.length === 0) return external;
+
+  const narrowed = internal.filter((value) => external.includes(value));
+  return narrowed.length > 0 ? narrowed : external;
+};
+
+const mergeIncludeExpired = (external: boolean | undefined, internal: boolean | undefined): boolean | undefined => {
+  if (external === false || internal === false) return false;
+  if (external === true) return true;
+  return internal;
+};
+
+// External filters define the page bounds.
+// Internal UI controls can only narrow within those bounds, never widen past them.
 export const mergeInquiryFilters = (
   external: InquiryFilters | undefined,
   internal: InquiryFilters,
 ): InquiryFilters => ({
-  types: external?.types ?? internal.types,
-  statuses: external?.statuses ?? internal.statuses,
-  includeExpired: external?.includeExpired ?? internal.includeExpired,
+  types: mergeBoundedArray(external?.types, internal.types),
+  statuses: mergeBoundedArray(external?.statuses, internal.statuses),
+  includeExpired: mergeIncludeExpired(external?.includeExpired, internal.includeExpired),
 });
 
 // Converts InquiryFilters to bracket-notation searchFields for the API.

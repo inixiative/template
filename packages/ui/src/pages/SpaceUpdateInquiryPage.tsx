@@ -5,7 +5,7 @@ import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiryQueryKeys';
+import { INQUIRY_STATUS_COLORS, isTerminalInquiry } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { useState } from 'react';

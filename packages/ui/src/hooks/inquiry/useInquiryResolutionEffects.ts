@@ -4,7 +4,7 @@ import {
   organizationReadManySpacesQueryKey,
   spaceProtectedQueryKey,
 } from '@template/ui/apiClient';
-import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
+import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
 
 export const useInquiryResolutionEffects = () => {

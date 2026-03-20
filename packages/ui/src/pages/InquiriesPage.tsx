@@ -2,7 +2,7 @@ import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClien
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
-import { inquiryContextQueries } from '@template/ui/lib/inquiryContextQueries';
+import { inquiryContextQueries } from '@template/ui/lib/inquiries/contextQueries';
 import {
   INQUIRY_STATUS_COLORS,
   INQUIRY_TYPE_LABELS,
@@ -10,8 +10,8 @@ import {
   type InquiryStatus,
   inquiryFiltersToSearchFields,
   mergeInquiryFilters,
-} from '@template/ui/lib/inquiryQueryKeys';
-import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
+} from '@template/ui/lib/inquiries/queryKeys';
+import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
 import { useAppStore } from '@template/ui/store';
 import { useMemo, useState } from 'react';
 

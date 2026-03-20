@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { inquiryFiltersToSearchFields, mergeInquiryFilters } from '@template/ui/lib/inquiryQueryKeys';
+import { inquiryFiltersToSearchFields, mergeInquiryFilters } from '@template/ui/lib/inquiries/queryKeys';
 
 describe('inquiryFiltersToSearchFields', () => {
   it('empty filters returns empty object', () => {
@@ -69,9 +69,12 @@ describe('inquiryFiltersToSearchFields', () => {
 });
 
 describe('mergeInquiryFilters', () => {
-  it('external types overrides internal', () => {
-    const merged = mergeInquiryFilters({ types: ['createSpace'] }, { types: ['transferSpace'] });
-    expect(merged.types).toEqual(['createSpace']);
+  it('external types bound internal values and allow narrowing by overlap', () => {
+    const merged = mergeInquiryFilters(
+      { types: ['createSpace', 'transferSpace'] },
+      { types: ['transferSpace'] },
+    );
+    expect(merged.types).toEqual(['transferSpace']);
   });
 
   it('falls back to internal when external is undefined', () => {
@@ -79,8 +82,26 @@ describe('mergeInquiryFilters', () => {
     expect(merged.types).toEqual(['transferSpace']);
   });
 
-  it('external includeExpired: false overrides internal true', () => {
+  it('clamps internal values back to external bounds when there is no overlap', () => {
+    const merged = mergeInquiryFilters({ types: ['createSpace'] }, { types: ['transferSpace'] });
+    expect(merged.types).toEqual(['createSpace']);
+  });
+
+  it('narrowing works for statuses too', () => {
+    const merged = mergeInquiryFilters(
+      { statuses: ['sent', 'approved'] },
+      { statuses: ['approved'] },
+    );
+    expect(merged.statuses).toEqual(['approved']);
+  });
+
+  it('external includeExpired: false cannot be widened by internal true', () => {
     const merged = mergeInquiryFilters({ includeExpired: false }, { includeExpired: true });
+    expect(merged.includeExpired).toBe(false);
+  });
+
+  it('external includeExpired: true still allows internal false to narrow', () => {
+    const merged = mergeInquiryFilters({ includeExpired: true }, { includeExpired: false });
     expect(merged.includeExpired).toBe(false);
   });
 

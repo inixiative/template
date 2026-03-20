@@ -1,8 +1,8 @@
 import { inquiryDelete } from '@template/ui/apiClient';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
-import { sourceMutations } from '@template/ui/lib/inquiryQueryKeys';
+import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
+import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 export const useCancelInquiryMutation = () => {
   return useOptimisticMutation<unknown, Error, InquiryMeta>({
