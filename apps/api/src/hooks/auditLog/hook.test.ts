@@ -2,7 +2,7 @@ import '#tests/mocks/queue';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createCronJob, createInquiry, createToken, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createCronJob, createInquiry, createOrganization, createToken, createUser } from '@template/db/test';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -216,7 +216,12 @@ describe('auditLog hook', () => {
   });
 
   it('records sourceInquiryId when set in context', async () => {
-    const { entity: inquiry } = await createInquiry();
+    const { entity: organization } = await createOrganization();
+    const { entity: targetUser } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      sourceOrganizationId: organization.id,
+      targetUserId: targetUser.id,
+    });
     const ts = Date.now();
 
     const { fetch } = createTestApp({
@@ -244,10 +249,6 @@ describe('auditLog hook', () => {
   });
 
   it('creates a delete audit log on soft-delete (deletedAt transition)', async () => {
-    // Hard-delete events cannot be audited via FK because the subject row is already
-    // gone when the after hook fires. Use soft-delete (setting deletedAt) instead —
-    // the org still exists so the FK constraint is satisfied.
-    // (Hard-delete audit support requires scalar subject IDs — tracked in FEAT-017.)
     const ts = Date.now();
 
     const { fetch } = createTestApp({
@@ -273,6 +274,42 @@ describe('auditLog hook', () => {
     expect(log).not.toBeNull();
     expect(log?.action).toBe(AuditAction.delete);
     expect(log?.before).not.toBeNull();
+    expect(log?.after).toBeNull();
+  });
+
+  it('creates a delete audit log on hard-delete and preserves the deleted row in before', async () => {
+    const ts = Date.now();
+    const slug = `harddel-${ts}`;
+
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.post('/test/org/hard-delete', async (c) => {
+            const org = await db.organization.create({ data: { name: `audit-harddel-${ts}`, slug } });
+            await db.organization.delete({ where: { id: org.id } });
+            return c.json({ id: org.id });
+          });
+        },
+      ],
+    });
+
+    const res = await fetch(new Request('http://localhost/test/org/hard-delete', { method: 'POST' }));
+    const { id } = await res.json<{ id: string }>();
+
+    const logs = await db.auditLog.findMany({
+      where: { subjectModel: 'Organization', action: AuditAction.delete },
+      orderBy: { id: 'desc' },
+      take: 10,
+    });
+
+    const log = logs.find((entry) => {
+      const before = entry.before as { id?: string; slug?: string } | null;
+      return before?.id === id && before.slug === slug;
+    });
+
+    expect(log).toBeDefined();
+    expect(log?.subjectOrganizationId).toBeNull();
+    expect(log?.action).toBe(AuditAction.delete);
     expect(log?.after).toBeNull();
   });
 
