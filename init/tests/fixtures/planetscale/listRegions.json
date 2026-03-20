@@ -1,0 +1,6 @@
+[
+  { "id": "us-east", "slug": "us-east", "display_name": "US East (N. Virginia)", "enabled": true },
+  { "id": "us-west", "slug": "us-west", "display_name": "US West (Oregon)", "enabled": true },
+  { "id": "eu-west", "slug": "eu-west", "display_name": "EU West (Ireland)", "enabled": true },
+  { "id": "ap-south", "slug": "ap-south", "display_name": "Asia Pacific (Mumbai)", "enabled": false }
+]

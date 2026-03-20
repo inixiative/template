@@ -38,6 +38,7 @@ import {
   setProgressComplete,
   updateConfigField,
 } from '../utils/configHelpers';
+import { delay } from '../utils/delay';
 import { retryWithTimeout } from '../utils/retry';
 import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
@@ -151,7 +152,7 @@ export const setupPlanetScale = async (
     // Step 4: Wait for database initial provisioning
     // Give PlanetScale time to initialize (branch renaming has its own retry logic)
     await onStepComplete?.('Waiting for database to initialize...');
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await delay(5000);
 
     // Step 5: Rename main branch to prod
     // This preserves the production status and PS-5 cluster assignment

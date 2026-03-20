@@ -7,169 +7,91 @@
  * 3. Successfully runs initMigrationTable step
  */
 
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import type { ProjectConfig } from '../../utils/getProjectConfig';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { createMockConfig, createMockInfisical, createMockPlanetScale, createMockSystem, loadFixture } from '../../tests/mocks';
+import type { PlanetScaleBranch, PlanetScaleDatabase } from '../../api/planetscale';
 
-// Create mock functions
-const mockIsProgressComplete = mock(async (_section: string, action: string) => {
-  const completedSteps = [
-    'selectOrg',
-    'selectRegion',
-    'createToken',
-    'setInfisicalToken',
-    'createDB',
-    'renameProductionBranch',
-    'createStagingBranch',
-    'createPasswords',
-    'storeConnectionStrings',
-  ];
-  return completedSteps.includes(action);
-});
-const mockSetProgressComplete = mock(async () => {});
-const mockUpdateConfigField = mock(async () => {});
-const mockClearConfigError = mock(async () => {});
-const mockSetConfigError = mock(async () => {});
-const mockClearAllProgress = mock(async () => {});
+// Create service mocks
+const ps = createMockPlanetScale();
+const infisical = createMockInfisical();
+const config = createMockConfig();
+const system = createMockSystem();
 
-const mockGetProjectConfig = mock(async () =>
-  ({
-    project: { name: 'template', organization: 'test-org' },
-    infisical: { projectId: 'test-project-id' },
-    planetscale: {
-      organization: 'inixiative',
-      database: 'template',
-      region: 'us-east',
-      tokenId: 'test-token-id',
-    },
-  }) as unknown as ProjectConfig,
-);
-
-const mockGetSecretAsync = mock(
-  async (key: string, options?: { environment?: string; projectId?: string }) => {
-    if (key === 'DATABASE_URL') {
-      if (options?.environment === 'prod') {
-        return 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require';
-      }
-      if (options?.environment === 'staging') {
-        return 'postgresql://staging-user:staging-pass@aws.connect.psdb.cloud/template?sslmode=require';
-      }
-    }
-    return '';
-  },
-);
-const mockSetSecretAsync = mock(async () => {});
-const mockSetSecret = mock(() => {});
-const mockGetSecret = mock(() => '');
-
-const mockExec = mock((_cmd: string, _opts: unknown, callback?: unknown) => {
-  if (typeof callback === 'function') {
-    callback(null, { stdout: '', stderr: '' });
-  }
-  return {} as ReturnType<typeof import('node:child_process').exec>;
-});
-
-const mockGetDatabase = mock(async () => ({
-  id: 'db-id',
-  name: 'template',
-  region: 'us-east',
-}));
-const mockGetBranch = mock(async () => ({
-  id: 'branch-id',
-  name: 'main',
-  region: 'us-east',
-  production: true,
-}));
-const mockUpdateDatabaseSettings = mock(async () => {});
-const mockCreateRole = mock(async () => ({}));
-
-// Mock modules before any imports that depend on them
-mock.module('../../utils/configHelpers', () => ({
-  isProgressComplete: mockIsProgressComplete,
-  setProgressComplete: mockSetProgressComplete,
-  updateConfigField: mockUpdateConfigField,
-  clearConfigError: mockClearConfigError,
-  setConfigError: mockSetConfigError,
-  clearAllProgress: mockClearAllProgress,
-}));
-
-mock.module('../../utils/getProjectConfig', () => ({
-  getProjectConfig: mockGetProjectConfig,
-}));
-
-mock.module('../infisicalSetup', () => ({
-  getSecretAsync: mockGetSecretAsync,
-  setSecretAsync: mockSetSecretAsync,
-  setSecret: mockSetSecret,
-  getSecret: mockGetSecret,
-  setupInfisical: mock(async () => ({ projectId: 'test-project-id', organizationId: 'test-org-id' })),
-}));
-
-mock.module('../../api/planetscale', () => ({
-  getDatabase: mockGetDatabase,
-  getBranch: mockGetBranch,
-  updateDatabaseSettings: mockUpdateDatabaseSettings,
-  createRole: mockCreateRole,
-  listOrganizations: mock(async () => []),
-  listRegions: mock(async () => []),
-  createDatabase: mock(async () => ({})),
-  renameBranch: mock(async () => ({})),
-  createBranch: mock(async () => ({})),
-}));
-
-mock.module('node:child_process', () => ({
-  exec: mockExec,
-  execSync: mock(() => ''),
-}));
-
-mock.module('node:util', () => ({
-  promisify: (fn: unknown) => {
-    return async (...args: unknown[]) => {
-      const result = (fn as (...a: unknown[]) => unknown)(...args);
-      return { stdout: result || '', stderr: '' };
-    };
-  },
-}));
+// Install all mocks (must be before importing setup code)
+ps.install();
+infisical.install();
+config.install();
+system.install();
 
 describe('PlanetScale Resume Scenario', () => {
   beforeEach(() => {
-    mockIsProgressComplete.mockClear();
-    mockSetProgressComplete.mockClear();
-    mockUpdateConfigField.mockClear();
-    mockClearConfigError.mockClear();
-    mockGetProjectConfig.mockClear();
-    mockGetSecretAsync.mockClear();
-    mockExec.mockClear();
-    mockGetDatabase.mockClear();
-    mockGetBranch.mockClear();
-    mockUpdateDatabaseSettings.mockClear();
-    mockCreateRole.mockClear();
+    ps.clearAll();
+    infisical.clearAll();
+    config.clearAll();
+    system.clearAll();
+
+    // Resume scenario: steps 1-9 are complete
+    config.markComplete('planetscale', [
+      'selectOrg',
+      'selectRegion',
+      'createToken',
+      'setInfisicalToken',
+      'createDB',
+      'renameProductionBranch',
+      'createStagingBranch',
+      'createPasswords',
+      'storeConnectionStrings',
+    ]);
+
+    // Seed connection strings (already in Infisical from previous run)
+    infisical.seed([
+      {
+        key: 'DATABASE_URL',
+        environment: 'prod',
+        path: '/api',
+        value: 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require',
+      },
+      {
+        key: 'DATABASE_URL',
+        environment: 'staging',
+        path: '/api',
+        value: 'postgresql://staging-user:staging-pass@aws.connect.psdb.cloud/template?sslmode=require',
+      },
+    ]);
+
+    // VCR: getDatabase called once (resume fetches existing DB)
+    ps.vcr.database.add(loadFixture<PlanetScaleDatabase>('planetscale/createDatabase'));
+
+    // VCR: getBranch called for staging (resume fetches existing branch)
+    ps.vcr.branch.add(loadFixture<PlanetScaleBranch>('planetscale/getBranch-staging'));
   });
 
   afterEach(() => {
-    mock.restore();
+    ps.clearAll();
+    infisical.clearAll();
+    config.clearAll();
+    system.clearAll();
   });
 
   test('should NOT create new roles when resuming', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
+    await setupPlanetScale('test-org');
 
-    await setupPlanetScale('inixiative');
-
-    expect(mockCreateRole).not.toHaveBeenCalled();
+    expect(ps.mocks.createRole).not.toHaveBeenCalled();
   });
 
   test('should fetch connection strings from Infisical', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
+    await setupPlanetScale('test-org');
 
-    await setupPlanetScale('inixiative');
-
-    expect(mockGetSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
-      projectId: 'test-project-id',
+    expect(infisical.mocks.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
+      projectId: 'infisical-proj-id-000',
       environment: 'prod',
       path: '/api',
     });
 
-    expect(mockGetSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
-      projectId: 'test-project-id',
+    expect(infisical.mocks.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
+      projectId: 'infisical-proj-id-000',
       environment: 'staging',
       path: '/api',
     });
@@ -177,10 +99,9 @@ describe('PlanetScale Resume Scenario', () => {
 
   test('should run bun script to init migration table', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
+    await setupPlanetScale('test-org');
 
-    await setupPlanetScale('inixiative');
-
-    const calls = mockExec.mock.calls;
+    const calls = system.mocks.exec.mock.calls;
     const migrationCalls = calls.filter(
       (call) => typeof call[0] === 'string' && call[0].includes('initMigrationTable'),
     );
@@ -192,18 +113,16 @@ describe('PlanetScale Resume Scenario', () => {
 
   test('should mark initMigrationTable as complete', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
+    await setupPlanetScale('test-org');
 
-    await setupPlanetScale('inixiative');
-
-    expect(mockSetProgressComplete).toHaveBeenCalledWith('planetscale', 'initMigrationTable');
+    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initMigrationTable');
   });
 
   test('should configure database after migration table init', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
+    await setupPlanetScale('test-org');
 
-    await setupPlanetScale('inixiative');
-
-    expect(mockUpdateDatabaseSettings).toHaveBeenCalledWith('inixiative', 'template', {
+    expect(ps.mocks.updateDatabaseSettings).toHaveBeenCalledWith('test-org', 'template', {
       allow_foreign_key_constraints: true,
     });
   });

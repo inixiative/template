@@ -1,3 +1,5 @@
+import { delay } from './delay';
+
 type RetryOptions = {
   maxRetries: number;
   delayMs: number;
@@ -45,7 +47,7 @@ export const retryWithTimeout = async <T>(operation: () => Promise<T>, options: 
       await onRetry?.(attempt + 1, maxRetries);
 
       // Wait before next retry
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await delay(delayMs);
     }
   }
 
