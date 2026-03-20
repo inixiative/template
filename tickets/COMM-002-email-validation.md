@@ -103,6 +103,25 @@ Integrate an email validation/verification API to validate email addresses at po
 
 ## Implementation Notes
 
+### Adapter Architecture (Bring Your Own Provider)
+
+The template ships adapter code but **no API key** — deployers register with their chosen provider and supply their own key, same pattern as `ResendEmailClient`:
+
+```
+EmailValidator (interface)
+├── BouncerValidator      ← default/recommended adapter
+├── EmailableValidator    ← alternative adapter
+├── ClearoutValidator     ← alternative adapter
+└── ConsoleValidator      ← dev/test mock (always returns valid)
+```
+
+- Provider selection via env var (e.g., `EMAIL_VALIDATOR_PROVIDER=bouncer`)
+- API key via encrypted secrets (e.g., `EMAIL_VALIDATOR_API_KEY`)
+- Each deployer/tenant registers their own account with the provider
+- Template ships with Bouncer as the default adapter; others can be added by the community or per-project
+
+### General Notes
+
 - Follow the existing `EmailClient` interface pattern in `packages/email/src/client/`
 - Current email validation is Zod `.email()` only (syntax check) — this adds mailbox-level verification
 - Provider API key should go through the encrypted secrets system (FEAT-013)
