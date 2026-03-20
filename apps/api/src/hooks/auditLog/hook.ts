@@ -31,12 +31,24 @@ const isManyAction = (action: DbAction): action is ManyAction =>
 const isDeleteAction = (action: DbAction): action is DbAction.delete | DbAction.deleteMany =>
   action === DbAction.delete || action === DbAction.deleteMany;
 
+const buildDeleteContextFkFields = (model: AuditSubjectModel, record: Record<string, unknown>) => {
+  if (model === 'Organization') return {};
+  if (model === 'Space') {
+    return {
+      contextOrganizationId: record.organizationId ?? null,
+      contextSpaceId: null,
+    };
+  }
+  return buildContextFkFields(model, record);
+};
+
 const buildAuditEntry = (
   model: AuditSubjectModel,
   action: AuditAction,
   record: Record<string, unknown>,
   previous?: Record<string, unknown>,
-  withFkFields = true,
+  withContextFkFields = true,
+  withSubjectFkFields = true,
 ): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.getScope();
 
@@ -62,8 +74,8 @@ const buildAuditEntry = (
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
     sourceInquiryId: actor?.sourceInquiryId ?? null,
-    ...(withFkFields ? buildContextFkFields(model, record) : {}),
-    ...(withFkFields ? buildSubjectFkFields(model, record) : {}),
+    ...(withContextFkFields ? buildContextFkFields(model, record) : {}),
+    ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
   };
 };
 
@@ -71,22 +83,27 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
   const { action: dbAction } = options;
   const entries: NonNullable<ReturnType<typeof buildAuditEntry>>[] = [];
 
-  // Hard deletes: capture entity data in `before` JSON, FK fields set to null (they would
-  // be cascade-nulled anyway, and inserting with live FK avoids transaction timeout issues).
+  // Hard deletes: capture entity data in `before` JSON and always drop subject FKs.
+  // Keep tenant context for child deletes, clear org context for Organization deletes,
+  // and clear only the space context for Space deletes.
   if (isDeleteAction(dbAction)) {
     if (isManyAction(dbAction)) {
       const records = (options.result ?? []) as Record<string, unknown>[];
       for (const record of records) {
-        const entry = buildAuditEntry(model, AuditAction.delete, record, record, false);
-        if (entry) entries.push(entry);
+        const entry = buildAuditEntry(model, AuditAction.delete, record, record, false, false);
+        if (entry) {
+          Object.assign(entry, buildDeleteContextFkFields(model, record));
+          entries.push(entry);
+        }
       }
     } else {
-      const record = (options as HookOptions & { action: SingleAction }).result as
-        | Record<string, unknown>
-        | undefined;
+      const record = (options as HookOptions & { action: SingleAction }).result as Record<string, unknown> | undefined;
       if (!record) return entries;
-      const entry = buildAuditEntry(model, AuditAction.delete, record, record, false);
-      if (entry) entries.push(entry);
+      const entry = buildAuditEntry(model, AuditAction.delete, record, record, false, false);
+      if (entry) {
+        Object.assign(entry, buildDeleteContextFkFields(model, record));
+        entries.push(entry);
+      }
     }
     return entries;
   }

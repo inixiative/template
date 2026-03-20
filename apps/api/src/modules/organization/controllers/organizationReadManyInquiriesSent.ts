@@ -12,6 +12,7 @@ export const organizationReadManyInquiriesSentController = makeController(
     const org = getResource<'organization'>(c);
 
     const { data, pagination } = await paginate(c, db.inquiry, {
+      orNullFields: ['expiresAt'],
       where: { sourceModel: InquiryResourceModel.Organization, sourceOrganizationId: org.id },
       orderBy: { createdAt: 'desc' },
       include: includeInquirySent,

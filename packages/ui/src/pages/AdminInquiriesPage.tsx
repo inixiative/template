@@ -37,6 +37,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   const expiredCutoff = useMemo(() => (merged.includeExpired === false ? new Date() : undefined), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
+  if (view === 'platform') searchFields.targetModel = { in: ['admin'] };
   const hasSearchFields = Object.keys(searchFields).length > 0;
 
   const { data, isLoading } = useQuery({
@@ -47,10 +48,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
     queryFn: apiQuery((opts: Parameters<typeof adminInquiryReadMany>[0]) => adminInquiryReadMany(opts)),
   });
 
-  const allInquiries = data?.data ?? [];
-
-  // includeExpired:false goes server-side via searchFields[expiresAt][gte]; only platform filter is client-side
-  const inquiries = view === 'platform' ? allInquiries.filter((inq) => inq.targetModel === 'admin') : allInquiries;
+  const inquiries = data?.data ?? [];
 
   const statusDropdown = !filters?.statuses && (
     <select

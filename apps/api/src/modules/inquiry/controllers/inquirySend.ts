@@ -24,9 +24,15 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
   });
 
   const handler = inquiryHandlers[inquiry.type];
-  if (await handler.autoApprove(db, inquiry)) {
-    const approved = await resolveInquiry(c, inquiry, InquiryStatus.approved, {});
-    return respond.ok({ ...sent, ...approved });
+  if (await handler.autoApprove(db, sent)) {
+    await resolveInquiry(c, sent, InquiryStatus.approved, {});
+
+    const approved = await db.inquiry.findUniqueOrThrow({
+      where: { id: sent.id },
+      include: includeInquirySent,
+    });
+
+    return respond.ok(approved);
   }
 
   return respond.ok(sent);

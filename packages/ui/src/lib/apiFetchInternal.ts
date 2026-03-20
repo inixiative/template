@@ -54,7 +54,7 @@ export type RequestOptionsFor<TVariables extends Record<string, unknown> | undef
  * Use this directly when you need to avoid circular dependencies.
  *
  * Handles both React Query context and direct variables:
- * - QueryFunctionContext: Extracts variables from queryKey[1]
+ * - QueryFunctionContext: Extracts variables from queryKey[0]
  * - Direct vars: Uses them as-is
  */
 export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | undefined | void = void>(
@@ -95,9 +95,10 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
       return new Request(url, request);
     });
 
-    // Detect React Query context and extract variables from queryKey
+    // Generated query keys are a single-element tuple: [requestOptions]
+    // Detect React Query context and extract variables from queryKey[0].
     const isQueryContext = (contextOrVars as QueryFunctionContext)?.queryKey !== undefined;
-    const vars = (isQueryContext ? (contextOrVars as QueryFunctionContext).queryKey[1] : contextOrVars) as
+    const vars = (isQueryContext ? (contextOrVars as QueryFunctionContext).queryKey[0] : contextOrVars) as
       | TVariables
       | undefined;
 

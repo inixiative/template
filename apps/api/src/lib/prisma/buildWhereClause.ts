@@ -8,6 +8,7 @@ type BuildWhereOptions = {
   searchableFields?: readonly string[];
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
+  orNullFields?: string[];
 };
 
 const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
@@ -143,7 +144,14 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { search, searchFields, searchableFields = [], skipFieldValidation = false, filters = {} } = options;
+  const {
+    search,
+    searchFields,
+    searchableFields = [],
+    skipFieldValidation = false,
+    filters = {},
+    orNullFields = [],
+  } = options;
   const conditions: Record<string, unknown>[] = [];
 
   if (search && searchableFields.length) {
@@ -163,7 +171,11 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
     const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation);
     for (const [key, value] of Object.entries(transformed)) {
-      conditions.push({ [key]: value });
+      if (orNullFields.includes(key)) {
+        conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
+      } else {
+        conditions.push({ [key]: value });
+      }
     }
   }
 

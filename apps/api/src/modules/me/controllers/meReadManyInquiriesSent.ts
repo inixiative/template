@@ -9,6 +9,7 @@ export const meReadManyInquiriesSentController = makeController(meReadManyInquir
   const db = c.get('db');
 
   const { data, pagination } = await paginate(c, db.inquiry, {
+    orNullFields: ['expiresAt'],
     where: { sourceModel: InquiryResourceModel.User, sourceUserId: user.id },
     orderBy: { createdAt: 'desc' },
     include: includeInquirySent,

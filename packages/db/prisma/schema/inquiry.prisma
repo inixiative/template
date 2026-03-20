@@ -6,6 +6,7 @@ model Inquiry {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
   sentAt    DateTime?
   expiresAt DateTime?
 

@@ -71,6 +71,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
 
   const inviteMutation = useMutation({
     mutationFn: apiMutation((vars: Parameters<typeof organizationCreateInquiry>[0]) => organizationCreateInquiry(vars)),
+    onSuccess: () => setIsInviteModalOpen(false),
   });
 
   const columns = [
@@ -127,7 +128,6 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
         targetEmail: email,
       },
     });
-    setIsInviteModalOpen(false);
   };
 
   const _organization = tenant.context.organization;

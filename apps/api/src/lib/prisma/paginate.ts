@@ -23,6 +23,7 @@ type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: 
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   searchableFields?: readonly string[];
+  orNullFields?: string[];
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
   include?: FindManyInclude<T>;
@@ -58,7 +59,11 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const { searchableFields: explicitSearchableFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
+  const {
+    searchableFields: explicitSearchableFields,
+    orNullFields,
+    ...findManyOptions
+  } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
@@ -70,7 +75,7 @@ export const paginate = async <
 
   const searchWhere =
     searchableFields?.length || skipFieldValidation
-      ? buildWhereClause({ search, searchFields, searchableFields, skipFieldValidation })
+      ? buildWhereClause({ search, searchFields, searchableFields, skipFieldValidation, orNullFields })
       : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

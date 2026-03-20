@@ -32,7 +32,7 @@ describe('GET /api/admin/inquiry', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('applies expiresAt gte filters against inquiry DateTime rows', async () => {
+  it('applies expiresAt gte filters while including never-expiring inquiries', async () => {
     const { entity: sourceOrganization } = await createOrganization();
     const { entity: targetUser } = await createUser();
 
@@ -62,6 +62,17 @@ describe('GET /api/admin/inquiry', () => {
       expiresAt: past,
     });
 
+    const { entity: noExpiryInquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: sourceOrganization.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: targetUser.id,
+      content: { organizationId: sourceOrganization.id, role: 'member' },
+      expiresAt: null,
+    });
+
     const response = await fetch(
       get(`/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`),
     );
@@ -70,5 +81,6 @@ describe('GET /api/admin/inquiry', () => {
     expect(response.status).toBe(200);
     expect(data.map((inq) => inq.id)).toContain(futureInquiry.id);
     expect(data.map((inq) => inq.id)).not.toContain(pastInquiry.id);
+    expect(data.map((inq) => inq.id)).toContain(noExpiryInquiry.id);
   });
 });

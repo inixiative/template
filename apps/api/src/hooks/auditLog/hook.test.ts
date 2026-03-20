@@ -2,7 +2,15 @@ import '#tests/mocks/queue';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createCronJob, createInquiry, createOrganization, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCronJob,
+  createInquiry,
+  createOrganization,
+  createSpace,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -309,8 +317,78 @@ describe('auditLog hook', () => {
 
     expect(log).toBeDefined();
     expect(log?.subjectOrganizationId).toBeNull();
+    expect(log?.contextOrganizationId).toBeNull();
     expect(log?.action).toBe(AuditAction.delete);
     expect(log?.after).toBeNull();
+  });
+
+  it('keeps tenant context on hard-delete for child records', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization });
+
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.post('/test/token/hard-delete', async (c) => {
+            await db.token.delete({ where: { id: token.id } });
+            return c.json({ ok: true });
+          });
+        },
+      ],
+    });
+
+    const res = await fetch(new Request('http://localhost/test/token/hard-delete', { method: 'POST' }));
+    expect(res.status).toBe(200);
+
+    const logs = await db.auditLog.findMany({
+      where: { subjectModel: 'Token', action: AuditAction.delete, contextOrganizationId: organization.id },
+      orderBy: { id: 'desc' },
+      take: 10,
+    });
+
+    const log = logs.find((entry) => {
+      const before = entry.before as { id?: string } | null;
+      return before?.id === token.id;
+    });
+
+    expect(log).toBeDefined();
+    expect(log?.subjectTokenId).toBeNull();
+    expect(log?.contextOrganizationId).toBe(organization.id);
+  });
+
+  it('keeps org context but clears space context on hard-delete for spaces', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization });
+
+    const { fetch } = createTestApp({
+      mount: [
+        (app) => {
+          app.post('/test/space/hard-delete', async (c) => {
+            await db.space.delete({ where: { id: space.id } });
+            return c.json({ ok: true });
+          });
+        },
+      ],
+    });
+
+    const res = await fetch(new Request('http://localhost/test/space/hard-delete', { method: 'POST' }));
+    expect(res.status).toBe(200);
+
+    const logs = await db.auditLog.findMany({
+      where: { subjectModel: 'Space', action: AuditAction.delete, contextOrganizationId: organization.id },
+      orderBy: { id: 'desc' },
+      take: 10,
+    });
+
+    const log = logs.find((entry) => {
+      const before = entry.before as { id?: string } | null;
+      return before?.id === space.id;
+    });
+
+    expect(log).toBeDefined();
+    expect(log?.subjectSpaceId).toBeNull();
+    expect(log?.contextOrganizationId).toBe(organization.id);
+    expect(log?.contextSpaceId).toBeNull();
   });
 
   it('does not write audit log for non-enabled models', async () => {

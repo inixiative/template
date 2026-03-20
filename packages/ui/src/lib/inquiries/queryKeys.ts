@@ -73,10 +73,9 @@ export const mergeInquiryFilters = (
 // across renders. Recompute `now` only when the filter is toggled (e.g. useMemo with
 // hideExpired as a dependency) to avoid triggering a new fetch every render.
 //
-// NOTE: expiresAt[gte] uses SQL >= semantics, which excludes NULL rows. Inquiries with
-// no expiresAt set (null = never expires) are therefore incorrectly hidden when
-// includeExpired:false. Fixing this properly requires a dedicated server-side
-// includeExpired param that emits: WHERE expiresAt IS NULL OR expiresAt >= now.
+// The server handles the NULL case via orNullFields: when expiresAt[gte] is in
+// searchFields and 'expiresAt' is listed in orNullFields, the controller emits
+// WHERE (expiresAt >= now OR expiresAt IS NULL) — never-expiring inquiries are preserved.
 export const inquiryFiltersToSearchFields = (filters: InquiryFilters, now?: Date): Record<string, unknown> => {
   const searchFields: Record<string, unknown> = {};
   if (filters.types?.length) searchFields.type = { in: filters.types };
