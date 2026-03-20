@@ -1,7 +1,10 @@
-import { execSync } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { exec } from 'node:child_process';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { getProjectConfig, getProjectConfigPath } from '../utils/getProjectConfig';
+
+const execAsync = promisify(exec);
 
 type ProjectConfigData = {
   name: string;
@@ -16,19 +19,19 @@ export const getCurrentConfig = async (): Promise<ProjectConfigData> => {
   };
 };
 
-export const updateProjectConfig = (data: ProjectConfigData): void => {
+export const updateProjectConfig = async (data: ProjectConfigData): Promise<void> => {
   const configPath = getProjectConfigPath();
-  const content = readFileSync(configPath, 'utf-8');
+  const content = await readFile(configPath, 'utf-8');
 
   let updated = content;
   // Update within the project object
   updated = updated.replace(/(project:\s*\{[^}]*name:\s*)['"](.+?)['"]/, `$1'${data.name}'`);
   updated = updated.replace(/(project:\s*\{[^}]*organization:\s*)['"](.+?)['"]/, `$1'${data.organization}'`);
 
-  writeFileSync(configPath, updated, 'utf-8');
+  await writeFile(configPath, updated, 'utf-8');
 };
 
-export const renameProject = (oldName: string, newName: string): void => {
+export const renameProject = async (oldName: string, newName: string): Promise<void> => {
   // If oldName is empty or 'template', use 'template' for replacements
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
@@ -41,24 +44,24 @@ export const renameProject = (oldName: string, newName: string): void => {
   // 1. Update root package.json
   console.log('  • Updating root package.json...');
   const rootPkgPath = join(process.cwd(), 'package.json');
-  const rootPkg = JSON.parse(readFileSync(rootPkgPath, 'utf-8'));
+  const rootPkg = JSON.parse(await readFile(rootPkgPath, 'utf-8'));
   rootPkg.name = newName;
-  writeFileSync(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
+  await writeFile(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
 
   // 2. Update workspace packages
   console.log('  • Updating workspace packages...');
   const workspaces = ['apps', 'packages'];
   for (const workspace of workspaces) {
     const workspacePath = join(process.cwd(), workspace);
-    const dirs = readdirSync(workspacePath, { withFileTypes: true });
+    const dirs = await readdir(workspacePath, { withFileTypes: true });
 
     for (const dir of dirs) {
       if (dir.isDirectory()) {
         const pkgPath = join(workspacePath, dir.name, 'package.json');
         try {
-          const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+          const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'));
           pkg.name = pkg.name.replace(`@${fromName}/`, `@${newName}/`);
-          writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+          await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
         } catch (_error) {
           // Package.json might not exist, skip
         }
@@ -71,9 +74,8 @@ export const renameProject = (oldName: string, newName: string): void => {
   const extensions = ['ts', 'tsx', 'js', 'jsx'];
   for (const ext of extensions) {
     try {
-      execSync(
+      await execAsync(
         `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\///@${newName}\\//g' {} +`,
-        { stdio: 'pipe' },
       );
     } catch (_error) {
       // Continue even if some replacements fail
@@ -84,11 +86,11 @@ export const renameProject = (oldName: string, newName: string): void => {
   console.log('  • Updating README.md...');
   try {
     const readmePath = join(process.cwd(), 'README.md');
-    let readme = readFileSync(readmePath, 'utf-8');
+    let readme = await readFile(readmePath, 'utf-8');
     // Replace title-case references
     readme = readme.replace(new RegExp(`# ${oldName}`, 'gi'), `# ${newName}`);
     readme = readme.replace(new RegExp(`\\b${oldName}\\b`, 'g'), newName);
-    writeFileSync(readmePath, readme, 'utf-8');
+    await writeFile(readmePath, readme, 'utf-8');
   } catch (_error) {
     // README might not exist
   }
@@ -106,9 +108,9 @@ export const renameProject = (oldName: string, newName: string): void => {
   for (const path of tsconfigPaths) {
     try {
       const tsconfigPath = join(process.cwd(), path);
-      let content = readFileSync(tsconfigPath, 'utf-8');
+      let content = await readFile(tsconfigPath, 'utf-8');
       content = content.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
-      writeFileSync(tsconfigPath, content, 'utf-8');
+      await writeFile(tsconfigPath, content, 'utf-8');
     } catch (_error) {
       // Config might not exist
     }
@@ -128,7 +130,7 @@ export const renameProject = (oldName: string, newName: string): void => {
   for (const envFile of envExampleFiles) {
     try {
       const filePath = join(process.cwd(), envFile);
-      const content = readFileSync(filePath, 'utf-8');
+      const content = await readFile(filePath, 'utf-8');
       const pattern = new RegExp(fromName, 'g');
       const updated = content
         .split('\n')
@@ -141,14 +143,14 @@ export const renameProject = (oldName: string, newName: string): void => {
           return `${key}=${value.replace(pattern, newName)}`;
         })
         .join('\n');
-      writeFileSync(filePath, updated, 'utf-8');
+      await writeFile(filePath, updated, 'utf-8');
     } catch {
       // File might not exist
     }
   }
 
   console.log('  • Running bun install to update lockfile...');
-  execSync('bun install', { stdio: 'inherit' });
+  await execAsync('bun install');
 
   console.log(`\n✓ Project renamed successfully to "${newName}"!`);
 };

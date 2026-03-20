@@ -29,7 +29,7 @@ import {
 } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { retryWithTimeout } from '../utils/retry';
-import { getSecret, setSecret } from './infisicalSetup';
+import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
 type SetupResult = {
   projectId: string;
@@ -149,14 +149,14 @@ export const setupRailway = async (
           await updateConfigField('railway', 'prodEnvironmentId', prodEnv.id);
 
           // Store in Infisical for reference
-          setSecret(infisicalProjectId, 'root', 'RAILWAY_PROD_ENVIRONMENT_ID', prodEnv.id);
+          await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_PROD_ENVIRONMENT_ID', prodEnv.id);
         } catch (_error) {
           // Ignore if already exists
         }
       } else {
         // Prod exists, store its ID
         await updateConfigField('railway', 'prodEnvironmentId', prodEnv.id);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_PROD_ENVIRONMENT_ID', prodEnv.id);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_PROD_ENVIRONMENT_ID', prodEnv.id);
       }
 
       // Delete production if it exists
@@ -189,14 +189,14 @@ export const setupRailway = async (
           await updateConfigField('railway', 'stagingEnvironmentId', stagingEnv.id);
 
           // Store in Infisical for reference
-          setSecret(infisicalProjectId, 'root', 'RAILWAY_STAGING_ENVIRONMENT_ID', stagingEnv.id);
+          await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_ENVIRONMENT_ID', stagingEnv.id);
         } catch (_error) {
           // Ignore if already exists
         }
       } else {
         // Staging exists, store its ID
         await updateConfigField('railway', 'stagingEnvironmentId', stagingEnv.id);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_STAGING_ENVIRONMENT_ID', stagingEnv.id);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_ENVIRONMENT_ID', stagingEnv.id);
       }
 
       await setProgressComplete('railway', 'createStagingEnv');
@@ -341,8 +341,8 @@ export const setupRailway = async (
       );
 
       // Store in Infisical (/api path for API and Worker services)
-      setSecret(infisicalProjectId, 'prod', 'REDIS_URL', prodRedisUrl, '/api');
-      setSecret(infisicalProjectId, 'staging', 'REDIS_URL', stagingRedisUrl, '/api');
+      await setSecretAsync(infisicalProjectId, 'prod', 'REDIS_URL', prodRedisUrl, '/api');
+      await setSecretAsync(infisicalProjectId, 'staging', 'REDIS_URL', stagingRedisUrl, '/api');
 
       await setProgressComplete('railway', 'storeRedisUrl');
       await onStepComplete?.();
@@ -394,7 +394,7 @@ export const setupRailway = async (
         const prodApiService = await createService(projectId, prodEnv.id, 'prod', `${configProjectName}-prod-api`);
         prodApiServiceId = prodApiService.id;
         await updateConfigField('railway', 'prodApiServiceId', prodApiServiceId);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_PROD_API_SERVICE_ID', prodApiServiceId);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_PROD_API_SERVICE_ID', prodApiServiceId);
       }
       await setProgressComplete('railway', 'createApiProd');
       await onStepComplete?.();
@@ -474,7 +474,7 @@ export const setupRailway = async (
         );
         stagingApiServiceId = stagingApiService.id;
         await updateConfigField('railway', 'stagingApiServiceId', stagingApiServiceId);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_STAGING_API_SERVICE_ID', stagingApiServiceId);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_API_SERVICE_ID', stagingApiServiceId);
       }
       await setProgressComplete('railway', 'createApiStaging');
       await onStepComplete?.();
@@ -543,13 +543,13 @@ export const setupRailway = async (
       // Store prod API URL
       const prodApiUrl = await getServiceDomain(prodApiServiceId, prodEnv.id);
       if (prodApiUrl) {
-        setSecret(infisicalProjectId, 'prod', 'API_URL', prodApiUrl, '/');
+        await setSecretAsync(infisicalProjectId, 'prod', 'API_URL', prodApiUrl, '/');
       }
 
       // Store staging API URL
       const stagingApiUrl = await getServiceDomain(stagingApiServiceId, stagingEnv.id);
       if (stagingApiUrl) {
-        setSecret(infisicalProjectId, 'staging', 'API_URL', stagingApiUrl, '/');
+        await setSecretAsync(infisicalProjectId, 'staging', 'API_URL', stagingApiUrl, '/');
       }
 
       await setProgressComplete('railway', 'storeApiUrl');
@@ -567,7 +567,7 @@ export const setupRailway = async (
         );
         prodWorkerServiceId = prodWorkerService.id;
         await updateConfigField('railway', 'prodWorkerServiceId', prodWorkerServiceId);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_PROD_WORKER_SERVICE_ID', prodWorkerServiceId);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_PROD_WORKER_SERVICE_ID', prodWorkerServiceId);
       }
       await setProgressComplete('railway', 'createWorkerProd');
       await onStepComplete?.();
@@ -638,7 +638,7 @@ export const setupRailway = async (
         );
         stagingWorkerServiceId = stagingWorkerService.id;
         await updateConfigField('railway', 'stagingWorkerServiceId', stagingWorkerServiceId);
-        setSecret(infisicalProjectId, 'root', 'RAILWAY_STAGING_WORKER_SERVICE_ID', stagingWorkerServiceId);
+        await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_WORKER_SERVICE_ID', stagingWorkerServiceId);
       }
       await setProgressComplete('railway', 'createWorkerStaging');
       await onStepComplete?.();
@@ -713,25 +713,25 @@ export const setupRailway = async (
     }
 
     // Fetch final URLs from Infisical (source of truth)
-    const prodApiUrl = getSecret('API_URL', {
+    const prodApiUrl = await getSecretAsync('API_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/',
     });
 
-    const stagingApiUrl = getSecret('API_URL', {
+    const stagingApiUrl = await getSecretAsync('API_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/',
     });
 
-    const prodRedisUrl = getSecret('REDIS_URL', {
+    const prodRedisUrl = await getSecretAsync('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/api',
     });
 
-    const stagingRedisUrl = getSecret('REDIS_URL', {
+    const stagingRedisUrl = await getSecretAsync('REDIS_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/api',

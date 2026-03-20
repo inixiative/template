@@ -81,13 +81,12 @@ const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; 
   const details: string[] = [];
   if (progress.selectWorkspace) details.push('Workspace selected');
   if (progress.createProject) details.push('Project created');
-  if (progress.deployApi) details.push('API service deployed');
+  if (progress.createApiProd) details.push('API service deployed');
   if (progress.storeApiUrl) details.push('API URL stored');
-  if (progress.deployWorker) details.push('Worker service deployed');
-  if (progress.provisionRedis) details.push('Redis provisioned');
+  if (progress.createWorkerProd) details.push('Worker service deployed');
+  if (progress.createRedisProd) details.push('Redis provisioned');
   if (progress.storeRedisUrl) details.push('Redis URL stored');
-  if (progress.setupInfisicalIntegration) details.push('Infisical integration configured');
-  if (progress.configureEnvVars) details.push('Environment variables configured');
+  if (progress.createInfisicalConnection) details.push('Infisical integration configured');
   if (progress.verifyDeployment) details.push('Deployment verified');
 
   if (error) {
@@ -109,8 +108,7 @@ const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; d
   if (progress.createWebProject) details.push('Web project created');
   if (progress.createAdminProject) details.push('Admin project created');
   if (progress.createSuperadminProject) details.push('Superadmin project created');
-  if (progress.linkGitHub) details.push('GitHub linked');
-  if (progress.configureEnvVars) details.push('Environment variables configured');
+  if (progress.linkWebGitHub) details.push('GitHub linked');
   if (progress.deployProduction) details.push('Production deployment complete');
 
   if (error) {
@@ -200,13 +198,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
         { label: '13. Exit', value: 'exit', status: 'pending' },
       ];
 
-      setItems(updatedItems);
+      setItems(updatedItems as MenuItem[]);
     };
 
     updateItems();
   }, [config]);
 
-  const itemComponent = ({ isSelected, label }: { isSelected: boolean; label: string }) => {
+  const itemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
     // Find the item to get its status
     const item = items.find((i) => i.label === label);
     const statusIcon = item?.status === 'completed' ? '✓' : item?.status === 'incomplete' ? '⋯' : ' ';

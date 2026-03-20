@@ -2,7 +2,7 @@
  * Test: PlanetScale setup resume scenario
  *
  * Verifies that when resuming with passwords already created:
- * 1. Doesn't try to create new passwords (would cause "Display name already taken")
+ * 1. Doesn't try to create new roles (would cause "Display name already taken")
  * 2. Fetches connection strings from Infisical
  * 3. Successfully runs initMigrationTable step
  */
@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Mock modules MUST be at top level before imports
 vi.mock('../../utils/configHelpers');
+vi.mock('../../utils/getProjectConfig');
 vi.mock('../infisicalSetup');
 vi.mock('../../api/planetscale');
 vi.mock('node:child_process');
@@ -33,6 +34,7 @@ import type { PlanetScaleBranch, PlanetScaleDatabase } from '../../api/planetsca
 import * as planetscaleApi from '../../api/planetscale';
 import * as configHelpers from '../../utils/configHelpers';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
+import * as getProjectConfigModule from '../../utils/getProjectConfig';
 import * as infisicalSetup from '../infisicalSetup';
 
 describe('PlanetScale Resume Scenario', () => {
@@ -40,27 +42,24 @@ describe('PlanetScale Resume Scenario', () => {
     vi.clearAllMocks();
 
     // Mock config state: passwords and connection strings already complete
-    vi.mocked(configHelpers.isProgressComplete).mockImplementation(async (section, action) => {
-      if (section === 'planetscale') {
-        // Steps 1-8 are complete, step 9+ are not
-        const completedSteps = [
-          'selectOrg',
-          'selectRegion',
-          'createToken',
-          'setInfisicalToken',
-          'createDB',
-          'setupProductionBranch',
-          'createStagingBranch',
-          'createPasswords',
-          'storeConnectionStrings',
-        ];
-        return completedSteps.includes(action as string);
-      }
-      return false;
+    vi.mocked(configHelpers.isProgressComplete).mockImplementation(async (_section, action) => {
+      // Steps 1-8 are complete, step 9+ are not
+      const completedSteps = [
+        'selectOrg',
+        'selectRegion',
+        'createToken',
+        'setInfisicalToken',
+        'createDB',
+        'renameProductionBranch',
+        'createStagingBranch',
+        'createPasswords',
+        'storeConnectionStrings',
+      ];
+      return completedSteps.includes(action as string);
     });
 
     // Mock getProjectConfig to return proper config
-    vi.mocked(configHelpers.getProjectConfig).mockResolvedValue({
+    vi.mocked(getProjectConfigModule.getProjectConfig).mockResolvedValue({
       project: { name: 'template', organization: 'test-org' },
       infisical: { projectId: 'test-project-id' },
       planetscale: {
@@ -120,15 +119,15 @@ describe('PlanetScale Resume Scenario', () => {
     vi.restoreAllMocks();
   });
 
-  test('should NOT create new passwords when resuming', async () => {
+  test('should NOT create new roles when resuming', async () => {
     // Import after mocks are set up
     const { setupPlanetScale } = await import('../planetscaleSetup');
 
     // Run setup
     await setupPlanetScale('inixiative');
 
-    // Verify createPassword was NEVER called
-    expect(planetscaleApi.createPassword).not.toHaveBeenCalled();
+    // Verify createRole was NEVER called
+    expect(planetscaleApi.createRole).not.toHaveBeenCalled();
   });
 
   test('should fetch connection strings from Infisical', async () => {
@@ -184,8 +183,6 @@ describe('PlanetScale Resume Scenario', () => {
     // Verify database settings were updated
     expect(planetscaleApi.updateDatabaseSettings).toHaveBeenCalledWith('inixiative', 'template', {
       allow_foreign_key_constraints: true,
-      automatic_migrations: true,
-      migration_table_name: '_prisma_migrations',
     });
   });
 });

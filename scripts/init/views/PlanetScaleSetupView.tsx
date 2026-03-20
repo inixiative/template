@@ -1,13 +1,14 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
-import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listOrganizations, listRegions, type PlanetScaleRegion } from '../api/planetscale';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
+import { ActionSpinner } from '../components/ActionSpinner';
 import { StepProgress } from '../components/StepProgress';
-import { setSecret } from '../tasks/infisicalSetup';
+import { useAsyncAction } from '../components/useAsyncAction';
+import { setSecretAsync } from '../tasks/infisicalSetup';
 import { setupPlanetScale } from '../tasks/planetscaleSetup';
 import {
   clearAllProgress,
@@ -113,7 +114,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const [loadingRegions, setLoadingRegions] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenIdInput, setTokenIdInput] = useState('');
-  const [savingToken, setSavingToken] = useState(false);
+  const tokenAction = useAsyncAction();
   const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
 
   // Step callback: no args = step completed (sync config), with string = update action label
@@ -313,18 +314,16 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const handleTokenValueSubmit = async () => {
     if (!config || !tokenInput.trim() || !tokenIdInput.trim()) return;
 
-    setSavingToken(true);
-
-    try {
+    await tokenAction.run('Saving to Infisical...', async () => {
       const infisicalProjectId = config.infisical.projectId;
       const orgName = config.planetscale.organization;
       const region = config.planetscale.region;
 
       // Store PlanetScale configuration in Infisical root environment
-      await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
-      await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
-      await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
-      await setSecret(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
+      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
+      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
+      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
+      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
 
       // Mark token steps as complete
       await updateConfigField('planetscale', 'tokenId', tokenIdInput);
@@ -332,13 +331,12 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       await setProgressComplete('planetscale', 'setInfisicalToken');
       await syncConfig();
 
-      setSavingToken(false);
-
       // Show confirmation screen to verify permissions
       setViewState('token-confirm');
-    } catch (err) {
-      setSavingToken(false);
-      await setConfigError('planetscale', err instanceof Error ? err.message : 'Failed to store token');
+    });
+
+    if (tokenAction.error) {
+      await setConfigError('planetscale', tokenAction.error);
       await syncConfig();
     }
   };
@@ -379,7 +377,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   if (viewState === 'org-select') {
     return (
       <OrgSelector
-        organizations={organizations}
+        organizations={organizations ?? []}
         serviceName="PlanetScale"
         identifierKey="name"
         loading={loadingRegions}
@@ -405,7 +403,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       value: region.slug,
     }));
 
-    const regionItemComponent = ({ isSelected, label }: { isSelected: boolean; label: string }) => {
+    const regionItemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
       const prefix = isSelected ? '❯ ' : '  ';
       return (
         <Text color={isSelected ? 'cyan' : undefined}>
@@ -534,15 +532,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
           <TextInput value={tokenInput} onChange={setTokenInput} onSubmit={handleTokenValueSubmit} />
         </Box>
 
-        {savingToken && (
-          <Box marginTop={1}>
-            <Text color="cyan">
-              <Spinner type="dots" /> Saving to Infisical...
-            </Text>
-          </Box>
-        )}
+        {tokenAction.running && <ActionSpinner label={tokenAction.actionLabel} />}
 
-        {!savingToken && (
+        {!tokenAction.running && (
           <Box marginTop={1}>
             <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
           </Box>

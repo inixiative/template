@@ -1,4 +1,5 @@
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
@@ -7,6 +8,8 @@ import { useEffect, useState } from 'react';
 import { getCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
 import { setProgressComplete } from '../utils/configHelpers';
 import { prompt } from '../utils/prompts';
+
+const execAsync = promisify(exec);
 
 // NOTE: This is a linear wizard flow (not resumable like other setup views)
 // ViewState includes execution states because they represent distinct screens
@@ -66,14 +69,14 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
     setViewState('executing');
 
     try {
-      updateProjectConfig({ name: newName, organization: newOrg });
+      await updateProjectConfig({ name: newName, organization: newOrg });
 
       if (newOrg && newOrg.trim() !== '') {
         await setProgressComplete('project', 'renameOrg');
       }
 
       if (newName !== currentConfig.name) {
-        renameProject(currentConfig.name, newName);
+        await renameProject(currentConfig.name, newName);
       }
 
       if (newName && newName.trim() !== '') {
@@ -81,7 +84,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
       }
 
       setViewState('running-setup');
-      execSync('bun run setup', { stdio: 'pipe' });
+      await execAsync('bun run setup');
       await setProgressComplete('project', 'setup');
 
       setViewState('complete');

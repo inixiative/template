@@ -129,7 +129,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 
       // Go to org select (or run immediately if 1 org)
       if (organizations.length === 1) {
-        await runSetup(organizations[0].id);
+        await runSetup(organizations[0].id!);
       } else {
         setViewState('org-select');
       }
@@ -144,7 +144,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
       // Check if need org selection
       if (organizations.length === 1) {
         // Single org - run immediately
-        await runSetup(organizations[0].id);
+        await runSetup(organizations[0].id!);
       } else {
         // Multiple orgs - show selector
         setViewState('org-select');

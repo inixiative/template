@@ -45,7 +45,7 @@ export const clearAllProgress = async (section: string): Promise<void> => {
  */
 export const setConfigError = async (section: string, message: string): Promise<void> => {
   const config = await getProjectConfig();
-  (config as Record<string, { error: string }>)[section].error = message;
+  (config as unknown as Record<string, { error: string }>)[section].error = message;
   await writeProjectConfig(config);
 };
 

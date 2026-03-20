@@ -2,8 +2,10 @@ import { Box, Text, useInput } from 'ink';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { listTeams } from '../api/vercel';
+import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
+import { useAsyncAction } from '../components/useAsyncAction';
 import { setupVercel } from '../tasks/vercelSetup';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
@@ -166,6 +168,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   const [running, setRunning] = useState(false);
   const [teams, setTeams] = useState<Organization[] | null>(null);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const confirmAction = useAsyncAction();
 
   // Derive setup state from config
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
@@ -315,16 +318,18 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   const handleGithubConfirm = async () => {
     if (!config) return;
 
-    await clearConfigError('vercel');
-    await syncConfig();
+    await confirmAction.run('Resuming setup...', async () => {
+      await clearConfigError('vercel');
+      await syncConfig();
 
-    const existingTeamId = config.vercel?.teamId;
-    const existingTeamName = config.vercel?.teamName || '';
-    if (existingTeamId) {
-      setViewState('status');
-      setRunning(true);
-      await runSetup(existingTeamId, existingTeamName);
-    }
+      const existingTeamId = config.vercel?.teamId;
+      const existingTeamName = config.vercel?.teamName || '';
+      if (existingTeamId) {
+        setViewState('status');
+        setRunning(true);
+        await runSetup(existingTeamId, existingTeamName);
+      }
+    });
   };
 
   // Team selection view
@@ -376,9 +381,13 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
               <Text dimColor>Press Enter when GitHub integration is configured</Text>
             </Box>
 
-            <Box marginTop={1}>
-              <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
-            </Box>
+            {confirmAction.running ? (
+              <ActionSpinner label={confirmAction.actionLabel} />
+            ) : (
+              <Box marginTop={1}>
+                <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>

@@ -259,8 +259,8 @@ export const setupPlanetScale = async (
     // Step 8: Store connection strings in Infisical
     if (!(await isProgressComplete('planetscale', 'storeConnectionStrings'))) {
       await onStepComplete?.('Storing connection strings in Infisical...');
-      const prodConnectionString = productionPassword.connection_strings.general;
-      const stagingConnectionString = stagingPassword.connection_strings.general;
+      const prodConnectionString = productionPassword!.connection_strings.general;
+      const stagingConnectionString = stagingPassword!.connection_strings.general;
 
       if (!prodConnectionString || !stagingConnectionString) {
         throw new Error('Connection strings are empty. Check password creation output.');

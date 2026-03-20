@@ -147,9 +147,9 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
         },
         railway: {
           projectId: railwayResult.projectId,
-          apiServiceId: railwayResult.apiServiceId,
-          workerServiceId: railwayResult.workerServiceId,
-          redisServiceId: railwayResult.redisServiceId,
+          apiServiceId: railwayResult.prodApiServiceId,
+          workerServiceId: railwayResult.prodWorkerServiceId,
+          redisServiceId: railwayResult.prodRedisServiceId,
         },
       },
     };

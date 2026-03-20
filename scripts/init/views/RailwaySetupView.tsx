@@ -1,12 +1,13 @@
 import { Box, Text, useInput } from 'ink';
-import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { listWorkspaces } from '../api/railway';
+import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
-import { getSecret, setSecret } from '../tasks/infisicalSetup';
+import { useAsyncAction } from '../components/useAsyncAction';
+import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
 import { setupRailway } from '../tasks/railwaySetup';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
@@ -193,7 +194,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   const [workspaces, setWorkspaces] = useState<Organization[] | null>(null);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [workspaceToken, setWorkspaceToken] = useState('');
-  const [storingToken, setStoringToken] = useState(false);
+  const tokenAction = useAsyncAction();
+  const confirmAction = useAsyncAction();
 
   // Derive setup state from config
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
@@ -226,7 +228,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   // Handle keyboard input on status page
   useInput((input, key) => {
     // Prevent input if already running or processing
-    if (viewState !== 'status' || running || storingToken) return;
+    if (viewState !== 'status' || running || tokenAction.running) return;
 
     if (key.escape) {
       onCancel();
@@ -245,7 +247,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
   const handleAction = async (action: 'run' | 'continue' | 'restart') => {
     // Prevent duplicate calls
-    if (!config || !workspaces || running || storingToken) return;
+    if (!config || !workspaces || running || tokenAction.running) return;
 
     // Show loading immediately
     setRunning(true);
@@ -273,7 +275,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
       // Go to workspace select (or run immediately if 1 workspace)
       if (workspaces.length === 1) {
-        await runSetup(workspaces[0].id);
+        await runSetup(workspaces[0].id!);
       } else {
         setRunning(false);
         setViewState('workspace-select');
@@ -295,7 +297,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       } else {
         // No workspace selected - go to workspace selection
         if (workspaces.length === 1) {
-          await runSetup(workspaces[0].id);
+          await runSetup(workspaces[0].id!);
         } else {
           setRunning(false);
           setViewState('workspace-select');
@@ -312,7 +314,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
     let hasToken = false;
 
     try {
-      const token = getSecret('RAILWAY_WORKSPACE_TOKEN', {
+      const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
         projectId: infisicalProjectId,
         environment: 'root',
       });
@@ -355,39 +357,35 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   const handleGithubConfirm = async () => {
     if (!config) return;
 
-    await clearConfigError('railway');
+    await confirmAction.run('Resuming setup...', async () => {
+      await clearConfigError('railway');
 
-    // Mark as complete to proceed past the check
-    // If GitHub connection fails, the setup task will clear this flag
-    // Fetch fresh config to avoid using stale progress from React state
-    await syncConfig();
-    const { getProjectConfig } = await import('../utils/getProjectConfig');
-    const freshConfig = await getProjectConfig();
-    await updateConfigField('railway', 'progress', {
-      ...freshConfig.railway.progress,
-      promptedForGithub: true,
+      // Mark as complete to proceed past the check
+      // If GitHub connection fails, the setup task will clear this flag
+      // Fetch fresh config to avoid using stale progress from React state
+      await syncConfig();
+      const { getProjectConfig } = await import('../utils/getProjectConfig');
+      const freshConfig = await getProjectConfig();
+      const { setProgressComplete } = await import('../utils/configHelpers');
+      await setProgressComplete('railway', 'promptedForGithub');
+      await syncConfig();
+
+      const existingWorkspace = freshConfig.railway?.workspaceId;
+      if (existingWorkspace) {
+        setViewState('status');
+        setRunning(true);
+        await runSetup(existingWorkspace);
+      }
     });
-    await syncConfig();
-
-    const existingWorkspace = freshConfig.railway?.workspaceId;
-    if (existingWorkspace) {
-      setViewState('status');
-      setRunning(true);
-      await runSetup(existingWorkspace);
-    }
   };
 
   const handleTokenSubmit = async () => {
     if (!config || !workspaceToken.trim()) return;
 
-    setStoringToken(true);
-
-    try {
+    await tokenAction.run('Storing token and continuing setup...', async () => {
       // Store token in Infisical
       const infisicalProjectId = config.infisical.projectId;
-      await setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
-
-      setStoringToken(false);
+      await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
       // Continue with setup
       const existingWorkspace = config.railway?.workspaceId;
@@ -398,16 +396,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       } else if (workspaces && workspaces.length === 1) {
         setRunning(true);
         setViewState('status');
-        await runSetup(workspaces[0].id);
+        await runSetup(workspaces[0].id!);
       } else {
         setRunning(false);
         setViewState('workspace-select');
       }
-    } catch (error) {
-      setStoringToken(false);
-      setRunning(false);
-      throw error;
-    }
+    });
   };
 
   const handleWorkspaceSelect = async (workspaceId: string) => {
@@ -450,12 +444,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
           <Text>Paste the token below (UUID format, ~36 characters):</Text>
         </Box>
 
-        {storingToken ? (
-          <Box marginTop={1}>
-            <Text color="cyan">
-              <Spinner type="dots" /> Storing token and continuing setup...
-            </Text>
-          </Box>
+        {tokenAction.running ? (
+          <ActionSpinner label={tokenAction.actionLabel} />
         ) : (
           <>
             <Box marginTop={1}>
@@ -517,9 +507,13 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
               </Text>
             </Box>
 
-            <Box marginTop={1}>
-              <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
-            </Box>
+            {confirmAction.running ? (
+              <ActionSpinner label={confirmAction.actionLabel} />
+            ) : (
+              <Box marginTop={1}>
+                <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>

@@ -12,7 +12,7 @@ import {
 } from '../api/vercel';
 import { updateConfigField } from '../utils/configHelpers';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
-import { setSecret } from './infisicalSetup';
+import { setSecretAsync } from './infisicalSetup';
 
 /**
  * Get or create Vercel connection in Infisical (idempotent)
@@ -25,7 +25,7 @@ const getOrCreateVercelConnection = async (infisicalProjectId: string, projectNa
   const vercelToken = auth.token;
 
   // Store Vercel token in Infisical
-  await setSecret(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
+  await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
 
   // Create Vercel connection in Infisical (idempotent)
   const connectionId = await createVercelConnection(
@@ -54,8 +54,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await updateConfigField('vercel', 'configProjectName', projectName);
 
       // Store team ID and name in Infisical for reference
-      await setSecret(infisicalProjectId, 'root', 'VERCEL_TEAM_ID', teamId);
-      await setSecret(infisicalProjectId, 'root', 'VERCEL_TEAM_NAME', teamName);
+      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_ID', teamId);
+      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_NAME', teamName);
 
       await markComplete('vercel', 'selectTeam');
       await syncConfig();

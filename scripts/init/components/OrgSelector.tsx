@@ -37,7 +37,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
   // Auto-select if only one org
   React.useEffect(() => {
     if (organizations.length === 1) {
-      onSelect(organizations[0].id);
+      onSelect(organizations[0].id!);
     }
   }, [organizations, onSelect]);
 
@@ -72,7 +72,7 @@ export const OrgSelector: React.FC<OrgSelectorProps> = ({
     };
   });
 
-  const itemComponent = ({ isSelected, label }: { isSelected: boolean; label: string }) => {
+  const itemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
     const prefix = isSelected ? '❯ ' : '  ';
 
     return (

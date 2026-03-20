@@ -61,8 +61,8 @@ export const setupInfisical = async (
       // Suppressed for TUI: console.log('  • Selecting organization...');
       const response = await getOrganization(selectedOrgId);
 
-      // Handle nested response structure
-      const selectedOrg = response.organization || response;
+      // Handle nested response structure (API returns { organization: {...} })
+      const selectedOrg = (response as unknown as { organization?: typeof response }).organization || response;
       const _orgName = selectedOrg.name || 'Unknown';
       const orgSlug = selectedOrg.slug || selectedOrgId;
 
@@ -96,7 +96,7 @@ export const setupInfisical = async (
 
       // Get final project details to capture actual slug
       const finalProjectDetails = await getProject(projectId);
-      projectSlug = finalProjectDetails.workspace?.slug || project.slug;
+      projectSlug = (finalProjectDetails as unknown as { workspace?: { slug: string } }).workspace?.slug || project.slug;
 
       // Update config with project details
       await updateConfigField('infisical', 'projectId', projectId);
@@ -116,7 +116,8 @@ export const setupInfisical = async (
       try {
         // Get full project details to find dev environment ID
         const projectDetails = await getProject(projectId);
-        const devEnv = projectDetails.workspace?.environments?.find(
+        const workspace = (projectDetails as unknown as { workspace?: { environments?: Array<{ slug: string; id: string }> } }).workspace;
+        const devEnv = workspace?.environments?.find(
           (e: { slug: string; id: string }) => e.slug === 'dev',
         );
 
