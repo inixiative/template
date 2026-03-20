@@ -54,7 +54,7 @@ describe('GET /me/spaces', () => {
     const spaceWithMembership = data.find((s) => s.id === space.id);
     expect(spaceWithMembership).toBeDefined();
     expect(spaceWithMembership!.spaceUser.role).toBe('admin');
-    expect(spaceWithMembership!.organization.id).toBe(org.id);
+    expect(spaceWithMembership!.organization.id).toBe(_org.id);
   });
 
   it('returns multiple spaces across orgs', async () => {
