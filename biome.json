@@ -5,6 +5,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "suspicious": {
+        "noConfusingVoidType": "off"
+      },
       "complexity": {
         "noForEach": "off",
         "useArrowFunction": "error"
@@ -15,6 +18,7 @@
       "style": {
         "noNonNullAssertion": "off",
         "noDefaultExport": "error",
+        "useNodejsImportProtocol": "off",
         "useFilenamingConvention": {
           "level": "error",
           "options": {
@@ -53,7 +57,7 @@
       "!**/generated",
       "!tmp",
       "!packages/shared/styles/theme.css",
-      "!scripts/ci/rule-violations/**"
+      "!scripts/ci/rule-violations"
     ]
   },
   "overrides": [
@@ -125,7 +129,6 @@
       "includes": [
         "apps/**/app/routes/**",
         "**/app/routes/**",
-        "**/scripts/**",
         "**/tests/mocks/**",
         "project.config.template-internal.ts"
       ],

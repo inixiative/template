@@ -16,7 +16,7 @@ import { getProjectConfig } from '../utils/getProjectConfig';
  */
 const initPrismaMigrationTable = async (connectionString: string): Promise<void> => {
   try {
-    execSync(`bun scripts/db/init-migration-table.ts "${connectionString}"`, {
+    execSync(`bun scripts/db/initMigrationTable.ts "${connectionString}"`, {
       encoding: 'utf-8',
       stdio: 'pipe',
       timeout: 30000,

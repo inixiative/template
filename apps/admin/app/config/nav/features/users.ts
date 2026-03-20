@@ -7,4 +7,12 @@ export const usersItem: NavItem = {
   path: '/users',
   icon: Users,
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    { label: 'Users', path: '/members' },
+    {
+      label: 'Invitations',
+      path: '/invitations',
+      access: (_permissions, context) => context.type === 'organization',
+    },
+  ],
 };

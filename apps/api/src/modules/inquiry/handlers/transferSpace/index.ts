@@ -14,6 +14,8 @@ export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
   resolutionSchema: baseResolutionInputSchema,
   unique: 'untargeted',
   defaultExpirationDays: 30,
+  autoApprove: async () => false,
+
   handleApprove: async (db, inquiry) => {
     await db.space.update({
       where: { id: inquiry.sourceSpaceId as SpaceId },

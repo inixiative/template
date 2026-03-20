@@ -11,6 +11,7 @@ export const meReadManyInquiriesReceivedController = makeController(
     const db = c.get('db');
 
     const { data, pagination } = await paginate(c, db.inquiry, {
+      orNullFields: ['expiresAt'],
       where: {
         targetModel: InquiryResourceModel.User,
         targetUserId: user.id,

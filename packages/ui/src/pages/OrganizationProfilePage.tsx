@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   type OrganizationUpdateData,
   organizationProtected,
@@ -7,7 +6,7 @@ import {
 } from '@template/ui/apiClient';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
-import { useQuery } from '@template/ui/hooks';
+import { useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
@@ -17,10 +16,10 @@ import { useEffect, useState } from 'react';
 export const OrganizationProfilePage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const organizationId = context.organization!.id;
-  const queryClient = useQueryClient();
+  const detailQueryKey = organizationProtectedQueryKey({ path: { id: organizationId } });
 
   const { data, isLoading } = useQuery({
-    queryKey: organizationProtectedQueryKey({ path: { id: organizationId } }),
+    queryKey: detailQueryKey,
     queryFn: apiQuery((opts: Parameters<typeof organizationProtected>[0]) =>
       organizationProtected({ ...opts, path: { id: organizationId } }),
     ),
@@ -35,13 +34,18 @@ export const OrganizationProfilePage = () => {
     setSlug(profile?.slug ?? '');
   }, [profile?.name, profile?.slug]);
 
-  const updateMutation = useMutation({
+  const updateMutation = useOptimisticMutation({
     mutationFn: apiMutation((payload: Omit<OrganizationUpdateData, 'url'>) => organizationUpdate(payload)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: organizationProtectedQueryKey({ path: { id: organizationId } }),
-      });
-    },
+    targets: [
+      {
+        queryKey: detailQueryKey,
+        optimisticUpdate: (old, payload: Omit<OrganizationUpdateData, 'url'>) => {
+          const cached = old as { data?: Record<string, unknown> } | undefined;
+          if (!cached?.data) return cached;
+          return { ...cached, data: { ...cached.data, ...payload.body } };
+        },
+      },
+    ],
   });
 
   const handleSave = () => {

@@ -31,6 +31,8 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
     if (existing) throw makeError({ status: 409, message: 'User is already a member of this organization' });
   },
 
+  autoApprove: async () => false,
+
   handleApprove: async (db: Db, inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
     await db.organizationUser.create({
       data: {

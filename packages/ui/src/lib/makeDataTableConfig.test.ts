@@ -39,15 +39,15 @@ describe('makeDataTableConfig', () => {
     expect(arrayFields).toEqual([]);
   });
 
-  it('auto-detects enum filters from schema with in/notin ops', () => {
+  it('auto-detects enum filters from schema with in/notIn ops', () => {
     const config = makeDataTableConfig('adminInquiryReadMany');
 
     const statusFilter = config.enumFilters.find((f) => f.field === 'status');
     expect(statusFilter).toBeDefined();
     expect(statusFilter?.values).toContain('draft');
     expect(statusFilter?.values).toContain('sent');
-    expect(statusFilter?.values).toContain('resolved');
-    expect(statusFilter?.operators).toEqual(['in', 'notin']);
+    expect(statusFilter?.values).toContain('changesRequested');
+    expect(statusFilter?.operators).toEqual(['in', 'notIn']);
   });
 
   it('applies boolean canSearch permission', () => {
@@ -66,10 +66,11 @@ describe('makeDataTableConfig', () => {
     expect(config.canOrder).toBe(false);
   });
 
-  it('defaults canSearch and canOrder to true', () => {
+  it('defaults canSearch to false when no searchable fields, canOrder to true', () => {
     const config = makeDataTableConfig('adminOrganizationReadMany');
 
-    expect(config.canSearch).toBe(true);
+    // Admin routes have no searchable fields, so canSearch defaults to false
+    expect(config.canSearch).toBe(false);
     expect(config.canOrder).toBe(true);
   });
 
@@ -107,7 +108,8 @@ describe('makeDataTableConfig', () => {
     const config = makeDataTableConfig('tokenDelete');
 
     expect(config.searchableFields).toEqual([]);
-    expect(config.canSearch).toBe(true);
+    // No searchable fields → canSearch defaults to false (nothing to search against)
+    expect(config.canSearch).toBe(false);
     expect(config.canOrder).toBe(true);
   });
 

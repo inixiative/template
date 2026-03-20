@@ -55,6 +55,27 @@ describe('POST /api/v1/inquiry/:id/resolve', () => {
     expect(data.status).toBe(InquiryStatus.approved);
   });
 
+  it('returns source relations but not target relations in response', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
+    const response = await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const { data } = await json<Record<string, unknown>>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.sourceOrganization).toBeDefined();
+    expect(data.targetUser).toBeUndefined();
+  });
+
   it('sets status to denied', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({

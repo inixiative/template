@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import type { UserId } from '@template/db/generated/client/client';
+import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import type { RebacSchema } from '@template/permissions/rebac/types';
@@ -701,7 +701,7 @@ describe('rebac check', () => {
       const org: Record<string, unknown> = { id: 'org-1', parentSpace: space };
       space.organization = org;
 
-      expect(() => check(permix, cyclicSchema, 'space', space, 'own')).toThrow(/Cycle detected/);
+      expect(() => check(permix, cyclicSchema, 'space', space as { id: string }, 'own')).toThrow(/Cycle detected/);
     });
   });
 });

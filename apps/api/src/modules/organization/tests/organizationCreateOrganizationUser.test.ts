@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { z } from '@hono/zod-openapi';
+import { OpenAPIHono, type z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
-import { organizationRouter } from '#/modules/organization';
-import type { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
+import { validateActor } from '#/middleware/validations/validateActor';
+import { organizationCreateOrganizationUserController } from '#/modules/organization/controllers/organizationCreateOrganizationUser';
+import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
+import type { AppEnv } from '#/types/appEnv';
 import { createTestApp } from '#tests/createTestApp';
 import { json, jsonError, post } from '#tests/utils/request';
 
@@ -26,10 +28,14 @@ describe('POST /api/v1/organization/:id/organizationUsers', () => {
     const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
     adminOrgUser = ou;
 
+    const router = new OpenAPIHono<AppEnv>();
+    router.use('*', validateActor);
+    router.openapi(organizationCreateOrganizationUserRoute, organizationCreateOrganizationUserController);
+
     const harness = createTestApp({
       mockUser: admin,
       mockOrganizationUsers: [adminOrgUser],
-      mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
+      mount: [(app) => app.route('/api/v1/organization', router)],
     });
     fetch = harness.fetch;
     db = harness.db;

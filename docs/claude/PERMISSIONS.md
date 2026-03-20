@@ -415,6 +415,15 @@ Defines how actions can delegate to other actions or related resources:
 const highRoles = ['owner', 'admin'];
 
 export const rebacSchema: RebacSchema = {
+  user: {
+    actions: {
+      own: null,
+      manage: 'own',
+      operate: 'manage',
+      read: 'operate',
+    },
+  },
+
   organization: {
     actions: {
       own: null,           // Terminal - no delegation
@@ -430,6 +439,7 @@ export const rebacSchema: RebacSchema = {
       },
     },
   },
+
   space: {
     actions: {
       own: { rel: 'organization', action: 'own' },  // Delegate to org
@@ -439,6 +449,7 @@ export const rebacSchema: RebacSchema = {
       assign: { /* same as organization */ },
     },
   },
+
   organizationUser: {
     actions: {
       read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
@@ -447,6 +458,7 @@ export const rebacSchema: RebacSchema = {
       own: { rel: 'organization', action: 'own' },
     },
   },
+
   spaceUser: {
     actions: {
       read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
@@ -455,9 +467,63 @@ export const rebacSchema: RebacSchema = {
       own: { rel: 'space', action: 'own' },
     },
   },
+
   token: {
     actions: {
       leave: { self: 'userId' },  // Users can delete their own tokens
+    },
+  },
+
+  authProvider: {
+    actions: {
+      own: { rel: 'organization', action: 'own' },  // Only org owners manage auth providers
+    },
+  },
+
+  inquiry: {
+    actions: {
+      // Source or target can read their own inquiry
+      read: {
+        any: [
+          { self: 'sourceUserId' },
+          { rel: 'sourceOrganization', action: 'manage' },
+          { rel: 'sourceSpace', action: 'manage' },
+          { self: 'targetUserId' },
+          { rel: 'targetOrganization', action: 'manage' },
+          { rel: 'targetSpace', action: 'manage' },
+        ],
+      },
+
+      // Send: who may create/initiate each inquiry type
+      send: {
+        any: [
+          // Source user can act on their own inquiry (cancel, edit, re-send)
+          // Add type strings here when user-sourced inquiry types exist
+          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { self: 'sourceUserId' }] },
+          // inviteOrganizationUser: high roles require own
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'in', value: highRoles } }, { rel: 'sourceOrganization', action: 'own' }] },
+          // inviteOrganizationUser: normal roles require manage
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'notIn', value: highRoles } }, { rel: 'sourceOrganization', action: 'manage' }] },
+          // createSpace — org owner only
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['createSpace'] } }, { rel: 'sourceOrganization', action: 'own' }] },
+          // updateSpace — space owner or org owner (sourceSpace.own delegates to org.own)
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['updateSpace'] } }, { rel: 'sourceSpace', action: 'own' }] },
+          // transferSpace — org owner only (explicit 2-hop bypasses direct space.own)
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'sourceSpace.organization', action: 'own' }] },
+        ],
+      },
+
+      // Resolve: target decides (approve/deny/requestChanges)
+      resolve: {
+        any: [
+          { self: 'targetUserId' },
+          // transferSpace — target org owner only
+          { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'own' }] },
+          // all other types — target org manager
+          { all: [{ rule: { field: 'type', operator: 'notIn', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'manage' }] },
+          { rel: 'targetSpace', action: 'manage' },
+        ],
+      },
     },
   },
 };

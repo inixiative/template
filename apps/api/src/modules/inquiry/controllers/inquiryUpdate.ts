@@ -6,7 +6,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -42,7 +42,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
       ...(content !== undefined && { content: content as Prisma.InputJsonValue }),
       ...statusFields,
     },
-    include: includeInquiryResponse,
+    include: includeInquirySent,
   });
 
   return respond.ok(updated);

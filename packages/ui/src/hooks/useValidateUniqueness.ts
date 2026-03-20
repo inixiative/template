@@ -49,7 +49,8 @@ export const useValidateUniqueness = (
         throw result.error;
       }
 
-      const record = result?.data?.data ?? result?.data;
+      const raw = result?.data;
+      const record = raw ? ('data' in raw ? raw.data : (raw as { id: string })) : undefined;
       const isTaken = record && (!options?.excludeId || record.id !== options.excludeId);
 
       return {

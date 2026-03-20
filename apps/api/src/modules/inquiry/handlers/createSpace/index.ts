@@ -49,6 +49,8 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   resolutionSchema,
   defaultExpirationDays: 90,
   validate,
+  autoApprove: async () => false,
+
   handleApprove: async (db, inquiry, content) => {
     const space = await db.space.create({
       data: { ...content, organizationId: inquiry.sourceOrganizationId as OrganizationId },

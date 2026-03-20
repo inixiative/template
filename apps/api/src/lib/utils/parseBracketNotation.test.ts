@@ -47,6 +47,23 @@ describe('parseBracketNotation', () => {
     });
   });
 
+  it('collects repeated leaf params into arrays', () => {
+    const url =
+      '?searchFields[type][in]=inviteOrganizationUser&searchFields[type][in]=transferSpace&searchFields[status][notIn]=denied&searchFields[status][notIn]=canceled';
+    const result = parseBracketNotation(url);
+
+    expect(result).toEqual({
+      searchFields: {
+        type: {
+          in: ['inviteOrganizationUser', 'transferSpace'],
+        },
+        status: {
+          notIn: ['denied', 'canceled'],
+        },
+      },
+    });
+  });
+
   it('handles URL encoding', () => {
     const url = '?filters[name]=John%20Doe';
     const result = parseBracketNotation(url);

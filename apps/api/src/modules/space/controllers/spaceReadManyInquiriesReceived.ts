@@ -12,6 +12,7 @@ export const spaceReadManyInquiriesReceivedController = makeController(
     const space = getResource<'space'>(c);
 
     const { data, pagination } = await paginate(c, db.inquiry, {
+      orNullFields: ['expiresAt'],
       where: {
         targetModel: InquiryResourceModel.Space,
         targetSpaceId: space.id,

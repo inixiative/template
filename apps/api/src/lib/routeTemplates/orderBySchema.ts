@@ -13,7 +13,7 @@ export const orderByRequestSchema = z
     example: ['name:asc', 'user.email:desc', 'createdAt:desc'],
   });
 
-export const parseOrderBy = (orderBy: string[]): Record<string, Prisma.SortOrder>[] => {
+export const parseOrderBy = (orderBy: string[]): Record<string, unknown>[] => {
   return orderBy.map((item) => {
     const [field, direction] = item.split(':');
 

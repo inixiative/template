@@ -230,6 +230,79 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('handles in and notIn arrays for field operators', () => {
+      const result = buildWhereClause({
+        searchFields: {
+          type: { in: ['inviteOrganizationUser', 'transferSpace'] },
+          status: { notIn: ['denied', 'canceled'] },
+        },
+        searchableFields: ['type', 'status'],
+      });
+
+      expect(result).toEqual({
+        AND: [
+          { type: { in: ['inviteOrganizationUser', 'transferSpace'] } },
+          { status: { notIn: ['denied', 'canceled'] } },
+        ],
+      });
+    });
+
+    it('normalizes singleton in and notIn values to arrays', () => {
+      const result = buildWhereClause({
+        searchFields: {
+          type: { in: 'inviteOrganizationUser' },
+          status: { notIn: 'denied' },
+        },
+        searchableFields: ['type', 'status'],
+      });
+
+      expect(result).toEqual({
+        AND: [{ type: { in: ['inviteOrganizationUser'] } }, { status: { notIn: ['denied'] } }],
+      });
+    });
+
+    it('widens configured fields to include null values', () => {
+      const now = '2026-03-20T12:00:00.000Z';
+
+      const result = buildWhereClause({
+        searchFields: {
+          expiresAt: { gte: now },
+        },
+        searchableFields: ['expiresAt'],
+        orNullFields: ['expiresAt'],
+      });
+
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [{ expiresAt: { gte: now } }, { expiresAt: null }],
+          },
+        ],
+      });
+    });
+
+    it('rejects array values for non-array field operators', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: {
+            name: { contains: ['john', 'jane'] },
+          },
+          searchableFields: ['name'],
+        }),
+      ).toThrow("Operator 'contains' on field 'name' does not support array values");
+    });
+
+    it('rejects array values without an operator', () => {
+      expect(() =>
+        buildWhereClause({
+          searchFields: {
+            status: ['pending', 'approved'],
+          },
+          searchableFields: ['status'],
+        }),
+      ).toThrow("Field 'status' does not support array values without an operator");
+    });
+
     it('rejects non-whitelisted relation fields', () => {
       expect(() =>
         buildWhereClause({

@@ -1,4 +1,5 @@
-export type BracketQueryValue = string | number | boolean | null | BracketQueryRecord;
+export type BracketQueryPrimitive = string | number | boolean | null;
+export type BracketQueryValue = BracketQueryPrimitive | BracketQueryPrimitive[] | BracketQueryRecord;
 export type BracketQueryRecord = {
   [key: string]: BracketQueryValue | undefined;
 };
@@ -32,7 +33,20 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     }
 
     const decodedValue = decodeURIComponent(value.replace(/\+/g, ' ')).trim();
-    current[keys[keys.length - 1]] = decodedValue;
+    const leafKey = keys[keys.length - 1];
+    const existingValue = current[leafKey];
+
+    if (existingValue === undefined) {
+      current[leafKey] = decodedValue;
+      continue;
+    }
+
+    if (Array.isArray(existingValue)) {
+      existingValue.push(decodedValue);
+      continue;
+    }
+
+    current[leafKey] = [existingValue as BracketQueryPrimitive, decodedValue];
   }
 
   return result;

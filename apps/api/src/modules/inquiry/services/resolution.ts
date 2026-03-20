@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import type { AppEnv } from '#/types/appEnv';
@@ -41,7 +41,7 @@ export const resolveInquiry = async (
           resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
           expiresAt,
         },
-        include: includeInquiryResponse,
+        include: includeInquiryReceived,
       });
     });
   } finally {

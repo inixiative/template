@@ -13,6 +13,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./utils": "./src/utils/index.ts",
+    "./bracketQuery": "./src/lib/bracketQuery/index.ts",
     "./lib": "./src/lib/index.ts",
     "./logger": "./src/logger/index.ts",
     "./adapter": "./src/adapter/index.ts",

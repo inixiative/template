@@ -6,7 +6,7 @@ type InviteUserModalProps = {
   onClose: () => void;
   onSubmit: (email: string, role: string) => void;
   title?: string;
-  roles?: { value: string; label: string }[];
+  roles?: string[];
 };
 
 export const InviteUserModal = memo(
@@ -15,21 +15,17 @@ export const InviteUserModal = memo(
     onClose,
     onSubmit,
     title = 'Invite User',
-    roles = [
-      { value: 'member', label: 'Member' },
-      { value: 'admin', label: 'Admin' },
-      { value: 'owner', label: 'Owner' },
-    ],
+    roles = ['member', 'admin', 'owner'],
   }: InviteUserModalProps) => {
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState(roles[0]?.value || 'member');
+    const [role, setRole] = useState(roles[0] ?? 'member');
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (email.trim()) {
         onSubmit(email.trim(), role);
         setEmail('');
-        setRole(roles[0]?.value || 'member');
+        setRole(roles[0] ?? 'member');
         onClose();
       }
     };
@@ -59,8 +55,8 @@ export const InviteUserModal = memo(
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {roles.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
+                <option key={r} value={r}>
+                  {r}
                 </option>
               ))}
             </select>

@@ -14,7 +14,7 @@ import { del } from '#tests/utils/request';
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/inquiry', inquiryRouter)];
 
-describe('DELETE /api/v1/inquiry/:id', () => {
+describe('DELETE /api/v1/inquiry/:id/cancel', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
   let admin: User;
@@ -50,7 +50,7 @@ describe('DELETE /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}`));
+    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
     expect(response.status).toBe(204);
   });
 
@@ -67,7 +67,7 @@ describe('DELETE /api/v1/inquiry/:id', () => {
       expiresAt: new Date('2099-01-01'),
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}`));
+    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
     expect(response.status).toBe(204);
 
     const updated = await db.inquiry.findUnique({ where: { id: inquiry.id } });
@@ -86,7 +86,7 @@ describe('DELETE /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}`));
+    const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
     expect(response.status).toBe(400);
   });
 });

@@ -12,7 +12,7 @@ import {
 import { Badge, Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
+import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
@@ -36,28 +36,40 @@ export const OrganizationAuthProvidersPage = () => {
 
   const providers = data?.data?.organization ?? [];
 
-  const deleteMutation = useOptimisticListMutation<AuthProvider, Omit<AuthProviderDeleteData, 'url'>>({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof authProviderDelete>[0]) =>
       authProviderDelete(requestOptions),
     ),
-    queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
-    operation: 'delete',
+    targets: [
+      createOptimisticListTarget<AuthProvider, Omit<AuthProviderDeleteData, 'url'>>({
+        queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
+        operation: 'delete',
+      }),
+    ],
   });
 
-  const createMutation = useOptimisticListMutation<AuthProvider, Omit<OrganizationCreateAuthProviderData, 'url'>>({
+  const createMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreateAuthProvider>[0]) =>
       organizationCreateAuthProvider(requestOptions),
     ),
-    queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
-    operation: 'create',
+    targets: [
+      createOptimisticListTarget<AuthProvider, Omit<OrganizationCreateAuthProviderData, 'url'>>({
+        queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
+        operation: 'create',
+      }),
+    ],
   });
 
-  const updateMutation = useOptimisticListMutation<AuthProvider, Omit<AuthProviderUpdateData, 'url'>>({
+  const updateMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof authProviderUpdate>[0]) =>
       authProviderUpdate(requestOptions),
     ),
-    queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
-    operation: 'update',
+    targets: [
+      createOptimisticListTarget<AuthProvider, Omit<AuthProviderUpdateData, 'url'>>({
+        queryKey: organizationReadAuthProviderQueryKey({ path: { id: organizationId! } }),
+        operation: 'update',
+      }),
+    ],
   });
 
   const getTypeLabel = (type: string) => {

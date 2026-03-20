@@ -12,5 +12,6 @@ export const inquirySearchableFields = searchable({
     'targetUserId',
     'targetOrganizationId',
     'targetSpaceId',
+    'expiresAt',
   ],
 });

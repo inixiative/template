@@ -22,7 +22,7 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
 
   return createRoute({
     ...routeArgs,
-    operationId: buildOperationId({ action: 'delete', model, submodel, admin }),
+    operationId: buildOperationId({ action: action ?? 'delete', model, submodel, admin }),
     method: 'delete',
     path: routePath,
     tags: routeTags,

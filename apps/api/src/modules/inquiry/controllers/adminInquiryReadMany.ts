@@ -7,6 +7,7 @@ export const adminInquiryReadManyController = makeController(adminInquiryReadMan
   const db = c.get('db');
 
   const { data, pagination } = await paginate(c, db.inquiry, {
+    orNullFields: ['expiresAt'],
     include: includeInquiryResponse,
   });
 

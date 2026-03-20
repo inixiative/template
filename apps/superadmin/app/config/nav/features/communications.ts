@@ -7,4 +7,14 @@ export const communicationsItem: NavItem = {
   path: '/communications',
   icon: Mail,
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    {
+      label: 'Inquiries',
+      path: '/inquiries',
+      items: [
+        { label: 'Platform', path: '/platform' },
+        { label: 'All', path: '/all' },
+      ],
+    },
+  ],
 };

@@ -1,8 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/ui/apiClient';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
-import { useQuery } from '@template/ui/hooks';
+import { useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
@@ -12,10 +11,10 @@ import { useEffect, useState } from 'react';
 export const SpaceProfilePage = () => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const spaceId = context.space!.id;
-  const queryClient = useQueryClient();
+  const detailQueryKey = spaceProtectedQueryKey({ path: { id: spaceId } });
 
   const { data, isLoading } = useQuery({
-    queryKey: spaceProtectedQueryKey({ path: { id: spaceId } }),
+    queryKey: detailQueryKey,
     queryFn: apiQuery((opts: Parameters<typeof spaceProtected>[0]) =>
       spaceProtected({ ...opts, path: { id: spaceId } }),
     ),
@@ -30,13 +29,18 @@ export const SpaceProfilePage = () => {
     setSlug(profile?.slug ?? '');
   }, [profile?.name, profile?.slug]);
 
-  const updateMutation = useMutation({
+  const updateMutation = useOptimisticMutation({
     mutationFn: apiMutation((payload: Omit<SpaceUpdateData, 'url'>) => spaceUpdate(payload)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: spaceProtectedQueryKey({ path: { id: spaceId } }),
-      });
-    },
+    targets: [
+      {
+        queryKey: detailQueryKey,
+        optimisticUpdate: (old, payload: Omit<SpaceUpdateData, 'url'>) => {
+          const cached = old as { data?: Record<string, unknown> } | undefined;
+          if (!cached?.data) return cached;
+          return { ...cached, data: { ...cached.data, ...payload.body } };
+        },
+      },
+    ],
   });
 
   const handleSave = () => {

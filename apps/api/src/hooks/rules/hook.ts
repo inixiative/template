@@ -117,7 +117,10 @@ export const registerRulesHook = () => {
     '*',
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
-    async ({ model, args }) => processCreateArgs(args, model as ModelName),
+    async ({ model, args }) => {
+      if (model === 'AuditLog') return;
+      processCreateArgs(args, model as ModelName);
+    },
   );
 
   // Upsert hook - validate create path always, update path only if record exists

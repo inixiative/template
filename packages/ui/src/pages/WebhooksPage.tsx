@@ -1,27 +1,14 @@
-import {
-  type MeCreateWebhookSubscriptionData,
-  type MeReadManyWebhookSubscriptionsResponse,
-  meCreateWebhookSubscription,
-  meReadManyWebhookSubscriptions,
-  meReadManyWebhookSubscriptionsQueryKey,
-  type OrganizationCreateWebhookSubscriptionData,
-  type OrganizationReadManyWebhookSubscriptionsResponse,
-  organizationCreateWebhookSubscription,
-  organizationReadManyWebhookSubscriptions,
-  organizationReadManyWebhookSubscriptionsQueryKey,
-  type SpaceCreateWebhookSubscriptionData,
-  type SpaceReadManyWebhookSubscriptionsResponse,
-  spaceCreateWebhookSubscription,
-  spaceReadManyWebhookSubscriptions,
-  spaceReadManyWebhookSubscriptionsQueryKey,
-  type WebhookSubscriptionDeleteData,
-  webhookSubscriptionDelete,
+import type {
+  MeCreateWebhookSubscriptionData,
+  MeReadManyWebhookSubscriptionsResponse,
+  OrganizationReadManyWebhookSubscriptionsResponse,
+  SpaceReadManyWebhookSubscriptionsResponse,
+  WebhookSubscriptionDeleteData,
 } from '@template/ui/apiClient';
 import { Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
-import { apiMutation } from '@template/ui/lib/apiMutation';
-import { apiQuery } from '@template/ui/lib/apiQuery';
+import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
 import { Plus, Trash2 } from 'lucide-react';
@@ -35,73 +22,33 @@ type WebhookSubscription =
 export const WebhooksPage = () => {
   const [_isModalOpen, setIsModalOpen] = useState(false);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
-  const organizationId = context.organization?.id;
-  const spaceId = context.space?.id;
-
-  const endpoints = (() => {
-    switch (context.type) {
-      case 'user':
-        return {
-          queryKey: meReadManyWebhookSubscriptionsQueryKey(),
-          queryFn: apiQuery((opts: Parameters<typeof meReadManyWebhookSubscriptions>[0]) =>
-            meReadManyWebhookSubscriptions(opts),
-          ),
-        };
-      case 'organization':
-        return {
-          queryKey: organizationReadManyWebhookSubscriptionsQueryKey({ path: { id: organizationId! } }),
-          queryFn: apiQuery((opts: Parameters<typeof organizationReadManyWebhookSubscriptions>[0]) =>
-            organizationReadManyWebhookSubscriptions({ ...opts, path: { id: organizationId! } }),
-          ),
-        };
-      case 'space':
-        return {
-          queryKey: spaceReadManyWebhookSubscriptionsQueryKey({ path: { id: spaceId! } }),
-          queryFn: apiQuery((opts: Parameters<typeof spaceReadManyWebhookSubscriptions>[0]) =>
-            spaceReadManyWebhookSubscriptions({ ...opts, path: { id: spaceId! } }),
-          ),
-        };
-    }
-  })();
+  const webhookQueries = webhookContextQueries(context);
 
   const { data, isLoading } = useQuery({
-    queryKey: endpoints.queryKey,
-    queryFn: endpoints.queryFn,
-    enabled: context.type === 'user' || !!organizationId || !!spaceId,
+    queryKey: webhookQueries.readMany.queryKey,
+    queryFn: webhookQueries.readMany.queryFn,
   });
 
   const webhooks = data?.data ?? [];
 
-  const deleteMutation = useOptimisticListMutation<WebhookSubscription, Omit<WebhookSubscriptionDeleteData, 'url'>>({
-    mutationFn: apiMutation((opts: Parameters<typeof webhookSubscriptionDelete>[0]) => webhookSubscriptionDelete(opts)),
-    queryKey: endpoints.queryKey,
-    operation: 'delete',
+  const deleteMutation = useOptimisticMutation({
+    mutationFn: webhookQueries.delete.mutationFn,
+    targets: [
+      createOptimisticListTarget<WebhookSubscription, Omit<WebhookSubscriptionDeleteData, 'url'>>({
+        queryKey: webhookQueries.readMany.queryKey,
+        operation: 'delete',
+      }),
+    ],
   });
 
-  type CreateData = Omit<
-    MeCreateWebhookSubscriptionData | OrganizationCreateWebhookSubscriptionData | SpaceCreateWebhookSubscriptionData,
-    'url'
-  >;
-
-  const createMutation = useOptimisticListMutation<WebhookSubscription, CreateData>({
-    mutationFn: async (vars) => {
-      switch (context.type) {
-        case 'user':
-          return apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) =>
-            meCreateWebhookSubscription(opts),
-          )(vars as Omit<MeCreateWebhookSubscriptionData, 'url'>);
-        case 'organization':
-          return apiMutation((opts: Parameters<typeof organizationCreateWebhookSubscription>[0]) =>
-            organizationCreateWebhookSubscription(opts),
-          )(vars as Omit<OrganizationCreateWebhookSubscriptionData, 'url'>);
-        case 'space':
-          return apiMutation((opts: Parameters<typeof spaceCreateWebhookSubscription>[0]) =>
-            spaceCreateWebhookSubscription(opts),
-          )(vars as Omit<SpaceCreateWebhookSubscriptionData, 'url'>);
-      }
-    },
-    queryKey: endpoints.queryKey,
-    operation: 'create',
+  const createMutation = useOptimisticMutation({
+    mutationFn: webhookQueries.create.mutationFn,
+    targets: [
+      createOptimisticListTarget<WebhookSubscription, Omit<MeCreateWebhookSubscriptionData, 'url'>>({
+        queryKey: webhookQueries.readMany.queryKey,
+        operation: 'create',
+      }),
+    ],
   });
 
   const columns = [
@@ -135,20 +82,8 @@ export const WebhooksPage = () => {
     },
   ];
 
-  const buildCreatePayload = (body: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>): CreateData => {
-    switch (context.type) {
-      case 'user':
-        return { body };
-      case 'organization':
-        return { path: { id: organizationId! }, body };
-      case 'space':
-        return { path: { id: spaceId! }, body };
-    }
-  };
-
   const _handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
-    const payload = buildCreatePayload(data);
-    createMutation.mutate(payload);
+    createMutation.mutate({ body: data });
     setIsModalOpen(false);
   };
 
