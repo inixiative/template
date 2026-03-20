@@ -18,7 +18,7 @@ import {
   mergeInquiryFilters,
 } from '@template/ui/lib/inquiryQueryKeys';
 import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type Inquiry = AdminInquiryReadManyResponses[200]['data'][number];
 
@@ -33,7 +33,10 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   const merged = mergeInquiryFilters(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
   });
-  const searchFields = inquiryFiltersToSearchFields(merged);
+  // Stable on mount — filters prop doesn't change; useMemo prevents key churn on re-renders
+  const expiredCutoff = useMemo(() => (merged.includeExpired === false ? new Date() : undefined), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
   const hasSearchFields = Object.keys(searchFields).length > 0;
 
   const { data, isLoading } = useQuery({
@@ -159,61 +162,59 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
             ))}
           </tr>
         </thead>
-        <tbody>
-          {inquiries.map((inq) => {
-            const entry = getInquiryInterface(inq.type);
-            const SourceSummary = entry?.source?.summary;
-            const TargetSummary = entry?.target?.summary;
+        {inquiries.map((inq) => {
+          const entry = getInquiryInterface(inq.type);
+          const SourceSummary = entry?.source?.summary;
+          const TargetSummary = entry?.target?.summary;
 
-            // Registry components expect InquirySentItem / InquiryReceivedItem; admin item is structurally compatible
-            const sourceNode = SourceSummary ? (
-              <SourceSummary inquiry={inq as unknown as InquirySentItem} />
-            ) : (
-              actorLabel(inq, 'source')
-            );
-            const targetNode = TargetSummary ? (
-              <TargetSummary inquiry={inq as unknown as InquiryReceivedItem} />
-            ) : (
-              actorLabel(inq, 'target')
-            );
+          // Registry components expect InquirySentItem / InquiryReceivedItem; admin item is structurally compatible
+          const sourceNode = SourceSummary ? (
+            <SourceSummary inquiry={inq as unknown as InquirySentItem} />
+          ) : (
+            actorLabel(inq, 'source')
+          );
+          const targetNode = TargetSummary ? (
+            <TargetSummary inquiry={inq as unknown as InquiryReceivedItem} />
+          ) : (
+            actorLabel(inq, 'target')
+          );
 
-            return (
-              // group on tbody so both rows highlight together on hover
-              <tbody key={inq.id} className="group border-b last:border-b-0">
-                <tr className="group-hover:bg-muted/30 transition-colors">
-                  <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                    {INQUIRY_TYPE_LABELS[inq.type] ?? inq.type}
-                  </td>
-                  <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                    <StatusBadge inq={inq} />
-                  </td>
-                  <td className="px-4 pt-3 pb-1 text-sm">
-                    <span className="text-xs text-muted-foreground mr-1">↑</span>
-                    {sourceNode}
-                  </td>
-                  <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                    {inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
-                    {inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-4 pt-3 pb-1">
-                    <InquirySourceControls inquiry={inq as unknown as InquirySentItem} />
-                  </td>
-                </tr>
-                <tr className="group-hover:bg-muted/30 transition-colors">
-                  <td className="px-4 pb-3 pt-1 text-sm">
-                    <span className="text-xs text-muted-foreground mr-1">↓</span>
-                    {targetNode}
-                  </td>
-                  <td className="px-4 pb-3 pt-1">
-                    <InquiryTargetControls inquiry={inq as unknown as InquiryReceivedItem} />
-                  </td>
-                </tr>
-              </tbody>
-            );
-          })}
-        </tbody>
+          return (
+            // group on tbody so both rows highlight together on hover
+            <tbody key={inq.id} className="group border-b last:border-b-0">
+              <tr className="group-hover:bg-muted/30 transition-colors">
+                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+                  {INQUIRY_TYPE_LABELS[inq.type] ?? inq.type}
+                </td>
+                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+                  <StatusBadge inq={inq} />
+                </td>
+                <td className="px-4 pt-3 pb-1 text-sm">
+                  <span className="text-xs text-muted-foreground mr-1">↑</span>
+                  {sourceNode}
+                </td>
+                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+                  {inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'}
+                </td>
+                <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
+                  {inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'}
+                </td>
+                <td className="px-4 pt-3 pb-1">
+                  <InquirySourceControls inquiry={inq as unknown as InquirySentItem} />
+                </td>
+              </tr>
+              <tr className="group-hover:bg-muted/30 transition-colors">
+                <td className="px-4 pb-3 pt-1 text-sm">
+                  <span className="text-xs text-muted-foreground mr-1">↓</span>
+                  {targetNode}
+                </td>
+                <td className="px-4 pb-3 pt-1">
+                  <InquiryTargetControls inquiry={inq as unknown as InquiryReceivedItem} />
+                </td>
+              </tr>
+            </tbody>
+          );
+        })}
       </table>
     </div>
   );

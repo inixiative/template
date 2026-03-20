@@ -34,15 +34,18 @@ export type DataTableOptions = {
  */
 export const makeDataTableConfig = (operationId: string, options?: DataTableOptions): DataTableConfig => {
   const metadata = getQueryMetadataByOperation(operationId);
+  const adminMode = options?.adminMode ?? false;
+  const searchableFields = metadata.searchableFields ?? [];
 
   return {
-    searchableFields: metadata.searchableFields ?? [],
+    searchableFields,
     orderableFields: metadata.orderableFields ?? [],
     enumFilters: metadata.enumFilters ?? [],
     searchMode: options?.searchMode ?? 'combined',
-    adminMode: options?.adminMode ?? false,
+    adminMode,
     defaultOrderBy: options?.defaultOrderBy,
-    canSearch: options?.canSearch ?? true,
+    // Search requires searchable fields; adminMode only supports field-specific filters (no broad search)
+    canSearch: options?.canSearch ?? (!adminMode && searchableFields.length > 0),
     canOrder: options?.canOrder ?? true,
   };
 };

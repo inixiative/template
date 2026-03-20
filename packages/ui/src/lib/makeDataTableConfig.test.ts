@@ -46,7 +46,7 @@ describe('makeDataTableConfig', () => {
     expect(statusFilter).toBeDefined();
     expect(statusFilter?.values).toContain('draft');
     expect(statusFilter?.values).toContain('sent');
-    expect(statusFilter?.values).toContain('resolved');
+    expect(statusFilter?.values).toContain('changesRequested');
     expect(statusFilter?.operators).toEqual(['in', 'notIn']);
   });
 
@@ -66,10 +66,11 @@ describe('makeDataTableConfig', () => {
     expect(config.canOrder).toBe(false);
   });
 
-  it('defaults canSearch and canOrder to true', () => {
+  it('defaults canSearch to false when no searchable fields, canOrder to true', () => {
     const config = makeDataTableConfig('adminOrganizationReadMany');
 
-    expect(config.canSearch).toBe(true);
+    // Admin routes have no searchable fields, so canSearch defaults to false
+    expect(config.canSearch).toBe(false);
     expect(config.canOrder).toBe(true);
   });
 
@@ -107,7 +108,8 @@ describe('makeDataTableConfig', () => {
     const config = makeDataTableConfig('tokenDelete');
 
     expect(config.searchableFields).toEqual([]);
-    expect(config.canSearch).toBe(true);
+    // No searchable fields → canSearch defaults to false (nothing to search against)
+    expect(config.canSearch).toBe(false);
     expect(config.canOrder).toBe(true);
   });
 

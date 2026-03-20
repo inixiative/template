@@ -68,8 +68,10 @@ export const buildQuery = (
 ): Record<string, unknown> => {
   const query: Record<string, unknown> = { page, pageSize };
 
-  // Combined search: top-level param, API ORs contains across all searchable fields
-  if (search && searchMode === 'combined') {
+  // Combined search: top-level param, API ORs contains across all searchable fields.
+  // Requires searchable fields to be configured, and is not available in adminMode
+  // (which uses filters[...] for direct Prisma — no equivalent broad-search facility).
+  if (search && searchMode === 'combined' && !adminMode && searchableFields.length > 0) {
     query.search = search;
   }
 

@@ -53,12 +53,23 @@ export const mergeInquiryFilters = (
 });
 
 // Converts InquiryFilters to bracket-notation searchFields for the API.
-// includeExpired:false → expiresAt[gte]=<now> (exclude rows whose expiry is already past)
-export const inquiryFiltersToSearchFields = (filters: InquiryFilters): Record<string, unknown> => {
+//
+// includeExpired:false → expiresAt[gte]=<now> (exclude rows whose expiry is already past).
+// `now` must be provided by the caller as a memoized value so the query key stays stable
+// across renders. Recompute `now` only when the filter is toggled (e.g. useMemo with
+// hideExpired as a dependency) to avoid triggering a new fetch every render.
+//
+// NOTE: expiresAt[gte] uses SQL >= semantics, which excludes NULL rows. Inquiries with
+// no expiresAt set (null = never expires) are therefore incorrectly hidden when
+// includeExpired:false. Fixing this properly requires a dedicated server-side
+// includeExpired param that emits: WHERE expiresAt IS NULL OR expiresAt >= now.
+export const inquiryFiltersToSearchFields = (filters: InquiryFilters, now?: Date): Record<string, unknown> => {
   const searchFields: Record<string, unknown> = {};
   if (filters.types?.length) searchFields.type = { in: filters.types };
   if (filters.statuses?.length) searchFields.status = { in: filters.statuses };
-  if (filters.includeExpired === false) searchFields.expiresAt = { gte: new Date().toISOString() };
+  if (filters.includeExpired === false) {
+    searchFields.expiresAt = { gte: (now ?? new Date()).toISOString() };
+  }
   return searchFields;
 };
 

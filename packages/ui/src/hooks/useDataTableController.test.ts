@@ -198,4 +198,19 @@ describe('buildQuery — adminMode', () => {
     );
     expect(result['filters[organizationUser][role][equals]']).toBe('admin');
   });
+
+  it('adminMode: combined search is suppressed (no broad search facility in filters mode)', () => {
+    const result = buildQuery('acme', 'combined', ['name', 'email'], {}, [], 1, 20, true);
+    expect(result.search).toBeUndefined();
+  });
+
+  it('non-admin with no searchableFields: search is suppressed (nothing to search against)', () => {
+    const result = buildQuery('acme', 'combined', [], {}, [], 1, 20, false);
+    expect(result.search).toBeUndefined();
+  });
+
+  it('non-admin with searchableFields: combined search emitted', () => {
+    const result = buildQuery('acme', 'combined', ['name'], {}, [], 1, 20, false);
+    expect(result.search).toBe('acme');
+  });
 });

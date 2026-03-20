@@ -37,6 +37,10 @@ const validateFieldOperatorValue = (fieldPath: string, operator: string, value: 
   if (isArray) {
     throw new Error(`Operator '${operator}' on field '${fieldPath}' does not support array values`);
   }
+
+  if (!isBracketQueryPrimitive(value)) {
+    throw new Error(`Operator '${operator}' on field '${fieldPath}' requires a primitive value`);
+  }
 };
 
 const validateAndTransformSearchFields = (
@@ -117,7 +121,7 @@ const validateAndTransformSearchFields = (
           if ((FIELD_OPERATORS as readonly string[]).includes(operator) && operatorValue !== undefined) {
             validateFieldOperatorValue(currentPath, operator, operatorValue);
             if (isArrayFieldOperator(operator) && !Array.isArray(operatorValue)) {
-              normalizedOperators[operator] = [operatorValue];
+              normalizedOperators[operator] = [operatorValue as BracketQueryPrimitive];
             }
           }
         }

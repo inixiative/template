@@ -17,8 +17,9 @@ type OptimisticTargets<TVariables> =
   | OptimisticTarget<TVariables>[]
   | ((variables: TVariables) => OptimisticTarget<TVariables>[]);
 
-type OptimisticContext = {
+type OptimisticContext<TVariables> = {
   snapshots: OptimisticSnapshot[];
+  resolvedTargets: OptimisticTarget<TVariables>[];
 };
 
 export type OptimisticListOperation = 'create' | 'update' | 'delete';
@@ -55,14 +56,14 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   targets: OptimisticTargets<TVariables>;
   /** Additional mutation options */
   mutationOptions?: Omit<
-    UseMutationOptions<TData, TError, TVariables, OptimisticContext>,
+    UseMutationOptions<TData, TError, TVariables, OptimisticContext<TVariables>>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
 }) => {
   const queryClient = useQueryClient();
   const { mutationFn, targets, mutationOptions } = options;
 
-  return useMutation<TData, TError, TVariables, OptimisticContext>({
+  return useMutation<TData, TError, TVariables, OptimisticContext<TVariables>>({
     mutationFn,
 
     onMutate: async (variables) => {
@@ -80,7 +81,7 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
         queryClient.setQueryData(target.queryKey, (old) => target.optimisticUpdate(old, variables));
       }
 
-      return { snapshots };
+      return { snapshots, resolvedTargets };
     },
 
     onError: (_error, _variables, context) => {
@@ -89,8 +90,8 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
       }
     },
 
-    onSettled: async (_data, _error, variables) => {
-      for (const target of resolveTargets(targets, variables)) {
+    onSettled: async (_data, _error, _variables, context) => {
+      for (const target of context?.resolvedTargets ?? []) {
         if (target.invalidateOnSettled === false) continue;
         await queryClient.invalidateQueries({ queryKey: target.queryKey });
       }

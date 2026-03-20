@@ -13,7 +13,7 @@ import {
 } from '@template/ui/lib/inquiryQueryKeys';
 import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
 import { useAppStore } from '@template/ui/store';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type Row = InquirySentItem | InquiryReceivedItem;
 
@@ -47,12 +47,16 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   // external includeExpired:false forces hide; otherwise user controls the checkbox
   const [hideExpired, setHideExpired] = useState(filters?.includeExpired === false);
 
+  // Memoized so the expiresAt cutoff stays stable while hideExpired is unchanged —
+  // only recomputed (producing a new query key + fresh fetch) when the toggle changes.
+  const expiredCutoff = useMemo(() => (hideExpired ? new Date() : undefined), [hideExpired]);
+
   // hideExpired drives includeExpired in the merged filters → translates to expiresAt[gte]=now server-side
   const merged = mergeInquiryFilters(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
     includeExpired: filters?.includeExpired !== undefined ? undefined : hideExpired ? false : undefined,
   });
-  const searchFields = inquiryFiltersToSearchFields(merged);
+  const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
   const hasSearchFields = Object.keys(searchFields).length > 0;
 
   const inquiryQueries = inquiryContextQueries(context, hasSearchFields ? { query: { searchFields } } : undefined);

@@ -42,11 +42,11 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     }
 
     if (Array.isArray(existingValue)) {
-      current[leafKey] = [...existingValue, decodedValue];
+      existingValue.push(decodedValue);
       continue;
     }
 
-    current[leafKey] = [existingValue, decodedValue];
+    current[leafKey] = [existingValue as BracketQueryPrimitive, decodedValue];
   }
 
   return result;
