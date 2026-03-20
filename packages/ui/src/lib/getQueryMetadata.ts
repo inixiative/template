@@ -3,7 +3,7 @@ import openApiSpec from '@template/ui/openapi.gen.json';
 export type EnumFilter = {
   field: string;
   values: string[];
-  operators: ['in', 'notin'];
+  operators: ['in', 'notIn'];
 };
 
 export type QueryMetadata = {
@@ -69,7 +69,7 @@ const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> 
       filters.push({
         field: fieldPath,
         values: propSchema.enum,
-        operators: ['in', 'notin'],
+        operators: ['in', 'notIn'],
       });
     }
 

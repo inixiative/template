@@ -11,7 +11,7 @@ import {
 } from '@template/ui/apiClient';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
+import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -57,12 +57,16 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   });
   const users = data?.data ?? [];
 
-  const deleteMutation = useOptimisticListMutation<OrganizationUser, Omit<OrganizationUserDeleteData, 'url'>>({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationUserDelete>[0]) =>
       organizationUserDelete(requestOptions),
     ),
-    queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
-    operation: 'delete',
+    targets: [
+      createOptimisticListTarget<OrganizationUser, Omit<OrganizationUserDeleteData, 'url'>>({
+        queryKey: organizationReadManyUsersQueryKey({ path: { id: organizationId } }),
+        operation: 'delete',
+      }),
+    ],
   });
 
   const inviteMutation = useMutation({

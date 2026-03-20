@@ -1,8 +1,5 @@
-import type { QueryKey } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
 import { inquiryUpdate } from '@template/ui/apiClient';
-import { useInquirySendEffects } from '@template/ui/hooks/inquiry/useInquirySendEffects';
-import { useMutation } from '@template/ui/hooks/useQuery';
+import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
 import { sourceMutations } from '@template/ui/lib/inquiryQueryKeys';
@@ -12,42 +9,20 @@ type UpdateVars = {
   body: { content?: Record<string, unknown>; status?: 'draft' | 'sent' };
 };
 
-type UpdateContext = { snapshots: [QueryKey, unknown][] };
-
 export const useUpdateInquiryMutation = () => {
-  const queryClient = useQueryClient();
-  const applySendEffects = useInquirySendEffects();
-
-  return useMutation<unknown, Error, UpdateVars, UpdateContext>({
+  return useOptimisticMutation<unknown, Error, UpdateVars>({
     mutationFn: apiMutation(({ inquiry, body }: UpdateVars) => inquiryUpdate({ path: { id: inquiry.id }, body })),
-
-    onMutate: async ({ inquiry, body }) => {
-      const keys = sourceMutations[inquiry.type](inquiry);
-      const snapshots: [QueryKey, unknown][] = [];
-
-      for (const key of keys) {
-        await queryClient.cancelQueries({ queryKey: key });
-        snapshots.push([key, queryClient.getQueryData(key)]);
-        queryClient.setQueryData(key, (old: { data?: { id: string }[] } | undefined) => {
-          if (!old?.data) return old;
+    targets: ({ inquiry, body }) =>
+      sourceMutations[inquiry.type](inquiry).map((queryKey) => ({
+        queryKey,
+        optimisticUpdate: (old: unknown) => {
+          const cached = old as { data?: { id: string }[] } | undefined;
+          if (!cached?.data) return cached;
           return {
-            ...old,
-            data: old.data.map((inq) => (inq.id === inquiry.id ? { ...inq, ...body } : inq)),
+            ...cached,
+            data: cached.data.map((inq) => (inq.id === inquiry.id ? { ...inq, ...body } : inq)),
           };
-        });
-      }
-
-      return { snapshots };
-    },
-
-    onError: (_err, _vars, context) => {
-      for (const [key, data] of context?.snapshots ?? []) {
-        queryClient.setQueryData(key, data);
-      }
-    },
-
-    onSettled: async (_data, _err, { inquiry }) => {
-      await applySendEffects(inquiry, 'update');
-    },
+        },
+      })),
   });
 };

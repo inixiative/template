@@ -9,7 +9,7 @@ import {
 } from '@template/ui/apiClient';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
-import { useOptimisticListMutation, useQuery } from '@template/ui/hooks';
+import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -34,21 +34,29 @@ export const OrganizationsPage = () => {
   });
   const organizations = data?.data ?? [];
 
-  const deleteMutation = useOptimisticListMutation<Organization, Omit<OrganizationDeleteData, 'url'>>({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationDelete>[0]) =>
       organizationDelete(requestOptions),
     ),
-    queryKey: meReadManyOrganizationsQueryKey(),
-    operation: 'delete',
+    targets: [
+      createOptimisticListTarget<Organization, Omit<OrganizationDeleteData, 'url'>>({
+        queryKey: meReadManyOrganizationsQueryKey(),
+        operation: 'delete',
+      }),
+    ],
   });
 
-  const createMutation = useOptimisticListMutation<Organization, Omit<OrganizationCreateData, 'url'>>({
+  const createMutation = useOptimisticMutation({
     mutationFn: apiMutation((requestOptions: Parameters<typeof organizationCreate>[0]) =>
       organizationCreate(requestOptions),
     ),
-    queryKey: meReadManyOrganizationsQueryKey(),
-    operation: 'create',
-    optimisticExtras: { organizationUser: { role: 'owner' } as Organization['organizationUser'] },
+    targets: [
+      createOptimisticListTarget<Organization, Omit<OrganizationCreateData, 'url'>>({
+        queryKey: meReadManyOrganizationsQueryKey(),
+        operation: 'create',
+        optimisticExtras: { organizationUser: { role: 'owner' } as Organization['organizationUser'] },
+      }),
+    ],
     mutationOptions: {
       onSuccess: () => refreshMe(),
     },

@@ -3,21 +3,27 @@ import { Button } from '@template/ui/components/primitives/Button';
 import { useCancelInquiryMutation, useSendInquiryMutation } from '@template/ui/hooks/inquiry';
 import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
 import { isTerminalInquiry } from '@template/ui/lib/inquiryQueryKeys';
+import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
+import { useState } from 'react';
 
 type InquirySourceControlsProps = {
   inquiry: InquirySentItem;
   size?: 'sm' | 'default' | 'lg';
-  onEdit?: () => void;
 };
 
-export const InquirySourceControls = ({ inquiry, size = 'sm', onEdit }: InquirySourceControlsProps) => {
+export const InquirySourceControls = ({ inquiry, size = 'sm' }: InquirySourceControlsProps) => {
   const cancelMutation = useCancelInquiryMutation();
   const sendMutation = useSendInquiryMutation();
   const hasPermission = useInquiryPermission(inquiry, 'send', 'source');
+  const [isOpen, setIsOpen] = useState(false);
 
   const isTerminal = isTerminalInquiry(inquiry);
   const isDraft = inquiry.status === 'draft';
-  const canEdit = !isTerminal && !!onEdit;
+
+  const entry = getInquiryInterface(inquiry.type);
+  const Compose = entry?.source?.compose;
+
+  const canEdit = !isTerminal && !!Compose;
   const canSend = isDraft || inquiry.status === 'changesRequested';
   const canCancel = !isTerminal && (inquiry.status === 'sent' || isDraft);
   const isPersistedInquiry = !!inquiry.id && inquiry.id !== '__optimistic__';
@@ -29,7 +35,7 @@ export const InquirySourceControls = ({ inquiry, size = 'sm', onEdit }: InquiryS
         size={size}
         show={canEdit}
         disabled={!isPersistedInquiry || !hasPermission}
-        onClick={onEdit}
+        onClick={() => setIsOpen(true)}
       >
         Edit
       </Button>
@@ -50,6 +56,7 @@ export const InquirySourceControls = ({ inquiry, size = 'sm', onEdit }: InquiryS
       >
         Cancel
       </Button>
+      {Compose && isOpen && <Compose inquiry={inquiry} onClose={() => setIsOpen(false)} />}
     </div>
   );
 };

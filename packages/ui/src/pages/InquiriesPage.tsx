@@ -1,24 +1,17 @@
-import {
-  type InquiryReceivedItem,
-  type InquirySentItem,
-  meReceivedManyInquiries,
-  meReceivedManyInquiriesQueryKey,
-  meSentManyInquiries,
-  meSentManyInquiriesQueryKey,
-  organizationReceivedManyInquiries,
-  organizationReceivedManyInquiriesQueryKey,
-  organizationSentManyInquiries,
-  organizationSentManyInquiriesQueryKey,
-  spaceReceivedManyInquiries,
-  spaceReceivedManyInquiriesQueryKey,
-  spaceSentManyInquiries,
-  spaceSentManyInquiriesQueryKey,
-} from '@template/ui/apiClient';
+import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClient';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
-import { apiQuery } from '@template/ui/lib/apiQuery';
-import { INQUIRY_STATUS_COLORS, INQUIRY_TYPE_LABELS, type InquiryStatus } from '@template/ui/lib/inquiryQueryKeys';
+import { inquiryContextQueries } from '@template/ui/lib/inquiryContextQueries';
+import {
+  INQUIRY_STATUS_COLORS,
+  INQUIRY_TYPE_LABELS,
+  type InquiryFilters,
+  type InquiryStatus,
+  inquiryFiltersToSearchFields,
+  mergeInquiryFilters,
+} from '@template/ui/lib/inquiryQueryKeys';
+import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
 
@@ -41,81 +34,69 @@ const getEntityLabel = (inq: Row, direction: 'sent' | 'received'): string => {
 
 type InquiriesPageProps = {
   direction: 'sent' | 'received';
+  /** External hard constraints — sent to the server as searchFields filters */
+  filters?: InquiryFilters;
+  title?: string;
+  emptyMessage?: string;
 };
 
-export const InquiriesPage = ({ direction }: InquiriesPageProps) => {
+export const InquiriesPage = ({ direction, filters, title, emptyMessage }: InquiriesPageProps) => {
   const context = useAppStore((state) => state.tenant.context);
 
   const [statusFilter, setStatusFilter] = useState<InquiryStatus | ''>('');
-  const [hideExpired, setHideExpired] = useState(false);
+  // external includeExpired:false forces hide; otherwise user controls the checkbox
+  const [hideExpired, setHideExpired] = useState(filters?.includeExpired === false);
 
-  const organizationId = context.organization?.id ?? '';
-  const spaceId = context.space?.id ?? '';
-  const isOrgContext = context.type === 'organization';
-  const isSpaceContext = context.type === 'space';
-  const isUserContext = !isOrgContext && !isSpaceContext;
+  // hideExpired drives includeExpired in the merged filters → translates to expiresAt[gte]=now server-side
+  const merged = mergeInquiryFilters(filters, {
+    statuses: statusFilter ? [statusFilter] : undefined,
+    includeExpired: filters?.includeExpired !== undefined ? undefined : hideExpired ? false : undefined,
+  });
+  const searchFields = inquiryFiltersToSearchFields(merged);
+  const hasSearchFields = Object.keys(searchFields).length > 0;
 
-  const { data: userSentData } = useQuery({
-    queryKey: meSentManyInquiriesQueryKey(),
-    queryFn: apiQuery((opts: Parameters<typeof meSentManyInquiries>[0]) => meSentManyInquiries(opts)),
-    enabled: isUserContext && direction === 'sent',
+  const inquiryQueries = inquiryContextQueries(context, hasSearchFields ? { query: { searchFields } } : undefined);
+  const querySlot = direction === 'sent' ? inquiryQueries.sent : inquiryQueries.received;
+
+  const { data } = useQuery({
+    queryKey: querySlot.queryKey,
+    queryFn: querySlot.queryFn,
   });
 
-  const { data: userReceivedData } = useQuery({
-    queryKey: meReceivedManyInquiriesQueryKey(),
-    queryFn: apiQuery((opts: Parameters<typeof meReceivedManyInquiries>[0]) => meReceivedManyInquiries(opts)),
-    enabled: isUserContext && direction === 'received',
-  });
+  const inquiries = (data?.data ?? []) as Row[];
 
-  const { data: orgSentData } = useQuery({
-    queryKey: organizationSentManyInquiriesQueryKey({ path: { id: organizationId } }),
-    queryFn: apiQuery((opts: Parameters<typeof organizationSentManyInquiries>[0]) =>
-      organizationSentManyInquiries({ ...opts, path: { id: organizationId } }),
-    ),
-    enabled: isOrgContext && direction === 'sent',
-  });
-
-  const { data: orgReceivedData } = useQuery({
-    queryKey: organizationReceivedManyInquiriesQueryKey({ path: { id: organizationId } }),
-    queryFn: apiQuery((opts: Parameters<typeof organizationReceivedManyInquiries>[0]) =>
-      organizationReceivedManyInquiries({ ...opts, path: { id: organizationId } }),
-    ),
-    enabled: isOrgContext && direction === 'received',
-  });
-
-  const { data: spaceSentData } = useQuery({
-    queryKey: spaceSentManyInquiriesQueryKey({ path: { id: spaceId } }),
-    queryFn: apiQuery((opts: Parameters<typeof spaceSentManyInquiries>[0]) =>
-      spaceSentManyInquiries({ ...opts, path: { id: spaceId } }),
-    ),
-    enabled: isSpaceContext && direction === 'sent',
-  });
-
-  const { data: spaceReceivedData } = useQuery({
-    queryKey: spaceReceivedManyInquiriesQueryKey({ path: { id: spaceId } }),
-    queryFn: apiQuery((opts: Parameters<typeof spaceReceivedManyInquiries>[0]) =>
-      spaceReceivedManyInquiries({ ...opts, path: { id: spaceId } }),
-    ),
-    enabled: isSpaceContext && direction === 'received',
-  });
-
-  let rawData: Row[] = [];
-  if (isOrgContext) rawData = ((direction === 'sent' ? orgSentData : orgReceivedData)?.data ?? []) as Row[];
-  else if (isSpaceContext) rawData = ((direction === 'sent' ? spaceSentData : spaceReceivedData)?.data ?? []) as Row[];
-  else rawData = ((direction === 'sent' ? userSentData : userReceivedData)?.data ?? []) as Row[];
-
-  const inquiries = rawData.filter((inq) => {
-    if (statusFilter && inq.status !== statusFilter) return false;
-    if (hideExpired && inq.expiresAt && new Date(inq.expiresAt) < new Date()) return false;
-    return true;
-  });
+  // Derive page title: registry label for single-type filter, else prop title, else default
+  const singleType = filters?.types?.length === 1 ? filters.types[0] : undefined;
+  const registryLabel = singleType ? getInquiryInterface(singleType)?.label : undefined;
+  const pageTitle = title ?? registryLabel ?? (direction === 'sent' ? 'Sent Inquiries' : 'Received Inquiries');
 
   const columns = [
     {
-      key: 'type',
-      label: 'Type',
-      render: (inq: Row) => INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
+      key: 'summary',
+      label: direction === 'sent' ? 'To' : 'From',
+      render: (inq: Row) => {
+        if (direction === 'sent') {
+          const entry = getInquiryInterface(inq.type);
+          const Summary = entry?.source?.summary;
+          if (Summary) return <Summary inquiry={inq as InquirySentItem} />;
+        } else {
+          const entry = getInquiryInterface(inq.type);
+          const Summary = entry?.target?.summary;
+          if (Summary) return <Summary inquiry={inq as InquiryReceivedItem} />;
+        }
+        return getEntityLabel(inq, direction);
+      },
     },
+    // Type column only shown when not filtered to a single type
+    ...(singleType
+      ? []
+      : [
+          {
+            key: 'type',
+            label: 'Type',
+            render: (inq: Row) => INQUIRY_TYPE_LABELS[inq.type] ?? inq.type,
+          },
+        ]),
     {
       key: 'status',
       label: 'Status',
@@ -129,11 +110,6 @@ export const InquiriesPage = ({ direction }: InquiriesPageProps) => {
           </Badge>
         );
       },
-    },
-    {
-      key: 'entity',
-      label: direction === 'sent' ? 'To' : 'From',
-      render: (inq: Row) => getEntityLabel(inq, direction),
     },
     {
       key: 'sentAt',
@@ -157,34 +133,40 @@ export const InquiriesPage = ({ direction }: InquiriesPageProps) => {
     },
   ];
 
+  const defaultEmptyMessage = `No ${direction} inquiries`;
+
   return (
     <div className="p-8 space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>{direction === 'sent' ? 'Sent Inquiries' : 'Received Inquiries'}</CardTitle>
+          <CardTitle>{pageTitle}</CardTitle>
           <div className="flex items-center gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as InquiryStatus | '')}
-              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="changesRequested">Changes Requested</option>
-              <option value="approved">Approved</option>
-              <option value="denied">Denied</option>
-              <option value="canceled">Canceled</option>
-            </select>
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={hideExpired}
-                onChange={(e) => setHideExpired(e.target.checked)}
-                className="h-4 w-4"
-              />
-              Hide expired
-            </label>
+            {!filters?.statuses && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as InquiryStatus | '')}
+                className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="changesRequested">Changes Requested</option>
+                <option value="approved">Approved</option>
+                <option value="denied">Denied</option>
+                <option value="canceled">Canceled</option>
+              </select>
+            )}
+            {filters?.includeExpired === undefined && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hideExpired}
+                  onChange={(e) => setHideExpired(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Hide expired
+              </label>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -192,7 +174,7 @@ export const InquiriesPage = ({ direction }: InquiriesPageProps) => {
             columns={columns}
             data={inquiries}
             keyExtractor={(inq) => inq.id}
-            emptyMessage={`No ${direction} inquiries`}
+            emptyMessage={emptyMessage ?? defaultEmptyMessage}
           />
         </CardContent>
       </Card>

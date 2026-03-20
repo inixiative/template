@@ -1,5 +1,6 @@
+import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
-import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
+import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   search?: string;
@@ -9,11 +10,34 @@ type BuildWhereOptions = {
   filters?: Record<string, unknown>;
 };
 
-const relationOperators = ['some', 'every', 'none', 'is', 'isNot'];
-const fieldOperators = ['contains', 'equals', 'in', 'notIn', 'lt', 'lte', 'gt', 'gte', 'startsWith', 'endsWith', 'not'];
-
 const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isBracketQueryPrimitive = (value: BracketQueryValue): value is BracketQueryPrimitive =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null;
+
+const validateFieldOperatorValue = (fieldPath: string, operator: string, value: BracketQueryValue) => {
+  const expectsArray = isArrayFieldOperator(operator);
+  const isArray = Array.isArray(value);
+
+  if (expectsArray) {
+    if (isArray) {
+      if (!value.every(isBracketQueryPrimitive)) {
+        throw new Error(`Operator '${operator}' on field '${fieldPath}' requires primitive values`);
+      }
+      return;
+    }
+
+    if (!isBracketQueryPrimitive(value)) {
+      throw new Error(`Operator '${operator}' on field '${fieldPath}' requires primitive values`);
+    }
+    return;
+  }
+
+  if (isArray) {
+    throw new Error(`Operator '${operator}' on field '${fieldPath}' does not support array values`);
+  }
+};
 
 const validateAndTransformSearchFields = (
   obj: BracketQueryRecord,
@@ -49,9 +73,13 @@ const validateAndTransformSearchFields = (
       }
       result[key] = value;
     } else if (typeof value === 'object' && value !== null) {
+      if (Array.isArray(value)) {
+        throw new Error(`Field '${currentPath}' does not support array values without an operator`);
+      }
+
       const keys = Object.keys(value);
-      const hasRelationOperator = keys.some((k) => relationOperators.includes(k));
-      const hasFieldOperator = keys.some((k) => fieldOperators.includes(k));
+      const hasRelationOperator = keys.some((k) => isRelationOperator(k));
+      const hasFieldOperator = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
 
       if (hasRelationOperator) {
         if (
@@ -64,7 +92,7 @@ const validateAndTransformSearchFields = (
         }
         const relationValue: BracketQueryRecord = {};
         for (const [opKey, opValue] of Object.entries(value)) {
-          if (relationOperators.includes(opKey) && isBracketQueryRecord(opValue)) {
+          if (isRelationOperator(opKey) && isBracketQueryRecord(opValue)) {
             relationValue[opKey] = validateAndTransformSearchFields(
               opValue,
               searchableFields,
@@ -83,7 +111,17 @@ const validateAndTransformSearchFields = (
         if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
           throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
         }
-        result[key] = value;
+
+        const normalizedOperators = { ...value };
+        for (const [operator, operatorValue] of Object.entries(value)) {
+          if ((FIELD_OPERATORS as readonly string[]).includes(operator) && operatorValue !== undefined) {
+            validateFieldOperatorValue(currentPath, operator, operatorValue);
+            if (isArrayFieldOperator(operator) && !Array.isArray(operatorValue)) {
+              normalizedOperators[operator] = [operatorValue];
+            }
+          }
+        }
+        result[key] = normalizedOperators;
       } else {
         result[key] = validateAndTransformSearchFields(
           value,

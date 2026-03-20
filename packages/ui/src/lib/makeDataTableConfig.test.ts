@@ -39,7 +39,7 @@ describe('makeDataTableConfig', () => {
     expect(arrayFields).toEqual([]);
   });
 
-  it('auto-detects enum filters from schema with in/notin ops', () => {
+  it('auto-detects enum filters from schema with in/notIn ops', () => {
     const config = makeDataTableConfig('adminInquiryReadMany');
 
     const statusFilter = config.enumFilters.find((f) => f.field === 'status');
@@ -47,7 +47,7 @@ describe('makeDataTableConfig', () => {
     expect(statusFilter?.values).toContain('draft');
     expect(statusFilter?.values).toContain('sent');
     expect(statusFilter?.values).toContain('resolved');
-    expect(statusFilter?.operators).toEqual(['in', 'notin']);
+    expect(statusFilter?.operators).toEqual(['in', 'notIn']);
   });
 
   it('applies boolean canSearch permission', () => {

@@ -35,6 +35,33 @@ export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: stri
   return false;
 };
 
+export type InquiryFilters = {
+  types?: InquiryType[];
+  statuses?: InquiryStatus[];
+  includeExpired?: boolean;
+};
+
+// External filters are hard constraints — internal UI controls can only narrow further.
+// External wins on any field it specifies.
+export const mergeInquiryFilters = (
+  external: InquiryFilters | undefined,
+  internal: InquiryFilters,
+): InquiryFilters => ({
+  types: external?.types ?? internal.types,
+  statuses: external?.statuses ?? internal.statuses,
+  includeExpired: external?.includeExpired ?? internal.includeExpired,
+});
+
+// Converts InquiryFilters to bracket-notation searchFields for the API.
+// includeExpired:false → expiresAt[gte]=<now> (exclude rows whose expiry is already past)
+export const inquiryFiltersToSearchFields = (filters: InquiryFilters): Record<string, unknown> => {
+  const searchFields: Record<string, unknown> = {};
+  if (filters.types?.length) searchFields.type = { in: filters.types };
+  if (filters.statuses?.length) searchFields.status = { in: filters.statuses };
+  if (filters.includeExpired === false) searchFields.expiresAt = { gte: new Date().toISOString() };
+  return searchFields;
+};
+
 export type InquiryMeta = {
   id: string;
   type: InquiryType;

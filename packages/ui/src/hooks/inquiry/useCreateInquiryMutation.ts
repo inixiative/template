@@ -1,7 +1,4 @@
-import type { QueryKey } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
-import { useInquirySendEffects } from '@template/ui/hooks/inquiry/useInquirySendEffects';
-import { useMutation } from '@template/ui/hooks/useQuery';
+import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
 import { sourceMutations } from '@template/ui/lib/inquiryQueryKeys';
 
@@ -11,40 +8,19 @@ type CreateVars = {
   optimisticItem: Record<string, unknown>;
 };
 
-type CreateContext = { snapshots: [QueryKey, unknown][] };
-
 export const useCreateInquiryMutation = () => {
-  const queryClient = useQueryClient();
-  const applySendEffects = useInquirySendEffects();
-
-  return useMutation<unknown, Error, CreateVars, CreateContext>({
+  return useOptimisticMutation<unknown, Error, CreateVars>({
     mutationFn: ({ call }) => call(),
-
-    onMutate: async ({ inquiry, optimisticItem }) => {
+    targets: ({ inquiry, optimisticItem }) => {
       const meta = { ...inquiry, id: '__optimistic__' } as InquiryMeta;
-      const keys = sourceMutations[inquiry.type](meta);
-      const snapshots: [QueryKey, unknown][] = [];
-
-      for (const key of keys) {
-        await queryClient.cancelQueries({ queryKey: key });
-        snapshots.push([key, queryClient.getQueryData(key)]);
-        queryClient.setQueryData(key, (old: { data?: unknown[] } | undefined) => {
-          if (!old?.data) return old;
-          return { ...old, data: [...old.data, { id: '__optimistic__', ...optimisticItem }] };
-        });
-      }
-
-      return { snapshots };
-    },
-
-    onError: (_err, _vars, context) => {
-      for (const [key, data] of context?.snapshots ?? []) {
-        queryClient.setQueryData(key, data);
-      }
-    },
-
-    onSettled: async (_data, _err, { inquiry }) => {
-      await applySendEffects({ ...inquiry, id: '__optimistic__' } as InquiryMeta, 'create');
+      return sourceMutations[inquiry.type](meta).map((queryKey) => ({
+        queryKey,
+        optimisticUpdate: (old: unknown) => {
+          const cached = old as { data?: unknown[] } | undefined;
+          if (!cached?.data) return cached;
+          return { ...cached, data: [...cached.data, { id: '__optimistic__', ...optimisticItem }] };
+        },
+      }));
     },
   });
 };

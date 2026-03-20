@@ -5,7 +5,6 @@ import {
   spaceProtectedQueryKey,
 } from '@template/ui/apiClient';
 import type { InquiryMeta } from '@template/ui/lib/inquiryQueryKeys';
-import { targetMutations } from '@template/ui/lib/inquiryQueryKeys';
 import { useAppStore } from '@template/ui/store';
 
 export const useInquiryResolutionEffects = () => {
@@ -13,10 +12,6 @@ export const useInquiryResolutionEffects = () => {
   const queryClient = useQueryClient();
 
   return async (inquiry: InquiryMeta, status: 'approved' | 'denied' | 'changesRequested') => {
-    for (const key of targetMutations[inquiry.type](inquiry)) {
-      await queryClient.invalidateQueries({ queryKey: key });
-    }
-
     if (status !== 'approved') return;
 
     switch (inquiry.type) {

@@ -2,6 +2,34 @@ import type { QueryKey, UseMutationOptions } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@template/ui/hooks/useQuery';
 
+type OptimisticSnapshot = {
+  queryKey: QueryKey;
+  previousData: unknown;
+};
+
+export type OptimisticTarget<TVariables> = {
+  queryKey: QueryKey;
+  optimisticUpdate: (currentData: unknown, variables: TVariables) => unknown;
+  invalidateOnSettled?: boolean;
+};
+
+type OptimisticTargets<TVariables> =
+  | OptimisticTarget<TVariables>[]
+  | ((variables: TVariables) => OptimisticTarget<TVariables>[]);
+
+type OptimisticContext = {
+  snapshots: OptimisticSnapshot[];
+};
+
+export type OptimisticListOperation = 'create' | 'update' | 'delete';
+
+const resolveTargets = <TVariables>(
+  targets: OptimisticTargets<TVariables>,
+  variables: TVariables,
+): OptimisticTarget<TVariables>[] => {
+  return typeof targets === 'function' ? targets(variables) : targets;
+};
+
 /**
  * Optimistic mutation wrapper for TanStack Query.
  *
@@ -20,53 +48,52 @@ import { useMutation } from '@template/ui/hooks/useQuery';
  * });
  * ```
  */
-export const useOptimisticMutation = <TData, TError = Error, TVariables = void, TQueryData = unknown>(options: {
+export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(options: {
   /** The mutation function */
   mutationFn: (variables: TVariables) => Promise<TData>;
-  /** Query key to invalidate on success/error */
-  queryKey: QueryKey;
-  /**
-   * Function to optimistically update cached data.
-   * Receives current cached data and mutation variables.
-   * Return the new cached data shape.
-   */
-  optimisticUpdate: (currentData: TQueryData | undefined, variables: TVariables) => TQueryData;
+  /** Cache targets to optimistically patch and invalidate */
+  targets: OptimisticTargets<TVariables>;
   /** Additional mutation options */
   mutationOptions?: Omit<
-    UseMutationOptions<TData, TError, TVariables, { previousData: TQueryData | undefined }>,
+    UseMutationOptions<TData, TError, TVariables, OptimisticContext>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
   >;
 }) => {
   const queryClient = useQueryClient();
-  const { mutationFn, queryKey, optimisticUpdate, mutationOptions } = options;
+  const { mutationFn, targets, mutationOptions } = options;
 
-  return useMutation<TData, TError, TVariables, { previousData: TQueryData | undefined }>({
+  return useMutation<TData, TError, TVariables, OptimisticContext>({
     mutationFn,
 
     onMutate: async (variables) => {
-      // Cancel outgoing refetches to prevent race conditions
-      await queryClient.cancelQueries({ queryKey });
+      const resolvedTargets = resolveTargets(targets, variables);
+      const snapshots: OptimisticSnapshot[] = [];
 
-      // Snapshot current value
-      const previousData = queryClient.getQueryData<TQueryData>(queryKey);
+      for (const target of resolvedTargets) {
+        await queryClient.cancelQueries({ queryKey: target.queryKey });
 
-      // Optimistically update cache
-      queryClient.setQueryData<TQueryData>(queryKey, (old) => optimisticUpdate(old, variables));
+        snapshots.push({
+          queryKey: target.queryKey,
+          previousData: queryClient.getQueryData(target.queryKey),
+        });
 
-      // Return context for rollback
-      return { previousData };
+        queryClient.setQueryData(target.queryKey, (old) => target.optimisticUpdate(old, variables));
+      }
+
+      return { snapshots };
     },
 
     onError: (_error, _variables, context) => {
-      // Rollback to previous value on error
-      if (context?.previousData !== undefined) {
-        queryClient.setQueryData(queryKey, context.previousData);
+      for (const snapshot of context?.snapshots ?? []) {
+        queryClient.setQueryData(snapshot.queryKey, snapshot.previousData);
       }
     },
 
-    onSettled: () => {
-      // Invalidate to refetch real data regardless of success/error
-      queryClient.invalidateQueries({ queryKey });
+    onSettled: async (_data, _error, variables) => {
+      for (const target of resolveTargets(targets, variables)) {
+        if (target.invalidateOnSettled === false) continue;
+        await queryClient.invalidateQueries({ queryKey: target.queryKey });
+      }
     },
 
     ...mutationOptions,
@@ -74,44 +101,22 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void, 
 };
 
 /**
- * Simplified optimistic mutation for list operations.
- * Handles common patterns: create, update, delete items from a list.
- * Supports OpenAPI-style parameters: { path: { id }, body?: {...} }
- * Operation names match controller/route naming conventions.
- *
- * Expects SDK response shape: { data: TItem | void, request, response }
- * Extracts .data internally for optimistic updates and return value.
- *
- * TODO: Add support for 'lookup' operation to handle fetching and caching
- * individual items without modifying the list (e.g., for detail views that
- * need to optimistically show cached data while fetching fresh updates).
+ * Pure helper for building a single optimistic target for list create/update/delete operations.
+ * Supports OpenAPI-style variables: { path: { id }, body?: {...} }.
  */
-export const useOptimisticListMutation = <TItem extends { id: string }, TVariables = unknown>(options: {
-  mutationFn: (
-    variables: TVariables,
-  ) => Promise<{ data: TItem | undefined | void; request: Request; response: Response }>;
+export const createOptimisticListTarget = <TItem extends { id: string }, TVariables = unknown>(options: {
   queryKey: QueryKey;
-  /** 'create' | 'update' | 'delete' - matches controller naming. TODO: Add 'lookup' for fetching individual items */
-  operation: 'create' | 'update' | 'delete';
-  /** Extra fields merged into the optimistic item on create (e.g. derived fields the API would normally compute) */
+  operation: OptimisticListOperation;
   optimisticExtras?: Partial<TItem>;
-  mutationOptions?: Omit<
-    UseMutationOptions<TItem | undefined, Error, TVariables, { previousData: TItem[] | undefined }>,
-    'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
-  >;
 }) => {
-  const { operation, optimisticExtras, mutationFn, ...rest } = options;
+  const { operation, optimisticExtras, queryKey } = options;
 
-  return useOptimisticMutation<TItem | undefined, Error, TVariables, TItem[]>({
-    ...rest,
-    mutationFn: async (variables) => {
-      const result = await mutationFn(variables);
-      return result.data as TItem | undefined;
-    },
+  return {
+    queryKey,
     optimisticUpdate: (currentData, variables) => {
-      // Cache may be a plain array or a wrapped { data: TItem[], ... } shape
       const isWrapped = currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
-      const list: TItem[] = (isWrapped ? (currentData as { data: TItem[] }).data : currentData) ?? [];
+      const list: TItem[] =
+        (isWrapped ? (currentData as { data: TItem[] }).data : (currentData as TItem[] | undefined)) ?? [];
 
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;
@@ -133,7 +138,7 @@ export const useOptimisticListMutation = <TItem extends { id: string }, TVariabl
           updated = list;
       }
 
-      return (isWrapped ? { ...(currentData as object), data: updated } : updated) as TItem[];
+      return isWrapped ? { ...(currentData as object), data: updated } : updated;
     },
-  });
+  } satisfies OptimisticTarget<TVariables>;
 };

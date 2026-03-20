@@ -3,6 +3,8 @@ import { Button } from '@template/ui/components/primitives/Button';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';
 import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';
 import { isTerminalInquiry } from '@template/ui/lib/inquiryQueryKeys';
+import { getInquiryInterface } from '@template/ui/lib/inquiryRegistry';
+import { useState } from 'react';
 
 type InquiryTargetControlsProps = {
   inquiry: InquiryReceivedItem;
@@ -12,13 +14,28 @@ type InquiryTargetControlsProps = {
 export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetControlsProps) => {
   const resolveMutation = useResolveInquiryMutation();
   const hasPermission = useInquiryPermission(inquiry, 'resolve', 'target');
+  const [isOpen, setIsOpen] = useState(false);
 
   const isTerminal = isTerminalInquiry(inquiry);
   const canResolve = !isTerminal && (inquiry.status === 'sent' || inquiry.status === 'changesRequested');
   const isPersistedInquiry = !!inquiry.id && inquiry.id !== '__optimistic__';
 
+  const entry = getInquiryInterface(inquiry.type);
+  const Review = entry?.target?.review;
+
   return (
     <div className="flex justify-end gap-2">
+      {Review && (
+        <Button
+          variant="outline"
+          size={size}
+          show={canResolve}
+          disabled={!isPersistedInquiry || !hasPermission}
+          onClick={() => setIsOpen(true)}
+        >
+          Review
+        </Button>
+      )}
       <Button
         variant="outline"
         size={size}
@@ -37,6 +54,7 @@ export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetCon
       >
         Decline
       </Button>
+      {Review && isOpen && <Review inquiry={inquiry} onClose={() => setIsOpen(false)} />}
     </div>
   );
 };
