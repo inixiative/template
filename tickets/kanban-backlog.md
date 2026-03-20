@@ -27,6 +27,7 @@ kanban
     FEAT-013-encryption
     FEAT-014-ai-developer-experience
     FEAT-015-ai-dashboard-generator
+    COMM-002-email-validation
 ```
 
 ## Tickets
@@ -38,6 +39,7 @@ kanban
 - [FEAT-007: White Labeling](./FEAT-007-white-labeling.md) - Custom domains, DNS hooks, CORS, theming
 - [FEAT-010: Addresses](./FEAT-010-addresses.md) - Address validation, geocoding, international formats
 - [FEAT-012: Notifications](./FEAT-012-notifications.md) - Novu integration, app-events completion, notification center
+- [COMM-002: Email Validation](./COMM-002-email-validation.md) - Email verification API (Bouncer/Emailable) for deliverability
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
@@ -84,6 +86,7 @@ kanban
 
 ### Communication & Engagement
 - Notifications (user engagement, retention)
+- Email Validation (deliverability, sender reputation)
 
 ### Enterprise Features
 - SSO (enterprise sales requirement)
@@ -96,11 +99,11 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 19
+- **Total Backlog Items**: 20
 - **Polish**: 3
 - **Enterprise**: 1
 - **Financial**: 2
-- **Communication**: 1
+- **Communication**: 2
 - **Infrastructure**: 5
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
@@ -122,4 +125,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-03-04_
+_Last Updated: 2026-03-20_
