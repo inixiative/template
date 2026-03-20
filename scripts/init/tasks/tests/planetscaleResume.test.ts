@@ -14,8 +14,21 @@ vi.mock('../../utils/configHelpers');
 vi.mock('../infisicalSetup');
 vi.mock('../../api/planetscale');
 vi.mock('node:child_process');
+vi.mock('node:util', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:util')>();
+  return {
+    ...actual,
+    promisify: (fn: unknown) => {
+      // Return an async wrapper that calls the mock
+      return async (...args: unknown[]) => {
+        const result = (fn as (...a: unknown[]) => unknown)(...args);
+        return { stdout: result || '', stderr: '' };
+      };
+    },
+  };
+});
 
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import type { PlanetScaleBranch, PlanetScaleDatabase } from '../../api/planetscale';
 import * as planetscaleApi from '../../api/planetscale';
 import * as configHelpers from '../../utils/configHelpers';
@@ -58,9 +71,9 @@ describe('PlanetScale Resume Scenario', () => {
       },
     } as unknown as ProjectConfig);
 
-    // Mock Infisical getSecret to return connection strings
-    vi.mocked(infisicalSetup.getSecret).mockImplementation(
-      (key: string, options?: { environment?: string; projectId?: string }) => {
+    // Mock Infisical getSecretAsync to return connection strings
+    vi.mocked(infisicalSetup.getSecretAsync).mockImplementation(
+      async (key: string, options?: { environment?: string; projectId?: string }) => {
         if (key === 'DATABASE_URL') {
           if (options?.environment === 'prod') {
             return 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require';
@@ -73,8 +86,13 @@ describe('PlanetScale Resume Scenario', () => {
       },
     );
 
-    // Mock execSync (for psql commands)
-    vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+    // Mock exec (for bun scripts/db/initMigrationTable.ts)
+    vi.mocked(exec).mockImplementation((_cmd: string, _opts: unknown, callback?: unknown) => {
+      if (typeof callback === 'function') {
+        callback(null, { stdout: '', stderr: '' });
+      }
+      return {} as ReturnType<typeof exec>;
+    });
 
     // Mock other config helpers
     vi.mocked(configHelpers.setProgressComplete).mockResolvedValue(undefined);
@@ -118,37 +136,35 @@ describe('PlanetScale Resume Scenario', () => {
 
     await setupPlanetScale('inixiative');
 
-    // Verify getSecret was called for both environments
-    expect(infisicalSetup.getSecret).toHaveBeenCalledWith('DATABASE_URL', {
+    // Verify getSecretAsync was called for both environments
+    expect(infisicalSetup.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
       projectId: 'test-project-id',
       environment: 'prod',
       path: '/api',
     });
 
-    expect(infisicalSetup.getSecret).toHaveBeenCalledWith('DATABASE_URL', {
+    expect(infisicalSetup.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
       projectId: 'test-project-id',
       environment: 'staging',
       path: '/api',
     });
   });
 
-  test('should run psql commands to init migration table', async () => {
+  test('should run bun script to init migration table', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
 
     await setupPlanetScale('inixiative');
 
-    // Verify psql was called twice (prod and staging)
-    expect(execSync).toHaveBeenCalledTimes(2);
+    // Verify exec was called for both prod and staging migration tables
+    const calls = vi.mocked(exec).mock.calls;
+    const migrationCalls = calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('initMigrationTable'),
+    );
+    expect(migrationCalls).toHaveLength(2);
 
-    // Check it called psql with correct connection strings
-    const calls = vi.mocked(execSync).mock.calls;
-    expect(calls[0][0]).toContain('psql');
-    expect(calls[0][0]).toContain('postgresql://prod-user:prod-pass');
-    expect(calls[0][0]).toContain('CREATE TABLE IF NOT EXISTS "_prisma_migrations"');
-
-    expect(calls[1][0]).toContain('psql');
-    expect(calls[1][0]).toContain('postgresql://staging-user:staging-pass');
-    expect(calls[1][0]).toContain('CREATE TABLE IF NOT EXISTS "_prisma_migrations"');
+    // Check it called with correct connection strings
+    expect(migrationCalls[0][0]).toContain('postgresql://prod-user:prod-pass');
+    expect(migrationCalls[1][0]).toContain('postgresql://staging-user:staging-pass');
   });
 
   test('should mark initMigrationTable as complete', async () => {

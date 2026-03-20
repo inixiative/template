@@ -1,9 +1,9 @@
 import { Box, Text, useInput } from 'ink';
-import Spinner from 'ink-spinner';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { listOrganizations } from '../api/infisical';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
+import { StepProgress } from '../components/StepProgress';
 import { setupInfisical } from '../tasks/infisicalSetup';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
@@ -219,32 +219,13 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
   const progressItems = getProgressDisplay(config);
   const error = config.infisical.error;
 
-  // Determine which step is currently in progress
-  const currentStepIndex = running ? progressItems.findIndex((item) => !item.completed) : -1;
-
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>Infisical Setup</Text>
 
       {/* Progress List - Show ALL steps */}
-      <Box flexDirection="column" marginTop={1}>
-        {progressItems.map((item, i) => {
-          const isCompleted = item.completed;
-          const isInProgress = running && i === currentStepIndex;
-          const isPending = !isCompleted && !isInProgress;
-
-          return (
-            <Box key={item.label}>
-              {isCompleted && <Text color="green">✓ {item.label}</Text>}
-              {isInProgress && (
-                <Text color="cyan">
-                  <Spinner type="dots" /> {item.label}
-                </Text>
-              )}
-              {isPending && <Text dimColor>− {item.label}</Text>}
-            </Box>
-          );
-        })}
+      <Box marginTop={1}>
+        <StepProgress items={progressItems} running={running} />
       </Box>
 
       {/* Error Display */}

@@ -1,4 +1,5 @@
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import {
   createBranch,
   createDatabase,
@@ -10,15 +11,16 @@ import {
 } from '../api/planetscale';
 import { getProjectConfig } from '../utils/getProjectConfig';
 
+const execAsync = promisify(exec);
+
 /**
  * Initialize Prisma migration table in the database
  * Uses Bun script with Prisma client to connect and create table
  */
 const initPrismaMigrationTable = async (connectionString: string): Promise<void> => {
   try {
-    execSync(`bun scripts/db/initMigrationTable.ts "${connectionString}"`, {
+    await execAsync(`bun scripts/db/initMigrationTable.ts "${connectionString}"`, {
       encoding: 'utf-8',
-      stdio: 'pipe',
       timeout: 30000,
     });
   } catch (error) {
@@ -37,7 +39,7 @@ import {
   updateConfigField,
 } from '../utils/configHelpers';
 import { retryWithTimeout } from '../utils/retry';
-import { getSecret, setSecret } from './infisicalSetup';
+import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
 type SetupResult = {
   databaseName: string;
@@ -52,11 +54,18 @@ type SetupResult = {
 };
 
 /**
+ * Callback for reporting step progress.
+ * Called with no args when a step completes (triggers config re-read).
+ * Called with an action string to update the active action label shown in the UI.
+ */
+export type StepCallback = (action?: string) => Promise<void>;
+
+/**
  * Setup PlanetScale database with branching
  */
 export const setupPlanetScale = async (
   selectedOrgName: string,
-  onStepComplete?: () => Promise<void>,
+  onStepComplete?: StepCallback,
 ): Promise<SetupResult> => {
   try {
     const config = await getProjectConfig();
@@ -141,6 +150,7 @@ export const setupPlanetScale = async (
 
     // Step 4: Wait for database initial provisioning
     // Give PlanetScale time to initialize (branch renaming has its own retry logic)
+    await onStepComplete?.('Waiting for database to initialize...');
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Step 5: Rename main branch to prod
@@ -156,6 +166,9 @@ export const setupPlanetScale = async (
           );
         },
         timeoutMessage: 'Branch rename timed out after 5 minutes - cluster not fully initialized',
+        onRetry: async (attempt, maxRetries) => {
+          await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
+        },
       });
       await setProgressComplete('planetscale', 'renameProductionBranch');
       await onStepComplete?.();
@@ -175,6 +188,9 @@ export const setupPlanetScale = async (
             );
           },
           timeoutMessage: 'Staging branch creation timed out after 5 minutes - cluster not fully initialized',
+          onRetry: async (attempt, maxRetries) => {
+            await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
+          },
         });
       } catch (error) {
         if (error instanceof Error && error.message.includes('already exists')) {
@@ -191,12 +207,12 @@ export const setupPlanetScale = async (
     }
 
     // Step 7: Create passwords (connection strings)
-    // Suppressed for TUI: console.log('  • Creating connection passwords...');
     let productionPassword: Awaited<ReturnType<typeof createRole>> | undefined;
     let stagingPassword: Awaited<ReturnType<typeof createRole>> | undefined;
 
     if (!(await isProgressComplete('planetscale', 'createPasswords'))) {
       // Production branch role (Postgres uses roles, not passwords)
+      await onStepComplete?.('Creating production role...');
       productionPassword = await retryWithTimeout(
         () => createRole(organization, databaseName, 'prod', `${configProjectName}-production-init`),
         {
@@ -209,10 +225,14 @@ export const setupPlanetScale = async (
             );
           },
           timeoutMessage: 'Production role creation timed out after 5 minutes - cluster not fully initialized',
+          onRetry: async (attempt, maxRetries) => {
+            await onStepComplete?.(`Creating production role... attempt ${attempt}/${maxRetries}`);
+          },
         },
       );
 
       // Staging branch role
+      await onStepComplete?.('Creating staging role...');
       stagingPassword = await retryWithTimeout(
         () => createRole(organization, databaseName, 'staging', `${configProjectName}-staging-init`),
         {
@@ -225,6 +245,9 @@ export const setupPlanetScale = async (
             );
           },
           timeoutMessage: 'Staging role creation timed out after 5 minutes - cluster not fully initialized',
+          onRetry: async (attempt, maxRetries) => {
+            await onStepComplete?.(`Creating staging role... attempt ${attempt}/${maxRetries}`);
+          },
         },
       );
       await setProgressComplete('planetscale', 'createPasswords');
@@ -235,6 +258,7 @@ export const setupPlanetScale = async (
 
     // Step 8: Store connection strings in Infisical
     if (!(await isProgressComplete('planetscale', 'storeConnectionStrings'))) {
+      await onStepComplete?.('Storing connection strings in Infisical...');
       const prodConnectionString = productionPassword.connection_strings.general;
       const stagingConnectionString = stagingPassword.connection_strings.general;
 
@@ -243,36 +267,38 @@ export const setupPlanetScale = async (
       }
 
       // Store production connection string in prod environment, /api folder
-      setSecret(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
+      await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
 
       // Store staging connection string in staging environment, /api folder
-      setSecret(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
+      await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
 
       await setProgressComplete('planetscale', 'storeConnectionStrings');
       await onStepComplete?.();
     }
 
     // Step 9: Initialize Prisma migration table (run on both prod and staging)
-    // Uses docker exec to run psql against PlanetScale
     if (!(await isProgressComplete('planetscale', 'initMigrationTable'))) {
       try {
         // Fetch connection strings from Infisical (source of truth)
-        const prodConnectionString = getSecret('DATABASE_URL', {
+        await onStepComplete?.('Fetching connection strings from Infisical...');
+        const prodConnectionString = await getSecretAsync('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'prod',
           path: '/api',
         });
 
-        const stagingConnectionString = getSecret('DATABASE_URL', {
+        const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'staging',
           path: '/api',
         });
 
         // Initialize _prisma_migrations table in production branch
+        await onStepComplete?.('Initializing migration table (production)...');
         await initPrismaMigrationTable(prodConnectionString);
 
         // Initialize _prisma_migrations table in staging branch
+        await onStepComplete?.('Initializing migration table (staging)...');
         await initPrismaMigrationTable(stagingConnectionString);
 
         await setProgressComplete('planetscale', 'initMigrationTable');
@@ -305,13 +331,13 @@ export const setupPlanetScale = async (
     // Suppressed for TUI: console.log(`   • Configure Render/Vercel to use these connections\n`);
 
     // Fetch connection strings from Infisical (source of truth)
-    const prodConnectionString = getSecret('DATABASE_URL', {
+    const prodConnectionString = await getSecretAsync('DATABASE_URL', {
       projectId: infisicalProjectId,
       environment: 'prod',
       path: '/api',
     });
 
-    const stagingConnectionString = getSecret('DATABASE_URL', {
+    const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
       projectId: infisicalProjectId,
       environment: 'staging',
       path: '/api',

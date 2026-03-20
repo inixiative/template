@@ -3,9 +3,10 @@ import SelectInput from 'ink-select-input';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listOrganizations, listRegions, type PlanetScaleRegion } from '../api/planetscale';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
+import { StepProgress } from '../components/StepProgress';
 import { setSecret } from '../tasks/infisicalSetup';
 import { setupPlanetScale } from '../tasks/planetscaleSetup';
 import {
@@ -113,6 +114,20 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const [tokenInput, setTokenInput] = useState('');
   const [tokenIdInput, setTokenIdInput] = useState('');
   const [savingToken, setSavingToken] = useState(false);
+  const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
+
+  // Step callback: no args = step completed (sync config), with string = update action label
+  const stepCallback = useCallback(
+    async (action?: string) => {
+      if (action) {
+        setActiveAction(action);
+      } else {
+        setActiveAction(undefined);
+        await syncConfig();
+      }
+    },
+    [syncConfig],
+  );
 
   // Derive setup state from config (no delay)
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
@@ -340,19 +355,22 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
     // Make sure we're on status view
     setViewState('status');
     setRunning(true);
+    setActiveAction(undefined);
 
     try {
-      await setupPlanetScale(orgName, syncConfig);
+      await setupPlanetScale(orgName, stepCallback);
 
       // Refresh config to show completed progress (setupState will auto-update via useMemo)
       await syncConfig();
 
+      setActiveAction(undefined);
       setRunning(false);
     } catch (_err) {
       // Error is already persisted by setupPlanetScale via setError
       // Return to status view and refresh to show error
       setViewState('status');
       await syncConfig();
+      setActiveAction(undefined);
       setRunning(false);
     }
   };
@@ -545,9 +563,6 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const progressItems = getProgressDisplay(config);
   const error = config.planetscale.error;
 
-  // Determine which step is currently in progress
-  const currentStepIndex = running ? progressItems.findIndex((item) => !item.completed) : -1;
-
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>PlanetScale Setup</Text>
@@ -561,25 +576,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
         </Box>
       )}
 
-      {/* Progress List - Show ALL steps */}
-      <Box flexDirection="column" marginTop={1}>
-        {progressItems.map((item, i) => {
-          const isCompleted = item.completed;
-          const isInProgress = running && i === currentStepIndex;
-          const isPending = !isCompleted && !isInProgress;
-
-          return (
-            <Box key={item.label}>
-              {isCompleted && <Text color="green">✓ {item.label}</Text>}
-              {isInProgress && (
-                <Text color="cyan">
-                  <Spinner type="dots" /> {item.label}
-                </Text>
-              )}
-              {isPending && <Text dimColor>− {item.label}</Text>}
-            </Box>
-          );
-        })}
+      {/* Progress List - Show ALL steps with active action */}
+      <Box marginTop={1}>
+        <StepProgress items={progressItems} running={running} activeAction={activeAction} />
       </Box>
 
       {/* State Message */}

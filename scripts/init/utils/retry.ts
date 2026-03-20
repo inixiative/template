@@ -3,6 +3,8 @@ type RetryOptions = {
   delayMs: number;
   retryCondition?: (error: Error) => boolean;
   timeoutMessage?: string;
+  /** Called before each retry with the current attempt number and max retries. Use to update UI. */
+  onRetry?: (attempt: number, maxRetries: number) => void | Promise<void>;
 };
 
 /**
@@ -14,6 +16,7 @@ export const retryWithTimeout = async <T>(operation: () => Promise<T>, options: 
     delayMs,
     retryCondition = () => true,
     timeoutMessage = 'Operation timed out after maximum retries',
+    onRetry,
   } = options;
 
   let lastError: Error | undefined;
@@ -37,6 +40,9 @@ export const retryWithTimeout = async <T>(operation: () => Promise<T>, options: 
       if (attempt >= maxRetries) {
         throw new Error(`${timeoutMessage}: ${error.message}`);
       }
+
+      // Notify caller of retry (for UI updates)
+      await onRetry?.(attempt + 1, maxRetries);
 
       // Wait before next retry
       await new Promise((resolve) => setTimeout(resolve, delayMs));

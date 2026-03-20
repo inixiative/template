@@ -1,9 +1,9 @@
 import { Box, Text, useInput } from 'ink';
-import Spinner from 'ink-spinner';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { listTeams } from '../api/vercel';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
+import { StepProgress } from '../components/StepProgress';
 import { setupVercel } from '../tasks/vercelSetup';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
@@ -396,7 +396,6 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
 
   // Status view (main screen)
   const error = config.vercel?.error;
-  const currentStepIndex = running ? progressItems.findIndex((item) => !item.completed) : -1;
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -420,23 +419,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       {/* Progress list */}
       <Box flexDirection="column" marginTop={1}>
         <Text dimColor>Progress:</Text>
-        {progressItems.map((item, i) => {
-          const isCompleted = item.completed;
-          const isInProgress = running && i === currentStepIndex;
-          const isPending = !isCompleted && !isInProgress;
-
-          return (
-            <Box key={item.label} marginLeft={2}>
-              {isCompleted && <Text color="green">✓ {item.label}</Text>}
-              {isInProgress && (
-                <Text color="cyan">
-                  <Spinner type="dots" /> {item.label}
-                </Text>
-              )}
-              {isPending && <Text dimColor>− {item.label}</Text>}
-            </Box>
-          );
-        })}
+        <StepProgress items={progressItems} running={running} marginLeft={2} />
       </Box>
 
       {/* Instructions */}
