@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
 export type ProjectConfig = {
+  launched: boolean;
   project: {
     name: string;
     organization: string;

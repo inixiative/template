@@ -1,4 +1,5 @@
 export const projectConfig = {
+  launched: false,
   project: {
     name: '',
     organization: '',
