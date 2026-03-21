@@ -12,6 +12,11 @@ if (!existsSync(envInitPath) && existsSync(envInitExamplePath)) {
   copyFileSync(envInitExamplePath, envInitPath);
 }
 
+// Hard exit fallback — Ctrl+C in raw mode sends \x03 (not SIGINT),
+// but macOS PTY still sends SIGINT to the process group. This ensures
+// we always exit even if Ink's exitOnCtrlC handler is blocked by a hung exec.
+process.on('SIGINT', () => process.exit(0));
+
 // Render the app and wait for it to exit
 (async () => {
   try {
