@@ -1,6 +1,9 @@
-import { execSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 import { getProjectConfig, getProjectConfigPath } from '../utils/getProjectConfig';
 
 type ProjectConfigData = {
@@ -28,12 +31,16 @@ export const updateProjectConfig = (data: ProjectConfigData): void => {
   writeFileSync(configPath, updated, 'utf-8');
 };
 
-export const renameProject = (oldName: string, newName: string): void => {
+export const renameProject = async (
+  oldName: string,
+  newName: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<number> => {
   // If oldName is empty or 'template', use 'template' for replacements
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
     console.log('No rename needed - project name unchanged');
-    return;
+    return 0;
   }
 
   console.log(`\nRenaming project from "${oldName}" to "${newName}"...`);
@@ -69,18 +76,32 @@ export const renameProject = (oldName: string, newName: string): void => {
     }
   }
 
-  // 3. Replace import paths in all TypeScript/JavaScript files
+  // 3. Replace import paths in all TypeScript/JavaScript files (batched to avoid ARG_MAX limits)
   console.log('  • Updating import paths...');
-  const extensions = ['ts', 'tsx', 'js', 'jsx'];
-  for (const ext of extensions) {
-    try {
-      execSync(
-        `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\//@${newName}\\//g' {} +`,
-        { stdio: 'pipe' },
-      );
-    } catch (_error) {
-      // Continue even if some replacements fail
+  let fileCount = 0;
+  try {
+    const { stdout } = await execAsync(
+      "find apps packages -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\)",
+      { encoding: 'utf-8' },
+    );
+    const files = stdout.trim().split('\n').filter(Boolean);
+    fileCount = files.length;
+    const BATCH = 100;
+    let done = 0;
+    for (let i = 0; i < files.length; i += BATCH) {
+      const batch = files.slice(i, i + BATCH);
+      try {
+        await execAsync(
+          `sed -i '' 's/@${fromName}\\//\@${newName}\\//g' ${batch.map((f) => `'${f}'`).join(' ')}`,
+        );
+      } catch (_error) {
+        // Continue on batch failure
+      }
+      done += batch.length;
+      onProgress?.(done, fileCount);
     }
+  } catch (_error) {
+    // Continue if find fails
   }
 
   // 4. Update README.md
@@ -151,7 +172,8 @@ export const renameProject = (oldName: string, newName: string): void => {
   }
 
   console.log('  • Running bun install to update lockfile...');
-  execSync('bun install', { stdio: 'inherit' });
+  await execAsync('bun install');
 
   console.log(`\n✓ Project renamed successfully to "${newName}"!`);
+  return fileCount;
 };

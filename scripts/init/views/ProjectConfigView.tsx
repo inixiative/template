@@ -24,6 +24,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   const [newName, setNewName] = useState('');
   const [newOrg, setNewOrg] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [fileProgress, setFileProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Handle escape and enter keys
   useInput((_input, key) => {
@@ -73,7 +74,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
       }
 
       if (newName !== currentConfig.name) {
-        renameProject(currentConfig.name, newName);
+        await renameProject(currentConfig.name, newName, (done, total) => setFileProgress({ done, total }));
       }
 
       if (newName && newName.trim() !== '') {
@@ -204,7 +205,10 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
     return (
       <Box flexDirection="column" padding={1}>
         <Text>
-          <Spinner type="dots" /> Updating configuration...
+          <Spinner type="dots" />{' '}
+          {fileProgress
+            ? `Renaming imports... ${fileProgress.done}/${fileProgress.total} files`
+            : 'Updating configuration...'}
         </Text>
       </Box>
     );
