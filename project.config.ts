@@ -1,6 +1,6 @@
 export const projectConfig = {
   project: {
-    name: '',
+    name: 'template',
     organization: '',
     progress: {
       renameOrg: false,

@@ -5,6 +5,7 @@ import {
   createSecretImport,
   getOrganization,
   getProject,
+  toInfisicalSlug,
   updateEnvironment,
   updateProjectSlug,
   upsertProject,
@@ -34,6 +35,11 @@ export const setupInfisical = async (
 
     // Clear any previous error when starting/continuing
     await clearConfigError('infisical');
+
+    // Guard: project name must be set before Infisical setup can run
+    if (!configProjectName || configProjectName.trim().length === 0) {
+      throw new Error('Project name is not set. Complete "Project Configuration" (step 1) before running Infisical setup.');
+    }
 
     // Check if config is stale (project name changed since last setup)
     const isStale = config.infisical.configProjectName && config.infisical.configProjectName !== configProjectName;
@@ -88,7 +94,7 @@ export const setupInfisical = async (
 
       // Try to update project slug to match project name
       try {
-        await updateProjectSlug(projectId, configProjectName);
+        await updateProjectSlug(projectId, toInfisicalSlug(configProjectName));
         // Suppressed for TUI: console.log(`    ✓ Updated slug to: ${configProjectName}`);
       } catch (_error) {
         // Suppressed for TUI: console.log('    ⚠ Could not update slug (may already be correct)');

@@ -17,7 +17,7 @@ echo "Generating database client..."
 bun run db:generate
 
 echo "Pushing database schema..."
-bun run with local api bun run db:push
+bun run with local api bun run db:push:force
 
 echo "Seeding database..."
 bun run with local api bun run db:seed

@@ -86,6 +86,19 @@ export const getOrganization = async (organizationId: string): Promise<Infisical
 };
 
 /**
+ * Convert a project name to a valid Infisical slug.
+ * Rules: lowercase, alphanumeric + hyphens, min 5 chars.
+ */
+export const toInfisicalSlug = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  // Pad to minimum 5 chars if needed
+  return slug.length >= 5 ? slug : slug.padEnd(5, '0');
+};
+
+/**
  * Update project/workspace slug
  */
 export const updateProjectSlug = async (projectId: string, slug: string): Promise<void> => {
@@ -115,7 +128,7 @@ export const upsertProject = async (name: string): Promise<InfisicalProject> => 
       method: 'POST',
       body: JSON.stringify({
         projectName: name,
-        slug: name, // Explicitly set slug to prevent random suffix
+        slug: toInfisicalSlug(name),
       }),
     },
   );

@@ -105,7 +105,7 @@ export const checkInfisicalSession = (): InfisicalSession => {
  */
 export const checkInfisicalSessionAsync = async (): Promise<InfisicalSession> => {
   try {
-    const { stdout } = await execAsync('infisical user get token');
+    const { stdout } = await execAsync('infisical user get token', { timeout: 8000 });
     const output = stdout.trim();
 
     const sessionMatch = output.match(/Session ID: (.+)/);
