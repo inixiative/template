@@ -45,7 +45,7 @@ export const renameProject = (oldName: string, newName: string): void => {
   rootPkg.name = newName;
   writeFileSync(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
 
-  // 2. Update workspace packages
+  // 2. Update workspace packages (name + all dependency references)
   console.log('  • Updating workspace packages...');
   const workspaces = ['apps', 'packages'];
   for (const workspace of workspaces) {
@@ -56,9 +56,10 @@ export const renameProject = (oldName: string, newName: string): void => {
       if (dir.isDirectory()) {
         const pkgPath = join(workspacePath, dir.name, 'package.json');
         try {
-          const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-          pkg.name = pkg.name.replace(`@${fromName}/`, `@${newName}/`);
-          writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+          // Replace all @fromName/ references in the file, not just the name field
+          const content = readFileSync(pkgPath, 'utf-8');
+          const updated = content.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
+          writeFileSync(pkgPath, updated, 'utf-8');
         } catch (_error) {
           // Package.json might not exist, skip
         }
