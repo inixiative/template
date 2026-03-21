@@ -1,1 +1,6 @@
-export { createFixtureLoader, loadFixture, createProviderFixtureLoader, loadFixtureSequence } from './createFixtureLoader';
+export {
+  createFixtureLoader,
+  createProviderFixtureLoader,
+  loadFixture,
+  loadFixtureSequence,
+} from './createFixtureLoader';

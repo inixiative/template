@@ -53,7 +53,8 @@ const DEFAULT_RULES: SanitizeRule[] = [
   // UUIDs (replace with deterministic zeroed UUIDs, preserving structure)
   // Only in id/token fields, not everywhere
   {
-    pattern: /(?<="(?:id|token_id|project_id|organization_id|workspace_id|environment_id|service_id)":\s*")[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+    pattern:
+      /(?<="(?:id|token_id|project_id|organization_id|workspace_id|environment_id|service_id)":\s*")[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
     replacement: '00000000-0000-0000-0000-000000000000',
   },
 
@@ -90,7 +91,7 @@ export const recordFixture = (name: string, data: unknown, extraRules: SanitizeR
   mkdirSync(dirname(fullPath), { recursive: true });
 
   const sanitized = sanitize(data, extraRules);
-  writeFileSync(fullPath, JSON.stringify(sanitized, null, 2) + '\n');
+  writeFileSync(fullPath, `${JSON.stringify(sanitized, null, 2)}\n`);
 };
 
 export type { SanitizeRule };

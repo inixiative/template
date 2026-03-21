@@ -9,7 +9,6 @@ export {
   type MockOpenAIEmbedding,
 } from './openai.mock';
 export { createMockS3Client, type MockS3Client } from './s3.mock';
-
+export { recordFixture, type SanitizeRule, sanitize } from './sanitize';
 // VCR for fixture management
 export { VCR } from './VCR';
-export { sanitize, recordFixture, type SanitizeRule } from './sanitize';

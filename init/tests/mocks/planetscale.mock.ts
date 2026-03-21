@@ -1,9 +1,5 @@
 import { mock } from 'bun:test';
-import type {
-  PlanetScaleBranch,
-  PlanetScaleDatabase,
-  PlanetScaleRegion,
-} from '../../api/planetscale';
+import type { PlanetScaleBranch, PlanetScaleDatabase, PlanetScaleRegion } from '../../api/planetscale';
 import { VCR } from './VCR';
 
 type PlanetScalePassword = {
@@ -49,14 +45,29 @@ export const createMockPlanetScale = () => {
 
   return {
     mocks,
-    vcr: { orgs: orgsVcr, regions: regionsVcr, database: databaseVcr, branch: branchVcr, role: roleVcr, password: passwordVcr },
+    vcr: {
+      orgs: orgsVcr,
+      regions: regionsVcr,
+      database: databaseVcr,
+      branch: branchVcr,
+      role: roleVcr,
+      password: passwordVcr,
+    },
     /** Install as mock.module — call before importing setup code */
     install: () => {
       mock.module('../../api/planetscale', () => mocks);
     },
     clearAll: () => {
       for (const fn of Object.values(mocks)) fn.mockClear();
-      for (const vcr of Object.values({ orgs: orgsVcr, regions: regionsVcr, database: databaseVcr, branch: branchVcr, role: roleVcr, password: passwordVcr })) vcr.clear();
+      for (const vcr of Object.values({
+        orgs: orgsVcr,
+        regions: regionsVcr,
+        database: databaseVcr,
+        branch: branchVcr,
+        role: roleVcr,
+        password: passwordVcr,
+      }))
+        vcr.clear();
     },
   };
 };

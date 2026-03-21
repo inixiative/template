@@ -50,8 +50,8 @@ const listVercelConnections = async (infisicalProjectId: string): Promise<Array<
     throw new Error(`Failed to list Vercel connections: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.appConnections || [];
+  const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
+  return data.appConnections ?? [];
 };
 
 /**
@@ -72,8 +72,8 @@ export const listVercelSyncs = async (infisicalProjectId: string): Promise<Verce
     throw new Error(`Failed to list Vercel syncs: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.secretSyncs || [];
+  const data = (await response.json()) as { secretSyncs?: VercelSecretSync[] };
+  return data.secretSyncs ?? [];
 };
 
 /**
@@ -116,8 +116,12 @@ export const createVercelConnection = async (
     throw new Error(`Failed to create Vercel connection: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.appConnection?.id || data.id;
+  const data = (await response.json()) as { appConnection?: { id?: string }; id?: string };
+  const connectionId = data.appConnection?.id ?? data.id;
+  if (!connectionId) {
+    throw new Error(`Failed to create Vercel connection "${connectionName}"`);
+  }
+  return connectionId;
 };
 
 /**
@@ -170,8 +174,12 @@ export const createVercelSync = async (
     throw new Error(`Failed to create Vercel sync: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.secretSync?.id || data.id;
+  const data = (await response.json()) as { secretSync?: { id?: string }; id?: string };
+  const syncId = data.secretSync?.id ?? data.id;
+  if (!syncId) {
+    throw new Error(`Failed to create Vercel sync "${syncName}"`);
+  }
+  return syncId;
 };
 
 /**

@@ -4,8 +4,8 @@ import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listOrganizations, listRegions, type PlanetScaleRegion } from '../api/planetscale';
-import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { ActionSpinner } from '../components/ActionSpinner';
+import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setSecretAsync } from '../tasks/infisicalSetup';
@@ -314,7 +314,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const handleTokenValueSubmit = async () => {
     if (!config || !tokenInput.trim() || !tokenIdInput.trim()) return;
 
-    await tokenAction.run('Saving to Infisical...', async () => {
+    const actionError = await tokenAction.run('Saving to Infisical...', async () => {
       const infisicalProjectId = config.infisical.projectId;
       const orgName = config.planetscale.organization;
       const region = config.planetscale.region;
@@ -335,8 +335,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       setViewState('token-confirm');
     });
 
-    if (tokenAction.error) {
-      await setConfigError('planetscale', tokenAction.error);
+    if (actionError) {
+      setViewState('status');
+      await setConfigError('planetscale', actionError);
       await syncConfig();
     }
   };

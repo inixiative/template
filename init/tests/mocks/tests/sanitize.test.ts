@@ -58,9 +58,7 @@ describe('sanitize', () => {
 
   test('applies custom rules', () => {
     const data = { custom: 'KEEP-THIS-abc123' };
-    const result = sanitize(data, [
-      { pattern: /KEEP-THIS-[a-z0-9]+/g, replacement: 'REDACTED' },
-    ]);
+    const result = sanitize(data, [{ pattern: /KEEP-THIS-[a-z0-9]+/g, replacement: 'REDACTED' }]);
     expect(result.custom).toBe('REDACTED');
   });
 

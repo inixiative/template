@@ -86,7 +86,7 @@ const planetscaleFetch = async <T>(endpoint: string, options: RequestInit = {}):
     throw new Error(`PlanetScale API error (${response.status}): ${error}`);
   }
 
-  return response.json();
+  return (await response.json()) as T;
 };
 
 /**
@@ -119,10 +119,10 @@ export const listRegions = async (organizationName: string): Promise<PlanetScale
     .map((region) => ({
       id: region.id || region.slug,
       slug: region.slug,
-      display_name: region.display_name || region.name,
+      display_name: region.display_name || region.name || region.slug,
       enabled: region.enabled !== false,
     }))
-    .filter((r: PlanetScaleRegion) => r.enabled);
+    .filter((region) => region.enabled);
 };
 
 /**

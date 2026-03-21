@@ -62,9 +62,7 @@ describe('VCR', () => {
     const vcr = new VCR<{ value: string }>();
     vcr.add({ value: 'from queue' });
 
-    const result = await vcr.playOrRecord(
-      async () => ({ value: 'from real call' }),
-    );
+    const result = await vcr.playOrRecord(async () => ({ value: 'from real call' }));
 
     expect(result.value).toBe('from queue');
   });
@@ -72,9 +70,7 @@ describe('VCR', () => {
   test('playOrRecord calls real function when queue empty', async () => {
     const vcr = new VCR<{ value: string }>();
 
-    const result = await vcr.playOrRecord(
-      async () => ({ value: 'from real call' }),
-    );
+    const result = await vcr.playOrRecord(async () => ({ value: 'from real call' }));
 
     expect(result.value).toBe('from real call');
   });
@@ -82,9 +78,7 @@ describe('VCR', () => {
   test('playOrRecord records sanitized result', async () => {
     const vcr = new VCR<{ apiKey: string; data: string }>();
 
-    await vcr.playOrRecord(
-      async () => ({ apiKey: 'sk-ant-real-secret-key-abc123', data: 'hello' }),
-    );
+    await vcr.playOrRecord(async () => ({ apiKey: 'sk-ant-real-secret-key-abc123', data: 'hello' }));
 
     const recorded = vcr.getRecorded();
     expect(recorded).toHaveLength(1);

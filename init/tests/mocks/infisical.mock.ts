@@ -13,14 +13,12 @@ export const createMockInfisical = () => {
       if (!getSecretVcr.isEmpty()) return getSecretVcr.require();
       return secretStore.get(key) ?? '';
     }),
-    getSecretAsync: mock(
-      async (key: string, opts?: { projectId?: string; environment?: string; path?: string }) => {
-        if (!getSecretVcr.isEmpty()) return getSecretVcr.require();
-        // Composite key for environment-specific lookups
-        const compositeKey = opts?.environment ? `${opts.environment}:${opts.path ?? '/'}:${key}` : key;
-        return secretStore.get(compositeKey) ?? secretStore.get(key) ?? '';
-      },
-    ),
+    getSecretAsync: mock(async (key: string, opts?: { projectId?: string; environment?: string; path?: string }) => {
+      if (!getSecretVcr.isEmpty()) return getSecretVcr.require();
+      // Composite key for environment-specific lookups
+      const compositeKey = opts?.environment ? `${opts.environment}:${opts.path ?? '/'}:${key}` : key;
+      return secretStore.get(compositeKey) ?? secretStore.get(key) ?? '';
+    }),
     setSecret: mock((_projectId: string, _env: string, key: string, value: string) => {
       secretStore.set(key, value);
     }),
@@ -40,9 +38,7 @@ export const createMockInfisical = () => {
     /** Pre-seed secrets (e.g., connection strings for resume scenarios) */
     seed: (entries: SecretEntry[]) => {
       for (const entry of entries) {
-        const compositeKey = entry.environment
-          ? `${entry.environment}:${entry.path ?? '/'}:${entry.key}`
-          : entry.key;
+        const compositeKey = entry.environment ? `${entry.environment}:${entry.path ?? '/'}:${entry.key}` : entry.key;
         secretStore.set(compositeKey, entry.value);
         secretStore.set(entry.key, entry.value);
       }

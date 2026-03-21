@@ -60,7 +60,9 @@ const defaultMessage: MockAnthropicMessage = {
  * const { client, vcr } = createMockAnthropicClient(realAnthropicClient);
  * // VCR empty → calls real API, sanitizes, saves fixture, returns sanitized
  */
-export const createMockAnthropicClient = (realClient?: { messages: { create: (...args: unknown[]) => Promise<MockAnthropicMessage> } }) => {
+export const createMockAnthropicClient = (realClient?: {
+  messages: { create: (...args: unknown[]) => Promise<MockAnthropicMessage> };
+}) => {
   const vcr = new VCR<MockAnthropicMessage>();
 
   const client = {
@@ -72,10 +74,9 @@ export const createMockAnthropicClient = (realClient?: { messages: { create: (..
 
         // Auto-record: call real client if provided
         if (realClient) {
-          return vcr.playOrRecord(
-            () => realClient.messages.create(...args),
-            { fixtureName: 'anthropic/chatCompletion' },
-          );
+          return vcr.playOrRecord(() => realClient.messages.create(...args), {
+            fixtureName: 'anthropic/chatCompletion',
+          });
         }
 
         // Fallback to deterministic mock

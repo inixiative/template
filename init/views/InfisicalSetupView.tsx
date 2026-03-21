@@ -216,6 +216,22 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
     );
   }
 
+  // Guard: project name must be set first
+  if (!config.project.name || config.project.name.trim().length === 0) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold>Infisical Setup</Text>
+        <Box marginTop={1}>
+          <Text color="yellow">⚠ Project name is not set.</Text>
+        </Box>
+        <Text dimColor>Complete "1. Project Configuration" before running Infisical setup.</Text>
+        <Box marginTop={1}>
+          <Text dimColor>{prompt(['cancel'])}</Text>
+        </Box>
+      </Box>
+    );
+  }
+
   const progressItems = getProgressDisplay(config);
   const error = config.infisical.error;
 

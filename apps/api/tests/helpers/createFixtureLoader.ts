@@ -68,9 +68,7 @@ export const createProviderFixtureLoader = (provider: AIProvider) => {
       return JSON.parse(content) as T;
     }
 
-    throw new Error(
-      `Fixture not found: ${provider}/${operation}.json (also checked shared/${operation}.json)`,
-    );
+    throw new Error(`Fixture not found: ${provider}/${operation}.json (also checked shared/${operation}.json)`);
   };
 };
 
@@ -81,9 +79,7 @@ export const createProviderFixtureLoader = (provider: AIProvider) => {
 export const loadFixtureSequence = <T = unknown>(dir: string): T[] => {
   const { readdirSync } = require('node:fs');
   const fullDir = join(FIXTURES_DIR, dir);
-  const files = (readdirSync(fullDir) as string[])
-    .filter((f: string) => f.endsWith('.json'))
-    .sort();
+  const files = (readdirSync(fullDir) as string[]).filter((f: string) => f.endsWith('.json')).sort();
 
   return files.map((file: string) => {
     const content = readFileSync(join(fullDir, file), 'utf-8');

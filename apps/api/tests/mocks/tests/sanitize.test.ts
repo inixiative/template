@@ -88,9 +88,7 @@ describe('sanitize', () => {
 
   test('applies custom rules alongside defaults', () => {
     const data = { custom: 'INTERNAL-CODE-abc123', id: 'msg_realId' };
-    const result = sanitize(data, [
-      { pattern: /INTERNAL-CODE-[a-z0-9]+/g, replacement: 'REDACTED' },
-    ]);
+    const result = sanitize(data, [{ pattern: /INTERNAL-CODE-[a-z0-9]+/g, replacement: 'REDACTED' }]);
     expect(result.custom).toBe('REDACTED');
     expect(result.id).toBe('msg_SANITIZED_000'); // default rule still applies
   });

@@ -8,8 +8,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createMockConfig, createMockInfisical, createMockPlanetScale, createMockSystem, loadFixture } from '../../tests/mocks';
 import type { PlanetScaleBranch, PlanetScaleDatabase } from '../../api/planetscale';
+import {
+  createMockConfig,
+  createMockInfisical,
+  createMockPlanetScale,
+  createMockSystem,
+  loadFixture,
+} from '../../tests/mocks';
 
 // Create service mocks
 const ps = createMockPlanetScale();

@@ -45,9 +45,7 @@ describe('createProviderFixtureLoader', () => {
 
   test('throws when neither provider nor shared fixture exists', () => {
     const load = createProviderFixtureLoader('google');
-    expect(() => load('nonexistent')).toThrow(
-      'Fixture not found: google/nonexistent.json',
-    );
+    expect(() => load('nonexistent')).toThrow('Fixture not found: google/nonexistent.json');
   });
 
   test('prefers provider fixture over shared', () => {

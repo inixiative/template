@@ -9,7 +9,7 @@ import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
 import { setupRailway } from '../tasks/railwaySetup';
-import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
+import { clearAllProgress, clearConfigError, setConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
 import { prompt } from '../utils/prompts';
@@ -382,7 +382,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   const handleTokenSubmit = async () => {
     if (!config || !workspaceToken.trim()) return;
 
-    await tokenAction.run('Storing token and continuing setup...', async () => {
+    const actionError = await tokenAction.run('Storing token and continuing setup...', async () => {
       // Store token in Infisical
       const infisicalProjectId = config.infisical.projectId;
       await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
@@ -402,6 +402,13 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
         setViewState('workspace-select');
       }
     });
+
+    if (actionError) {
+      setRunning(false);
+      setViewState('status');
+      await setConfigError('railway', actionError);
+      await syncConfig();
+    }
   };
 
   const handleWorkspaceSelect = async (workspaceId: string) => {

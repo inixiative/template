@@ -5,7 +5,7 @@
  * without rendering the React component (no ink-testing-library needed).
  */
 
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createMockInfisical, createMockSystem } from '../../tests/mocks';
 
 const infisical = createMockInfisical();
@@ -32,10 +32,16 @@ describe('TokenInputView - setSecretAsync integration', () => {
 
     expect(infisical.mocks.setSecretAsync).toHaveBeenCalledTimes(2);
     expect(infisical.mocks.setSecretAsync).toHaveBeenCalledWith(
-      'proj-123', 'root', 'PLANETSCALE_TOKEN_ID', 'pscale_tkid_test123',
+      'proj-123',
+      'root',
+      'PLANETSCALE_TOKEN_ID',
+      'pscale_tkid_test123',
     );
     expect(infisical.mocks.setSecretAsync).toHaveBeenCalledWith(
-      'proj-123', 'root', 'PLANETSCALE_TOKEN', 'pscale_tk_secret456',
+      'proj-123',
+      'root',
+      'PLANETSCALE_TOKEN',
+      'pscale_tk_secret456',
     );
 
     // Verify stored in mock store
@@ -51,9 +57,9 @@ describe('TokenInputView - setSecretAsync integration', () => {
       new Error('Failed to set secret PLANETSCALE_TOKEN: Connection refused'),
     );
 
-    await expect(
-      setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN', 'value'),
-    ).rejects.toThrow('Connection refused');
+    await expect(setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN', 'value')).rejects.toThrow(
+      'Connection refused',
+    );
   });
 
   test('multiple token fields are stored independently', async () => {
@@ -102,9 +108,7 @@ describe('TokenInputView - VCR error injection', () => {
   test('getSecretAsync falls back to secret store when VCR empty', async () => {
     const { getSecretAsync } = await import('../../tasks/infisicalSetup');
 
-    infisical.seed([
-      { key: 'MY_TOKEN', value: 'stored-value' },
-    ]);
+    infisical.seed([{ key: 'MY_TOKEN', value: 'stored-value' }]);
 
     const value = await getSecretAsync('MY_TOKEN', { projectId: 'proj-123', environment: 'root' });
     expect(value).toBe('stored-value');

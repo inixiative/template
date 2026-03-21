@@ -1,4 +1,4 @@
-import { sanitize, type SanitizeRule } from './sanitize';
+import { type SanitizeRule, sanitize } from './sanitize';
 
 type VCROptions = {
   /** Fixture name for auto-recording (e.g., 'planetscale/createDatabase') */

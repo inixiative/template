@@ -55,7 +55,7 @@ const infisicalFetch = async <T>(endpoint: string, options: RequestInit = {}): P
     throw new Error(`Infisical API error (${response.status}): ${error}`);
   }
 
-  return response.json();
+  return (await response.json()) as T;
 };
 
 /**
@@ -83,6 +83,19 @@ export const listOrganizations = async (): Promise<InfisicalOrganization[]> => {
  */
 export const getOrganization = async (organizationId: string): Promise<InfisicalOrganization> => {
   return await infisicalFetch<InfisicalOrganization>(`/v1/organization/${organizationId}`);
+};
+
+/**
+ * Convert a project name to a valid Infisical slug.
+ * Rules: lowercase, alphanumeric + hyphens, min 5 chars.
+ */
+export const toInfisicalSlug = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  // Pad to minimum 5 chars if needed
+  return slug.length >= 5 ? slug : slug.padEnd(5, '0');
 };
 
 /**
@@ -115,12 +128,17 @@ export const upsertProject = async (name: string): Promise<InfisicalProject> => 
       method: 'POST',
       body: JSON.stringify({
         projectName: name,
-        slug: name, // Explicitly set slug to prevent random suffix
+        slug: toInfisicalSlug(name),
       }),
     },
   );
 
-  return createResponse.workspace || createResponse.project;
+  const project = createResponse.workspace ?? createResponse.project;
+  if (!project) {
+    throw new Error(`Failed to create Infisical project "${name}"`);
+  }
+
+  return project;
 };
 
 /**

@@ -154,7 +154,7 @@ const railwayGraphQLWithToken = async <T>(
     );
   }
 
-  const result = await response.json();
+  const result = (await response.json()) as { data: T; errors?: Array<{ message: string }> };
 
   // GraphQL errors are returned in the response
   if (result.errors && result.errors.length > 0) {
@@ -182,8 +182,8 @@ const _railwayGraphQLWorkspace = async <T>(query: string, variables?: Record<str
 export const listWorkspaces = async (): Promise<RailwayWorkspace[]> => {
   try {
     const { stdout } = await execAsync('railway whoami --json', { encoding: 'utf-8' });
-    const data = JSON.parse(stdout.trim());
-    return data.workspaces || [];
+    const data = JSON.parse(stdout.trim()) as { workspaces?: RailwayWorkspace[] };
+    return data.workspaces ?? [];
   } catch (_error) {
     // If CLI fails, return empty array
     return [];

@@ -211,10 +211,13 @@ export const addEnvVar = async (
 ): Promise<void> => {
   try {
     const teamFlag = teamId ? `--scope ${teamId}` : '';
-    await execAsync(`vercel env add ${key} ${environment} --project ${projectName} ${teamFlag} --yes`, {
-      encoding: 'utf-8',
-      input: value, // Pass value via stdin
-    });
+    const escapedValue = value.replace(/'/g, `'"'"'`);
+    await execAsync(
+      `printf '%s\\n' '${escapedValue}' | vercel env add ${key} ${environment} --project ${projectName} ${teamFlag} --yes`,
+      {
+        encoding: 'utf-8',
+      },
+    );
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to add environment variable ${key}: ${error.message}`);

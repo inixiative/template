@@ -10,8 +10,8 @@ type AsyncActionState = {
 };
 
 type AsyncActionReturn = AsyncActionState & {
-  /** Execute an async action with a loading label. Sets running=true, clears on completion/error. */
-  run: (label: string, action: () => Promise<void>) => Promise<void>;
+  /** Execute an async action with a loading label. Returns an error message on failure so callers can react immediately. */
+  run: (label: string, action: () => Promise<void>) => Promise<string | null>;
   /** Clear the error state */
   clearError: () => void;
 };
@@ -26,9 +26,12 @@ type AsyncActionReturn = AsyncActionState & {
  * ```tsx
  * const { running, error, actionLabel, run } = useAsyncAction();
  *
- * const handleSubmit = () => run('Saving token...', async () => {
+ * const handleSubmit = async () => {
+ *   const error = await run('Saving token...', async () => {
  *   await setSecretAsync(projectId, env, key, value);
- * });
+ *   });
+ *   if (error) console.error(error);
+ * };
  *
  * // In render:
  * {running && <ActionSpinner label={actionLabel} />}
@@ -47,12 +50,15 @@ export const useAsyncAction = (): AsyncActionReturn => {
     try {
       await action();
       setState({ running: false, error: null, actionLabel: null });
+      return null;
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Action failed';
       setState({
         running: false,
-        error: err instanceof Error ? err.message : 'Action failed',
+        error: message,
         actionLabel: null,
       });
+      return message;
     }
   }, []);
 

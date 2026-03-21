@@ -54,8 +54,8 @@ const listRailwayConnections = async (infisicalProjectId: string): Promise<Array
     throw new Error(`Failed to list Railway connections: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.appConnections || [];
+  const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
+  return data.appConnections ?? [];
 };
 
 /**
@@ -79,8 +79,8 @@ export const listRailwaySyncs = async (infisicalProjectId: string): Promise<Rail
     throw new Error(`Failed to list Railway syncs: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
-  return data.secretSyncs || [];
+  const data = (await response.json()) as { secretSyncs?: RailwaySecretSync[] };
+  return data.secretSyncs ?? [];
 };
 
 /**
@@ -125,7 +125,7 @@ export const createRailwayConnection = async (
     throw new Error(`Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as { appConnection?: { id?: string } };
 
   // Response is { appConnection: { id, ... } }
   if (data.appConnection?.id) {

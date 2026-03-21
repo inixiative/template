@@ -113,10 +113,9 @@ export const createMockOpenAIClient = (realClient?: RealOpenAIClient) => {
           if (recorded) return recorded;
 
           if (realClient?.chat) {
-            return chatVcr.playOrRecord(
-              () => realClient.chat!.completions.create(...args),
-              { fixtureName: 'openai/chatCompletion' },
-            );
+            return chatVcr.playOrRecord(() => realClient.chat!.completions.create(...args), {
+              fixtureName: 'openai/chatCompletion',
+            });
           }
 
           return { ...defaultChatCompletion, id: `chatcmpl-mock-${Date.now()}` };
@@ -129,10 +128,9 @@ export const createMockOpenAIClient = (realClient?: RealOpenAIClient) => {
         if (recorded) return recorded;
 
         if (realClient?.embeddings) {
-          return embeddingVcr.playOrRecord(
-            () => realClient.embeddings!.create(...args),
-            { fixtureName: 'openai/embedding' },
-          );
+          return embeddingVcr.playOrRecord(() => realClient.embeddings!.create(...args), {
+            fixtureName: 'openai/embedding',
+          });
         }
 
         return { ...defaultEmbedding };

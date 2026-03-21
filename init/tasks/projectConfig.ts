@@ -31,24 +31,30 @@ export const updateProjectConfig = async (data: ProjectConfigData): Promise<void
   await writeFile(configPath, updated, 'utf-8');
 };
 
-export const renameProject = async (oldName: string, newName: string): Promise<void> => {
+export const renameProject = async (
+  oldName: string,
+  newName: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<number> => {
   // If oldName is empty or 'template', use 'template' for replacements
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
     console.log('No rename needed - project name unchanged');
-    return;
+    return 0;
   }
 
   console.log(`\nRenaming project from "${oldName}" to "${newName}"...`);
 
-  // 1. Update root package.json
+  // 1. Update root package.json (name field + any @scope/ references in deps)
   console.log('  • Updating root package.json...');
   const rootPkgPath = join(process.cwd(), 'package.json');
-  const rootPkg = JSON.parse(await readFile(rootPkgPath, 'utf-8'));
-  rootPkg.name = newName;
+  const rootContent = await readFile(rootPkgPath, 'utf-8');
+  const rootWithScope = rootContent.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
+  const rootPkg = JSON.parse(rootWithScope);
+  rootPkg.name = newName; // root package has no @scope prefix
   await writeFile(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
 
-  // 2. Update workspace packages
+  // 2. Update workspace packages (name + all dependency references)
   console.log('  • Updating workspace packages...');
   const workspaces = ['apps', 'packages'];
   for (const workspace of workspaces) {
@@ -59,9 +65,10 @@ export const renameProject = async (oldName: string, newName: string): Promise<v
       if (dir.isDirectory()) {
         const pkgPath = join(workspacePath, dir.name, 'package.json');
         try {
-          const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'));
-          pkg.name = pkg.name.replace(`@${fromName}/`, `@${newName}/`);
-          await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
+          // Replace all @fromName/ references in the file, not just the name field
+          const content = await readFile(pkgPath, 'utf-8');
+          const updated = content.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
+          await writeFile(pkgPath, updated, 'utf-8');
         } catch (_error) {
           // Package.json might not exist, skip
         }
@@ -69,17 +76,36 @@ export const renameProject = async (oldName: string, newName: string): Promise<v
     }
   }
 
-  // 3. Replace import paths in all TypeScript/JavaScript files
+  // 3. Replace import paths in all TypeScript/JavaScript files (batched to avoid ARG_MAX limits)
   console.log('  • Updating import paths...');
-  const extensions = ['ts', 'tsx', 'js', 'jsx'];
-  for (const ext of extensions) {
-    try {
-      await execAsync(
-        `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\///@${newName}\\//g' {} +`,
-      );
-    } catch (_error) {
-      // Continue even if some replacements fail
+  let fileCount = 0;
+  try {
+    const { stdout } = await execAsync(
+      "find apps packages -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\)",
+      { encoding: 'utf-8' },
+    );
+    const files = stdout.trim().split('\n').filter(Boolean);
+    fileCount = files.length;
+    const BATCH = 100;
+    let done = 0;
+    for (let i = 0; i < files.length; i += BATCH) {
+      const batch = files.slice(i, i + BATCH);
+      for (const filePath of batch) {
+        try {
+          const content = await readFile(filePath, 'utf-8');
+          const updated = content.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
+          if (updated !== content) {
+            await writeFile(filePath, updated, 'utf-8');
+          }
+        } catch (_error) {
+          // Continue on file failure
+        }
+      }
+      done += batch.length;
+      onProgress?.(done, fileCount);
     }
+  } catch (_error) {
+    // Continue if find fails
   }
 
   // 4. Update README.md
@@ -153,4 +179,5 @@ export const renameProject = async (oldName: string, newName: string): Promise<v
   await execAsync('bun install');
 
   console.log(`\n✓ Project renamed successfully to "${newName}"!`);
+  return fileCount;
 };
