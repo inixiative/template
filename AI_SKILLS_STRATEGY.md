@@ -149,6 +149,113 @@ MuninnDB already has the storage primitives (vaults, concepts, tags, links, life
 
 ---
 
+## The Policy Pipeline: Memory → Docs → Corpus
+
+MuninnDB memories are fluid — they evolve, decay, get consolidated. But at some point, validated knowledge needs to become *formal policy*: the `docs/claude/` files that shape agent behavior. This is a maturity pipeline.
+
+### The Problem with Docs in Git
+
+The current `docs/claude/` files are static markdown checked into git. This works, but has real friction:
+
+1. **No lifecycle metadata** — A doc is either in the repo or it isn't. There's no way to say "this section is in development," "this pattern is deprecated," or "this convention isn't active yet."
+2. **Format lock-in** — Markdown is great for humans, but agents might benefit from graph relationships (Neo4j), vector embeddings, or pre-tokenized formats. Right now everything is flat text.
+3. **Merge conflicts on knowledge** — Multiple people updating conventions creates git conflicts on docs, which is awkward because knowledge isn't really "mergeable" the way code is.
+4. **No visibility into what's coming** — PMs and team leads can't see what conventions are being proposed, tested, or deprecated without reading git diffs.
+
+### Doc Lifecycle States
+
+Every piece of documentation (or section within a doc) should carry a lifecycle state:
+
+| State | Meaning | Agent behavior |
+|-------|---------|---------------|
+| `draft` | Being worked on, not validated | Agents ignore unless explicitly asked |
+| `development` | Active but experimental, being tested | Agents follow but flag as experimental |
+| `active` | Validated, stable convention | Agents follow as policy |
+| `deprecated` | Being phased out, replacement exists | Agents warn if referenced, suggest replacement |
+| `archived` | No longer relevant, kept for history | Agents ignore completely |
+
+This is essentially feature flags for documentation.
+
+### The Pipeline
+
+```
+MuninnDB (fluid)          Formal Docs (structured)         Corpus (optimized)
+
+  muninn_remember    ──►   Draft doc/section          ──►   Tokenized/indexed
+  muninn_evolve            with lifecycle tag                for agent consumption
+  muninn_decide
+       │                        │                              │
+       │ Librarian              │ Librarian                    │ Cartographer
+       │ classifies             │ promotes                     │ routes
+       │                        │                              │
+  Scratch/WIP           Development/Active              Pre-compiled context
+  in vaults             in docs (git or external)       bundles for executors
+```
+
+### Where Should Formal Docs Live?
+
+Git is convenient but not ideal for living documentation. Options:
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Git + frontmatter** | Simple, versioned, existing workflow | Merge conflicts, no real-time visibility, lifecycle tags clutter diffs |
+| **MuninnDB all the way** | Fluid lifecycle, agent-native, no merge conflicts | Not human-browsable, no git history, single point of failure |
+| **Hybrid: git as source of truth, MuninnDB as runtime cache** | Best of both — humans edit markdown, pipeline syncs to MuninnDB with enrichment (vectors, graph links, lifecycle) | More moving parts, sync complexity |
+| **External doc platform** (Notion/Confluence-like) | Real-time collaboration, lifecycle features built in | Another dependency, not git-integrated |
+
+The hybrid approach is probably right: `docs/claude/` stays as the human-editable source of truth, but a pipeline process enriches and syncs to MuninnDB where agents actually consume it. The enrichment step can:
+
+- Add vector embeddings for semantic search
+- Build graph relationships between doc sections
+- Apply lifecycle tags from frontmatter
+- Pre-tokenize for efficient agent consumption
+- Track which docs are referenced most (usage analytics feeding back to the Librarian)
+
+### Frontmatter Convention for Doc Lifecycle
+
+If we go with git + frontmatter, docs could carry metadata:
+
+```markdown
+---
+status: active
+since: 2026-01-15
+supersedes: null
+deprecated_by: null
+owners: [backend-team]
+last_validated: 2026-03-01
+---
+
+# API Routes
+
+...actual content...
+```
+
+Sections within a doc could use inline tags:
+
+```markdown
+## Batch Operations <!-- status: development -->
+
+This pattern is being tested...
+
+## Legacy Webhook Format <!-- status: deprecated, see: #new-webhook-format -->
+
+Old format, will be removed in Q3...
+```
+
+### The Corpus Compilation Step
+
+This is what Foundry calls "corpus layering." The pipeline compiles raw docs into an optimized format:
+
+1. **Filter by lifecycle** — Strip `draft` and `archived` sections, annotate `deprecated` and `development`
+2. **Resolve references** — Inline cross-doc links, expand "see also" into actual content
+3. **Build graph** — Which docs reference which, dependency relationships
+4. **Embed** — Vector embeddings for semantic retrieval
+5. **Hash** — Content hash for reproducibility (Foundry's immutable snapshot concept)
+
+The compiled corpus is what the Cartographer actually loads. Not the raw markdown — the processed, lifecycle-aware, enriched version.
+
+---
+
 ## Hivemind as First-Class Dependency
 
 Hivemind solves the coordination problem that MuninnDB doesn't: real-time multi-agent awareness.
@@ -179,12 +286,16 @@ These could live alongside the coding skills but serve a completely different us
 
 ## Open Questions
 
-1. **Cartographer context budget** — 18k lines of docs is manageable for a routing-only agent, but should we also include sample code from the codebase? That could balloon quickly.
+1. **Cartographer context budget** — 18k lines of docs is manageable for a routing-only agent, but should we also include sample code from the codebase? That could balloon quickly. Does it load raw markdown or compiled corpus?
 2. **Skill format** — `.claude/commands/` (Claude Code native) vs `AI/skills/` (template convention)? The former integrates with `/skill-name` invocation.
 3. **Interaction log schema** — What events matter? Task type, docs referenced, corrections made, time-to-completion? Need to define this before building.
 4. **Foundry integration** — If Foundry matures, it could test our skills: give the Cartographer a task, measure whether its routing produces good outcomes, iterate on the corpus. This is the "recursion engine" concept.
 5. **Personal public vault provisioning** — Per-user vaults on shared Railway instance? Or a single vault with user-scoped tags? Tradeoffs around isolation vs simplicity.
 6. **Librarian trigger** — Always-on (classifies every interaction) vs on-demand (user says "remember this")? Always-on is powerful but noisy and expensive.
+7. **Doc lifecycle adoption** — Frontmatter in existing docs? Inline section tags? Or external metadata file that maps doc paths to lifecycle states? Need to pick one and migrate.
+8. **Corpus storage backend** — Pure MuninnDB? MuninnDB + vector store (pgvector in existing Postgres)? Neo4j for graph relationships? Or is MuninnDB's built-in Hebbian associations + BM25 + vector search sufficient without adding another database?
+9. **Corpus compilation trigger** — On git push (CI step)? On `bun run setup`? On-demand via a skill? Needs to be automatic enough that docs don't drift from compiled corpus.
+10. **External doc visibility** — Does the living doc state (what's draft, what's deprecated, what's being proposed) need a UI? Or is agent-queryable via MuninnDB sufficient? PMs might want a dashboard.
 
 ## Next Steps
 
@@ -193,5 +304,7 @@ These could live alongside the coding skills but serve a completely different us
 3. Build 2-3 domain execution skills to prove the handoff pattern
 4. Add Hivemind to docker-compose and Railway init
 5. Define the personal public vault schema and provisioning
-6. Adapt Mauricio's business skills for template context
-7. Measure: does the two-layer approach actually outperform just dumping everything in context?
+6. Add frontmatter lifecycle tags to existing `docs/claude/` files
+7. Build the corpus compilation pipeline (docs → MuninnDB enrichment)
+8. Adapt Mauricio's business skills for template context
+9. Measure: does the two-layer approach actually outperform just dumping everything in context?
