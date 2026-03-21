@@ -33,8 +33,11 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
   const merged = mergeInquiryFilters(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
   });
-  // Stable on mount — filters prop doesn't change; useMemo prevents key churn on re-renders
-  const expiredCutoff = useMemo(() => (merged.includeExpired === false ? new Date() : undefined), []);
+  // Recompute when the include-expired toggle changes so the cutoff stays in sync with the filter state.
+  const expiredCutoff = useMemo(
+    () => (merged.includeExpired === false ? new Date() : undefined),
+    [merged.includeExpired],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
   if (view === 'platform') searchFields.targetModel = { in: ['admin'] };
