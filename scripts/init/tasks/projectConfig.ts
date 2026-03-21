@@ -38,11 +38,13 @@ export const renameProject = (oldName: string, newName: string): void => {
 
   console.log(`\nRenaming project from "${oldName}" to "${newName}"...`);
 
-  // 1. Update root package.json
+  // 1. Update root package.json (name field + any @scope/ references in deps)
   console.log('  • Updating root package.json...');
   const rootPkgPath = join(process.cwd(), 'package.json');
-  const rootPkg = JSON.parse(readFileSync(rootPkgPath, 'utf-8'));
-  rootPkg.name = newName;
+  const rootContent = readFileSync(rootPkgPath, 'utf-8');
+  const rootWithScope = rootContent.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
+  const rootPkg = JSON.parse(rootWithScope);
+  rootPkg.name = newName; // root package has no @scope prefix
   writeFileSync(rootPkgPath, `${JSON.stringify(rootPkg, null, 2)}\n`, 'utf-8');
 
   // 2. Update workspace packages (name + all dependency references)
@@ -73,7 +75,7 @@ export const renameProject = (oldName: string, newName: string): void => {
   for (const ext of extensions) {
     try {
       execSync(
-        `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\///@${newName}\\//g' {} +`,
+        `find apps packages -name "*.${ext}" -type f -exec sed -i '' 's/@${fromName}\\//@${newName}\\//g' {} +`,
         { stdio: 'pipe' },
       );
     } catch (_error) {
