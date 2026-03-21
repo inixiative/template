@@ -272,6 +272,79 @@ Hivemind solves the coordination problem that MuninnDB doesn't: real-time multi-
 
 ---
 
+## RACI for Agent Roles
+
+Multi-agent systems have the same problem that human organizations have: unclear ownership leads to duplicated work, dropped balls, and diffused accountability. RACI (Responsible, Accountable, Consulted, Informed) maps cleanly onto agent roles.
+
+### The RACI Matrix
+
+| Activity | Cartographer | Librarian | Domain Executor | Hivemind | Human |
+|---|---|---|---|---|---|
+| Classify an interaction | I | **R** | - | I | **A** |
+| Route task to executor | **R** | C | I | I | **A** |
+| Write code | - | - | **R** | I | **A** |
+| Review code | - | - | **R** (reviewer executor) | I | **A** |
+| Promote memory tier | I | **R** | - | I | **A** |
+| Compile corpus | **R** | C | - | - | **A** |
+| Coordinate parallel agents | I | - | I | **R** | **A** |
+| Record decision | - | **R** | C | I | **A** |
+| Deprecate a doc | C | **R** | - | - | **A** |
+| Validate against conventions | - | C | **R** (validator executor) | I | **A** |
+
+**Key constraint:** Exactly one **A** per row. For agents, this prevents the common failure mode of overlapping work with no owner.
+
+### Where the Human Sits
+
+Notice the pattern: humans are almost always **A** (accountable), rarely **R** (responsible). Agents do the work, humans own the outcome. The human approves promotions, signs off on code, blesses policy changes. Agents propose, execute, classify.
+
+This is the right posture *for now*. But it's also the bottleneck.
+
+### The Trust Problem
+
+Right now, the same small team writes code, reviews code, and validates code. That's not sustainable, and it's exactly where we want AI to take on more R *and* eventually more A. But we can't just hand over accountability — trust needs to be built incrementally.
+
+The path toward earned trust:
+
+```
+Phase 1 (now):     Human = A for everything. Agent = R for execution only.
+Phase 2 (near):    Agent = A for low-risk (formatting, test coverage, doc updates).
+                   Human = A for high-risk (architecture, security, data model).
+Phase 3 (future):  Agent = A for most execution. Human = A for strategy and promotion.
+```
+
+Each phase transition happens when we have *evidence* that agents handle A reliably at the current tier. Foundry's scoring rubrics (completion, demerits, craft) could provide that evidence — you don't promote an agent's accountability level on vibes, you promote it on measured performance.
+
+### Guardian Skills: "Don't Fuck It Up" Agents
+
+This reframes some domain executors not as builders but as *guardians*. Their job isn't to write code — it's to make sure code doesn't break things. Different role-play, different persona, different success criteria.
+
+| Guardian Skill | Role | What it watches for |
+|---|---|---|
+| **Convention Guard** | Validates code against established patterns | Import aliases, file structure, naming, anti-patterns |
+| **Security Guard** | Reviews for OWASP top 10, auth gaps, tenant boundary violations | Injection, XSS, missing permission checks, leaked secrets |
+| **API Contract Guard** | Ensures API changes don't break consumers | Breaking schema changes, missing versioning, response shape drift |
+| **Test Coverage Guard** | Validates that changes have appropriate test coverage | Missing factories, untested branches, integration gaps |
+| **Performance Guard** | Flags N+1 queries, missing indexes, unbounded queries | Query patterns, pagination, cache usage |
+
+These guardians are the "make sure this thing isn't fucking up" agents. They don't build — they watch. And critically, they have a different relationship to RACI: they're **R** for validation, and the human is **A** for deciding whether to act on their findings.
+
+The role-play matters here. A builder agent's persona is "implement this feature." A guardian's persona is "find everything wrong with this change." Different framing produces genuinely different behavior from the model — the guardian is adversarial by design, which counteracts the model's natural tendency to be agreeable and say everything looks fine.
+
+### RACI + Memory Tiers
+
+The promotion flow maps directly onto RACI accountability handoffs:
+
+| Promotion | R (proposes) | A (approves) |
+|---|---|---|
+| Personal private → personal public | Developer (self-promote) | Developer |
+| Personal public → team | Librarian | Developer or tech lead |
+| Team → org | Librarian | Architect or eng manager |
+| Convention → guardian rule | Librarian + Convention Guard | Tech lead |
+
+Each tier increase requires a higher-authority **A**. Knowledge doesn't leak upward because there's always a human accountable for the promotion. As trust builds (Phase 2, Phase 3), some of these A roles can shift to agents with proven track records.
+
+---
+
 ## Business-Side Skills (from mauriff)
 
 Separate from the coding skills, adapted versions of Mauricio's skills for template users asking "I built this, now what?":
