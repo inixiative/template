@@ -82,10 +82,8 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
       await setProgressComplete('project', 'renameOrg');
     }
 
-    // Mark project setup complete
-    if (!(await isProgressComplete('project', 'setup'))) {
-      await setProgressComplete('project', 'setup');
-    }
+    // Agent mode provisions remote services only. It does not run `bun run setup`,
+    // so the local shell setup flag must remain owned by the interactive flow.
 
     // Step 2: Infisical Setup
     onProgress?.('infisical', 'Setting up Infisical secrets management');
