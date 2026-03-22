@@ -55,3 +55,12 @@ export const setConfigError = async (section: string, message: string): Promise<
 export const clearConfigError = async (section: string): Promise<void> => {
   await setConfigError(section, '');
 };
+
+/**
+ * Set the launched flag at the root of project config
+ */
+export const setLaunched = async (value: boolean): Promise<void> => {
+  const config = await getProjectConfig();
+  (config as Record<string, unknown>).launched = value;
+  await writeProjectConfig(config);
+};

@@ -276,6 +276,10 @@ const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; d
   return { status: 'completed', details };
 };
 
+const getLaunchStatus = (config: ProjectConfig): MenuItem['status'] => {
+  return config.launched ? 'completed' : 'pending';
+};
+
 const DEFAULT_ITEMS: MenuItem[] = [
   { label: '1. Project Configuration', value: 'project-config', status: 'pending' },
   { label: '2. Infisical Setup', value: 'infisical', status: 'pending' },
@@ -287,7 +291,7 @@ const DEFAULT_ITEMS: MenuItem[] = [
   { label: '8. DNS Configuration', value: 'dns', status: 'pending' },
   { label: '9. Database Seeding', value: 'seeding', status: 'pending' },
   { label: '10. GitHub Actions Setup', value: 'github-actions', status: 'pending' },
-  { label: '11. Final Verification', value: 'verification', status: 'pending' },
+  { label: '11. Launch', value: 'launch', status: 'pending' },
   { label: '12. Documentation Generation', value: 'documentation', status: 'pending' },
   { label: '13. Exit', value: 'exit', status: 'pending' },
 ];
@@ -314,6 +318,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const planetscaleStatus = getPlanetScaleStatus(cfg);
       const railwayStatus = getRailwayStatus(cfg);
       const vercelStatus = getVercelStatus(cfg);
+      const launchStatus = getLaunchStatus(cfg);
 
       const updatedItems = [
         {
@@ -349,7 +354,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
         { label: '8. DNS Configuration', value: 'dns', status: 'pending' },
         { label: '9. Database Seeding', value: 'seeding', status: 'pending' },
         { label: '10. GitHub Actions Setup', value: 'github-actions', status: 'pending' },
-        { label: '11. Final Verification', value: 'verification', status: 'pending' },
+        { label: '11. Launch', value: 'launch', status: launchStatus },
         { label: '12. Documentation Generation', value: 'documentation', status: 'pending' },
         { label: '13. Exit', value: 'exit', status: 'pending' },
       ];

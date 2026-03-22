@@ -8,6 +8,7 @@ import { PlanetScaleSetupView } from './views/PlanetScaleSetupView';
 import { Prerequisites } from './views/Prerequisites';
 import { ProjectConfigView } from './views/ProjectConfigView';
 import { RailwaySetupView } from './views/RailwaySetupView';
+import { LaunchView } from './views/LaunchView';
 import { VercelSetupView } from './views/VercelSetupView';
 
 type AppState = 'prerequisites' | 'menu' | 'task';
@@ -68,11 +69,15 @@ export const App: React.FC = () => {
             {currentTask === 'vercel' && (
               <VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
+            {currentTask === 'launch' && (
+              <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask !== 'project-config' &&
               currentTask !== 'infisical' &&
               currentTask !== 'planetscale' &&
               currentTask !== 'railway' &&
-              currentTask !== 'vercel' && (
+              currentTask !== 'vercel' &&
+              currentTask !== 'launch' && (
                 <Box flexDirection="column">
                   <Text color="yellow">Task: {currentTask}</Text>
                   <Text dimColor>Coming soon...</Text>
