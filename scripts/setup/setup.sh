@@ -6,7 +6,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 # Check if project has been launched (config is committed, so grep is reliable)
-IS_LAUNCHED=$(grep -c '"launched": true\|launched: true' "$ROOT_DIR/project.config.ts" 2>/dev/null || echo "0")
+if grep -q 'launched.*true\|"launched": true' "$ROOT_DIR/project.config.ts" 2>/dev/null; then
+  IS_LAUNCHED=1
+else
+  IS_LAUNCHED=0
+fi
 
 "$SCRIPT_DIR/check-prereqs.sh"
 "$SCRIPT_DIR/sync-env.sh"
