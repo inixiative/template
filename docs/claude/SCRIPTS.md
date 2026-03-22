@@ -19,6 +19,7 @@
 | Directory | Purpose | Committed |
 |-----------|---------|-----------|
 | `scripts/` | Shared shell scripts, deployment, db ops | Yes |
+| `init/` | Interactive infrastructure provisioning TUI (Bun + Ink) | Yes |
 | `scripts/setup/` | Project initialization, env sync | Yes |
 | `scripts/db/` | Postgres/Redis operations | Yes |
 | `scripts/deployment/` | Deploy, env injection | Yes |
@@ -32,8 +33,7 @@ scripts/
 │   ├── check-prereqs.sh    # Verify bun, docker, etc.
 │   ├── setup.sh            # Full project setup
 │   ├── sync-env.sh         # Sync .env from examples
-│   ├── init.sh             # Initialize from template
-│   └── (init script planned) # Project initialization
+│   └── init.sh             # Legacy shell bootstrap notes
 ├── db/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
@@ -45,6 +45,13 @@ scripts/
     ├── deploy.sh           # Deploy to environment
     ├── with-env.sh         # Run command with env vars
     └── wait-for-api.sh     # Health check wait
+
+init/
+├── index.tsx                    # bun run init entrypoint
+├── app.tsx                      # Ink app shell
+├── tasks/                       # Provider setup logic
+├── views/                       # Task/launch views
+└── tests/                       # Fixtures and mocks
 
 Database utilities (packages/db/prisma/):
 ├── seed.ts                       # Seed script with UUID validation
@@ -247,7 +254,7 @@ bun run setup           # → scripts/setup/setup.sh
 bun run sync-env        # → scripts/setup/sync-env.sh
 
 # Initialize project (includes Infisical setup)
-bun run init            # → scripts/init/index.ts (planned)
+bun run init            # → init/index.tsx
 ```
 
 ---

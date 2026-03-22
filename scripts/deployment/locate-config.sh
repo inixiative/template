@@ -11,7 +11,7 @@ ROOT_DIR="$SCRIPT_DIR/../.."
 cd "$ROOT_DIR"
 
 CONFIG_FILE=$(bun -e "
-import { getProjectConfigPath } from './scripts/init/utils/getProjectConfig.ts';
+import { getProjectConfigPath } from './init/utils/getProjectConfig.ts';
 const path = getProjectConfigPath();
 console.log(path.split('/').pop());
 " 2>/dev/null)

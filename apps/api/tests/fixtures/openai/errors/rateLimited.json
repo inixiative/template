@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Rate limit reached for gpt-4o. Please try again in 20s.",
+    "type": "tokens",
+    "code": "rate_limit_exceeded"
+  }
+}

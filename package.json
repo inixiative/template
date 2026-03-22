@@ -12,8 +12,8 @@
   },
   "scripts": {
     "postinstall": "bash ./scripts/postinstall.sh",
-    "init": "NODE_ENV=development bun --env-file=.env.init scripts/init/index.tsx",
-    "init:agent": "NODE_ENV=development bun --env-file=.env.init scripts/init/agent.ts",
+    "init": "NODE_ENV=development bun --env-file=.env.init init/index.tsx",
+    "init:agent": "NODE_ENV=development bun --env-file=.env.init init/agent.ts",
     "setup": "./scripts/setup/setup.sh",
     "sync-env": "./scripts/setup/sync-env.sh",
     "with": "./scripts/deployment/with-env.sh",
@@ -34,6 +34,7 @@
     "tsc": "bun run '--filter=*' typecheck",
     "db:generate": "bun run --filter=@template/db db:generate",
     "db:push": "bun run --filter=@template/db db:push",
+    "db:push:force": "bun run --filter=@template/db db:push:force",
     "db:migrate": "bun run --filter=@template/db db:migrate",
     "db:deploy": "bun run --filter=@template/db db:deploy",
     "db:studio": "bun run --filter=@template/db db:studio",
