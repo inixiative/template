@@ -1,8 +1,15 @@
 # Init Script - Architecture & Patterns
 
-**Location:** `scripts/init/`
+**Location:** `init/`
 
 Automated infrastructure provisioning via Terminal UI (Ink). Full implementation guide for INFRA-001 ticket.
+
+**Current implementation notes:**
+- Source of truth now lives under `init/**` plus root-level `project.config.ts`
+- Persist only atomic progress flags: one flag = one idempotent, externally verifiable provider fact
+- Views may group atomic flags into friendlier UI labels like `Bootstrap ready (4/6)`
+- Task coverage uses Bun-native tests plus fixture-backed VCR helpers under `init/tests/`
+- Launch is part of the init flow: preflight checks gate flipping `launched = true`
 
 ---
 
@@ -32,7 +39,7 @@ State Flow:
 
 **Pattern:** Single source of truth for project config, shared across all views via Context.
 
-**Location:** `scripts/init/utils/configState.tsx`
+**Location:** `init/utils/configState.tsx`
 
 ```typescript
 // Provider wraps the entire app
@@ -118,7 +125,7 @@ const runSetup = async (orgId: string) => {
 
 **Pattern:** Add timestamp query param to dynamic imports to bypass Node/Bun module cache.
 
-**Location:** `scripts/init/utils/getProjectConfig.ts`
+**Location:** `init/utils/getProjectConfig.ts`
 
 **Why:**
 - Config file is `.ts`, loaded via `import()`
@@ -167,7 +174,7 @@ const setupState = useMemo(
 
 **Pattern:** Define action commands once, compose them in consistent order.
 
-**Location:** `scripts/init/utils/prompts.ts`
+**Location:** `init/utils/prompts.ts`
 
 **Why:**
 - ✅ Consistent ordering across all views
@@ -221,10 +228,19 @@ export function prompt(commands: Command[]): string {
 
 **Implementation:**
 ```typescript
+const bootstrapCount = [
+  progress.selectTeam,
+  progress.storeTeamIdSecret,
+  progress.storeTeamNameSecret,
+  progress.promptedForGithub,
+  progress.storeVercelToken,
+  progress.createInfisicalConnection,
+].filter(Boolean).length;
+
 const progressItems = [
-  { label: 'Organization selected', completed: progress.selectOrg },
-  { label: 'Project created', completed: progress.createProject },
-  { label: 'Environments configured', completed: progress.renameEnv },
+  { label: `Bootstrap ready (${bootstrapCount}/6)`, completed: bootstrapCount === 6 },
+  { label: 'Web project created', completed: progress.createWebProject },
+  { label: 'Web production sync configured', completed: progress.createWebInfisicalSyncProd },
   // ... etc
 ];
 
@@ -249,11 +265,11 @@ const currentStepIndex = running ? progressItems.findIndex(item => !item.complet
 
 **Output:**
 ```
-✓ Organization selected
-✓ Project created
-⠹ Environments configured
-− Folder structure created
-− Inheritance chains configured
+✓ Bootstrap ready (6/6)
+✓ Web project created
+⠹ Web production sync configured
+− Admin project created
+− Superadmin project created
 ```
 
 ### 7. Suppress Console Logs in Tasks
@@ -287,13 +303,13 @@ await onStepComplete?.(); // View updates via config sync
 **Implementation:**
 ```typescript
 // ❌ Bad: Rely on password object from previous step
-if (!(await isProgressComplete('planetscale', 'initMigrationTable'))) {
+if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = productionPassword.connection_strings.general; // undefined if resuming!
   await initPrismaMigrationTable(prodConnectionString);
 }
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
-if (!(await isProgressComplete('planetscale', 'initMigrationTable'))) {
+if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = getSecret('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
@@ -465,7 +481,7 @@ await execAsync('railway add --service "${name}" --json', { encoding: 'utf-8', c
 await execAsync('infisical org list --format json', { encoding: 'utf-8' });
 ```
 
-**Rule:** If you see `execSync` anywhere in `scripts/init/api/`, it's a bug. Convert to async immediately.
+**Rule:** If you see `execSync` anywhere in `init/api/`, it's a bug. Convert to async immediately.
 
 ### 11. Railway CLI vs GraphQL API
 
@@ -565,15 +581,22 @@ const handleTokenSubmit = async () => {
 )}
 ```
 
-### 13. Idempotent API Calls
+### 13. Atomic Progress Flags + Idempotent API Calls
 
-**Pattern:** Make setup operations idempotent - detect existing resources and skip creation instead of failing.
+**Pattern:** Persist one progress flag per externally verifiable action, and make the underlying setup call idempotent whenever the provider API allows it.
 
 **Why:**
 - ✅ Setup can be re-run without errors
 - ✅ Handles interrupted setup gracefully
 - ✅ Resume from any point without manual cleanup
 - ✅ Better UX - no "already exists" errors
+- ✅ Prevents half-complete bundled steps from breaking resume
+
+**Rules:**
+- ✅ One progress flag = one provider fact (`storeProdRedisUrl`, `createInfisicalConnection`, `initProdMigrationTable`)
+- ✅ Group multiple flags only in the view layer, never in persisted config
+- ✅ If a step can partially succeed, split it before marking progress
+- ❌ Don't store umbrella flags like "create passwords" or "configure everything" when they hide multiple remote writes
 
 **Implementation:**
 ```typescript
@@ -955,12 +978,45 @@ const handleAction = async () => {
 - ❌ Never use IIFE pattern `(async () => { ... })()` - make handler async instead
 - ❌ Never use `setTimeout` before showing loading state
 
+### 16. Bun-Native Resume Tests with VCR Fixtures
+
+**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and fixture-backed `VCR` helpers.
+
+**Why:**
+- ✅ Fast, deterministic task coverage without live provider calls
+- ✅ Resume paths are easy to model by toggling progress flags in config
+- ✅ Fixtures keep provider payloads readable and sanitized
+- ✅ Matches the repo-wide move away from Vitest
+
+**Current layout:**
+```text
+init/
+├── tasks/tests/
+│   ├── planetscaleResume.test.ts
+│   ├── infisicalResume.test.ts
+│   ├── railwayResume.test.ts
+│   └── vercelBootstrapResume.test.ts
+└── tests/
+    ├── fixtures/
+    │   ├── infisical/
+    │   ├── railway/
+    │   └── vercel/
+    └── mocks/
+        └── VCR.ts
+```
+
+**Testing guidance:**
+- Unit test pure helpers directly
+- Use task-level resume tests for provider workflows
+- Record sanitized fixture values, then replay them via `VCR.require()`
+- Mock module boundaries, not internal implementation details
+
 ---
 
 ## File Structure
 
-```
-scripts/init/
+```text
+init/
 ├── index.tsx                  # Entry point
 ├── app.tsx                    # Main app with ConfigProvider
 ├── views/                     # UI components
@@ -968,9 +1024,11 @@ scripts/init/
 │   ├── MainMenu.tsx          # Task selection menu
 │   ├── ProjectConfigView.tsx # Project name/org setup
 │   ├── InfisicalSetupView.tsx# Infisical setup (reference impl)
+│   ├── LaunchView.tsx        # Launch preflight + confirmation
 │   └── ...                   # Other task views
 ├── tasks/                     # Business logic
 │   ├── projectConfig.ts      # Project rename logic
+│   ├── launch.ts             # Launch preflight + launched flag update
 │   ├── infisicalSetup.ts     # Infisical API calls
 │   └── ...                   # Other task logic
 ├── utils/
@@ -982,6 +1040,9 @@ scripts/init/
 ├── api/                       # Service API clients
 │   ├── infisical.ts
 │   └── ...
+├── tasks/tests/               # Bun-native provider resume tests
+├── tests/fixtures/            # Sanitized provider fixtures
+├── tests/mocks/               # Shared VCR/config/system mocks
 └── components/                # Reusable components
     └── OrgSelector.tsx
 ```
