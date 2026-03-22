@@ -36,17 +36,22 @@ describe('PlanetScale Resume Scenario', () => {
     config.clearAll();
     system.clearAll();
 
-    // Resume scenario: steps 1-9 are complete
+    // Resume scenario: provider-side setup is complete up to per-environment connection strings
     config.markComplete('planetscale', [
       'selectOrg',
       'selectRegion',
-      'createToken',
-      'setInfisicalToken',
+      'recordTokenId',
+      'storeOrganizationSecret',
+      'storeRegionSecret',
+      'storeTokenIdSecret',
+      'storeTokenSecret',
       'createDB',
       'renameProductionBranch',
       'createStagingBranch',
-      'createPasswords',
-      'storeConnectionStrings',
+      'createProdRole',
+      'createStagingRole',
+      'storeProdConnectionString',
+      'storeStagingConnectionString',
     ]);
 
     // Seed connection strings (already in Infisical from previous run)
@@ -117,11 +122,12 @@ describe('PlanetScale Resume Scenario', () => {
     expect(migrationCalls[1][0]).toContain('postgresql://staging-user:staging-pass');
   });
 
-  test('should mark initMigrationTable as complete', async () => {
+  test('should mark both migration table steps as complete', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initMigrationTable');
+    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initProdMigrationTable');
+    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initStagingMigrationTable');
   });
 
   test('should configure database after migration table init', async () => {

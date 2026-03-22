@@ -45,6 +45,53 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
 
 const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
   const { progress, organizationSlug, projectSlug } = config.infisical;
+  const rootFolderCount = [
+    progress.createRootApiFolder,
+    progress.createRootWebFolder,
+    progress.createRootAdminFolder,
+    progress.createRootSuperadminFolder,
+  ].filter(Boolean).length;
+  const stagingFolderCount = [
+    progress.createStagingApiFolder,
+    progress.createStagingWebFolder,
+    progress.createStagingAdminFolder,
+    progress.createStagingSuperadminFolder,
+  ].filter(Boolean).length;
+  const prodFolderCount = [
+    progress.createProdApiFolder,
+    progress.createProdWebFolder,
+    progress.createProdAdminFolder,
+    progress.createProdSuperadminFolder,
+  ].filter(Boolean).length;
+  const stagingInheritanceCount = [
+    progress.createStagingApiRootImport,
+    progress.createStagingApiRootAppImport,
+    progress.createStagingApiEnvImport,
+    progress.createStagingWebRootImport,
+    progress.createStagingWebRootAppImport,
+    progress.createStagingWebEnvImport,
+    progress.createStagingAdminRootImport,
+    progress.createStagingAdminRootAppImport,
+    progress.createStagingAdminEnvImport,
+    progress.createStagingSuperadminRootImport,
+    progress.createStagingSuperadminRootAppImport,
+    progress.createStagingSuperadminEnvImport,
+  ].filter(Boolean).length;
+  const prodInheritanceCount = [
+    progress.createProdApiRootImport,
+    progress.createProdApiRootAppImport,
+    progress.createProdApiEnvImport,
+    progress.createProdWebRootImport,
+    progress.createProdWebRootAppImport,
+    progress.createProdWebEnvImport,
+    progress.createProdAdminRootImport,
+    progress.createProdAdminRootAppImport,
+    progress.createProdAdminEnvImport,
+    progress.createProdSuperadminRootImport,
+    progress.createProdSuperadminRootAppImport,
+    progress.createProdSuperadminEnvImport,
+  ].filter(Boolean).length;
+
   return [
     {
       label: organizationSlug ? `Organization selected: ${organizationSlug}` : 'Organization selected',
@@ -59,16 +106,32 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: progress.renameEnv,
     },
     {
-      label: 'Folder structure created',
-      completed: progress.createApps,
+      label: `Root app folders created (${rootFolderCount}/4)`,
+      completed: rootFolderCount === 4,
     },
     {
-      label: 'Inheritance chains configured',
-      completed: progress.setInheritance,
+      label: `Staging app folders created (${stagingFolderCount}/4)`,
+      completed: stagingFolderCount === 4,
     },
     {
-      label: 'API auth secrets initialized',
-      completed: progress.ensureApiAuthSecrets,
+      label: `Production app folders created (${prodFolderCount}/4)`,
+      completed: prodFolderCount === 4,
+    },
+    {
+      label: `Staging inheritance chains configured (${stagingInheritanceCount}/12)`,
+      completed: stagingInheritanceCount === 12,
+    },
+    {
+      label: `Production inheritance chains configured (${prodInheritanceCount}/12)`,
+      completed: prodInheritanceCount === 12,
+    },
+    {
+      label: 'Production API auth secret initialized',
+      completed: progress.ensureProdApiAuthSecret,
+    },
+    {
+      label: 'Staging API auth secret initialized',
+      completed: progress.ensureStagingApiAuthSecret,
     },
   ];
 };

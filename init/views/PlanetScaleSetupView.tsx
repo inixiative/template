@@ -66,12 +66,24 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: progress.selectRegion,
     },
     {
-      label: tokenId ? `Service token created: ${tokenId}` : 'Service token created',
-      completed: progress.createToken,
+      label: tokenId ? `Service token recorded: ${tokenId}` : 'Service token recorded',
+      completed: progress.recordTokenId,
     },
     {
-      label: 'Token stored in Infisical',
-      completed: progress.setInfisicalToken,
+      label: 'PlanetScale organization stored in Infisical',
+      completed: progress.storeOrganizationSecret,
+    },
+    {
+      label: 'PlanetScale region stored in Infisical',
+      completed: progress.storeRegionSecret,
+    },
+    {
+      label: 'PlanetScale token ID stored in Infisical',
+      completed: progress.storeTokenIdSecret,
+    },
+    {
+      label: 'PlanetScale token stored in Infisical',
+      completed: progress.storeTokenSecret,
     },
     {
       label: database ? `Database created: ${database}` : 'Database created',
@@ -86,16 +98,28 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: progress.createStagingBranch,
     },
     {
-      label: 'Passwords created',
-      completed: progress.createPasswords,
+      label: 'Prod role created',
+      completed: progress.createProdRole,
     },
     {
-      label: 'Connection strings stored in Infisical',
-      completed: progress.storeConnectionStrings,
+      label: 'Staging role created',
+      completed: progress.createStagingRole,
     },
     {
-      label: 'Migration table initialized',
-      completed: progress.initMigrationTable,
+      label: 'Prod connection string stored in Infisical',
+      completed: progress.storeProdConnectionString,
+    },
+    {
+      label: 'Staging connection string stored in Infisical',
+      completed: progress.storeStagingConnectionString,
+    },
+    {
+      label: 'Prod migration table initialized',
+      completed: progress.initProdMigrationTable,
+    },
+    {
+      label: 'Staging migration table initialized',
+      completed: progress.initStagingMigrationTable,
     },
     {
       label: 'Database configured (FK, migrations)',
@@ -116,6 +140,18 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   const [tokenIdInput, setTokenIdInput] = useState('');
   const tokenAction = useAsyncAction();
   const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
+
+  const isTokenBootstrapComplete = useMemo(() => {
+    if (!config) return false;
+    const { progress } = config.planetscale;
+    return (
+      progress.recordTokenId &&
+      progress.storeOrganizationSecret &&
+      progress.storeRegionSecret &&
+      progress.storeTokenIdSecret &&
+      progress.storeTokenSecret
+    );
+  }, [config]);
 
   // Step callback: no args = step completed (sync config), with string = update action label
   const stepCallback = useCallback(
@@ -222,7 +258,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
           } finally {
             setLoadingRegions(false);
           }
-        } else if (progress.selectRegion && !progress.createToken) {
+        } else if (progress.selectRegion && !isTokenBootstrapComplete) {
           // Need to create token
           setViewState('token-id-input');
         } else {
@@ -319,16 +355,26 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       const orgName = config.planetscale.organization;
       const region = config.planetscale.region;
 
-      // Store PlanetScale configuration in Infisical root environment
-      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
-      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
-      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
-      await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
-
-      // Mark token steps as complete
-      await updateConfigField('planetscale', 'tokenId', tokenIdInput);
-      await setProgressComplete('planetscale', 'createToken');
-      await setProgressComplete('planetscale', 'setInfisicalToken');
+      if (!config.planetscale.progress.recordTokenId) {
+        await updateConfigField('planetscale', 'tokenId', tokenIdInput);
+        await setProgressComplete('planetscale', 'recordTokenId');
+      }
+      if (!config.planetscale.progress.storeOrganizationSecret) {
+        await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
+        await setProgressComplete('planetscale', 'storeOrganizationSecret');
+      }
+      if (!config.planetscale.progress.storeRegionSecret) {
+        await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
+        await setProgressComplete('planetscale', 'storeRegionSecret');
+      }
+      if (!config.planetscale.progress.storeTokenIdSecret) {
+        await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
+        await setProgressComplete('planetscale', 'storeTokenIdSecret');
+      }
+      if (!config.planetscale.progress.storeTokenSecret) {
+        await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
+        await setProgressComplete('planetscale', 'storeTokenSecret');
+      }
       await syncConfig();
 
       // Show confirmation screen to verify permissions

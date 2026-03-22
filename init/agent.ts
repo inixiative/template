@@ -103,10 +103,13 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
       setSecret(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN_ID', config.planetscaleTokenId);
       setSecret(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN', config.planetscaleToken);
 
-      // Mark token steps as complete
+      // Mark token/bootstrap storage steps as complete
       await updateConfigField('planetscale', 'tokenId', config.planetscaleTokenId);
-      await setProgressComplete('planetscale', 'createToken');
-      await setProgressComplete('planetscale', 'setInfisicalToken');
+      await setProgressComplete('planetscale', 'recordTokenId');
+      await setProgressComplete('planetscale', 'storeOrganizationSecret');
+      await setProgressComplete('planetscale', 'storeRegionSecret');
+      await setProgressComplete('planetscale', 'storeTokenIdSecret');
+      await setProgressComplete('planetscale', 'storeTokenSecret');
 
       // Store region
       await updateConfigField('planetscale', 'region', config.planetscaleRegion);

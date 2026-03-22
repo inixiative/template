@@ -115,7 +115,13 @@ export const setupPlanetScale = async (
 
     // Step 1: Service token (handled by view - just skip if already complete)
     // Token is prompted in the view and stored before this function is called
-    if (!(await isProgressComplete('planetscale', 'createToken'))) {
+    if (
+      !(await isProgressComplete('planetscale', 'recordTokenId')) ||
+      !(await isProgressComplete('planetscale', 'storeOrganizationSecret')) ||
+      !(await isProgressComplete('planetscale', 'storeRegionSecret')) ||
+      !(await isProgressComplete('planetscale', 'storeTokenIdSecret')) ||
+      !(await isProgressComplete('planetscale', 'storeTokenSecret'))
+    ) {
       throw new Error('Service token required but not provided. Please restart setup.');
     }
 
@@ -211,7 +217,7 @@ export const setupPlanetScale = async (
     let productionPassword: Awaited<ReturnType<typeof createRole>> | undefined;
     let stagingPassword: Awaited<ReturnType<typeof createRole>> | undefined;
 
-    if (!(await isProgressComplete('planetscale', 'createPasswords'))) {
+    if (!(await isProgressComplete('planetscale', 'createProdRole'))) {
       // Production branch role (Postgres uses roles, not passwords)
       await onStepComplete?.('Creating production role...');
       productionPassword = await retryWithTimeout(
@@ -231,7 +237,11 @@ export const setupPlanetScale = async (
           },
         },
       );
+      await setProgressComplete('planetscale', 'createProdRole');
+      await onStepComplete?.();
+    }
 
+    if (!(await isProgressComplete('planetscale', 'createStagingRole'))) {
       // Staging branch role
       await onStepComplete?.('Creating staging role...');
       stagingPassword = await retryWithTimeout(
@@ -251,62 +261,77 @@ export const setupPlanetScale = async (
           },
         },
       );
-      await setProgressComplete('planetscale', 'createPasswords');
+      await setProgressComplete('planetscale', 'createStagingRole');
       await onStepComplete?.();
     }
     // If already complete: passwords exist, connection strings stored in Infisical
     // Later steps fetch from Infisical, so we don't need password objects
 
     // Step 8: Store connection strings in Infisical
-    if (!(await isProgressComplete('planetscale', 'storeConnectionStrings'))) {
-      await onStepComplete?.('Storing connection strings in Infisical...');
-      const prodConnectionString = productionPassword!.connection_strings.general;
-      const stagingConnectionString = stagingPassword!.connection_strings.general;
-
-      if (!prodConnectionString || !stagingConnectionString) {
-        throw new Error('Connection strings are empty. Check password creation output.');
+    if (!(await isProgressComplete('planetscale', 'storeProdConnectionString'))) {
+      await onStepComplete?.('Storing prod connection string in Infisical...');
+      const prodConnectionString = productionPassword?.connection_strings.general;
+      if (!prodConnectionString) {
+        throw new Error('Production connection string is empty. Check production role creation output.');
       }
-
       // Store production connection string in prod environment, /api folder
       await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
+      await setProgressComplete('planetscale', 'storeProdConnectionString');
+      await onStepComplete?.();
+    }
 
+    if (!(await isProgressComplete('planetscale', 'storeStagingConnectionString'))) {
+      await onStepComplete?.('Storing staging connection string in Infisical...');
+      const stagingConnectionString = stagingPassword?.connection_strings.general;
+      if (!stagingConnectionString) {
+        throw new Error('Staging connection string is empty. Check staging role creation output.');
+      }
       // Store staging connection string in staging environment, /api folder
       await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
-
-      await setProgressComplete('planetscale', 'storeConnectionStrings');
+      await setProgressComplete('planetscale', 'storeStagingConnectionString');
       await onStepComplete?.();
     }
 
     // Step 9: Initialize Prisma migration table (run on both prod and staging)
-    if (!(await isProgressComplete('planetscale', 'initMigrationTable'))) {
+    if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
       try {
         // Fetch connection strings from Infisical (source of truth)
-        await onStepComplete?.('Fetching connection strings from Infisical...');
+        await onStepComplete?.('Fetching prod connection string from Infisical...');
         const prodConnectionString = await getSecretAsync('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'prod',
           path: '/api',
         });
 
+        // Initialize _prisma_migrations table in production branch
+        await onStepComplete?.('Initializing migration table (production)...');
+        await initPrismaMigrationTable(prodConnectionString);
+        await setProgressComplete('planetscale', 'initProdMigrationTable');
+        await onStepComplete?.();
+      } catch (error) {
+        throw new Error(
+          `Failed to initialize prod migration table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
+
+    if (!(await isProgressComplete('planetscale', 'initStagingMigrationTable'))) {
+      try {
+        await onStepComplete?.('Fetching staging connection string from Infisical...');
         const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
           projectId: infisicalProjectId,
           environment: 'staging',
           path: '/api',
         });
 
-        // Initialize _prisma_migrations table in production branch
-        await onStepComplete?.('Initializing migration table (production)...');
-        await initPrismaMigrationTable(prodConnectionString);
-
         // Initialize _prisma_migrations table in staging branch
         await onStepComplete?.('Initializing migration table (staging)...');
         await initPrismaMigrationTable(stagingConnectionString);
-
-        await setProgressComplete('planetscale', 'initMigrationTable');
+        await setProgressComplete('planetscale', 'initStagingMigrationTable');
         await onStepComplete?.();
       } catch (error) {
         throw new Error(
-          `Failed to initialize migration table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          `Failed to initialize staging migration table: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     }

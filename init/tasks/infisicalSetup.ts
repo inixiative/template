@@ -147,51 +147,213 @@ export const setupInfisical = async (
     }
 
     // Step 4: Create folder structure
-    if (!(await isProgressComplete('infisical', 'createApps'))) {
-      // Suppressed for TUI: console.log('  • Creating folder structure...');
-      const apps = ['api', 'web', 'admin', 'superadmin'];
-      const envs = ['staging', 'prod'];
+    const folderSteps = [
+      { action: 'createRootApiFolder', environment: 'root', app: 'api' },
+      { action: 'createRootWebFolder', environment: 'root', app: 'web' },
+      { action: 'createRootAdminFolder', environment: 'root', app: 'admin' },
+      { action: 'createRootSuperadminFolder', environment: 'root', app: 'superadmin' },
+      { action: 'createStagingApiFolder', environment: 'staging', app: 'api' },
+      { action: 'createStagingWebFolder', environment: 'staging', app: 'web' },
+      { action: 'createStagingAdminFolder', environment: 'staging', app: 'admin' },
+      { action: 'createStagingSuperadminFolder', environment: 'staging', app: 'superadmin' },
+      { action: 'createProdApiFolder', environment: 'prod', app: 'api' },
+      { action: 'createProdWebFolder', environment: 'prod', app: 'web' },
+      { action: 'createProdAdminFolder', environment: 'prod', app: 'admin' },
+      { action: 'createProdSuperadminFolder', environment: 'prod', app: 'superadmin' },
+    ] as const;
 
-      for (const env of ['root', ...envs]) {
-        for (const app of apps) {
-          await createFolder(projectId, env, app, '/');
-        }
-      }
+    for (const step of folderSteps) {
+      if (await isProgressComplete('infisical', step.action)) continue;
 
-      // Suppressed for TUI: console.log('    ✓ Folders created: api, web, admin, superadmin');
-      await setProgressComplete('infisical', 'createApps');
+      await createFolder(projectId, step.environment, step.app, '/');
+      await setProgressComplete('infisical', step.action);
       await onStepComplete?.();
-    } else {
-      // Suppressed for TUI: console.log('  ✓ Folder structure already created (skipping)');
     }
 
     // Step 5: Set up inheritance chains
-    if (!(await isProgressComplete('infisical', 'setInheritance'))) {
-      // Suppressed for TUI: console.log('  • Setting up inheritance chains...');
-      const apps = ['api', 'web', 'admin', 'superadmin'];
-      const envs = ['staging', 'prod'];
+    const inheritanceSteps = [
+      {
+        action: 'createStagingApiRootImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/api',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingApiRootAppImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/api',
+        sourceEnvironment: 'root',
+        sourcePath: '/api',
+      },
+      {
+        action: 'createStagingApiEnvImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/api',
+        sourceEnvironment: 'staging',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingWebRootImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/web',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingWebRootAppImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/web',
+        sourceEnvironment: 'root',
+        sourcePath: '/web',
+      },
+      {
+        action: 'createStagingWebEnvImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/web',
+        sourceEnvironment: 'staging',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingAdminRootImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/admin',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingAdminRootAppImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/admin',
+        sourceEnvironment: 'root',
+        sourcePath: '/admin',
+      },
+      {
+        action: 'createStagingAdminEnvImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/admin',
+        sourceEnvironment: 'staging',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingSuperadminRootImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createStagingSuperadminRootAppImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'root',
+        sourcePath: '/superadmin',
+      },
+      {
+        action: 'createStagingSuperadminEnvImport',
+        destinationEnvironment: 'staging',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'staging',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdApiRootImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/api',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdApiRootAppImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/api',
+        sourceEnvironment: 'root',
+        sourcePath: '/api',
+      },
+      {
+        action: 'createProdApiEnvImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/api',
+        sourceEnvironment: 'prod',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdWebRootImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/web',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdWebRootAppImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/web',
+        sourceEnvironment: 'root',
+        sourcePath: '/web',
+      },
+      {
+        action: 'createProdWebEnvImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/web',
+        sourceEnvironment: 'prod',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdAdminRootImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/admin',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdAdminRootAppImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/admin',
+        sourceEnvironment: 'root',
+        sourcePath: '/admin',
+      },
+      {
+        action: 'createProdAdminEnvImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/admin',
+        sourceEnvironment: 'prod',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdSuperadminRootImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'root',
+        sourcePath: '/',
+      },
+      {
+        action: 'createProdSuperadminRootAppImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'root',
+        sourcePath: '/superadmin',
+      },
+      {
+        action: 'createProdSuperadminEnvImport',
+        destinationEnvironment: 'prod',
+        destinationPath: '/superadmin',
+        sourceEnvironment: 'prod',
+        sourcePath: '/',
+      },
+    ] as const;
 
-      for (const env of envs) {
-        for (const app of apps) {
-          const destPath = `/${app}`;
+    for (const step of inheritanceSteps) {
+      if (await isProgressComplete('infisical', step.action)) continue;
 
-          // Import order matters! Create from lowest to highest priority:
-          // Priority 1 (lowest): root:/ -> env:/app/
-          await createSecretImport(projectId, env, destPath, 'root', '/');
-
-          // Priority 2: root:/app/ -> env:/app/
-          await createSecretImport(projectId, env, destPath, 'root', destPath);
-
-          // Priority 3 (highest): env:/ -> env:/app/
-          await createSecretImport(projectId, env, destPath, env, '/');
-        }
-      }
-
-      // Suppressed for TUI: console.log('    ✓ Inheritance: 12 import chains configured');
-      await setProgressComplete('infisical', 'setInheritance');
+      await createSecretImport(
+        projectId,
+        step.destinationEnvironment,
+        step.destinationPath,
+        step.sourceEnvironment,
+        step.sourcePath,
+      );
+      await setProgressComplete('infisical', step.action);
       await onStepComplete?.();
-    } else {
-      // Suppressed for TUI: console.log('  ✓ Inheritance already configured (skipping)');
     }
 
     // Always enforce runtime environment markers used by API/worker.
@@ -210,27 +372,33 @@ export const setupInfisical = async (
     await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Superadmin', '/superadmin');
 
     // Step 6: Ensure API auth secrets exist for deploy environments
-    if (!(await isProgressComplete('infisical', 'ensureApiAuthSecrets'))) {
-      for (const env of ['prod', 'staging']) {
-        try {
-          const existing = await getSecretAsync('BETTER_AUTH_SECRET', {
-            projectId,
-            environment: env,
-            path: '/api',
-          });
-          if (existing && existing.trim().length >= 32) continue;
-        } catch {
-          // Missing secret is expected on first run.
-        }
+    const apiAuthSecretSteps = [
+      { action: 'ensureProdApiAuthSecret', environment: 'prod' },
+      { action: 'ensureStagingApiAuthSecret', environment: 'staging' },
+    ] as const;
 
-        const secret = await generateSecretAsync();
-        await setSecretAsync(projectId, env, 'BETTER_AUTH_SECRET', secret, '/api');
+    for (const step of apiAuthSecretSteps) {
+      if (await isProgressComplete('infisical', step.action)) continue;
+
+      let hasValidSecret = false;
+      try {
+        const existing = await getSecretAsync('BETTER_AUTH_SECRET', {
+          projectId,
+          environment: step.environment,
+          path: '/api',
+        });
+        hasValidSecret = Boolean(existing && existing.trim().length >= 32);
+      } catch {
+        // Missing secret is expected on first run.
       }
 
-      await setProgressComplete('infisical', 'ensureApiAuthSecrets');
+      if (!hasValidSecret) {
+        const secret = await generateSecretAsync();
+        await setSecretAsync(projectId, step.environment, 'BETTER_AUTH_SECRET', secret, '/api');
+      }
+
+      await setProgressComplete('infisical', step.action);
       await onStepComplete?.();
-    } else {
-      // Suppressed for TUI: console.log('  ✓ API auth secrets already configured (skipping)');
     }
 
     // Suppressed for TUI: console.log('\n✅ Infisical setup complete!');

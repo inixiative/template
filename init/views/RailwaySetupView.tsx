@@ -62,6 +62,8 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
     progress,
     workspaceId,
     projectId,
+    prodEnvironmentId,
+    stagingEnvironmentId,
     prodApiServiceId,
     stagingApiServiceId,
     prodWorkerServiceId,
@@ -69,6 +71,63 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
     prodRedisServiceId,
     stagingRedisServiceId,
   } = config.railway;
+  const prodEnvironmentCount = [
+    progress.ensureProdEnvironment,
+    progress.storeProdEnvironmentIdSecret,
+    progress.deleteLegacyProductionEnvironment,
+  ].filter(Boolean).length;
+  const stagingEnvironmentCount = [progress.ensureStagingEnvironment, progress.storeStagingEnvironmentIdSecret].filter(
+    Boolean,
+  ).length;
+  const prodRedisCount = [
+    progress.ensureProdRedisService,
+    progress.captureProdRedisVolume,
+    progress.renameProdRedisService,
+    progress.renameProdRedisVolume,
+    progress.storeProdRedisUrl,
+  ].filter(Boolean).length;
+  const stagingRedisCount = [
+    progress.ensureStagingRedisService,
+    progress.captureStagingRedisVolume,
+    progress.renameStagingRedisService,
+    progress.renameStagingRedisVolume,
+    progress.storeStagingRedisUrl,
+  ].filter(Boolean).length;
+  const prodApiCount = [
+    progress.ensureProdApiService,
+    progress.storeProdApiServiceIdSecret,
+    progress.createInfisicalSyncProd,
+    progress.configureProdApiService,
+    progress.connectProdApiGithub,
+    progress.ensureProdApiDeployment,
+    progress.storeProdApiUrl,
+  ].filter(Boolean).length;
+  const stagingApiCount = [
+    progress.ensureStagingApiService,
+    progress.storeStagingApiServiceIdSecret,
+    progress.createInfisicalSyncStagingApi,
+    progress.configureStagingApiService,
+    progress.connectStagingApiGithub,
+    progress.ensureStagingApiDeployment,
+    progress.storeStagingApiUrl,
+  ].filter(Boolean).length;
+  const prodWorkerCount = [
+    progress.ensureProdWorkerService,
+    progress.storeProdWorkerServiceIdSecret,
+    progress.createInfisicalSyncProdWorker,
+    progress.configureProdWorkerService,
+    progress.connectProdWorkerGithub,
+    progress.ensureProdWorkerDeployment,
+  ].filter(Boolean).length;
+  const stagingWorkerCount = [
+    progress.ensureStagingWorkerService,
+    progress.storeStagingWorkerServiceIdSecret,
+    progress.createInfisicalSyncStagingWorker,
+    progress.configureStagingWorkerService,
+    progress.connectStagingWorkerGithub,
+    progress.ensureStagingWorkerDeployment,
+  ].filter(Boolean).length;
+
   return [
     {
       label: workspaceId ? `Workspace selected: ${workspaceId}` : 'Workspace selected',
@@ -83,40 +142,28 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: progress.createProject,
     },
     {
-      label: 'Created "prod" and deleted "production" environment',
-      completed: progress.renameProductionEnv,
+      label: prodEnvironmentId
+        ? `Production environment ready (${prodEnvironmentCount}/3): ${prodEnvironmentId}`
+        : `Production environment ready (${prodEnvironmentCount}/3)`,
+      completed: prodEnvironmentCount === 3,
     },
     {
-      label: 'Created "staging" environment',
-      completed: progress.createStagingEnv,
+      label: stagingEnvironmentId
+        ? `Staging environment ready (${stagingEnvironmentCount}/2): ${stagingEnvironmentId}`
+        : `Staging environment ready (${stagingEnvironmentCount}/2)`,
+      completed: stagingEnvironmentCount === 2,
     },
     {
-      label: prodRedisServiceId ? `Prod Redis created: ${prodRedisServiceId}` : 'Prod Redis created',
-      completed: progress.createRedisProd,
+      label: prodRedisServiceId
+        ? `Prod Redis ready (${prodRedisCount}/5): ${prodRedisServiceId}`
+        : `Prod Redis ready (${prodRedisCount}/5)`,
+      completed: prodRedisCount === 5,
     },
     {
-      label: 'Prod Redis service renamed to "redis-prod"',
-      completed: progress.renameRedisProd,
-    },
-    {
-      label: 'Prod Redis volume renamed to "redis-prod-data"',
-      completed: progress.renameRedisProdVolume,
-    },
-    {
-      label: stagingRedisServiceId ? `Staging Redis created: ${stagingRedisServiceId}` : 'Staging Redis created',
-      completed: progress.createRedisStaging,
-    },
-    {
-      label: 'Staging Redis service renamed to "redis-staging"',
-      completed: progress.renameRedisStaging,
-    },
-    {
-      label: 'Staging Redis volume renamed to "redis-staging-data"',
-      completed: progress.renameRedisStagingVolume,
-    },
-    {
-      label: 'Redis URLs stored in Infisical',
-      completed: progress.storeRedisUrl,
+      label: stagingRedisServiceId
+        ? `Staging Redis ready (${stagingRedisCount}/5): ${stagingRedisServiceId}`
+        : `Staging Redis ready (${stagingRedisCount}/5)`,
+      completed: stagingRedisCount === 5,
     },
     {
       label: 'Infisical Railway connection created',
@@ -127,62 +174,28 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: progress.promptedForGithub,
     },
     {
-      label: prodApiServiceId ? `Prod API service created: ${prodApiServiceId}` : 'Prod API service created',
-      completed: progress.createApiProd,
-    },
-    {
-      label: 'Infisical sync created for prod API',
-      completed: progress.createInfisicalSyncProd,
-    },
-    {
-      label: 'Prod API connected to GitHub and deployed',
-      completed: progress.connectApiProdGithub,
+      label: prodApiServiceId
+        ? `Prod API ready (${prodApiCount}/7): ${prodApiServiceId}`
+        : `Prod API ready (${prodApiCount}/7)`,
+      completed: prodApiCount === 7,
     },
     {
       label: stagingApiServiceId
-        ? `Staging API service created: ${stagingApiServiceId}`
-        : 'Staging API service created',
-      completed: progress.createApiStaging,
-    },
-    {
-      label: 'Infisical sync created for staging API',
-      completed: progress.createInfisicalSyncStagingApi,
-    },
-    {
-      label: 'Staging API connected to GitHub and deployed',
-      completed: progress.connectApiStagingGithub,
-    },
-    {
-      label: 'API URLs stored in Infisical',
-      completed: progress.storeApiUrl,
+        ? `Staging API ready (${stagingApiCount}/7): ${stagingApiServiceId}`
+        : `Staging API ready (${stagingApiCount}/7)`,
+      completed: stagingApiCount === 7,
     },
     {
       label: prodWorkerServiceId
-        ? `Prod Worker service created: ${prodWorkerServiceId}`
-        : 'Prod Worker service created',
-      completed: progress.createWorkerProd,
-    },
-    {
-      label: 'Prod Worker connected to GitHub and deployed',
-      completed: progress.connectWorkerProdGithub,
+        ? `Prod Worker ready (${prodWorkerCount}/6): ${prodWorkerServiceId}`
+        : `Prod Worker ready (${prodWorkerCount}/6)`,
+      completed: prodWorkerCount === 6,
     },
     {
       label: stagingWorkerServiceId
-        ? `Staging Worker service created: ${stagingWorkerServiceId}`
-        : 'Staging Worker service created',
-      completed: progress.createWorkerStaging,
-    },
-    {
-      label: 'Infisical sync created for staging Worker',
-      completed: progress.createInfisicalSyncStagingWorker,
-    },
-    {
-      label: 'Staging Worker connected to GitHub and deployed',
-      completed: progress.connectWorkerStagingGithub,
-    },
-    {
-      label: 'All deployments verified',
-      completed: progress.verifyDeployment,
+        ? `Staging Worker ready (${stagingWorkerCount}/6): ${stagingWorkerServiceId}`
+        : `Staging Worker ready (${stagingWorkerCount}/6)`,
+      completed: stagingWorkerCount === 6,
     },
   ];
 };

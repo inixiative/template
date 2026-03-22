@@ -11,30 +11,18 @@ import {
   updateProjectSettings,
 } from '../api/vercel';
 import { updateConfigField } from '../utils/configHelpers';
+import { getProjectConfig } from '../utils/getProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
 import { setSecretAsync } from './infisicalSetup';
 
 /**
- * Get or create Vercel connection in Infisical (idempotent)
+ * Read Vercel API token from local CLI auth config
  */
-const getOrCreateVercelConnection = async (infisicalProjectId: string, projectName: string): Promise<string> => {
-  // Get Vercel API token from CLI config
+const readVercelToken = async (): Promise<string> => {
   const authPath = path.join(homedir(), 'Library/Application Support/com.vercel.cli/auth.json');
   const authContent = await readFile(authPath, 'utf-8');
   const auth = JSON.parse(authContent);
-  const vercelToken = auth.token;
-
-  // Store Vercel token in Infisical
-  await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
-
-  // Create Vercel connection in Infisical (idempotent)
-  const connectionId = await createVercelConnection(
-    infisicalProjectId,
-    vercelToken,
-    `${projectName}-vercel-connection`,
-  );
-
-  return connectionId;
+  return auth.token;
 };
 
 /**
@@ -42,26 +30,40 @@ const getOrCreateVercelConnection = async (infisicalProjectId: string, projectNa
  */
 export const setupVercel = async (teamId: string, teamName: string, syncConfig: () => Promise<void>): Promise<void> => {
   try {
-    const config = (await import('../utils/getProjectConfig')).getProjectConfig();
-    const projectConfig = await config;
+    const projectConfig = await getProjectConfig();
     const projectName = projectConfig.project.name;
     const infisicalProjectId = projectConfig.infisical.projectId;
+    let webProjectId = projectConfig.vercel.webProjectId;
+    let adminProjectId = projectConfig.vercel.adminProjectId;
+    let superadminProjectId = projectConfig.vercel.superadminProjectId;
+    let connectionId = projectConfig.vercel.connectionId;
+    let vercelToken = '';
 
-    // Step 1: Store team ID and mark progress
+    // Step 1: Store team selection in config
     if (!(await isComplete('vercel', 'selectTeam'))) {
       await updateConfigField('vercel', 'teamId', teamId);
       await updateConfigField('vercel', 'teamName', teamName);
       await updateConfigField('vercel', 'configProjectName', projectName);
 
-      // Store team ID and name in Infisical for reference
-      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_ID', teamId);
-      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_NAME', teamName);
-
       await markComplete('vercel', 'selectTeam');
       await syncConfig();
     }
 
-    // Step 2: Check GitHub integration (once, before creating projects)
+    // Step 2: Store team ID in Infisical
+    if (!(await isComplete('vercel', 'storeTeamIdSecret'))) {
+      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_ID', teamId);
+      await markComplete('vercel', 'storeTeamIdSecret');
+      await syncConfig();
+    }
+
+    // Step 3: Store team name in Infisical
+    if (!(await isComplete('vercel', 'storeTeamNameSecret'))) {
+      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_TEAM_NAME', teamName);
+      await markComplete('vercel', 'storeTeamNameSecret');
+      await syncConfig();
+    }
+
+    // Step 4: Check GitHub integration (once, before creating projects)
     if (!(await isComplete('vercel', 'promptedForGithub'))) {
       // Check if Vercel GitHub App is installed using GitHub API
       const isVercelAppInstalled = await isAppInstalled(projectConfig.project.organization, 'vercel');
@@ -79,22 +81,48 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
+    // Step 5: Store Vercel API token in Infisical
+    if (!(await isComplete('vercel', 'storeVercelToken'))) {
+      vercelToken = await readVercelToken();
+      await setSecretAsync(infisicalProjectId, 'root', 'VERCEL_API_TOKEN', vercelToken);
+      await markComplete('vercel', 'storeVercelToken');
+      await syncConfig();
+    }
+
+    // Step 6: Ensure Vercel connection exists in Infisical
+    if (!connectionId || !(await isComplete('vercel', 'createInfisicalConnection'))) {
+      if (!vercelToken) {
+        vercelToken = await readVercelToken();
+      }
+
+      if (!connectionId) {
+        connectionId = await createVercelConnection(
+          infisicalProjectId,
+          vercelToken,
+          `${projectName}-vercel-connection`,
+        );
+        await updateConfigField('vercel', 'connectionId', connectionId);
+      }
+
+      await markComplete('vercel', 'createInfisicalConnection');
+      await syncConfig();
+    }
+
     // === WEB APP ===
 
-    // Step 3: Create web project
+    // Step 7: Create web project
     if (!(await isComplete('vercel', 'createWebProject'))) {
       const webProjectName = `${projectName}-web`;
       const webProject = await createProject(webProjectName, teamId);
 
-      await updateConfigField('vercel', 'webProjectId', webProject.id);
+      webProjectId = webProject.id;
+      await updateConfigField('vercel', 'webProjectId', webProjectId);
       await markComplete('vercel', 'createWebProject');
       await syncConfig();
     }
 
-    // Step 4: Configure Web root directory
+    // Step 8: Configure Web root directory
     if (!(await isComplete('vercel', 'configureWebRootDirectory'))) {
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await updateProjectSettings(webProjectId, teamId, {
         rootDirectory: 'apps/web',
       });
@@ -103,10 +131,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 5: Create Web staging environment (optional - requires Pro/Enterprise)
+    // Step 9: Create Web staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createWebStagingEnvironment'))) {
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       try {
         await createCustomEnvironment(webProjectId, teamId, 'Staging', 'staging');
         console.log('✅ Created custom staging environment for Web');
@@ -124,20 +150,16 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 6: Link Web project to GitHub
+    // Step 10: Link Web project to GitHub
     if (!(await isComplete('vercel', 'linkWebGitHub'))) {
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await linkGitHub(webProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkWebGitHub');
       await syncConfig();
     }
 
-    // Step 7: Configure Web branches
+    // Step 11: Configure Web branches
     if (!(await isComplete('vercel', 'configureWebBranches'))) {
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await updateProjectSettings(webProjectId, teamId, {
         git: {
           deploymentEnabled: {
@@ -151,11 +173,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 8: Create Infisical sync for Web → production
+    // Step 12: Create Infisical sync for Web → production
     if (!(await isComplete('vercel', 'createWebInfisicalSyncProd'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -172,11 +191,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 9: Create Infisical sync for Web → staging (custom environment via preview + branch)
+    // Step 13: Create Infisical sync for Web → staging (custom environment via preview + branch)
     if (!(await isComplete('vercel', 'createWebInfisicalSyncStaging'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -194,11 +210,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 10: Create Infisical sync for Web → preview (optional)
+    // Step 14: Create Infisical sync for Web → preview (optional)
     if (!(await isComplete('vercel', 'createWebInfisicalSyncPreview'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const webProjectId = projectConfig.vercel.webProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -217,20 +230,19 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // === ADMIN APP ===
 
-    // Step 11: Create admin project
+    // Step 15: Create admin project
     if (!(await isComplete('vercel', 'createAdminProject'))) {
       const adminProjectName = `${projectName}-admin`;
       const adminProject = await createProject(adminProjectName, teamId);
 
-      await updateConfigField('vercel', 'adminProjectId', adminProject.id);
+      adminProjectId = adminProject.id;
+      await updateConfigField('vercel', 'adminProjectId', adminProjectId);
       await markComplete('vercel', 'createAdminProject');
       await syncConfig();
     }
 
-    // Step 12: Configure Admin root directory
+    // Step 16: Configure Admin root directory
     if (!(await isComplete('vercel', 'configureAdminRootDirectory'))) {
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await updateProjectSettings(adminProjectId, teamId, {
         rootDirectory: 'apps/admin',
       });
@@ -239,10 +251,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 13: Create Admin staging environment (optional - requires Pro/Enterprise)
+    // Step 17: Create Admin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createAdminStagingEnvironment'))) {
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       try {
         await createCustomEnvironment(adminProjectId, teamId, 'Staging', 'staging');
         console.log('✅ Created custom staging environment for Admin');
@@ -260,20 +270,16 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 14: Link Admin project to GitHub
+    // Step 18: Link Admin project to GitHub
     if (!(await isComplete('vercel', 'linkAdminGitHub'))) {
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await linkGitHub(adminProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkAdminGitHub');
       await syncConfig();
     }
 
-    // Step 15: Configure Admin branches
+    // Step 19: Configure Admin branches
     if (!(await isComplete('vercel', 'configureAdminBranches'))) {
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await updateProjectSettings(adminProjectId, teamId, {
         git: {
           deploymentEnabled: {
@@ -287,11 +293,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 16: Create Infisical sync for Admin → production
+    // Step 20: Create Infisical sync for Admin → production
     if (!(await isComplete('vercel', 'createAdminInfisicalSyncProd'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -308,11 +311,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 17: Create Infisical sync for Admin → staging (custom environment via preview + branch)
+    // Step 21: Create Infisical sync for Admin → staging (custom environment via preview + branch)
     if (!(await isComplete('vercel', 'createAdminInfisicalSyncStaging'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -330,11 +330,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 18: Create Infisical sync for Admin → preview
+    // Step 22: Create Infisical sync for Admin → preview
     if (!(await isComplete('vercel', 'createAdminInfisicalSyncPreview'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const adminProjectId = projectConfig.vercel.adminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -353,20 +350,19 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // === SUPERADMIN APP ===
 
-    // Step 19: Create superadmin project
+    // Step 23: Create superadmin project
     if (!(await isComplete('vercel', 'createSuperadminProject'))) {
       const superadminProjectName = `${projectName}-superadmin`;
       const superadminProject = await createProject(superadminProjectName, teamId);
 
-      await updateConfigField('vercel', 'superadminProjectId', superadminProject.id);
+      superadminProjectId = superadminProject.id;
+      await updateConfigField('vercel', 'superadminProjectId', superadminProjectId);
       await markComplete('vercel', 'createSuperadminProject');
       await syncConfig();
     }
 
-    // Step 20: Configure Superadmin root directory
+    // Step 24: Configure Superadmin root directory
     if (!(await isComplete('vercel', 'configureSuperadminRootDirectory'))) {
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await updateProjectSettings(superadminProjectId, teamId, {
         rootDirectory: 'apps/superadmin',
       });
@@ -375,10 +371,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 21: Create Superadmin staging environment (optional - requires Pro/Enterprise)
+    // Step 25: Create Superadmin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createSuperadminStagingEnvironment'))) {
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       try {
         await createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'staging');
         console.log('✅ Created custom staging environment for Superadmin');
@@ -396,10 +390,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 22: Link Superadmin project to GitHub
+    // Step 26: Link Superadmin project to GitHub
     if (!(await isComplete('vercel', 'linkSuperadminGitHub'))) {
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await linkGitHub(
         superadminProjectId,
         projectConfig.project.organization,
@@ -412,10 +404,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 23: Configure Superadmin branches
+    // Step 27: Configure Superadmin branches
     if (!(await isComplete('vercel', 'configureSuperadminBranches'))) {
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await updateProjectSettings(superadminProjectId, teamId, {
         git: {
           deploymentEnabled: {
@@ -429,11 +419,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 24: Create Infisical sync for Superadmin → production
+    // Step 28: Create Infisical sync for Superadmin → production
     if (!(await isComplete('vercel', 'createSuperadminInfisicalSyncProd'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -450,11 +437,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 25: Create Infisical sync for Superadmin → staging (custom environment via preview + branch)
+    // Step 29: Create Infisical sync for Superadmin → staging (custom environment via preview + branch)
     if (!(await isComplete('vercel', 'createSuperadminInfisicalSyncStaging'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -472,11 +456,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 26: Create Infisical sync for Superadmin → preview
+    // Step 30: Create Infisical sync for Superadmin → preview
     if (!(await isComplete('vercel', 'createSuperadminInfisicalSyncPreview'))) {
-      const connectionId = await getOrCreateVercelConnection(infisicalProjectId, projectName);
-      const superadminProjectId = projectConfig.vercel.superadminProjectId!;
-
       await ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -493,7 +474,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 27: Mark setup complete
+    // Step 31: Mark setup complete
     if (!(await isComplete('vercel', 'deployProduction'))) {
       // All done! Projects created, GitHub linked, Infisical synced
       await markComplete('vercel', 'deployProduction');

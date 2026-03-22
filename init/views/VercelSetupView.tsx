@@ -46,12 +46,23 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
 };
 
 const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
-  const { progress, teamId, webProjectId, adminProjectId, superadminProjectId } = config.vercel;
+  const { progress, teamId, connectionId, webProjectId, adminProjectId, superadminProjectId } = config.vercel;
+  const bootstrapCount = [
+    progress.selectTeam,
+    progress.storeTeamIdSecret,
+    progress.storeTeamNameSecret,
+    progress.promptedForGithub,
+    progress.storeVercelToken,
+    progress.createInfisicalConnection,
+  ].filter(Boolean).length;
 
   return [
     {
-      label: teamId ? `Team selected: ${teamId}` : 'Team selected',
-      completed: progress.selectTeam,
+      label:
+        teamId || connectionId
+          ? `Bootstrap ready (${bootstrapCount}/6): ${teamId || 'team selected'}`
+          : `Bootstrap ready (${bootstrapCount}/6)`,
+      completed: bootstrapCount === 6,
     },
     // Web app
     {
@@ -236,6 +247,8 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
     if (action === 'restart') {
       // Clear progress, config, and errors
       await updateConfigField('vercel', 'teamId', '');
+      await updateConfigField('vercel', 'teamName', '');
+      await updateConfigField('vercel', 'connectionId', '');
       await updateConfigField('vercel', 'webProjectId', '');
       await updateConfigField('vercel', 'adminProjectId', '');
       await updateConfigField('vercel', 'superadminProjectId', '');
