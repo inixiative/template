@@ -21,14 +21,6 @@ export enum LogScope {
 const store = new AsyncLocalStorage<string[]>();
 
 /**
- * Wrap execution in a log scope. All log calls within `fn` will include this scope.
- */
-export const logScope = <T>(id: string | LogScope, fn: () => T): T => {
-  const current = store.getStore() ?? [];
-  return store.run([...current, id], fn);
-};
-
-/**
  * Get current scope IDs (for internal use by logger).
  */
 export const getLogScopes = (): string[] => store.getStore() ?? [];
@@ -40,17 +32,30 @@ export type LogBroadcastFn = (level: string, message: string) => void;
 const broadcastStore = new AsyncLocalStorage<LogBroadcastFn[]>();
 
 /**
- * Register a broadcast target for all log calls within `fn`.
- * Broadcasts are fire-and-forget — errors in targets never affect the log call.
+ * Wrap execution in a log scope. All log calls within `fn` will include this scope.
+ * Also initializes the broadcast store if not already active.
+ */
+export const logScope = <T>(id: string | LogScope, fn: () => T): T => {
+  const current = store.getStore() ?? [];
+  const broadcasts = broadcastStore.getStore();
+  const run = () => store.run([...current, id], fn);
+  return broadcasts ? run() : broadcastStore.run([], run);
+};
+
+/**
+ * Register a broadcast target in the current scope.
+ * All log calls in this async context will also be sent to the target.
+ * Fire-and-forget — errors in targets never affect the log call.
  *
  * @example
- * logBroadcast((level, msg) => job.log(msg), async () => {
+ * await logScope(LogScope.worker, async () => {
+ *   addLogBroadcast((_level, msg) => job.log(msg));
  *   log.info('this goes to stdout AND job.log()');
  * });
  */
-export const logBroadcast = <T>(target: LogBroadcastFn, fn: () => T): T => {
-  const current = broadcastStore.getStore() ?? [];
-  return broadcastStore.run([...current, target], fn);
+export const addLogBroadcast = (target: LogBroadcastFn): void => {
+  const broadcasts = broadcastStore.getStore();
+  if (broadcasts) broadcasts.push(target);
 };
 
 /**

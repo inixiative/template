@@ -1,5 +1,5 @@
 import { createRedisConnection, db } from '@template/db';
-import { LogScope, log, logBroadcast, logScope } from '@template/shared/logger';
+import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
@@ -39,41 +39,39 @@ export const initializeWorker = async (): Promise<void> => {
       const scopeId = `${job.name}:${job.id}`;
       await logScope(LogScope.worker, () =>
         logScope(scopeId, () =>
-          logBroadcast(
-            (_level, msg) => job.log(msg),
-            () =>
-              db.scope(
-                scopeId,
-                async () => {
-                  const ctx: WorkerContext = {
-                    db,
-                    queue,
-                    job,
-                    log: (message: string) => log.info(message),
-                  };
+          db.scope(
+            scopeId,
+            async () => {
+              addLogBroadcast((_level, msg) => job.log(msg));
 
-                  log.info(`Processing job ${job.name} (${job.id})`);
+              const ctx: WorkerContext = {
+                db,
+                queue,
+                job,
+                log: (message: string) => log.info(message),
+              };
 
-                  try {
-                    const payload = (job.data as { payload?: unknown }).payload;
-                    await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-                      if (payload === undefined) {
-                        await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                      } else {
-                        await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
-                          ctx,
-                          payload,
-                        );
-                      }
-                    });
-                    log.info(`Completed job ${job.name} (${job.id})`);
-                  } catch (error) {
-                    log.error(`Failed job ${job.name} (${job.id}):`, error);
-                    throw error;
+              log.info(`Processing job ${job.name} (${job.id})`);
+
+              try {
+                const payload = (job.data as { payload?: unknown }).payload;
+                await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
+                  if (payload === undefined) {
+                    await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+                  } else {
+                    await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
+                      ctx,
+                      payload,
+                    );
                   }
-                },
-                'worker',
-              ),
+                });
+                log.info(`Completed job ${job.name} (${job.id})`);
+              } catch (error) {
+                log.error(`Failed job ${job.name} (${job.id}):`, error);
+                throw error;
+              }
+            },
+            'worker',
           ),
         ),
       );
