@@ -32,3 +32,28 @@ export const logScope = <T>(id: string | LogScope, fn: () => T): T => {
  * Get current scope IDs (for internal use by logger).
  */
 export const getLogScopes = (): string[] => store.getStore() ?? [];
+
+// --- Log broadcasting ---
+
+export type LogBroadcastFn = (level: string, message: string) => void;
+
+const broadcastStore = new AsyncLocalStorage<LogBroadcastFn[]>();
+
+/**
+ * Register a broadcast target for all log calls within `fn`.
+ * Broadcasts are fire-and-forget — errors in targets never affect the log call.
+ *
+ * @example
+ * logBroadcast((level, msg) => job.log(msg), async () => {
+ *   log.info('this goes to stdout AND job.log()');
+ * });
+ */
+export const logBroadcast = <T>(target: LogBroadcastFn, fn: () => T): T => {
+  const current = broadcastStore.getStore() ?? [];
+  return broadcastStore.run([...current, target], fn);
+};
+
+/**
+ * Get current broadcast targets (for internal use by logger).
+ */
+export const getLogBroadcasts = (): LogBroadcastFn[] => broadcastStore.getStore() ?? [];

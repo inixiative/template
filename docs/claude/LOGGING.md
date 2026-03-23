@@ -107,9 +107,35 @@ await logScope(LogScope.api, () => logScope(requestId, async () => {
 // prepareRequest.ts - chains scopes without intermediate await
 await logScope(LogScope.api, () => logScope(requestId, () => db.scope(requestId, next)));
 
-// worker.ts
-await logScope(LogScope.worker, () => logScope(scopeId, () => handler(ctx, payload)));
+// worker.ts - broadcasts all logs to BullBoard
+await logScope(LogScope.worker, () =>
+  logScope(scopeId, () =>
+    logBroadcast((_level, msg) => job.log(msg), () => handler(ctx, payload)),
+  ),
+);
 ```
+
+### Log Broadcasting
+
+Register broadcast targets that receive all log calls within a scope. Broadcasts are fire-and-forget — errors in targets never affect the log call.
+
+```typescript
+import { logBroadcast } from '@template/shared/logger';
+
+// Single target
+logBroadcast((level, msg) => job.log(msg), async () => {
+  log.info('goes to stdout AND job.log()');
+});
+
+// Multiple targets (nest calls — they stack like logScope)
+logBroadcast((level, msg) => job.log(msg), () =>
+  logBroadcast((level, msg) => auditStream.write(msg), async () => {
+    log.info('goes to stdout, job.log(), AND auditStream');
+  }),
+);
+```
+
+Used in `worker.ts` to pipe all job logs to BullBoard automatically.
 
 ### Output
 

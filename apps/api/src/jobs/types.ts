@@ -9,7 +9,7 @@ export type WorkerContext = {
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;
-  /** Log to both stdout AND BullBoard job logs */
+  /** Log to stdout (automatically broadcast to BullBoard via logBroadcast) */
   log: (message: string) => void;
 };
 
