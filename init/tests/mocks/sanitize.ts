@@ -2,7 +2,8 @@
  * Field-path redactor for VCR fixtures.
  *
  * Specify the exact fields to redact per fixture — no guessing, no broad regex.
- * Paths use dot notation and traverse arrays automatically.
+ * Paths use dot notation. Arrays are traversed automatically, so a path like
+ * 'connection_strings.general' redacts the field on every item in the array.
  *
  * @example
  * redact(role, ['plain_text', 'username', 'connection_strings.general'])

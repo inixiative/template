@@ -32,6 +32,9 @@ type RealOpenAIClient = {
  * - Fixture file present → returns body, no real call
  * - No fixture + realClient → calls real API, redacts sensitive fields, writes fixture
  * - 4xx/5xx fixture → throws with status + message, mirroring real SDK behavior
+ *
+ * Note: integration tests that exercise the full OpenAI/ChatGPT provider flow (e.g. auth,
+ * credential validation) should live alongside the ChatGPT integration module, not here.
  */
 export const createMockOpenAIClient = (realClient?: RealOpenAIClient) => {
   const vcr = new VCR();

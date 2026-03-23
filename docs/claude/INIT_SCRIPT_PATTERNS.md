@@ -594,7 +594,7 @@ const handleTokenSubmit = async () => {
 
 **Rules:**
 - ✅ One progress flag = one provider fact (`storeProdRedisUrl`, `createInfisicalConnection`, `initProdMigrationTable`)
-- ✅ Group multiple flags only in the view layer, never in persisted config
+- ✅ The view layer must reflect the underlying config — don't create visual groupings that don't correspond to persisted state
 - ✅ If a step can partially succeed, split it before marking progress
 - ❌ Don't store umbrella flags like "create passwords" or "configure everything" when they hide multiple remote writes
 

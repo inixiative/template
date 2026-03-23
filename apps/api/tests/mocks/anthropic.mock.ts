@@ -22,6 +22,9 @@ type RealAnthropicClient = {
  * - No fixture + realClient → calls real API, redacts id, writes fixture
  * - 4xx/5xx fixture → throws with status + message, mirroring real SDK behavior
  *
+ * Note: integration tests that exercise the full Anthropic provider flow (e.g. auth,
+ * credential validation) should live alongside the Anthropic integration module, not here.
+ *
  * @example
  * const { client } = createMockAnthropicClient();
  * const msg = await client.messages.create({ model: 'claude-sonnet-4-6', ... });

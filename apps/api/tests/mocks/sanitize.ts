@@ -2,10 +2,11 @@
  * Field-path redactor for VCR fixtures.
  *
  * Specify the exact fields to redact per fixture — no guessing, no broad regex.
- * Paths use dot notation and traverse arrays automatically.
+ * Paths use dot notation. Arrays are traversed automatically, so a path like
+ * 'choices.message.content' redacts content on every item in the choices array.
  *
  * @example
- * redact(message, ['id', 'usage'])
+ * redact(completion, ['id', 'system_fingerprint', 'choices.message.content'])
  */
 
 const redactPath = (obj: unknown, parts: string[]): void => {
