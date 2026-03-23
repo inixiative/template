@@ -107,6 +107,81 @@ describe('api transport wrappers', () => {
     );
   });
 
+  it('unwraps nested { data: { data, pagination } } response', async () => {
+    const sdkFn = mock(async () => ({
+      data: {
+        data: [{ id: 1 }, { id: 2 }],
+        pagination: { page: 1, pageSize: 10, total: 2 },
+      },
+      response: new Response(),
+    }));
+    const fetcher = apiFetchInternal(sdkFn);
+
+    const result = await fetcher();
+
+    expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
+    expect((result as Record<string, unknown>).pagination).toEqual({ page: 1, pageSize: 10, total: 2 });
+    expect((result as Record<string, unknown>).response).toBeInstanceOf(Response);
+  });
+
+  it('returns non-nested { data } responses as-is', async () => {
+    const sdkFn = mock(async () => ({
+      data: { id: 1, name: 'test' },
+      response: new Response(),
+    }));
+    const fetcher = apiFetchInternal(sdkFn);
+
+    const result = await fetcher();
+
+    expect(result.data).toEqual({ id: 1, name: 'test' });
+    expect((result as Record<string, unknown>).response).toBeInstanceOf(Response);
+  });
+
+  it('unwraps nested response even when throwOnError is false', async () => {
+    const sdkFn = mock(async () => ({
+      data: {
+        data: [{ id: 1 }],
+        pagination: { page: 1, pageSize: 10, total: 1 },
+      },
+      response: new Response(),
+    }));
+    const fetcher = apiFetchInternal(sdkFn, { throwOnError: false });
+
+    const result = await fetcher();
+
+    expect(result.data).toEqual([{ id: 1 }]);
+    expect((result as Record<string, unknown>).pagination).toEqual({ page: 1, pageSize: 10, total: 1 });
+  });
+
+  it('preserves error and response.status when throwOnError is false (404 check pattern)', async () => {
+    const sdkFn = mock(async () => ({
+      data: undefined,
+      error: { message: 'Not found' },
+      response: new Response(null, { status: 404 }),
+    }));
+    const fetcher = apiFetchInternal(sdkFn, { throwOnError: false });
+
+    const result = await fetcher();
+    const raw = result as Record<string, unknown>;
+
+    expect(raw.error).toEqual({ message: 'Not found' });
+    expect(raw.response).toBeInstanceOf(Response);
+    expect((raw.response as Response).status).toBe(404);
+    expect(raw.data).toBeUndefined();
+  });
+
+  it('throws error field when throwOnError is true', async () => {
+    const errorObj = { message: 'Server error' };
+    const sdkFn = mock(async () => ({
+      data: undefined,
+      error: errorObj,
+      response: new Response(null, { status: 500 }),
+    }));
+    const fetcher = apiFetchInternal(sdkFn);
+
+    expect(fetcher()).rejects.toEqual(errorObj);
+  });
+
   it('apiQuery reads spoofing state from the app store and forwards query vars', async () => {
     useAppStore.setState((state) => ({
       ...state,

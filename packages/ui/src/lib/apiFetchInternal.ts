@@ -110,16 +110,10 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
 
     const result = await fn(mergedOptions);
 
-    // When throwOnError: false, return the raw SDK result ({ data, error, response })
-    // so the caller can inspect response.status for things like 404 checks
-    if (!throwOnError) {
-      return result as UnwrapResponse<T>;
-    }
-
     // Runtime check: ensure we have a success response (no error field)
     // With throwOnError: true, this should never happen, but we check to help TypeScript
     // and ensure errors are properly thrown for the toast handler
-    if (result && typeof result === 'object' && 'error' in result && result.error !== undefined) {
+    if (throwOnError && result && typeof result === 'object' && 'error' in result && result.error !== undefined) {
       throw result.error;
     }
 
@@ -130,8 +124,8 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
         const { data: innerData, ...otherKeys } = apiResult.data;
         return {
           ...apiResult,
-          data: innerData,
           ...otherKeys,
+          data: innerData,
         } as UnwrapResponse<T>;
       }
     }

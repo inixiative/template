@@ -1,5 +1,5 @@
 import { createRedisConnection, db } from '@template/db';
-import { LogScope, log, logScope } from '@template/shared/logger';
+import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
@@ -42,20 +42,16 @@ export const initializeWorker = async (): Promise<void> => {
           db.scope(
             scopeId,
             async () => {
-              // Helper that logs to both stdout and BullBoard
-              const jobLog = (message: string) => {
-                log.info(message);
-                job.log(message);
-              };
+              addLogBroadcast((_level, msg) => job.log(msg));
 
               const ctx: WorkerContext = {
                 db,
                 queue,
                 job,
-                log: jobLog,
+                log: (message: string) => log.info(message),
               };
 
-              jobLog(`Processing job ${job.name} (${job.id})`);
+              log.info(`Processing job ${job.name} (${job.id})`);
 
               try {
                 const payload = (job.data as { payload?: unknown }).payload;
@@ -69,10 +65,9 @@ export const initializeWorker = async (): Promise<void> => {
                     );
                   }
                 });
-                jobLog(`Completed job ${job.name} (${job.id})`);
+                log.info(`Completed job ${job.name} (${job.id})`);
               } catch (error) {
                 log.error(`Failed job ${job.name} (${job.id}):`, error);
-                job.log(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
                 throw error;
               }
             },
