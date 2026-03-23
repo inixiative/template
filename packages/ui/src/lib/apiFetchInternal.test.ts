@@ -153,7 +153,7 @@ describe('api transport wrappers', () => {
     expect((result as Record<string, unknown>).pagination).toEqual({ page: 1, pageSize: 10, total: 1 });
   });
 
-  it('preserves error field when throwOnError is false', async () => {
+  it('preserves error and response.status when throwOnError is false (404 check pattern)', async () => {
     const sdkFn = mock(async () => ({
       data: undefined,
       error: { message: 'Not found' },
@@ -162,9 +162,12 @@ describe('api transport wrappers', () => {
     const fetcher = apiFetchInternal(sdkFn, { throwOnError: false });
 
     const result = await fetcher();
+    const raw = result as Record<string, unknown>;
 
-    expect((result as Record<string, unknown>).error).toEqual({ message: 'Not found' });
-    expect((result as Record<string, unknown>).response).toBeInstanceOf(Response);
+    expect(raw.error).toEqual({ message: 'Not found' });
+    expect(raw.response).toBeInstanceOf(Response);
+    expect((raw.response as Response).status).toBe(404);
+    expect(raw.data).toBeUndefined();
   });
 
   it('throws error field when throwOnError is true', async () => {
