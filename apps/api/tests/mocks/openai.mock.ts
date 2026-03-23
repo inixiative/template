@@ -1,8 +1,5 @@
 import { VCR } from './VCR';
 
-/**
- * Mock OpenAI chat completion response type
- */
 export type MockOpenAIChatCompletion = {
   id: string;
   object: 'chat.completion';
@@ -11,75 +8,17 @@ export type MockOpenAIChatCompletion = {
   system_fingerprint?: string;
   choices: Array<{
     index: number;
-    message: {
-      role: 'assistant';
-      content: string;
-    };
+    message: { role: 'assistant'; content: string };
     finish_reason: 'stop' | 'length' | 'tool_calls';
   }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
+  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 };
 
-/**
- * Mock OpenAI embedding response type
- */
 export type MockOpenAIEmbedding = {
   object: 'list';
-  data: Array<{
-    object: 'embedding';
-    index: number;
-    embedding: number[];
-  }>;
+  data: Array<{ object: 'embedding'; index: number; embedding: number[] }>;
   model: string;
-  usage: {
-    prompt_tokens: number;
-    total_tokens: number;
-  };
-};
-
-/** Default deterministic chat fallback */
-const defaultChatCompletion: MockOpenAIChatCompletion = {
-  id: 'chatcmpl-SANITIZED_000',
-  object: 'chat.completion',
-  created: Math.floor(Date.now() / 1000),
-  model: 'gpt-4o',
-  system_fingerprint: 'fp_SANITIZED',
-  choices: [
-    {
-      index: 0,
-      message: {
-        role: 'assistant',
-        content: 'Mock response for testing',
-      },
-      finish_reason: 'stop',
-    },
-  ],
-  usage: {
-    prompt_tokens: 50,
-    completion_tokens: 20,
-    total_tokens: 70,
-  },
-};
-
-/** Default deterministic embedding fallback */
-const defaultEmbedding: MockOpenAIEmbedding = {
-  object: 'list',
-  data: [
-    {
-      object: 'embedding',
-      index: 0,
-      embedding: Array.from({ length: 1536 }, (_, i) => Math.sin(i * 0.01)),
-    },
-  ],
-  model: 'text-embedding-3-small',
-  usage: {
-    prompt_tokens: 10,
-    total_tokens: 10,
-  },
+  usage: { prompt_tokens: number; total_tokens: number };
 };
 
 type RealOpenAIClient = {
@@ -88,59 +27,54 @@ type RealOpenAIClient = {
 };
 
 /**
- * Create a mock OpenAI client for testing.
+ * Mock OpenAI client backed by VCR fixtures.
  *
- * Supports three modes via VCR:
- * 1. Playback — pre-loaded fixtures popped FIFO
- * 2. Error injection — queued errors thrown for unhappy path
- * 3. Auto-record — calls real client, sanitizes, saves fixture
- *
- * @param realClient - Optional real OpenAI client for auto-record mode
- *
- * @example
- * const { client, chatVcr, embeddingVcr } = createMockOpenAIClient();
- * chatVcr.add(loadFixture('openai/chatCompletion'));
+ * - Fixture file present → returns body, no real call
+ * - No fixture + realClient → calls real API, redacts sensitive fields, writes fixture
+ * - 4xx/5xx fixture → throws with status + message, mirroring real SDK behavior
  */
 export const createMockOpenAIClient = (realClient?: RealOpenAIClient) => {
-  const chatVcr = new VCR<MockOpenAIChatCompletion>();
-  const embeddingVcr = new VCR<MockOpenAIEmbedding>();
+  const vcr = new VCR();
 
   const client = {
     chat: {
       completions: {
         create: async (...args: unknown[]): Promise<MockOpenAIChatCompletion> => {
-          const recorded = chatVcr.get();
-          if (recorded) return recorded;
-
-          if (realClient?.chat) {
-            return chatVcr.playOrRecord(() => realClient.chat!.completions.create(...args), {
-              fixtureName: 'openai/chatCompletion',
-            });
+          const fixture = await vcr.call(
+            'openai/chatCompletion',
+            () =>
+              realClient?.chat
+                ? realClient.chat.completions.create(...args)
+                : Promise.reject(new Error('No real OpenAI client — add fixture or pass realClient')),
+            { redact: ['id', 'system_fingerprint'] },
+          );
+          if (fixture.status >= 400) {
+            const msg = (fixture.body as { message?: string })?.message ?? 'Unknown error';
+            throw new Error(`OpenAI API error (${fixture.status}): ${msg}`);
           }
-
-          return { ...defaultChatCompletion, id: `chatcmpl-mock-${Date.now()}` };
+          return fixture.body as MockOpenAIChatCompletion;
         },
       },
     },
     embeddings: {
       create: async (...args: unknown[]): Promise<MockOpenAIEmbedding> => {
-        const recorded = embeddingVcr.get();
-        if (recorded) return recorded;
-
-        if (realClient?.embeddings) {
-          return embeddingVcr.playOrRecord(() => realClient.embeddings!.create(...args), {
-            fixtureName: 'openai/embedding',
-          });
+        const fixture = await vcr.call(
+          'openai/embedding',
+          () =>
+            realClient?.embeddings
+              ? realClient.embeddings.create(...args)
+              : Promise.reject(new Error('No real OpenAI client — add fixture or pass realClient')),
+        );
+        if (fixture.status >= 400) {
+          const msg = (fixture.body as { message?: string })?.message ?? 'Unknown error';
+          throw new Error(`OpenAI API error (${fixture.status}): ${msg}`);
         }
-
-        return { ...defaultEmbedding };
+        return fixture.body as MockOpenAIEmbedding;
       },
     },
-    chatVcr,
-    embeddingVcr,
   };
 
-  return { client, chatVcr, embeddingVcr };
+  return { client };
 };
 
 export type MockOpenAIClient = ReturnType<typeof createMockOpenAIClient>['client'];

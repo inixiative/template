@@ -1,6 +1,1 @@
-export {
-  createFixtureLoader,
-  createProviderFixtureLoader,
-  loadFixture,
-  loadFixtureSequence,
-} from './createFixtureLoader';
+export { VCR, type Fixture } from '../mocks/VCR';
