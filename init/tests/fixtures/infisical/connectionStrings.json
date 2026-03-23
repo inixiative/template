@@ -1,17 +1,7 @@
 {
   "status": 200,
   "body": [
-    {
-      "key": "DATABASE_URL",
-      "environment": "prod",
-      "path": "/api",
-      "value": "postgresql://sanitized_prod_user_abc123:SANITIZED_PROD_PASSWORD_xyz789@aws.connect.psdb.cloud/template?sslmode=require"
-    },
-    {
-      "key": "DATABASE_URL",
-      "environment": "staging",
-      "path": "/api",
-      "value": "postgresql://sanitized_staging_user_def456:SANITIZED_STAGING_PASSWORD_uvw321@aws.connect.psdb.cloud/template?sslmode=require"
-    }
+    { "key": "DATABASE_URL", "environment": "prod", "path": "/api", "value": "REDACTED" },
+    { "key": "DATABASE_URL", "environment": "staging", "path": "/api", "value": "REDACTED" }
   ]
 }

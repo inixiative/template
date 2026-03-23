@@ -1,25 +1,16 @@
 {
   "status": 200,
   "body": {
-    "id": "chatcmpl-SANITIZED_000",
+    "id": "chatcmpl-1",
     "object": "chat.completion",
     "created": 1700000000,
     "model": "gpt-4o",
-    "system_fingerprint": "fp_SANITIZED",
-    "choices": [
-      {
-        "index": 0,
-        "message": {
-          "role": "assistant",
-          "content": "This is a sanitized fixture response for testing."
-        },
-        "finish_reason": "stop"
-      }
-    ],
-    "usage": {
-      "prompt_tokens": 50,
-      "completion_tokens": 20,
-      "total_tokens": 70
-    }
+    "system_fingerprint": "REDACTED",
+    "choices": [{
+      "index": 0,
+      "message": { "role": "assistant", "content": "Mock response for testing." },
+      "finish_reason": "stop"
+    }],
+    "usage": { "prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70 }
   }
 }

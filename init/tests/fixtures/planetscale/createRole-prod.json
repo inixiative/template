@@ -1,12 +1,12 @@
 {
   "status": 200,
   "body": {
-    "id": "role-00000000-0000-0000-0000-000000000001",
+    "id": "role-prod-1",
     "name": "template-prod",
-    "username": "sanitized_prod_user_abc123",
-    "plain_text": "SANITIZED_PROD_PASSWORD_xyz789",
+    "username": "REDACTED",
+    "plain_text": "REDACTED",
     "connection_strings": {
-      "general": "postgresql://sanitized_prod_user_abc123:SANITIZED_PROD_PASSWORD_xyz789@aws.connect.psdb.cloud:5432/postgres"
+      "general": "REDACTED"
     }
   }
 }
