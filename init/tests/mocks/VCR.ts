@@ -1,124 +1,65 @@
-import { type SanitizeRule, sanitize } from './sanitize';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { redact } from './sanitize';
 
-type VCROptions = {
-  /** Fixture name for auto-recording (e.g., 'planetscale/createDatabase') */
-  fixtureName?: string;
-  /** Extra sanitize rules beyond defaults */
-  sanitizeRules?: SanitizeRule[];
+const FIXTURES_DIR = join(import.meta.dir, '..', 'fixtures');
+
+/**
+ * HTTP-style fixture — mirrors what a real HTTP response looks like.
+ * The caller (mock API client) decides whether to throw based on status,
+ * exactly as the real client would.
+ */
+export type Fixture<T = unknown> = {
+  status: number;
+  body: T | null;
+  headers?: Record<string, string>;
 };
 
 /**
- * VCR (Video Cassette Recorder) - Queue-based response manager for init tests
+ * VCR — file-based HTTP fixture manager.
  *
- * Three modes:
- * 1. **Playback** — pre-loaded fixtures are popped FIFO (normal test mode)
- * 2. **Error injection** — queue Error instances for unhappy path testing
- * 3. **Auto-record** — when queue is empty and a fallback is provided,
- *    calls the real function, sanitizes the response, saves a fixture,
- *    and returns the sanitized result.
+ * Returns a Fixture<T> (status + body + headers) on every call.
+ * The caller is responsible for treating 4xx/5xx as errors,
+ * mirroring how the real HTTP client behaves.
+ *
+ * - Fixture file exists → return it (no real call)
+ * - No fixture file    → call real function, redact specified fields, save to disk
+ *
+ * Fixture files live at: init/tests/fixtures/<name>.json
  *
  * @example
- * // Playback mode (happy path)
- * const vcr = new VCR<PlanetScaleDatabase>();
- * vcr.add(loadFixture('planetscale/createDatabase'));
- * const response = vcr.next(); // fixture data
+ * const vcr = new VCR();
  *
- * // Error injection (unhappy path)
- * vcr.addError(new Error('PlanetScale API error (403): Forbidden'));
- * vcr.add(successFixture); // retry succeeds
- *
- * // Auto-record mode (first run — no fixture exists yet)
- * const result = await vcr.playOrRecord(
- *   () => createDatabase(org, db, region),
- *   { fixtureName: 'planetscale/createDatabase' },
+ * // Happy path — loads from fixtures/planetscale/createRole-prod.json
+ * const fixture = await vcr.call(
+ *   'planetscale/createRole-prod',
+ *   () => createRole(org, db, branch, 'prod'),
+ *   { redact: ['plain_text', 'username', 'connection_strings.general'] },
  * );
+ * if (fixture.status >= 400) throw new Error(`PlanetScale API error (${fixture.status})`);
+ * return fixture.body;
+ *
+ * // Error path — just point at an error fixture file
+ * const fixture = await vcr.call('planetscale/errors/alreadyExists', () => createDatabase(...));
+ * // fixture = { status: 409, body: { message: 'Database already exists' } }
  */
-export class VCR<T> {
-  private queue: Array<T | Error> = [];
-  private recorded: T[] = [];
+export class VCR {
+  async call<T>(
+    fixtureName: string,
+    realCall: () => Promise<T>,
+    options: { redact?: string[] } = {},
+  ): Promise<Fixture<T>> {
+    const fixturePath = join(FIXTURES_DIR, `${fixtureName}.json`);
 
-  /** Replace entire queue */
-  set(items: T[]): void {
-    this.queue = [...items];
-  }
-
-  /** Append a successful response */
-  add(item: T): void {
-    this.queue.push(item);
-  }
-
-  /** Append an error (will be thrown on next()) */
-  addError(error: Error): void {
-    this.queue.push(error);
-  }
-
-  /**
-   * Pop next item. Throws if it's an Error.
-   * Returns undefined if queue is empty.
-   */
-  next(): T | undefined {
-    const item = this.queue.shift();
-    if (item instanceof Error) throw item;
-    return item;
-  }
-
-  /**
-   * Pop next item, throwing if queue is empty.
-   * Use when the call MUST have a fixture response.
-   */
-  require(): T {
-    if (this.queue.length === 0) {
-      throw new Error('VCR queue exhausted — missing fixture data');
-    }
-    const item = this.queue.shift()!;
-    if (item instanceof Error) throw item;
-    return item;
-  }
-
-  /**
-   * Play from queue if available, otherwise call the real function,
-   * sanitize the result, optionally save it as a fixture, and return it.
-   *
-   * This is the key auto-record method: on first run (no fixture),
-   * it makes the real API call and creates the fixture file.
-   * On subsequent runs, it plays back from the pre-loaded queue.
-   */
-  async playOrRecord(realCall: () => Promise<T>, options: VCROptions = {}): Promise<T> {
-    // If queue has items, play back
-    if (this.queue.length > 0) {
-      return this.require();
+    if (existsSync(fixturePath)) {
+      return JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
     }
 
-    // Queue empty — make the real call and record
+    // No fixture — call real function, redact specified fields, write, return
     const raw = await realCall();
-    const sanitized = sanitize(raw, options.sanitizeRules);
-
-    this.recorded.push(sanitized);
-
-    // Auto-save fixture if name provided
-    if (options.fixtureName) {
-      const { recordFixture } = await import('./sanitize');
-      recordFixture(options.fixtureName, raw, options.sanitizeRules);
-    }
-
-    return sanitized;
-  }
-
-  /** Get all items recorded via playOrRecord (for assertions) */
-  getRecorded(): T[] {
-    return [...this.recorded];
-  }
-
-  clear(): void {
-    this.queue = [];
-    this.recorded = [];
-  }
-
-  isEmpty(): boolean {
-    return this.queue.length === 0;
-  }
-
-  size(): number {
-    return this.queue.length;
+    const fixture: Fixture<T> = { status: 200, body: redact(raw, options.redact ?? []) };
+    mkdirSync(dirname(fixturePath), { recursive: true });
+    writeFileSync(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+    return fixture;
   }
 }

@@ -1,18 +1,21 @@
 {
-  "id": "msg_SANITIZED_000",
-  "type": "message",
-  "role": "assistant",
-  "content": [
-    {
-      "type": "text",
-      "text": "This is a sanitized fixture response for testing."
+  "status": 200,
+  "body": {
+    "id": "msg_SANITIZED_000",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a sanitized fixture response for testing."
+      }
+    ],
+    "model": "claude-sonnet-4-20250514",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 125,
+      "output_tokens": 42
     }
-  ],
-  "model": "claude-sonnet-4-20250514",
-  "stop_reason": "end_turn",
-  "stop_sequence": null,
-  "usage": {
-    "input_tokens": 125,
-    "output_tokens": 42
   }
 }

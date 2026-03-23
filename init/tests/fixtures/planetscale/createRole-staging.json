@@ -1,9 +1,12 @@
 {
-  "id": "role-00000000-0000-0000-0000-000000000002",
-  "name": "template-staging",
-  "username": "sanitized_staging_user_def456",
-  "plain_text": "SANITIZED_STAGING_PASSWORD_uvw321",
-  "connection_strings": {
-    "general": "postgresql://sanitized_staging_user_def456:SANITIZED_STAGING_PASSWORD_uvw321@aws.connect.psdb.cloud:5432/postgres"
+  "status": 200,
+  "body": {
+    "id": "role-00000000-0000-0000-0000-000000000002",
+    "name": "template-staging",
+    "username": "sanitized_staging_user_def456",
+    "plain_text": "SANITIZED_STAGING_PASSWORD_uvw321",
+    "connection_strings": {
+      "general": "postgresql://sanitized_staging_user_def456:SANITIZED_STAGING_PASSWORD_uvw321@aws.connect.psdb.cloud:5432/postgres"
+    }
   }
 }

@@ -1,1 +1,7 @@
-["pscale_tkid_from_vcr", "pscale_tk_from_vcr"]
+{
+  "status": 200,
+  "body": [
+    "pscale_tkid_from_vcr",
+    "pscale_tk_from_vcr"
+  ]
+}

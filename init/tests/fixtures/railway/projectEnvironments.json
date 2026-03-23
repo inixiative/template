@@ -1,10 +1,13 @@
-[
-  {
-    "id": "env-prod-123",
-    "name": "prod"
-  },
-  {
-    "id": "env-staging-123",
-    "name": "staging"
-  }
-]
+{
+  "status": 200,
+  "body": [
+    {
+      "id": "env-prod-123",
+      "name": "prod"
+    },
+    {
+      "id": "env-staging-123",
+      "name": "staging"
+    }
+  ]
+}

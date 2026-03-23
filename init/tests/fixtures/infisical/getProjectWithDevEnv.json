@@ -1,15 +1,18 @@
 {
-  "workspace": {
-    "slug": "template",
-    "environments": [
-      {
-        "slug": "dev",
-        "id": "env-dev-123"
-      },
-      {
-        "slug": "root",
-        "id": "env-root-123"
-      }
-    ]
+  "status": 200,
+  "body": {
+    "workspace": {
+      "slug": "template",
+      "environments": [
+        {
+          "slug": "dev",
+          "id": "env-dev-123"
+        },
+        {
+          "slug": "root",
+          "id": "env-root-123"
+        }
+      ]
+    }
   }
 }

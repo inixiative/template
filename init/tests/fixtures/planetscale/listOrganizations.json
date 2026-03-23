@@ -1,1 +1,13 @@
-[{ "name": "test-org", "slug": "test-org" }, { "name": "personal", "slug": "personal" }]
+{
+  "status": 200,
+  "body": [
+    {
+      "name": "test-org",
+      "slug": "test-org"
+    },
+    {
+      "name": "personal",
+      "slug": "personal"
+    }
+  ]
+}

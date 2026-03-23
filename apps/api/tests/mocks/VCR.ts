@@ -1,145 +1,65 @@
-import { type SanitizeRule, sanitize } from './sanitize';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { redact } from './sanitize';
 
-type VCROptions = {
-  /** Fixture name for auto-recording (e.g., 'anthropic/chatCompletion') */
-  fixtureName?: string;
-  /** Extra sanitize rules beyond defaults */
-  sanitizeRules?: SanitizeRule[];
+const FIXTURES_DIR = join(import.meta.dir, '..', 'fixtures');
+
+/**
+ * HTTP-style fixture — mirrors what a real HTTP response looks like.
+ * The caller (mock API client) decides whether to throw based on status,
+ * exactly as the real client would.
+ */
+export type Fixture<T = unknown> = {
+  status: number;
+  body: T | null;
+  headers?: Record<string, string>;
 };
 
 /**
- * VCR (Video Cassette Recorder) - Queue-based response manager
+ * VCR — file-based HTTP fixture manager.
  *
- * Three modes:
- * 1. **Playback** — pre-loaded fixtures are popped FIFO
- * 2. **Error injection** — queue Error instances for unhappy path testing
- * 3. **Auto-record** — when queue is empty and a fallback is provided,
- *    calls the real function, sanitizes the response, saves a fixture,
- *    and returns the sanitized result.
+ * Returns a Fixture<T> (status + body + headers) on every call.
+ * The caller is responsible for treating 4xx/5xx as errors,
+ * mirroring how the real HTTP client behaves.
+ *
+ * - Fixture file exists → return it (no real call)
+ * - No fixture file    → call real function, redact specified fields, save to disk
+ *
+ * Fixture files live at: apps/api/tests/fixtures/<name>.json
  *
  * @example
- * // Playback (happy path)
- * const vcr = new VCR<AnthropicMessage>();
- * vcr.add(loadFixture('anthropic/chatCompletion'));
- * const response = vcr.next(); // fixture data
+ * const vcr = new VCR();
  *
- * // Error injection (unhappy path)
- * vcr.addError(new Error('API rate limit exceeded'));
- * vcr.add(successFixture); // retry succeeds
- *
- * // Auto-record (first run — no fixture exists)
- * const result = await vcr.playOrRecord(
+ * // Happy path — loads from fixtures/anthropic/chatCompletion.json
+ * const fixture = await vcr.call(
+ *   'anthropic/chatCompletion',
  *   () => anthropic.messages.create({ ... }),
- *   { fixtureName: 'anthropic/chatCompletion' },
+ *   { redact: ['id', 'usage'] },
  * );
+ * if (fixture.status >= 400) throw new Error(`Anthropic API error (${fixture.status})`);
+ * return fixture.body;
+ *
+ * // Error path — point at an error fixture file
+ * const fixture = await vcr.call('anthropic/errors/rateLimited', () => anthropic.messages.create({ ... }));
+ * // fixture = { status: 429, body: { message: 'Rate limit exceeded...' } }
  */
-export class VCR<T> {
-  private queue: Array<T | Error> = [];
-  private recorded: T[] = [];
+export class VCR {
+  async call<T>(
+    fixtureName: string,
+    realCall: () => Promise<T>,
+    options: { redact?: string[] } = {},
+  ): Promise<Fixture<T>> {
+    const fixturePath = join(FIXTURES_DIR, `${fixtureName}.json`);
 
-  /**
-   * Replace entire queue with new items
-   */
-  set(items: T[]): void {
-    this.queue = [...items];
-  }
-
-  /**
-   * Append item to end of queue
-   */
-  add(item: T): void {
-    this.queue.push(item);
-  }
-
-  /**
-   * Append an error (will be thrown on next()/get())
-   */
-  addError(error: Error): void {
-    this.queue.push(error);
-  }
-
-  /**
-   * Pop first item from queue (FIFO).
-   * Throws if item is an Error. Returns undefined if empty.
-   */
-  get(): T | undefined {
-    const item = this.queue.shift();
-    if (item instanceof Error) throw item;
-    return item;
-  }
-
-  /**
-   * Alias for get() — matches init VCR naming
-   */
-  next(): T | undefined {
-    return this.get();
-  }
-
-  /**
-   * Pop next item, throwing if queue is empty.
-   * Use when the call MUST have a fixture response.
-   */
-  require(): T {
-    if (this.queue.length === 0) {
-      throw new Error('VCR queue exhausted — missing fixture data');
-    }
-    const item = this.queue.shift()!;
-    if (item instanceof Error) throw item;
-    return item;
-  }
-
-  /**
-   * Play from queue if available, otherwise call the real function,
-   * sanitize the result, optionally save it as a fixture, and return it.
-   *
-   * On first run (no fixture), makes the real API call and creates the fixture.
-   * On subsequent runs, plays back from the pre-loaded queue.
-   */
-  async playOrRecord(realCall: () => Promise<T>, options: VCROptions = {}): Promise<T> {
-    // If queue has items, play back
-    if (this.queue.length > 0) {
-      return this.require();
+    if (existsSync(fixturePath)) {
+      return JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
     }
 
-    // Queue empty — make the real call and record
+    // No fixture — call real function, redact specified fields, write, return
     const raw = await realCall();
-    const sanitized = sanitize(raw, options.sanitizeRules);
-
-    this.recorded.push(sanitized);
-
-    // Auto-save fixture if name provided
-    if (options.fixtureName) {
-      const { recordFixture } = await import('./sanitize');
-      recordFixture(options.fixtureName, raw, options.sanitizeRules);
-    }
-
-    return sanitized;
-  }
-
-  /** Get all items recorded via playOrRecord (for assertions) */
-  getRecorded(): T[] {
-    return [...this.recorded];
-  }
-
-  /**
-   * Empty the queue
-   */
-  clear(): void {
-    this.queue = [];
-    this.recorded = [];
-  }
-
-  /**
-   * Check if queue has items
-   */
-  isEmpty(): boolean {
-    return this.queue.length === 0;
-  }
-
-  /**
-   * Get number of items in queue
-   */
-  size(): number {
-    return this.queue.length;
+    const fixture: Fixture<T> = { status: 200, body: redact(raw, options.redact ?? []) };
+    mkdirSync(dirname(fixturePath), { recursive: true });
+    writeFileSync(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+    return fixture;
   }
 }
