@@ -13,13 +13,12 @@ import {
   spaceSentManyInquiriesQueryKey,
 } from '@template/ui/apiClient';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { makeContextQueries, type QuerySlot } from '@template/ui/lib/makeContextQueries';
+import { makeContextQueries } from '@template/ui/lib/makeContextQueries';
 
-type InquiryQueries = { sent: QuerySlot; received: QuerySlot };
 type InquiryQueryParams = { query?: Record<string, unknown> };
 
-export const inquiryContextQueries = makeContextQueries<InquiryQueries, InquiryQueryParams>({
-  user: (_args, params): InquiryQueries => ({
+export const inquiryContextQueries = makeContextQueries<InquiryQueryParams>()({
+  user: (_args, params) => ({
     sent: {
       queryKey: meSentManyInquiriesQueryKey({ query: params?.query }),
       queryFn: apiQuery((opts: Parameters<typeof meSentManyInquiries>[0]) => meSentManyInquiries(opts)),
@@ -29,7 +28,7 @@ export const inquiryContextQueries = makeContextQueries<InquiryQueries, InquiryQ
       queryFn: apiQuery((opts: Parameters<typeof meReceivedManyInquiries>[0]) => meReceivedManyInquiries(opts)),
     },
   }),
-  organization: ({ organization }, params): InquiryQueries => ({
+  organization: ({ organization }, params) => ({
     sent: {
       queryKey: organizationSentManyInquiriesQueryKey({ path: { id: organization.id }, query: params?.query }),
       queryFn: apiQuery((opts: Parameters<typeof organizationSentManyInquiries>[0]) =>
@@ -43,7 +42,7 @@ export const inquiryContextQueries = makeContextQueries<InquiryQueries, InquiryQ
       ),
     },
   }),
-  space: ({ space }, params): InquiryQueries => ({
+  space: ({ space }, params) => ({
     sent: {
       queryKey: spaceSentManyInquiriesQueryKey({ path: { id: space.id }, query: params?.query }),
       queryFn: apiQuery((opts: Parameters<typeof spaceSentManyInquiries>[0]) =>

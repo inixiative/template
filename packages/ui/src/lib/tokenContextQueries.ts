@@ -12,12 +12,10 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { type MutationSlot, makeContextQueries, type QuerySlot } from '@template/ui/lib/makeContextQueries';
+import { makeContextQueries } from '@template/ui/lib/makeContextQueries';
 
-type TokenQueries = { readMany: QuerySlot; create: MutationSlot; delete: MutationSlot };
-
-export const tokenContextQueries = makeContextQueries({
-  user: (): TokenQueries => ({
+export const tokenContextQueries = makeContextQueries()({
+  user: () => ({
     readMany: {
       queryKey: meReadManyTokensQueryKey(),
       queryFn: apiQuery((opts: Parameters<typeof meReadManyTokens>[0]) => meReadManyTokens(opts)),
@@ -29,7 +27,7 @@ export const tokenContextQueries = makeContextQueries({
       mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
     },
   }),
-  organization: ({ organization }): TokenQueries => ({
+  organization: ({ organization }) => ({
     readMany: {
       queryKey: organizationReadManyTokensQueryKey({ path: { id: organization.id } }),
       queryFn: apiQuery((opts: Parameters<typeof organizationReadManyTokens>[0]) =>
@@ -45,7 +43,7 @@ export const tokenContextQueries = makeContextQueries({
       mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
     },
   }),
-  space: ({ space }): TokenQueries => ({
+  space: ({ space }) => ({
     readMany: {
       queryKey: spaceReadManyTokensQueryKey({ path: { id: space.id } }),
       queryFn: apiQuery((opts: Parameters<typeof spaceReadManyTokens>[0]) =>
