@@ -81,6 +81,32 @@ Testing-specific pattern discovery:
 - Apps: `/apps/web`, `/apps/admin`, `/apps/superadmin`, `/apps/api`
 - Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/permissions`, `/packages/email`
 - Docs source of truth: `/docs/claude/*`
+- Worktree scripts: `/scripts/worktree/`
+
+### Worktrees (Isolated Feature Work)
+
+Use worktrees for isolated feature development with dedicated ports, databases, and Redis. **Always use these scripts — never manually `git worktree add`.**
+
+```bash
+# Create a worktree (forks new-branch from base-branch)
+bun run worktree:create <base-branch> <new-branch>
+# Example: bun run worktree:create main feature/my-feature
+# Creates .worktrees/feature-my-feature/ with slot-specific env
+
+# List all worktrees with their slots and ports
+bun run worktree:list
+
+# Tear down a worktree (drops DBs, kills ports, removes worktree)
+bun run worktree:destroy <name>
+# Example: bun run worktree:destroy feature-my-feature
+```
+
+Each worktree gets its own **slot (1-9)** providing full isolation:
+- **Ports**: `8N00` (API), `3N00` (Web), `3N01` (Admin), `3N02` (Superadmin) where N=slot
+- **PostgreSQL**: `${PROJECT_NAME}_wt_N` (local) / `${PROJECT_NAME}_test_wt_N` (test) — same Docker container
+- **Redis**: DB number N — same Docker container
+
+Tests and local dev just work because `create.sh` generates `.env.local` and `.env.test` with the right values.
 
 ## 6. Core Engineering Standards
 

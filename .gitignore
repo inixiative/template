@@ -145,6 +145,9 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Worktrees
+.worktrees/
+
 # Project-specific Claude instructions
 CLAUDE.local.md
 

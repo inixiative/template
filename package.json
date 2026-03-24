@@ -51,7 +51,11 @@
     "lint:imports": "./scripts/lint/check-import-aliases.sh",
     "lint:generated": "./scripts/lint/check-generated-files.sh",
     "lint:fix": "biome check --write . && bun run lint:postBiome",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "kill-ports": "bash scripts/kill-local-ports.sh",
+    "worktree:create": "bash scripts/worktree/create.sh",
+    "worktree:destroy": "bash scripts/worktree/destroy.sh",
+    "worktree:list": "bash scripts/worktree/list.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
