@@ -12,63 +12,61 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { type MutationSlot, makeContextQueries, type QuerySlot } from '@template/ui/lib/makeContextQueries';
+import { makeContextQueries, mutation, query } from '@template/ui/lib/makeContextQueries';
 
-type WebhookQueries = { readMany: QuerySlot; create: MutationSlot; delete: MutationSlot };
-
-export const webhookContextQueries = makeContextQueries({
-  user: (): WebhookQueries => ({
-    readMany: {
+export const webhookContextQueries = makeContextQueries()({
+  user: () => ({
+    readMany: query({
       queryKey: meReadManyWebhookSubscriptionsQueryKey(),
       queryFn: apiQuery((opts: Parameters<typeof meReadManyWebhookSubscriptions>[0]) =>
         meReadManyWebhookSubscriptions(opts),
       ),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) =>
         meCreateWebhookSubscription(opts),
       ),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof webhookSubscriptionDelete>[0]) =>
         webhookSubscriptionDelete(opts),
       ),
-    },
+    }),
   }),
-  organization: ({ organization }): WebhookQueries => ({
-    readMany: {
+  organization: ({ organization }) => ({
+    readMany: query({
       queryKey: organizationReadManyWebhookSubscriptionsQueryKey({ path: { id: organization.id } }),
       queryFn: apiQuery((opts: Parameters<typeof organizationReadManyWebhookSubscriptions>[0]) =>
         organizationReadManyWebhookSubscriptions({ ...opts, path: { id: organization.id } }),
       ),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) =>
         organizationCreateWebhookSubscription({ ...opts, path: { id: organization.id } }),
       ),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof webhookSubscriptionDelete>[0]) =>
         webhookSubscriptionDelete(opts),
       ),
-    },
+    }),
   }),
-  space: ({ space }): WebhookQueries => ({
-    readMany: {
+  space: ({ space }) => ({
+    readMany: query({
       queryKey: spaceReadManyWebhookSubscriptionsQueryKey({ path: { id: space.id } }),
       queryFn: apiQuery((opts: Parameters<typeof spaceReadManyWebhookSubscriptions>[0]) =>
         spaceReadManyWebhookSubscriptions({ ...opts, path: { id: space.id } }),
       ),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateWebhookSubscription>[0]) =>
         spaceCreateWebhookSubscription({ ...opts, path: { id: space.id } }),
       ),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof webhookSubscriptionDelete>[0]) =>
         webhookSubscriptionDelete(opts),
       ),
-    },
+    }),
   }),
 });

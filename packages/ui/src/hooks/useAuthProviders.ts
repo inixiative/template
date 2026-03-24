@@ -6,7 +6,7 @@ import {
   type OrganizationReadAuthProviderResponses,
   organizationReadAuthProvider,
 } from '@template/ui/apiClient';
-import { apiQuery } from '@template/ui/lib';
+import { apiQuery } from '@template/ui/lib/apiQuery';
 
 type PlatformProvider = AuthProviderReadManyResponses[200]['data'][number];
 type OrgProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];

@@ -3,7 +3,6 @@ import type {
   MeReadManyWebhookSubscriptionsResponse,
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
-  WebhookSubscriptionDeleteData,
 } from '@template/ui/apiClient';
 import { Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
@@ -34,7 +33,7 @@ export const WebhooksPage = () => {
   const deleteMutation = useOptimisticMutation({
     mutationFn: webhookQueries.delete.mutationFn,
     targets: [
-      createOptimisticListTarget<WebhookSubscription, Omit<WebhookSubscriptionDeleteData, 'url'>>({
+      createOptimisticListTarget<WebhookSubscription>({
         queryKey: webhookQueries.readMany.queryKey,
         operation: 'delete',
       }),
@@ -44,7 +43,7 @@ export const WebhooksPage = () => {
   const createMutation = useOptimisticMutation({
     mutationFn: webhookQueries.create.mutationFn,
     targets: [
-      createOptimisticListTarget<WebhookSubscription, Omit<MeCreateWebhookSubscriptionData, 'url'>>({
+      createOptimisticListTarget<WebhookSubscription>({
         queryKey: webhookQueries.readMany.queryKey,
         operation: 'create',
       }),

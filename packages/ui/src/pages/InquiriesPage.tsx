@@ -2,7 +2,10 @@ import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClien
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
-import { inquiryContextQueries } from '@template/ui/lib/inquiries/contextQueries';
+import {
+  receivedInquiryContextQueries,
+  sentInquiryContextQueries,
+} from '@template/ui/lib/inquiries/contextQueries';
 import {
   INQUIRY_STATUS_COLORS,
   INQUIRY_TYPE_LABELS,
@@ -58,15 +61,15 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   });
   const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
   const hasSearchFields = Object.keys(searchFields).length > 0;
+  const queryParams = hasSearchFields ? { query: { searchFields } } : undefined;
 
-  const inquiryQueries = inquiryContextQueries(context, hasSearchFields ? { query: { searchFields } } : undefined);
-  const querySlot = direction === 'sent' ? inquiryQueries.sent : inquiryQueries.received;
+  const sentSlot = sentInquiryContextQueries(context, queryParams);
+  const receivedSlot = receivedInquiryContextQueries(context, queryParams);
 
-  const { data } = useQuery({
-    queryKey: querySlot.queryKey,
-    queryFn: querySlot.queryFn,
-  });
+  const sentQuery = useQuery({ ...sentSlot, enabled: direction === 'sent' });
+  const receivedQuery = useQuery({ ...receivedSlot, enabled: direction === 'received' });
 
+  const data = direction === 'sent' ? sentQuery.data : receivedQuery.data;
   const inquiries = (data?.data ?? []) as Row[];
 
   // Derive page title: registry label for single-type filter, else prop title, else default

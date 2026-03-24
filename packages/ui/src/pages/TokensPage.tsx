@@ -3,7 +3,6 @@ import type {
   MeReadManyTokensResponse,
   OrganizationReadManyTokensResponse,
   SpaceReadManyTokensResponse,
-  TokenDeleteData,
 } from '@template/ui/apiClient';
 import { Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
@@ -35,7 +34,7 @@ export const TokensPage = () => {
   const deleteMutation = useOptimisticMutation({
     mutationFn: tokenQueries.delete.mutationFn,
     targets: [
-      createOptimisticListTarget<Token, Omit<TokenDeleteData, 'url'>>({
+      createOptimisticListTarget<Token>({
         queryKey: tokenQueries.readMany.queryKey,
         operation: 'delete',
       }),
@@ -45,7 +44,7 @@ export const TokensPage = () => {
   const createMutation = useOptimisticMutation({
     mutationFn: tokenQueries.create.mutationFn,
     targets: [
-      createOptimisticListTarget<Token, Omit<MeCreateTokenData, 'url'>>({
+      createOptimisticListTarget<Token>({
         queryKey: tokenQueries.readMany.queryKey,
         operation: 'create',
       }),
