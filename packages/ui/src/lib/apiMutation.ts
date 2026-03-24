@@ -1,27 +1,26 @@
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import type { SdkFunction } from '@template/ui/lib/sdkTypes';
 import { useAppStore } from '@template/ui/store';
-
-/**
- * Extracts the parameter type from a function
- */
-// biome-ignore lint/suspicious/noExplicitAny: conditional type infer — any required to extract param type from any function signature
-type FunctionParams<TFn> = TFn extends (params: infer P) => any ? P : never;
 
 /**
  * Store-aware API wrapper for mutations.
  * Automatically reads token and spoofUserEmail from the store.
  * Use this for mutations (create, update, delete operations).
  *
- * Generic over the SDK function type to preserve full type safety.
+ * Generic over the SDK function type to preserve full type safety —
+ * ReturnType<TFn> captures the exact conditional return type from hey-api,
+ * and Parameters<TFn>[0] preserves the specific parameter shape.
  */
-// biome-ignore lint/suspicious/noExplicitAny: generic constraint — any required to match any SDK function signature
-export const apiMutation = <TFn extends (opts: any) => Promise<any>>(fn: TFn) => {
-  return async (vars?: FunctionParams<TFn>) => {
+export const apiMutation = <TFn extends SdkFunction>(fn: TFn) => {
+  return async (vars?: Parameters<TFn>[0]) => {
     const { auth } = useAppStore.getState();
 
-    const fetcher = apiFetchInternal<Awaited<ReturnType<TFn>>, FunctionParams<TFn>>(fn, {
-      spoofUserEmail: auth.spoofUserEmail,
-    });
+    const fetcher = apiFetchInternal<Awaited<ReturnType<TFn>>, Parameters<TFn>[0]>(
+      fn as (opts: Parameters<TFn>[0]) => Promise<Awaited<ReturnType<TFn>>>,
+      {
+        spoofUserEmail: auth.spoofUserEmail,
+      },
+    );
 
     if (vars === undefined) {
       return fetcher();
