@@ -12,7 +12,6 @@ import {
   mergeInquiryFilters,
 } from '@template/ui/lib/inquiries/queryKeys';
 import { getInquiryInterface } from '@template/ui/lib/inquiries/registry';
-import type { QuerySlot } from '@template/ui/lib/makeContextQueries';
 import { useAppStore } from '@template/ui/store';
 import { useMemo, useState } from 'react';
 
@@ -61,12 +60,9 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   const hasSearchFields = Object.keys(searchFields).length > 0;
 
   const inquiryQueries = inquiryContextQueries(context, hasSearchFields ? { query: { searchFields } } : undefined);
-  const querySlot = (direction === 'sent' ? inquiryQueries.sent : inquiryQueries.received) as QuerySlot;
+  const { queryKey, queryFn } = inquiryQueries[direction];
 
-  const { data } = useQuery({
-    queryKey: querySlot.queryKey,
-    queryFn: querySlot.queryFn,
-  });
+  const { data } = useQuery({ queryKey, queryFn });
 
   const inquiries = ((data as { data?: Row[] } | undefined)?.data ?? []) as Row[];
 
