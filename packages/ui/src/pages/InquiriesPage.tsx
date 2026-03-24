@@ -61,15 +61,14 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   const hasSearchFields = Object.keys(searchFields).length > 0;
 
   const inquiryQueries = inquiryContextQueries(context, hasSearchFields ? { query: { searchFields } } : undefined);
-  // Widen to QuerySlot — sent/received have different item types but the page handles both via Row
-  const querySlot: QuerySlot = direction === 'sent' ? inquiryQueries.sent : inquiryQueries.received;
+  const querySlot = (direction === 'sent' ? inquiryQueries.sent : inquiryQueries.received) as QuerySlot;
 
   const { data } = useQuery({
     queryKey: querySlot.queryKey,
     queryFn: querySlot.queryFn,
   });
 
-  const inquiries = ((data as { data?: Row[] })?.data ?? []) as Row[];
+  const inquiries = ((data as { data?: Row[] } | undefined)?.data ?? []) as Row[];
 
   // Derive page title: registry label for single-type filter, else prop title, else default
   const singleType = filters?.types?.length === 1 ? filters.types[0] : undefined;

@@ -17,68 +17,41 @@ export type MutationSlot<TVars = unknown, TData = unknown> = {
 
 export type Slot = QuerySlot | MutationSlot;
 
-/** Extracts the return type from a function type */
-// biome-ignore lint/suspicious/noExplicitAny: conditional type inference requires any for the args position
-type FnReturn<T> = T extends (...args: any[]) => infer R ? R : never;
+/** Normalizes a query slot — widens queryKey so T unifies across scopes */
+export const query = <TData>(slot: QuerySlot<TData>): QuerySlot<TData> => slot;
 
-/** Resolves the return type for a specific scope key in the map */
-type ScopeReturn<TMap, K extends string> = K extends keyof TMap ? FnReturn<TMap[K]> : never;
+/** Normalizes a mutation slot */
+export const mutation = <TVars, TData>(slot: MutationSlot<TVars, TData>): MutationSlot<TVars, TData> => slot;
 
-/**
- * Distributes over TType to produce per-context return types.
- * When TType is a union (e.g. 'user' | 'organization'), the conditional
- * distributes and produces the union of matching scope return types.
- * When narrowed to a single literal, resolves to that scope's exact type.
- */
-type ContextResult<TMap, TType extends string> = TType extends 'public'
-  ? ScopeReturn<TMap, 'public'>
-  : TType extends 'user'
-    ? ScopeReturn<TMap, 'user'>
-    : TType extends 'organization'
-      ? ScopeReturn<TMap, 'organization'>
-      : TType extends 'space'
-        ? ScopeReturn<TMap, 'space'>
-        : never;
-
-type ContextScopeMap<P = undefined> = {
-  public?: (args: undefined, params?: P) => Record<string, unknown>;
-  user?: (args: { user: User }, params?: P) => Record<string, unknown>;
-  organization?: (args: { organization: Organization }, params?: P) => Record<string, unknown>;
-  space?: (args: { organization: Organization; space: Space }, params?: P) => Record<string, unknown>;
+type ContextScopeMap<T, P> = {
+  public?: (args: undefined, params?: P) => T;
+  user?: (args: { user: User }, params?: P) => T;
+  organization?: (args: { organization: Organization }, params?: P) => T;
+  space?: (args: { organization: Organization; space: Space }, params?: P) => T;
 };
 
 /**
- * Creates context-aware query/mutation factories that dispatch to
- * the correct scope (user/org/space) based on the tenant context.
+ * Context-aware query/mutation factory. Dispatches to the correct scope
+ * (user/org/space) at runtime. All scopes must return the same shape T.
  *
- * The return type narrows per-context via distributive conditional types:
- * - Full TenantContext → union of all scope return types
- * - Narrowed context (e.g. after `if (context.type === 'user')`) → that scope's exact type
- *
- * Use the curried form to specify params type: `makeContextQueries<ParamsType>()({...})`
+ * Curried: `makeContextQueries<ParamsType>()({...})` or `makeContextQueries()({...})`
  */
 export const makeContextQueries =
   <P = undefined>() =>
-  <TMap extends ContextScopeMap<P>>(scopeMap: TMap) =>
-  <TContext extends TenantContext>(context: TContext, params?: P): ContextResult<TMap, TContext['type']> => {
+  <T>(scopeMap: ContextScopeMap<T, P>) =>
+  (context: TenantContext, params?: P): T => {
     if (context.type === 'public' && scopeMap.public) {
-      return scopeMap.public(undefined, params) as ContextResult<TMap, TContext['type']>;
+      return scopeMap.public(undefined, params);
     }
     if (context.type === 'space' && context.space && scopeMap.space) {
-      return scopeMap.space({ organization: context.organization!, space: context.space }, params) as ContextResult<
-        TMap,
-        TContext['type']
-      >;
+      return scopeMap.space({ organization: context.organization!, space: context.space }, params);
     }
     if (context.type === 'organization' && context.organization && scopeMap.organization) {
-      return scopeMap.organization({ organization: context.organization }, params) as ContextResult<
-        TMap,
-        TContext['type']
-      >;
+      return scopeMap.organization({ organization: context.organization }, params);
     }
     if (context.type === 'user' && scopeMap.user) {
       const user = useAppStore.getState().auth.user;
-      if (user) return scopeMap.user({ user }, params) as ContextResult<TMap, TContext['type']>;
+      if (user) return scopeMap.user({ user }, params);
     }
     throw new Error(`No scope registered for context: ${context.type}`);
   };

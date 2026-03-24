@@ -12,51 +12,51 @@ import {
 } from '@template/ui/apiClient';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
-import { makeContextQueries } from '@template/ui/lib/makeContextQueries';
+import { makeContextQueries, mutation, query } from '@template/ui/lib/makeContextQueries';
 
 export const tokenContextQueries = makeContextQueries()({
   user: () => ({
-    readMany: {
+    readMany: query({
       queryKey: meReadManyTokensQueryKey(),
       queryFn: apiQuery((opts: Parameters<typeof meReadManyTokens>[0]) => meReadManyTokens(opts)),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateToken>[0]) => meCreateToken(opts)),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
-    },
+    }),
   }),
   organization: ({ organization }) => ({
-    readMany: {
+    readMany: query({
       queryKey: organizationReadManyTokensQueryKey({ path: { id: organization.id } }),
       queryFn: apiQuery((opts: Parameters<typeof organizationReadManyTokens>[0]) =>
         organizationReadManyTokens({ ...opts, path: { id: organization.id } }),
       ),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateToken>[0]) =>
         organizationCreateToken({ ...opts, path: { id: organization.id } }),
       ),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
-    },
+    }),
   }),
   space: ({ space }) => ({
-    readMany: {
+    readMany: query({
       queryKey: spaceReadManyTokensQueryKey({ path: { id: space.id } }),
       queryFn: apiQuery((opts: Parameters<typeof spaceReadManyTokens>[0]) =>
         spaceReadManyTokens({ ...opts, path: { id: space.id } }),
       ),
-    },
-    create: {
+    }),
+    create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateToken>[0]) =>
         spaceCreateToken({ ...opts, path: { id: space.id } }),
       ),
-    },
-    delete: {
+    }),
+    delete: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof tokenDelete>[0]) => tokenDelete(opts)),
-    },
+    }),
   }),
 });
