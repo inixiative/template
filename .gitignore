@@ -177,8 +177,5 @@ apps/web/app.config.timestamp_*.js
 # Init script scratch files
 scripts/init/test-*.ts
 
-# Agent skills (installed via symlink, not stored in repo)
-.agents/
-.claude/skills/
-.cursor/skills/
-.codex/skills/
+# External agent skills cache (installed via symlink by sync.sh)
+.agents/skills/.cache/

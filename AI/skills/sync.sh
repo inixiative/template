@@ -1,6 +1,7 @@
 #!/bin/bash
 # Syncs external agent skills declared in manifest.json.
-# Skills are installed via symlink so they stay out of the repo.
+# External skills go to .agents/skills/.cache/ (gitignored).
+# Project-level skills in .claude/skills/ etc. are left alone.
 #
 # Usage:
 #   bash AI/skills/sync.sh          # install skills-cli skills
@@ -10,6 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MANIFEST="$SCRIPT_DIR/manifest.json"
+CACHE_DIR="$ROOT_DIR/.agents/skills/.cache"
 
 if ! command -v bun &>/dev/null; then
   echo "Error: bun is required. Install from https://bun.sh" >&2
@@ -20,6 +22,8 @@ if [ ! -f "$MANIFEST" ]; then
   echo "Error: manifest.json not found at $MANIFEST" >&2
   exit 1
 fi
+
+mkdir -p "$CACHE_DIR"
 
 echo "Syncing agent skills from manifest..."
 
