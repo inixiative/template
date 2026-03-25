@@ -32,8 +32,19 @@ Promote local → team only after a finding is verified (working code, confirmed
 
 ## Skills
 
-Stored in `.claude/commands/`. Invoke with `/skill-name`.
+Custom skills stored in `.claude/commands/`. Invoke with `/skill-name`.
 See `AI/ENTRYPOINT.md` §10 for doc routing before implementing.
+
+### External skills
+
+Declared in `AI/skills/manifest.json`. Install with `bun run setup:skills`.
+
+- **superpowers** (plugin) — structured workflow: brainstorm → plan → TDD → debug
+- **react-best-practices** (skills-cli) — 40+ React performance rules
+- **web-design-guidelines** (skills-cli) — 100+ accessibility/UX rules
+- **composition-patterns** (skills-cli) — React component design patterns
+
+Plugin skills require interactive install: `/plugin install superpowers@claude-plugins-official`
 
 ## Handoff to Codex
 

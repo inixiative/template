@@ -15,6 +15,7 @@
     "init": "NODE_ENV=development bun --env-file=.env.init scripts/init/index.tsx",
     "init:agent": "NODE_ENV=development bun --env-file=.env.init scripts/init/agent.ts",
     "setup": "./scripts/setup/setup.sh",
+    "setup:skills": "bash AI/skills/sync.sh",
     "sync-env": "./scripts/setup/sync-env.sh",
     "with": "./scripts/deployment/with-env.sh",
     "local": "./scripts/local.sh",

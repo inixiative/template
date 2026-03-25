@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "External agent skills to install. Run `bash AI/skills/sync.sh` or `bun run setup:skills`.",
+  "skills": [
+    {
+      "name": "superpowers",
+      "source": "obra/superpowers",
+      "method": "plugin",
+      "description": "Structured dev workflow: brainstorm, plan, TDD, systematic debugging"
+    },
+    {
+      "name": "react-best-practices",
+      "source": "vercel-labs/agent-skills",
+      "method": "skills-cli",
+      "description": "40+ React performance optimization rules"
+    },
+    {
+      "name": "web-design-guidelines",
+      "source": "vercel-labs/agent-skills",
+      "method": "skills-cli",
+      "description": "100+ accessibility, UX, and performance audit rules"
+    },
+    {
+      "name": "composition-patterns",
+      "source": "vercel-labs/agent-skills",
+      "method": "skills-cli",
+      "description": "React component design and prop management patterns"
+    }
+  ]
+}
