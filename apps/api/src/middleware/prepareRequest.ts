@@ -4,6 +4,7 @@ import { createPermissions } from '@template/permissions';
 import { logScope } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { emailClient } from '#/lib/email';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
@@ -23,6 +24,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   c.set('db', batchContext?.txn ?? db);
   c.set('txn', batchContext?.txn);
+  c.set('emailClient', emailClient);
   c.set('requestId', requestId);
   c.set('permix', createPermissions());
 

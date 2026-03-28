@@ -8,6 +8,7 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
+import type { EmailClient } from '@template/email/client';
 import type { Permix } from '@template/permissions';
 import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -15,6 +16,7 @@ import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
   app: Hono<AppEnv>;
+  emailClient: EmailClient;
   db: Db;
   txn: Prisma.TransactionClient | undefined;
   user: User | null;

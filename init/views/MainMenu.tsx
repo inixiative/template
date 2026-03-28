@@ -280,6 +280,24 @@ const getLaunchStatus = (config: ProjectConfig): MenuItem['status'] => {
   return config.launched ? 'completed' : 'pending';
 };
 
+const getEmailStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+  const { progress, error } = config.email;
+  const completed = Object.values(progress).filter((v) => v === true).length;
+  const total = Object.keys(progress).length;
+
+  const details: string[] = [];
+  if (progress.storeProdApiKey && progress.storeStagingApiKey) details.push('API key stored in Infisical');
+  if (progress.storeProdFromAddress && progress.storeStagingFromAddress)
+    details.push('From address stored in Infisical');
+  if (progress.addDomain) details.push('Domain registered with Resend');
+  if (progress.confirmDns) details.push('DNS records confirmed');
+  if (error) details.push(`Error: ${error}`);
+
+  if (completed === 0) return { status: 'pending', details: [] };
+  if (completed < total) return { status: 'incomplete', details };
+  return { status: 'completed', details };
+};
+
 const DEFAULT_ITEMS: MenuItem[] = [
   { label: '1. Project Configuration', value: 'project-config', status: 'pending' },
   { label: '2. Infisical Setup', value: 'infisical', status: 'pending' },
@@ -318,6 +336,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const planetscaleStatus = getPlanetScaleStatus(cfg);
       const railwayStatus = getRailwayStatus(cfg);
       const vercelStatus = getVercelStatus(cfg);
+      const emailStatus = getEmailStatus(cfg);
       const launchStatus = getLaunchStatus(cfg);
 
       const updatedItems = [
@@ -349,7 +368,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           status: vercelStatus.status,
           progressDetails: vercelStatus.details,
         },
-        { label: '6. Resend Setup', value: 'resend', status: 'pending' },
+        {
+          label: '6. Resend Setup',
+          value: 'resend',
+          status: emailStatus.status,
+          progressDetails: emailStatus.details,
+        },
         { label: '7. Optional Integrations', value: 'integrations', status: 'pending' },
         { label: '8. DNS Configuration', value: 'dns', status: 'pending' },
         { label: '9. Database Seeding', value: 'seeding', status: 'pending' },

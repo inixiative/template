@@ -153,6 +153,21 @@ export type ProjectConfig = {
     };
     error: string;
   };
+  email: {
+    provider: 'resend' | 'console';
+    fromAddress: string;
+    domainId: string;
+    configProjectName: string;
+    progress: {
+      storeProdApiKey: boolean;
+      storeStagingApiKey: boolean;
+      storeProdFromAddress: boolean;
+      storeStagingFromAddress: boolean;
+      addDomain: boolean;
+      confirmDns: boolean;
+    };
+    error: string;
+  };
   vercel: {
     teamId: string;
     teamName: string;
@@ -199,6 +214,29 @@ export type ProjectConfig = {
       deployProduction: boolean;
     };
     error: string;
+  };
+};
+
+const defaultEmailProgress: ProjectConfig['email']['progress'] = {
+  storeProdApiKey: false,
+  storeStagingApiKey: false,
+  storeProdFromAddress: false,
+  storeStagingFromAddress: false,
+  addDomain: false,
+  confirmDns: false,
+};
+
+const normalizeEmailProgress = (
+  progress: Partial<Record<string, boolean>> | undefined,
+): ProjectConfig['email']['progress'] => {
+  const raw = progress ?? {};
+  return {
+    storeProdApiKey: raw.storeProdApiKey === true,
+    storeStagingApiKey: raw.storeStagingApiKey === true,
+    storeProdFromAddress: raw.storeProdFromAddress === true,
+    storeStagingFromAddress: raw.storeStagingFromAddress === true,
+    addDomain: raw.addDomain === true,
+    confirmDns: raw.confirmDns === true,
   };
 };
 
@@ -567,6 +605,14 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
 
     return {
       ...config,
+      email: {
+        provider: config.email?.provider ?? 'resend',
+        fromAddress: config.email?.fromAddress ?? '',
+        domainId: config.email?.domainId ?? '',
+        configProjectName: config.email?.configProjectName ?? '',
+        progress: normalizeEmailProgress(config.email?.progress),
+        error: config.email?.error ?? '',
+      },
       infisical: {
         ...config.infisical,
         progress: normalizeInfisicalProgress(config.infisical?.progress),
@@ -612,6 +658,13 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
 
   const normalizedConfig: ProjectConfig = {
     ...config,
+    email: {
+      ...config.email,
+      progress: {
+        ...defaultEmailProgress,
+        ...config.email.progress,
+      },
+    },
     infisical: {
       ...config.infisical,
       progress: {

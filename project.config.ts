@@ -9,6 +9,21 @@ export const projectConfig = {
       setup: false,
     },
   },
+  email: {
+    provider: 'resend',
+    fromAddress: '',
+    domainId: '',
+    configProjectName: '',
+    progress: {
+      storeProdApiKey: false,
+      storeStagingApiKey: false,
+      storeProdFromAddress: false,
+      storeStagingFromAddress: false,
+      addDomain: false,
+      confirmDns: false,
+    },
+    error: '',
+  },
   infisical: {
     projectId: '',
     organizationId: '',
