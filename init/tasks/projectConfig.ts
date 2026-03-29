@@ -132,6 +132,11 @@ export const renameProject = async (
       'apps/web/tsconfig.json',
       'apps/admin/tsconfig.json',
       'apps/superadmin/tsconfig.json',
+      'packages/db/tsconfig.json',
+      'packages/email/tsconfig.json',
+      'packages/permissions/tsconfig.json',
+      'packages/shared/tsconfig.json',
+      'packages/ui/tsconfig.json',
     ];
 
     for (const path of tsconfigPaths) {
