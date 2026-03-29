@@ -11,7 +11,9 @@
       "@template/permissions": ["../../packages/permissions/src/index.ts"],
       "@template/permissions/*": ["../../packages/permissions/src/*"],
       "@template/shared": ["../../packages/shared/src/index.ts"],
-      "@template/shared/*": ["../../packages/shared/src/*"]
+      "@template/shared/*": ["../../packages/shared/src/*"],
+      "@template/email": ["../../packages/email/src/index.ts"],
+      "@template/email/*": ["../../packages/email/src/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*", "../../packages/db/src/types/**/*"],

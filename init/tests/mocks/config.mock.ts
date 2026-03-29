@@ -1,8 +1,15 @@
-export const projectConfig = {
+import { mock } from 'bun:test';
+import type { ProjectConfig } from '../../utils/getProjectConfig';
+
+const envProjectName = process.env.PROJECT_NAME ?? 'template';
+const envOrganizationName = process.env.ORGANIZATION_NAME ?? process.env.PLANETSCALE_ORG ?? 'test-org';
+
+/** Default test config — override fields as needed */
+const defaultConfig: ProjectConfig = {
   launched: false,
   project: {
-    name: 'template',
-    organization: '',
+    name: envProjectName,
+    organization: envOrganizationName,
     progress: {
       renameOrg: false,
       renameProject: false,
@@ -13,7 +20,7 @@ export const projectConfig = {
     provider: 'resend',
     fromAddress: '',
     domainId: '',
-    configProjectName: '',
+    configProjectName: envProjectName,
     progress: {
       storeProdApiKey: false,
       storeStagingApiKey: false,
@@ -25,11 +32,11 @@ export const projectConfig = {
     error: '',
   },
   infisical: {
-    projectId: '',
-    organizationId: '',
-    organizationSlug: '',
-    projectSlug: '',
-    configProjectName: '',
+    projectId: process.env.INFISICAL_PROJECT_ID ?? 'infisical-proj-id-000',
+    organizationId: process.env.INFISICAL_ORG_ID ?? 'infisical-org-id-000',
+    organizationSlug: envOrganizationName,
+    projectSlug: envProjectName,
+    configProjectName: envProjectName,
     progress: {
       selectOrg: false,
       createProject: false,
@@ -82,11 +89,11 @@ export const projectConfig = {
     error: '',
   },
   planetscale: {
-    organization: '',
-    region: '',
-    database: '',
-    tokenId: '',
-    configProjectName: '',
+    organization: process.env.PLANETSCALE_ORG ?? envOrganizationName,
+    database: envProjectName,
+    region: process.env.PLANETSCALE_REGION ?? 'us-east',
+    tokenId: process.env.PLANETSCALE_TOKEN_ID ?? 'pscale_tkid_SANITIZED_abc123',
+    configProjectName: envProjectName,
     progress: {
       selectOrg: false,
       selectRegion: false,
@@ -109,19 +116,19 @@ export const projectConfig = {
     error: '',
   },
   railway: {
-    projectId: '',
-    workspaceId: '',
-    prodEnvironmentId: '',
-    stagingEnvironmentId: '',
-    prodApiServiceId: '',
-    stagingApiServiceId: '',
-    prodWorkerServiceId: '',
-    stagingWorkerServiceId: '',
-    prodRedisServiceId: '',
-    stagingRedisServiceId: '',
-    prodRedisVolumeId: '',
-    stagingRedisVolumeId: '',
-    configProjectName: '',
+    workspaceId: process.env.RAILWAY_WORKSPACE_ID ?? '',
+    projectId: process.env.RAILWAY_PROJECT_ID ?? '',
+    prodEnvironmentId: process.env.RAILWAY_PROD_ENVIRONMENT_ID ?? '',
+    stagingEnvironmentId: process.env.RAILWAY_STAGING_ENVIRONMENT_ID ?? '',
+    prodApiServiceId: process.env.RAILWAY_PROD_API_SERVICE_ID ?? '',
+    stagingApiServiceId: process.env.RAILWAY_STAGING_API_SERVICE_ID ?? '',
+    prodWorkerServiceId: process.env.RAILWAY_PROD_WORKER_SERVICE_ID ?? '',
+    stagingWorkerServiceId: process.env.RAILWAY_STAGING_WORKER_SERVICE_ID ?? '',
+    prodRedisServiceId: process.env.RAILWAY_PROD_REDIS_SERVICE_ID ?? '',
+    stagingRedisServiceId: process.env.RAILWAY_STAGING_REDIS_SERVICE_ID ?? '',
+    prodRedisVolumeId: process.env.RAILWAY_PROD_REDIS_VOLUME_ID ?? '',
+    stagingRedisVolumeId: process.env.RAILWAY_STAGING_REDIS_VOLUME_ID ?? '',
+    configProjectName: envProjectName,
     progress: {
       selectWorkspace: false,
       storeRailwayToken: false,
@@ -173,13 +180,13 @@ export const projectConfig = {
     error: '',
   },
   vercel: {
-    teamId: '',
-    teamName: '',
+    teamId: process.env.VERCEL_TEAM_ID ?? '',
+    teamName: process.env.VERCEL_TEAM_NAME ?? '',
     connectionId: '',
     webProjectId: '',
     adminProjectId: '',
     superadminProjectId: '',
-    configProjectName: '',
+    configProjectName: envProjectName,
     progress: {
       selectTeam: false,
       promptedForGithub: false,
@@ -221,6 +228,70 @@ export const projectConfig = {
     },
     error: '',
   },
-} as const;
+};
 
-export type ProjectConfig = typeof projectConfig;
+export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
+  let currentConfig = { ...defaultConfig, ...overrides } as ProjectConfig;
+
+  const mockGetProjectConfig = mock(async () => currentConfig);
+
+  const progressState = new Map<string, Set<string>>();
+
+  const mockIsProgressComplete = mock(async (section: string, action: string) => {
+    const completed = progressState.get(section);
+    if (completed?.has(action)) return true;
+    const sectionConfig = currentConfig[section as keyof ProjectConfig];
+    if (sectionConfig && typeof sectionConfig === 'object' && 'progress' in sectionConfig) {
+      return (sectionConfig.progress as Record<string, boolean>)[action] ?? false;
+    }
+    return false;
+  });
+
+  const mockSetProgressComplete = mock(async (section: string, action: string) => {
+    if (!progressState.has(section)) progressState.set(section, new Set());
+    progressState.get(section)!.add(action);
+  });
+
+  const mockUpdateConfigField = mock(async () => {});
+  const mockClearConfigError = mock(async () => {});
+  const mockSetConfigError = mock(async () => {});
+  const mockClearAllProgress = mock(async (section: string) => {
+    progressState.delete(section);
+  });
+
+  const configHelperMocks = {
+    isProgressComplete: mockIsProgressComplete,
+    setProgressComplete: mockSetProgressComplete,
+    updateConfigField: mockUpdateConfigField,
+    clearConfigError: mockClearConfigError,
+    setConfigError: mockSetConfigError,
+    clearAllProgress: mockClearAllProgress,
+  };
+
+  return {
+    mocks: { getProjectConfig: mockGetProjectConfig, ...configHelperMocks },
+    /** Update the config that getProjectConfig returns */
+    setConfig: (config: ProjectConfig) => {
+      currentConfig = config;
+    },
+    /** Mark steps as already complete (for resume scenarios) */
+    markComplete: (section: string, actions: string[]) => {
+      if (!progressState.has(section)) progressState.set(section, new Set());
+      for (const action of actions) progressState.get(section)!.add(action);
+    },
+    install: () => {
+      mock.module('../../utils/getProjectConfig', () => ({
+        getProjectConfig: mockGetProjectConfig,
+      }));
+      mock.module('../../utils/configHelpers', () => configHelperMocks);
+    },
+    clearAll: () => {
+      for (const fn of Object.values(configHelperMocks)) fn.mockClear();
+      mockGetProjectConfig.mockClear();
+      progressState.clear();
+    },
+  };
+};
+
+export { defaultConfig };
+export type MockConfig = ReturnType<typeof createMockConfig>;

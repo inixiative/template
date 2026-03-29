@@ -1,0 +1,4 @@
+{
+  "status": 429,
+  "body": { "message": "Rate limit exceeded. Please retry after 30 seconds." }
+}
