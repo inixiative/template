@@ -1,28 +1,26 @@
 import { mock } from 'bun:test';
-import { VCR } from './VCR';
 
 type SecretEntry = { key: string; value: string; environment?: string; path?: string };
 
+const getEnvSecret = (key: string): string => process.env[key] ?? '';
+
 export const createMockInfisical = () => {
   const secretStore = new Map<string, string>();
-  const getSecretVcr = new VCR<string>();
 
   const mocks = {
     getSecret: mock((key: string, _opts?: { projectId?: string; environment?: string; path?: string }) => {
-      // VCR first, then store fallback
-      if (!getSecretVcr.isEmpty()) return getSecretVcr.require();
-      return secretStore.get(key) ?? '';
+      return secretStore.get(key) ?? getEnvSecret(key);
     }),
     getSecretAsync: mock(async (key: string, opts?: { projectId?: string; environment?: string; path?: string }) => {
-      if (!getSecretVcr.isEmpty()) return getSecretVcr.require();
-      // Composite key for environment-specific lookups
       const compositeKey = opts?.environment ? `${opts.environment}:${opts.path ?? '/'}:${key}` : key;
-      return secretStore.get(compositeKey) ?? secretStore.get(key) ?? '';
+      return secretStore.get(compositeKey) ?? secretStore.get(key) ?? getEnvSecret(key);
     }),
     setSecret: mock((_projectId: string, _env: string, key: string, value: string) => {
       secretStore.set(key, value);
     }),
-    setSecretAsync: mock(async (_projectId: string, _env: string, key: string, value: string) => {
+    setSecretAsync: mock(async (_projectId: string, _env: string, key: string, value: string, path?: string) => {
+      const compositeKey = path ? `${_env}:${path}:${key}` : key;
+      secretStore.set(compositeKey, value);
       secretStore.set(key, value);
     }),
     setupInfisical: mock(async () => ({
@@ -33,7 +31,6 @@ export const createMockInfisical = () => {
 
   return {
     mocks,
-    vcr: { getSecret: getSecretVcr },
     secretStore,
     /** Pre-seed secrets (e.g., connection strings for resume scenarios) */
     seed: (entries: SecretEntry[]) => {
@@ -45,20 +42,9 @@ export const createMockInfisical = () => {
     },
     install: () => {
       mock.module('../../tasks/infisicalSetup', () => mocks);
-      // Also mock the api/infisical module for direct API calls
-      mock.module('../../api/infisical', () => ({
-        createFolder: mock(async () => {}),
-        createSecretImport: mock(async () => {}),
-        getOrganization: mock(async () => ({ id: 'org-id', name: 'test-org' })),
-        getProject: mock(async () => ({ id: 'proj-id', name: 'template' })),
-        updateEnvironment: mock(async () => {}),
-        updateProjectSlug: mock(async () => {}),
-        upsertProject: mock(async () => ({ id: 'test-project-id', name: 'template' })),
-      }));
     },
     clearAll: () => {
       for (const fn of Object.values(mocks)) fn.mockClear();
-      getSecretVcr.clear();
       secretStore.clear();
     },
   };

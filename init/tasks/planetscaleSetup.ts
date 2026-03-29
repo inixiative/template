@@ -1,14 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  createBranch,
-  createDatabase,
-  createRole,
-  getBranch,
-  getDatabase,
-  renameBranch,
-  updateDatabaseSettings,
-} from '../api/planetscale';
+import { planetscaleApi } from '../api/planetscale';
 import { getProjectConfig } from '../utils/getProjectConfig';
 
 const execAsync = promisify(exec);
@@ -132,14 +124,14 @@ export const setupPlanetScale = async (
     // IMPORTANT: Before production launch, upgrade to multi-replica plan for HA:
     //   pscale database upgrade-plan <database> --org <org> --plan multi
     //   This provides Primary + 2 replicas with 99.99% SLA
-    let _dbResult: Awaited<ReturnType<typeof getDatabase>> | undefined;
+    let _dbResult: Awaited<ReturnType<typeof planetscaleApi.getDatabase>> | undefined;
     if (!(await isProgressComplete('planetscale', 'createDB'))) {
       try {
-        _dbResult = await createDatabase(organization, databaseName, region);
+        _dbResult = await planetscaleApi.createDatabase(organization, databaseName, region);
       } catch (error) {
         // Database might already exist
         if (error instanceof Error && error.message.includes('already exists')) {
-          _dbResult = await getDatabase(organization, databaseName);
+          _dbResult = await planetscaleApi.getDatabase(organization, databaseName);
         } else {
           throw error;
         }
@@ -152,7 +144,7 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Database already created, just fetch it
-      _dbResult = await getDatabase(organization, databaseName);
+      _dbResult = await planetscaleApi.getDatabase(organization, databaseName);
     }
 
     // Step 4: Wait for database initial provisioning
@@ -163,7 +155,7 @@ export const setupPlanetScale = async (
     // Step 5: Rename main branch to prod
     // This preserves the production status and PS-5 cluster assignment
     if (!(await isProgressComplete('planetscale', 'renameProductionBranch'))) {
-      await retryWithTimeout(() => renameBranch(organization, databaseName, 'main', 'prod'), {
+      await retryWithTimeout(() => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'), {
         maxRetries: 100,
         delayMs: 3000,
         retryCondition: (error) => {
@@ -182,10 +174,10 @@ export const setupPlanetScale = async (
     }
 
     // Step 6: Create staging branch (from prod)
-    let _stagingBranch: Awaited<ReturnType<typeof getBranch>> | undefined;
+    let _stagingBranch: Awaited<ReturnType<typeof planetscaleApi.getBranch>> | undefined;
     if (!(await isProgressComplete('planetscale', 'createStagingBranch'))) {
       try {
-        _stagingBranch = await retryWithTimeout(() => createBranch(organization, databaseName, 'staging', 'prod'), {
+        _stagingBranch = await retryWithTimeout(() => planetscaleApi.createBranch(organization, databaseName, 'staging', 'prod'), {
           maxRetries: 100,
           delayMs: 3000,
           retryCondition: (error) => {
@@ -201,7 +193,7 @@ export const setupPlanetScale = async (
         });
       } catch (error) {
         if (error instanceof Error && error.message.includes('already exists')) {
-          _stagingBranch = await getBranch(organization, databaseName, 'staging');
+          _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');
         } else {
           throw error;
         }
@@ -210,18 +202,18 @@ export const setupPlanetScale = async (
       await onStepComplete?.();
     } else {
       // Staging branch already created, just fetch it
-      _stagingBranch = await getBranch(organization, databaseName, 'staging');
+      _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');
     }
 
     // Step 7: Create passwords (connection strings)
-    let productionPassword: Awaited<ReturnType<typeof createRole>> | undefined;
-    let stagingPassword: Awaited<ReturnType<typeof createRole>> | undefined;
+    let productionPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
+    let stagingPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
 
     if (!(await isProgressComplete('planetscale', 'createProdRole'))) {
       // Production branch role (Postgres uses roles, not passwords)
       await onStepComplete?.('Creating production role...');
       productionPassword = await retryWithTimeout(
-        () => createRole(organization, databaseName, 'prod', `${configProjectName}-production-init`),
+        () => planetscaleApi.createRole(organization, databaseName, 'prod', `${configProjectName}-production-init`),
         {
           maxRetries: 100,
           delayMs: 3000,
@@ -245,7 +237,7 @@ export const setupPlanetScale = async (
       // Staging branch role
       await onStepComplete?.('Creating staging role...');
       stagingPassword = await retryWithTimeout(
-        () => createRole(organization, databaseName, 'staging', `${configProjectName}-staging-init`),
+        () => planetscaleApi.createRole(organization, databaseName, 'staging', `${configProjectName}-staging-init`),
         {
           maxRetries: 100,
           delayMs: 3000,
@@ -343,7 +335,7 @@ export const setupPlanetScale = async (
       const orgName = latestConfig.planetscale.organization;
       const dbName = latestConfig.planetscale.database;
 
-      await updateDatabaseSettings(orgName, dbName, {
+      await planetscaleApi.updateDatabaseSettings(orgName, dbName, {
         allow_foreign_key_constraints: true, // Required for Prisma relations
       });
       await setProgressComplete('planetscale', 'configureDB');

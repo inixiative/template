@@ -17,6 +17,7 @@
     "./lib": "./src/lib/index.ts",
     "./logger": "./src/logger/index.ts",
     "./adapter": "./src/adapter/index.ts",
+    "./vcr": "./src/vcr.ts",
     "./styles/theme.css": "./styles/theme.css"
   },
   "dependencies": {

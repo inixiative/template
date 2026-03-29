@@ -1,4 +1,0 @@
-{
-  "status": 429,
-  "body": { "type": "rate_limit_error", "message": "Rate limit exceeded. Please retry after 30 seconds." }
-}

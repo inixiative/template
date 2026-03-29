@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createMockInfisical, createMockSystem, loadFixture } from '../../tests/mocks';
+import { createMockInfisical, createMockSystem } from '../../tests/mocks';
 
 const infisical = createMockInfisical();
 const system = createMockSystem();
@@ -91,11 +91,13 @@ describe('TokenInputView - VCR error injection', () => {
     system.clearAll();
   });
 
-  test('getSecretAsync returns VCR values when loaded', async () => {
+  test('getSecretAsync returns seeded values', async () => {
     const { getSecretAsync } = await import('../../tasks/infisicalSetup');
 
-    // Load VCR with recorded fixture responses
-    infisical.vcr.getSecret.set(loadFixture<string[]>('infisical/tokenReads'));
+    infisical.seed([
+      { key: 'PLANETSCALE_TOKEN_ID', value: 'pscale_tkid_from_vcr' },
+      { key: 'PLANETSCALE_TOKEN', value: 'pscale_tk_from_vcr' },
+    ]);
 
     const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', { projectId: 'proj-123', environment: 'root' });
     const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId: 'proj-123', environment: 'root' });

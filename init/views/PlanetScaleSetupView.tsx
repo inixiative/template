@@ -3,7 +3,7 @@ import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { listOrganizations, listRegions, type PlanetScaleRegion } from '../api/planetscale';
+import { planetscaleApi, type PlanetScaleRegion } from '../api/planetscale';
 import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
@@ -173,7 +173,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
   useEffect(() => {
     const init = async () => {
       try {
-        const orgs = await listOrganizations();
+        const orgs = await planetscaleApi.listOrganizations();
         setOrganizations(orgs);
       } catch (_err) {
         setOrganizations([]);
@@ -248,7 +248,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
           // Need to select region
           setLoadingRegions(true);
           try {
-            const availableRegions = await listRegions(existingOrg);
+            const availableRegions = await planetscaleApi.listRegions(existingOrg);
             setRegions(availableRegions);
             setViewState('region-select');
           } catch (err) {
@@ -318,7 +318,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
     // Load regions for this org
     try {
-      const availableRegions = await listRegions(selectedOrg.name);
+      const availableRegions = await planetscaleApi.listRegions(selectedOrg.name);
       setRegions(availableRegions);
       setViewState('region-select');
     } catch (err) {

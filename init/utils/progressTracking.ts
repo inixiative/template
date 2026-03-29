@@ -42,6 +42,12 @@ export type InfisicalAction =
   | 'createProdSuperadminRootImport'
   | 'createProdSuperadminRootAppImport'
   | 'createProdSuperadminEnvImport'
+  | 'storeProjectNameSecret'
+  | 'storeViteProjectNameSecret'
+  | 'storeViteAppShortNameSecret'
+  | 'storeWebAppNameSecret'
+  | 'storeAdminAppNameSecret'
+  | 'storeSuperadminAppNameSecret'
   | 'ensureProdApiAuthSecret'
   | 'ensureStagingApiAuthSecret';
 export type ProjectAction = 'renameOrg' | 'renameProject' | 'setup';
@@ -127,6 +133,8 @@ export type VercelAction =
   | 'createWebInfisicalSyncProd'
   | 'createWebInfisicalSyncStaging'
   | 'createWebInfisicalSyncPreview'
+  | 'storeProdWebUrls'
+  | 'storeStagingWebUrls'
   | 'createAdminProject'
   | 'configureAdminRootDirectory'
   | 'createAdminStagingEnvironment'
@@ -135,6 +143,8 @@ export type VercelAction =
   | 'createAdminInfisicalSyncProd'
   | 'createAdminInfisicalSyncStaging'
   | 'createAdminInfisicalSyncPreview'
+  | 'storeProdAdminUrls'
+  | 'storeStagingAdminUrls'
   | 'createSuperadminProject'
   | 'configureSuperadminRootDirectory'
   | 'createSuperadminStagingEnvironment'
@@ -143,6 +153,8 @@ export type VercelAction =
   | 'createSuperadminInfisicalSyncProd'
   | 'createSuperadminInfisicalSyncStaging'
   | 'createSuperadminInfisicalSyncPreview'
+  | 'storeProdSuperadminUrls'
+  | 'storeStagingSuperadminUrls'
   | 'deployProduction';
 
 export type ProgressActions = {

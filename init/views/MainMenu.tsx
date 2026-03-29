@@ -74,6 +74,16 @@ const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']
     progress.createProdSuperadminRootAppImport,
     progress.createProdSuperadminEnvImport,
   ].filter(Boolean).length;
+  const sharedIdentityCount = [
+    progress.storeProjectNameSecret,
+    progress.storeViteProjectNameSecret,
+    progress.storeViteAppShortNameSecret,
+  ].filter(Boolean).length;
+  const appNameCount = [
+    progress.storeWebAppNameSecret,
+    progress.storeAdminAppNameSecret,
+    progress.storeSuperadminAppNameSecret,
+  ].filter(Boolean).length;
 
   const details: string[] = [];
   if (progress.selectOrg) details.push('Organization selected');
@@ -89,6 +99,10 @@ const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']
   else if (stagingInheritanceCount > 0) details.push(`Staging inheritance configured (${stagingInheritanceCount}/12)`);
   if (prodInheritanceCount === 12) details.push('Production inheritance configured');
   else if (prodInheritanceCount > 0) details.push(`Production inheritance configured (${prodInheritanceCount}/12)`);
+  if (sharedIdentityCount === 3) details.push('Shared app identity secrets stored');
+  else if (sharedIdentityCount > 0) details.push(`Shared app identity secrets stored (${sharedIdentityCount}/3)`);
+  if (appNameCount === 3) details.push('Per-app display names stored');
+  else if (appNameCount > 0) details.push(`Per-app display names stored (${appNameCount}/3)`);
   if (progress.ensureProdApiAuthSecret) details.push('Production API auth secret initialized');
   if (progress.ensureStagingApiAuthSecret) details.push('Staging API auth secret initialized');
 
@@ -262,8 +276,23 @@ const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; d
   if (bootstrapCount === 6) details.push('Bootstrap ready');
   else if (bootstrapCount > 0) details.push(`Bootstrap ready (${bootstrapCount}/6)`);
   if (progress.createWebProject) details.push('Web project created');
+  if (progress.storeProdWebUrls && progress.storeStagingWebUrls) details.push('Web URLs stored');
+  else {
+    if (progress.storeProdWebUrls) details.push('Web production URL stored');
+    if (progress.storeStagingWebUrls) details.push('Web staging URL stored');
+  }
   if (progress.createAdminProject) details.push('Admin project created');
+  if (progress.storeProdAdminUrls && progress.storeStagingAdminUrls) details.push('Admin URLs stored');
+  else {
+    if (progress.storeProdAdminUrls) details.push('Admin production URL stored');
+    if (progress.storeStagingAdminUrls) details.push('Admin staging URL stored');
+  }
   if (progress.createSuperadminProject) details.push('Superadmin project created');
+  if (progress.storeProdSuperadminUrls && progress.storeStagingSuperadminUrls) details.push('Superadmin URLs stored');
+  else {
+    if (progress.storeProdSuperadminUrls) details.push('Superadmin production URL stored');
+    if (progress.storeStagingSuperadminUrls) details.push('Superadmin staging URL stored');
+  }
   if (progress.linkWebGitHub) details.push('GitHub linked');
   if (progress.deployProduction) details.push('Production deployment complete');
 

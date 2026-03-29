@@ -1,4 +1,4 @@
-import { setSecret } from '../api/infisical';
+import { infisicalApi } from '../api/infisical';
 import { type ResendDomain, upsertDomain } from '../api/resend';
 import { setProgressComplete, updateConfigField } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
@@ -7,9 +7,9 @@ import { getProjectConfig } from '../utils/getProjectConfig';
  * Store Resend API key in Infisical for both prod and staging API folders.
  */
 export const storeResendApiKey = async (projectId: string, apiKey: string): Promise<void> => {
-  await setSecret(projectId, 'prod', '/api/', 'RESEND_API_KEY', apiKey);
+  await infisicalApi.setSecret(projectId, 'prod', '/api/', 'RESEND_API_KEY', apiKey);
   await setProgressComplete('email', 'storeProdApiKey');
-  await setSecret(projectId, 'staging', '/api/', 'RESEND_API_KEY', apiKey);
+  await infisicalApi.setSecret(projectId, 'staging', '/api/', 'RESEND_API_KEY', apiKey);
   await setProgressComplete('email', 'storeStagingApiKey');
 };
 
@@ -17,9 +17,9 @@ export const storeResendApiKey = async (projectId: string, apiKey: string): Prom
  * Store from address in Infisical for both prod and staging API folders.
  */
 export const storeFromAddress = async (projectId: string, fromAddress: string): Promise<void> => {
-  await setSecret(projectId, 'prod', '/api/', 'EMAIL_FROM', fromAddress);
+  await infisicalApi.setSecret(projectId, 'prod', '/api/', 'EMAIL_FROM', fromAddress);
   await setProgressComplete('email', 'storeProdFromAddress');
-  await setSecret(projectId, 'staging', '/api/', 'EMAIL_FROM', fromAddress);
+  await infisicalApi.setSecret(projectId, 'staging', '/api/', 'EMAIL_FROM', fromAddress);
   await setProgressComplete('email', 'storeStagingFromAddress');
 };
 

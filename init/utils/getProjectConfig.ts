@@ -57,6 +57,12 @@ export type ProjectConfig = {
       createProdSuperadminRootImport: boolean;
       createProdSuperadminRootAppImport: boolean;
       createProdSuperadminEnvImport: boolean;
+      storeProjectNameSecret: boolean;
+      storeViteProjectNameSecret: boolean;
+      storeViteAppShortNameSecret: boolean;
+      storeWebAppNameSecret: boolean;
+      storeAdminAppNameSecret: boolean;
+      storeSuperadminAppNameSecret: boolean;
       ensureProdApiAuthSecret: boolean;
       ensureStagingApiAuthSecret: boolean;
     };
@@ -192,6 +198,8 @@ export type ProjectConfig = {
       createWebInfisicalSyncProd: boolean;
       createWebInfisicalSyncStaging: boolean;
       createWebInfisicalSyncPreview: boolean;
+      storeProdWebUrls: boolean;
+      storeStagingWebUrls: boolean;
       // Admin app
       createAdminProject: boolean;
       configureAdminRootDirectory: boolean;
@@ -201,6 +209,8 @@ export type ProjectConfig = {
       createAdminInfisicalSyncProd: boolean;
       createAdminInfisicalSyncStaging: boolean;
       createAdminInfisicalSyncPreview: boolean;
+      storeProdAdminUrls: boolean;
+      storeStagingAdminUrls: boolean;
       // Superadmin app
       createSuperadminProject: boolean;
       configureSuperadminRootDirectory: boolean;
@@ -210,6 +220,8 @@ export type ProjectConfig = {
       createSuperadminInfisicalSyncProd: boolean;
       createSuperadminInfisicalSyncStaging: boolean;
       createSuperadminInfisicalSyncPreview: boolean;
+      storeProdSuperadminUrls: boolean;
+      storeStagingSuperadminUrls: boolean;
       // Final
       deployProduction: boolean;
     };
@@ -280,6 +292,12 @@ const defaultInfisicalProgress: ProjectConfig['infisical']['progress'] = {
   createProdSuperadminRootImport: false,
   createProdSuperadminRootAppImport: false,
   createProdSuperadminEnvImport: false,
+  storeProjectNameSecret: false,
+  storeViteProjectNameSecret: false,
+  storeViteAppShortNameSecret: false,
+  storeWebAppNameSecret: false,
+  storeAdminAppNameSecret: false,
+  storeSuperadminAppNameSecret: false,
   ensureProdApiAuthSecret: false,
   ensureStagingApiAuthSecret: false,
 };
@@ -331,6 +349,12 @@ const normalizeInfisicalProgress = (
     createProdSuperadminRootImport: raw.createProdSuperadminRootImport === true || raw.setInheritance === true,
     createProdSuperadminRootAppImport: raw.createProdSuperadminRootAppImport === true || raw.setInheritance === true,
     createProdSuperadminEnvImport: raw.createProdSuperadminEnvImport === true || raw.setInheritance === true,
+    storeProjectNameSecret: raw.storeProjectNameSecret === true,
+    storeViteProjectNameSecret: raw.storeViteProjectNameSecret === true,
+    storeViteAppShortNameSecret: raw.storeViteAppShortNameSecret === true,
+    storeWebAppNameSecret: raw.storeWebAppNameSecret === true,
+    storeAdminAppNameSecret: raw.storeAdminAppNameSecret === true,
+    storeSuperadminAppNameSecret: raw.storeSuperadminAppNameSecret === true,
     ensureProdApiAuthSecret: raw.ensureProdApiAuthSecret === true || raw.ensureApiAuthSecrets === true,
     ensureStagingApiAuthSecret: raw.ensureStagingApiAuthSecret === true || raw.ensureApiAuthSecrets === true,
   };
@@ -420,6 +444,8 @@ const defaultVercelProgress: ProjectConfig['vercel']['progress'] = {
   createWebInfisicalSyncProd: false,
   createWebInfisicalSyncStaging: false,
   createWebInfisicalSyncPreview: false,
+  storeProdWebUrls: false,
+  storeStagingWebUrls: false,
   createAdminProject: false,
   configureAdminRootDirectory: false,
   createAdminStagingEnvironment: false,
@@ -428,6 +454,8 @@ const defaultVercelProgress: ProjectConfig['vercel']['progress'] = {
   createAdminInfisicalSyncProd: false,
   createAdminInfisicalSyncStaging: false,
   createAdminInfisicalSyncPreview: false,
+  storeProdAdminUrls: false,
+  storeStagingAdminUrls: false,
   createSuperadminProject: false,
   configureSuperadminRootDirectory: false,
   createSuperadminStagingEnvironment: false,
@@ -436,6 +464,8 @@ const defaultVercelProgress: ProjectConfig['vercel']['progress'] = {
   createSuperadminInfisicalSyncProd: false,
   createSuperadminInfisicalSyncStaging: false,
   createSuperadminInfisicalSyncPreview: false,
+  storeProdSuperadminUrls: false,
+  storeStagingSuperadminUrls: false,
   deployProduction: false,
 };
 
@@ -470,6 +500,8 @@ const normalizeVercelProgress = (
     createWebInfisicalSyncProd: raw.createWebInfisicalSyncProd === true,
     createWebInfisicalSyncStaging: raw.createWebInfisicalSyncStaging === true,
     createWebInfisicalSyncPreview: raw.createWebInfisicalSyncPreview === true,
+    storeProdWebUrls: raw.storeProdWebUrls === true,
+    storeStagingWebUrls: raw.storeStagingWebUrls === true,
     createAdminProject: raw.createAdminProject === true,
     configureAdminRootDirectory: raw.configureAdminRootDirectory === true,
     createAdminStagingEnvironment: raw.createAdminStagingEnvironment === true,
@@ -478,6 +510,8 @@ const normalizeVercelProgress = (
     createAdminInfisicalSyncProd: raw.createAdminInfisicalSyncProd === true,
     createAdminInfisicalSyncStaging: raw.createAdminInfisicalSyncStaging === true,
     createAdminInfisicalSyncPreview: raw.createAdminInfisicalSyncPreview === true,
+    storeProdAdminUrls: raw.storeProdAdminUrls === true,
+    storeStagingAdminUrls: raw.storeStagingAdminUrls === true,
     createSuperadminProject: raw.createSuperadminProject === true,
     configureSuperadminRootDirectory: raw.configureSuperadminRootDirectory === true,
     createSuperadminStagingEnvironment: raw.createSuperadminStagingEnvironment === true,
@@ -486,6 +520,8 @@ const normalizeVercelProgress = (
     createSuperadminInfisicalSyncProd: raw.createSuperadminInfisicalSyncProd === true,
     createSuperadminInfisicalSyncStaging: raw.createSuperadminInfisicalSyncStaging === true,
     createSuperadminInfisicalSyncPreview: raw.createSuperadminInfisicalSyncPreview === true,
+    storeProdSuperadminUrls: raw.storeProdSuperadminUrls === true,
+    storeStagingSuperadminUrls: raw.storeStagingSuperadminUrls === true,
     deployProduction: raw.deployProduction === true,
   };
 };

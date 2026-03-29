@@ -8,33 +8,26 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { PlanetScaleBranch, PlanetScaleDatabase } from '../../api/planetscale';
-import {
-  createMockConfig,
-  createMockInfisical,
-  createMockPlanetScale,
-  createMockSystem,
-  loadFixture,
-} from '../../tests/mocks';
+import { planetscaleApi } from '../../api/planetscale';
+import { createMockConfig, createMockInfisical, createMockSystem } from '../../tests/mocks';
 
 // Create service mocks
-const ps = createMockPlanetScale();
 const infisical = createMockInfisical();
 const config = createMockConfig();
 const system = createMockSystem();
 
 // Install all mocks (must be before importing setup code)
-ps.install();
 infisical.install();
 config.install();
 system.install();
 
 describe('PlanetScale Resume Scenario', () => {
   beforeEach(() => {
-    ps.clearAll();
+    planetscaleApi.vcr.clear();
     infisical.clearAll();
     config.clearAll();
     system.clearAll();
+    system.stubExec('bun scripts/db/initMigrationTable.ts', { stdout: '', stderr: '' });
 
     // Resume scenario: provider-side setup is complete up to per-environment connection strings
     config.markComplete('planetscale', [
@@ -70,15 +63,16 @@ describe('PlanetScale Resume Scenario', () => {
       },
     ]);
 
-    // VCR: getDatabase called once (resume fetches existing DB)
-    ps.vcr.database.add(loadFixture<PlanetScaleDatabase>('planetscale/createDatabase'));
-
-    // VCR: getBranch called for staging (resume fetches existing branch)
-    ps.vcr.branch.add(loadFixture<PlanetScaleBranch>('planetscale/getBranch-staging'));
+    // createDB complete → else branch: fetch existing DB
+    planetscaleApi.vcr.queue('getDatabase', 'success');
+    // createStagingBranch complete → else branch: fetch existing branch
+    planetscaleApi.vcr.queue('getBranch', 'staging');
+    // configureDB not complete → update settings
+    planetscaleApi.vcr.queue('updateDatabaseSettings', 'configureDB');
   });
 
   afterEach(() => {
-    ps.clearAll();
+    planetscaleApi.vcr.clear();
     infisical.clearAll();
     config.clearAll();
     system.clearAll();
@@ -87,8 +81,6 @@ describe('PlanetScale Resume Scenario', () => {
   test('should NOT create new roles when resuming', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
-
-    expect(ps.mocks.createRole).not.toHaveBeenCalled();
   });
 
   test('should fetch connection strings from Infisical', async () => {
@@ -134,8 +126,6 @@ describe('PlanetScale Resume Scenario', () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    expect(ps.mocks.updateDatabaseSettings).toHaveBeenCalledWith('test-org', 'template', {
-      allow_foreign_key_constraints: true,
-    });
+    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'configureDB');
   });
 });

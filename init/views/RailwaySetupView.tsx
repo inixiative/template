@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { listWorkspaces } from '../api/railway';
+import { railwayApi } from '../api/railway';
 import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
@@ -220,7 +220,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   useEffect(() => {
     const init = async () => {
       try {
-        const railwayWorkspaces = await listWorkspaces();
+        const railwayWorkspaces = await railwayApi.listWorkspaces();
         // Convert Railway workspaces to Organization format for OrgSelector
         setWorkspaces(
           railwayWorkspaces.map((workspace) => ({

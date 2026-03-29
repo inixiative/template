@@ -1,4 +1,0 @@
-{
-  "status": 429,
-  "body": { "type": "tokens", "code": "rate_limit_exceeded", "message": "Rate limit reached for gpt-4o. Please try again in 20s." }
-}

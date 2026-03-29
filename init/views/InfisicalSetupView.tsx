@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { listOrganizations } from '../api/infisical';
+import { infisicalApi } from '../api/infisical';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { setupInfisical } from '../tasks/infisicalSetup';
@@ -91,6 +91,16 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
     progress.createProdSuperadminRootAppImport,
     progress.createProdSuperadminEnvImport,
   ].filter(Boolean).length;
+  const sharedIdentityCount = [
+    progress.storeProjectNameSecret,
+    progress.storeViteProjectNameSecret,
+    progress.storeViteAppShortNameSecret,
+  ].filter(Boolean).length;
+  const appNameCount = [
+    progress.storeWebAppNameSecret,
+    progress.storeAdminAppNameSecret,
+    progress.storeSuperadminAppNameSecret,
+  ].filter(Boolean).length;
 
   return [
     {
@@ -126,6 +136,14 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       completed: prodInheritanceCount === 12,
     },
     {
+      label: `Shared app identity secrets stored (${sharedIdentityCount}/3)`,
+      completed: sharedIdentityCount === 3,
+    },
+    {
+      label: `Per-app display names stored (${appNameCount}/3)`,
+      completed: appNameCount === 3,
+    },
+    {
       label: 'Production API auth secret initialized',
       completed: progress.ensureProdApiAuthSecret,
     },
@@ -148,7 +166,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
   // Load organizations
   useEffect(() => {
     const init = async () => {
-      const orgs = await listOrganizations();
+      const orgs = await infisicalApi.listOrganizations();
       setOrganizations(orgs);
     };
 

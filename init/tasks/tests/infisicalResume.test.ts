@@ -1,44 +1,23 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { createMockConfig, createMockSystem, defaultConfig, loadFixture, VCR } from '../../tests/mocks';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { infisicalApi } from '../../api/infisical';
+import { createMockConfig, createMockSystem, defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
 const config = createMockConfig();
 const system = createMockSystem();
-const getProjectVcr = new VCR<unknown>();
-
-const apiMocks = {
-  createFolder: mock(async () => {}),
-  createSecretImport: mock(async () => {}),
-  getOrganization: mock(async () => ({ id: 'org-123', name: 'Template Org', slug: 'template-org' })),
-  getProject: mock(async () => getProjectVcr.require()),
-  updateEnvironment: mock(async () => {}),
-  updateProjectSlug: mock(async () => {}),
-  upsertProject: mock(async () => ({ id: 'workspace-123', name: 'template', slug: 'template' })),
-  toInfisicalSlug: (name: string) => name.toLowerCase(),
-};
-
-const clearApiMocks = () => {
-  apiMocks.createFolder.mockClear();
-  apiMocks.createSecretImport.mockClear();
-  apiMocks.getOrganization.mockClear();
-  apiMocks.getProject.mockClear();
-  apiMocks.updateEnvironment.mockClear();
-  apiMocks.updateProjectSlug.mockClear();
-  apiMocks.upsertProject.mockClear();
-  getProjectVcr.clear();
-};
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
+const liveProjectId = process.env.INFISICAL_PROJECT_ID ?? 'workspace-123';
+const liveOrganizationId = process.env.INFISICAL_ORG_ID ?? 'org-123';
 
 config.install();
 system.install();
-mock.module('../../api/infisical', () => apiMocks);
 
 describe('Infisical Resume Scenario', () => {
   beforeEach(() => {
+    infisicalApi.vcr.clear();
     config.clearAll();
     system.clearAll();
-    clearApiMocks();
 
     config.setConfig({
       ...cloneDefaultConfig(),
@@ -52,11 +31,11 @@ describe('Infisical Resume Scenario', () => {
       },
       infisical: {
         ...cloneDefaultConfig().infisical,
-        projectId: 'workspace-123',
-        organizationId: 'org-123',
+        projectId: liveProjectId,
+        organizationId: liveOrganizationId,
         organizationSlug: 'template-org',
         projectSlug: 'template',
-        configProjectName: 'template',
+        configProjectName: cloneDefaultConfig().project.name,
       },
     });
 
@@ -102,13 +81,17 @@ describe('Infisical Resume Scenario', () => {
       'ensureStagingApiAuthSecret',
     ]);
 
-    getProjectVcr.add(loadFixture('infisical/getProjectWithDevEnv'));
+    // renameEnv not complete → getProject + updateEnvironment
+    infisicalApi.vcr.queue('getProject', 'withDevEnv');
+    infisicalApi.vcr.queue('updateEnvironment', 'root');
+    // createStagingAdminEnvImport not complete → createSecretImport
+    infisicalApi.vcr.queue('createSecretImport', 'stagingAdmin');
   });
 
   afterEach(() => {
+    infisicalApi.vcr.clear();
     config.clearAll();
     system.clearAll();
-    clearApiMocks();
   });
 
   test('resumes only the missing rename/import steps and skips completed auth secrets', async () => {
@@ -116,14 +99,7 @@ describe('Infisical Resume Scenario', () => {
 
     await setupInfisical('org-123');
 
-    expect(apiMocks.createFolder).not.toHaveBeenCalled();
-    expect(apiMocks.updateEnvironment).toHaveBeenCalledWith('workspace-123', 'env-dev-123', {
-      name: 'Root',
-      slug: 'root',
-    });
-
-    expect(apiMocks.createSecretImport).toHaveBeenCalledTimes(1);
-    expect(apiMocks.createSecretImport).toHaveBeenCalledWith('workspace-123', 'staging', '/admin', 'staging', '/');
+    // createFolder not called — if it were, VCR would throw (no cassette queued)
 
     expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('infisical', 'renameEnv');
     expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('infisical', 'createStagingAdminEnvImport');

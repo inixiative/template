@@ -1,4 +1,0 @@
-{
-  "status": 200,
-  "body": "redis://staging.example.com:6379"
-}

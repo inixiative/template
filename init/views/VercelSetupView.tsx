@@ -97,6 +97,14 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
       label: 'Web: Infisical sync → preview',
       completed: progress.createWebInfisicalSyncPreview,
     },
+    {
+      label: 'Web: Production URLs stored',
+      completed: progress.storeProdWebUrls,
+    },
+    {
+      label: 'Web: Staging URLs stored',
+      completed: progress.storeStagingWebUrls,
+    },
     // Admin app
     {
       label: adminProjectId ? `Admin: Project created (${adminProjectId})` : 'Admin: Project created',
@@ -129,6 +137,14 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
     {
       label: 'Admin: Infisical sync → preview',
       completed: progress.createAdminInfisicalSyncPreview,
+    },
+    {
+      label: 'Admin: Production URLs stored',
+      completed: progress.storeProdAdminUrls,
+    },
+    {
+      label: 'Admin: Staging URLs stored',
+      completed: progress.storeStagingAdminUrls,
     },
     // Superadmin app
     {
@@ -164,6 +180,14 @@ const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; compl
     {
       label: 'Superadmin: Infisical sync → preview',
       completed: progress.createSuperadminInfisicalSyncPreview,
+    },
+    {
+      label: 'Superadmin: Production URLs stored',
+      completed: progress.storeProdSuperadminUrls,
+    },
+    {
+      label: 'Superadmin: Staging URLs stored',
+      completed: progress.storeStagingSuperadminUrls,
     },
     // Final
     {

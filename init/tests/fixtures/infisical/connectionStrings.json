@@ -1,7 +1,0 @@
-{
-  "status": 200,
-  "body": [
-    { "key": "DATABASE_URL", "environment": "prod", "path": "/api", "value": "REDACTED" },
-    { "key": "DATABASE_URL", "environment": "staging", "path": "/api", "value": "REDACTED" }
-  ]
-}

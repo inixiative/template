@@ -1,15 +1,6 @@
 import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import {
-  createFolder,
-  createSecretImport,
-  getOrganization,
-  getProject,
-  toInfisicalSlug,
-  updateEnvironment,
-  updateProjectSlug,
-  upsertProject,
-} from '../api/infisical';
+import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import {
   clearAllProgress,
   clearConfigError,
@@ -67,7 +58,7 @@ export const setupInfisical = async (
     // Step 1: Select organization
     if (!(await isProgressComplete('infisical', 'selectOrg'))) {
       // Suppressed for TUI: console.log('  • Selecting organization...');
-      const response = await getOrganization(selectedOrgId);
+      const response = await infisicalApi.getOrganization(selectedOrgId);
 
       // Handle nested response structure (API returns { organization: {...} })
       const selectedOrg = (response as unknown as { organization?: typeof response }).organization || response;
@@ -91,19 +82,19 @@ export const setupInfisical = async (
     // Step 2: Create project
     if (!(await isProgressComplete('infisical', 'createProject'))) {
       // Suppressed for TUI: console.log('  • Creating project...');
-      const project = await upsertProject(configProjectName);
+      const project = await infisicalApi.upsertProject(configProjectName);
       projectId = project.id;
 
       // Try to update project slug to match project name
       try {
-        await updateProjectSlug(projectId, toInfisicalSlug(configProjectName));
+        await infisicalApi.updateProjectSlug(projectId, toInfisicalSlug(configProjectName));
         // Suppressed for TUI: console.log(`    ✓ Updated slug to: ${configProjectName}`);
       } catch (_error) {
         // Suppressed for TUI: console.log('    ⚠ Could not update slug (may already be correct)');
       }
 
       // Get final project details to capture actual slug
-      const finalProjectDetails = await getProject(projectId);
+      const finalProjectDetails = await infisicalApi.getProject(projectId);
       projectSlug =
         (finalProjectDetails as unknown as { workspace?: { slug: string } }).workspace?.slug || project.slug;
 
@@ -124,14 +115,14 @@ export const setupInfisical = async (
       // Suppressed for TUI: console.log('  • Renaming dev → root...');
       try {
         // Get full project details to find dev environment ID
-        const projectDetails = await getProject(projectId);
+        const projectDetails = await infisicalApi.getProject(projectId);
         const workspace = (
           projectDetails as unknown as { workspace?: { environments?: Array<{ slug: string; id: string }> } }
         ).workspace;
         const devEnv = workspace?.environments?.find((e: { slug: string; id: string }) => e.slug === 'dev');
 
         if (devEnv) {
-          await updateEnvironment(projectId, devEnv.id, { name: 'Root', slug: 'root' });
+          await infisicalApi.updateEnvironment(projectId, devEnv.id, { name: 'Root', slug: 'root' });
           // Suppressed for TUI: console.log('    ✓ Renamed dev → root');
         } else {
           // Suppressed for TUI: console.log('    ⚠ Dev environment not found (may already be renamed)');
@@ -165,7 +156,7 @@ export const setupInfisical = async (
     for (const step of folderSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
-      await createFolder(projectId, step.environment, step.app, '/');
+      await infisicalApi.createFolder(projectId, step.environment, step.app, '/');
       await setProgressComplete('infisical', step.action);
       await onStepComplete?.();
     }
@@ -345,7 +336,7 @@ export const setupInfisical = async (
     for (const step of inheritanceSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
-      await createSecretImport(
+      await infisicalApi.createSecretImport(
         projectId,
         step.destinationEnvironment,
         step.destinationPath,
@@ -362,14 +353,48 @@ export const setupInfisical = async (
     await setSecretAsync(projectId, 'prod', 'ENVIRONMENT', 'prod', '/api');
     await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
 
-    // Project identity — shared across all apps/envs via root:/ inheritance
-    await setSecretAsync(projectId, 'root', 'PROJECT_NAME', configProjectName, '/');
-    await setSecretAsync(projectId, 'root', 'VITE_PROJECT_NAME', configProjectName, '/');
+    const identitySecretSteps = [
+      {
+        action: 'storeProjectNameSecret',
+        key: 'PROJECT_NAME',
+        value: configProjectName,
+        path: '/',
+      },
+      {
+        action: 'storeViteProjectNameSecret',
+        key: 'VITE_PROJECT_NAME',
+        value: configProjectName,
+        path: '/',
+      },
+      {
+        action: 'storeViteAppShortNameSecret',
+        key: 'VITE_APP_SHORT_NAME',
+        value: configProjectName,
+        path: '/',
+      },
+    ] as const;
 
-    // Per-app display names — inherited by each app folder
-    await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Web', '/web');
-    await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Admin', '/admin');
-    await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', 'Superadmin', '/superadmin');
+    for (const step of identitySecretSteps) {
+      if (await isProgressComplete('infisical', step.action)) continue;
+
+      await setSecretAsync(projectId, 'root', step.key, step.value, step.path);
+      await setProgressComplete('infisical', step.action);
+      await onStepComplete?.();
+    }
+
+    const appNameSecretSteps = [
+      { action: 'storeWebAppNameSecret', value: 'Web', path: '/web' },
+      { action: 'storeAdminAppNameSecret', value: 'Admin', path: '/admin' },
+      { action: 'storeSuperadminAppNameSecret', value: 'Superadmin', path: '/superadmin' },
+    ] as const;
+
+    for (const step of appNameSecretSteps) {
+      if (await isProgressComplete('infisical', step.action)) continue;
+
+      await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', step.value, step.path);
+      await setProgressComplete('infisical', step.action);
+      await onStepComplete?.();
+    }
 
     // Step 6: Ensure API auth secrets exist for deploy environments
     const apiAuthSecretSteps = [
