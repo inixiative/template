@@ -31,7 +31,7 @@ type ProgressSummary = {
 const getProjectConfigStatus = (config: ProjectConfig): MenuItem['status'] => {
   // Check if all project config steps are complete
   const { progress } = config.project;
-  const allComplete = progress.renameOrg && progress.renameProject && progress.setup;
+  const allComplete = Object.values(progress).every((v) => v === true);
   return allComplete ? 'completed' : 'pending';
 };
 

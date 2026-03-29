@@ -50,7 +50,15 @@ export type InfisicalAction =
   | 'storeSuperadminAppNameSecret'
   | 'ensureProdApiAuthSecret'
   | 'ensureStagingApiAuthSecret';
-export type ProjectAction = 'renameOrg' | 'renameProject' | 'setup';
+export type ProjectAction =
+  | 'renameOrg'
+  | 'updatePackages'
+  | 'updateImports'
+  | 'updateReadme'
+  | 'updateTsconfigs'
+  | 'updateEnvFiles'
+  | 'cleanInstall'
+  | 'setup';
 export type PlanetScaleAction =
   | 'selectOrg'
   | 'selectRegion'

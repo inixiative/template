@@ -7,6 +7,7 @@
 
 import { setupInfisical } from './tasks/infisicalSetup';
 import { setupPlanetScale } from './tasks/planetscaleSetup';
+import { renameProject } from './tasks/projectConfig';
 import { setupRailway } from './tasks/railwaySetup';
 import { isProgressComplete, setProgressComplete, updateConfigField } from './utils/configHelpers';
 import { getProjectConfig, writeProjectConfig } from './utils/getProjectConfig';
@@ -69,10 +70,8 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
     const projectConfig = await getProjectConfig();
 
     // Update project name if needed
-    if (!(await isProgressComplete('project', 'renameProject'))) {
-      projectConfig.project.name = config.projectName;
-      await writeProjectConfig(projectConfig);
-      await setProgressComplete('project', 'renameProject');
+    if (!(await isProgressComplete('project', 'cleanInstall'))) {
+      await renameProject(projectConfig.project.name, config.projectName);
     }
 
     // Update organization name if needed

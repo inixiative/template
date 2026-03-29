@@ -12,7 +12,12 @@ const defaultConfig: ProjectConfig = {
     organization: envOrganizationName,
     progress: {
       renameOrg: false,
-      renameProject: false,
+      updatePackages: false,
+      updateImports: false,
+      updateReadme: false,
+      updateTsconfigs: false,
+      updateEnvFiles: false,
+      cleanInstall: false,
       setup: false,
     },
   },

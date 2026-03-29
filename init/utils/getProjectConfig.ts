@@ -7,7 +7,12 @@ export type ProjectConfig = {
     organization: string;
     progress: {
       renameOrg: boolean;
-      renameProject: boolean;
+      updatePackages: boolean;
+      updateImports: boolean;
+      updateReadme: boolean;
+      updateTsconfigs: boolean;
+      updateEnvFiles: boolean;
+      cleanInstall: boolean;
       setup: boolean;
     };
   };
@@ -651,7 +656,12 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         organization: config.project?.organization ?? '',
         progress: {
           renameOrg: config.project?.progress.renameOrg === true,
-          renameProject: config.project?.progress.renameProject === true,
+          updatePackages: (config.project?.progress as Record<string, boolean>).updatePackages === true,
+          updateImports: (config.project?.progress as Record<string, boolean>).updateImports === true,
+          updateReadme: (config.project?.progress as Record<string, boolean>).updateReadme === true,
+          updateTsconfigs: (config.project?.progress as Record<string, boolean>).updateTsconfigs === true,
+          updateEnvFiles: (config.project?.progress as Record<string, boolean>).updateEnvFiles === true,
+          cleanInstall: (config.project?.progress as Record<string, boolean>).cleanInstall === true,
           setup: config.project?.progress.setup === true,
         },
       },

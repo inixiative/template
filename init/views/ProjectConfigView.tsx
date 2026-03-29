@@ -4,17 +4,17 @@ import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { StepProgress } from '../components/StepProgress';
 import { getCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
+import { getProjectProgressItems } from '../tasks/projectSteps';
 import { setProgressComplete } from '../utils/configHelpers';
+import { useConfig } from '../utils/configState';
 import { prompt } from '../utils/prompts';
 
 const execAsync = promisify(exec);
 
-// NOTE: This is a linear wizard flow (not resumable like other setup views)
-// ViewState includes execution states because they represent distinct screens
-// No SetupState needed - wizard either completes or errors
-type ViewState = 'loading' | 'prompt-name' | 'prompt-org' | 'confirm' | 'executing' | 'running-setup' | 'complete';
+type ViewState = 'loading' | 'prompt-name' | 'prompt-org' | 'confirm' | 'executing' | 'complete';
 
 type ProjectConfigViewProps = {
   onComplete: () => void;
@@ -22,14 +22,19 @@ type ProjectConfigViewProps = {
 };
 
 export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete, onCancel }) => {
+  const { config, syncConfig } = useConfig();
   const [viewState, setViewState] = useState<ViewState>('loading');
   const [currentConfig, setCurrentConfig] = useState({ name: '', organization: '' });
   const [newName, setNewName] = useState('');
   const [newOrg, setNewOrg] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [fileProgress, setFileProgress] = useState<{ done: number; total: number } | null>(null);
+  const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
 
-  // Handle escape and enter keys
+  const progressItems = useMemo(() => {
+    if (!config) return [];
+    return getProjectProgressItems(config);
+  }, [config]);
+
   useInput((_input, key) => {
     if (key.escape && viewState !== 'executing' && viewState !== 'complete') {
       onCancel();
@@ -41,17 +46,16 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const config = await getCurrentConfig();
-        setCurrentConfig(config);
-        setNewName(config.name);
-        setNewOrg(config.organization);
+        const cfg = await getCurrentConfig();
+        setCurrentConfig(cfg);
+        setNewName(cfg.name);
+        setNewOrg(cfg.organization);
         setViewState('prompt-name');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load config');
       }
     };
 
-    // Defer to avoid blocking React
     setTimeout(() => loadConfig(), 100);
   }, []);
 
@@ -65,8 +69,15 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
     setViewState('confirm');
   };
 
+  const onStepComplete = useCallback(
+    async (action?: string) => {
+      setActiveAction(action);
+      await syncConfig();
+    },
+    [syncConfig],
+  );
+
   const handleConfirm = async () => {
-    // Show spinner immediately
     setViewState('executing');
 
     try {
@@ -74,19 +85,17 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 
       if (newOrg && newOrg.trim() !== '') {
         await setProgressComplete('project', 'renameOrg');
+        await onStepComplete();
       }
 
       if (newName !== currentConfig.name) {
-        await renameProject(currentConfig.name, newName, (done, total) => setFileProgress({ done, total }));
+        await renameProject(currentConfig.name, newName, onStepComplete);
       }
 
-      if (newName && newName.trim() !== '') {
-        await setProgressComplete('project', 'renameProject');
-      }
-
-      setViewState('running-setup');
+      // bun run setup (Docker, Prisma generate, etc.)
       await execAsync('bun run setup');
       await setProgressComplete('project', 'setup');
+      await onStepComplete();
 
       setViewState('complete');
     } catch (err) {
@@ -108,7 +117,9 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   if (viewState === 'loading') {
     return (
       <Box padding={1}>
-        <Text>Loading current configuration...</Text>
+        <Text>
+          <Spinner type="dots" /> Loading current configuration...
+        </Text>
       </Box>
     );
   }
@@ -207,23 +218,12 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   if (viewState === 'executing') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text>
-          <Spinner type="dots" />{' '}
-          {fileProgress
-            ? `Renaming imports... ${fileProgress.done}/${fileProgress.total} files`
-            : 'Updating configuration...'}
-        </Text>
-      </Box>
-    );
-  }
-
-  if (viewState === 'running-setup') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="green">✓ Configuration updated</Text>
-        <Text>
-          <Spinner type="dots" /> Running bun run setup (starting Docker)...
-        </Text>
+        <Box marginBottom={1}>
+          <Text bold>
+            Renaming to <Text color="green">{newName}</Text>
+          </Text>
+        </Box>
+        <StepProgress items={progressItems} running={true} activeAction={activeAction} />
       </Box>
     );
   }
@@ -231,8 +231,10 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
   if (viewState === 'complete') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="green">✓ Configuration complete!</Text>
-        <Text color="green">✓ Docker started with new project names</Text>
+        <StepProgress items={progressItems} running={false} />
+        <Box marginTop={1}>
+          <Text color="green">✓ Project configured!</Text>
+        </Box>
         <Box marginTop={1}>
           <Text dimColor>{prompt(['enter'])}</Text>
         </Box>

@@ -25,7 +25,12 @@ describe('Infisical Resume Scenario', () => {
         ...cloneDefaultConfig().project,
         progress: {
           renameOrg: true,
-          renameProject: true,
+          updatePackages: true,
+          updateImports: true,
+          updateReadme: true,
+          updateTsconfigs: true,
+          updateEnvFiles: true,
+          cleanInstall: true,
           setup: true,
         },
       },
