@@ -76,11 +76,11 @@ export const renameProject = async (
     await onStepComplete?.();
   }
 
-  // 2. Replace import paths in all TypeScript/JavaScript files
+  // 2. Replace @scope/ references in all source files
   if (!(await isProgressComplete('project', 'updateImports'))) {
     try {
       const { stdout } = await execAsync(
-        "find apps packages -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\)",
+        "find apps packages scripts docs init -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' \\)",
         { encoding: 'utf-8' },
       );
       const files = stdout.trim().split('\n').filter(Boolean);
@@ -128,6 +128,7 @@ export const renameProject = async (
   if (!(await isProgressComplete('project', 'updateTsconfigs'))) {
     const tsconfigPaths = [
       'tsconfig.json',
+      'tsconfig.frontend.json',
       'apps/api/tsconfig.json',
       'apps/web/tsconfig.json',
       'apps/admin/tsconfig.json',
@@ -156,16 +157,27 @@ export const renameProject = async (
 
   // 5. Update env example files
   if (!(await isProgressComplete('project', 'updateEnvFiles'))) {
-    const envExampleFiles = [
+    const envFiles = [
+      '.env.local',
+      '.env.test',
       '.env.local.example',
       '.env.test.example',
+      'apps/api/.env.local',
+      'apps/api/.env.test',
       'apps/api/.env.local.example',
       'apps/api/.env.test.example',
+      'apps/web/.env.local',
+      'apps/web/.env.test',
       'apps/web/.env.local.example',
+      'apps/admin/.env.local',
+      'apps/admin/.env.test',
       'apps/admin/.env.local.example',
+      'apps/superadmin/.env.local',
+      'apps/superadmin/.env.test',
       'apps/superadmin/.env.local.example',
+      'packages/db/.env.test',
     ];
-    for (const envFile of envExampleFiles) {
+    for (const envFile of envFiles) {
       try {
         const filePath = join(process.cwd(), envFile);
         const content = await readFile(filePath, 'utf-8');
