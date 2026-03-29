@@ -1,12 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { exec } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { VCR } from '../../packages/shared/src/vcr';
 import { getSecret, setSecret } from '../tasks/infisicalSetup';
 import { getProjectConfig } from '../utils/getProjectConfig';
-import { retryWithTimeout } from '../utils/retry';
 
 const execAsync = promisify(exec);
 
@@ -88,34 +87,6 @@ class RailwayApi {
   private async _railwayGraphQLUser<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     const token = await this._getRailwayUserToken();
     return this._railwayGraphQLWithToken<T>(token, query, variables);
-  }
-
-  private async _getServiceInstanceId(serviceId: string, environmentId: string): Promise<string> {
-    return retryWithTimeout(
-      async () => {
-        const query = `
-          query ServiceInstance($serviceId: String!, $environmentId: String!) {
-            serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
-              id
-            }
-          }
-        `;
-        const data = await this._railwayGraphQLUser<{
-          serviceInstance: { id: string } | null;
-        }>(query, { serviceId, environmentId });
-
-        if (!data.serviceInstance?.id) {
-          throw new Error(`Service instance not found for service ${serviceId} in environment ${environmentId}`);
-        }
-        return data.serviceInstance.id;
-      },
-      {
-        maxRetries: 10,
-        delayMs: 2000,
-        retryCondition: (error) => error.message.includes('Service instance not found'),
-        timeoutMessage: 'Timed out waiting for serviceInstance to be provisioned',
-      },
-    );
   }
 
   async getRailwayUserToken(): Promise<string> {
@@ -212,7 +183,9 @@ class RailwayApi {
 
   async isServiceConnectedToGitHub(serviceId: string, environmentId: string): Promise<boolean> {
     if (process.env.NODE_ENV !== 'test') return this._isServiceConnectedToGitHub(serviceId, environmentId);
-    return this.vcr.capture('isServiceConnectedToGitHub', () => this._isServiceConnectedToGitHub(serviceId, environmentId));
+    return this.vcr.capture('isServiceConnectedToGitHub', () =>
+      this._isServiceConnectedToGitHub(serviceId, environmentId),
+    );
   }
   private async _isServiceConnectedToGitHub(serviceId: string, environmentId: string): Promise<boolean> {
     const query = `
@@ -236,7 +209,9 @@ class RailwayApi {
     branch: string = 'main',
   ): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._connectServiceToGitHub(serviceId, environmentId, repo, branch);
-    return this.vcr.capture('connectServiceToGitHub', () => this._connectServiceToGitHub(serviceId, environmentId, repo, branch));
+    return this.vcr.capture('connectServiceToGitHub', () =>
+      this._connectServiceToGitHub(serviceId, environmentId, repo, branch),
+    );
   }
   private async _connectServiceToGitHub(
     serviceId: string,
@@ -257,7 +232,9 @@ class RailwayApi {
       { serviceId, environmentId, input: { source: { repo } } },
     );
     if (!data.serviceInstanceUpdate) {
-      throw new Error(`Failed to connect service ${serviceId} to GitHub repository ${repo} in environment ${environmentId}`);
+      throw new Error(
+        `Failed to connect service ${serviceId} to GitHub repository ${repo} in environment ${environmentId}`,
+      );
     }
   }
 
@@ -282,7 +259,9 @@ class RailwayApi {
     input: { rootDirectory?: string; buildCommand?: string; startCommand?: string },
   ): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._updateServiceInstanceConfig(serviceId, environmentId, input);
-    return this.vcr.capture('updateServiceInstanceConfig', () => this._updateServiceInstanceConfig(serviceId, environmentId, input));
+    return this.vcr.capture('updateServiceInstanceConfig', () =>
+      this._updateServiceInstanceConfig(serviceId, environmentId, input),
+    );
   }
   private async _updateServiceInstanceConfig(
     serviceId: string,
@@ -302,7 +281,9 @@ class RailwayApi {
       { serviceId, environmentId, input },
     );
     if (!data.serviceInstanceUpdate) {
-      throw new Error(`Failed to update service instance config for service ${serviceId} in environment ${environmentId}`);
+      throw new Error(
+        `Failed to update service instance config for service ${serviceId} in environment ${environmentId}`,
+      );
     }
   }
 
@@ -326,10 +307,7 @@ class RailwayApi {
     return data.project.volumes.edges.map((edge) => edge.node);
   }
 
-  async getServiceVolume(
-    projectId: string,
-    serviceName: string,
-  ): Promise<{ id: string; name: string } | null> {
+  async getServiceVolume(projectId: string, serviceName: string): Promise<{ id: string; name: string } | null> {
     if (process.env.NODE_ENV !== 'test') return this._getServiceVolume(projectId, serviceName);
     return this.vcr.capture('getServiceVolume', () => this._getServiceVolume(projectId, serviceName));
   }
@@ -363,7 +341,9 @@ class RailwayApi {
     name: string,
   ): Promise<RailwayService> {
     if (process.env.NODE_ENV !== 'test') return this._createService(projectId, _environmentId, environmentName, name);
-    return this.vcr.capture('createService', () => this._createService(projectId, _environmentId, environmentName, name));
+    return this.vcr.capture('createService', () =>
+      this._createService(projectId, _environmentId, environmentName, name),
+    );
   }
   private async _createService(
     projectId: string,
@@ -473,19 +453,11 @@ class RailwayApi {
     return data.environmentRename;
   }
 
-  async createRedis(
-    projectId: string,
-    environmentId: string,
-    environmentName: string,
-  ): Promise<RailwayRedis> {
+  async createRedis(projectId: string, environmentId: string, environmentName: string): Promise<RailwayRedis> {
     if (process.env.NODE_ENV !== 'test') return this._createRedis(projectId, environmentId, environmentName);
     return this.vcr.capture('createRedis', () => this._createRedis(projectId, environmentId, environmentName));
   }
-  private async _createRedis(
-    projectId: string,
-    environmentId: string,
-    environmentName: string,
-  ): Promise<RailwayRedis> {
+  private async _createRedis(projectId: string, environmentId: string, environmentName: string): Promise<RailwayRedis> {
     try {
       await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
         encoding: 'utf-8',
@@ -514,8 +486,11 @@ class RailwayApi {
     environmentName: string,
     projectId: string,
   ): Promise<string> {
-    if (process.env.NODE_ENV !== 'test') return this._getRedisUrl(serviceId, _environmentId, environmentName, projectId);
-    return this.vcr.capture('getRedisUrl', () => this._getRedisUrl(serviceId, _environmentId, environmentName, projectId));
+    if (process.env.NODE_ENV !== 'test')
+      return this._getRedisUrl(serviceId, _environmentId, environmentName, projectId);
+    return this.vcr.capture('getRedisUrl', () =>
+      this._getRedisUrl(serviceId, _environmentId, environmentName, projectId),
+    );
   }
   private async _getRedisUrl(
     serviceId: string,
@@ -545,7 +520,9 @@ class RailwayApi {
     variables: Record<string, string>,
   ): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._setEnvironmentVariables(serviceId, environmentId, variables);
-    return this.vcr.capture('setEnvironmentVariables', () => this._setEnvironmentVariables(serviceId, environmentId, variables));
+    return this.vcr.capture('setEnvironmentVariables', () =>
+      this._setEnvironmentVariables(serviceId, environmentId, variables),
+    );
   }
   private async _setEnvironmentVariables(
     serviceId: string,
@@ -635,10 +612,22 @@ class RailwayApi {
     infisicalPath: string = '/',
   ): Promise<{ id: string }> {
     if (process.env.NODE_ENV !== 'test') {
-      return this._setupInfisicalIntegration(projectId, environmentId, infisicalProjectId, infisicalEnvironment, infisicalPath);
+      return this._setupInfisicalIntegration(
+        projectId,
+        environmentId,
+        infisicalProjectId,
+        infisicalEnvironment,
+        infisicalPath,
+      );
     }
     return this.vcr.capture('setupInfisicalIntegration', () =>
-      this._setupInfisicalIntegration(projectId, environmentId, infisicalProjectId, infisicalEnvironment, infisicalPath),
+      this._setupInfisicalIntegration(
+        projectId,
+        environmentId,
+        infisicalProjectId,
+        infisicalEnvironment,
+        infisicalPath,
+      ),
     );
   }
   private async _setupInfisicalIntegration(

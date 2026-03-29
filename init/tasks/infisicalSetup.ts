@@ -10,6 +10,13 @@ import {
   updateConfigField,
 } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
+import {
+  infisicalApiAuthSecretSteps,
+  infisicalAppNameSecretSteps,
+  infisicalFolderSteps,
+  infisicalIdentitySecretSteps,
+  infisicalInheritanceSteps,
+} from './infisicalSteps';
 
 const execAsync = promisify(exec);
 
@@ -138,22 +145,7 @@ export const setupInfisical = async (
     }
 
     // Step 4: Create folder structure
-    const folderSteps = [
-      { action: 'createRootApiFolder', environment: 'root', app: 'api' },
-      { action: 'createRootWebFolder', environment: 'root', app: 'web' },
-      { action: 'createRootAdminFolder', environment: 'root', app: 'admin' },
-      { action: 'createRootSuperadminFolder', environment: 'root', app: 'superadmin' },
-      { action: 'createStagingApiFolder', environment: 'staging', app: 'api' },
-      { action: 'createStagingWebFolder', environment: 'staging', app: 'web' },
-      { action: 'createStagingAdminFolder', environment: 'staging', app: 'admin' },
-      { action: 'createStagingSuperadminFolder', environment: 'staging', app: 'superadmin' },
-      { action: 'createProdApiFolder', environment: 'prod', app: 'api' },
-      { action: 'createProdWebFolder', environment: 'prod', app: 'web' },
-      { action: 'createProdAdminFolder', environment: 'prod', app: 'admin' },
-      { action: 'createProdSuperadminFolder', environment: 'prod', app: 'superadmin' },
-    ] as const;
-
-    for (const step of folderSteps) {
+    for (const step of infisicalFolderSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
       await infisicalApi.createFolder(projectId, step.environment, step.app, '/');
@@ -162,178 +154,7 @@ export const setupInfisical = async (
     }
 
     // Step 5: Set up inheritance chains
-    const inheritanceSteps = [
-      {
-        action: 'createStagingApiRootImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/api',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingApiRootAppImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/api',
-        sourceEnvironment: 'root',
-        sourcePath: '/api',
-      },
-      {
-        action: 'createStagingApiEnvImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/api',
-        sourceEnvironment: 'staging',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingWebRootImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/web',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingWebRootAppImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/web',
-        sourceEnvironment: 'root',
-        sourcePath: '/web',
-      },
-      {
-        action: 'createStagingWebEnvImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/web',
-        sourceEnvironment: 'staging',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingAdminRootImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/admin',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingAdminRootAppImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/admin',
-        sourceEnvironment: 'root',
-        sourcePath: '/admin',
-      },
-      {
-        action: 'createStagingAdminEnvImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/admin',
-        sourceEnvironment: 'staging',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingSuperadminRootImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createStagingSuperadminRootAppImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'root',
-        sourcePath: '/superadmin',
-      },
-      {
-        action: 'createStagingSuperadminEnvImport',
-        destinationEnvironment: 'staging',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'staging',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdApiRootImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/api',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdApiRootAppImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/api',
-        sourceEnvironment: 'root',
-        sourcePath: '/api',
-      },
-      {
-        action: 'createProdApiEnvImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/api',
-        sourceEnvironment: 'prod',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdWebRootImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/web',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdWebRootAppImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/web',
-        sourceEnvironment: 'root',
-        sourcePath: '/web',
-      },
-      {
-        action: 'createProdWebEnvImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/web',
-        sourceEnvironment: 'prod',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdAdminRootImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/admin',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdAdminRootAppImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/admin',
-        sourceEnvironment: 'root',
-        sourcePath: '/admin',
-      },
-      {
-        action: 'createProdAdminEnvImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/admin',
-        sourceEnvironment: 'prod',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdSuperadminRootImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'root',
-        sourcePath: '/',
-      },
-      {
-        action: 'createProdSuperadminRootAppImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'root',
-        sourcePath: '/superadmin',
-      },
-      {
-        action: 'createProdSuperadminEnvImport',
-        destinationEnvironment: 'prod',
-        destinationPath: '/superadmin',
-        sourceEnvironment: 'prod',
-        sourcePath: '/',
-      },
-    ] as const;
-
-    for (const step of inheritanceSteps) {
+    for (const step of infisicalInheritanceSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
       await infisicalApi.createSecretImport(
@@ -353,42 +174,15 @@ export const setupInfisical = async (
     await setSecretAsync(projectId, 'prod', 'ENVIRONMENT', 'prod', '/api');
     await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
 
-    const identitySecretSteps = [
-      {
-        action: 'storeProjectNameSecret',
-        key: 'PROJECT_NAME',
-        value: configProjectName,
-        path: '/',
-      },
-      {
-        action: 'storeViteProjectNameSecret',
-        key: 'VITE_PROJECT_NAME',
-        value: configProjectName,
-        path: '/',
-      },
-      {
-        action: 'storeViteAppShortNameSecret',
-        key: 'VITE_APP_SHORT_NAME',
-        value: configProjectName,
-        path: '/',
-      },
-    ] as const;
-
-    for (const step of identitySecretSteps) {
+    for (const step of infisicalIdentitySecretSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
-      await setSecretAsync(projectId, 'root', step.key, step.value, step.path);
+      await setSecretAsync(projectId, 'root', step.key, step.getValue(config), step.path);
       await setProgressComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
-    const appNameSecretSteps = [
-      { action: 'storeWebAppNameSecret', value: 'Web', path: '/web' },
-      { action: 'storeAdminAppNameSecret', value: 'Admin', path: '/admin' },
-      { action: 'storeSuperadminAppNameSecret', value: 'Superadmin', path: '/superadmin' },
-    ] as const;
-
-    for (const step of appNameSecretSteps) {
+    for (const step of infisicalAppNameSecretSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
       await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', step.value, step.path);
@@ -397,12 +191,7 @@ export const setupInfisical = async (
     }
 
     // Step 6: Ensure API auth secrets exist for deploy environments
-    const apiAuthSecretSteps = [
-      { action: 'ensureProdApiAuthSecret', environment: 'prod' },
-      { action: 'ensureStagingApiAuthSecret', environment: 'staging' },
-    ] as const;
-
-    for (const step of apiAuthSecretSteps) {
+    for (const step of infisicalApiAuthSecretSteps) {
       if (await isProgressComplete('infisical', step.action)) continue;
 
       let hasValidSecret = false;

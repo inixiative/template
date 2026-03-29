@@ -16,7 +16,7 @@ const defaultConfig: ProjectConfig = {
       setup: false,
     },
   },
-  email: {
+  resend: {
     provider: 'resend',
     fromAddress: '',
     domainId: '',

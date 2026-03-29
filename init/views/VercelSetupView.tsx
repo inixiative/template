@@ -7,6 +7,7 @@ import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setupVercel } from '../tasks/vercelSetup';
+import { getVercelProgressItems } from '../tasks/vercelSteps';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
@@ -45,158 +46,6 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
   return 'incomplete';
 };
 
-const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
-  const { progress, teamId, connectionId, webProjectId, adminProjectId, superadminProjectId } = config.vercel;
-  const bootstrapCount = [
-    progress.selectTeam,
-    progress.storeTeamIdSecret,
-    progress.storeTeamNameSecret,
-    progress.promptedForGithub,
-    progress.storeVercelToken,
-    progress.createInfisicalConnection,
-  ].filter(Boolean).length;
-
-  return [
-    {
-      label:
-        teamId || connectionId
-          ? `Bootstrap ready (${bootstrapCount}/6): ${teamId || 'team selected'}`
-          : `Bootstrap ready (${bootstrapCount}/6)`,
-      completed: bootstrapCount === 6,
-    },
-    // Web app
-    {
-      label: webProjectId ? `Web: Project created (${webProjectId})` : 'Web: Project created',
-      completed: progress.createWebProject,
-    },
-    {
-      label: 'Web: Root directory configured',
-      completed: progress.configureWebRootDirectory,
-    },
-    {
-      label: 'Web: Staging environment created',
-      completed: progress.createWebStagingEnvironment,
-    },
-    {
-      label: 'Web: GitHub linked',
-      completed: progress.linkWebGitHub,
-    },
-    {
-      label: 'Web: Branches configured',
-      completed: progress.configureWebBranches,
-    },
-    {
-      label: 'Web: Infisical sync → production',
-      completed: progress.createWebInfisicalSyncProd,
-    },
-    {
-      label: 'Web: Infisical sync → staging',
-      completed: progress.createWebInfisicalSyncStaging,
-    },
-    {
-      label: 'Web: Infisical sync → preview',
-      completed: progress.createWebInfisicalSyncPreview,
-    },
-    {
-      label: 'Web: Production URLs stored',
-      completed: progress.storeProdWebUrls,
-    },
-    {
-      label: 'Web: Staging URLs stored',
-      completed: progress.storeStagingWebUrls,
-    },
-    // Admin app
-    {
-      label: adminProjectId ? `Admin: Project created (${adminProjectId})` : 'Admin: Project created',
-      completed: progress.createAdminProject,
-    },
-    {
-      label: 'Admin: Root directory configured',
-      completed: progress.configureAdminRootDirectory,
-    },
-    {
-      label: 'Admin: Staging environment created',
-      completed: progress.createAdminStagingEnvironment,
-    },
-    {
-      label: 'Admin: GitHub linked',
-      completed: progress.linkAdminGitHub,
-    },
-    {
-      label: 'Admin: Branches configured',
-      completed: progress.configureAdminBranches,
-    },
-    {
-      label: 'Admin: Infisical sync → production',
-      completed: progress.createAdminInfisicalSyncProd,
-    },
-    {
-      label: 'Admin: Infisical sync → staging',
-      completed: progress.createAdminInfisicalSyncStaging,
-    },
-    {
-      label: 'Admin: Infisical sync → preview',
-      completed: progress.createAdminInfisicalSyncPreview,
-    },
-    {
-      label: 'Admin: Production URLs stored',
-      completed: progress.storeProdAdminUrls,
-    },
-    {
-      label: 'Admin: Staging URLs stored',
-      completed: progress.storeStagingAdminUrls,
-    },
-    // Superadmin app
-    {
-      label: superadminProjectId
-        ? `Superadmin: Project created (${superadminProjectId})`
-        : 'Superadmin: Project created',
-      completed: progress.createSuperadminProject,
-    },
-    {
-      label: 'Superadmin: Root directory configured',
-      completed: progress.configureSuperadminRootDirectory,
-    },
-    {
-      label: 'Superadmin: Staging environment created',
-      completed: progress.createSuperadminStagingEnvironment,
-    },
-    {
-      label: 'Superadmin: GitHub linked',
-      completed: progress.linkSuperadminGitHub,
-    },
-    {
-      label: 'Superadmin: Branches configured',
-      completed: progress.configureSuperadminBranches,
-    },
-    {
-      label: 'Superadmin: Infisical sync → production',
-      completed: progress.createSuperadminInfisicalSyncProd,
-    },
-    {
-      label: 'Superadmin: Infisical sync → staging',
-      completed: progress.createSuperadminInfisicalSyncStaging,
-    },
-    {
-      label: 'Superadmin: Infisical sync → preview',
-      completed: progress.createSuperadminInfisicalSyncPreview,
-    },
-    {
-      label: 'Superadmin: Production URLs stored',
-      completed: progress.storeProdSuperadminUrls,
-    },
-    {
-      label: 'Superadmin: Staging URLs stored',
-      completed: progress.storeStagingSuperadminUrls,
-    },
-    // Final
-    {
-      label: 'Setup complete',
-      completed: progress.deployProduction,
-    },
-  ];
-};
-
 export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, onCancel }) => {
   const { config, syncConfig } = useConfig();
   const [viewState, setViewState] = useState<ViewState>('status');
@@ -209,7 +58,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
 
   // Progress items
-  const progressItems = useMemo(() => (config ? getProgressDisplay(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? getVercelProgressItems(config) : []), [config]);
 
   // Load teams on mount
   useEffect(() => {

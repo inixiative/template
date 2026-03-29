@@ -9,7 +9,7 @@ export const projectConfig = {
       setup: false,
     },
   },
-  email: {
+  resend: {
     provider: 'resend',
     fromAddress: '',
     domainId: '',

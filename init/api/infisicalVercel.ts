@@ -83,8 +83,11 @@ class InfisicalVercelApi {
     vercelApiToken: string,
     connectionName: string,
   ): Promise<string> {
-    if (process.env.NODE_ENV !== 'test') return this._createVercelConnection(infisicalProjectId, vercelApiToken, connectionName);
-    return this.vcr.capture('createVercelConnection', () => this._createVercelConnection(infisicalProjectId, vercelApiToken, connectionName));
+    if (process.env.NODE_ENV !== 'test')
+      return this._createVercelConnection(infisicalProjectId, vercelApiToken, connectionName);
+    return this.vcr.capture('createVercelConnection', () =>
+      this._createVercelConnection(infisicalProjectId, vercelApiToken, connectionName),
+    );
   }
   private async _createVercelConnection(
     infisicalProjectId: string,
@@ -136,14 +139,30 @@ class InfisicalVercelApi {
   ): Promise<string> {
     if (process.env.NODE_ENV !== 'test') {
       return this._createVercelSync(
-        infisicalProjectId, connectionId, syncName, infisicalEnvironment, infisicalSecretPath,
-        vercelProjectId, vercelProjectName, vercelEnvironment, vercelTeamId, vercelBranch,
+        infisicalProjectId,
+        connectionId,
+        syncName,
+        infisicalEnvironment,
+        infisicalSecretPath,
+        vercelProjectId,
+        vercelProjectName,
+        vercelEnvironment,
+        vercelTeamId,
+        vercelBranch,
       );
     }
     return this.vcr.capture('createVercelSync', () =>
       this._createVercelSync(
-        infisicalProjectId, connectionId, syncName, infisicalEnvironment, infisicalSecretPath,
-        vercelProjectId, vercelProjectName, vercelEnvironment, vercelTeamId, vercelBranch,
+        infisicalProjectId,
+        connectionId,
+        syncName,
+        infisicalEnvironment,
+        infisicalSecretPath,
+        vercelProjectId,
+        vercelProjectName,
+        vercelEnvironment,
+        vercelTeamId,
+        vercelBranch,
       ),
     );
   }
@@ -216,8 +235,16 @@ class InfisicalVercelApi {
     const existing = existingSyncs.find((sync) => sync.name === syncName);
     if (!existing) {
       await this._createVercelSync(
-        infisicalProjectId, connectionId, syncName, infisicalEnvironment, infisicalSecretPath,
-        vercelProjectId, vercelProjectName, vercelEnvironment, vercelTeamId, vercelBranch,
+        infisicalProjectId,
+        connectionId,
+        syncName,
+        infisicalEnvironment,
+        infisicalSecretPath,
+        vercelProjectId,
+        vercelProjectName,
+        vercelEnvironment,
+        vercelTeamId,
+        vercelBranch,
       );
     }
   }

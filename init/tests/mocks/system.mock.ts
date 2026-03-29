@@ -1,5 +1,5 @@
-import { exec as realExec, execSync as realExecSync } from 'node:child_process';
 import { mock } from 'bun:test';
+import { exec as realExec, execSync as realExecSync } from 'node:child_process';
 
 type CommandMatcher = RegExp | string | ((command: string) => boolean);
 type ExecResult = {
@@ -7,9 +7,7 @@ type ExecResult = {
   stdout?: string;
 };
 
-const cliPath = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH]
-  .filter(Boolean)
-  .join(':');
+const cliPath = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
 
 const matchesCommand = (matcher: CommandMatcher, command: string): boolean => {
   if (typeof matcher === 'function') return matcher(command);

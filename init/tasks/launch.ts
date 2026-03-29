@@ -1,5 +1,5 @@
-import type { ProjectConfig } from '../utils/getProjectConfig';
 import { setLaunched } from '../utils/configHelpers';
+import type { ProjectConfig } from '../utils/getProjectConfig';
 
 export type PreflightCheck = {
   label: string;

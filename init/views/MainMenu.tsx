@@ -2,6 +2,11 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
+import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
+import { getRailwayProgressSummaries } from '../tasks/railwaySteps';
+import { getResendProgressSummaries } from '../tasks/resendSteps';
+import { getVercelProgressSummaries } from '../tasks/vercelSteps';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
 import { prompt } from '../utils/prompts';
@@ -17,6 +22,12 @@ type MainMenuProps = {
   onSelectTask: (taskId: string) => void;
 };
 
+type ProgressSummary = {
+  label: string;
+  completedCount: number;
+  totalCount: number;
+};
+
 const getProjectConfigStatus = (config: ProjectConfig): MenuItem['status'] => {
   // Check if all project config steps are complete
   const { progress } = config.project;
@@ -24,87 +35,14 @@ const getProjectConfigStatus = (config: ProjectConfig): MenuItem['status'] => {
   return allComplete ? 'completed' : 'pending';
 };
 
-const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  const { progress, error } = config.infisical;
-  const completed = Object.values(progress).filter((v) => v === true).length;
+const getStatusFromSummaries = (
+  progress: Record<string, boolean>,
+  summaries: readonly ProgressSummary[],
+  error?: string,
+): { status: MenuItem['status']; details: string[] } => {
+  const completed = Object.values(progress).filter((value) => value === true).length;
   const total = Object.keys(progress).length;
-  const rootFolderCount = [
-    progress.createRootApiFolder,
-    progress.createRootWebFolder,
-    progress.createRootAdminFolder,
-    progress.createRootSuperadminFolder,
-  ].filter(Boolean).length;
-  const stagingFolderCount = [
-    progress.createStagingApiFolder,
-    progress.createStagingWebFolder,
-    progress.createStagingAdminFolder,
-    progress.createStagingSuperadminFolder,
-  ].filter(Boolean).length;
-  const prodFolderCount = [
-    progress.createProdApiFolder,
-    progress.createProdWebFolder,
-    progress.createProdAdminFolder,
-    progress.createProdSuperadminFolder,
-  ].filter(Boolean).length;
-  const stagingInheritanceCount = [
-    progress.createStagingApiRootImport,
-    progress.createStagingApiRootAppImport,
-    progress.createStagingApiEnvImport,
-    progress.createStagingWebRootImport,
-    progress.createStagingWebRootAppImport,
-    progress.createStagingWebEnvImport,
-    progress.createStagingAdminRootImport,
-    progress.createStagingAdminRootAppImport,
-    progress.createStagingAdminEnvImport,
-    progress.createStagingSuperadminRootImport,
-    progress.createStagingSuperadminRootAppImport,
-    progress.createStagingSuperadminEnvImport,
-  ].filter(Boolean).length;
-  const prodInheritanceCount = [
-    progress.createProdApiRootImport,
-    progress.createProdApiRootAppImport,
-    progress.createProdApiEnvImport,
-    progress.createProdWebRootImport,
-    progress.createProdWebRootAppImport,
-    progress.createProdWebEnvImport,
-    progress.createProdAdminRootImport,
-    progress.createProdAdminRootAppImport,
-    progress.createProdAdminEnvImport,
-    progress.createProdSuperadminRootImport,
-    progress.createProdSuperadminRootAppImport,
-    progress.createProdSuperadminEnvImport,
-  ].filter(Boolean).length;
-  const sharedIdentityCount = [
-    progress.storeProjectNameSecret,
-    progress.storeViteProjectNameSecret,
-    progress.storeViteAppShortNameSecret,
-  ].filter(Boolean).length;
-  const appNameCount = [
-    progress.storeWebAppNameSecret,
-    progress.storeAdminAppNameSecret,
-    progress.storeSuperadminAppNameSecret,
-  ].filter(Boolean).length;
-
-  const details: string[] = [];
-  if (progress.selectOrg) details.push('Organization selected');
-  if (progress.createProject) details.push('Project created');
-  if (progress.renameEnv) details.push('Environments configured');
-  if (rootFolderCount === 4) details.push('Root folders created');
-  else if (rootFolderCount > 0) details.push(`Root folders created (${rootFolderCount}/4)`);
-  if (stagingFolderCount === 4) details.push('Staging folders created');
-  else if (stagingFolderCount > 0) details.push(`Staging folders created (${stagingFolderCount}/4)`);
-  if (prodFolderCount === 4) details.push('Production folders created');
-  else if (prodFolderCount > 0) details.push(`Production folders created (${prodFolderCount}/4)`);
-  if (stagingInheritanceCount === 12) details.push('Staging inheritance configured');
-  else if (stagingInheritanceCount > 0) details.push(`Staging inheritance configured (${stagingInheritanceCount}/12)`);
-  if (prodInheritanceCount === 12) details.push('Production inheritance configured');
-  else if (prodInheritanceCount > 0) details.push(`Production inheritance configured (${prodInheritanceCount}/12)`);
-  if (sharedIdentityCount === 3) details.push('Shared app identity secrets stored');
-  else if (sharedIdentityCount > 0) details.push(`Shared app identity secrets stored (${sharedIdentityCount}/3)`);
-  if (appNameCount === 3) details.push('Per-app display names stored');
-  else if (appNameCount > 0) details.push(`Per-app display names stored (${appNameCount}/3)`);
-  if (progress.ensureProdApiAuthSecret) details.push('Production API auth secret initialized');
-  if (progress.ensureStagingApiAuthSecret) details.push('Staging API auth secret initialized');
+  const details = summaries.filter((summary) => summary.completedCount > 0).map((summary) => summary.label);
 
   if (error) {
     details.push(`Error: ${error}`);
@@ -113,218 +51,38 @@ const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']
   if (completed === 0) return { status: 'pending', details: [] };
   if (completed < total) return { status: 'incomplete', details };
   return { status: 'completed', details };
+};
+
+const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(
+    config.infisical.progress,
+    getInfisicalProgressSummaries(config),
+    config.infisical.error,
+  );
 };
 
 const getPlanetScaleStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  const { progress, error } = config.planetscale;
-  const completed = Object.values(progress).filter((v) => v === true).length;
-  const total = Object.keys(progress).length;
-
-  const details: string[] = [];
-  if (progress.selectOrg) details.push('Organization selected');
-  if (progress.selectRegion) details.push('Region selected');
-  if (progress.recordTokenId) details.push('Service token recorded');
-  if (
-    progress.storeOrganizationSecret &&
-    progress.storeRegionSecret &&
-    progress.storeTokenIdSecret &&
-    progress.storeTokenSecret
-  )
-    details.push('PlanetScale secrets stored in Infisical');
-  else {
-    if (progress.storeOrganizationSecret) details.push('PlanetScale organization stored');
-    if (progress.storeRegionSecret) details.push('PlanetScale region stored');
-    if (progress.storeTokenIdSecret) details.push('PlanetScale token ID stored');
-    if (progress.storeTokenSecret) details.push('PlanetScale token stored');
-  }
-  if (progress.createDB) details.push('Database created');
-  if (progress.renameProductionBranch) details.push('Production branch renamed');
-  if (progress.createStagingBranch) details.push('Staging branch created');
-  if (progress.createProdRole && progress.createStagingRole) details.push('Roles created');
-  else {
-    if (progress.createProdRole) details.push('Prod role created');
-    if (progress.createStagingRole) details.push('Staging role created');
-  }
-  if (progress.storeProdConnectionString && progress.storeStagingConnectionString)
-    details.push('Connection strings stored');
-  else {
-    if (progress.storeProdConnectionString) details.push('Prod connection string stored');
-    if (progress.storeStagingConnectionString) details.push('Staging connection string stored');
-  }
-  if (progress.initProdMigrationTable && progress.initStagingMigrationTable)
-    details.push('Migration tables initialized');
-  else {
-    if (progress.initProdMigrationTable) details.push('Prod migration table initialized');
-    if (progress.initStagingMigrationTable) details.push('Staging migration table initialized');
-  }
-  if (progress.configureDB) details.push('Database configured');
-
-  if (error) {
-    details.push(`Error: ${error}`);
-  }
-
-  if (completed === 0) return { status: 'pending', details: [] };
-  if (completed < total) return { status: 'incomplete', details };
-  return { status: 'completed', details };
+  return getStatusFromSummaries(
+    config.planetscale.progress,
+    getPlanetScaleProgressSummaries(config),
+    config.planetscale.error,
+  );
 };
 
 const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  const { progress, error } = config.railway;
-  const completed = Object.values(progress).filter((v) => v === true).length;
-  const total = Object.keys(progress).length;
-  const prodEnvironmentCount = [
-    progress.ensureProdEnvironment,
-    progress.storeProdEnvironmentIdSecret,
-    progress.deleteLegacyProductionEnvironment,
-  ].filter(Boolean).length;
-  const stagingEnvironmentCount = [progress.ensureStagingEnvironment, progress.storeStagingEnvironmentIdSecret].filter(
-    Boolean,
-  ).length;
-  const prodRedisCount = [
-    progress.ensureProdRedisService,
-    progress.captureProdRedisVolume,
-    progress.renameProdRedisService,
-    progress.renameProdRedisVolume,
-    progress.storeProdRedisUrl,
-  ].filter(Boolean).length;
-  const stagingRedisCount = [
-    progress.ensureStagingRedisService,
-    progress.captureStagingRedisVolume,
-    progress.renameStagingRedisService,
-    progress.renameStagingRedisVolume,
-    progress.storeStagingRedisUrl,
-  ].filter(Boolean).length;
-  const prodApiCount = [
-    progress.ensureProdApiService,
-    progress.storeProdApiServiceIdSecret,
-    progress.createInfisicalSyncProd,
-    progress.configureProdApiService,
-    progress.connectProdApiGithub,
-    progress.ensureProdApiDeployment,
-    progress.storeProdApiUrl,
-  ].filter(Boolean).length;
-  const stagingApiCount = [
-    progress.ensureStagingApiService,
-    progress.storeStagingApiServiceIdSecret,
-    progress.createInfisicalSyncStagingApi,
-    progress.configureStagingApiService,
-    progress.connectStagingApiGithub,
-    progress.ensureStagingApiDeployment,
-    progress.storeStagingApiUrl,
-  ].filter(Boolean).length;
-  const prodWorkerCount = [
-    progress.ensureProdWorkerService,
-    progress.storeProdWorkerServiceIdSecret,
-    progress.createInfisicalSyncProdWorker,
-    progress.configureProdWorkerService,
-    progress.connectProdWorkerGithub,
-    progress.ensureProdWorkerDeployment,
-  ].filter(Boolean).length;
-  const stagingWorkerCount = [
-    progress.ensureStagingWorkerService,
-    progress.storeStagingWorkerServiceIdSecret,
-    progress.createInfisicalSyncStagingWorker,
-    progress.configureStagingWorkerService,
-    progress.connectStagingWorkerGithub,
-    progress.ensureStagingWorkerDeployment,
-  ].filter(Boolean).length;
-
-  const details: string[] = [];
-  if (progress.selectWorkspace) details.push('Workspace selected');
-  if (progress.createProject) details.push('Project created');
-  if (prodEnvironmentCount === 3) details.push('Production environment ready');
-  else if (prodEnvironmentCount > 0) details.push(`Production environment ready (${prodEnvironmentCount}/3)`);
-  if (stagingEnvironmentCount === 2) details.push('Staging environment ready');
-  else if (stagingEnvironmentCount > 0) details.push(`Staging environment ready (${stagingEnvironmentCount}/2)`);
-  if (prodRedisCount === 5) details.push('Production Redis ready');
-  else if (prodRedisCount > 0) details.push(`Production Redis ready (${prodRedisCount}/5)`);
-  if (stagingRedisCount === 5) details.push('Staging Redis ready');
-  else if (stagingRedisCount > 0) details.push(`Staging Redis ready (${stagingRedisCount}/5)`);
-  if (prodApiCount === 7) details.push('Production API ready');
-  else if (prodApiCount > 0) details.push(`Production API ready (${prodApiCount}/7)`);
-  if (stagingApiCount === 7) details.push('Staging API ready');
-  else if (stagingApiCount > 0) details.push(`Staging API ready (${stagingApiCount}/7)`);
-  if (prodWorkerCount === 6) details.push('Production Worker ready');
-  else if (prodWorkerCount > 0) details.push(`Production Worker ready (${prodWorkerCount}/6)`);
-  if (stagingWorkerCount === 6) details.push('Staging Worker ready');
-  else if (stagingWorkerCount > 0) details.push(`Staging Worker ready (${stagingWorkerCount}/6)`);
-  if (progress.createInfisicalConnection) details.push('Infisical integration configured');
-
-  if (error) {
-    details.push(`Error: ${error}`);
-  }
-
-  if (completed === 0) return { status: 'pending', details: [] };
-  if (completed < total) return { status: 'incomplete', details };
-  return { status: 'completed', details };
+  return getStatusFromSummaries(config.railway.progress, getRailwayProgressSummaries(config), config.railway.error);
 };
 
 const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  const { progress, error } = config.vercel;
-  const completed = Object.values(progress).filter((v) => v === true).length;
-  const total = Object.keys(progress).length;
-  const bootstrapCount = [
-    progress.selectTeam,
-    progress.storeTeamIdSecret,
-    progress.storeTeamNameSecret,
-    progress.promptedForGithub,
-    progress.storeVercelToken,
-    progress.createInfisicalConnection,
-  ].filter(Boolean).length;
-
-  const details: string[] = [];
-  if (bootstrapCount === 6) details.push('Bootstrap ready');
-  else if (bootstrapCount > 0) details.push(`Bootstrap ready (${bootstrapCount}/6)`);
-  if (progress.createWebProject) details.push('Web project created');
-  if (progress.storeProdWebUrls && progress.storeStagingWebUrls) details.push('Web URLs stored');
-  else {
-    if (progress.storeProdWebUrls) details.push('Web production URL stored');
-    if (progress.storeStagingWebUrls) details.push('Web staging URL stored');
-  }
-  if (progress.createAdminProject) details.push('Admin project created');
-  if (progress.storeProdAdminUrls && progress.storeStagingAdminUrls) details.push('Admin URLs stored');
-  else {
-    if (progress.storeProdAdminUrls) details.push('Admin production URL stored');
-    if (progress.storeStagingAdminUrls) details.push('Admin staging URL stored');
-  }
-  if (progress.createSuperadminProject) details.push('Superadmin project created');
-  if (progress.storeProdSuperadminUrls && progress.storeStagingSuperadminUrls) details.push('Superadmin URLs stored');
-  else {
-    if (progress.storeProdSuperadminUrls) details.push('Superadmin production URL stored');
-    if (progress.storeStagingSuperadminUrls) details.push('Superadmin staging URL stored');
-  }
-  if (progress.linkWebGitHub) details.push('GitHub linked');
-  if (progress.deployProduction) details.push('Production deployment complete');
-
-  if (error) {
-    details.push(`Error: ${error}`);
-  }
-
-  if (completed === 0) return { status: 'pending', details: [] };
-  if (completed < total) return { status: 'incomplete', details };
-  return { status: 'completed', details };
+  return getStatusFromSummaries(config.vercel.progress, getVercelProgressSummaries(config), config.vercel.error);
 };
 
 const getLaunchStatus = (config: ProjectConfig): MenuItem['status'] => {
   return config.launched ? 'completed' : 'pending';
 };
 
-const getEmailStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  const { progress, error } = config.email;
-  const completed = Object.values(progress).filter((v) => v === true).length;
-  const total = Object.keys(progress).length;
-
-  const details: string[] = [];
-  if (progress.storeProdApiKey && progress.storeStagingApiKey) details.push('API key stored in Infisical');
-  if (progress.storeProdFromAddress && progress.storeStagingFromAddress)
-    details.push('From address stored in Infisical');
-  if (progress.addDomain) details.push('Domain registered with Resend');
-  if (progress.confirmDns) details.push('DNS records confirmed');
-  if (error) details.push(`Error: ${error}`);
-
-  if (completed === 0) return { status: 'pending', details: [] };
-  if (completed < total) return { status: 'incomplete', details };
-  return { status: 'completed', details };
+const getResendStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(config.resend.progress, getResendProgressSummaries(config), config.resend.error);
 };
 
 const DEFAULT_ITEMS: MenuItem[] = [
@@ -365,7 +123,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const planetscaleStatus = getPlanetScaleStatus(cfg);
       const railwayStatus = getRailwayStatus(cfg);
       const vercelStatus = getVercelStatus(cfg);
-      const emailStatus = getEmailStatus(cfg);
+      const resendStatus = getResendStatus(cfg);
       const launchStatus = getLaunchStatus(cfg);
 
       const updatedItems = [
@@ -390,6 +148,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           label: '4. Railway Setup',
           value: 'railway',
           status: railwayStatus.status,
+          progressDetails: railwayStatus.details,
         },
         {
           label: '5. Vercel Setup',
@@ -400,8 +159,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
         {
           label: '6. Resend Setup',
           value: 'resend',
-          status: emailStatus.status,
-          progressDetails: emailStatus.details,
+          status: resendStatus.status,
+          progressDetails: resendStatus.details,
         },
         { label: '7. Optional Integrations', value: 'integrations', status: 'pending' },
         { label: '8. DNS Configuration', value: 'dns', status: 'pending' },

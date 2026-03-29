@@ -1,12 +1,10 @@
-import { rmSync, writeFileSync } from 'node:fs';
-import { mkdirSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, test } from 'bun:test';
 import { VCR } from '@template/shared/vcr';
 
 const FIXTURES_DIR = join(import.meta.dir, '..', '..', 'fixtures', 'acme');
-const ERROR_FIXTURES_DIR = join(FIXTURES_DIR, 'errors');
 
 describe('VCR — per-method capture (playback)', () => {
   test('returns body from queued fixture', async () => {
@@ -17,9 +15,9 @@ describe('VCR — per-method capture (playback)', () => {
   });
 
   test('throws for error fixtures (status >= 400)', async () => {
-    const vcr = new VCR(ERROR_FIXTURES_DIR);
-    vcr.queue('rateLimited', 'default');
-    await expect(vcr.capture('rateLimited', async () => {})).rejects.toThrow();
+    const vcr = new VCR(FIXTURES_DIR);
+    vcr.queue('message', 'rateLimited');
+    await expect(vcr.capture('message', async () => {})).rejects.toThrow();
   });
 
   test('consumes per-method queue in FIFO order', async () => {
@@ -81,6 +79,22 @@ describe('VCR — record', () => {
     expect((result as { secret: string }).secret).toBe('REDACTED');
     expect((result as { nested: { token: string } }).nested.token).toBe('REDACTED');
     expect((result as { id: string }).id).toBe('keep');
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('records raw JSON payloads without requiring an HTTP-shaped fixture body', async () => {
+    const vcr = new VCR(tmpDir);
+    const payload = [{ id: 'one' }, { id: 'two', nested: { ok: true } }];
+
+    vcr.queue('rawPayload', 'test');
+    const result = await vcr.capture('rawPayload', async () => payload);
+
+    expect(result).toEqual(payload);
+    expect(JSON.parse(readFileSync(join(tmpDir, 'rawPayload.test.json'), 'utf-8'))).toEqual({
+      status: 200,
+      body: payload,
+    });
+
     rmSync(tmpDir, { recursive: true, force: true });
   });
 });

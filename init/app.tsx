@@ -2,7 +2,6 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { ConfigProvider } from './utils/configState';
-import { EmailSetupView } from './views/EmailSetupView';
 import { InfisicalSetupView } from './views/InfisicalSetupView';
 import { LaunchView } from './views/LaunchView';
 import { MainMenu } from './views/MainMenu';
@@ -10,6 +9,7 @@ import { PlanetScaleSetupView } from './views/PlanetScaleSetupView';
 import { Prerequisites } from './views/Prerequisites';
 import { ProjectConfigView } from './views/ProjectConfigView';
 import { RailwaySetupView } from './views/RailwaySetupView';
+import { ResendSetupView } from './views/ResendSetupView';
 import { VercelSetupView } from './views/VercelSetupView';
 
 type AppState = 'prerequisites' | 'menu' | 'task';
@@ -70,7 +70,9 @@ export const App: React.FC = () => {
             {currentTask === 'vercel' && (
               <VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
-            {currentTask === 'resend' && <EmailSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
+            {currentTask === 'resend' && (
+              <ResendSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'launch' && <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
             {currentTask !== 'project-config' &&
               currentTask !== 'infisical' &&

@@ -9,6 +9,7 @@ import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
 import { setupRailway } from '../tasks/railwaySetup';
+import { getRailwayProgressItems } from '../tasks/railwaySteps';
 import { clearAllProgress, clearConfigError, setConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
@@ -52,154 +53,6 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
   return 'incomplete';
 };
 
-const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
-  // Railway config might not exist yet
-  if (!config.railway) {
-    return [];
-  }
-
-  const {
-    progress,
-    workspaceId,
-    projectId,
-    prodEnvironmentId,
-    stagingEnvironmentId,
-    prodApiServiceId,
-    stagingApiServiceId,
-    prodWorkerServiceId,
-    stagingWorkerServiceId,
-    prodRedisServiceId,
-    stagingRedisServiceId,
-  } = config.railway;
-  const prodEnvironmentCount = [
-    progress.ensureProdEnvironment,
-    progress.storeProdEnvironmentIdSecret,
-    progress.deleteLegacyProductionEnvironment,
-  ].filter(Boolean).length;
-  const stagingEnvironmentCount = [progress.ensureStagingEnvironment, progress.storeStagingEnvironmentIdSecret].filter(
-    Boolean,
-  ).length;
-  const prodRedisCount = [
-    progress.ensureProdRedisService,
-    progress.captureProdRedisVolume,
-    progress.renameProdRedisService,
-    progress.renameProdRedisVolume,
-    progress.storeProdRedisUrl,
-  ].filter(Boolean).length;
-  const stagingRedisCount = [
-    progress.ensureStagingRedisService,
-    progress.captureStagingRedisVolume,
-    progress.renameStagingRedisService,
-    progress.renameStagingRedisVolume,
-    progress.storeStagingRedisUrl,
-  ].filter(Boolean).length;
-  const prodApiCount = [
-    progress.ensureProdApiService,
-    progress.storeProdApiServiceIdSecret,
-    progress.createInfisicalSyncProd,
-    progress.configureProdApiService,
-    progress.connectProdApiGithub,
-    progress.ensureProdApiDeployment,
-    progress.storeProdApiUrl,
-  ].filter(Boolean).length;
-  const stagingApiCount = [
-    progress.ensureStagingApiService,
-    progress.storeStagingApiServiceIdSecret,
-    progress.createInfisicalSyncStagingApi,
-    progress.configureStagingApiService,
-    progress.connectStagingApiGithub,
-    progress.ensureStagingApiDeployment,
-    progress.storeStagingApiUrl,
-  ].filter(Boolean).length;
-  const prodWorkerCount = [
-    progress.ensureProdWorkerService,
-    progress.storeProdWorkerServiceIdSecret,
-    progress.createInfisicalSyncProdWorker,
-    progress.configureProdWorkerService,
-    progress.connectProdWorkerGithub,
-    progress.ensureProdWorkerDeployment,
-  ].filter(Boolean).length;
-  const stagingWorkerCount = [
-    progress.ensureStagingWorkerService,
-    progress.storeStagingWorkerServiceIdSecret,
-    progress.createInfisicalSyncStagingWorker,
-    progress.configureStagingWorkerService,
-    progress.connectStagingWorkerGithub,
-    progress.ensureStagingWorkerDeployment,
-  ].filter(Boolean).length;
-
-  return [
-    {
-      label: workspaceId ? `Workspace selected: ${workspaceId}` : 'Workspace selected',
-      completed: progress.selectWorkspace,
-    },
-    {
-      label: 'Railway token stored in Infisical',
-      completed: progress.storeRailwayToken,
-    },
-    {
-      label: projectId ? `Project created: ${projectId}` : 'Project created',
-      completed: progress.createProject,
-    },
-    {
-      label: prodEnvironmentId
-        ? `Production environment ready (${prodEnvironmentCount}/3): ${prodEnvironmentId}`
-        : `Production environment ready (${prodEnvironmentCount}/3)`,
-      completed: prodEnvironmentCount === 3,
-    },
-    {
-      label: stagingEnvironmentId
-        ? `Staging environment ready (${stagingEnvironmentCount}/2): ${stagingEnvironmentId}`
-        : `Staging environment ready (${stagingEnvironmentCount}/2)`,
-      completed: stagingEnvironmentCount === 2,
-    },
-    {
-      label: prodRedisServiceId
-        ? `Prod Redis ready (${prodRedisCount}/5): ${prodRedisServiceId}`
-        : `Prod Redis ready (${prodRedisCount}/5)`,
-      completed: prodRedisCount === 5,
-    },
-    {
-      label: stagingRedisServiceId
-        ? `Staging Redis ready (${stagingRedisCount}/5): ${stagingRedisServiceId}`
-        : `Staging Redis ready (${stagingRedisCount}/5)`,
-      completed: stagingRedisCount === 5,
-    },
-    {
-      label: 'Infisical Railway connection created',
-      completed: progress.createInfisicalConnection,
-    },
-    {
-      label: 'GitHub setup confirmed',
-      completed: progress.promptedForGithub,
-    },
-    {
-      label: prodApiServiceId
-        ? `Prod API ready (${prodApiCount}/7): ${prodApiServiceId}`
-        : `Prod API ready (${prodApiCount}/7)`,
-      completed: prodApiCount === 7,
-    },
-    {
-      label: stagingApiServiceId
-        ? `Staging API ready (${stagingApiCount}/7): ${stagingApiServiceId}`
-        : `Staging API ready (${stagingApiCount}/7)`,
-      completed: stagingApiCount === 7,
-    },
-    {
-      label: prodWorkerServiceId
-        ? `Prod Worker ready (${prodWorkerCount}/6): ${prodWorkerServiceId}`
-        : `Prod Worker ready (${prodWorkerCount}/6)`,
-      completed: prodWorkerCount === 6,
-    },
-    {
-      label: stagingWorkerServiceId
-        ? `Staging Worker ready (${stagingWorkerCount}/6): ${stagingWorkerServiceId}`
-        : `Staging Worker ready (${stagingWorkerCount}/6)`,
-      completed: stagingWorkerCount === 6,
-    },
-  ];
-};
-
 export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, onCancel }) => {
   const { config, syncConfig } = useConfig();
   const [viewState, setViewState] = useState<ViewState>('status');
@@ -214,7 +67,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
 
   // Progress items
-  const progressItems = useMemo(() => (config ? getProgressDisplay(config) : []), [config]);
+  const progressItems = useMemo(() => (config ? getRailwayProgressItems(config) : []), [config]);
 
   // Load workspaces on mount
   useEffect(() => {

@@ -159,7 +159,7 @@ export type ProjectConfig = {
     };
     error: string;
   };
-  email: {
+  resend: {
     provider: 'resend' | 'console';
     fromAddress: string;
     domainId: string;
@@ -229,7 +229,11 @@ export type ProjectConfig = {
   };
 };
 
-const defaultEmailProgress: ProjectConfig['email']['progress'] = {
+type LegacyProjectConfig = Partial<ProjectConfig> & {
+  email?: ProjectConfig['resend'];
+};
+
+const defaultResendProgress: ProjectConfig['resend']['progress'] = {
   storeProdApiKey: false,
   storeStagingApiKey: false,
   storeProdFromAddress: false,
@@ -238,9 +242,9 @@ const defaultEmailProgress: ProjectConfig['email']['progress'] = {
   confirmDns: false,
 };
 
-const normalizeEmailProgress = (
+const normalizeResendProgress = (
   progress: Partial<Record<string, boolean>> | undefined,
-): ProjectConfig['email']['progress'] => {
+): ProjectConfig['resend']['progress'] => {
   const raw = progress ?? {};
   return {
     storeProdApiKey: raw.storeProdApiKey === true,
@@ -637,34 +641,73 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
   try {
     // Bust import cache with timestamp to get fresh config
     const module = await import(`${configPath}?t=${Date.now()}`);
-    const config = module.projectConfig as ProjectConfig;
+    const config = module.projectConfig as LegacyProjectConfig;
+    const resendConfig = config.resend ?? config.email;
 
     return {
-      ...config,
-      email: {
-        provider: config.email?.provider ?? 'resend',
-        fromAddress: config.email?.fromAddress ?? '',
-        domainId: config.email?.domainId ?? '',
-        configProjectName: config.email?.configProjectName ?? '',
-        progress: normalizeEmailProgress(config.email?.progress),
-        error: config.email?.error ?? '',
+      launched: config.launched ?? false,
+      project: {
+        name: config.project?.name ?? 'template',
+        organization: config.project?.organization ?? '',
+        progress: {
+          renameOrg: config.project?.progress.renameOrg === true,
+          renameProject: config.project?.progress.renameProject === true,
+          setup: config.project?.progress.setup === true,
+        },
+      },
+      resend: {
+        provider: resendConfig?.provider ?? 'resend',
+        fromAddress: resendConfig?.fromAddress ?? '',
+        domainId: resendConfig?.domainId ?? '',
+        configProjectName: resendConfig?.configProjectName ?? '',
+        progress: normalizeResendProgress(resendConfig?.progress),
+        error: resendConfig?.error ?? '',
       },
       infisical: {
-        ...config.infisical,
+        projectId: config.infisical?.projectId ?? '',
+        organizationId: config.infisical?.organizationId ?? '',
+        organizationSlug: config.infisical?.organizationSlug ?? '',
+        projectSlug: config.infisical?.projectSlug ?? '',
+        configProjectName: config.infisical?.configProjectName ?? '',
         progress: normalizeInfisicalProgress(config.infisical?.progress),
+        error: config.infisical?.error ?? '',
       },
       planetscale: {
-        ...config.planetscale,
+        organization: config.planetscale?.organization ?? '',
+        region: config.planetscale?.region ?? '',
+        database: config.planetscale?.database ?? '',
+        tokenId: config.planetscale?.tokenId ?? '',
+        configProjectName: config.planetscale?.configProjectName ?? '',
         progress: normalizePlanetScaleProgress(config.planetscale?.progress),
+        error: config.planetscale?.error ?? '',
       },
       railway: {
-        ...config.railway,
+        projectId: config.railway?.projectId ?? '',
+        workspaceId: config.railway?.workspaceId ?? '',
+        prodEnvironmentId: config.railway?.prodEnvironmentId ?? '',
+        stagingEnvironmentId: config.railway?.stagingEnvironmentId ?? '',
+        prodApiServiceId: config.railway?.prodApiServiceId ?? '',
+        stagingApiServiceId: config.railway?.stagingApiServiceId ?? '',
+        prodWorkerServiceId: config.railway?.prodWorkerServiceId ?? '',
+        stagingWorkerServiceId: config.railway?.stagingWorkerServiceId ?? '',
+        prodRedisServiceId: config.railway?.prodRedisServiceId ?? '',
+        stagingRedisServiceId: config.railway?.stagingRedisServiceId ?? '',
+        prodRedisVolumeId: config.railway?.prodRedisVolumeId ?? '',
+        stagingRedisVolumeId: config.railway?.stagingRedisVolumeId ?? '',
+        configProjectName: config.railway?.configProjectName ?? '',
         progress: normalizeRailwayProgress(config.railway?.progress),
+        error: config.railway?.error ?? '',
       },
       vercel: {
-        ...config.vercel,
+        teamId: config.vercel?.teamId ?? '',
+        teamName: config.vercel?.teamName ?? '',
         connectionId: config.vercel?.connectionId ?? '',
+        webProjectId: config.vercel?.webProjectId ?? '',
+        adminProjectId: config.vercel?.adminProjectId ?? '',
+        superadminProjectId: config.vercel?.superadminProjectId ?? '',
+        configProjectName: config.vercel?.configProjectName ?? '',
         progress: normalizeVercelProgress(config.vercel?.progress),
+        error: config.vercel?.error ?? '',
       },
     };
   } catch (error) {
@@ -691,14 +734,17 @@ export const getProjectConfigPath = (): string => {
 export const writeProjectConfig = async (config: ProjectConfig): Promise<void> => {
   const { writeFileSync } = await import('node:fs');
   const configPath = getProjectConfigPath();
+  const { email: _legacyEmail, ...restConfig } = config as ProjectConfig & {
+    email?: ProjectConfig['resend'];
+  };
 
   const normalizedConfig: ProjectConfig = {
-    ...config,
-    email: {
-      ...config.email,
+    ...restConfig,
+    resend: {
+      ...config.resend,
       progress: {
-        ...defaultEmailProgress,
-        ...config.email.progress,
+        ...defaultResendProgress,
+        ...config.resend.progress,
       },
     },
     infisical: {

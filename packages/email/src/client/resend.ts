@@ -1,8 +1,21 @@
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { Resend } from 'resend';
 
+const resendClients = new Map<string, Resend>();
+
+const getResendClient = (apiKey: string): Resend => {
+  const existingClient = resendClients.get(apiKey);
+  if (existingClient) {
+    return existingClient;
+  }
+
+  const resendClient = new Resend(apiKey);
+  resendClients.set(apiKey, resendClient);
+  return resendClient;
+};
+
 export const createResendClient = (apiKey: string): EmailClient => {
-  const resend = new Resend(apiKey);
+  const resend = getResendClient(apiKey);
 
   return {
     send: async (options: SendEmailOptions): Promise<SendEmailResult> => {

@@ -10,18 +10,10 @@ const execAsync = promisify(exec);
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
 const SANITIZE_KEYS = ['plain_text', 'username', 'connection_strings.general'];
-const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH]
-  .filter(Boolean)
-  .join(':');
+const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
 
 const withCliEnv = (
-  options: {
-    cwd?: string;
-    encoding?: BufferEncoding;
-    env?: NodeJS.ProcessEnv;
-    shell?: string;
-    timeout?: number;
-  } = {},
+  options: { cwd?: string; encoding?: BufferEncoding; env?: NodeJS.ProcessEnv; shell?: string; timeout?: number } = {},
 ) => ({
   ...options,
   env: {
@@ -153,8 +145,11 @@ class PlanetScaleApi {
     region: string = 'us-east-1',
     clusterSize: string = 'PS-5',
   ): Promise<PlanetScaleDatabase> {
-    if (process.env.NODE_ENV !== 'test') return this._createDatabase(organizationName, databaseName, region, clusterSize);
-    return this.vcr.capture('createDatabase', () => this._createDatabase(organizationName, databaseName, region, clusterSize));
+    if (process.env.NODE_ENV !== 'test')
+      return this._createDatabase(organizationName, databaseName, region, clusterSize);
+    return this.vcr.capture('createDatabase', () =>
+      this._createDatabase(organizationName, databaseName, region, clusterSize),
+    );
   }
   private async _createDatabase(
     organizationName: string,
@@ -162,13 +157,10 @@ class PlanetScaleApi {
     region: string,
     clusterSize: string,
   ): Promise<PlanetScaleDatabase> {
-    const response = await this._fetch<{ data: PlanetScaleDatabase }>(
-      `/organizations/${organizationName}/databases`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ name: databaseName, cluster_size: clusterSize, region, kind: 'postgresql', replicas: 0 }),
-      },
-    );
+    const response = await this._fetch<{ data: PlanetScaleDatabase }>(`/organizations/${organizationName}/databases`, {
+      method: 'POST',
+      body: JSON.stringify({ name: databaseName, cluster_size: clusterSize, region, kind: 'postgresql', replicas: 0 }),
+    });
     return response.data;
   }
 
@@ -227,8 +219,11 @@ class PlanetScaleApi {
     branchName: string,
     parentBranch?: string,
   ): Promise<PlanetScaleBranch> {
-    if (process.env.NODE_ENV !== 'test') return this._createBranch(organizationName, databaseName, branchName, parentBranch);
-    return this.vcr.capture('createBranch', () => this._createBranch(organizationName, databaseName, branchName, parentBranch));
+    if (process.env.NODE_ENV !== 'test')
+      return this._createBranch(organizationName, databaseName, branchName, parentBranch);
+    return this.vcr.capture('createBranch', () =>
+      this._createBranch(organizationName, databaseName, branchName, parentBranch),
+    );
   }
   private async _createBranch(
     organizationName: string,
@@ -244,11 +239,7 @@ class PlanetScaleApi {
     return JSON.parse(stdout);
   }
 
-  async getBranch(
-    organizationName: string,
-    databaseName: string,
-    branchName: string,
-  ): Promise<PlanetScaleBranch> {
+  async getBranch(organizationName: string, databaseName: string, branchName: string): Promise<PlanetScaleBranch> {
     if (process.env.NODE_ENV !== 'test') return this._getBranch(organizationName, databaseName, branchName);
     return this.vcr.capture('getBranch', () => this._getBranch(organizationName, databaseName, branchName));
   }
@@ -312,7 +303,8 @@ class PlanetScaleApi {
     branchName: string,
     passwordName: string,
   ): Promise<PlanetScalePassword> {
-    if (process.env.NODE_ENV !== 'test') return this._createPassword(organizationName, databaseName, branchName, passwordName);
+    if (process.env.NODE_ENV !== 'test')
+      return this._createPassword(organizationName, databaseName, branchName, passwordName);
     return this.vcr.capture('createPassword', () =>
       this._createPassword(organizationName, databaseName, branchName, passwordName),
     );
@@ -358,11 +350,7 @@ class PlanetScaleApi {
     return response.data ?? [];
   }
 
-  async promoteBranch(
-    organizationName: string,
-    databaseName: string,
-    branchName: string,
-  ): Promise<PlanetScaleBranch> {
+  async promoteBranch(organizationName: string, databaseName: string, branchName: string): Promise<PlanetScaleBranch> {
     if (process.env.NODE_ENV !== 'test') return this._promoteBranch(organizationName, databaseName, branchName);
     return this.vcr.capture('promoteBranch', () => this._promoteBranch(organizationName, databaseName, branchName));
   }
@@ -385,7 +373,9 @@ class PlanetScaleApi {
     newName: string,
   ): Promise<PlanetScaleBranch> {
     if (process.env.NODE_ENV !== 'test') return this._renameBranch(organizationName, databaseName, branchName, newName);
-    return this.vcr.capture('renameBranch', () => this._renameBranch(organizationName, databaseName, branchName, newName));
+    return this.vcr.capture('renameBranch', () =>
+      this._renameBranch(organizationName, databaseName, branchName, newName),
+    );
   }
   private async _renameBranch(
     organizationName: string,
@@ -399,19 +389,11 @@ class PlanetScaleApi {
     );
   }
 
-  async deleteBranch(
-    organizationName: string,
-    databaseName: string,
-    branchName: string,
-  ): Promise<void> {
+  async deleteBranch(organizationName: string, databaseName: string, branchName: string): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._deleteBranch(organizationName, databaseName, branchName);
     return this.vcr.capture('deleteBranch', () => this._deleteBranch(organizationName, databaseName, branchName));
   }
-  private async _deleteBranch(
-    organizationName: string,
-    databaseName: string,
-    branchName: string,
-  ): Promise<void> {
+  private async _deleteBranch(organizationName: string, databaseName: string, branchName: string): Promise<void> {
     await execAsync(
       `pscale branch delete ${databaseName} ${branchName} --org ${organizationName} --force`,
       withCliEnv({ encoding: 'utf-8' }),

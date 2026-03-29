@@ -3,7 +3,9 @@ import { infisicalVercelApi } from '../../api/infisicalVercel';
 import { defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
-const readFileMock = mock(async () => JSON.stringify({ token: process.env.VERCEL_API_TOKEN ?? 'vercel-token-from-file' }));
+const readFileMock = mock(async () =>
+  JSON.stringify({ token: process.env.VERCEL_API_TOKEN ?? 'vercel-token-from-file' }),
+);
 const getProjectConfigMock = mock(async () => currentConfig);
 const updateConfigFieldMock = mock(async (section: string, field: string, value: string) => {
   (currentConfig[section as keyof ProjectConfig] as Record<string, unknown>)[field] = value;

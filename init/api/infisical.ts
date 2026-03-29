@@ -7,9 +7,7 @@ const execAsync = promisify(exec);
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');
-const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH]
-  .filter(Boolean)
-  .join(':');
+const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
 
 export type InfisicalApp = 'api' | 'web' | 'admin' | 'superadmin';
 
@@ -145,11 +143,7 @@ class InfisicalApi {
     if (process.env.NODE_ENV !== 'test') return this._upsertEnvironment(projectId, name, slug);
     return this.vcr.capture('upsertEnvironment', () => this._upsertEnvironment(projectId, name, slug));
   }
-  private async _upsertEnvironment(
-    projectId: string,
-    name: string,
-    slug: string,
-  ): Promise<InfisicalEnvironment> {
+  private async _upsertEnvironment(projectId: string, name: string, slug: string): Promise<InfisicalEnvironment> {
     try {
       const createResponse = await this._fetch<{ environment: InfisicalEnvironment }>(
         `/v1/projects/${projectId}/environments`,
@@ -204,12 +198,7 @@ class InfisicalApi {
     if (process.env.NODE_ENV !== 'test') return this._createFolder(projectId, environment, name, path);
     return this.vcr.capture('createFolder', () => this._createFolder(projectId, environment, name, path));
   }
-  private async _createFolder(
-    projectId: string,
-    environment: string,
-    name: string,
-    path: string,
-  ): Promise<unknown> {
+  private async _createFolder(projectId: string, environment: string, name: string, path: string): Promise<unknown> {
     try {
       return await this._fetch('/v2/folders', {
         method: 'POST',
@@ -229,7 +218,13 @@ class InfisicalApi {
     sourcePath: string,
   ): Promise<void> {
     if (process.env.NODE_ENV !== 'test') {
-      return this._createSecretImport(projectId, destinationEnvironment, destinationPath, sourceEnvironment, sourcePath);
+      return this._createSecretImport(
+        projectId,
+        destinationEnvironment,
+        destinationPath,
+        sourceEnvironment,
+        sourcePath,
+      );
     }
     return this.vcr.capture('createSecretImport', () =>
       this._createSecretImport(projectId, destinationEnvironment, destinationPath, sourceEnvironment, sourcePath),
@@ -280,7 +275,14 @@ class InfisicalApi {
     try {
       await this._fetch('/v3/secrets/raw', {
         method: 'POST',
-        body: JSON.stringify({ workspaceId: projectId, environment, secretPath: path, secretKey: key, secretValue: value, type }),
+        body: JSON.stringify({
+          workspaceId: projectId,
+          environment,
+          secretPath: path,
+          secretKey: key,
+          secretValue: value,
+          type,
+        }),
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {

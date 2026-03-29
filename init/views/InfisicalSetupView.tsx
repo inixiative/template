@@ -5,6 +5,7 @@ import { infisicalApi } from '../api/infisical';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { setupInfisical } from '../tasks/infisicalSetup';
+import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
@@ -41,117 +42,6 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
 
   // Incomplete otherwise
   return 'incomplete';
-};
-
-const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
-  const { progress, organizationSlug, projectSlug } = config.infisical;
-  const rootFolderCount = [
-    progress.createRootApiFolder,
-    progress.createRootWebFolder,
-    progress.createRootAdminFolder,
-    progress.createRootSuperadminFolder,
-  ].filter(Boolean).length;
-  const stagingFolderCount = [
-    progress.createStagingApiFolder,
-    progress.createStagingWebFolder,
-    progress.createStagingAdminFolder,
-    progress.createStagingSuperadminFolder,
-  ].filter(Boolean).length;
-  const prodFolderCount = [
-    progress.createProdApiFolder,
-    progress.createProdWebFolder,
-    progress.createProdAdminFolder,
-    progress.createProdSuperadminFolder,
-  ].filter(Boolean).length;
-  const stagingInheritanceCount = [
-    progress.createStagingApiRootImport,
-    progress.createStagingApiRootAppImport,
-    progress.createStagingApiEnvImport,
-    progress.createStagingWebRootImport,
-    progress.createStagingWebRootAppImport,
-    progress.createStagingWebEnvImport,
-    progress.createStagingAdminRootImport,
-    progress.createStagingAdminRootAppImport,
-    progress.createStagingAdminEnvImport,
-    progress.createStagingSuperadminRootImport,
-    progress.createStagingSuperadminRootAppImport,
-    progress.createStagingSuperadminEnvImport,
-  ].filter(Boolean).length;
-  const prodInheritanceCount = [
-    progress.createProdApiRootImport,
-    progress.createProdApiRootAppImport,
-    progress.createProdApiEnvImport,
-    progress.createProdWebRootImport,
-    progress.createProdWebRootAppImport,
-    progress.createProdWebEnvImport,
-    progress.createProdAdminRootImport,
-    progress.createProdAdminRootAppImport,
-    progress.createProdAdminEnvImport,
-    progress.createProdSuperadminRootImport,
-    progress.createProdSuperadminRootAppImport,
-    progress.createProdSuperadminEnvImport,
-  ].filter(Boolean).length;
-  const sharedIdentityCount = [
-    progress.storeProjectNameSecret,
-    progress.storeViteProjectNameSecret,
-    progress.storeViteAppShortNameSecret,
-  ].filter(Boolean).length;
-  const appNameCount = [
-    progress.storeWebAppNameSecret,
-    progress.storeAdminAppNameSecret,
-    progress.storeSuperadminAppNameSecret,
-  ].filter(Boolean).length;
-
-  return [
-    {
-      label: organizationSlug ? `Organization selected: ${organizationSlug}` : 'Organization selected',
-      completed: progress.selectOrg,
-    },
-    {
-      label: projectSlug ? `Project created: ${projectSlug}` : 'Project created',
-      completed: progress.createProject,
-    },
-    {
-      label: 'Environments configured',
-      completed: progress.renameEnv,
-    },
-    {
-      label: `Root app folders created (${rootFolderCount}/4)`,
-      completed: rootFolderCount === 4,
-    },
-    {
-      label: `Staging app folders created (${stagingFolderCount}/4)`,
-      completed: stagingFolderCount === 4,
-    },
-    {
-      label: `Production app folders created (${prodFolderCount}/4)`,
-      completed: prodFolderCount === 4,
-    },
-    {
-      label: `Staging inheritance chains configured (${stagingInheritanceCount}/12)`,
-      completed: stagingInheritanceCount === 12,
-    },
-    {
-      label: `Production inheritance chains configured (${prodInheritanceCount}/12)`,
-      completed: prodInheritanceCount === 12,
-    },
-    {
-      label: `Shared app identity secrets stored (${sharedIdentityCount}/3)`,
-      completed: sharedIdentityCount === 3,
-    },
-    {
-      label: `Per-app display names stored (${appNameCount}/3)`,
-      completed: appNameCount === 3,
-    },
-    {
-      label: 'Production API auth secret initialized',
-      completed: progress.ensureProdApiAuthSecret,
-    },
-    {
-      label: 'Staging API auth secret initialized',
-      completed: progress.ensureStagingApiAuthSecret,
-    },
-  ];
 };
 
 export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComplete, onCancel }) => {
@@ -313,7 +203,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
     );
   }
 
-  const progressItems = getProgressDisplay(config);
+  const progressItems = getInfisicalProgressSummaries(config).map(({ label, completed }) => ({ label, completed }));
   const error = config.infisical.error;
 
   return (

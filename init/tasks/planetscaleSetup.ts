@@ -177,20 +177,23 @@ export const setupPlanetScale = async (
     let _stagingBranch: Awaited<ReturnType<typeof planetscaleApi.getBranch>> | undefined;
     if (!(await isProgressComplete('planetscale', 'createStagingBranch'))) {
       try {
-        _stagingBranch = await retryWithTimeout(() => planetscaleApi.createBranch(organization, databaseName, 'staging', 'prod'), {
-          maxRetries: 100,
-          delayMs: 3000,
-          retryCondition: (error) => {
-            const msg = error.message.toLowerCase();
-            return (
-              msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
-            );
+        _stagingBranch = await retryWithTimeout(
+          () => planetscaleApi.createBranch(organization, databaseName, 'staging', 'prod'),
+          {
+            maxRetries: 100,
+            delayMs: 3000,
+            retryCondition: (error) => {
+              const msg = error.message.toLowerCase();
+              return (
+                msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
+              );
+            },
+            timeoutMessage: 'Staging branch creation timed out after 5 minutes - cluster not fully initialized',
+            onRetry: async (attempt, maxRetries) => {
+              await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
+            },
           },
-          timeoutMessage: 'Staging branch creation timed out after 5 minutes - cluster not fully initialized',
-          onRetry: async (attempt, maxRetries) => {
-            await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
-          },
-        });
+        );
       } catch (error) {
         if (error instanceof Error && error.message.includes('already exists')) {
           _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');

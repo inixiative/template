@@ -6,7 +6,7 @@ import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
  */
 export const updateConfigField = async (section: string, key: string, value: string): Promise<void> => {
   const config = await getProjectConfig();
-  (config as Record<string, Record<string, unknown>>)[section][key] = value;
+  (config as unknown as Record<string, Record<string, unknown>>)[section][key] = value;
   await writeProjectConfig(config);
 };
 
@@ -16,7 +16,7 @@ export const updateConfigField = async (section: string, key: string, value: str
  */
 export const setProgressComplete = async (section: string, action: string): Promise<void> => {
   const config = await getProjectConfig();
-  (config as Record<string, { progress: Record<string, boolean> }>)[section].progress[action] = true;
+  (config as unknown as Record<string, { progress: Record<string, boolean> }>)[section].progress[action] = true;
   await writeProjectConfig(config);
 };
 
@@ -25,7 +25,9 @@ export const setProgressComplete = async (section: string, action: string): Prom
  */
 export const isProgressComplete = async (section: string, action: string): Promise<boolean> => {
   const config = await getProjectConfig();
-  return (config as Record<string, { progress: Record<string, boolean> }>)[section].progress[action] === true;
+  return (
+    (config as unknown as Record<string, { progress: Record<string, boolean> }>)[section].progress[action] === true
+  );
 };
 
 /**
@@ -33,7 +35,7 @@ export const isProgressComplete = async (section: string, action: string): Promi
  */
 export const clearAllProgress = async (section: string): Promise<void> => {
   const config = await getProjectConfig();
-  const progress = (config as Record<string, { progress: Record<string, boolean> }>)[section].progress;
+  const progress = (config as unknown as Record<string, { progress: Record<string, boolean> }>)[section].progress;
   for (const key in progress) {
     progress[key] = false;
   }

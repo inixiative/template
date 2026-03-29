@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { type PreflightCheck, executeLaunch, runPreflightChecks } from '../tasks/launch';
+import { executeLaunch, type PreflightCheck, runPreflightChecks } from '../tasks/launch';
 import { useConfig } from '../utils/configState';
 import { prompt } from '../utils/prompts';
 
@@ -93,9 +93,7 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
         <Box marginTop={1}>
           {viewState === 'blocked' && (
             <Box flexDirection="column">
-              <Text color="yellow">
-                Fix the failing checks above before launching.
-              </Text>
+              <Text color="yellow">Fix the failing checks above before launching.</Text>
               <Box marginTop={1}>
                 <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
               </Box>
@@ -106,15 +104,9 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
               <Text color="cyan" bold>
                 All checks passed. Ready to launch.
               </Text>
-              <Text dimColor>
-                This will set launched=true in project.config.ts.
-              </Text>
-              <Text dimColor>
-                After launch: db:push and db:seed are blocked in setup.sh.
-              </Text>
-              <Text dimColor>
-                Use db:migrate for schema changes instead.
-              </Text>
+              <Text dimColor>This will set launched=true in project.config.ts.</Text>
+              <Text dimColor>After launch: db:push and db:seed are blocked in setup.sh.</Text>
+              <Text dimColor>Use db:migrate for schema changes instead.</Text>
               <Box marginTop={1}>
                 <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
               </Box>
@@ -138,12 +130,12 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
   if (viewState === 'complete') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text color="green" bold>✓ Launched!</Text>
-        <Text color="green">  project.config.ts updated: launched = true</Text>
+        <Text color="green" bold>
+          ✓ Launched!
+        </Text>
+        <Text color="green"> project.config.ts updated: launched = true</Text>
         <Box marginTop={1}>
-          <Text dimColor>
-            From now on, use db:migrate for schema changes.
-          </Text>
+          <Text dimColor>From now on, use db:migrate for schema changes.</Text>
         </Box>
         <Box marginTop={1}>
           <Text dimColor>{prompt(['enter'])}</Text>

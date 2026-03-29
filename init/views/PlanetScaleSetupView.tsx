@@ -3,13 +3,14 @@ import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { planetscaleApi, type PlanetScaleRegion } from '../api/planetscale';
+import { type PlanetScaleRegion, planetscaleApi } from '../api/planetscale';
 import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setSecretAsync } from '../tasks/infisicalSetup';
 import { setupPlanetScale } from '../tasks/planetscaleSetup';
+import { getPlanetScaleProgressItems } from '../tasks/planetscaleSteps';
 import {
   clearAllProgress,
   clearConfigError,
@@ -54,80 +55,6 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
   return 'incomplete';
 };
 
-const getProgressDisplay = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
-  const { progress, organization, region, tokenId, database } = config.planetscale;
-  return [
-    {
-      label: organization ? `Organization selected: ${organization}` : 'Organization selected',
-      completed: progress.selectOrg,
-    },
-    {
-      label: region ? `Region selected: ${region}` : 'Region selected',
-      completed: progress.selectRegion,
-    },
-    {
-      label: tokenId ? `Service token recorded: ${tokenId}` : 'Service token recorded',
-      completed: progress.recordTokenId,
-    },
-    {
-      label: 'PlanetScale organization stored in Infisical',
-      completed: progress.storeOrganizationSecret,
-    },
-    {
-      label: 'PlanetScale region stored in Infisical',
-      completed: progress.storeRegionSecret,
-    },
-    {
-      label: 'PlanetScale token ID stored in Infisical',
-      completed: progress.storeTokenIdSecret,
-    },
-    {
-      label: 'PlanetScale token stored in Infisical',
-      completed: progress.storeTokenSecret,
-    },
-    {
-      label: database ? `Database created: ${database}` : 'Database created',
-      completed: progress.createDB,
-    },
-    {
-      label: 'Rename main branch to prod',
-      completed: progress.renameProductionBranch,
-    },
-    {
-      label: 'Staging branch created',
-      completed: progress.createStagingBranch,
-    },
-    {
-      label: 'Prod role created',
-      completed: progress.createProdRole,
-    },
-    {
-      label: 'Staging role created',
-      completed: progress.createStagingRole,
-    },
-    {
-      label: 'Prod connection string stored in Infisical',
-      completed: progress.storeProdConnectionString,
-    },
-    {
-      label: 'Staging connection string stored in Infisical',
-      completed: progress.storeStagingConnectionString,
-    },
-    {
-      label: 'Prod migration table initialized',
-      completed: progress.initProdMigrationTable,
-    },
-    {
-      label: 'Staging migration table initialized',
-      completed: progress.initStagingMigrationTable,
-    },
-    {
-      label: 'Database configured (FK, migrations)',
-      completed: progress.configureDB,
-    },
-  ];
-};
-
 export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onComplete, onCancel }) => {
   const { config, syncConfig } = useConfig();
   const [viewState, setViewState] = useState<ViewState>('status');
@@ -168,6 +95,8 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
   // Derive setup state from config (no delay)
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
+  const progressItems = useMemo(() => (config ? getPlanetScaleProgressItems(config) : []), [config]);
+  const error = config?.planetscale.error ?? '';
 
   // Load organizations
   useEffect(() => {
@@ -598,9 +527,6 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       </Box>
     );
   }
-
-  const progressItems = getProgressDisplay(config);
-  const error = config.planetscale.error;
 
   return (
     <Box flexDirection="column" padding={1}>

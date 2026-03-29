@@ -1,5 +1,11 @@
 import { createConsoleClient, createResendClient, type EmailClient } from '@template/email/client';
 
-const apiKey = process.env.RESEND_API_KEY;
+const createEmailClient = (): EmailClient => {
+  if (process.env.RESEND_API_KEY) {
+    return createResendClient(process.env.RESEND_API_KEY);
+  }
 
-export const emailClient: EmailClient = apiKey ? createResendClient(apiKey) : createConsoleClient();
+  return createConsoleClient();
+};
+
+export const emailClient: EmailClient = createEmailClient();
