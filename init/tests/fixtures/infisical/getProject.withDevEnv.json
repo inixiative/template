@@ -1,4 +1,0 @@
-{
-  "status": 500,
-  "body": "Infisical API error (404): {\"reqId\":\"req-Axjdk4Za9GPSAY\",\"statusCode\":404,\"message\":\"Project with ID 'workspace-123' not found\",\"error\":\"NotFound\"}"
-}

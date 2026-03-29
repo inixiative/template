@@ -1,4 +1,0 @@
-{
-  "status": 500,
-  "body": "Command failed: pscale database show template --org test-org --format json\n{\"error\": \"database template does not exist in organization test-org\"}"
-}
