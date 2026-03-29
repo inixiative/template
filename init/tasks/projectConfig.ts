@@ -3,7 +3,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { isProgressComplete, setProgressComplete } from '../utils/configHelpers';
-import { getProjectConfig, getProjectConfigPath } from '../utils/getProjectConfig';
+import { getProjectConfig, writeProjectConfig } from '../utils/getProjectConfig';
 
 const execAsync = promisify(exec);
 
@@ -23,15 +23,10 @@ export const getCurrentConfig = async (): Promise<ProjectConfigData> => {
 };
 
 export const updateProjectConfig = async (data: ProjectConfigData): Promise<void> => {
-  const configPath = getProjectConfigPath();
-  const content = await readFile(configPath, 'utf-8');
-
-  let updated = content;
-  // Update within the project object
-  updated = updated.replace(/(project:\s*\{[^}]*name:\s*)['"](.+?)['"]/, `$1'${data.name}'`);
-  updated = updated.replace(/(project:\s*\{[^}]*organization:\s*)['"](.+?)['"]/, `$1'${data.organization}'`);
-
-  await writeFile(configPath, updated, 'utf-8');
+  const config = await getProjectConfig();
+  config.project.name = data.name;
+  config.project.organization = data.organization;
+  await writeProjectConfig(config);
 };
 
 export const renameProject = async (
