@@ -1,7 +1,4 @@
-import { exec, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execAsync = promisify(exec);
+import { execAsync } from './exec';
 
 export type PrerequisiteStatus = {
   name: string;
@@ -18,36 +15,7 @@ export type InfisicalSession = {
 };
 
 /**
- * Check if a CLI is installed and get its version (sync version)
- */
-export const checkCLI = (name: string, command: string, versionFlag = '--version'): PrerequisiteStatus => {
-  try {
-    const output = execSync(`${command} ${versionFlag}`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Extract version from output (first line usually has version)
-    const version = output.split('\n')[0];
-
-    return {
-      name,
-      command,
-      installed: true,
-      version,
-    };
-  } catch (error) {
-    return {
-      name,
-      command,
-      installed: false,
-      error: error instanceof Error ? error.message : 'Not found',
-    };
-  }
-};
-
-/**
- * Check if a CLI is installed and get its version (async version for parallel execution)
+ * Check if a CLI is installed and get its version
  */
 export const checkCLIAsync = async (
   name: string,
@@ -75,33 +43,7 @@ export const checkCLIAsync = async (
 };
 
 /**
- * Check if user is logged into Infisical (sync version)
- */
-export const checkInfisicalSession = (): InfisicalSession => {
-  try {
-    const output = execSync('infisical user get token', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Parse output to get session ID
-    const sessionMatch = output.match(/Session ID: (.+)/);
-    const sessionId = sessionMatch?.[1];
-
-    return {
-      loggedIn: !!sessionId,
-      user: sessionId ? `Session ${sessionId.substring(0, 8)}...` : undefined,
-    };
-  } catch (_error) {
-    return {
-      loggedIn: false,
-      error: 'Not logged in',
-    };
-  }
-};
-
-/**
- * Check if user is logged into Infisical (async version)
+ * Check if user is logged into Infisical
  */
 export const checkInfisicalSessionAsync = async (): Promise<InfisicalSession> => {
   try {
@@ -124,32 +66,7 @@ export const checkInfisicalSessionAsync = async (): Promise<InfisicalSession> =>
 };
 
 /**
- * Check if user is logged into PlanetScale (sync version)
- */
-export const checkPlanetScaleSession = (): InfisicalSession => {
-  try {
-    const output = execSync('pscale auth check', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Check if authenticated
-    const isLoggedIn = output.includes('authenticated');
-
-    return {
-      loggedIn: isLoggedIn,
-      user: isLoggedIn ? 'Authenticated' : undefined,
-    };
-  } catch (_error) {
-    return {
-      loggedIn: false,
-      error: 'Not logged in',
-    };
-  }
-};
-
-/**
- * Check if user is logged into PlanetScale (async version)
+ * Check if user is logged into PlanetScale
  */
 export const checkPlanetScaleSessionAsync = async (): Promise<InfisicalSession> => {
   try {
@@ -169,32 +86,7 @@ export const checkPlanetScaleSessionAsync = async (): Promise<InfisicalSession> 
 };
 
 /**
- * Check if user is logged into Vercel (sync version)
- */
-export const checkVercelSession = (): InfisicalSession => {
-  try {
-    const output = execSync('vercel whoami', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Output is the username if logged in
-    const isLoggedIn = output.length > 0 && !output.toLowerCase().includes('error');
-
-    return {
-      loggedIn: isLoggedIn,
-      user: isLoggedIn ? output : undefined,
-    };
-  } catch (_error) {
-    return {
-      loggedIn: false,
-      error: 'Not logged in',
-    };
-  }
-};
-
-/**
- * Check if user is logged into Vercel (async version)
+ * Check if user is logged into Vercel
  */
 export const checkVercelSessionAsync = async (): Promise<InfisicalSession> => {
   try {
@@ -215,33 +107,7 @@ export const checkVercelSessionAsync = async (): Promise<InfisicalSession> => {
 };
 
 /**
- * Check if user is logged into Railway (sync version)
- */
-export const checkRailwaySession = (): InfisicalSession => {
-  try {
-    // Railway whoami returns user info if logged in
-    const output = execSync('railway whoami', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    // Output contains user info if logged in
-    const isLoggedIn = output.length > 0 && !output.toLowerCase().includes('not logged in');
-
-    return {
-      loggedIn: isLoggedIn,
-      user: isLoggedIn ? output.split('\n')[0] : undefined,
-    };
-  } catch (_error) {
-    return {
-      loggedIn: false,
-      error: 'Not logged in',
-    };
-  }
-};
-
-/**
- * Check if user is logged into Railway (async version)
+ * Check if user is logged into Railway
  */
 export const checkRailwaySessionAsync = async (): Promise<InfisicalSession> => {
   try {
@@ -262,18 +128,15 @@ export const checkRailwaySessionAsync = async (): Promise<InfisicalSession> => {
 };
 
 /**
- * Check if user is logged into GitHub CLI (async version)
+ * Check if user is logged into GitHub CLI
  */
 export const checkGitHubSessionAsync = async (): Promise<InfisicalSession> => {
   try {
     const { stdout } = await execAsync('gh auth status');
     const output = stdout.trim();
 
-    // gh auth status prints to stderr on success, stdout on error
-    // Check for "Logged in" in output
     const isLoggedIn = output.toLowerCase().includes('logged in');
 
-    // Extract username if available
     const userMatch = output.match(/Logged in to .+ as (.+?) \(/);
     const user = userMatch?.[1];
 
@@ -282,8 +145,6 @@ export const checkGitHubSessionAsync = async (): Promise<InfisicalSession> => {
       user: user || (isLoggedIn ? 'Authenticated' : undefined),
     };
   } catch (error) {
-    // gh auth status exits with non-zero if not authenticated
-    // But it may print to stderr, check the error output
     const errorOutput =
       error instanceof Error && 'stderr' in error ? String((error as { stderr: unknown }).stderr) : '';
 
@@ -322,20 +183,20 @@ export const checkDockerRunningAsync = async (): Promise<InfisicalSession> => {
 };
 
 /**
- * Check all prerequisites
+ * Check all prerequisites (async)
  */
-export const checkAllPrerequisites = () => {
-  const clis: PrerequisiteStatus[] = [
-    checkCLI('Git', 'git'),
-    checkCLI('GitHub CLI', 'gh'),
-    checkCLI('Bun', 'bun'),
-    checkCLI('Infisical', 'infisical'),
-    checkCLI('Vercel', 'vercel'),
-    checkCLI('PlanetScale', 'pscale', 'version'), // pscale uses 'version' not '--version'
-    checkCLI('Docker', 'docker'), // Optional for local dev
-  ];
+export const checkAllPrerequisitesAsync = async () => {
+  const clis = await Promise.all([
+    checkCLIAsync('Git', 'git'),
+    checkCLIAsync('GitHub CLI', 'gh'),
+    checkCLIAsync('Bun', 'bun'),
+    checkCLIAsync('Infisical', 'infisical'),
+    checkCLIAsync('Vercel', 'vercel'),
+    checkCLIAsync('PlanetScale', 'pscale', 'version'),
+    checkCLIAsync('Docker', 'docker'),
+  ]);
 
-  const infisicalSession = checkInfisicalSession();
+  const infisicalSession = await checkInfisicalSessionAsync();
 
   const allInstalled = clis.every((cli) => cli.installed);
   const canProceed = allInstalled && infisicalSession.loggedIn;

@@ -1,11 +1,8 @@
-import { exec } from 'node:child_process';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
-import { isProgressComplete, setProgressComplete } from '../utils/configHelpers';
+import { execAsync } from '../utils/exec';
 import { getProjectConfig, writeProjectConfig } from '../utils/getProjectConfig';
-
-const execAsync = promisify(exec);
+import { isComplete, markComplete } from '../utils/progressTracking';
 
 type ProjectConfigData = {
   name: string;
@@ -29,18 +26,14 @@ export const updateProjectConfig = async (data: ProjectConfigData): Promise<void
   await writeProjectConfig(config);
 };
 
-export const renameProject = async (
-  oldName: string,
-  newName: string,
-  onStepComplete?: StepCallback,
-): Promise<void> => {
+export const renameProject = async (oldName: string, newName: string, onStepComplete?: StepCallback): Promise<void> => {
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
     return;
   }
 
   // 1. Update root + workspace package.json files
-  if (!(await isProgressComplete('project', 'updatePackages'))) {
+  if (!(await isComplete('project', 'updatePackages'))) {
     const rootPkgPath = join(process.cwd(), 'package.json');
     const rootContent = await readFile(rootPkgPath, 'utf-8');
     const rootWithScope = rootContent.replace(new RegExp(`@${fromName}/`, 'g'), `@${newName}/`);
@@ -67,12 +60,12 @@ export const renameProject = async (
       }
     }
 
-    await setProgressComplete('project', 'updatePackages');
+    await markComplete('project', 'updatePackages');
     await onStepComplete?.();
   }
 
   // 2. Replace @scope/ references in all source files
-  if (!(await isProgressComplete('project', 'updateImports'))) {
+  if (!(await isComplete('project', 'updateImports'))) {
     try {
       const { stdout } = await execAsync(
         "find apps packages scripts docs init -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' \\)",
@@ -99,12 +92,12 @@ export const renameProject = async (
       // Continue if find fails
     }
 
-    await setProgressComplete('project', 'updateImports');
+    await markComplete('project', 'updateImports');
     await onStepComplete?.();
   }
 
   // 3. Update README.md
-  if (!(await isProgressComplete('project', 'updateReadme'))) {
+  if (!(await isComplete('project', 'updateReadme'))) {
     try {
       const readmePath = join(process.cwd(), 'README.md');
       let readme = await readFile(readmePath, 'utf-8');
@@ -115,12 +108,12 @@ export const renameProject = async (
       // README might not exist
     }
 
-    await setProgressComplete('project', 'updateReadme');
+    await markComplete('project', 'updateReadme');
     await onStepComplete?.();
   }
 
   // 4. Update tsconfig path aliases
-  if (!(await isProgressComplete('project', 'updateTsconfigs'))) {
+  if (!(await isComplete('project', 'updateTsconfigs'))) {
     const tsconfigPaths = [
       'tsconfig.json',
       'tsconfig.frontend.json',
@@ -146,12 +139,12 @@ export const renameProject = async (
       }
     }
 
-    await setProgressComplete('project', 'updateTsconfigs');
+    await markComplete('project', 'updateTsconfigs');
     await onStepComplete?.();
   }
 
   // 5. Update env example files
-  if (!(await isProgressComplete('project', 'updateEnvFiles'))) {
+  if (!(await isComplete('project', 'updateEnvFiles'))) {
     const envFiles = [
       '.env.local',
       '.env.test',
@@ -194,17 +187,17 @@ export const renameProject = async (
       }
     }
 
-    await setProgressComplete('project', 'updateEnvFiles');
+    await markComplete('project', 'updateEnvFiles');
     await onStepComplete?.();
   }
 
   // 6. Clean install with new package names
-  if (!(await isProgressComplete('project', 'cleanInstall'))) {
+  if (!(await isComplete('project', 'cleanInstall'))) {
     await execAsync('rm -rf node_modules bun.lock');
     await onStepComplete?.('Installing dependencies...');
     await execAsync('bun install');
 
-    await setProgressComplete('project', 'cleanInstall');
+    await markComplete('project', 'cleanInstall');
     await onStepComplete?.();
   }
 };

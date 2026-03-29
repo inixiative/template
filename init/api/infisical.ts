@@ -1,9 +1,6 @@
-import { exec } from 'node:child_process';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import { VCR } from '../../packages/shared/src/vcr';
-
-const execAsync = promisify(exec);
+import { execAsync } from '../utils/exec';
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');

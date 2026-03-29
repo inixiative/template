@@ -1,9 +1,6 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { planetscaleApi } from '../api/planetscale';
+import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
-
-const execAsync = promisify(exec);
 
 /**
  * Initialize Prisma migration table in the database
@@ -11,7 +8,7 @@ const execAsync = promisify(exec);
  */
 const initPrismaMigrationTable = async (connectionString: string): Promise<void> => {
   try {
-    await execAsync(`bun scripts/db/initMigrationTable.ts "${connectionString}"`, {
+    await execAsync(`bun --cwd packages/db scripts/initMigrationTable.ts "${connectionString}"`, {
       encoding: 'utf-8',
       timeout: 30000,
     });
@@ -22,15 +19,9 @@ const initPrismaMigrationTable = async (connectionString: string): Promise<void>
   }
 };
 
-import {
-  clearAllProgress,
-  clearConfigError,
-  isProgressComplete,
-  setConfigError,
-  setProgressComplete,
-  updateConfigField,
-} from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { delay } from '../utils/delay';
+import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
 import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
@@ -71,7 +62,7 @@ export const setupPlanetScale = async (
     }
 
     // Clear any previous error
-    await clearConfigError('planetscale');
+    await clearError('planetscale');
 
     // Check if config is stale (project name changed since last setup)
     const isStale = config.planetscale.configProjectName && config.planetscale.configProjectName !== configProjectName;
@@ -82,7 +73,7 @@ export const setupPlanetScale = async (
       await updateConfigField('planetscale', 'database', '');
       await updateConfigField('planetscale', 'tokenId', '');
       await updateConfigField('planetscale', 'configProjectName', '');
-      await clearAllProgress('planetscale');
+      await clearProgress('planetscale');
     }
 
     // Variables to hold intermediate results
@@ -92,27 +83,27 @@ export const setupPlanetScale = async (
     const _tokenId = config.planetscale.tokenId;
 
     // Step 0: Store organization and mark selected
-    if (!(await isProgressComplete('planetscale', 'selectOrg'))) {
+    if (!(await isComplete('planetscale', 'selectOrg'))) {
       organization = selectedOrgName;
       await updateConfigField('planetscale', 'organization', organization);
       await updateConfigField('planetscale', 'configProjectName', configProjectName);
-      await setProgressComplete('planetscale', 'selectOrg');
+      await markComplete('planetscale', 'selectOrg');
       await onStepComplete?.();
     }
 
     // Step 0.5: Region selection (handled by view - just check if complete)
-    if (!(await isProgressComplete('planetscale', 'selectRegion'))) {
+    if (!(await isComplete('planetscale', 'selectRegion'))) {
       throw new Error('Region required but not provided. Please restart setup.');
     }
 
     // Step 1: Service token (handled by view - just skip if already complete)
     // Token is prompted in the view and stored before this function is called
     if (
-      !(await isProgressComplete('planetscale', 'recordTokenId')) ||
-      !(await isProgressComplete('planetscale', 'storeOrganizationSecret')) ||
-      !(await isProgressComplete('planetscale', 'storeRegionSecret')) ||
-      !(await isProgressComplete('planetscale', 'storeTokenIdSecret')) ||
-      !(await isProgressComplete('planetscale', 'storeTokenSecret'))
+      !(await isComplete('planetscale', 'recordTokenId')) ||
+      !(await isComplete('planetscale', 'storeOrganizationSecret')) ||
+      !(await isComplete('planetscale', 'storeRegionSecret')) ||
+      !(await isComplete('planetscale', 'storeTokenIdSecret')) ||
+      !(await isComplete('planetscale', 'storeTokenSecret'))
     ) {
       throw new Error('Service token required but not provided. Please restart setup.');
     }
@@ -125,7 +116,7 @@ export const setupPlanetScale = async (
     //   pscale database upgrade-plan <database> --org <org> --plan multi
     //   This provides Primary + 2 replicas with 99.99% SLA
     let _dbResult: Awaited<ReturnType<typeof planetscaleApi.getDatabase>> | undefined;
-    if (!(await isProgressComplete('planetscale', 'createDB'))) {
+    if (!(await isComplete('planetscale', 'createDB'))) {
       try {
         _dbResult = await planetscaleApi.createDatabase(organization, databaseName, region);
       } catch (error) {
@@ -140,7 +131,7 @@ export const setupPlanetScale = async (
 
       // Save database name to config immediately so it shows in UI
       await updateConfigField('planetscale', 'database', databaseName);
-      await setProgressComplete('planetscale', 'createDB');
+      await markComplete('planetscale', 'createDB');
       await onStepComplete?.();
     } else {
       // Database already created, just fetch it
@@ -154,7 +145,7 @@ export const setupPlanetScale = async (
 
     // Step 5: Rename main branch to prod
     // This preserves the production status and PS-5 cluster assignment
-    if (!(await isProgressComplete('planetscale', 'renameProductionBranch'))) {
+    if (!(await isComplete('planetscale', 'renameProductionBranch'))) {
       await retryWithTimeout(() => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'), {
         maxRetries: 100,
         delayMs: 3000,
@@ -169,13 +160,13 @@ export const setupPlanetScale = async (
           await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
         },
       });
-      await setProgressComplete('planetscale', 'renameProductionBranch');
+      await markComplete('planetscale', 'renameProductionBranch');
       await onStepComplete?.();
     }
 
     // Step 6: Create staging branch (from prod)
     let _stagingBranch: Awaited<ReturnType<typeof planetscaleApi.getBranch>> | undefined;
-    if (!(await isProgressComplete('planetscale', 'createStagingBranch'))) {
+    if (!(await isComplete('planetscale', 'createStagingBranch'))) {
       try {
         _stagingBranch = await retryWithTimeout(
           () => planetscaleApi.createBranch(organization, databaseName, 'staging', 'prod'),
@@ -201,7 +192,7 @@ export const setupPlanetScale = async (
           throw error;
         }
       }
-      await setProgressComplete('planetscale', 'createStagingBranch');
+      await markComplete('planetscale', 'createStagingBranch');
       await onStepComplete?.();
     } else {
       // Staging branch already created, just fetch it
@@ -212,7 +203,7 @@ export const setupPlanetScale = async (
     let productionPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
     let stagingPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
 
-    if (!(await isProgressComplete('planetscale', 'createProdRole'))) {
+    if (!(await isComplete('planetscale', 'createProdRole'))) {
       // Production branch role (Postgres uses roles, not passwords)
       await onStepComplete?.('Creating production role...');
       productionPassword = await retryWithTimeout(
@@ -232,11 +223,11 @@ export const setupPlanetScale = async (
           },
         },
       );
-      await setProgressComplete('planetscale', 'createProdRole');
+      await markComplete('planetscale', 'createProdRole');
       await onStepComplete?.();
     }
 
-    if (!(await isProgressComplete('planetscale', 'createStagingRole'))) {
+    if (!(await isComplete('planetscale', 'createStagingRole'))) {
       // Staging branch role
       await onStepComplete?.('Creating staging role...');
       stagingPassword = await retryWithTimeout(
@@ -256,14 +247,14 @@ export const setupPlanetScale = async (
           },
         },
       );
-      await setProgressComplete('planetscale', 'createStagingRole');
+      await markComplete('planetscale', 'createStagingRole');
       await onStepComplete?.();
     }
     // If already complete: passwords exist, connection strings stored in Infisical
     // Later steps fetch from Infisical, so we don't need password objects
 
     // Step 8: Store connection strings in Infisical
-    if (!(await isProgressComplete('planetscale', 'storeProdConnectionString'))) {
+    if (!(await isComplete('planetscale', 'storeProdConnectionString'))) {
       await onStepComplete?.('Storing prod connection string in Infisical...');
       const prodConnectionString = productionPassword?.connection_strings.general;
       if (!prodConnectionString) {
@@ -271,11 +262,11 @@ export const setupPlanetScale = async (
       }
       // Store production connection string in prod environment, /api folder
       await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
-      await setProgressComplete('planetscale', 'storeProdConnectionString');
+      await markComplete('planetscale', 'storeProdConnectionString');
       await onStepComplete?.();
     }
 
-    if (!(await isProgressComplete('planetscale', 'storeStagingConnectionString'))) {
+    if (!(await isComplete('planetscale', 'storeStagingConnectionString'))) {
       await onStepComplete?.('Storing staging connection string in Infisical...');
       const stagingConnectionString = stagingPassword?.connection_strings.general;
       if (!stagingConnectionString) {
@@ -283,12 +274,12 @@ export const setupPlanetScale = async (
       }
       // Store staging connection string in staging environment, /api folder
       await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
-      await setProgressComplete('planetscale', 'storeStagingConnectionString');
+      await markComplete('planetscale', 'storeStagingConnectionString');
       await onStepComplete?.();
     }
 
     // Step 9: Initialize Prisma migration table (run on both prod and staging)
-    if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
+    if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
       try {
         // Fetch connection strings from Infisical (source of truth)
         await onStepComplete?.('Fetching prod connection string from Infisical...');
@@ -301,7 +292,7 @@ export const setupPlanetScale = async (
         // Initialize _prisma_migrations table in production branch
         await onStepComplete?.('Initializing migration table (production)...');
         await initPrismaMigrationTable(prodConnectionString);
-        await setProgressComplete('planetscale', 'initProdMigrationTable');
+        await markComplete('planetscale', 'initProdMigrationTable');
         await onStepComplete?.();
       } catch (error) {
         throw new Error(
@@ -310,7 +301,7 @@ export const setupPlanetScale = async (
       }
     }
 
-    if (!(await isProgressComplete('planetscale', 'initStagingMigrationTable'))) {
+    if (!(await isComplete('planetscale', 'initStagingMigrationTable'))) {
       try {
         await onStepComplete?.('Fetching staging connection string from Infisical...');
         const stagingConnectionString = await getSecretAsync('DATABASE_URL', {
@@ -322,7 +313,7 @@ export const setupPlanetScale = async (
         // Initialize _prisma_migrations table in staging branch
         await onStepComplete?.('Initializing migration table (staging)...');
         await initPrismaMigrationTable(stagingConnectionString);
-        await setProgressComplete('planetscale', 'initStagingMigrationTable');
+        await markComplete('planetscale', 'initStagingMigrationTable');
         await onStepComplete?.();
       } catch (error) {
         throw new Error(
@@ -332,16 +323,16 @@ export const setupPlanetScale = async (
     }
 
     // Step 10: Configure database settings (now that migration table exists)
-    if (!(await isProgressComplete('planetscale', 'configureDB'))) {
+    if (!(await isComplete('planetscale', 'configureDB'))) {
       // Re-read from config (don't trust local variables when resuming)
       const latestConfig = await getProjectConfig();
       const orgName = latestConfig.planetscale.organization;
-      const dbName = latestConfig.planetscale.database;
+      const dbName = latestConfig.planetscale.database || latestConfig.project.name;
 
       await planetscaleApi.updateDatabaseSettings(orgName, dbName, {
         allow_foreign_key_constraints: true, // Required for Prisma relations
       });
-      await setProgressComplete('planetscale', 'configureDB');
+      await markComplete('planetscale', 'configureDB');
       await onStepComplete?.();
     }
 
@@ -377,7 +368,7 @@ export const setupPlanetScale = async (
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    await setConfigError('planetscale', errorMsg);
+    await setError('planetscale', errorMsg);
     throw error;
   }
 };

@@ -10,9 +10,7 @@ const projectProgressItems: readonly ProjectProgressItem[] = [
   {
     action: 'renameOrg',
     getLabel: (config) =>
-      config.project.organization
-        ? `Organization set: ${config.project.organization}`
-        : 'Organization configured',
+      config.project.organization ? `Organization set: ${config.project.organization}` : 'Organization configured',
   },
   {
     action: 'updatePackages',

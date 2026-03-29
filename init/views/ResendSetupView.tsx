@@ -11,9 +11,10 @@ import {
   storeResendFromAddress,
 } from '../tasks/resendSetup';
 import { getResendProgressItems } from '../tasks/resendSteps';
-import { clearAllProgress, clearConfigError, setConfigError, updateConfigField } from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type ViewState = 'status' | 'api-key-input' | 'from-input' | 'dns-records';
@@ -77,8 +78,8 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
     await updateConfigField('resend', 'fromAddress', '');
     await updateConfigField('resend', 'domainId', '');
     await updateConfigField('resend', 'configProjectName', '');
-    await clearAllProgress('resend');
-    await clearConfigError('resend');
+    await clearProgress('resend');
+    await clearError('resend');
     await syncConfig();
     setApiKey('');
     setFromAddress('');
@@ -107,7 +108,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
       setViewState('dns-records');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Failed to load domain details';
-      await setConfigError('resend', message);
+      await setError('resend', message);
       await syncConfig();
       setViewState('status');
     } finally {
@@ -126,10 +127,10 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
     try {
       if (setupState === 'stale') {
         await updateConfigField('resend', 'domainId', '');
-        await clearAllProgress('resend');
+        await clearProgress('resend');
       }
 
-      await clearConfigError('resend');
+      await clearError('resend');
       await syncConfig();
 
       const projectId = await getInfisicalProjectId();
@@ -171,7 +172,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
       setViewState('dns-records');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Resend setup failed';
-      await setConfigError('resend', message);
+      await setError('resend', message);
       await syncConfig();
       setViewState('status');
     } finally {
@@ -245,20 +246,20 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
   const handleDnsConfirm = async () => {
     const currentFromAddress = config?.resend.fromAddress || fromAddress;
     if (!currentFromAddress) {
-      await setConfigError('resend', 'From address is missing. Restart Resend setup.');
+      await setError('resend', 'From address is missing. Restart Resend setup.');
       await syncConfig();
       setViewState('status');
       return;
     }
 
     try {
-      await clearConfigError('resend');
+      await clearError('resend');
       await confirmResendDnsSetup(currentFromAddress);
       await syncConfig();
       setViewState('status');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Failed to confirm DNS';
-      await setConfigError('resend', message);
+      await setError('resend', message);
       await syncConfig();
       setViewState('status');
     }

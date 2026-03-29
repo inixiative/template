@@ -1,15 +1,8 @@
-import { exec, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
-import {
-  clearAllProgress,
-  clearConfigError,
-  isProgressComplete,
-  setConfigError,
-  setProgressComplete,
-  updateConfigField,
-} from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
+import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
 import {
   infisicalApiAuthSecretSteps,
   infisicalAppNameSecretSteps,
@@ -17,8 +10,6 @@ import {
   infisicalIdentitySecretSteps,
   infisicalInheritanceSteps,
 } from './infisicalSteps';
-
-const execAsync = promisify(exec);
 
 /**
  * Setup Infisical project and environment structure with resume support
@@ -32,7 +23,7 @@ export const setupInfisical = async (
     const configProjectName = config.project.name;
 
     // Clear any previous error when starting/continuing
-    await clearConfigError('infisical');
+    await clearError('infisical');
 
     // Guard: project name must be set before Infisical setup can run
     if (!configProjectName || configProjectName.trim().length === 0) {
@@ -51,7 +42,7 @@ export const setupInfisical = async (
       await updateConfigField('infisical', 'organizationSlug', '');
       await updateConfigField('infisical', 'projectSlug', '');
       await updateConfigField('infisical', 'configProjectName', '');
-      await clearAllProgress('infisical');
+      await clearProgress('infisical');
     }
 
     // Suppressed for TUI: console.log(`\nSetting up Infisical project: ${configProjectName}`);
@@ -63,7 +54,7 @@ export const setupInfisical = async (
     let projectSlug = config.infisical.projectSlug;
 
     // Step 1: Select organization
-    if (!(await isProgressComplete('infisical', 'selectOrg'))) {
+    if (!(await isComplete('infisical', 'selectOrg'))) {
       // Suppressed for TUI: console.log('  • Selecting organization...');
       const response = await infisicalApi.getOrganization(selectedOrgId);
 
@@ -80,14 +71,14 @@ export const setupInfisical = async (
       await updateConfigField('infisical', 'organizationSlug', organizationSlug);
 
       // Suppressed for TUI: console.log(`    ✓ Organization: ${orgName} (${organizationSlug})`);
-      await setProgressComplete('infisical', 'selectOrg');
+      await markComplete('infisical', 'selectOrg');
       await onStepComplete?.();
     } else {
       // Suppressed for TUI: console.log('  ✓ Organization already selected (skipping)');
     }
 
     // Step 2: Create project
-    if (!(await isProgressComplete('infisical', 'createProject'))) {
+    if (!(await isComplete('infisical', 'createProject'))) {
       // Suppressed for TUI: console.log('  • Creating project...');
       const project = await infisicalApi.upsertProject(configProjectName);
       projectId = project.id;
@@ -111,14 +102,14 @@ export const setupInfisical = async (
       await updateConfigField('infisical', 'configProjectName', configProjectName);
 
       // Suppressed for TUI: console.log(`    ✓ Project created: ${configProjectName}`);
-      await setProgressComplete('infisical', 'createProject');
+      await markComplete('infisical', 'createProject');
       await onStepComplete?.();
     } else {
       // Suppressed for TUI: console.log('  ✓ Project already created (skipping)');
     }
 
     // Step 3: Rename dev environment to root
-    if (!(await isProgressComplete('infisical', 'renameEnv'))) {
+    if (!(await isComplete('infisical', 'renameEnv'))) {
       // Suppressed for TUI: console.log('  • Renaming dev → root...');
       try {
         // Get full project details to find dev environment ID
@@ -138,7 +129,7 @@ export const setupInfisical = async (
         // Suppressed for TUI: console.log('    ⚠ Could not rename dev environment:', error instanceof Error ? error.message : error);
       }
 
-      await setProgressComplete('infisical', 'renameEnv');
+      await markComplete('infisical', 'renameEnv');
       await onStepComplete?.();
     } else {
       // Suppressed for TUI: console.log('  ✓ Environments already configured (skipping)');
@@ -146,16 +137,16 @@ export const setupInfisical = async (
 
     // Step 4: Create folder structure
     for (const step of infisicalFolderSteps) {
-      if (await isProgressComplete('infisical', step.action)) continue;
+      if (await isComplete('infisical', step.action)) continue;
 
       await infisicalApi.createFolder(projectId, step.environment, step.app, '/');
-      await setProgressComplete('infisical', step.action);
+      await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
     // Step 5: Set up inheritance chains
     for (const step of infisicalInheritanceSteps) {
-      if (await isProgressComplete('infisical', step.action)) continue;
+      if (await isComplete('infisical', step.action)) continue;
 
       await infisicalApi.createSecretImport(
         projectId,
@@ -164,7 +155,7 @@ export const setupInfisical = async (
         step.sourceEnvironment,
         step.sourcePath,
       );
-      await setProgressComplete('infisical', step.action);
+      await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
@@ -175,24 +166,24 @@ export const setupInfisical = async (
     await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
 
     for (const step of infisicalIdentitySecretSteps) {
-      if (await isProgressComplete('infisical', step.action)) continue;
+      if (await isComplete('infisical', step.action)) continue;
 
       await setSecretAsync(projectId, 'root', step.key, step.getValue(config), step.path);
-      await setProgressComplete('infisical', step.action);
+      await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
     for (const step of infisicalAppNameSecretSteps) {
-      if (await isProgressComplete('infisical', step.action)) continue;
+      if (await isComplete('infisical', step.action)) continue;
 
       await setSecretAsync(projectId, 'root', 'VITE_APP_NAME', step.value, step.path);
-      await setProgressComplete('infisical', step.action);
+      await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
     // Step 6: Ensure API auth secrets exist for deploy environments
     for (const step of infisicalApiAuthSecretSteps) {
-      if (await isProgressComplete('infisical', step.action)) continue;
+      if (await isComplete('infisical', step.action)) continue;
 
       let hasValidSecret = false;
       try {
@@ -211,7 +202,7 @@ export const setupInfisical = async (
         await setSecretAsync(projectId, step.environment, 'BETTER_AUTH_SECRET', secret, '/api');
       }
 
-      await setProgressComplete('infisical', step.action);
+      await markComplete('infisical', step.action);
       await onStepComplete?.();
     }
 
@@ -221,16 +212,9 @@ export const setupInfisical = async (
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     // Suppressed for TUI: console.error('\n❌ Infisical setup failed:', errorMsg);
-    await setConfigError('infisical', errorMsg);
+    await setError('infisical', errorMsg);
     throw error;
   }
-};
-
-/**
- * Generate a secure random secret
- */
-export const generateSecret = (length = 32): string => {
-  return execSync(`openssl rand -hex ${length}`, { encoding: 'utf-8' }).trim();
 };
 
 /**
@@ -239,42 +223,6 @@ export const generateSecret = (length = 32): string => {
 export const generateSecretAsync = async (length = 32): Promise<string> => {
   const { stdout } = await execAsync(`openssl rand -hex ${length}`);
   return stdout.trim();
-};
-
-/**
- * Get a secret using Infisical CLI
- */
-export const getSecret = (
-  key: string,
-  options?: {
-    projectId?: string;
-    environment?: string;
-    path?: string;
-  },
-): string => {
-  try {
-    let cmd = `infisical secrets get ${key}`;
-
-    if (options?.projectId) {
-      cmd += ` --projectId="${options.projectId}"`;
-    }
-    if (options?.environment) {
-      cmd += ` --env="${options.environment}"`;
-    }
-    if (options?.path) {
-      cmd += ` --path="${options.path}"`;
-    }
-
-    cmd += ' --plain';
-
-    const output = execSync(cmd, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return output.trim();
-  } catch (error) {
-    throw new Error(`Failed to get secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
 };
 
 /**
@@ -307,28 +255,6 @@ export const getSecretAsync = async (
     return stdout.trim();
   } catch (error) {
     throw new Error(`Failed to get secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-};
-
-/**
- * Set a secret using Infisical CLI
- */
-export const setSecret = (
-  projectId: string,
-  environment: string,
-  key: string,
-  value: string,
-  path: string = '/',
-): void => {
-  try {
-    execSync(
-      `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
-      {
-        stdio: 'pipe',
-      },
-    );
-  } catch (error) {
-    throw new Error(`Failed to set secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 

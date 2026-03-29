@@ -8,21 +8,16 @@ export const createMockInfisical = () => {
   const secretStore = new Map<string, string>();
 
   const mocks = {
-    getSecret: mock((key: string, _opts?: { projectId?: string; environment?: string; path?: string }) => {
-      return secretStore.get(key) ?? getEnvSecret(key);
-    }),
     getSecretAsync: mock(async (key: string, opts?: { projectId?: string; environment?: string; path?: string }) => {
       const compositeKey = opts?.environment ? `${opts.environment}:${opts.path ?? '/'}:${key}` : key;
       return secretStore.get(compositeKey) ?? secretStore.get(key) ?? getEnvSecret(key);
-    }),
-    setSecret: mock((_projectId: string, _env: string, key: string, value: string) => {
-      secretStore.set(key, value);
     }),
     setSecretAsync: mock(async (_projectId: string, _env: string, key: string, value: string, path?: string) => {
       const compositeKey = path ? `${_env}:${path}:${key}` : key;
       secretStore.set(compositeKey, value);
       secretStore.set(key, value);
     }),
+    generateSecretAsync: mock(async () => 'mock-generated-secret-0123456789abcdef'),
     setupInfisical: mock(async () => ({
       projectId: 'test-project-id',
       organizationId: 'test-org-id',

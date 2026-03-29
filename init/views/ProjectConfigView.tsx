@@ -1,5 +1,3 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
@@ -8,11 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
 import { getCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
 import { getProjectProgressItems } from '../tasks/projectSteps';
-import { clearAllProgress, setProgressComplete } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
+import { execAsync } from '../utils/exec';
+import { clearProgress, markComplete } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
-
-const execAsync = promisify(exec);
 
 type ViewState = 'loading' | 'prompt-name' | 'prompt-org' | 'confirm' | 'executing' | 'complete';
 
@@ -82,13 +79,13 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 
     try {
       // Reset all project progress for a clean run
-      await clearAllProgress('project');
+      await clearProgress('project');
       await onStepComplete();
 
       await updateProjectConfig({ name: newName, organization: newOrg });
 
       if (newOrg && newOrg.trim() !== '') {
-        await setProgressComplete('project', 'renameOrg');
+        await markComplete('project', 'renameOrg');
         await onStepComplete();
       }
 
@@ -98,7 +95,7 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
 
       // bun run setup (Docker, Prisma generate, etc.)
       await execAsync('bun run setup');
-      await setProgressComplete('project', 'setup');
+      await markComplete('project', 'setup');
       await onStepComplete();
 
       setViewState('complete');

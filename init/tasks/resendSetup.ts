@@ -1,7 +1,8 @@
 import { infisicalApi } from '../api/infisical';
 import { type ResendDomain, upsertDomain } from '../api/resend';
-import { setProgressComplete, updateConfigField } from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
+import { markComplete } from '../utils/progressTracking';
 import { getSecretAsync } from './infisicalSetup';
 
 const getDomainName = (fromAddress: string): string => {
@@ -31,9 +32,9 @@ const getStoredResendApiKey = async (projectId: string): Promise<string> => {
 export const storeResendApiKey = async (projectId: string, apiKey: string): Promise<void> => {
   await syncResendProjectName();
   await infisicalApi.setSecret(projectId, 'prod', '/api/', 'RESEND_API_KEY', apiKey);
-  await setProgressComplete('resend', 'storeProdApiKey');
+  await markComplete('resend', 'storeProdApiKey');
   await infisicalApi.setSecret(projectId, 'staging', '/api/', 'RESEND_API_KEY', apiKey);
-  await setProgressComplete('resend', 'storeStagingApiKey');
+  await markComplete('resend', 'storeStagingApiKey');
 };
 
 /**
@@ -43,9 +44,9 @@ export const storeResendFromAddress = async (projectId: string, fromAddress: str
   await updateConfigField('resend', 'fromAddress', fromAddress);
   await syncResendProjectName();
   await infisicalApi.setSecret(projectId, 'prod', '/api/', 'EMAIL_FROM', fromAddress);
-  await setProgressComplete('resend', 'storeProdFromAddress');
+  await markComplete('resend', 'storeProdFromAddress');
   await infisicalApi.setSecret(projectId, 'staging', '/api/', 'EMAIL_FROM', fromAddress);
-  await setProgressComplete('resend', 'storeStagingFromAddress');
+  await markComplete('resend', 'storeStagingFromAddress');
 };
 
 /**
@@ -61,7 +62,7 @@ export const ensureResendDomain = async (
   await updateConfigField('resend', 'fromAddress', fromAddress);
   await updateConfigField('resend', 'domainId', result.id);
   await syncResendProjectName();
-  await setProgressComplete('resend', 'addDomain');
+  await markComplete('resend', 'addDomain');
 
   return result;
 };
@@ -72,7 +73,7 @@ export const ensureResendDomain = async (
 export const confirmResendDnsSetup = async (fromAddress: string): Promise<void> => {
   await updateConfigField('resend', 'fromAddress', fromAddress);
   await syncResendProjectName();
-  await setProgressComplete('resend', 'confirmDns');
+  await markComplete('resend', 'confirmDns');
 };
 
 /**

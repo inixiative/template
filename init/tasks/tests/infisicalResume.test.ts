@@ -106,10 +106,10 @@ describe('Infisical Resume Scenario', () => {
 
     // createFolder not called — if it were, VCR would throw (no cassette queued)
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('infisical', 'renameEnv');
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('infisical', 'createStagingAdminEnvImport');
-    expect(config.mocks.setProgressComplete).not.toHaveBeenCalledWith('infisical', 'ensureProdApiAuthSecret');
-    expect(config.mocks.setProgressComplete).not.toHaveBeenCalledWith('infisical', 'ensureStagingApiAuthSecret');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'renameEnv');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'createStagingAdminEnvImport');
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureProdApiAuthSecret');
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureStagingApiAuthSecret');
 
     const authSecretCalls = system.mocks.exec.mock.calls.filter(
       (call) => typeof call[0] === 'string' && call[0].includes('BETTER_AUTH_SECRET'),

@@ -10,9 +10,10 @@ import { useAsyncAction } from '../components/useAsyncAction';
 import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
 import { setupRailway } from '../tasks/railwaySetup';
 import { getRailwayProgressItems } from '../tasks/railwaySteps';
-import { clearAllProgress, clearConfigError, setConfigError, updateConfigField } from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type ViewState = 'status' | 'workspace-select' | 'token-input' | 'github-prompt';
@@ -133,8 +134,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       await updateConfigField('railway', 'prodRedisVolumeId', '');
       await updateConfigField('railway', 'stagingRedisVolumeId', '');
       await updateConfigField('railway', 'configProjectName', '');
-      await clearAllProgress('railway');
-      await clearConfigError('railway');
+      await clearProgress('railway');
+      await clearError('railway');
 
       // Refresh config
       await syncConfig();
@@ -151,7 +152,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
     if (action === 'continue' || action === 'run') {
       // Clear any previous errors
-      await clearConfigError('railway');
+      await clearError('railway');
       await syncConfig();
 
       // Try to use existing workspace from config first
@@ -224,7 +225,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
     if (!config) return;
 
     await confirmAction.run('Resuming setup...', async () => {
-      await clearConfigError('railway');
+      await clearError('railway');
 
       // Mark as complete to proceed past the check
       // If GitHub connection fails, the setup task will clear this flag
@@ -232,8 +233,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       await syncConfig();
       const { getProjectConfig } = await import('../utils/getProjectConfig');
       const freshConfig = await getProjectConfig();
-      const { setProgressComplete } = await import('../utils/configHelpers');
-      await setProgressComplete('railway', 'promptedForGithub');
+      const { markComplete: markStepComplete } = await import('../utils/progressTracking');
+      await markStepComplete('railway', 'promptedForGithub');
       await syncConfig();
 
       const existingWorkspace = freshConfig.railway?.workspaceId;
@@ -272,7 +273,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
     if (actionError) {
       setRunning(false);
       setViewState('status');
-      await setConfigError('railway', actionError);
+      await setError('railway', actionError);
       await syncConfig();
     }
   };

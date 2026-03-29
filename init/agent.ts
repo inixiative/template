@@ -9,8 +9,9 @@ import { setupInfisical } from './tasks/infisicalSetup';
 import { setupPlanetScale } from './tasks/planetscaleSetup';
 import { renameProject } from './tasks/projectConfig';
 import { setupRailway } from './tasks/railwaySetup';
-import { isProgressComplete, setProgressComplete, updateConfigField } from './utils/configHelpers';
+import { updateConfigField } from './utils/configHelpers';
 import { getProjectConfig, writeProjectConfig } from './utils/getProjectConfig';
+import { isComplete, markComplete } from './utils/progressTracking';
 
 export type InitConfig = {
   // Project details
@@ -70,15 +71,15 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
     const projectConfig = await getProjectConfig();
 
     // Update project name if needed
-    if (!(await isProgressComplete('project', 'cleanInstall'))) {
+    if (!(await isComplete('project', 'cleanInstall'))) {
       await renameProject(projectConfig.project.name, config.projectName);
     }
 
     // Update organization name if needed
-    if (!(await isProgressComplete('project', 'renameOrg'))) {
+    if (!(await isComplete('project', 'renameOrg'))) {
       projectConfig.project.organization = config.organizationName;
       await writeProjectConfig(projectConfig);
-      await setProgressComplete('project', 'renameOrg');
+      await markComplete('project', 'renameOrg');
     }
 
     // Agent mode provisions remote services only. It does not run `bun run setup`,
@@ -96,21 +97,21 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
 
     // Store PlanetScale tokens if provided
     if (config.planetscaleTokenId && config.planetscaleToken) {
-      const { setSecret } = await import('./tasks/infisicalSetup');
-      setSecret(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN_ID', config.planetscaleTokenId);
-      setSecret(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN', config.planetscaleToken);
+      const { setSecretAsync } = await import('./tasks/infisicalSetup');
+      await setSecretAsync(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN_ID', config.planetscaleTokenId);
+      await setSecretAsync(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN', config.planetscaleToken);
 
       // Mark token/bootstrap storage steps as complete
       await updateConfigField('planetscale', 'tokenId', config.planetscaleTokenId);
-      await setProgressComplete('planetscale', 'recordTokenId');
-      await setProgressComplete('planetscale', 'storeOrganizationSecret');
-      await setProgressComplete('planetscale', 'storeRegionSecret');
-      await setProgressComplete('planetscale', 'storeTokenIdSecret');
-      await setProgressComplete('planetscale', 'storeTokenSecret');
+      await markComplete('planetscale', 'recordTokenId');
+      await markComplete('planetscale', 'storeOrganizationSecret');
+      await markComplete('planetscale', 'storeRegionSecret');
+      await markComplete('planetscale', 'storeTokenIdSecret');
+      await markComplete('planetscale', 'storeTokenSecret');
 
       // Store region
       await updateConfigField('planetscale', 'region', config.planetscaleRegion);
-      await setProgressComplete('planetscale', 'selectRegion');
+      await markComplete('planetscale', 'selectRegion');
     }
 
     const planetscaleResult = await setupPlanetScale(config.planetscaleOrg, async () => {
@@ -122,8 +123,8 @@ export async function initializeProject(config: InitConfig): Promise<InitResult>
 
     // Store Railway token if provided
     if (config.railwayApiToken) {
-      const { setSecret } = await import('./tasks/infisicalSetup');
-      setSecret(infisicalResult.projectId, 'root', 'RAILWAY_API_TOKEN', config.railwayApiToken);
+      const { setSecretAsync } = await import('./tasks/infisicalSetup');
+      await setSecretAsync(infisicalResult.projectId, 'root', 'RAILWAY_API_TOKEN', config.railwayApiToken);
     }
 
     const railwayResult = await setupRailway(config.railwayWorkspaceId, async () => {

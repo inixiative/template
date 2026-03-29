@@ -6,9 +6,10 @@ import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
 import { setupInfisical } from '../tasks/infisicalSetup';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
-import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type ViewState = 'status' | 'org-select';
@@ -92,8 +93,8 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
       await updateConfigField('infisical', 'organizationSlug', '');
       await updateConfigField('infisical', 'projectSlug', '');
       await updateConfigField('infisical', 'configProjectName', '');
-      await clearAllProgress('infisical');
-      await clearConfigError('infisical');
+      await clearProgress('infisical');
+      await clearError('infisical');
 
       // Refresh config (setupState will auto-update via useMemo)
       await syncConfig();
@@ -109,7 +110,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
 
     if (action === 'run' || action === 'continue') {
       // Clear any previous errors
-      await clearConfigError('infisical');
+      await clearError('infisical');
       await syncConfig();
 
       // Check if need org selection
@@ -138,8 +139,8 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
       await updateConfigField('infisical', 'organizationSlug', '');
       await updateConfigField('infisical', 'projectSlug', '');
       await updateConfigField('infisical', 'configProjectName', '');
-      await clearAllProgress('infisical');
-      await clearConfigError('infisical');
+      await clearProgress('infisical');
+      await clearError('infisical');
     }
 
     // Change to status view and run setup

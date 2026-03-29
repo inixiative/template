@@ -242,7 +242,7 @@ export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
 
   const progressState = new Map<string, Set<string>>();
 
-  const mockIsProgressComplete = mock(async (section: string, action: string) => {
+  const mockIsComplete = mock(async (section: string, action: string) => {
     const completed = progressState.get(section);
     if (completed?.has(action)) return true;
     const sectionConfig = currentConfig[section as keyof ProjectConfig];
@@ -252,29 +252,36 @@ export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
     return false;
   });
 
-  const mockSetProgressComplete = mock(async (section: string, action: string) => {
+  const mockMarkComplete = mock(async (section: string, action: string) => {
     if (!progressState.has(section)) progressState.set(section, new Set());
     progressState.get(section)!.add(action);
   });
 
   const mockUpdateConfigField = mock(async () => {});
-  const mockClearConfigError = mock(async () => {});
-  const mockSetConfigError = mock(async () => {});
-  const mockClearAllProgress = mock(async (section: string) => {
+  const mockClearError = mock(async () => {});
+  const mockSetError = mock(async () => {});
+  const mockClearProgress = mock(async (section: string) => {
     progressState.delete(section);
   });
 
   const configHelperMocks = {
-    isProgressComplete: mockIsProgressComplete,
-    setProgressComplete: mockSetProgressComplete,
     updateConfigField: mockUpdateConfigField,
-    clearConfigError: mockClearConfigError,
-    setConfigError: mockSetConfigError,
-    clearAllProgress: mockClearAllProgress,
+  };
+
+  const progressTrackingMocks = {
+    isComplete: mockIsComplete,
+    markComplete: mockMarkComplete,
+    clearError: mockClearError,
+    setError: mockSetError,
+    clearProgress: mockClearProgress,
   };
 
   return {
-    mocks: { getProjectConfig: mockGetProjectConfig, ...configHelperMocks },
+    mocks: {
+      getProjectConfig: mockGetProjectConfig,
+      ...configHelperMocks,
+      ...progressTrackingMocks,
+    },
     /** Update the config that getProjectConfig returns */
     setConfig: (config: ProjectConfig) => {
       currentConfig = config;
@@ -289,9 +296,11 @@ export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
         getProjectConfig: mockGetProjectConfig,
       }));
       mock.module('../../utils/configHelpers', () => configHelperMocks);
+      mock.module('../../utils/progressTracking', () => progressTrackingMocks);
     },
     clearAll: () => {
       for (const fn of Object.values(configHelperMocks)) fn.mockClear();
+      for (const fn of Object.values(progressTrackingMocks)) fn.mockClear();
       mockGetProjectConfig.mockClear();
       progressState.clear();
     },

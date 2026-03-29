@@ -8,9 +8,10 @@ import { StepProgress } from '../components/StepProgress';
 import { useAsyncAction } from '../components/useAsyncAction';
 import { setupVercel } from '../tasks/vercelSetup';
 import { getVercelProgressItems } from '../tasks/vercelSteps';
-import { clearAllProgress, clearConfigError, updateConfigField } from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import type { ProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type ViewState = 'status' | 'team-select' | 'github-prompt';
@@ -126,8 +127,8 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       await updateConfigField('vercel', 'adminProjectId', '');
       await updateConfigField('vercel', 'superadminProjectId', '');
       await updateConfigField('vercel', 'configProjectName', '');
-      await clearAllProgress('vercel');
-      await clearConfigError('vercel');
+      await clearProgress('vercel');
+      await clearError('vercel');
 
       // Refresh config
       await syncConfig();
@@ -144,7 +145,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
 
     if (action === 'continue' || action === 'run') {
       // Clear any previous errors
-      await clearConfigError('vercel');
+      await clearError('vercel');
       await syncConfig();
 
       // Try to use existing team from config first
@@ -205,7 +206,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
     if (!config) return;
 
     await confirmAction.run('Resuming setup...', async () => {
-      await clearConfigError('vercel');
+      await clearError('vercel');
       await syncConfig();
 
       const existingTeamId = config.vercel?.teamId;

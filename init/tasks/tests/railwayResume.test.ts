@@ -116,8 +116,8 @@ describe('Railway Resume Scenario', () => {
       '/api',
     );
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('railway', 'storeStagingRedisUrl');
-    expect(config.mocks.setProgressComplete).not.toHaveBeenCalledWith('railway', 'storeProdRedisUrl');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('railway', 'storeStagingRedisUrl');
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('railway', 'storeProdRedisUrl');
 
     expect(result.prodRedisUrl).toBe('redis://prod.example.com:6379');
     expect(result.stagingRedisUrl).toEqual(expect.any(String));
@@ -138,8 +138,8 @@ describe('Railway Resume Scenario', () => {
 
     const result = await setupRailway(liveWorkspaceId);
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('railway', 'ensureProdApiDeployment');
-    expect(config.mocks.setProgressComplete).not.toHaveBeenCalledWith('railway', 'ensureStagingApiDeployment');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('railway', 'ensureProdApiDeployment');
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('railway', 'ensureStagingApiDeployment');
 
     expect(infisical.mocks.setSecretAsync).not.toHaveBeenCalled();
 

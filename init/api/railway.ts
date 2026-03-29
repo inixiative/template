@@ -1,13 +1,10 @@
-import { exec } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import { VCR } from '../../packages/shared/src/vcr';
-import { getSecret, setSecret } from '../tasks/infisicalSetup';
+import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
+import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
-
-const execAsync = promisify(exec);
 
 const escapeName = (str: string) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
@@ -102,23 +99,22 @@ class RailwayApi {
     }
 
     try {
-      const token = getSecret('RAILWAY_USER_TOKEN', { projectId, environment: 'root' });
+      const token = await getSecretAsync('RAILWAY_USER_TOKEN', { projectId, environment: 'root' });
       if (token) return token;
     } catch (_error) {
       // Token not in Infisical, try Railway CLI config
     }
 
-    if (existsSync(RAILWAY_CONFIG_PATH)) {
-      try {
-        const railwayConfig = JSON.parse(readFileSync(RAILWAY_CONFIG_PATH, 'utf-8'));
-        const token = railwayConfig?.user?.token;
-        if (token) {
-          setSecret(projectId, 'root', 'RAILWAY_USER_TOKEN', token);
-          return token;
-        }
-      } catch (_error) {
-        // Fall through to error
+    try {
+      await access(RAILWAY_CONFIG_PATH);
+      const railwayConfig = JSON.parse(await readFile(RAILWAY_CONFIG_PATH, 'utf-8'));
+      const token = railwayConfig?.user?.token;
+      if (token) {
+        await setSecretAsync(projectId, 'root', 'RAILWAY_USER_TOKEN', token);
+        return token;
       }
+    } catch (_error) {
+      // Fall through to error
     }
 
     throw new Error('Railway user token not found. Please run: railway login');
@@ -137,7 +133,7 @@ class RailwayApi {
     }
 
     try {
-      const token = getSecret('RAILWAY_WORKSPACE_TOKEN', { projectId, environment: 'root' });
+      const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', { projectId, environment: 'root' });
       if (token) return token;
     } catch (_error) {
       // Not found

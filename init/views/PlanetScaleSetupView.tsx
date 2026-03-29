@@ -11,15 +11,10 @@ import { useAsyncAction } from '../components/useAsyncAction';
 import { setSecretAsync } from '../tasks/infisicalSetup';
 import { setupPlanetScale } from '../tasks/planetscaleSetup';
 import { getPlanetScaleProgressItems } from '../tasks/planetscaleSteps';
-import {
-  clearAllProgress,
-  clearConfigError,
-  setConfigError,
-  setProgressComplete,
-  updateConfigField,
-} from '../utils/configHelpers';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { clearError, clearProgress, markComplete, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type ViewState = 'status' | 'org-select' | 'region-select' | 'token-confirm' | 'token-id-input' | 'token-value-input';
@@ -142,8 +137,8 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       await updateConfigField('planetscale', 'database', '');
       await updateConfigField('planetscale', 'tokenId', '');
       await updateConfigField('planetscale', 'configProjectName', '');
-      await clearAllProgress('planetscale');
-      await clearConfigError('planetscale');
+      await clearProgress('planetscale');
+      await clearError('planetscale');
 
       // Refresh config to clear error display (setupState will auto-update via useMemo)
       await syncConfig();
@@ -162,7 +157,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
     if (action === 'continue' || action === 'run') {
       // Clear any previous errors
-      await clearConfigError('planetscale');
+      await clearError('planetscale');
       await syncConfig();
 
       // Try to use existing org from config first
@@ -181,7 +176,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
             setRegions(availableRegions);
             setViewState('region-select');
           } catch (err) {
-            await setConfigError('planetscale', err instanceof Error ? err.message : 'Failed to load regions');
+            await setError('planetscale', err instanceof Error ? err.message : 'Failed to load regions');
             await syncConfig();
             setViewState('status');
           } finally {
@@ -196,8 +191,8 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
         }
       } else if (organizations.length === 0) {
         // No organizations available - set error
-        await clearConfigError('planetscale');
-        await setConfigError(
+        await clearError('planetscale');
+        await setError(
           'planetscale',
           'No PlanetScale organizations available. Create one at https://app.planetscale.com',
         );
@@ -234,15 +229,15 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       await updateConfigField('planetscale', 'database', '');
       await updateConfigField('planetscale', 'tokenId', '');
       await updateConfigField('planetscale', 'configProjectName', '');
-      await clearAllProgress('planetscale');
-      await clearConfigError('planetscale');
+      await clearProgress('planetscale');
+      await clearError('planetscale');
       await syncConfig();
     }
 
     // Save org and mark selectOrg as complete
     await updateConfigField('planetscale', 'organization', selectedOrg.name);
     await updateConfigField('planetscale', 'configProjectName', config.project.name);
-    await setProgressComplete('planetscale', 'selectOrg');
+    await markComplete('planetscale', 'selectOrg');
     await syncConfig();
 
     // Load regions for this org
@@ -251,7 +246,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       setRegions(availableRegions);
       setViewState('region-select');
     } catch (err) {
-      await setConfigError('planetscale', err instanceof Error ? err.message : 'Failed to load regions');
+      await setError('planetscale', err instanceof Error ? err.message : 'Failed to load regions');
       await syncConfig();
       setViewState('status');
     } finally {
@@ -264,7 +259,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
     // Save region and mark selectRegion as complete
     await updateConfigField('planetscale', 'region', regionSlug);
-    await setProgressComplete('planetscale', 'selectRegion');
+    await markComplete('planetscale', 'selectRegion');
     await syncConfig();
 
     // Show token input (next step)
@@ -280,29 +275,31 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
     if (!config || !tokenInput.trim() || !tokenIdInput.trim()) return;
 
     const actionError = await tokenAction.run('Saving to Infisical...', async () => {
-      const infisicalProjectId = config.infisical.projectId;
-      const orgName = config.planetscale.organization;
-      const region = config.planetscale.region;
+      // Re-read config from disk to avoid stale React closure
+      const freshConfig = await getProjectConfig();
+      const infisicalProjectId = freshConfig.infisical.projectId;
+      const orgName = freshConfig.planetscale.organization;
+      const region = freshConfig.planetscale.region;
 
-      if (!config.planetscale.progress.recordTokenId) {
+      if (!freshConfig.planetscale.progress.recordTokenId) {
         await updateConfigField('planetscale', 'tokenId', tokenIdInput);
-        await setProgressComplete('planetscale', 'recordTokenId');
+        await markComplete('planetscale', 'recordTokenId');
       }
-      if (!config.planetscale.progress.storeOrganizationSecret) {
+      if (!freshConfig.planetscale.progress.storeOrganizationSecret) {
         await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_ORGANIZATION', orgName);
-        await setProgressComplete('planetscale', 'storeOrganizationSecret');
+        await markComplete('planetscale', 'storeOrganizationSecret');
       }
-      if (!config.planetscale.progress.storeRegionSecret) {
+      if (!freshConfig.planetscale.progress.storeRegionSecret) {
         await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_REGION', region);
-        await setProgressComplete('planetscale', 'storeRegionSecret');
+        await markComplete('planetscale', 'storeRegionSecret');
       }
-      if (!config.planetscale.progress.storeTokenIdSecret) {
+      if (!freshConfig.planetscale.progress.storeTokenIdSecret) {
         await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenIdInput);
-        await setProgressComplete('planetscale', 'storeTokenIdSecret');
+        await markComplete('planetscale', 'storeTokenIdSecret');
       }
-      if (!config.planetscale.progress.storeTokenSecret) {
+      if (!freshConfig.planetscale.progress.storeTokenSecret) {
         await setSecretAsync(infisicalProjectId, 'root', 'PLANETSCALE_TOKEN', tokenInput);
-        await setProgressComplete('planetscale', 'storeTokenSecret');
+        await markComplete('planetscale', 'storeTokenSecret');
       }
       await syncConfig();
 
@@ -312,7 +309,7 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
     if (actionError) {
       setViewState('status');
-      await setConfigError('planetscale', actionError);
+      await setError('planetscale', actionError);
       await syncConfig();
     }
   };
@@ -431,11 +428,21 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
         <Box flexDirection="column" marginBottom={1}>
           <Text color="cyan" bold>
-            Required Permissions:
+            Organization access permissions:
           </Text>
-          <Text> ✓ Create databases</Text>
-          <Text> ✓ Create branches</Text>
-          <Text> ✓ Create passwords</Text>
+          <Text> ✓ create_databases</Text>
+          <Text> ✓ read_databases</Text>
+        </Box>
+
+        <Box flexDirection="column" marginBottom={1}>
+          <Text color="cyan" bold>
+            Database access permissions (all databases):
+          </Text>
+          <Text> ✓ read_database</Text>
+          <Text> ✓ write_database</Text>
+          <Text> ✓ create_branch / read_branch</Text>
+          <Text> ✓ connect_branch</Text>
+          <Text> ✓ connect_production_branch</Text>
         </Box>
 
         <Box flexDirection="column" marginBottom={1}>
@@ -474,7 +481,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
           <Text>Create a service token with database permissions:</Text>
           <Text dimColor>1. Go to: https://app.planetscale.com/{orgName}/settings/service-tokens</Text>
           <Text dimColor>2. Click "New service token"</Text>
-          <Text dimColor>3. Enable permissions: Create databases, Create branches, Create passwords</Text>
+          <Text dimColor>3. Enable org permissions: create_databases, read_databases</Text>
+          <Text dimColor> Enable DB permissions (all databases): read_database, write_database,</Text>
+          <Text dimColor> create_branch, read_branch, connect_branch, connect_production_branch</Text>
           <Text dimColor>4. Set expiration to "No expiration"</Text>
           <Text dimColor>5. Copy BOTH the token ID and token value</Text>
         </Box>

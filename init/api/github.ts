@@ -1,7 +1,4 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execAsync = promisify(exec);
+import { execAsync } from '../utils/exec';
 
 /**
  * Check if a GitHub App is installed on an organization

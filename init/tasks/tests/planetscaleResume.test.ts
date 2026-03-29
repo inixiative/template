@@ -27,7 +27,7 @@ describe('PlanetScale Resume Scenario', () => {
     infisical.clearAll();
     config.clearAll();
     system.clearAll();
-    system.stubExec('bun scripts/db/initMigrationTable.ts', { stdout: '', stderr: '' });
+    system.stubExec('bun --cwd packages/db scripts/initMigrationTable.ts', { stdout: '', stderr: '' });
 
     // Resume scenario: provider-side setup is complete up to per-environment connection strings
     config.markComplete('planetscale', [
@@ -118,14 +118,14 @@ describe('PlanetScale Resume Scenario', () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initProdMigrationTable');
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'initStagingMigrationTable');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'initProdMigrationTable');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'initStagingMigrationTable');
   });
 
   test('should configure database after migration table init', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    expect(config.mocks.setProgressComplete).toHaveBeenCalledWith('planetscale', 'configureDB');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'configureDB');
   });
 });
