@@ -14,26 +14,26 @@ while IFS= read -r file; do
 done < <(find apps packages -name 'package.json' -not -path '*/node_modules/*' 2>/dev/null || true)
 
 if [[ "${#package_json_files[@]}" -gt 0 ]]; then
-  if grep -ln '"vitest"' "${package_json_files[@]}" >/dev/null 2>&1; then
-    echo "Found forbidden vitest dependency entries:"
-    grep -Hn '"vitest"' "${package_json_files[@]}"
+  if grep -ln '"@radix-ui/' "${package_json_files[@]}" >/dev/null 2>&1; then
+    echo "Found forbidden @radix-ui dependency entries (use React Aria instead):"
+    grep -Hn '"@radix-ui/' "${package_json_files[@]}"
     exit 1
   fi
 fi
 
 scan_roots=()
-for dir in apps packages tests; do
+for dir in apps packages; do
   if [[ -d "$dir" ]]; then
     scan_roots+=("$dir")
   fi
 done
 
 if [[ "${#scan_roots[@]}" -gt 0 ]]; then
-  if grep -rn --include='*.ts' --include='*.tsx' "from 'vitest'\|from \"vitest\"" "${scan_roots[@]}" >/dev/null 2>&1; then
-    echo "Found forbidden vitest imports:"
-    grep -rn --include='*.ts' --include='*.tsx' "from 'vitest'\|from \"vitest\"" "${scan_roots[@]}"
+  if grep -rn --include='*.ts' --include='*.tsx' "from '@radix-ui/\|from \"@radix-ui/" "${scan_roots[@]}" >/dev/null 2>&1; then
+    echo "Found forbidden @radix-ui imports (use React Aria instead):"
+    grep -rn --include='*.ts' --include='*.tsx' "from '@radix-ui/\|from \"@radix-ui/" "${scan_roots[@]}"
     exit 1
   fi
 fi
 
-echo "No vitest usage found."
+echo "No @radix-ui usage found."

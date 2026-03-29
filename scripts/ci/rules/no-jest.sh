@@ -9,16 +9,14 @@ if [[ -f package.json ]]; then
   package_json_files+=(package.json)
 fi
 
-if [[ -d apps || -d packages ]]; then
-  while IFS= read -r file; do
-    package_json_files+=("$file")
-  done < <(rg --files apps packages -g 'package.json' 2>/dev/null || true)
-fi
+while IFS= read -r file; do
+  package_json_files+=("$file")
+done < <(find apps packages -name 'package.json' -not -path '*/node_modules/*' 2>/dev/null || true)
 
 if [[ "${#package_json_files[@]}" -gt 0 ]]; then
-  if rg --line-number --no-heading '"(jest|@jest/globals|@types/jest|ts-jest|babel-jest|jest-environment-jsdom|jest-mock)"\s*:' "${package_json_files[@]}" >/dev/null; then
+  if grep -ln '"jest\|"@jest/globals\|"@types/jest\|"ts-jest\|"babel-jest\|"jest-environment-jsdom\|"jest-mock' "${package_json_files[@]}" >/dev/null 2>&1; then
     echo "Found forbidden jest dependency entries:"
-    rg --line-number --no-heading '"(jest|@jest/globals|@types/jest|ts-jest|babel-jest|jest-environment-jsdom|jest-mock)"\s*:' "${package_json_files[@]}"
+    grep -Hn '"jest\|"@jest/globals\|"@types/jest\|"ts-jest\|"babel-jest\|"jest-environment-jsdom\|"jest-mock' "${package_json_files[@]}"
     exit 1
   fi
 fi
@@ -31,15 +29,15 @@ for dir in apps packages tests; do
 done
 
 if [[ "${#scan_roots[@]}" -gt 0 ]]; then
-  if rg --line-number --no-heading "from 'jest'|from \"jest\"|from '@jest/globals'|from \"@jest/globals\"" "${scan_roots[@]}" -g'*.ts' -g'*.tsx' >/dev/null; then
+  if grep -rn --include='*.ts' --include='*.tsx' "from 'jest'\|from \"jest\"\|from '@jest/globals'\|from \"@jest/globals\"" "${scan_roots[@]}" >/dev/null 2>&1; then
     echo "Found forbidden jest imports:"
-    rg --line-number --no-heading "from 'jest'|from \"jest\"|from '@jest/globals'|from \"@jest/globals\"" "${scan_roots[@]}" -g'*.ts' -g'*.tsx'
+    grep -rn --include='*.ts' --include='*.tsx' "from 'jest'\|from \"jest\"\|from '@jest/globals'\|from \"@jest/globals\"" "${scan_roots[@]}"
     exit 1
   fi
 
-  if rg --line-number --no-heading '\bjest\.' "${scan_roots[@]}" -g'*.ts' -g'*.tsx' >/dev/null; then
+  if grep -rn --include='*.ts' --include='*.tsx' '\bjest\.' "${scan_roots[@]}" >/dev/null 2>&1; then
     echo "Found forbidden jest global usage:"
-    rg --line-number --no-heading '\bjest\.' "${scan_roots[@]}" -g'*.ts' -g'*.tsx'
+    grep -rn --include='*.ts' --include='*.tsx' '\bjest\.' "${scan_roots[@]}"
     exit 1
   fi
 fi

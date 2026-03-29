@@ -1,0 +1,7 @@
+{
+  "name": "fixture-no-radix-pass",
+  "private": true,
+  "dependencies": {
+    "react-aria-components": "^1.0.0"
+  }
+}
