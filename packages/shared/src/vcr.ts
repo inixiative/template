@@ -75,16 +75,14 @@ export class VCR {
    * Capture mode — serve from disk if fixture exists, otherwise call real fn,
    * sanitize, save to disk, and return. Returns T directly (same shape as real fn).
    *
+   * realFn returns a domain object T. VCR wraps it as { status: 200, body: T }.
+   *
    * Error handling:
    * - Fixture with status >= 400: throws Error(body)
    * - Real fn throws: saves { status: 500, body: message } and rethrows
    */
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
-    const q = this.queues.get(method);
-    const fixtureName = q?.shift();
-    if (!fixtureName) throw new Error(`VCR: no cassette queued for "${method}"`);
-
-    const fixturePath = join(this.fixturesDir, `${method}.${fixtureName}.json`);
+    const fixturePath = this._popFixturePath(method);
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -95,18 +93,53 @@ export class VCR {
     try {
       const raw = await realFn();
       const saved: Fixture<T> = { status: 200, body: sanitize(raw, this.sanitizeKeys) };
-      mkdirSync(dirname(fixturePath), { recursive: true });
-      writeFileSync(fixturePath, `${JSON.stringify(saved, null, 2)}\n`);
+      this._save(fixturePath, saved);
       return saved.body as T;
     } catch (error) {
-      const saved: Fixture<string> = {
-        status: 500,
-        body: error instanceof Error ? error.message : String(error),
-      };
-      mkdirSync(dirname(fixturePath), { recursive: true });
-      writeFileSync(fixturePath, `${JSON.stringify(saved, null, 2)}\n`);
+      this._save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
       throw error;
     }
+  }
+
+  /**
+   * Capture mode for response-shaped calls — realFn returns the full Fixture
+   * envelope (status, body, headers). Records and replays the envelope as-is.
+   *
+   * Does NOT throw on error status — returns the fixture so the caller can
+   * inspect status/headers. Use when the caller needs transport metadata.
+   */
+  async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
+    const fixturePath = this._popFixturePath(method);
+
+    if (existsSync(fixturePath)) {
+      return JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
+    }
+
+    try {
+      const raw = await realFn();
+      const saved: Fixture<T> = {
+        status: raw.status,
+        body: sanitize(raw.body, this.sanitizeKeys) as T | null,
+        ...(raw.headers && { headers: raw.headers }),
+      };
+      this._save(fixturePath, saved);
+      return saved;
+    } catch (error) {
+      this._save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  }
+
+  private _popFixturePath(method: string): string {
+    const q = this.queues.get(method);
+    const fixtureName = q?.shift();
+    if (!fixtureName) throw new Error(`VCR: no cassette queued for "${method}"`);
+    return join(this.fixturesDir, `${method}.${fixtureName}.json`);
+  }
+
+  private _save(fixturePath: string, data: unknown): void {
+    mkdirSync(dirname(fixturePath), { recursive: true });
+    writeFileSync(fixturePath, `${JSON.stringify(data, null, 2)}\n`);
   }
 
   isEmpty(): boolean {
