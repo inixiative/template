@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
 import { getCurrentConfig, renameProject, updateProjectConfig } from '../tasks/projectConfig';
 import { getProjectProgressItems } from '../tasks/projectSteps';
-import { setProgressComplete } from '../utils/configHelpers';
+import { clearAllProgress, setProgressComplete } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
 import { prompt } from '../utils/prompts';
 
@@ -81,6 +81,10 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
     setViewState('executing');
 
     try {
+      // Reset all project progress for a clean run
+      await clearAllProgress('project');
+      await onStepComplete();
+
       await updateProjectConfig({ name: newName, organization: newOrg });
 
       if (newOrg && newOrg.trim() !== '') {
