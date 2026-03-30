@@ -37,7 +37,7 @@ type EnsureRailwaySyncInput = {
  * List Railway connections in Infisical for a project
  */
 const listRailwayConnections = async (infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> => {
-  const infisicalToken = getInfisicalToken();
+  const infisicalToken = await getInfisicalToken();
 
   const response = await fetch(
     `https://app.infisical.com/api/v1/app-connections/railway?projectId=${infisicalProjectId}`,
@@ -62,7 +62,7 @@ const listRailwayConnections = async (infisicalProjectId: string): Promise<Array
  * List Railway secret syncs in Infisical for a project
  */
 export const listRailwaySyncs = async (infisicalProjectId: string): Promise<RailwaySecretSync[]> => {
-  const infisicalToken = getInfisicalToken();
+  const infisicalToken = await getInfisicalToken();
 
   const response = await fetch(
     `https://app.infisical.com/api/v1/secret-syncs/railway?projectId=${infisicalProjectId}`,
@@ -92,7 +92,7 @@ export const createRailwayConnection = async (
   railwayApiToken: string,
   connectionName: string,
 ): Promise<string> => {
-  const infisicalToken = getInfisicalToken();
+  const infisicalToken = await getInfisicalToken();
 
   const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
     method: 'POST',
@@ -151,7 +151,7 @@ export const createRailwaySync = async (
   railwayServiceId: string,
   railwayServiceName: string,
 ): Promise<void> => {
-  const infisicalToken = getInfisicalToken();
+  const infisicalToken = await getInfisicalToken();
 
   const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
     method: 'POST',

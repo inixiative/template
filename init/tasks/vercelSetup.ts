@@ -7,6 +7,7 @@ import {
   checkGitHubIntegration,
   createCustomEnvironment,
   createProject,
+  getProject,
   linkGitHub,
   listTeams,
   updateProjectSettings,
@@ -124,10 +125,11 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // === WEB APP ===
 
-    // Step 7: Create web project
+    // Step 7: Create web project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createWebProject'))) {
       const webProjectName = `${projectName}-web`;
-      const webProject = await createProject(webProjectName, teamId);
+      const existing = await getProject(webProjectName, teamId);
+      const webProject = existing ?? await createProject(webProjectName, teamId);
 
       webProjectId = webProject.id;
       await updateConfigField('vercel', 'webProjectId', webProjectId);
@@ -260,10 +262,11 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // === ADMIN APP ===
 
-    // Step 15: Create admin project
+    // Step 15: Create admin project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createAdminProject'))) {
       const adminProjectName = `${projectName}-admin`;
-      const adminProject = await createProject(adminProjectName, teamId);
+      const existing = await getProject(adminProjectName, teamId);
+      const adminProject = existing ?? await createProject(adminProjectName, teamId);
 
       adminProjectId = adminProject.id;
       await updateConfigField('vercel', 'adminProjectId', adminProjectId);
@@ -396,10 +399,11 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // === SUPERADMIN APP ===
 
-    // Step 23: Create superadmin project
+    // Step 23: Create superadmin project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createSuperadminProject'))) {
       const superadminProjectName = `${projectName}-superadmin`;
-      const superadminProject = await createProject(superadminProjectName, teamId);
+      const existing = await getProject(superadminProjectName, teamId);
+      const superadminProject = existing ?? await createProject(superadminProjectName, teamId);
 
       superadminProjectId = superadminProject.id;
       await updateConfigField('vercel', 'superadminProjectId', superadminProjectId);

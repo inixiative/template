@@ -146,20 +146,31 @@ export const setupPlanetScale = async (
     // Step 5: Rename main branch to prod
     // This preserves the production status and PS-5 cluster assignment
     if (!(await isComplete('planetscale', 'renameProductionBranch'))) {
-      await retryWithTimeout(() => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'), {
-        maxRetries: 100,
-        delayMs: 3000,
-        retryCondition: (error) => {
-          const msg = error.message.toLowerCase();
-          return (
-            msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
-          );
-        },
-        timeoutMessage: 'Branch rename timed out after 5 minutes - cluster not fully initialized',
-        onRetry: async (attempt, maxRetries) => {
-          await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
-        },
-      });
+      try {
+        await retryWithTimeout(() => planetscaleApi.renameBranch(organization, databaseName, 'main', 'prod'), {
+          maxRetries: 100,
+          delayMs: 3000,
+          retryCondition: (error) => {
+            const msg = error.message.toLowerCase();
+            return (
+              msg.includes('still initializing') || msg.includes('not ready') || msg.includes('cluster is not ready')
+            );
+          },
+          timeoutMessage: 'Branch rename timed out after 5 minutes - cluster not fully initialized',
+          onRetry: async (attempt, maxRetries) => {
+            await onStepComplete?.(`Waiting for cluster... attempt ${attempt}/${maxRetries}`);
+          },
+        });
+      } catch (error) {
+        // If 'main' branch not found, it was already renamed to 'prod' in a previous run
+        const msg = error instanceof Error ? error.message.toLowerCase() : '';
+        if (msg.includes('not found') || msg.includes('does not exist')) {
+          // Verify 'prod' branch exists to confirm rename already happened
+          await planetscaleApi.getBranch(organization, databaseName, 'prod');
+        } else {
+          throw error;
+        }
+      }
       await markComplete('planetscale', 'renameProductionBranch');
       await onStepComplete?.();
     }
@@ -199,14 +210,14 @@ export const setupPlanetScale = async (
       _stagingBranch = await planetscaleApi.getBranch(organization, databaseName, 'staging');
     }
 
-    // Step 7: Create passwords (connection strings)
-    let productionPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
-    let stagingPassword: Awaited<ReturnType<typeof planetscaleApi.createRole>> | undefined;
-
-    if (!(await isComplete('planetscale', 'createProdRole'))) {
-      // Production branch role (Postgres uses roles, not passwords)
+    // Step 7+8: Create roles and store connection strings atomically
+    // IMPORTANT: Role creation returns a one-time connection string that cannot be
+    // retrieved again. We must create the role AND store the string in a single atomic
+    // step. If we marked createProdRole complete separately, a crash before storing
+    // the connection string would leave us permanently stuck.
+    if (!(await isComplete('planetscale', 'storeProdConnectionString'))) {
       await onStepComplete?.('Creating production role...');
-      productionPassword = await retryWithTimeout(
+      const productionPassword = await retryWithTimeout(
         () => planetscaleApi.createRole(organization, databaseName, 'prod', `${configProjectName}-production-init`),
         {
           maxRetries: 100,
@@ -223,14 +234,22 @@ export const setupPlanetScale = async (
           },
         },
       );
+
+      const prodConnectionString = productionPassword.connection_strings.general;
+      if (!prodConnectionString) {
+        throw new Error('Production connection string is empty. Check production role creation output.');
+      }
+
+      await onStepComplete?.('Storing prod connection string in Infisical...');
+      await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
       await markComplete('planetscale', 'createProdRole');
+      await markComplete('planetscale', 'storeProdConnectionString');
       await onStepComplete?.();
     }
 
-    if (!(await isComplete('planetscale', 'createStagingRole'))) {
-      // Staging branch role
+    if (!(await isComplete('planetscale', 'storeStagingConnectionString'))) {
       await onStepComplete?.('Creating staging role...');
-      stagingPassword = await retryWithTimeout(
+      const stagingPassword = await retryWithTimeout(
         () => planetscaleApi.createRole(organization, databaseName, 'staging', `${configProjectName}-staging-init`),
         {
           maxRetries: 100,
@@ -247,33 +266,15 @@ export const setupPlanetScale = async (
           },
         },
       );
-      await markComplete('planetscale', 'createStagingRole');
-      await onStepComplete?.();
-    }
-    // If already complete: passwords exist, connection strings stored in Infisical
-    // Later steps fetch from Infisical, so we don't need password objects
 
-    // Step 8: Store connection strings in Infisical
-    if (!(await isComplete('planetscale', 'storeProdConnectionString'))) {
-      await onStepComplete?.('Storing prod connection string in Infisical...');
-      const prodConnectionString = productionPassword?.connection_strings.general;
-      if (!prodConnectionString) {
-        throw new Error('Production connection string is empty. Check production role creation output.');
-      }
-      // Store production connection string in prod environment, /api folder
-      await setSecretAsync(infisicalProjectId, 'prod', 'DATABASE_URL', prodConnectionString, '/api');
-      await markComplete('planetscale', 'storeProdConnectionString');
-      await onStepComplete?.();
-    }
-
-    if (!(await isComplete('planetscale', 'storeStagingConnectionString'))) {
-      await onStepComplete?.('Storing staging connection string in Infisical...');
-      const stagingConnectionString = stagingPassword?.connection_strings.general;
+      const stagingConnectionString = stagingPassword.connection_strings.general;
       if (!stagingConnectionString) {
         throw new Error('Staging connection string is empty. Check staging role creation output.');
       }
-      // Store staging connection string in staging environment, /api folder
+
+      await onStepComplete?.('Storing staging connection string in Infisical...');
       await setSecretAsync(infisicalProjectId, 'staging', 'DATABASE_URL', stagingConnectionString, '/api');
+      await markComplete('planetscale', 'createStagingRole');
       await markComplete('planetscale', 'storeStagingConnectionString');
       await onStepComplete?.();
     }

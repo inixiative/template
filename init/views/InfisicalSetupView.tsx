@@ -1,4 +1,5 @@
 import { Box, Text, useInput } from 'ink';
+import Spinner from 'ink-spinner';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { infisicalApi } from '../api/infisical';
@@ -50,6 +51,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
   const [viewState, setViewState] = useState<ViewState>('status');
   const [running, setRunning] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [orgsLoaded, setOrgsLoaded] = useState(false);
 
   // Derive setup state from config (no delay)
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
@@ -59,6 +61,7 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
     const init = async () => {
       const orgs = await infisicalApi.listOrganizations();
       setOrganizations(orgs);
+      setOrgsLoaded(true);
     };
 
     init();
@@ -74,12 +77,11 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
       // Enter: Complete, Continue, or Run setup
       if (setupState === 'complete') {
         onComplete();
-      } else {
+      } else if (orgsLoaded) {
         handleAction(setupState === 'incomplete' ? 'continue' : 'run');
       }
     } else if (input.toLowerCase() === 'r') {
-      // R: Restart
-      handleAction('restart');
+      if (orgsLoaded) handleAction('restart');
     }
   });
 
@@ -236,8 +238,17 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
         </Box>
       )}
 
+      {/* Loading orgs indicator */}
+      {!orgsLoaded && !running && (
+        <Box marginTop={1}>
+          <Text>
+            <Spinner type="dots" /> Loading organizations...
+          </Text>
+        </Box>
+      )}
+
       {/* Actions */}
-      {!running && (
+      {!running && orgsLoaded && (
         <Box marginTop={1}>
           <Text dimColor>
             {setupState === 'new' || setupState === 'stale'

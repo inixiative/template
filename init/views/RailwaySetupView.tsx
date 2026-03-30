@@ -418,12 +418,14 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       )}
 
       {/* Setup state indicator */}
-      <Box marginTop={1}>
-        {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Railway services</Text>}
-        {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
-        {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
-        {setupState === 'complete' && <Text color="green">✓ Railway setup complete</Text>}
-      </Box>
+      {!running && (
+        <Box marginTop={1}>
+          {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Railway services</Text>}
+          {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
+          {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
+          {setupState === 'complete' && <Text color="green">✓ Railway setup complete</Text>}
+        </Box>
+      )}
 
       {/* Progress list */}
       <Box flexDirection="column" marginTop={1}>

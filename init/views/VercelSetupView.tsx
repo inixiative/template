@@ -305,12 +305,14 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       )}
 
       {/* Setup state indicator */}
-      <Box marginTop={1}>
-        {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Vercel projects</Text>}
-        {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
-        {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
-        {setupState === 'complete' && <Text color="green">✓ Vercel setup complete</Text>}
-      </Box>
+      {!running && (
+        <Box marginTop={1}>
+          {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Vercel projects</Text>}
+          {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
+          {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
+          {setupState === 'complete' && <Text color="green">✓ Vercel setup complete</Text>}
+        </Box>
+      )}
 
       {/* Progress list */}
       <Box flexDirection="column" marginTop={1}>
