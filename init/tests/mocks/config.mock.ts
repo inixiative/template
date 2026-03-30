@@ -1,6 +1,9 @@
 import { mock } from 'bun:test';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
+// Force test mode — with-init-env.sh may pull NODE_ENV=production from Infisical secrets
+process.env.NODE_ENV = 'test';
+
 const envProjectName = process.env.PROJECT_NAME ?? 'template';
 const envOrganizationName = process.env.ORGANIZATION_NAME ?? process.env.PLANETSCALE_ORG ?? 'test-org';
 

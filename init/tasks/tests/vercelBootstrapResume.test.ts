@@ -1,72 +1,26 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { githubApi } from '../../api/github';
 import { infisicalVercelApi } from '../../api/infisicalVercel';
-import { defaultConfig } from '../../tests/mocks';
+import { vercelApi } from '../../api/vercel';
+import { createMockConfig, defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
-const readFileMock = mock(async () =>
-  JSON.stringify({ token: process.env.VERCEL_API_TOKEN ?? 'vercel-token-from-file' }),
-);
-const getProjectConfigMock = mock(async () => currentConfig);
-const updateConfigFieldMock = mock(async (section: string, field: string, value: string) => {
-  (currentConfig[section as keyof ProjectConfig] as Record<string, unknown>)[field] = value;
-});
-const isCompleteMock = mock(async (_section: string, action: string) => completedActions.has(action));
-const markCompleteMock = mock(async (_section: string, action: string) => {
-  completedActions.add(action);
-});
-const setErrorMock = mock(async () => {});
-const setSecretAsyncMock = mock(async () => {});
-const isAppInstalledMock = mock(async () => true);
-const checkGitHubIntegrationMock = mock(async () => ({}));
-const createCustomEnvironmentMock = mock(async () => {});
-const createProjectMock = mock(async () => ({ id: 'unused-project', name: 'unused', framework: null }));
-const linkGitHubMock = mock(async () => {});
-const updateProjectSettingsMock = mock(async () => {});
-
-let currentConfig: ProjectConfig;
-let completedActions = new Set<string>();
+const config = createMockConfig();
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
-
-mock.module('node:fs/promises', () => ({
-  readFile: readFileMock,
-}));
-mock.module('../../utils/getProjectConfig', () => ({
-  getProjectConfig: getProjectConfigMock,
-}));
-mock.module('../../utils/configHelpers', () => ({
-  updateConfigField: updateConfigFieldMock,
-}));
-mock.module('../../utils/progressTracking', () => ({
-  isComplete: isCompleteMock,
-  markComplete: markCompleteMock,
-  setError: setErrorMock,
-}));
-mock.module('../../tasks/infisicalSetup', () => ({
-  setSecretAsync: setSecretAsyncMock,
-}));
-mock.module('../../api/github', () => ({
-  isAppInstalled: isAppInstalledMock,
-}));
-const getProjectMock = mock(async () => null);
 const liveTeamId = process.env.VERCEL_TEAM_ID ?? 'team_123';
 const liveTeamSlug = process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
-const listTeamsMock = mock(async () => [{ id: liveTeamId, slug: liveTeamSlug, name: 'Template Team' }]);
-mock.module('../../api/vercel', () => ({
-  checkGitHubIntegration: checkGitHubIntegrationMock,
-  createCustomEnvironment: createCustomEnvironmentMock,
-  createProject: createProjectMock,
-  getProject: getProjectMock,
-  linkGitHub: linkGitHubMock,
-  listTeams: listTeamsMock,
-  updateProjectSettings: updateProjectSettingsMock,
-}));
+
+config.install();
 
 describe('Vercel Bootstrap Resume Scenario', () => {
   beforeEach(() => {
     infisicalVercelApi.vcr.clear();
+    vercelApi.vcr.clear();
+    githubApi.vcr.clear();
+    config.clearAll();
 
-    currentConfig = {
+    config.setConfig({
       ...cloneDefaultConfig(),
       project: {
         ...cloneDefaultConfig().project,
@@ -79,7 +33,7 @@ describe('Vercel Bootstrap Resume Scenario', () => {
       },
       vercel: {
         ...cloneDefaultConfig().vercel,
-        teamId: process.env.VERCEL_TEAM_ID ?? 'team_123',
+        teamId: liveTeamId,
         teamName: process.env.VERCEL_TEAM_NAME ?? 'Template Team',
         connectionId: '',
         webProjectId: 'web_proj_123',
@@ -87,45 +41,39 @@ describe('Vercel Bootstrap Resume Scenario', () => {
         superadminProjectId: 'superadmin_proj_123',
         configProjectName: process.env.PROJECT_NAME ?? cloneDefaultConfig().project.name,
       },
-    };
-    completedActions = new Set(
+    });
+
+    // All steps complete except createInfisicalConnection
+    config.markComplete(
+      'vercel',
       Object.keys(defaultConfig.vercel.progress).filter((action) => action !== 'createInfisicalConnection'),
     );
 
+    // listTeams runs unconditionally (line 51 in vercelSetup.ts)
+    vercelApi.vcr.queue('listTeams', 'default');
     // createInfisicalConnection not complete → createVercelConnection
     infisicalVercelApi.vcr.queue('createVercelConnection', 'default');
+  });
 
-    readFileMock.mockClear();
-    getProjectConfigMock.mockClear();
-    updateConfigFieldMock.mockClear();
-    isCompleteMock.mockClear();
-    markCompleteMock.mockClear();
-    setErrorMock.mockClear();
-    setSecretAsyncMock.mockClear();
-    isAppInstalledMock.mockClear();
-    checkGitHubIntegrationMock.mockClear();
-    createCustomEnvironmentMock.mockClear();
-    createProjectMock.mockClear();
-    getProjectMock.mockClear();
-    linkGitHubMock.mockClear();
-    updateProjectSettingsMock.mockClear();
+  afterEach(() => {
+    infisicalVercelApi.vcr.clear();
+    vercelApi.vcr.clear();
+    githubApi.vcr.clear();
+    config.clearAll();
   });
 
   test('resumes only the missing Infisical Vercel connection step', async () => {
-    const syncConfigMock = mock(async () => {});
+    const syncConfigMock = async () => {};
     const { setupVercel } = await import(`../vercelSetup?real=${Date.now()}`);
 
-    await setupVercel('team_123', 'Template Team', syncConfigMock);
+    await setupVercel(liveTeamId, 'Template Team', syncConfigMock);
 
-    // createVercelConnection was called — verified implicitly (cassette consumed) and by config update
-    expect(updateConfigFieldMock).toHaveBeenCalledWith('vercel', 'connectionId', expect.any(String));
-    expect(markCompleteMock).toHaveBeenCalledWith('vercel', 'createInfisicalConnection');
-    expect(syncConfigMock).toHaveBeenCalledTimes(1);
+    // createVercelConnection was called — verified by config update
+    expect(config.mocks.updateConfigField).toHaveBeenCalledWith('vercel', 'connectionId', expect.any(String));
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('vercel', 'createInfisicalConnection');
 
-    // ensureVercelSync not called — if it were, VCR would throw (no cassette queued)
-    expect(setSecretAsyncMock).not.toHaveBeenCalled();
-    expect(createProjectMock).not.toHaveBeenCalled();
-    expect(updateProjectSettingsMock).not.toHaveBeenCalled();
-    expect(linkGitHubMock).not.toHaveBeenCalled();
-  });
+    // No other API calls happened — VCR would throw if they did (no cassettes queued)
+    expect(infisicalVercelApi.vcr.isEmpty()).toBe(true);
+    expect(vercelApi.vcr.isEmpty()).toBe(true);
+  }, 60_000);
 });

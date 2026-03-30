@@ -28,7 +28,7 @@
     "build": "bun run '--filter=*' build",
     "pretest": "bun run with test api bun run --cwd packages/db db:push:force",
     "test": "bun run --cwd packages/permissions test && bun run --cwd packages/db test && bun run --cwd packages/email test && bun run --cwd apps/api test",
-    "test:init": "bash init/tests/with-init-env.sh bun test init/",
+    "test:init": "bash init/tests/with-init-env.sh env NODE_ENV=test bun test init/",
     "test:fe": "bun run generate:sdk && bun run generate:routes && bun run --filter=@template/shared test && bun test --concurrency=1 tests/frontend",
     "typecheck": "bun run '--filter=*' typecheck",
     "typecheck:fe": "bun run generate:routes && bun run --cwd apps/web typecheck && bun run --cwd apps/admin typecheck && bun run --cwd apps/superadmin typecheck",

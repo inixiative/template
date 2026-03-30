@@ -1,0 +1,4 @@
+{
+  "status": 500,
+  "body": "PlanetScale API error (404): {\"code\":\"not_found\",\"message\":\"Not Found\"}"
+}

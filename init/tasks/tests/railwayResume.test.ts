@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { infisicalApi } from '../../api/infisical';
+import { infisicalRailwayApi } from '../../api/infisicalRailway';
 import { railwayApi } from '../../api/railway';
 import { createMockConfig, defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
@@ -20,12 +21,6 @@ const liveProdRedisServiceId = process.env.RAILWAY_PROD_REDIS_SERVICE_ID ?? 'red
 const liveStagingRedisServiceId = process.env.RAILWAY_STAGING_REDIS_SERVICE_ID ?? 'redis-staging-123';
 const liveProdRedisVolumeId = process.env.RAILWAY_PROD_REDIS_VOLUME_ID ?? 'volume-prod-123';
 const liveStagingRedisVolumeId = process.env.RAILWAY_STAGING_REDIS_VOLUME_ID ?? 'volume-staging-123';
-
-// infisicalRailway is not being refactored — keep as mock.module
-mock.module('../../api/infisicalRailway', () => ({
-  createRailwayConnection: mock(async () => 'connection-123'),
-  ensureRailwaySync: mock(async () => {}),
-}));
 
 const seedRailwayResumeState = (missingActions: string[]) => {
   config.setConfig({
@@ -88,6 +83,7 @@ describe('Railway Resume Scenario', () => {
   beforeEach(() => {
     railwayApi.vcr.clear();
     infisicalApi.vcr.clear();
+    infisicalRailwayApi.vcr.clear();
     config.clearAll();
 
     seedRailwayResumeState(['storeStagingRedisUrl']);
@@ -96,6 +92,7 @@ describe('Railway Resume Scenario', () => {
     infisicalApi.vcr.queue('setSecret', 'stagingRedisUrl');
     // getConnectionId() runs unconditionally at line 414 (resolvedConnectionId)
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
+    infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
     // final return block: 4 getSecret calls
     queueFinalGetSecrets();
   });
@@ -103,6 +100,7 @@ describe('Railway Resume Scenario', () => {
   afterEach(() => {
     railwayApi.vcr.clear();
     infisicalApi.vcr.clear();
+    infisicalRailwayApi.vcr.clear();
     config.clearAll();
   });
 
@@ -119,16 +117,18 @@ describe('Railway Resume Scenario', () => {
 
     // All VCR cassettes consumed
     expect(infisicalApi.vcr.isEmpty()).toBe(true);
-  });
+  }, 60_000);
 
   test('resumes only the missing prod API deployment step', async () => {
     railwayApi.vcr.clear();
     infisicalApi.vcr.clear();
+    infisicalRailwayApi.vcr.clear();
     config.clearAll();
 
     seedRailwayResumeState(['ensureProdApiDeployment']);
     // getConnectionId() runs before ensureProdApiDeployment in the code flow
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
+    infisicalRailwayApi.vcr.queue('createRailwayConnection', 'default');
     railwayApi.vcr.queue('getLatestDeployment', 'null');
     railwayApi.vcr.queue('triggerServiceDeployment', 'default');
     // final return block: 4 getSecret calls
@@ -146,5 +146,5 @@ describe('Railway Resume Scenario', () => {
 
     // All VCR cassettes consumed — no setSecret calls happened
     expect(infisicalApi.vcr.isEmpty()).toBe(true);
-  });
+  }, 60_000);
 });

@@ -59,7 +59,13 @@ export const toInfisicalSlug = (name: string): string => {
 };
 
 class InfisicalApi {
-  readonly vcr = new VCR(FIXTURES_DIR);
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    sanitizeString: (s) =>
+      s
+        .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
+        .replace(/pscale_tkn_\w+/g, 'REDACTED')
+        .replace(/pscale_pw_\w+/g, 'REDACTED'),
+  });
 
   private async _fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await getInfisicalToken();

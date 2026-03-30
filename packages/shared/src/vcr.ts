@@ -56,11 +56,13 @@ export type Fixture<T = unknown> = {
 export class VCR {
   private readonly fixturesDir: string;
   private readonly sanitizeKeys: string[];
+  private readonly sanitizeString?: (value: string) => string;
   private readonly queues = new Map<string, string[]>();
 
-  constructor(fixturesDir: string, options: { sanitizeKeys?: string[] } = {}) {
+  constructor(fixturesDir: string, options: { sanitizeKeys?: string[]; sanitizeString?: (value: string) => string } = {}) {
     this.fixturesDir = fixturesDir;
     this.sanitizeKeys = options.sanitizeKeys ?? [];
+    this.sanitizeString = options.sanitizeString;
   }
 
   /** Queue a fixture for a specific method. Consumed in FIFO order per method. */
@@ -92,7 +94,7 @@ export class VCR {
 
     try {
       const raw = await realFn();
-      const saved: Fixture<T> = { status: 200, body: sanitize(raw, this.sanitizeKeys) };
+      const saved: Fixture<T> = { status: 200, body: this._sanitizeBody(raw) };
       this._save(fixturePath, saved);
       return saved.body as T;
     } catch (error) {
@@ -119,7 +121,7 @@ export class VCR {
       const raw = await realFn();
       const saved: Fixture<T> = {
         status: raw.status,
-        body: sanitize(raw.body, this.sanitizeKeys) as T | null,
+        body: this._sanitizeBody(raw.body) as T | null,
         ...(raw.headers && { headers: raw.headers }),
       };
       this._save(fixturePath, saved);
@@ -128,6 +130,13 @@ export class VCR {
       this._save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
       throw error;
     }
+  }
+
+  private _sanitizeBody<T>(data: T): T {
+    if (typeof data === 'string' && this.sanitizeString) {
+      return this.sanitizeString(data) as T;
+    }
+    return sanitize(data, this.sanitizeKeys);
   }
 
   private _popFixturePath(method: string): string {

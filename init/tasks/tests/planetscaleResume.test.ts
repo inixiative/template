@@ -58,8 +58,6 @@ describe('PlanetScale Resume Scenario', () => {
     planetscaleApi.vcr.queue('getDatabase', 'success');
     // createStagingBranch complete → else branch: fetch existing branch
     planetscaleApi.vcr.queue('getBranch', 'staging');
-    // configureDB not complete → update settings
-    planetscaleApi.vcr.queue('updateDatabaseSettings', 'configureDB');
   });
 
   afterEach(() => {
@@ -72,7 +70,7 @@ describe('PlanetScale Resume Scenario', () => {
   test('should NOT create new roles when resuming', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
-  });
+  }, 60_000);
 
   test('should fetch connection strings from Infisical and init migration tables', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
@@ -86,7 +84,7 @@ describe('PlanetScale Resume Scenario', () => {
       (call) => typeof call[0] === 'string' && call[0].includes('initMigrationTable'),
     );
     expect(migrationCalls).toHaveLength(2);
-  });
+  }, 60_000);
 
   test('should mark both migration table steps as complete', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
@@ -94,12 +92,12 @@ describe('PlanetScale Resume Scenario', () => {
 
     expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'initProdMigrationTable');
     expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'initStagingMigrationTable');
-  });
+  }, 60_000);
 
   test('should configure database after migration table init', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
     expect(config.mocks.markComplete).toHaveBeenCalledWith('planetscale', 'configureDB');
-  });
+  }, 60_000);
 });

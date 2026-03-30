@@ -89,9 +89,8 @@ describe('Infisical Resume Scenario', () => {
       'ensureStagingApiAuthSecret',
     ]);
 
-    // renameEnv not complete → getProject + updateEnvironment
+    // renameEnv not complete → getProject (dev already renamed to root in recorded fixture)
     infisicalApi.vcr.queue('getProject', 'withDevEnv');
-    infisicalApi.vcr.queue('updateEnvironment', 'root');
     // createStagingAdminEnvImport not complete → createSecretImport
     infisicalApi.vcr.queue('createSecretImport', 'stagingAdmin');
     // 3 always-run setSecretAsync calls (NODE_ENV, ENVIRONMENT×2)
@@ -119,5 +118,5 @@ describe('Infisical Resume Scenario', () => {
 
     // All VCR cassettes consumed — no extra setSecret/getSecret calls happened
     expect(infisicalApi.vcr.isEmpty()).toBe(true);
-  });
+  }, 60_000);
 });

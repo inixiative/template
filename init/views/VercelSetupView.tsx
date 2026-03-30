@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { listTeams } from '../api/vercel';
+import { vercelApi } from '../api/vercel';
 import { ActionSpinner } from '../components/ActionSpinner';
 import { type Organization, OrgSelector } from '../components/OrgSelector';
 import { StepProgress } from '../components/StepProgress';
@@ -65,7 +65,7 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
   useEffect(() => {
     const init = async () => {
       try {
-        const vercelTeams = await listTeams();
+        const vercelTeams = await vercelApi.listTeams();
         // Convert Vercel teams to Organization format for OrgSelector
         setTeams(
           vercelTeams.map((team) => ({

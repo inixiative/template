@@ -323,16 +323,8 @@ export const setupPlanetScale = async (
       }
     }
 
-    // Step 10: Configure database settings (now that migration table exists)
+    // Step 10: Configure database settings (PostgreSQL handles FK constraints natively)
     if (!(await isComplete('planetscale', 'configureDB'))) {
-      // Re-read from config (don't trust local variables when resuming)
-      const latestConfig = await getProjectConfig();
-      const orgName = latestConfig.planetscale.organization;
-      const dbName = latestConfig.planetscale.database || latestConfig.project.name;
-
-      await planetscaleApi.updateDatabaseSettings(orgName, dbName, {
-        allow_foreign_key_constraints: true, // Required for Prisma relations
-      });
       await markComplete('planetscale', 'configureDB');
       await onStepComplete?.();
     }

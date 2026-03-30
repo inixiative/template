@@ -1,17 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { isAppInstalled } from '../api/github';
+import { githubApi } from '../api/github';
 import { infisicalVercelApi } from '../api/infisicalVercel';
-import {
-  checkGitHubIntegration,
-  createCustomEnvironment,
-  createProject,
-  getProject,
-  linkGitHub,
-  listTeams,
-  updateProjectSettings,
-} from '../api/vercel';
+import { vercelApi } from '../api/vercel';
 import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
@@ -48,7 +40,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     let superadminProjectId = projectConfig.vercel.superadminProjectId;
     let connectionId = projectConfig.vercel.connectionId;
     let vercelToken = '';
-    const teamSlug = (await listTeams()).find((team) => team.id === teamId)?.slug;
+    const teamSlug = (await vercelApi.listTeams()).find((team) => team.id === teamId)?.slug;
 
     if (!teamSlug) {
       throw new Error('Could not resolve the selected Vercel team slug. Re-select the team and retry.');
@@ -83,7 +75,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 4: Check GitHub integration (once, before creating projects)
     if (!(await isComplete('vercel', 'promptedForGithub'))) {
       // Check if Vercel GitHub App is installed using GitHub API
-      const isVercelAppInstalled = await isAppInstalled(projectConfig.project.organization, 'vercel');
+      const isVercelAppInstalled = await githubApi.isAppInstalled(projectConfig.project.organization, 'vercel');
 
       if (!isVercelAppInstalled) {
         // GitHub App not installed - throw to trigger prompt
@@ -91,8 +83,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       }
 
       // Check what GitHub integrations Vercel knows about
-      console.log('🔍 Checking Vercel GitHub integrations...');
-      await checkGitHubIntegration();
+      await vercelApi.checkGitHubIntegration();
 
       await markComplete('vercel', 'promptedForGithub');
       await syncConfig();
@@ -130,8 +121,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 7: Create web project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createWebProject'))) {
       const webProjectName = `${projectName}-web`;
-      const existing = await getProject(webProjectName, teamId);
-      const webProject = existing ?? await createProject(webProjectName, teamId);
+      const existing = await vercelApi.getProject(webProjectName, teamId);
+      const webProject = existing ?? await vercelApi.createProject(webProjectName, teamId);
 
       webProjectId = webProject.id;
       await updateConfigField('vercel', 'webProjectId', webProjectId);
@@ -141,7 +132,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 8: Configure Web root directory
     if (!(await isComplete('vercel', 'configureWebRootDirectory'))) {
-      await updateProjectSettings(webProjectId, teamId, {
+      await vercelApi.updateProjectSettings(webProjectId, teamId, {
         rootDirectory: 'apps/web',
       });
 
@@ -152,13 +143,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 9: Create Web staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createWebStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(webProjectId, teamId, 'Staging', 'main');
-        console.log('✅ Created custom staging environment for Web');
+        await vercelApi.createCustomEnvironment(webProjectId, teamId, 'Staging', 'main');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
         if (error instanceof Error && error.message.includes('Cannot create more than')) {
-          console.log('⚠️  Custom environments not available (requires Pro/Enterprise plan)');
-          console.log('   Using Preview environment for staging deployments');
         } else {
           throw error;
         }
@@ -170,7 +158,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 10: Link Web project to GitHub
     if (!(await isComplete('vercel', 'linkWebGitHub'))) {
-      await linkGitHub(webProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
+      await vercelApi.linkGitHub(webProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkWebGitHub');
       await syncConfig();
@@ -212,9 +200,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         infisicalSecretPath: '/web',
         vercelProjectId: webProjectId,
         vercelProjectName: `${projectName}-web`,
-        vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
+        vercelEnvironment: 'preview',
         vercelTeamId: teamId,
-        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createWebInfisicalSyncStaging');
@@ -260,8 +247,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 15: Create admin project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createAdminProject'))) {
       const adminProjectName = `${projectName}-admin`;
-      const existing = await getProject(adminProjectName, teamId);
-      const adminProject = existing ?? await createProject(adminProjectName, teamId);
+      const existing = await vercelApi.getProject(adminProjectName, teamId);
+      const adminProject = existing ?? await vercelApi.createProject(adminProjectName, teamId);
 
       adminProjectId = adminProject.id;
       await updateConfigField('vercel', 'adminProjectId', adminProjectId);
@@ -271,7 +258,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 16: Configure Admin root directory
     if (!(await isComplete('vercel', 'configureAdminRootDirectory'))) {
-      await updateProjectSettings(adminProjectId, teamId, {
+      await vercelApi.updateProjectSettings(adminProjectId, teamId, {
         rootDirectory: 'apps/admin',
       });
 
@@ -282,13 +269,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 17: Create Admin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createAdminStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(adminProjectId, teamId, 'Staging', 'main');
-        console.log('✅ Created custom staging environment for Admin');
+        await vercelApi.createCustomEnvironment(adminProjectId, teamId, 'Staging', 'main');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
         if (error instanceof Error && error.message.includes('Cannot create more than')) {
-          console.log('⚠️  Custom environments not available (requires Pro/Enterprise plan)');
-          console.log('   Using Preview environment for staging deployments');
         } else {
           throw error;
         }
@@ -300,7 +284,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 18: Link Admin project to GitHub
     if (!(await isComplete('vercel', 'linkAdminGitHub'))) {
-      await linkGitHub(adminProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
+      await vercelApi.linkGitHub(adminProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkAdminGitHub');
       await syncConfig();
@@ -340,9 +324,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         infisicalSecretPath: '/admin',
         vercelProjectId: adminProjectId,
         vercelProjectName: `${projectName}-admin`,
-        vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
+        vercelEnvironment: 'preview',
         vercelTeamId: teamId,
-        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createAdminInfisicalSyncStaging');
@@ -388,8 +371,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 23: Create superadmin project (idempotent — finds existing by name on retry)
     if (!(await isComplete('vercel', 'createSuperadminProject'))) {
       const superadminProjectName = `${projectName}-superadmin`;
-      const existing = await getProject(superadminProjectName, teamId);
-      const superadminProject = existing ?? await createProject(superadminProjectName, teamId);
+      const existing = await vercelApi.getProject(superadminProjectName, teamId);
+      const superadminProject = existing ?? await vercelApi.createProject(superadminProjectName, teamId);
 
       superadminProjectId = superadminProject.id;
       await updateConfigField('vercel', 'superadminProjectId', superadminProjectId);
@@ -399,7 +382,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 24: Configure Superadmin root directory
     if (!(await isComplete('vercel', 'configureSuperadminRootDirectory'))) {
-      await updateProjectSettings(superadminProjectId, teamId, {
+      await vercelApi.updateProjectSettings(superadminProjectId, teamId, {
         rootDirectory: 'apps/superadmin',
       });
 
@@ -410,13 +393,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 25: Create Superadmin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createSuperadminStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'main');
-        console.log('✅ Created custom staging environment for Superadmin');
+        await vercelApi.createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'main');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
         if (error instanceof Error && error.message.includes('Cannot create more than')) {
-          console.log('⚠️  Custom environments not available (requires Pro/Enterprise plan)');
-          console.log('   Using Preview environment for staging deployments');
         } else {
           throw error;
         }
@@ -428,7 +408,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 26: Link Superadmin project to GitHub
     if (!(await isComplete('vercel', 'linkSuperadminGitHub'))) {
-      await linkGitHub(
+      await vercelApi.linkGitHub(
         superadminProjectId,
         projectConfig.project.organization,
         projectConfig.project.name,
@@ -474,9 +454,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         infisicalSecretPath: '/superadmin',
         vercelProjectId: superadminProjectId,
         vercelProjectName: `${projectName}-superadmin`,
-        vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
+        vercelEnvironment: 'preview',
         vercelTeamId: teamId,
-        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createSuperadminInfisicalSyncStaging');

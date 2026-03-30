@@ -1,5 +1,11 @@
 import { mock } from 'bun:test';
-import { exec as realExec, execSync as realExecSync } from 'child_process';
+import { exec as _exec, execSync as _execSync } from 'child_process';
+
+// Capture real function references as values — import bindings are live in ESM,
+// so mock.module('child_process', ...) would replace them in-place, causing
+// infinite recursion in the mockExec fallback path.
+const realExec = _exec;
+const realExecSync = _execSync;
 
 type CommandMatcher = RegExp | string | ((command: string) => boolean);
 type ExecResult = {
@@ -76,6 +82,17 @@ export const createMockSystem = () => {
       mock.module('child_process', () => ({
         exec: mockExec,
         execSync: mockExecSync,
+      }));
+      // Also mock the execAsync wrapper — it captures `exec` at import time via
+      // promisify, so mocking child_process alone doesn't intercept it.
+      mock.module('../../utils/exec', () => ({
+        execAsync: (command: string, options?: unknown) =>
+          new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+            mockExec(command, options, (error: Error | null, stdout: string, stderr: string) => {
+              if (error) reject(error);
+              else resolve({ stdout, stderr });
+            });
+          }),
       }));
     },
     clearAll: () => {

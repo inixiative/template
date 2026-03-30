@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "body": {
+    "id": "xxgulnedgfkc",
+    "name": "staging",
+    "cluster_name": "PS_DEV_AWS_ARM",
+    "cluster_display_name": "PS-DEV",
+    "cluster_architecture": "aarch64",
+    "cluster_iops": 0,
+    "state": "ready",
+    "created_at": "2026-03-30T10:57:38.862Z",
+    "updated_at": "2026-03-30T14:46:58.519Z",
+    "actor": {
+      "type": "User",
+      "id": "evbl5rawa5gv",
+      "display_name": "Aron Greenspan"
+    },
+    "production": false,
+    "ready": true,
+    "parent_branch": "prod",
+    "region": {
+      "slug": "us-east",
+      "provider": "AWS",
+      "display_name": "AWS us-east-1",
+      "location": "N. Virginia",
+      "enabled": true,
+      "current_default": true
+    },
+    "kind": "postgresql",
+    "replicas": 0
+  }
+}

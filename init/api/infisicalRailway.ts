@@ -1,4 +1,8 @@
+import { join } from 'path';
+import { VCR } from '../../packages/shared/src/vcr';
 import { getInfisicalToken } from './infisical';
+
+const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalRailway');
 
 type RailwaySecretSync = {
   id: string;
@@ -33,219 +37,205 @@ type EnsureRailwaySyncInput = {
   railwayServiceName: string;
 };
 
-/**
- * List Railway connections in Infisical for a project
- */
-const listRailwayConnections = async (infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> => {
-  const infisicalToken = await getInfisicalToken();
+class InfisicalRailwayApi {
+  readonly vcr = new VCR(FIXTURES_DIR);
 
-  const response = await fetch(
-    `https://app.infisical.com/api/v1/app-connections/railway?projectId=${infisicalProjectId}`,
-    {
-      method: 'GET',
+  /**
+   * Create a Railway connection in Infisical (idempotent - returns existing if already created)
+   */
+  async createRailwayConnection(
+    infisicalProjectId: string,
+    railwayApiToken: string,
+    connectionName: string,
+  ): Promise<string> {
+    if (process.env.NODE_ENV !== 'test')
+      return this._createRailwayConnection(infisicalProjectId, railwayApiToken, connectionName);
+    return this.vcr.capture('createRailwayConnection', () =>
+      this._createRailwayConnection(infisicalProjectId, railwayApiToken, connectionName),
+    );
+  }
+  private async _createRailwayConnection(
+    infisicalProjectId: string,
+    railwayApiToken: string,
+    connectionName: string,
+  ): Promise<string> {
+    const infisicalToken = await getInfisicalToken();
+
+    const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${infisicalToken}`,
       },
-    },
-  );
+      body: JSON.stringify({
+        name: connectionName,
+        method: 'team-token',
+        projectId: infisicalProjectId,
+        credentials: {
+          apiToken: railwayApiToken,
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to list Railway connections: ${response.statusText}\n${errorText}`);
-  }
+    if (!response.ok) {
+      const errorText = await response.text();
 
-  const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
-  return data.appConnections ?? [];
-};
-
-/**
- * List Railway secret syncs in Infisical for a project
- */
-export const listRailwaySyncs = async (infisicalProjectId: string): Promise<RailwaySecretSync[]> => {
-  const infisicalToken = await getInfisicalToken();
-
-  const response = await fetch(
-    `https://app.infisical.com/api/v1/secret-syncs/railway?projectId=${infisicalProjectId}`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${infisicalToken}`,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to list Railway syncs: ${response.statusText}\n${errorText}`);
-  }
-
-  const data = (await response.json()) as { secretSyncs?: RailwaySecretSync[] };
-  return data.secretSyncs ?? [];
-};
-
-/**
- * Create a Railway connection in Infisical (idempotent - returns existing if already created)
- * This allows Infisical to sync secrets to Railway projects
- */
-export const createRailwayConnection = async (
-  infisicalProjectId: string,
-  railwayApiToken: string,
-  connectionName: string,
-): Promise<string> => {
-  const infisicalToken = await getInfisicalToken();
-
-  const response = await fetch('https://app.infisical.com/api/v1/app-connections/railway', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${infisicalToken}`,
-    },
-    body: JSON.stringify({
-      name: connectionName,
-      method: 'team-token',
-      projectId: infisicalProjectId,
-      credentials: {
-        apiToken: railwayApiToken,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-
-    // If connection already exists, find and return its ID
-    if (errorText.includes('already exists')) {
-      const connections = await listRailwayConnections(infisicalProjectId);
-      const existing = connections.find((conn) => conn.name === connectionName);
-      if (existing) {
-        return existing.id;
+      if (errorText.includes('already exists')) {
+        const connections = await this._listRailwayConnections(infisicalProjectId);
+        const existing = connections.find((conn) => conn.name === connectionName);
+        if (existing) {
+          return existing.id;
+        }
       }
+
+      throw new Error(`Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`);
     }
 
-    throw new Error(`Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`);
+    const data = (await response.json()) as { appConnection?: { id?: string } };
+
+    if (data.appConnection?.id) {
+      return data.appConnection.id;
+    } else {
+      throw new Error(`Unexpected Infisical API response: ${JSON.stringify(data)}`);
+    }
   }
 
-  const data = (await response.json()) as { appConnection?: { id?: string } };
-
-  // Response is { appConnection: { id, ... } }
-  if (data.appConnection?.id) {
-    return data.appConnection.id;
-  } else {
-    throw new Error(`Unexpected Infisical API response: ${JSON.stringify(data)}`);
+  /**
+   * Ensure a service-scoped Railway sync exists and matches expected config
+   */
+  async ensureRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
+    if (process.env.NODE_ENV !== 'test') return this._ensureRailwaySync(input);
+    return this.vcr.capture('ensureRailwaySync', () => this._ensureRailwaySync(input));
   }
-};
+  private async _ensureRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
+    const existingSyncs = await this._listRailwaySyncs(input.infisicalProjectId);
+    const existing = existingSyncs.find((sync) => sync.name === input.syncName);
 
-/**
- * Create a secret sync from Infisical to Railway
- */
-export const createRailwaySync = async (
-  infisicalProjectId: string,
-  connectionId: string,
-  syncName: string,
-  infisicalEnvironment: string,
-  infisicalSecretPath: string,
-  railwayProjectId: string,
-  railwayProjectName: string,
-  railwayEnvironmentId: string,
-  railwayEnvironmentName: string,
-  railwayServiceId: string,
-  railwayServiceName: string,
-): Promise<void> => {
-  const infisicalToken = await getInfisicalToken();
+    if (!existing) {
+      await this._createRailwaySync(input);
+      return;
+    }
 
-  const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${infisicalToken}`,
-    },
-    body: JSON.stringify({
-      name: syncName,
-      projectId: infisicalProjectId,
-      environment: infisicalEnvironment,
-      secretPath: infisicalSecretPath,
-      connectionId,
-      syncOptions: {
-        initialSyncBehavior: 'import-prioritize-source',
+    const mismatches: string[] = [];
+    if ((existing.environment?.slug || '') !== input.infisicalEnvironment) {
+      mismatches.push(
+        `environment: expected "${input.infisicalEnvironment}", got "${existing.environment?.slug || ''}"`,
+      );
+    }
+    if ((existing.folder?.path || '') !== input.infisicalSecretPath) {
+      mismatches.push(
+        `secretPath: expected "${input.infisicalSecretPath}", got "${existing.folder?.path || ''}"`,
+      );
+    }
+
+    const destinationConfig = existing.destinationConfig || {};
+    if ((destinationConfig.projectId || '') !== input.railwayProjectId) {
+      mismatches.push(`projectId: expected "${input.railwayProjectId}", got "${destinationConfig.projectId || ''}"`);
+    }
+    if ((destinationConfig.environmentId || '') !== input.railwayEnvironmentId) {
+      mismatches.push(
+        `environmentId: expected "${input.railwayEnvironmentId}", got "${destinationConfig.environmentId || ''}"`,
+      );
+    }
+    if ((destinationConfig.serviceId || '') !== input.railwayServiceId) {
+      mismatches.push(`serviceId: expected "${input.railwayServiceId}", got "${destinationConfig.serviceId || ''}"`);
+    }
+
+    if (mismatches.length > 0) {
+      throw new Error(
+        `Railway sync "${input.syncName}" exists with mismatched config:\n` +
+          mismatches.map((mismatch) => `  - ${mismatch}`).join('\n'),
+      );
+    }
+  }
+
+  /**
+   * List Railway secret syncs in Infisical for a project
+   */
+  async listRailwaySyncs(infisicalProjectId: string): Promise<RailwaySecretSync[]> {
+    if (process.env.NODE_ENV !== 'test') return this._listRailwaySyncs(infisicalProjectId);
+    return this.vcr.capture('listRailwaySyncs', () => this._listRailwaySyncs(infisicalProjectId));
+  }
+  private async _listRailwaySyncs(infisicalProjectId: string): Promise<RailwaySecretSync[]> {
+    const infisicalToken = await getInfisicalToken();
+
+    const response = await fetch(
+      `https://app.infisical.com/api/v1/secret-syncs/railway?projectId=${infisicalProjectId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${infisicalToken}`,
+        },
       },
-      destinationConfig: {
-        projectId: railwayProjectId,
-        projectName: railwayProjectName,
-        environmentId: railwayEnvironmentId,
-        environmentName: railwayEnvironmentName,
-        serviceId: railwayServiceId,
-        serviceName: railwayServiceName,
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to list Railway syncs: ${response.statusText}\n${errorText}`);
+    }
+
+    const data = (await response.json()) as { secretSyncs?: RailwaySecretSync[] };
+    return data.secretSyncs ?? [];
+  }
+
+  private async _listRailwayConnections(
+    infisicalProjectId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const infisicalToken = await getInfisicalToken();
+
+    const response = await fetch(
+      `https://app.infisical.com/api/v1/app-connections/railway?projectId=${infisicalProjectId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${infisicalToken}`,
+        },
       },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to create Railway sync "${syncName}": ${response.statusText}\n${errorText}`);
-  }
-};
-
-/**
- * Ensure a service-scoped Railway sync exists and matches expected config
- */
-export const ensureRailwaySync = async ({
-  infisicalProjectId,
-  connectionId,
-  syncName,
-  infisicalEnvironment,
-  infisicalSecretPath,
-  railwayProjectId,
-  railwayProjectName,
-  railwayEnvironmentId,
-  railwayEnvironmentName,
-  railwayServiceId,
-  railwayServiceName,
-}: EnsureRailwaySyncInput): Promise<void> => {
-  const existingSyncs = await listRailwaySyncs(infisicalProjectId);
-  const existing = existingSyncs.find((sync) => sync.name === syncName);
-
-  if (!existing) {
-    await createRailwaySync(
-      infisicalProjectId,
-      connectionId,
-      syncName,
-      infisicalEnvironment,
-      infisicalSecretPath,
-      railwayProjectId,
-      railwayProjectName,
-      railwayEnvironmentId,
-      railwayEnvironmentName,
-      railwayServiceId,
-      railwayServiceName,
     );
-    return;
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to list Railway connections: ${response.statusText}\n${errorText}`);
+    }
+
+    const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
+    return data.appConnections ?? [];
   }
 
-  const mismatches: string[] = [];
-  if ((existing.environment?.slug || '') !== infisicalEnvironment) {
-    mismatches.push(`environment: expected "${infisicalEnvironment}", got "${existing.environment?.slug || ''}"`);
-  }
-  if ((existing.folder?.path || '') !== infisicalSecretPath) {
-    mismatches.push(`secretPath: expected "${infisicalSecretPath}", got "${existing.folder?.path || ''}"`);
-  }
+  private async _createRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
+    const infisicalToken = await getInfisicalToken();
 
-  const destinationConfig = existing.destinationConfig || {};
-  if ((destinationConfig.projectId || '') !== railwayProjectId) {
-    mismatches.push(`projectId: expected "${railwayProjectId}", got "${destinationConfig.projectId || ''}"`);
-  }
-  if ((destinationConfig.environmentId || '') !== railwayEnvironmentId) {
-    mismatches.push(
-      `environmentId: expected "${railwayEnvironmentId}", got "${destinationConfig.environmentId || ''}"`,
-    );
-  }
-  if ((destinationConfig.serviceId || '') !== railwayServiceId) {
-    mismatches.push(`serviceId: expected "${railwayServiceId}", got "${destinationConfig.serviceId || ''}"`);
-  }
+    const response = await fetch('https://app.infisical.com/api/v1/secret-syncs/railway', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${infisicalToken}`,
+      },
+      body: JSON.stringify({
+        name: input.syncName,
+        projectId: input.infisicalProjectId,
+        environment: input.infisicalEnvironment,
+        secretPath: input.infisicalSecretPath,
+        connectionId: input.connectionId,
+        syncOptions: {
+          initialSyncBehavior: 'import-prioritize-source',
+        },
+        destinationConfig: {
+          projectId: input.railwayProjectId,
+          projectName: input.railwayProjectName,
+          environmentId: input.railwayEnvironmentId,
+          environmentName: input.railwayEnvironmentName,
+          serviceId: input.railwayServiceId,
+          serviceName: input.railwayServiceName,
+        },
+      }),
+    });
 
-  if (mismatches.length > 0) {
-    throw new Error(
-      `Railway sync "${syncName}" exists with mismatched config:\n` +
-        mismatches.map((mismatch) => `  - ${mismatch}`).join('\n'),
-    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create Railway sync "${input.syncName}": ${response.statusText}\n${errorText}`);
+    }
   }
-};
+}
+
+export const infisicalRailwayApi = new InfisicalRailwayApi();
