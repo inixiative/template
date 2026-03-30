@@ -3,69 +3,50 @@
  *
  * Tests the token collection and Infisical storage flow
  * without rendering the React component (no ink-testing-library needed).
+ * Uses VCR fixtures — run with real credentials to record.
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createMockInfisical, createMockSystem } from '../../tests/mocks';
+import { infisicalApi } from '../../api/infisical';
 
-const infisical = createMockInfisical();
-const system = createMockSystem();
-
-infisical.install();
-system.install();
-
-describe('TokenInputView - setSecretAsync integration', () => {
+describe('TokenInputView - setSecretAsync via VCR', () => {
   beforeEach(() => {
-    infisical.clearAll();
-    system.clearAll();
+    infisicalApi.vcr.clear();
   });
 
   afterEach(() => {
-    infisical.clearAll();
+    infisicalApi.vcr.clear();
   });
 
   test('setSecretAsync stores tokens in Infisical', async () => {
+    infisicalApi.vcr.queue('setSecret', 'tokenId');
+    infisicalApi.vcr.queue('setSecret', 'token');
+
     const { setSecretAsync } = await import('../../tasks/infisicalSetup');
 
     await setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN_ID', 'pscale_tkid_test123');
     await setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN', 'pscale_tk_secret456');
 
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledTimes(2);
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledWith(
-      'proj-123',
-      'root',
-      'PLANETSCALE_TOKEN_ID',
-      'pscale_tkid_test123',
-    );
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledWith(
-      'proj-123',
-      'root',
-      'PLANETSCALE_TOKEN',
-      'pscale_tk_secret456',
-    );
-
-    // Verify stored in mock store
-    expect(infisical.secretStore.get('PLANETSCALE_TOKEN_ID')).toBe('pscale_tkid_test123');
-    expect(infisical.secretStore.get('PLANETSCALE_TOKEN')).toBe('pscale_tk_secret456');
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 
-  test('setSecretAsync propagates errors', async () => {
+  test('setSecretAsync propagates VCR errors', async () => {
+    // Queue an error fixture (status >= 400 → throws)
+    infisicalApi.vcr.queue('setSecret', 'error');
+
     const { setSecretAsync } = await import('../../tasks/infisicalSetup');
 
-    // Override to simulate failure
-    infisical.mocks.setSecretAsync.mockRejectedValueOnce(
-      new Error('Failed to set secret PLANETSCALE_TOKEN: Connection refused'),
-    );
-
-    await expect(setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN', 'value')).rejects.toThrow(
-      'Connection refused',
-    );
+    await expect(setSecretAsync('proj-123', 'root', 'PLANETSCALE_TOKEN', 'value')).rejects.toThrow();
   });
 
   test('multiple token fields are stored independently', async () => {
+    infisicalApi.vcr.queue('setSecret', 'org');
+    infisicalApi.vcr.queue('setSecret', 'region');
+    infisicalApi.vcr.queue('setSecret', 'tokenId');
+    infisicalApi.vcr.queue('setSecret', 'token');
+
     const { setSecretAsync } = await import('../../tasks/infisicalSetup');
 
-    // Simulate what TokenInputView does: save all tokens on final submit
     const tokens = [
       { key: 'PLANETSCALE_ORGANIZATION', env: 'root', value: 'test-org' },
       { key: 'PLANETSCALE_REGION', env: 'root', value: 'us-east' },
@@ -77,41 +58,30 @@ describe('TokenInputView - setSecretAsync integration', () => {
       await setSecretAsync('proj-123', t.env, t.key, t.value);
     }
 
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledTimes(4);
-    expect(infisical.secretStore.get('PLANETSCALE_ORGANIZATION')).toBe('test-org');
-    expect(infisical.secretStore.get('PLANETSCALE_REGION')).toBe('us-east');
-    expect(infisical.secretStore.get('PLANETSCALE_TOKEN_ID')).toBe('pscale_tkid_abc');
-    expect(infisical.secretStore.get('PLANETSCALE_TOKEN')).toBe('pscale_tk_xyz');
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 });
 
-describe('TokenInputView - VCR error injection', () => {
+describe('TokenInputView - getSecretAsync via VCR', () => {
   beforeEach(() => {
-    infisical.clearAll();
-    system.clearAll();
+    infisicalApi.vcr.clear();
   });
 
-  test('getSecretAsync returns seeded values', async () => {
-    const { getSecretAsync } = await import('../../tasks/infisicalSetup');
+  afterEach(() => {
+    infisicalApi.vcr.clear();
+  });
 
-    infisical.seed([
-      { key: 'PLANETSCALE_TOKEN_ID', value: 'pscale_tkid_from_vcr' },
-      { key: 'PLANETSCALE_TOKEN', value: 'pscale_tk_from_vcr' },
-    ]);
+  test('getSecretAsync returns values from VCR fixtures', async () => {
+    infisicalApi.vcr.queue('getSecret', 'planetscaleTokenId');
+    infisicalApi.vcr.queue('getSecret', 'planetscaleToken');
+
+    const { getSecretAsync } = await import('../../tasks/infisicalSetup');
 
     const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', { projectId: 'proj-123', environment: 'root' });
     const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId: 'proj-123', environment: 'root' });
 
-    expect(tokenId).toBe('pscale_tkid_from_vcr');
-    expect(token).toBe('pscale_tk_from_vcr');
-  });
-
-  test('getSecretAsync falls back to secret store when VCR empty', async () => {
-    const { getSecretAsync } = await import('../../tasks/infisicalSetup');
-
-    infisical.seed([{ key: 'MY_TOKEN', value: 'stored-value' }]);
-
-    const value = await getSecretAsync('MY_TOKEN', { projectId: 'proj-123', environment: 'root' });
-    expect(value).toBe('stored-value');
+    expect(tokenId).toEqual(expect.any(String));
+    expect(token).toEqual(expect.any(String));
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 });

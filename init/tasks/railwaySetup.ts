@@ -1,6 +1,6 @@
 import { createRailwayConnection, ensureRailwaySync } from '../api/infisicalRailway';
 import { railwayApi } from '../api/railway';
-import { updateConfigField } from '../utils/configHelpers';
+import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
 import { retryWithTimeout } from '../utils/retry';
@@ -85,14 +85,13 @@ export const setupRailway = async (
     // Step 1: Store workspace and mark selected
     if (!(await isComplete('railway', 'selectWorkspace'))) {
       workspaceId = selectedWorkspaceId;
-      await updateConfigField('railway', 'workspaceId', workspaceId);
-      await updateConfigField('railway', 'configProjectName', configProjectName);
+      await updateConfigFields('railway', { workspaceId, configProjectName });
       await markComplete('railway', 'selectWorkspace');
       await onStepComplete?.();
-    } else if (!workspaceId && selectedWorkspaceId) {
-      // Re-store workspaceId if it was cleared but step is already complete
-      workspaceId = selectedWorkspaceId;
-      await updateConfigField('railway', 'workspaceId', workspaceId);
+    } else if (!workspaceId || !config.railway.configProjectName) {
+      // Defensive: re-populate config values if they were lost
+      workspaceId = selectedWorkspaceId || workspaceId;
+      await updateConfigFields('railway', { workspaceId, configProjectName });
     }
 
     // Step 2: Store Railway user token in Infisical

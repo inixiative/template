@@ -1,5 +1,5 @@
 import { mock } from 'bun:test';
-import { exec as realExec, execSync as realExecSync } from 'node:child_process';
+import { exec as realExec, execSync as realExecSync } from 'child_process';
 
 type CommandMatcher = RegExp | string | ((command: string) => boolean);
 type ExecResult = {
@@ -73,7 +73,7 @@ export const createMockSystem = () => {
       execSyncStubs.push({ matcher, result });
     },
     install: () => {
-      mock.module('node:child_process', () => ({
+      mock.module('child_process', () => ({
         exec: mockExec,
         execSync: mockExecSync,
       }));

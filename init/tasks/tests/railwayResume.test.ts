@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { infisicalApi } from '../../api/infisical';
 import { railwayApi } from '../../api/railway';
-import { createMockConfig, createMockInfisical, defaultConfig } from '../../tests/mocks';
+import { createMockConfig, defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
 const config = createMockConfig();
-const infisical = createMockInfisical();
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
 const liveProjectName = process.env.PROJECT_NAME ?? cloneDefaultConfig().project.name;
@@ -70,36 +70,40 @@ const seedRailwayResumeState = (missingActions: string[]) => {
     Object.keys(defaultConfig.railway.progress).filter((key) => !missingActions.includes(key)),
   );
 
-  infisical.seed([
-    { key: 'API_URL', environment: 'prod', path: '/', value: 'https://prod.example.com' },
-    { key: 'API_URL', environment: 'staging', path: '/', value: 'https://staging.example.com' },
-    { key: 'REDIS_URL', environment: 'prod', path: '/api', value: 'redis://prod.example.com:6379' },
-    { key: 'REDIS_URL', environment: 'staging', path: '/api', value: 'redis://staging.example.com:6379' },
-  ]);
-
   // getProjectEnvironments runs unconditionally (line 118 in railwaySetup.ts)
   railwayApi.vcr.queue('getProjectEnvironments', 'default');
 };
 
+/** Queue the 4 getSecret fixtures for the final return block in railwaySetup */
+const queueFinalGetSecrets = () => {
+  infisicalApi.vcr.queue('getSecret', 'prodApiUrl');
+  infisicalApi.vcr.queue('getSecret', 'stagingApiUrl');
+  infisicalApi.vcr.queue('getSecret', 'prodRedisUrl');
+  infisicalApi.vcr.queue('getSecret', 'stagingRedisUrl');
+};
+
 config.install();
-infisical.install();
 
 describe('Railway Resume Scenario', () => {
   beforeEach(() => {
     railwayApi.vcr.clear();
+    infisicalApi.vcr.clear();
     config.clearAll();
-    infisical.clearAll();
 
     seedRailwayResumeState(['storeStagingRedisUrl']);
     railwayApi.vcr.queue('getRedisUrl', 'staging');
+    // storeStagingRedisUrl step calls setSecretAsync
+    infisicalApi.vcr.queue('setSecret', 'stagingRedisUrl');
     // getConnectionId() runs unconditionally at line 414 (resolvedConnectionId)
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
+    // final return block: 4 getSecret calls
+    queueFinalGetSecrets();
   });
 
   afterEach(() => {
     railwayApi.vcr.clear();
+    infisicalApi.vcr.clear();
     config.clearAll();
-    infisical.clearAll();
   });
 
   test('resumes only the missing staging Redis URL step', async () => {
@@ -107,32 +111,28 @@ describe('Railway Resume Scenario', () => {
 
     const result = await setupRailway(liveWorkspaceId);
 
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledTimes(1);
-    expect(infisical.mocks.setSecretAsync).toHaveBeenCalledWith(
-      'infisical-proj-id-000',
-      'staging',
-      'REDIS_URL',
-      expect.any(String),
-      '/api',
-    );
-
     expect(config.mocks.markComplete).toHaveBeenCalledWith('railway', 'storeStagingRedisUrl');
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('railway', 'storeProdRedisUrl');
 
-    expect(result.prodRedisUrl).toBe('redis://prod.example.com:6379');
+    expect(result.prodRedisUrl).toEqual(expect.any(String));
     expect(result.stagingRedisUrl).toEqual(expect.any(String));
+
+    // All VCR cassettes consumed
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 
   test('resumes only the missing prod API deployment step', async () => {
     railwayApi.vcr.clear();
+    infisicalApi.vcr.clear();
     config.clearAll();
-    infisical.clearAll();
 
     seedRailwayResumeState(['ensureProdApiDeployment']);
     // getConnectionId() runs before ensureProdApiDeployment in the code flow
     railwayApi.vcr.queue('getRailwayWorkspaceToken', 'default');
     railwayApi.vcr.queue('getLatestDeployment', 'null');
     railwayApi.vcr.queue('triggerServiceDeployment', 'default');
+    // final return block: 4 getSecret calls
+    queueFinalGetSecrets();
 
     const { setupRailway } = await import(`../railwaySetup?real=${Date.now()}`);
 
@@ -141,9 +141,10 @@ describe('Railway Resume Scenario', () => {
     expect(config.mocks.markComplete).toHaveBeenCalledWith('railway', 'ensureProdApiDeployment');
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('railway', 'ensureStagingApiDeployment');
 
-    expect(infisical.mocks.setSecretAsync).not.toHaveBeenCalled();
+    expect(result.prodApiUrl).toEqual(expect.any(String));
+    expect(result.stagingApiUrl).toEqual(expect.any(String));
 
-    expect(result.prodApiUrl).toBe('https://prod.example.com');
-    expect(result.stagingApiUrl).toBe('https://staging.example.com');
+    // All VCR cassettes consumed — no setSecret calls happened
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 });

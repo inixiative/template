@@ -309,10 +309,15 @@ class RailwayApi {
   }
   private async _getServiceVolume(
     projectId: string,
-    _serviceName: string,
+    serviceName: string,
   ): Promise<{ id: string; name: string } | null> {
     const volumes = await this._getProjectVolumes(projectId);
-    return volumes.length > 0 ? volumes[volumes.length - 1] : null;
+    if (volumes.length === 0) return null;
+    // Match by name first (works after volumes are renamed in earlier steps)
+    const match = volumes.find((v) => v.name.includes(serviceName));
+    if (match) return match;
+    // Fallback: return the last volume (works when there's only one or volumes haven't been renamed yet)
+    return volumes[volumes.length - 1];
   }
 
   async renameVolume(volumeId: string, name: string): Promise<void> {

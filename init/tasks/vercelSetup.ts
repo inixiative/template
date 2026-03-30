@@ -12,7 +12,7 @@ import {
   listTeams,
   updateProjectSettings,
 } from '../api/vercel';
-import { updateConfigField } from '../utils/configHelpers';
+import { updateConfigField, updateConfigFields } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { isComplete, markComplete, setError } from '../utils/progressTracking';
 import { setSecretAsync } from './infisicalSetup';
@@ -56,11 +56,13 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 1: Store team selection in config
     if (!(await isComplete('vercel', 'selectTeam'))) {
-      await updateConfigField('vercel', 'teamId', teamId);
-      await updateConfigField('vercel', 'teamName', teamName);
-      await updateConfigField('vercel', 'configProjectName', projectName);
+      await updateConfigFields('vercel', { teamId, teamName, configProjectName: projectName });
 
       await markComplete('vercel', 'selectTeam');
+      await syncConfig();
+    } else if (!projectConfig.vercel.teamId || !projectConfig.vercel.teamName || !projectConfig.vercel.configProjectName) {
+      // Defensive: re-populate config values if they were lost
+      await updateConfigFields('vercel', { teamId, teamName, configProjectName: projectName });
       await syncConfig();
     }
 
@@ -150,7 +152,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 9: Create Web staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createWebStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(webProjectId, teamId, 'Staging', 'staging');
+        await createCustomEnvironment(webProjectId, teamId, 'Staging', 'main');
         console.log('✅ Created custom staging environment for Web');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
@@ -212,7 +214,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         vercelProjectName: `${projectName}-web`,
         vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
         vercelTeamId: teamId,
-        vercelBranch: 'staging', // Target staging branch specifically
+        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createWebInfisicalSyncStaging');
@@ -246,7 +248,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     if (!(await isComplete('vercel', 'storeStagingWebUrls'))) {
-      const stagingWebUrl = buildVercelBranchUrl(`${projectName}-web`, 'staging', teamSlug);
+      const stagingWebUrl = buildVercelBranchUrl(`${projectName}-web`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'WEB_URL', stagingWebUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_WEB_URL', stagingWebUrl, '/');
       await markComplete('vercel', 'storeStagingWebUrls');
@@ -280,7 +282,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 17: Create Admin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createAdminStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(adminProjectId, teamId, 'Staging', 'staging');
+        await createCustomEnvironment(adminProjectId, teamId, 'Staging', 'main');
         console.log('✅ Created custom staging environment for Admin');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
@@ -340,7 +342,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         vercelProjectName: `${projectName}-admin`,
         vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
         vercelTeamId: teamId,
-        vercelBranch: 'staging', // Target staging branch specifically
+        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createAdminInfisicalSyncStaging');
@@ -374,7 +376,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     if (!(await isComplete('vercel', 'storeStagingAdminUrls'))) {
-      const stagingAdminUrl = buildVercelBranchUrl(`${projectName}-admin`, 'staging', teamSlug);
+      const stagingAdminUrl = buildVercelBranchUrl(`${projectName}-admin`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'ADMIN_URL', stagingAdminUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_ADMIN_URL', stagingAdminUrl, '/');
       await markComplete('vercel', 'storeStagingAdminUrls');
@@ -408,7 +410,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Step 25: Create Superadmin staging environment (optional - requires Pro/Enterprise)
     if (!(await isComplete('vercel', 'createSuperadminStagingEnvironment'))) {
       try {
-        await createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'staging');
+        await createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'main');
         console.log('✅ Created custom staging environment for Superadmin');
       } catch (error) {
         // Gracefully handle if custom environments not available (Hobby plan)
@@ -474,7 +476,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
         vercelProjectName: `${projectName}-superadmin`,
         vercelEnvironment: 'preview', // Use preview with branch matcher for custom staging
         vercelTeamId: teamId,
-        vercelBranch: 'staging', // Target staging branch specifically
+        vercelBranch: 'main', // Target main branch — staging is a preview env off main
       });
 
       await markComplete('vercel', 'createSuperadminInfisicalSyncStaging');
@@ -508,7 +510,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     if (!(await isComplete('vercel', 'storeStagingSuperadminUrls'))) {
-      const stagingSuperadminUrl = buildVercelBranchUrl(`${projectName}-superadmin`, 'staging', teamSlug);
+      const stagingSuperadminUrl = buildVercelBranchUrl(`${projectName}-superadmin`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'SUPERADMIN_URL', stagingSuperadminUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_SUPERADMIN_URL', stagingSuperadminUrl, '/');
       await markComplete('vercel', 'storeStagingSuperadminUrls');

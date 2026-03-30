@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join } from 'path';
 import { VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
@@ -287,10 +287,31 @@ class InfisicalApi {
           method: 'PATCH',
           body: JSON.stringify({ workspaceId: projectId, environment, secretPath: path, secretValue: value, type }),
         });
+      } else if (error instanceof Error && error.message.includes('secretKeyCiphertext')) {
+        // E2EE-enabled project — fall back to CLI which handles encryption transparently
+        await execAsync(
+          `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
+          { env: { ...process.env, PATH: CLI_PATH } },
+        );
       } else {
         throw error;
       }
     }
+  }
+  async getSecret(
+    projectId: string,
+    environment: string,
+    key: string,
+    path: string = '/',
+  ): Promise<string> {
+    if (process.env.NODE_ENV !== 'test') return this._getSecret(projectId, environment, key, path);
+    return this.vcr.capture('getSecret', () => this._getSecret(projectId, environment, key, path));
+  }
+  private async _getSecret(projectId: string, environment: string, key: string, path: string): Promise<string> {
+    const response = await this._fetch<{ secret: { secretValue: string } }>(
+      `/v3/secrets/raw/${key}?workspaceId=${projectId}&environment=${environment}&secretPath=${encodeURIComponent(path)}`,
+    );
+    return response.secret.secretValue;
   }
 }
 

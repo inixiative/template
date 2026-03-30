@@ -48,11 +48,17 @@ mock.module('../../tasks/infisicalSetup', () => ({
 mock.module('../../api/github', () => ({
   isAppInstalled: isAppInstalledMock,
 }));
+const getProjectMock = mock(async () => null);
+const liveTeamId = process.env.VERCEL_TEAM_ID ?? 'team_123';
+const liveTeamSlug = process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
+const listTeamsMock = mock(async () => [{ id: liveTeamId, slug: liveTeamSlug, name: 'Template Team' }]);
 mock.module('../../api/vercel', () => ({
   checkGitHubIntegration: checkGitHubIntegrationMock,
   createCustomEnvironment: createCustomEnvironmentMock,
   createProject: createProjectMock,
+  getProject: getProjectMock,
   linkGitHub: linkGitHubMock,
+  listTeams: listTeamsMock,
   updateProjectSettings: updateProjectSettingsMock,
 }));
 
@@ -100,6 +106,7 @@ describe('Vercel Bootstrap Resume Scenario', () => {
     checkGitHubIntegrationMock.mockClear();
     createCustomEnvironmentMock.mockClear();
     createProjectMock.mockClear();
+    getProjectMock.mockClear();
     linkGitHubMock.mockClear();
     updateProjectSettingsMock.mockClear();
   });

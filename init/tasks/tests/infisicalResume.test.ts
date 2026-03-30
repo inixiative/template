@@ -1,23 +1,20 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { infisicalApi } from '../../api/infisical';
-import { createMockConfig, createMockSystem, defaultConfig } from '../../tests/mocks';
+import { createMockConfig, defaultConfig } from '../../tests/mocks';
 import type { ProjectConfig } from '../../utils/getProjectConfig';
 
 const config = createMockConfig();
-const system = createMockSystem();
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
 const liveProjectId = process.env.INFISICAL_PROJECT_ID ?? 'workspace-123';
 const liveOrganizationId = process.env.INFISICAL_ORG_ID ?? 'org-123';
 
 config.install();
-system.install();
 
 describe('Infisical Resume Scenario', () => {
   beforeEach(() => {
     infisicalApi.vcr.clear();
     config.clearAll();
-    system.clearAll();
 
     config.setConfig({
       ...cloneDefaultConfig(),
@@ -82,6 +79,12 @@ describe('Infisical Resume Scenario', () => {
       'createProdSuperadminRootImport',
       'createProdSuperadminRootAppImport',
       'createProdSuperadminEnvImport',
+      'storeProjectNameSecret',
+      'storeViteProjectNameSecret',
+      'storeViteAppShortNameSecret',
+      'storeWebAppNameSecret',
+      'storeAdminAppNameSecret',
+      'storeSuperadminAppNameSecret',
       'ensureProdApiAuthSecret',
       'ensureStagingApiAuthSecret',
     ]);
@@ -91,12 +94,15 @@ describe('Infisical Resume Scenario', () => {
     infisicalApi.vcr.queue('updateEnvironment', 'root');
     // createStagingAdminEnvImport not complete → createSecretImport
     infisicalApi.vcr.queue('createSecretImport', 'stagingAdmin');
+    // 3 always-run setSecretAsync calls (NODE_ENV, ENVIRONMENT×2)
+    infisicalApi.vcr.queue('setSecret', 'nodeEnv');
+    infisicalApi.vcr.queue('setSecret', 'envProd');
+    infisicalApi.vcr.queue('setSecret', 'envStaging');
   });
 
   afterEach(() => {
     infisicalApi.vcr.clear();
     config.clearAll();
-    system.clearAll();
   });
 
   test('resumes only the missing rename/import steps and skips completed auth secrets', async () => {
@@ -111,9 +117,7 @@ describe('Infisical Resume Scenario', () => {
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureProdApiAuthSecret');
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureStagingApiAuthSecret');
 
-    const authSecretCalls = system.mocks.exec.mock.calls.filter(
-      (call) => typeof call[0] === 'string' && call[0].includes('BETTER_AUTH_SECRET'),
-    );
-    expect(authSecretCalls).toHaveLength(0);
+    // All VCR cassettes consumed — no extra setSecret/getSecret calls happened
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
   });
 });

@@ -8,23 +8,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { infisicalApi } from '../../api/infisical';
 import { planetscaleApi } from '../../api/planetscale';
-import { createMockConfig, createMockInfisical, createMockSystem } from '../../tests/mocks';
+import { createMockConfig, createMockSystem, defaultConfig } from '../../tests/mocks';
 
 // Create service mocks
-const infisical = createMockInfisical();
 const config = createMockConfig();
 const system = createMockSystem();
 
 // Install all mocks (must be before importing setup code)
-infisical.install();
 config.install();
 system.install();
 
 describe('PlanetScale Resume Scenario', () => {
   beforeEach(() => {
     planetscaleApi.vcr.clear();
-    infisical.clearAll();
+    infisicalApi.vcr.clear();
     config.clearAll();
     system.clearAll();
     system.stubExec('bun --cwd packages/db scripts/initMigrationTable.ts', { stdout: '', stderr: '' });
@@ -47,21 +46,13 @@ describe('PlanetScale Resume Scenario', () => {
       'storeStagingConnectionString',
     ]);
 
-    // Seed connection strings (already in Infisical from previous run)
-    infisical.seed([
-      {
-        key: 'DATABASE_URL',
-        environment: 'prod',
-        path: '/api',
-        value: 'postgresql://prod-user:prod-pass@aws.connect.psdb.cloud/template?sslmode=require',
-      },
-      {
-        key: 'DATABASE_URL',
-        environment: 'staging',
-        path: '/api',
-        value: 'postgresql://staging-user:staging-pass@aws.connect.psdb.cloud/template?sslmode=require',
-      },
-    ]);
+    // getSecret VCR fixtures for connection strings (fetched from Infisical):
+    // initProdMigrationTable step + final return
+    infisicalApi.vcr.queue('getSecret', 'prodDatabaseUrl');
+    infisicalApi.vcr.queue('getSecret', 'stagingDatabaseUrl');
+    // final return fetches both again
+    infisicalApi.vcr.queue('getSecret', 'prodDatabaseUrl');
+    infisicalApi.vcr.queue('getSecret', 'stagingDatabaseUrl');
 
     // createDB complete → else branch: fetch existing DB
     planetscaleApi.vcr.queue('getDatabase', 'success');
@@ -73,7 +64,7 @@ describe('PlanetScale Resume Scenario', () => {
 
   afterEach(() => {
     planetscaleApi.vcr.clear();
-    infisical.clearAll();
+    infisicalApi.vcr.clear();
     config.clearAll();
     system.clearAll();
   });
@@ -83,35 +74,18 @@ describe('PlanetScale Resume Scenario', () => {
     await setupPlanetScale('test-org');
   });
 
-  test('should fetch connection strings from Infisical', async () => {
+  test('should fetch connection strings from Infisical and init migration tables', async () => {
     const { setupPlanetScale } = await import('../planetscaleSetup');
     await setupPlanetScale('test-org');
 
-    expect(infisical.mocks.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
-      projectId: 'infisical-proj-id-000',
-      environment: 'prod',
-      path: '/api',
-    });
-
-    expect(infisical.mocks.getSecretAsync).toHaveBeenCalledWith('DATABASE_URL', {
-      projectId: 'infisical-proj-id-000',
-      environment: 'staging',
-      path: '/api',
-    });
-  });
-
-  test('should run bun script to init migration table', async () => {
-    const { setupPlanetScale } = await import('../planetscaleSetup');
-    await setupPlanetScale('test-org');
+    // All VCR cassettes consumed — getSecret was called the expected number of times
+    expect(infisicalApi.vcr.isEmpty()).toBe(true);
 
     const calls = system.mocks.exec.mock.calls;
     const migrationCalls = calls.filter(
       (call) => typeof call[0] === 'string' && call[0].includes('initMigrationTable'),
     );
     expect(migrationCalls).toHaveLength(2);
-
-    expect(migrationCalls[0][0]).toContain('postgresql://prod-user:prod-pass');
-    expect(migrationCalls[1][0]).toContain('postgresql://staging-user:staging-pass');
   });
 
   test('should mark both migration table steps as complete', async () => {

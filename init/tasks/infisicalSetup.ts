@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
 import { execAsync } from '../utils/exec';
@@ -221,12 +222,11 @@ export const setupInfisical = async (
  * Generate a secure random secret (async, non-blocking)
  */
 export const generateSecretAsync = async (length = 32): Promise<string> => {
-  const { stdout } = await execAsync(`openssl rand -hex ${length}`);
-  return stdout.trim();
+  return randomBytes(length).toString('hex');
 };
 
 /**
- * Get a secret using Infisical CLI (async, non-blocking)
+ * Get a secret using Infisical CLI (VCR-backed in tests)
  */
 export const getSecretAsync = async (
   key: string,
@@ -236,30 +236,24 @@ export const getSecretAsync = async (
     path?: string;
   },
 ): Promise<string> => {
-  try {
+  const realFn = async (): Promise<string> => {
     let cmd = `infisical secrets get ${key}`;
-
-    if (options?.projectId) {
-      cmd += ` --projectId="${options.projectId}"`;
-    }
-    if (options?.environment) {
-      cmd += ` --env="${options.environment}"`;
-    }
-    if (options?.path) {
-      cmd += ` --path="${options.path}"`;
-    }
-
+    if (options?.projectId) cmd += ` --projectId="${options.projectId}"`;
+    if (options?.environment) cmd += ` --env="${options.environment}"`;
+    if (options?.path) cmd += ` --path="${options.path}"`;
     cmd += ' --plain';
-
     const { stdout } = await execAsync(cmd);
     return stdout.trim();
-  } catch (error) {
-    throw new Error(`Failed to get secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  };
+
+  if (process.env.NODE_ENV === 'test') {
+    return infisicalApi.vcr.capture('getSecret', realFn);
   }
+  return realFn();
 };
 
 /**
- * Set a secret using Infisical CLI (async, non-blocking)
+ * Set a secret using Infisical CLI (VCR-backed in tests)
  */
 export const setSecretAsync = async (
   projectId: string,
@@ -268,11 +262,14 @@ export const setSecretAsync = async (
   value: string,
   path: string = '/',
 ): Promise<void> => {
-  try {
+  const realFn = async (): Promise<void> => {
     await execAsync(
       `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
     );
-  } catch (error) {
-    throw new Error(`Failed to set secret ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  };
+
+  if (process.env.NODE_ENV === 'test') {
+    return infisicalApi.vcr.capture('setSecret', realFn);
   }
+  return realFn();
 };
