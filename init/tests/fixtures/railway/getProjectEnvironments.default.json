@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "id": "5b37fad2-6950-425b-b22a-6a629d9ffcf8",
+      "name": "staging"
+    },
+    {
+      "id": "e74a0f58-01e1-4856-b4e6-a848a924ada4",
+      "name": "prod"
+    }
+  ]
+}

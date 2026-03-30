@@ -46,13 +46,6 @@ const envSchema = z
     BULL_BOARD_USERNAME: z.string().optional(),
     BULL_BOARD_PASSWORD: z.string().optional(),
 
-    // AWS S3 (optional integration)
-    AWS_REGION: z.string().optional(),
-    AWS_ACCESS_KEY_ID: z.string().optional(),
-    AWS_SECRET_ACCESS_KEY: z.string().optional(),
-    S3_BUCKET_NAME: z.string().optional(),
-    CLOUDFRONT_URL: z.string().optional(),
-
     // Stripe (optional integration)
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),

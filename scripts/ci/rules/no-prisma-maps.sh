@@ -11,9 +11,9 @@ if [[ ! -d "$schema_dir" ]]; then
   exit 1
 fi
 
-if rg --line-number --no-heading '@@?map\s*\(' "$schema_dir" -g'*.prisma' >/dev/null; then
+if grep -rn '@@\?map\s*(' "$schema_dir" --include='*.prisma' >/dev/null 2>&1; then
   echo "Found forbidden Prisma map directives (@map/@@map):"
-  rg --line-number --no-heading '@@?map\s*\(' "$schema_dir" -g'*.prisma'
+  grep -rn '@@\?map\s*(' "$schema_dir" --include='*.prisma'
   exit 1
 fi
 

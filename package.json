@@ -12,8 +12,8 @@
   },
   "scripts": {
     "postinstall": "bash ./scripts/postinstall.sh",
-    "init": "NODE_ENV=development bun --env-file=.env.init scripts/init/index.tsx",
-    "init:agent": "NODE_ENV=development bun --env-file=.env.init scripts/init/agent.ts",
+    "init": "NODE_ENV=development bun --env-file=.env.init init/index.tsx",
+    "init:agent": "NODE_ENV=development bun --env-file=.env.init init/agent.ts",
     "setup": "./scripts/setup/setup.sh",
     "sync-env": "./scripts/setup/sync-env.sh",
     "with": "./scripts/deployment/with-env.sh",
@@ -28,12 +28,14 @@
     "build": "bun run '--filter=*' build",
     "pretest": "bun run with test api bun run --cwd packages/db db:push:force",
     "test": "bun run --cwd packages/permissions test && bun run --cwd packages/db test && bun run --cwd packages/email test && bun run --cwd apps/api test",
+    "test:init": "bash init/tests/with-init-env.sh env NODE_ENV=test bun test init/",
     "test:fe": "bun run generate:sdk && bun run generate:routes && bun run --filter=@template/shared test && bun test --concurrency=1 tests/frontend",
     "typecheck": "bun run '--filter=*' typecheck",
     "typecheck:fe": "bun run generate:routes && bun run --cwd apps/web typecheck && bun run --cwd apps/admin typecheck && bun run --cwd apps/superadmin typecheck",
     "tsc": "bun run '--filter=*' typecheck",
     "db:generate": "bun run --filter=@template/db db:generate",
     "db:push": "bun run --filter=@template/db db:push",
+    "db:push:force": "bun run --filter=@template/db db:push:force",
     "db:migrate": "bun run --filter=@template/db db:migrate",
     "db:deploy": "bun run --filter=@template/db db:deploy",
     "db:studio": "bun run --filter=@template/db db:studio",
@@ -86,6 +88,7 @@
     "mermaid": "^11.12.3",
     "react": "^19.2.4",
     "react-aria-components": "^1.16.0",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "resend": "^6.9.4"
   }
 }

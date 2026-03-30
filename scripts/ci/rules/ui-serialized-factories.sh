@@ -13,17 +13,17 @@ if [[ ! -d "$ui_src" ]]; then
 fi
 
 while IFS= read -r file; do
-  if rg --line-number --no-heading '@template/db/test' "$file" >/dev/null; then
-    if ! rg --line-number --no-heading '__serialize\(\)' "$file" >/dev/null; then
+  if grep -q '@template/db/test' "$file"; then
+    if ! grep -q '__serialize()' "$file"; then
       echo "UI test imports @template/db/test but does not serialize factory entities: $file"
       has_error=1
     fi
   fi
-done < <(rg --files "$ui_src" -g'*.test.ts')
+done < <(find "$ui_src" -name '*.test.ts' 2>/dev/null)
 
-if rg --line-number --no-heading '__serialize\(\)\s+as\s+any' "$ui_src" -g'*.test.ts' >/dev/null; then
+if grep -rn '__serialize()\s*as\s*any' "$ui_src" --include='*.test.ts' >/dev/null 2>&1; then
   echo "Found forbidden '__serialize() as any' casts in UI tests:"
-  rg --line-number --no-heading '__serialize\(\)\s+as\s+any' "$ui_src" -g'*.test.ts'
+  grep -rn '__serialize()\s*as\s*any' "$ui_src" --include='*.test.ts'
   has_error=1
 fi
 

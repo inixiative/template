@@ -1,0 +1,7 @@
+{
+  "name": "fixture-no-radix-fail-dep",
+  "private": true,
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.0.0"
+  }
+}

@@ -172,6 +172,8 @@ apps/web/app.config.timestamp_*.js
 **/*.generated.ts
 **/.prisma.gen
 **/.sdk.gen
+packages/ui/src/apiClient/index.ts
+packages/ui/src/apiClient/client/index.ts
 .vercel
 
 # Init script scratch files

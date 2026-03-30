@@ -1,0 +1,45 @@
+{
+  "status": 200,
+  "body": {
+    "workspace": {
+      "id": "7a89b462-5b84-4040-afe2-26dc978ef5e4",
+      "name": "template",
+      "description": null,
+      "type": "secret-manager",
+      "defaultProduct": null,
+      "slug": "template",
+      "autoCapitalization": false,
+      "orgId": "8a62097b-1c14-4f0e-98fe-b743fdaf2ab4",
+      "createdAt": "2026-03-30T10:52:49.703Z",
+      "updatedAt": "2026-03-30T10:53:25.656Z",
+      "version": 3,
+      "upgradeStatus": null,
+      "pitVersionLimit": 10,
+      "kmsCertificateKeyId": null,
+      "auditLogsRetentionDays": null,
+      "hasDeleteProtection": false,
+      "secretSharing": true,
+      "showSnapshotsLegacy": false,
+      "secretDetectionIgnoreValues": null,
+      "enforceEncryptedSecretManagerSecretMetadata": null,
+      "_id": "7a89b462-5b84-4040-afe2-26dc978ef5e4",
+      "environments": [
+        {
+          "name": "Root",
+          "slug": "root",
+          "id": "d85c0e66-c584-4f71-a8f9-b5a963325875"
+        },
+        {
+          "name": "Staging",
+          "slug": "staging",
+          "id": "09b58872-877a-42fa-b690-04af9ddeefe9"
+        },
+        {
+          "name": "Production",
+          "slug": "prod",
+          "id": "7833de7f-142c-4604-94c5-87e6e418678f"
+        }
+      ]
+    }
+  }
+}

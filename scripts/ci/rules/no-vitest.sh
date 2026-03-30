@@ -9,16 +9,14 @@ if [[ -f package.json ]]; then
   package_json_files+=(package.json)
 fi
 
-if [[ -d apps || -d packages ]]; then
-  while IFS= read -r file; do
-    package_json_files+=("$file")
-  done < <(rg --files apps packages -g 'package.json' 2>/dev/null || true)
-fi
+while IFS= read -r file; do
+  package_json_files+=("$file")
+done < <(find apps packages -name 'package.json' -not -path '*/node_modules/*' 2>/dev/null || true)
 
 if [[ "${#package_json_files[@]}" -gt 0 ]]; then
-  if rg --line-number --no-heading '"vitest"\s*:' "${package_json_files[@]}" >/dev/null; then
+  if grep -ln '"vitest"' "${package_json_files[@]}" >/dev/null 2>&1; then
     echo "Found forbidden vitest dependency entries:"
-    rg --line-number --no-heading '"vitest"\s*:' "${package_json_files[@]}"
+    grep -Hn '"vitest"' "${package_json_files[@]}"
     exit 1
   fi
 fi
@@ -31,9 +29,9 @@ for dir in apps packages tests; do
 done
 
 if [[ "${#scan_roots[@]}" -gt 0 ]]; then
-  if rg --line-number --no-heading "from 'vitest'|from \"vitest\"" "${scan_roots[@]}" -g'*.ts' -g'*.tsx' >/dev/null; then
+  if grep -rn --include='*.ts' --include='*.tsx' "from 'vitest'\|from \"vitest\"" "${scan_roots[@]}" >/dev/null 2>&1; then
     echo "Found forbidden vitest imports:"
-    rg --line-number --no-heading "from 'vitest'|from \"vitest\"" "${scan_roots[@]}" -g'*.ts' -g'*.tsx'
+    grep -rn --include='*.ts' --include='*.tsx' "from 'vitest'\|from \"vitest\"" "${scan_roots[@]}"
     exit 1
   fi
 fi
