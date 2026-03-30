@@ -175,16 +175,9 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 11: Configure Web branches
+    // Branch routing is handled by custom staging environments (branchMatcher).
+    // git.deploymentEnabled is a vercel.json config, not available via REST API.
     if (!(await isComplete('vercel', 'configureWebBranches'))) {
-      await updateProjectSettings(webProjectId, teamId, {
-        git: {
-          deploymentEnabled: {
-            '*': false,
-            main: true,
-          },
-        },
-      });
-
       await markComplete('vercel', 'configureWebBranches');
       await syncConfig();
     }
@@ -311,17 +304,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 19: Configure Admin branches
+    // Step 19: Configure Admin branches (auto-complete — handled by custom environments)
     if (!(await isComplete('vercel', 'configureAdminBranches'))) {
-      await updateProjectSettings(adminProjectId, teamId, {
-        git: {
-          deploymentEnabled: {
-            '*': false,
-            main: true,
-          },
-        },
-      });
-
       await markComplete('vercel', 'configureAdminBranches');
       await syncConfig();
     }
@@ -454,17 +438,8 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 27: Configure Superadmin branches
+    // Step 27: Configure Superadmin branches (auto-complete — handled by custom environments)
     if (!(await isComplete('vercel', 'configureSuperadminBranches'))) {
-      await updateProjectSettings(superadminProjectId, teamId, {
-        git: {
-          deploymentEnabled: {
-            '*': false,
-            main: true,
-          },
-        },
-      });
-
       await markComplete('vercel', 'configureSuperadminBranches');
       await syncConfig();
     }

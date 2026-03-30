@@ -14,7 +14,7 @@ import type { ProjectConfig } from '../utils/getProjectConfig';
 import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
-type ViewState = 'status' | 'team-select' | 'github-prompt';
+type ViewState = 'status' | 'team-select' | 'github-prompt' | 'github-login-prompt';
 type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
 
 type VercelSetupViewProps = {
@@ -104,7 +104,8 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
 
   // Handle input on GitHub prompt view
   useInput((_input, key) => {
-    if (viewState !== 'github-prompt') return;
+    if (viewState !== 'github-prompt' && viewState !== 'github-login-prompt') return;
+    if (confirmAction.running) return;
 
     if (key.return) {
       handleGithubConfirm();
@@ -148,9 +149,11 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       await clearError('vercel');
       await syncConfig();
 
-      // Try to use existing team from config first
-      const existingTeamId = config.vercel?.teamId;
-      const existingTeamName = config.vercel?.teamName || '';
+      // Read fresh config from disk (React state may be stale)
+      const { getProjectConfig } = await import('../utils/getProjectConfig');
+      const freshConfig = await getProjectConfig();
+      const existingTeamId = freshConfig.vercel?.teamId;
+      const existingTeamName = freshConfig.vercel?.teamName || '';
 
       if (existingTeamId) {
         // Resume with existing team
@@ -177,15 +180,19 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       setRunning(false);
     } catch (error) {
       // Check if it's a GitHub connection error
-      if (
-        error instanceof Error &&
-        (error.message === 'GITHUB_NOT_CONNECTED' || error.message === 'GITHUB_NOT_INSTALLED')
-      ) {
-        // Show GitHub prompt
-        setRunning(false);
-        setViewState('github-prompt');
-        await syncConfig();
-        return;
+      if (error instanceof Error) {
+        if (error.message === 'GITHUB_NOT_CONNECTED' || error.message === 'GITHUB_NOT_INSTALLED') {
+          setRunning(false);
+          setViewState('github-prompt');
+          await syncConfig();
+          return;
+        }
+        if (error.message === 'GITHUB_LOGIN_CONNECTION_REQUIRED') {
+          setRunning(false);
+          setViewState('github-login-prompt');
+          await syncConfig();
+          return;
+        }
       }
 
       // Other errors - persist and show
@@ -209,8 +216,11 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       await clearError('vercel');
       await syncConfig();
 
-      const existingTeamId = config.vercel?.teamId;
-      const existingTeamName = config.vercel?.teamName || '';
+      // Read fresh config from disk (React state may be stale)
+      const { getProjectConfig } = await import('../utils/getProjectConfig');
+      const freshConfig = await getProjectConfig();
+      const existingTeamId = freshConfig.vercel?.teamId;
+      const existingTeamName = freshConfig.vercel?.teamName || '';
       if (existingTeamId) {
         setViewState('status');
         setRunning(true);
@@ -229,6 +239,50 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
         onSelect={handleTeamSelect}
         onCancel={onCancel}
       />
+    );
+  }
+
+  // GitHub Login Connection prompt view
+  if (viewState === 'github-login-prompt') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1}>
+          <Box flexDirection="column">
+            <Text bold color="yellow">
+              GitHub Login Connection Required
+            </Text>
+
+            <Box marginTop={1}>
+              <Text>Vercel requires your GitHub account to be added as a Login Connection.</Text>
+            </Box>
+
+            <Box flexDirection="column" marginTop={1} marginLeft={2}>
+              <Text>
+                1. Go to: <Text color="cyan">https://vercel.com/account/login-connections</Text>
+              </Text>
+              <Text>2. Click "Connect" next to GitHub</Text>
+              <Text>
+                3. Authorize the GitHub account that owns:{' '}
+                <Text color="yellow">
+                  {config?.project.organization}/{config?.project.name}
+                </Text>
+              </Text>
+            </Box>
+
+            <Box marginTop={1}>
+              <Text dimColor>Press Enter when the Login Connection is configured</Text>
+            </Box>
+
+            {confirmAction.running ? (
+              <ActionSpinner label={confirmAction.actionLabel} />
+            ) : (
+              <Box marginTop={1}>
+                <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Box>
     );
   }
 

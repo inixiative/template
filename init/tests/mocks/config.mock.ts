@@ -27,12 +27,17 @@ const defaultConfig: ProjectConfig = {
     domainId: '',
     configProjectName: envProjectName,
     progress: {
-      storeProdApiKey: false,
-      storeStagingApiKey: false,
-      storeProdFromAddress: false,
-      storeStagingFromAddress: false,
+      storeApiKey: false,
+      storeFromAddress: false,
       addDomain: false,
       confirmDns: false,
+    },
+    error: '',
+  },
+  bouncer: {
+    configProjectName: envProjectName,
+    progress: {
+      storeApiKey: false,
     },
     error: '',
   },

@@ -600,6 +600,31 @@ class RailwayApi {
     return domains.length > 0 ? `https://${domains[0].domain}` : null;
   }
 
+  async ensureServiceDomain(serviceId: string, environmentId: string): Promise<string> {
+    if (process.env.NODE_ENV !== 'test') return this._ensureServiceDomain(serviceId, environmentId);
+    return this.vcr.capture('ensureServiceDomain', () => this._ensureServiceDomain(serviceId, environmentId));
+  }
+  private async _ensureServiceDomain(serviceId: string, environmentId: string): Promise<string> {
+    // Check if domain already exists
+    const existing = await this._getServiceDomain(serviceId, environmentId);
+    if (existing) return existing;
+
+    // Create a service domain
+    const data = await this._railwayGraphQLUser<{
+      serviceDomainCreate: { domain: string };
+    }>(
+      `
+        mutation ServiceDomainCreate($serviceId: String!, $environmentId: String!) {
+          serviceDomainCreate(input: { serviceId: $serviceId, environmentId: $environmentId }) {
+            domain
+          }
+        }
+      `,
+      { serviceId, environmentId },
+    );
+    return `https://${data.serviceDomainCreate.domain}`;
+  }
+
   async setupInfisicalIntegration(
     projectId: string,
     environmentId: string,

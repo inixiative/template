@@ -1,5 +1,10 @@
+import { join } from 'node:path';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
+import { VCR } from '@template/shared/vcr';
 import { Resend } from 'resend';
+
+const FIXTURES_DIR = join(import.meta.dir, '../../tests/fixtures/resend');
+const SANITIZE_KEYS = ['id'];
 
 const resendClients = new Map<string, Resend>();
 
@@ -14,28 +19,40 @@ const getResendClient = (apiKey: string): Resend => {
   return resendClient;
 };
 
-export const createResendClient = (apiKey: string): EmailClient => {
-  const resend = getResendClient(apiKey);
+class ResendEmailClient implements EmailClient {
+  readonly vcr = new VCR(FIXTURES_DIR, { sanitizeKeys: SANITIZE_KEYS });
+  private readonly resend: Resend;
 
-  return {
-    send: async (options: SendEmailOptions): Promise<SendEmailResult> => {
-      const { data, error } = await resend.emails.send({
-        to: options.to,
-        from: options.from,
-        subject: options.subject,
-        html: options.html,
-        replyTo: options.replyTo,
-        tags: options.tags?.map((name) => ({ name, value: 'true' })),
-      });
+  constructor(apiKey: string) {
+    this.resend = getResendClient(apiKey);
+  }
 
-      if (error) {
-        throw new Error(`Resend error: ${error.message}`);
-      }
+  async send(options: SendEmailOptions): Promise<SendEmailResult> {
+    if (process.env.NODE_ENV !== 'test') return this._send(options);
+    return this.vcr.capture('send', () => this._send(options));
+  }
 
-      return {
-        id: data?.id ?? '',
-        success: true,
-      };
-    },
-  };
+  private async _send(options: SendEmailOptions): Promise<SendEmailResult> {
+    const { data, error } = await this.resend.emails.send({
+      to: options.to,
+      from: options.from,
+      subject: options.subject,
+      html: options.html,
+      replyTo: options.replyTo,
+      tags: options.tags?.map((name) => ({ name, value: 'true' })),
+    });
+
+    if (error) {
+      throw new Error(`Resend error: ${error.message}`);
+    }
+
+    return {
+      id: data?.id ?? '',
+      success: true,
+    };
+  }
+}
+
+export const createResendClient = (apiKey: string): ResendEmailClient => {
+  return new ResendEmailClient(apiKey);
 };

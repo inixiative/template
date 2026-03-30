@@ -52,20 +52,31 @@ export const upsertDomain = async (apiKey: string, domainName: string): Promise<
     });
     return data as ResendDomain;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
+    if (error instanceof Error && (error.message.includes('already exists') || error.message.includes('registered already'))) {
       const data = await resendFetch(apiKey, '/domains');
       const domains = (data as { data: ResendDomain[] }).data ?? [];
       const existing = domains.find((d) => d.name === domainName);
       if (!existing) throw new Error(`Domain ${domainName} not found after conflict`);
-      return existing;
+      // List endpoint doesn't include records — fetch full domain
+      return getDomain(apiKey, existing.id);
     }
     throw error;
   }
 };
 
 /**
- * Trigger domain verification check with Resend.
+ * Get domain details including current DNS record statuses.
  */
-export const verifyDomain = async (apiKey: string, domainId: string): Promise<void> => {
+export const getDomain = async (apiKey: string, domainId: string): Promise<ResendDomain> => {
+  const data = await resendFetch(apiKey, `/domains/${domainId}`);
+  return data as ResendDomain;
+};
+
+/**
+ * Trigger domain verification check with Resend, then return updated domain.
+ */
+export const verifyDomain = async (apiKey: string, domainId: string): Promise<ResendDomain> => {
   await resendFetch(apiKey, `/domains/${domainId}/verify`, { method: 'POST' });
+  // Re-fetch to get updated statuses after verification trigger
+  return getDomain(apiKey, domainId);
 };

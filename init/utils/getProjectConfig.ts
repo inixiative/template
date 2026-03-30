@@ -170,12 +170,17 @@ export type ProjectConfig = {
     domainId: string;
     configProjectName: string;
     progress: {
-      storeProdApiKey: boolean;
-      storeStagingApiKey: boolean;
-      storeProdFromAddress: boolean;
-      storeStagingFromAddress: boolean;
+      storeApiKey: boolean;
+      storeFromAddress: boolean;
       addDomain: boolean;
       confirmDns: boolean;
+    };
+    error: string;
+  };
+  bouncer: {
+    configProjectName: string;
+    progress: {
+      storeApiKey: boolean;
     };
     error: string;
   };
@@ -239,10 +244,8 @@ type LegacyProjectConfig = Partial<ProjectConfig> & {
 };
 
 const defaultResendProgress: ProjectConfig['resend']['progress'] = {
-  storeProdApiKey: false,
-  storeStagingApiKey: false,
-  storeProdFromAddress: false,
-  storeStagingFromAddress: false,
+  storeApiKey: false,
+  storeFromAddress: false,
   addDomain: false,
   confirmDns: false,
 };
@@ -252,12 +255,24 @@ const normalizeResendProgress = (
 ): ProjectConfig['resend']['progress'] => {
   const raw = progress ?? {};
   return {
-    storeProdApiKey: raw.storeProdApiKey === true,
-    storeStagingApiKey: raw.storeStagingApiKey === true,
-    storeProdFromAddress: raw.storeProdFromAddress === true,
-    storeStagingFromAddress: raw.storeStagingFromAddress === true,
+    storeApiKey: raw.storeApiKey === true || (raw.storeProdApiKey === true && raw.storeStagingApiKey === true),
+    storeFromAddress:
+      raw.storeFromAddress === true || (raw.storeProdFromAddress === true && raw.storeStagingFromAddress === true),
     addDomain: raw.addDomain === true,
     confirmDns: raw.confirmDns === true,
+  };
+};
+
+const defaultBouncerProgress: ProjectConfig['bouncer']['progress'] = {
+  storeApiKey: false,
+};
+
+const normalizeBouncerProgress = (
+  progress: Partial<Record<string, boolean>> | undefined,
+): ProjectConfig['bouncer']['progress'] => {
+  const raw = progress ?? {};
+  return {
+    storeApiKey: raw.storeApiKey === true,
   };
 };
 
@@ -673,6 +688,19 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         progress: normalizeResendProgress(resendConfig?.progress),
         error: resendConfig?.error ?? '',
       },
+      bouncer: {
+        configProjectName: (config as Record<string, unknown>).bouncer
+          ? ((config as Record<string, unknown>).bouncer as Record<string, string>).configProjectName ?? ''
+          : '',
+        progress: normalizeBouncerProgress(
+          ((config as Record<string, unknown>).bouncer as Record<string, unknown>)?.progress as
+            | Partial<Record<string, boolean>>
+            | undefined,
+        ),
+        error: (config as Record<string, unknown>).bouncer
+          ? ((config as Record<string, unknown>).bouncer as Record<string, string>).error ?? ''
+          : '',
+      },
       infisical: {
         projectId: config.infisical?.projectId ?? '',
         organizationId: config.infisical?.organizationId ?? '',
@@ -755,6 +783,13 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       progress: {
         ...defaultResendProgress,
         ...config.resend.progress,
+      },
+    },
+    bouncer: {
+      ...config.bouncer,
+      progress: {
+        ...defaultBouncerProgress,
+        ...config.bouncer.progress,
       },
     },
     infisical: {

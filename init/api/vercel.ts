@@ -21,7 +21,8 @@ export const listTeams = async (): Promise<VercelTeam[]> => {
     const result = await vercelAPI('/v2/teams', 'GET');
 
     if (result.error) {
-      console.error('Failed to list teams:', result.error);
+      const err = result.error as Record<string, unknown>;
+      console.error('Failed to list teams:', err.message ?? err.code ?? JSON.stringify(result.error));
       return [];
     }
 
@@ -186,9 +187,14 @@ export const linkGitHub = async (
   } catch (error) {
     if (error instanceof Error) {
       console.error('❌ Link error:', error.message);
+      const msg = error.message.toLowerCase();
       // Check for GitHub integration error
-      if (error.message.includes('install') || error.message.includes('integration')) {
+      if (msg.includes('install') || msg.includes('integration')) {
         throw new Error('GITHUB_NOT_INSTALLED');
+      }
+      // Check for Login Connection error (GitHub account not linked to Vercel)
+      if (msg.includes('login connection')) {
+        throw new Error('GITHUB_LOGIN_CONNECTION_REQUIRED');
       }
       throw error;
     }
@@ -243,7 +249,8 @@ export const updateProjectSettings = async (
   const result = await vercelAPI(endpoint, 'PATCH', settings);
 
   if (result.error) {
-    const msg = result.error instanceof Error ? result.error.message : String(result.error);
+    const err = result.error as Record<string, unknown>;
+    const msg = err.message ?? err.code ?? JSON.stringify(result.error);
     throw new Error(`Failed to update project settings: ${msg}`);
   }
 };
@@ -270,7 +277,8 @@ export const createCustomEnvironment = async (
   });
 
   if (result.error) {
-    const msg = result.error instanceof Error ? result.error.message : String(result.error);
+    const err = result.error as Record<string, unknown>;
+    const msg = err.message ?? err.code ?? JSON.stringify(result.error);
     throw new Error(`Failed to create custom environment: ${msg}`);
   }
 

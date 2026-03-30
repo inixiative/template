@@ -89,6 +89,10 @@ export const setupRailway = async (
       await updateConfigField('railway', 'configProjectName', configProjectName);
       await markComplete('railway', 'selectWorkspace');
       await onStepComplete?.();
+    } else if (!workspaceId && selectedWorkspaceId) {
+      // Re-store workspaceId if it was cleared but step is already complete
+      workspaceId = selectedWorkspaceId;
+      await updateConfigField('railway', 'workspaceId', workspaceId);
     }
 
     // Step 2: Store Railway user token in Infisical
@@ -578,24 +582,20 @@ export const setupRailway = async (
       await onStepComplete?.();
     }
 
-    // Step 26: Store prod API URL in Infisical
+    // Step 26: Store prod API URL in Infisical (creates domain if needed)
     if (!(await isComplete('railway', 'storeProdApiUrl'))) {
-      const prodApiUrl = await railwayApi.getServiceDomain(prodApiServiceId, prodEnv.id);
-      if (!prodApiUrl) {
-        throw new Error('Prod API domain not available yet. Retry Railway setup after deployment finishes.');
-      }
+      await onStepComplete?.('Ensuring prod API domain...');
+      const prodApiUrl = await railwayApi.ensureServiceDomain(prodApiServiceId, prodEnv.id);
       await setSecretAsync(infisicalProjectId, 'prod', 'API_URL', prodApiUrl, '/');
       await setSecretAsync(infisicalProjectId, 'prod', 'VITE_API_URL', prodApiUrl, '/');
       await markComplete('railway', 'storeProdApiUrl');
       await onStepComplete?.();
     }
 
-    // Step 27: Store staging API URL in Infisical
+    // Step 27: Store staging API URL in Infisical (creates domain if needed)
     if (!(await isComplete('railway', 'storeStagingApiUrl'))) {
-      const stagingApiUrl = await railwayApi.getServiceDomain(stagingApiServiceId, stagingEnv.id);
-      if (!stagingApiUrl) {
-        throw new Error('Staging API domain not available yet. Retry Railway setup after deployment finishes.');
-      }
+      await onStepComplete?.('Ensuring staging API domain...');
+      const stagingApiUrl = await railwayApi.ensureServiceDomain(stagingApiServiceId, stagingEnv.id);
       await setSecretAsync(infisicalProjectId, 'staging', 'API_URL', stagingApiUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_API_URL', stagingApiUrl, '/');
       await markComplete('railway', 'storeStagingApiUrl');

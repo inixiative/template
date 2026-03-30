@@ -20,10 +20,8 @@ export const projectConfig = {
     domainId: '',
     configProjectName: '',
     progress: {
-      storeProdApiKey: false,
-      storeStagingApiKey: false,
-      storeProdFromAddress: false,
-      storeStagingFromAddress: false,
+      storeApiKey: false,
+      storeFromAddress: false,
       addDomain: false,
       confirmDns: false,
     },

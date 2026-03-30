@@ -155,29 +155,38 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       await clearError('railway');
       await syncConfig();
 
-      // Try to use existing workspace from config first
-      const existingTeam = config.railway?.workspaceId;
+      // Read fresh config from disk (React state may be stale)
+      const { getProjectConfig } = await import('../utils/getProjectConfig');
+      const freshConfig = await getProjectConfig();
+      let existingTeam = freshConfig.railway?.workspaceId;
+
+      // If workspaceId was lost but workspace step is already complete,
+      // auto-select if only one workspace, otherwise prompt
+      if (!existingTeam || existingTeam.trim() === '') {
+        if (workspaces.length === 1) {
+          existingTeam = workspaces[0].id!;
+          await updateConfigField('railway', 'workspaceId', existingTeam);
+        }
+      }
 
       if (existingTeam && existingTeam.trim() !== '') {
         // Resume with existing workspace
         await runSetup(existingTeam);
       } else {
-        // No workspace selected - go to workspace selection
-        if (workspaces.length === 1) {
-          await runSetup(workspaces[0].id!);
-        } else {
-          setRunning(false);
-          setViewState('workspace-select');
-        }
+        // No workspace selected and multiple options - ask user
+        setRunning(false);
+        setViewState('workspace-select');
       }
     }
   };
 
   const runSetup = async (workspaceId: string) => {
-    if (!config) return;
+    // Read fresh config from disk (React state may be stale after syncConfig)
+    const { getProjectConfig } = await import('../utils/getProjectConfig');
+    const freshConfig = await getProjectConfig();
 
     // Check if workspace token exists in Infisical
-    const infisicalProjectId = config.infisical.projectId;
+    const infisicalProjectId = freshConfig.infisical.projectId;
     let hasToken = false;
 
     try {
@@ -279,6 +288,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
   };
 
   const handleWorkspaceSelect = async (workspaceId: string) => {
+    // Persist workspaceId immediately so it survives restarts
+    await updateConfigField('railway', 'workspaceId', workspaceId);
     // Show spinner immediately when workspace is selected
     setRunning(true);
     await runSetup(workspaceId);
@@ -293,7 +304,7 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
   // Handle input on GitHub prompt view
   useInput((_input, key) => {
-    if (viewState !== 'github-prompt') return;
+    if (viewState !== 'github-prompt' || confirmAction.running) return;
 
     if (key.return) {
       handleGithubConfirm();
@@ -380,6 +391,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
                 </Text>
               </Text>
             </Box>
+
+            {confirmAction.error && (
+              <Box marginTop={1}>
+                <Text color="red">✗ {confirmAction.error}</Text>
+              </Box>
+            )}
 
             {confirmAction.running ? (
               <ActionSpinner label={confirmAction.actionLabel} />

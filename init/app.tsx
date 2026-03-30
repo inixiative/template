@@ -9,6 +9,7 @@ import { PlanetScaleSetupView } from './views/PlanetScaleSetupView';
 import { Prerequisites } from './views/Prerequisites';
 import { ProjectConfigView } from './views/ProjectConfigView';
 import { RailwaySetupView } from './views/RailwaySetupView';
+import { BouncerSetupView } from './views/BouncerSetupView';
 import { ResendSetupView } from './views/ResendSetupView';
 import { VercelSetupView } from './views/VercelSetupView';
 
@@ -73,6 +74,9 @@ export const App: React.FC = () => {
             {currentTask === 'resend' && (
               <ResendSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
+            {currentTask === 'bouncer' && (
+              <BouncerSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'launch' && <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
             {currentTask !== 'project-config' &&
               currentTask !== 'infisical' &&
@@ -80,6 +84,7 @@ export const App: React.FC = () => {
               currentTask !== 'railway' &&
               currentTask !== 'vercel' &&
               currentTask !== 'resend' &&
+              currentTask !== 'bouncer' &&
               currentTask !== 'launch' && (
                 <Box flexDirection="column">
                   <Text color="yellow">Task: {currentTask}</Text>

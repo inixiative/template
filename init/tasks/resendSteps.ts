@@ -12,12 +12,6 @@ const countCompletedActions = (progress: ResendProgress, actions: readonly Resen
   return actions.filter((action) => progress[action]).length;
 };
 
-const countLabel =
-  (label: string) =>
-  (_config: ProjectConfig, completedCount: number, totalCount: number): string => {
-    return `${label} (${completedCount}/${totalCount})`;
-  };
-
 const getDomainLabel = (fromAddress: string): string => {
   const domainName = fromAddress.split('@')[1];
   return domainName ?? fromAddress;
@@ -25,15 +19,15 @@ const getDomainLabel = (fromAddress: string): string => {
 
 const resendProgressGroups: readonly ResendProgressGroup[] = [
   {
-    actions: ['storeProdApiKey', 'storeStagingApiKey'],
-    getLabel: countLabel('API key stored in Infisical'),
+    actions: ['storeApiKey'],
+    getLabel: () => 'API key stored in Infisical',
   },
   {
-    actions: ['storeProdFromAddress', 'storeStagingFromAddress'],
-    getLabel: (config, completedCount, totalCount) =>
+    actions: ['storeFromAddress'],
+    getLabel: (config) =>
       config.resend.fromAddress
-        ? `From address stored in Infisical (${completedCount}/${totalCount}): ${config.resend.fromAddress}`
-        : `From address stored in Infisical (${completedCount}/${totalCount})`,
+        ? `From address stored in Infisical: ${config.resend.fromAddress}`
+        : 'From address stored in Infisical',
   },
   {
     actions: ['addDomain'],

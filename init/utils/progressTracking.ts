@@ -1,6 +1,6 @@
 import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
 
-export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway' | 'resend' | 'vercel';
+export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway' | 'resend' | 'bouncer' | 'vercel';
 
 export type InfisicalAction =
   | 'selectOrg'
@@ -165,13 +165,9 @@ export type VercelAction =
   | 'storeStagingSuperadminUrls'
   | 'deployProduction';
 
-export type ResendAction =
-  | 'storeProdApiKey'
-  | 'storeStagingApiKey'
-  | 'storeProdFromAddress'
-  | 'storeStagingFromAddress'
-  | 'addDomain'
-  | 'confirmDns';
+export type ResendAction = 'storeApiKey' | 'storeFromAddress' | 'addDomain' | 'confirmDns';
+
+export type BouncerAction = 'storeApiKey';
 
 export type ProgressActions = {
   project: ProjectAction;
@@ -179,6 +175,7 @@ export type ProgressActions = {
   planetscale: PlanetScaleAction;
   railway: RailwayAction;
   resend: ResendAction;
+  bouncer: BouncerAction;
   vercel: VercelAction;
 };
 

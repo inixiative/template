@@ -3,10 +3,13 @@ import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { StepProgress } from '../components/StepProgress';
+import { getDomain } from '../api/resend';
 import {
   confirmResendDnsSetup,
+  type DnsVerificationResult,
   ensureResendDomain,
   getInfisicalProjectId,
+  getStoredResendApiKey,
   storeResendApiKey,
   storeResendFromAddress,
 } from '../tasks/resendSetup';
@@ -26,11 +29,11 @@ type ResendSetupViewProps = {
 };
 
 const hasStoredApiKey = (progress: ProjectConfig['resend']['progress']): boolean => {
-  return progress.storeProdApiKey && progress.storeStagingApiKey;
+  return progress.storeApiKey;
 };
 
 const hasStoredFromAddress = (progress: ProjectConfig['resend']['progress']): boolean => {
-  return progress.storeProdFromAddress && progress.storeStagingFromAddress;
+  return progress.storeFromAddress;
 };
 
 const detectSetupState = (config: ProjectConfig): SetupState => {
@@ -69,6 +72,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
     }>
   >([]);
   const [activeAction, setActiveAction] = useState<string | undefined>(undefined);
+  const [verificationResult, setVerificationResult] = useState<DnsVerificationResult | null>(null);
 
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
   const progressItems = useMemo(() => (config ? getResendProgressItems(config) : []), [config]);
@@ -85,6 +89,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
     setFromAddress('');
     setDnsRecords([]);
     setActiveAction(undefined);
+    setVerificationResult(null);
     setViewState('status');
   };
 
@@ -94,10 +99,20 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
     setActiveAction('Loading domain details from Resend...');
 
     try {
-      const domain = await ensureResendDomain(projectId, currentFromAddress);
+      await clearError('resend');
+      await syncConfig();
+      const freshConfig = await getProjectConfig();
+      const apiKey = await getStoredResendApiKey(projectId);
+      const storedDomainId = freshConfig.resend.domainId;
+
+      // If we already have the domainId, fetch directly (avoids upsert round-trip)
+      const domain = storedDomainId
+        ? await getDomain(apiKey, storedDomainId)
+        : await ensureResendDomain(projectId, currentFromAddress);
+
       setFromAddress(currentFromAddress);
       setDnsRecords(
-        domain.records.map((record) => ({
+        (domain.records ?? []).map((record) => ({
           type: record.type,
           name: record.name,
           value: record.value,
@@ -157,19 +172,28 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
         await syncConfig();
       }
 
-      setActiveAction('Registering domain with Resend...');
-      const domain = await ensureResendDomain(projectId, nextFromAddress, apiKey || undefined);
-      setFromAddress(nextFromAddress);
-      setDnsRecords(
-        domain.records.map((record) => ({
-          type: record.type,
-          name: record.name,
-          value: record.value,
-          priority: record.priority,
-        })),
-      );
-      await syncConfig();
-      setViewState('dns-records');
+      // Re-read progress after stores (may have changed)
+      const updatedConfig = await getProjectConfig();
+      const updatedProgress = updatedConfig.resend.progress;
+
+      if (!updatedProgress.addDomain) {
+        setActiveAction('Registering domain with Resend...');
+        const domain = await ensureResendDomain(projectId, nextFromAddress, apiKey || undefined);
+        setFromAddress(nextFromAddress);
+        setDnsRecords(
+          domain.records.map((record) => ({
+            type: record.type,
+            name: record.name,
+            value: record.value,
+            priority: record.priority,
+          })),
+        );
+        await syncConfig();
+      }
+
+      if (!updatedProgress.confirmDns) {
+        setViewState('dns-records');
+      }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Resend setup failed';
       await setError('resend', message);
@@ -252,16 +276,30 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
       return;
     }
 
+    setRunning(true);
+    setVerificationResult(null);
+    setActiveAction('Checking DNS records...');
+
     try {
       await clearError('resend');
-      await confirmResendDnsSetup(currentFromAddress);
+      const result = await confirmResendDnsSetup(currentFromAddress, setActiveAction);
       await syncConfig();
-      setViewState('status');
+
+      if (result.verified) {
+        setVerificationResult(null);
+        setViewState('status');
+      } else {
+        setVerificationResult(result);
+        // Stay on dns-records view so user can see what's failing and retry
+      }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Failed to confirm DNS';
       await setError('resend', message);
       await syncConfig();
       setViewState('status');
+    } finally {
+      setRunning(false);
+      setActiveAction(undefined);
     }
   };
 
@@ -288,6 +326,8 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
         onCancel();
       } else if (key.return) {
         void handleDnsConfirm();
+      } else if (input.toLowerCase() === 'r') {
+        void handleAction('restart');
       }
       return;
     }
@@ -380,7 +420,7 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
         </Box>
       )}
 
-      {viewState === 'dns-records' && (
+      {viewState === 'dns-records' && !running && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>DNS Records</Text>
           <Text dimColor>
@@ -408,9 +448,31 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
             ))}
             {dnsRecords.length === 0 && <Text dimColor>No DNS records returned - check Resend dashboard.</Text>}
           </Box>
-          <Text dimColor>Once DNS is configured, press Enter to confirm.</Text>
+          {verificationResult && !verificationResult.verified && (
+            <Box flexDirection="column" marginBottom={1}>
+              {verificationResult.failedRecords.some((r) => r.status === 'not_propagated') ? (
+                <Text color="yellow">⚠ DNS records not yet propagated:</Text>
+              ) : (
+                <Text color="yellow">⚠ DNS verification incomplete:</Text>
+              )}
+              {verificationResult.failedRecords.map((record, i) => (
+                <Text key={`fail-${i}-${record.type}-${record.name}`} color="red">
+                  {'  '}
+                  {record.type} {record.name} — {record.status === 'not_propagated' ? 'not found in DNS' : record.status}
+                </Text>
+              ))}
+              {verificationResult.failedRecords.length === 0 && (
+                <Text dimColor>
+                  {'  '}Domain status: {verificationResult.domain.status} (records may still be propagating)
+                </Text>
+              )}
+            </Box>
+          )}
+          <Text dimColor>
+            {verificationResult ? 'Press Enter to retry verification.' : 'Once DNS is configured, press Enter to verify.'}
+          </Text>
           <Box marginTop={1}>
-            <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
+            <Text dimColor>{prompt(['enter', 'restart', 'cancel'])}</Text>
           </Box>
         </Box>
       )}
