@@ -20,7 +20,7 @@ const getResendClient = (apiKey: string): Resend => {
 };
 
 class ResendEmailClient implements EmailClient {
-  readonly vcr = new VCR(FIXTURES_DIR, { sanitizeKeys: SANITIZE_KEYS });
+  readonly vcr = new VCR(FIXTURES_DIR, { send: { keys: SANITIZE_KEYS } });
   private readonly resend: Resend;
 
   constructor(apiKey: string) {

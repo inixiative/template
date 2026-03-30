@@ -47,7 +47,9 @@ export type RailwayDeployment = {
 
 class RailwayApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    sanitizeString: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@'),
+    getRedisUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
+    getRailwayUserToken: { fn: () => 'REDACTED' },
+    getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
   });
 
   private async _railwayGraphQLWithToken<T>(

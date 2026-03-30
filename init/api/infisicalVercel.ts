@@ -17,6 +17,7 @@ type VercelSecretSync = {
     projectId?: string;
     projectName?: string;
     environment?: string;
+    branch?: string;
   };
 };
 
@@ -34,7 +35,9 @@ type EnsureVercelSyncInput = {
 };
 
 class InfisicalVercelApi {
-  readonly vcr = new VCR(FIXTURES_DIR);
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    createVercelConnection: { fn: () => 'REDACTED' },
+  });
 
   async listVercelConnections(infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> {
     if (process.env.NODE_ENV !== 'test') return this._listVercelConnections(infisicalProjectId);
@@ -215,6 +218,22 @@ class InfisicalVercelApi {
     return syncId;
   }
 
+  async deleteVercelSync(syncId: string): Promise<void> {
+    if (process.env.NODE_ENV !== 'test') return this._deleteVercelSync(syncId);
+    return this.vcr.capture('deleteVercelSync', () => this._deleteVercelSync(syncId));
+  }
+  private async _deleteVercelSync(syncId: string): Promise<void> {
+    const infisicalToken = await getInfisicalToken();
+    const response = await fetch(`https://app.infisical.com/api/v1/secret-syncs/vercel/${syncId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${infisicalToken}` },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to delete Vercel sync: ${response.statusText}\n${errorText}`);
+    }
+  }
+
   async ensureVercelSync(input: EnsureVercelSyncInput): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._ensureVercelSync(input);
     return this.vcr.capture('ensureVercelSync', () => this._ensureVercelSync(input));
@@ -233,20 +252,29 @@ class InfisicalVercelApi {
   }: EnsureVercelSyncInput): Promise<void> {
     const existingSyncs = await this._listVercelSyncs(infisicalProjectId);
     const existing = existingSyncs.find((sync) => sync.name === syncName);
-    if (!existing) {
-      await this._createVercelSync(
-        infisicalProjectId,
-        connectionId,
-        syncName,
-        infisicalEnvironment,
-        infisicalSecretPath,
-        vercelProjectId,
-        vercelProjectName,
-        vercelEnvironment,
-        vercelTeamId,
-        vercelBranch,
-      );
+
+    if (existing) {
+      // Detect stale branch config — delete and recreate if branch setting has drifted
+      const currentBranch = existing.destinationConfig?.branch;
+      if (currentBranch !== vercelBranch && (currentBranch || vercelBranch)) {
+        await this._deleteVercelSync(existing.id);
+      } else {
+        return; // Config matches, nothing to do
+      }
     }
+
+    await this._createVercelSync(
+      infisicalProjectId,
+      connectionId,
+      syncName,
+      infisicalEnvironment,
+      infisicalSecretPath,
+      vercelProjectId,
+      vercelProjectName,
+      vercelEnvironment,
+      vercelTeamId,
+      vercelBranch,
+    );
   }
 }
 

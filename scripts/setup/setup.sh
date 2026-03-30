@@ -6,7 +6,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 # Check if project has been launched (config is committed, so grep is reliable)
-if grep -q 'launched.*true\|"launched": true' "$ROOT_DIR/project.config.ts" 2>/dev/null; then
+if [ "$USE_INTERNAL_CONFIG" = "true" ]; then
+  CONFIG_FILE="$ROOT_DIR/project.config.template-internal.ts"
+else
+  CONFIG_FILE="$ROOT_DIR/project.config.ts"
+fi
+if grep -q 'launched.*true\|"launched": true' "$CONFIG_FILE" 2>/dev/null; then
   IS_LAUNCHED=1
 else
   IS_LAUNCHED=0

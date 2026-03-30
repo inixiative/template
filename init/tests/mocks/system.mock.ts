@@ -1,5 +1,7 @@
 import { mock } from 'bun:test';
 import { exec as _exec, execSync as _execSync } from 'child_process';
+import { homedir } from 'os';
+import { join } from 'path';
 
 // Capture real function references as values — import bindings are live in ESM,
 // so mock.module('child_process', ...) would replace them in-place, causing
@@ -13,7 +15,7 @@ type ExecResult = {
   stdout?: string;
 };
 
-const cliPath = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
+const cliPath = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
 
 const matchesCommand = (matcher: CommandMatcher, command: string): boolean => {
   if (typeof matcher === 'function') return matcher(command);

@@ -38,7 +38,9 @@ type EnsureRailwaySyncInput = {
 };
 
 class InfisicalRailwayApi {
-  readonly vcr = new VCR(FIXTURES_DIR);
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    createRailwayConnection: { fn: () => 'REDACTED' },
+  });
 
   /**
    * Create a Railway connection in Infisical (idempotent - returns existing if already created)

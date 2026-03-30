@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { VCR } from '../../packages/shared/src/vcr';
 import { getSecretAsync } from '../tasks/infisicalSetup';
@@ -7,7 +8,7 @@ import { getProjectConfig } from '../utils/getProjectConfig';
 const PLANETSCALE_API = 'https://api.planetscale.com/v1';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/planetscale');
 const SANITIZE_KEYS = ['plain_text', 'username', 'connection_strings.general'];
-const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
+const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
 
 const withCliEnv = (
   options: { cwd?: string; encoding?: BufferEncoding; env?: NodeJS.ProcessEnv; shell?: string; timeout?: number } = {},
@@ -65,7 +66,11 @@ type ServiceToken = {
 };
 
 class PlanetScaleApi {
-  readonly vcr = new VCR(FIXTURES_DIR, { sanitizeKeys: SANITIZE_KEYS });
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    createPassword: { keys: SANITIZE_KEYS },
+    createRole: { keys: SANITIZE_KEYS },
+    listPasswords: { keys: SANITIZE_KEYS, isArray: true },
+  });
 
   private async _fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const config = await getProjectConfig();

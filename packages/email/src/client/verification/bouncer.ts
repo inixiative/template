@@ -24,7 +24,7 @@ const toResult = (data: BouncerResponse): VerificationResult => ({
 });
 
 class BouncerVerifierClient implements EmailVerifier {
-  readonly vcr = new VCR(FIXTURES_DIR, { sanitizeKeys: SANITIZE_KEYS });
+  readonly vcr = new VCR(FIXTURES_DIR, { verify: { keys: SANITIZE_KEYS } });
   private readonly apiKey: string;
 
   constructor(apiKey: string) {

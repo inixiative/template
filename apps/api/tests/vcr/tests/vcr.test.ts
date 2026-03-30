@@ -126,7 +126,7 @@ describe('VCR — captureResponse record', () => {
   });
 
   test('sanitizes body but preserves status and headers', async () => {
-    const vcr = new VCR(tmpDir, { sanitizeKeys: ['secret'] });
+    const vcr = new VCR(tmpDir, { sanitized: { keys: ['secret'] } });
     vcr.queue('sanitized', 'test');
     const result = await vcr.captureResponse<{ id: string; secret: string }>('sanitized', async () => ({
       status: 200,
@@ -164,7 +164,7 @@ describe('VCR — record', () => {
   });
 
   test('sanitizes specified keys before saving', async () => {
-    const vcr = new VCR(tmpDir, { sanitizeKeys: ['secret', 'nested.token'] });
+    const vcr = new VCR(tmpDir, { withSecrets: { keys: ['secret', 'nested.token'] } });
     vcr.queue('withSecrets', 'test');
     const result = await vcr.capture('withSecrets', async () => ({
       id: 'keep',

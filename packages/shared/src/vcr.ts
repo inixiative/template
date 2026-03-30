@@ -1,34 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-const redactValue = (value: unknown): unknown => {
-  if (value === null || value === undefined) return value;
-  if (typeof value === 'object') return value;
-  return 'REDACTED';
-};
-
-const sanitizePath = (obj: unknown, parts: string[]): void => {
-  if (!obj || typeof obj !== 'object') return;
-  if (Array.isArray(obj)) {
-    for (const item of obj) sanitizePath(item, parts);
-    return;
-  }
-  const record = obj as Record<string, unknown>;
-  const [head, ...rest] = parts;
-  if (rest.length === 0) {
-    if (head in record) record[head] = redactValue(record[head]);
-  } else {
-    sanitizePath(record[head], rest);
-  }
-};
-
-const sanitize = <T>(data: T, keys: string[]): T => {
-  if (!keys.length) return data;
-  const clone = JSON.parse(JSON.stringify(data)) as T;
-  for (const key of keys) sanitizePath(clone, key.split('.'));
-  return clone;
-};
-
 export type Fixture<T = unknown> = {
   status: number;
   body: T | null;
@@ -36,33 +8,35 @@ export type Fixture<T = unknown> = {
 };
 
 /**
+ * Per-method sanitizer applied during recording.
+ * - `fn`:      string transform for string bodies
+ * - `keys`:    dot-path redaction for object bodies (e.g. ['plain_text', 'actor.display_name'])
+ * - `isArray`: body is an array — apply fn/keys to each element
+ */
+type Sanitizer = {
+  fn?: (s: string) => string;
+  keys?: string[];
+  isArray?: boolean;
+};
+
+/**
  * VCR — per-method cassette-style fixture playback and capture.
  *
- * Each method has its own FIFO queue. Queue named fixtures before each test.
- * In test mode, provider methods call `.capture(method, realFn)` to serve from
- * disk or record a real call when the fixture is missing.
- *
  * @example
- * // In tests — queue per method
- * planetscaleApi.vcr.queue('getDatabase', 'success');
- * planetscaleApi.vcr.queue('getBranch', 'staging');
- *
- * // In provider class — record on miss
- * async getDatabase(org: string, db: string): Promise<PlanetScaleDatabase> {
- *   if (process.env.NODE_ENV !== 'test') return this._getDatabase(org, db);
- *   return this.vcr.capture('getDatabase', () => this._getDatabase(org, db));
- * }
+ * const vcr = new VCR(fixturesDir, {
+ *   getSecret:       { fn: (s) => s.replace(/rw_Fe26\S+/g, 'REDACTED') },
+ *   getDatabase:     { keys: ['plain_text', 'username'] },
+ *   listWorkspaces:  { keys: ['token'], isArray: true },
+ * });
  */
 export class VCR {
   private readonly fixturesDir: string;
-  private readonly sanitizeKeys: string[];
-  private readonly sanitizeString?: (value: string) => string;
+  private readonly sanitizers: Record<string, Sanitizer>;
   private readonly queues = new Map<string, string[]>();
 
-  constructor(fixturesDir: string, options: { sanitizeKeys?: string[]; sanitizeString?: (value: string) => string } = {}) {
+  constructor(fixturesDir: string, sanitizers: Record<string, Sanitizer> = {}) {
     this.fixturesDir = fixturesDir;
-    this.sanitizeKeys = options.sanitizeKeys ?? [];
-    this.sanitizeString = options.sanitizeString;
+    this.sanitizers = sanitizers;
   }
 
   /** Queue a fixture for a specific method. Consumed in FIFO order per method. */
@@ -74,14 +48,9 @@ export class VCR {
   }
 
   /**
-   * Capture mode — serve from disk if fixture exists, otherwise call real fn,
-   * sanitize, save to disk, and return. Returns T directly (same shape as real fn).
-   *
-   * realFn returns a domain object T. VCR wraps it as { status: 200, body: T }.
-   *
-   * Error handling:
-   * - Fixture with status >= 400: throws Error(body)
-   * - Real fn throws: saves { status: 500, body: message } and rethrows
+   * Serve from disk if fixture exists, otherwise call real fn, sanitize, save, return.
+   * - Fixture with status >= 400 → throws Error(body)
+   * - Real fn throws → saves { status: 500, body: message } and rethrows
    */
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
     const fixturePath = this._popFixturePath(method);
@@ -94,7 +63,7 @@ export class VCR {
 
     try {
       const raw = await realFn();
-      const saved: Fixture<T> = { status: 200, body: this._sanitizeBody(raw) };
+      const saved: Fixture<T> = { status: 200, body: this._sanitize(method, raw) };
       this._save(fixturePath, saved);
       return saved.body as T;
     } catch (error) {
@@ -104,11 +73,8 @@ export class VCR {
   }
 
   /**
-   * Capture mode for response-shaped calls — realFn returns the full Fixture
-   * envelope (status, body, headers). Records and replays the envelope as-is.
-   *
-   * Does NOT throw on error status — returns the fixture so the caller can
-   * inspect status/headers. Use when the caller needs transport metadata.
+   * Like capture but for response-shaped calls — realFn returns the full Fixture
+   * envelope (status, body, headers). Does NOT throw on error status.
    */
   async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
     const fixturePath = this._popFixturePath(method);
@@ -121,7 +87,7 @@ export class VCR {
       const raw = await realFn();
       const saved: Fixture<T> = {
         status: raw.status,
-        body: this._sanitizeBody(raw.body) as T | null,
+        body: this._sanitize(method, raw.body) as T | null,
         ...(raw.headers && { headers: raw.headers }),
       };
       this._save(fixturePath, saved);
@@ -132,11 +98,21 @@ export class VCR {
     }
   }
 
-  private _sanitizeBody<T>(data: T): T {
-    if (typeof data === 'string' && this.sanitizeString) {
-      return this.sanitizeString(data) as T;
+  private _sanitize<T>(method: string, data: T): T {
+    const rule = this.sanitizers[method];
+    if (!rule) return data;
+
+    if (rule.isArray && Array.isArray(data)) {
+      return data.map((item) => this._applyRule(rule, item)) as unknown as T;
     }
-    return sanitize(data, this.sanitizeKeys);
+
+    return this._applyRule(rule, data);
+  }
+
+  private _applyRule<T>(rule: Sanitizer, data: T): T {
+    if (rule.fn && typeof data === 'string') return rule.fn(data) as unknown as T;
+    if (rule.keys?.length) return redactKeys(data, rule.keys);
+    return data;
   }
 
   private _popFixturePath(method: string): string {
@@ -162,3 +138,29 @@ export class VCR {
     this.queues.clear();
   }
 }
+
+/** Redact dot-path keys to 'REDACTED'. */
+const redactKeys = <T>(data: T, keys: string[]): T => {
+  if (!keys.length) return data;
+  const clone = JSON.parse(JSON.stringify(data)) as T;
+  for (const key of keys) redactPath(clone, key.split('.'));
+  return clone;
+};
+
+const redactPath = (obj: unknown, parts: string[]): void => {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) redactPath(item, parts);
+    return;
+  }
+  const record = obj as Record<string, unknown>;
+  const [head, ...rest] = parts;
+  if (rest.length === 0) {
+    if (head in record) {
+      const v = record[head];
+      record[head] = v === null || v === undefined || typeof v === 'object' ? v : 'REDACTED';
+    }
+  } else {
+    redactPath(record[head], rest);
+  }
+};

@@ -68,7 +68,7 @@ export const renameProject = async (oldName: string, newName: string, onStepComp
   if (!(await isComplete('project', 'updateImports'))) {
     try {
       const { stdout } = await execAsync(
-        "find apps packages scripts docs init -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' \\)",
+        "find apps packages scripts docs init -path 'scripts/ci' -prune -o -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' \\) -print",
         { encoding: 'utf-8' },
       );
       const files = stdout.trim().split('\n').filter(Boolean);

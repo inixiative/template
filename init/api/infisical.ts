@@ -1,10 +1,11 @@
+import { homedir } from 'os';
 import { join } from 'path';
 import { VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');
-const CLI_PATH = ['/opt/homebrew/bin', '/Users/arongreenspan/.bun/bin', process.env.PATH].filter(Boolean).join(':');
+const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
 
 export type InfisicalApp = 'api' | 'web' | 'admin' | 'superadmin';
 
@@ -58,13 +59,17 @@ export const toInfisicalSlug = (name: string): string => {
   return slug.length >= 5 ? slug : slug.padEnd(5, '0');
 };
 
+const redactSecrets = (s: string) =>
+  s
+    .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
+    .replace(/pscale_tkn_\w+/g, 'REDACTED')
+    .replace(/pscale_pw_\w+/g, 'REDACTED')
+    .replace(/rw_Fe26\.\S+/g, 'REDACTED');
+
 class InfisicalApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    sanitizeString: (s) =>
-      s
-        .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
-        .replace(/pscale_tkn_\w+/g, 'REDACTED')
-        .replace(/pscale_pw_\w+/g, 'REDACTED'),
+    getSecret: { fn: redactSecrets },
+    setSecret: { fn: redactSecrets },
   });
 
   private async _fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
