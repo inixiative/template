@@ -1,4 +1,4 @@
-# COMM-001: Email System (Complete)
+# COMM-001: Email System
 
 **Status**: 🆕 Not Started
 **Assignee**: TBD
