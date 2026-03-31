@@ -32,6 +32,8 @@ kanban
     INFRA-009-adapter-primitives
     INFRA-009-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
+    DOC-001-scalar-api-docs-ui
+    DOC-002-ai-discoverable-api-metadata
 ```
 
 ## Tickets
@@ -80,6 +82,10 @@ kanban
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
 
+**Documentation & API Discovery:**
+- [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
+- [DOC-002: AI-Discoverable API Metadata](./DOC-002-ai-discoverable-api-metadata.md) - Page metadata, `.well-known` endpoint, and visible links for AI agent discovery
+
 **Frontend Architecture:**
 - [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
 
@@ -107,7 +113,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 24
+- **Total Backlog Items**: 26
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -117,6 +123,7 @@ kanban
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
 - **Frontend Architecture**: 1
+- **Documentation & Discovery**: 2
 - **API Reliability**: 1
 
 ## Notes
