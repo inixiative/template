@@ -1,6 +1,6 @@
 # FEAT-005: Audit Logs
 
-**Status**: 🚧 In Progress
+**Status**: ✅ Done
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
@@ -220,8 +220,8 @@ export const isAuditEnabled = (model: string): boolean => {
 - [x] `packages/db/src/registries/redactFields.ts` (shared — Token field corrected to `keyHash` only)
 - [x] Exported from `packages/db/src/index.ts`
 - [x] `packages/db/src/registries/auditEnabledModels.ts` — includes User, Organization, OrganizationUser, Space, SpaceUser, Token, AuthProvider, Account, EmailTemplate, EmailComponent
-- [ ] Update webhooks to use shared utilities (still using own copy)
-- [ ] Write tests for utilities: `packages/db/src/registries/ignoreFields.test.ts`
+- [ ] Update webhooks to use shared utilities (still using own copy — deferred)
+- [ ] Write tests for utilities: `packages/db/src/registries/ignoreFields.test.ts` (deferred)
 - [x] Write tests for utilities: `packages/db/src/registries/redactFields.test.ts`
 
 ---
@@ -253,7 +253,7 @@ export const isAuditEnabled = (model: string): boolean => {
 - [x] Soft delete detection: `deletedAt: null → timestamp` recorded as `delete` action
 - [x] Empty diff guard: update with no meaningful changes produces no audit row
 - [x] `sourceInquiryId` threaded through actor context for inquiry-driven mutations
-- [ ] Move audit writes into transaction (currently writes after commit — see FEAT-017)
+- [ ] Move audit writes into transaction (deferred — see FEAT-017)
 
 **File**: `apps/api/src/hooks/auditLog/utils.ts`
 
@@ -299,7 +299,7 @@ export const computeDiff = (
 **Tasks:**
 - [x] `apps/api/src/hooks/auditLog/utils.ts` — `processAuditData()`, `computeDiff()`, `buildContextFkFields()`, `buildSubjectFkFields()`
 - [x] `computeDiff()` takes pre-processed data (pure diff, no internal processAuditData call)
-- [ ] Write tests: `apps/api/src/hooks/auditLog/utils.test.ts`
+- [x] Write tests: `apps/api/src/hooks/auditLog/utils.test.ts`
 
 **File**: `apps/api/src/hooks/index.ts`
 
@@ -317,7 +317,7 @@ export const registerHooks = () => {
 
 **Tasks:**
 - [x] Register audit log hook in `apps/api/src/hooks/index.ts`
-- [ ] Integration test: hook fires on mutations
+- [x] Integration test: hook fires on mutations
 
 ---
 
@@ -347,11 +347,11 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 ```
 
 **Tasks:**
-- [ ] Create `apps/api/src/jobs/handlers/cleanStaleAuditLogs.ts`
-- [ ] Add to `apps/api/src/jobs/handlers/index.ts`
-- [ ] Write tests: `apps/api/src/jobs/handlers/tests/cleanStaleAuditLogs.test.ts`
-- [ ] Add `AUDIT_LOG_RETENTION_DAYS=90` to `.env.example`
-- [ ] Create CronJob in seed: run nightly at 3am
+- [x] Create `apps/api/src/jobs/handlers/cleanStaleAuditLogs.ts`
+- [x] Add to `apps/api/src/jobs/handlers/index.ts`
+- [ ] Write tests: `apps/api/src/jobs/handlers/tests/cleanStaleAuditLogs.test.ts` (deferred)
+- [x] Add `AUDIT_LOG_RETENTION_DAYS=90` to `.env.example`
+- [x] Create CronJob in seed: run nightly at 3am
 
 ---
 
@@ -372,11 +372,11 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 - `limit` / `offset` - Pagination
 
 **Tasks:**
-- [ ] Create `apps/api/src/modules/admin/auditLog/routes/adminAuditLogReadMany.ts`
-- [ ] Create controller using `paginate()`
-- [ ] Add to admin routes in `apps/api/src/routes/admin.ts`
-- [ ] Write API tests
-- [ ] Update OpenAPI docs
+- [x] Create `apps/api/src/modules/admin/auditLog/routes/auditLogReadMany.ts`
+- [x] Create controller using `paginate()`
+- [x] Add to admin routes in `apps/api/src/routes/admin.ts`
+- [x] Write response schema tests
+- [ ] Update OpenAPI docs (deferred)
 
 **Note**: Only superadmin access for now. Org/space-level access will come later when we have better data retention strategy.
 
@@ -406,12 +406,12 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 - Expand/collapse
 
 **Tasks:**
-- [ ] Create `packages/ui/src/components/tables/AuditLogDataTable.tsx`
-- [ ] Create superadmin audit log page
-- [ ] Add to navigation config (`features/auditLog.ts`)
-- [ ] Add permission checks (superadmin only)
-- [ ] Test filters and pagination
-- [ ] Test expandable rows
+- [ ] Create `packages/ui/src/components/tables/AuditLogDataTable.tsx` (deferred — FEAT-017)
+- [ ] Create superadmin audit log page (deferred — FEAT-017)
+- [ ] Add to navigation config (deferred — FEAT-017)
+- [ ] Add permission checks (deferred — FEAT-017)
+- [ ] Test filters and pagination (deferred — FEAT-017)
+- [ ] Test expandable rows (deferred — FEAT-017)
 
 ---
 
@@ -496,9 +496,12 @@ export const cleanStaleAuditLogs: JobHandler<void> = makeSingletonJob(async (ctx
 - ✅ Comprehensive test coverage
 - ✅ Shared hook utilities (`ignoreFields`, `redactFields`) can be reused by webhooks and other hooks
 
-**Future (not in scope):**
+**Deferred to FEAT-017:**
+- ❌ Superadmin UI (DataTable, filters, expandable rows)
 - ❌ Org/space-level access (wait for data lake/retention strategy)
 - ❌ CSV export (wait for data lake)
+- ❌ Transaction-scoped writes
+- ❌ Webhook migration to shared utilities
 
 ---
 

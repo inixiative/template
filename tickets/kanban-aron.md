@@ -10,9 +10,6 @@ kanban
   Todo
     INFRA-001-init-script
     INFRA-002-rules-builder
-    INFRA-003-cicd
-    INFRA-004-websockets
-    FEAT-001-inquiry-system
     FEAT-002-notes-system
     FEAT-003-feature-flags
     FEAT-004-ai-providers
@@ -21,23 +18,23 @@ kanban
     COMM-001-email-system
     FEAT-008-permissions-builder
   In Progress
+    AUTH-002-unified-auth-system
+    INFRA-004-websockets
   Review
   Done
     FE-002-navigation-refactoring
+    FEAT-001-inquiry-system
 ```
 
 ## Tickets
 
-### 🆕 Todo - High Priority
+### 🆕 Todo
 
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (separate repo)
-- [INFRA-003: CI/CD](./INFRA-003-cicd.md) - Review branch deployment strategy
-- [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Real-time features completion
 
 **Features:**
-- [FEAT-001: Inquiry System](./FEAT-001-inquiry-system.md) - Space CRUD, user invites, onboarding
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
 - [FEAT-003: Feature Flags](./FEAT-003-feature-flags.md) ⭐ - DB + Redis + WS + Admin UI
 - [FEAT-004: AI Providers](./FEAT-004-ai-providers.md) - OpenAI, Anthropic, Gemini (from Zealot)
@@ -50,15 +47,17 @@ kanban
 
 ### 📦 Backlog
 
-See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, etc.)
+See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
-_No tickets currently in progress_
+- [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
+- [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
 
 ### 👀 Review
 _No tickets currently in review_
 
 ### ✅ Done
+- [FEAT-001: Inquiry System](./archived/FEAT-001-inquiry-system.md) - Generic workflow engine for multi-party approval flows
 - [FE-002: Navigation Refactoring](./archived/FE-002-navigation-refactoring.md) - Context preservation and navigation cleanup
 
 ---
@@ -66,11 +65,10 @@ _No tickets currently in review_
 ## Quick Stats
 
 - **Total Tickets**: 12
-- **Todo**: 12
-- **In Progress**: 0
+- **Todo**: 9
+- **In Progress**: 2
 - **Blocked**: 2 (waiting on rules builder)
-- **Completed This Week**: 1
-- **Moved to Backlog**: 7 (see [Backlog Board](./kanban-backlog.md))
+- **Done**: 2
 
 ## Dependency Map
 
@@ -89,4 +87,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-02-14_
+_Last Updated: 2026-03-31_

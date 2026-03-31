@@ -1,6 +1,6 @@
 # FEAT-013: Encryption
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: TBD
 **Priority**: High
 **Created**: 2026-03-02

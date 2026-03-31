@@ -28,6 +28,10 @@ kanban
     FEAT-014-ai-developer-experience
     FEAT-015-ai-dashboard-generator
     COMM-002-email-validation
+    AUTH-003-saml-sso
+    INFRA-009-adapter-primitives
+    INFRA-009-audit-logs-cold-storage
+    INFRA-010-cloudflare-waf-and-asset-serving
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
 ```
@@ -45,6 +49,7 @@ kanban
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
+- [AUTH-003: SAML SSO](./AUTH-003-saml-sso.md) - SAML 2.0 via BetterAuth SSO plugin (depends on AUTH-002)
 
 **Financial:**
 - [FIN-001: Financial - Fiat](./FIN-001-financial-fiat.md) - Stripe alternatives (Paddle, Lemon Squeezy, Adyen)
@@ -56,6 +61,9 @@ kanban
 - [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
+- [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
+- [INFRA-009: Audit Log Cold Storage](./INFRA-009-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
+- [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
@@ -105,12 +113,12 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 22
+- **Total Backlog Items**: 26
 - **Polish**: 3
-- **Enterprise**: 1
+- **Enterprise**: 2
 - **Financial**: 2
 - **Communication**: 2
-- **Infrastructure**: 5
+- **Infrastructure**: 8
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
