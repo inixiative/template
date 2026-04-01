@@ -227,12 +227,32 @@ When implemented, ResourceBinding will answer:
 - On what resource? (Organization, Space, User, Event, Inquiry — polymorphic)
 - Is it publicly exposed? (`visibility: internal | public | unlisted`)
 - In what order? (for galleries)
+- How should it be rendered in this context? (display hints — sizing, crop, etc.)
 
 **Key principles (for when this is built):**
 - Visibility lives on the binding, not the file or permission. Same file can be public as a logo and private as an attachment.
 - Swapping a logo = update binding to point at different File, not delete + re-upload
 - One File → many ResourceBindings
 - `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File
+
+**Display hints on the binding:**
+
+The binding carries rendering context — the same image bound as a `thumbnail` vs a `hero` vs an `og:image` needs different display parameters. This is the same instinct as Cloudinary's transformation URLs (`w_300,h_200,c_fill,g_face`) and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — the transform is a property of the *usage*, not the *file*.
+
+```typescript
+// ResourceBinding.displayHints (Json, nullable)
+{
+  width?: number;           // desired display width (px)
+  height?: number;          // desired display height (px)
+  crop?: 'fill' | 'fit' | 'cover' | 'contain';  // how to fit into dimensions
+  gravity?: 'center' | 'face' | 'top' | 'auto';  // crop anchor point
+  quality?: number;         // 1-100 (for lossy formats)
+  format?: 'webp' | 'avif' | 'png' | 'jpg';      // preferred output format
+  // extensible — add fields as rendering needs grow
+}
+```
+
+**No server-side preprocessing in v2** — display hints are consumed by the frontend to set CSS/`<img>` attributes and request appropriate sizes. The file is served as-is from S3/CDN. Server-side transforms (resize, reformat, derivative generation) are a future capability that could grow from these hints — if we ever add a processing pipeline, the hints are already there telling it what to generate. Cloudinary-style on-the-fly transforms are the north star but not a v2 requirement.
 
 **Until v2:** files are just files. No `purpose` field, no binding. Code that needs "the org logo" queries files directly by convention (e.g., folder path or ad-hoc).
 
