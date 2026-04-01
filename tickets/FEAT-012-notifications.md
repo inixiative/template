@@ -16,23 +16,74 @@ Build a typed app events system that bridges domain events to outgoing side effe
 
 ## Architecture
 
-### Three Layers
+### The Chain: Event → Handler → Adapter Class → Integrations
 
 ```
-Layer 1: App Events (typed domain events)
-  createAppEvent('inquiry.approved', payload)
+App Event                    Handler                      Adapter Class              Integrations
+(domain data)                (typed handoff callbacks)     (logic layer)              (delivery)
 
-Layer 2: Workflows (multi-step, potentially delayed reaction chains)
-  Each event triggers N workflows in parallel
-  Each workflow is a sequence of steps backed by BullMQ
+createAppEvent(              handler.email(event, ctx)     Email adapter class         Resend
+  'inquiry.approved',        → returns handoff:            → resolves targets          SES
+  payload                      { target, message, meta }   → checks preferences        Console
+)                                                          → applies rate limits
+                             handler.notify(event, ctx)    → logs/observes
+                             → returns handoff             → broadcasts to ALL
+                               { target, message, meta }     registered integrations
 
-Layer 3: Adapter Classes (delivery)
-  Each step hands off to an adapter class (email, websocket, notify, etc.)
-  Each class can have multiple registered adapters (Resend + SES under email)
-  All enabled adapters in a class fire (broadcast within class)
+                             handler.websocket(...)        Notify adapter class
+                             → returns handoff             → same pattern
+                               { target, message, meta }
+                                                           WebSocket adapter class
+                             handler.chat(...)             → same pattern
+                             → null (not declared)
+                             → SKIPPED                     Firehose (dataLake, observe)
+                                                           → no handoff needed
+                                                           → receives raw event always
 ```
 
-### Event → Workflows → Steps → Adapters
+**Three responsibilities, cleanly separated:**
+
+1. **App Event Handler** — Knows the domain. For each adapter class it cares about, returns a typed handoff: WHO to target, WHAT to send, and META for preferences/categorization. Does not know about adapters, preferences, retries, or delivery. Can use callbacks for flexible targeting logic (look up org admins, resolve a segment, etc.).
+
+2. **Adapter Class** — Knows the delivery category. Receives the typed handoff and owns the logic layer: resolves targets to concrete addresses, checks user communication preferences, applies rate limits, handles errors/retries, logs delivery. Then fans out to all registered integrations via broadcast-to-all pattern.
+
+3. **Integrations** — Knows one provider. Resend, Twilio, Slack SDK, etc. Receives the resolved, preference-checked, ready-to-deliver message and sends it. Multiple integrations per class (Resend + SES under email) all fire.
+
+### Handoff Shape (target + message + metadata)
+
+Each adapter class defines its own typed handoff, but they all share the same structure:
+
+```typescript
+// Email handoff — handler returns this, adapter class consumes it
+type EmailHandoff = {
+  target: { userIds: string[] } | { orgRole: { orgId: string; role: Role } } | { raw: string[] };
+  message: { template: string; data: Record<string, unknown> };
+  tags: string[];       // e.g. ['inquiry', 'approval'] — for preference filtering
+  category: string;     // e.g. 'transactional' | 'marketing' | 'system'
+};
+
+// Notify handoff
+type NotifyHandoff = {
+  target: { userIds: string[] };
+  message: { title: string; body: string; actionUrl?: string };
+  tags: string[];
+  category: string;
+};
+
+// WebSocket handoff
+type WSHandoff = {
+  target: { channels: string[] } | { userIds: string[] };
+  message: { data: Record<string, unknown> };
+  tags: string[];
+  category: string;
+};
+```
+
+The adapter class uses `target` to resolve recipients, `tags` and `category` to check communication preferences and apply filtering, and `message` for the actual content. The handler never touches preferences, never calls an adapter, never knows what integrations are registered.
+
+### Workflow Layer (on top of this)
+
+Events can also trigger N **workflows** in parallel — multi-step, potentially delayed reaction chains backed by BullMQ:
 
 ```
 createAppEvent('inquiry.approved', payload)
@@ -48,8 +99,10 @@ createAppEvent('inquiry.approved', payload)
   ├─ workflow: 'onboard-new-space'  (if type=createSpace)
   │    step 1: enqueue onboarding jobs
   │
-  └─ raw callbacks: websocket broadcast, webhook relay
+  └─ immediate handoffs: websocket broadcast, firehose
 ```
+
+Each workflow step ultimately produces the same typed handoff to an adapter class. The workflow just orchestrates timing and conditions around it.
 
 ---
 
@@ -93,37 +146,34 @@ The core design pattern follows the inquiry system: each event is a handler obje
 This is exactly how inquiry handlers work: `handleApprove` can do whatever it wants internally, but it returns `Partial<TResolution>` — the contract is in the return type. The inquiry infrastructure then handles the DB transaction, audit logging, status transition, and expiration clearing. The handler doesn't know about any of that.
 
 ```typescript
-// Each adapter class defines its native message type
-type EmailMessage = { to: string[]; template: string; data: Record<string, unknown> };
-type InAppNotification = { userIds: string[]; title: string; body: string; actionUrl?: string };
-type WSBroadcast = { channels: string[]; data: Record<string, unknown> };
-type ChatMessage = { channel: string; text: string; blocks?: unknown[] };
-type SmsMessage = { to: string[]; body: string };
-
 // The handler interface: one optional typed callback per adapter class
+// Each returns a typed handoff (target + message + metadata) or null to skip
 type AppEventHandler<T> = {
   schema: z.ZodType<T>;
-  email?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<EmailMessage | null>;
-  notify?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<InAppNotification | null>;
-  websocket?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<WSBroadcast | null>;
-  chat?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<ChatMessage | null>;
-  sms?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<SmsMessage | null>;
+  email?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<EmailHandoff | null>;
+  notify?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<NotifyHandoff | null>;
+  websocket?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<WSHandoff | null>;
+  chat?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<ChatHandoff | null>;
+  sms?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<SmsHandoff | null>;
   // Adapter classes not declared are skipped (unless firehose)
 };
 ```
 
 **Why typed handoff instead of raw callbacks:**
 
-| Concern | Raw callback (does everything) | Typed handoff (returns message) |
+The callback is flexible (async lookups, conditional logic, complex targeting), but the **typed return** constrains it to produce a handoff the adapter class knows how to process. The handler never imports an adapter, never calls `emailClient.send()`, never checks preferences. It returns `{ target, message, tags, category }` and the plumbing does the rest.
+
+| Concern | Raw callback (does everything) | Typed handoff (returns to adapter class) |
 |---------|-------------------------------|-------------------------------|
 | Retry logic | Each callback implements its own | Adapter class owns it uniformly |
 | Error handling | Inconsistent across events | Uniform per class |
 | Logging/observability | Maybe, maybe not | Adapter class always logs |
-| User preferences | Each callback checks (or forgets) | Adapter class checks once |
+| User preferences | Each callback checks (or forgets) | Adapter class checks via tags/category |
 | Rate limiting | Per callback | Per class |
-| Adapter fan-out | Callback knows about Resend + SES | Class broadcasts to all registered adapters |
+| Target resolution | Callback resolves emails itself | Adapter class resolves userIds → addresses |
+| Adapter fan-out | Callback knows about Resend + SES | Class broadcasts to all registered integrations |
 
-The callback is flexible (can do async lookups, conditional logic, complex targeting), but the **typed return** constrains it to produce something the adapter class knows how to deliver. This gives uniform behavior without sacrificing flexibility.
+This is the same pattern as inquiry handlers: `handleApprove` can do whatever it wants internally, but it returns `Partial<TResolution>`. The infrastructure handles transactions, audit logs, status transitions. The handler doesn't know about any of that.
 
 **Example handler:**
 
@@ -131,27 +181,58 @@ The callback is flexible (can do async lookups, conditional logic, complex targe
 const inquiryApprovedHandler: AppEventHandler<InquiryApprovedPayload> = {
   schema: inquiryApprovedSchema,
 
-  email: async (event, ctx) => {
-    const user = await ctx.db.user.findUnique({ where: { id: event.data.targetUserId } });
-    if (!user?.email) return null;
-    return { to: [user.email], template: 'inquiry-approved', data: { type: event.data.type } };
-  },
+  email: async (event) => ({
+    target: { userIds: [event.data.targetUserId] },
+    message: { template: 'inquiry-approved', data: { type: event.data.type } },
+    tags: ['inquiry', 'approval'],
+    category: 'transactional',
+  }),
 
   notify: async (event) => ({
-    userIds: [event.data.targetUserId],
-    title: 'Inquiry Approved',
-    body: `Your ${event.data.type} request was approved`,
-    actionUrl: `/inquiries/${event.data.inquiryId}`,
+    target: { userIds: [event.data.targetUserId] },
+    message: {
+      title: 'Inquiry Approved',
+      body: `Your ${event.data.type} request was approved`,
+      actionUrl: `/inquiries/${event.data.inquiryId}`,
+    },
+    tags: ['inquiry', 'approval'],
+    category: 'transactional',
   }),
 
   websocket: async (event) => ({
-    channels: [`user:${event.actorId}`, `org:${event.data.orgId}`],
-    data: { inquiryId: event.data.inquiryId, type: event.data.type },
+    target: { channels: [`user:${event.actorId}`, `org:${event.data.orgId}`] },
+    message: { data: { inquiryId: event.data.inquiryId, type: event.data.type } },
+    tags: ['inquiry'],
+    category: 'transactional',
   }),
 
   // sms, chat: not declared — skipped for this event
 };
 ```
+
+**The plumbing** (app event infrastructure, written once) wires handler callbacks to adapter classes:
+
+```typescript
+// Infrastructure connects each handler callback to its adapter class at startup
+for (const [eventType, handler] of appEventHandlers) {
+  if (handler.email) {
+    registerAppEvent(eventType, async (event) => {
+      const handoff = await handler.email(event, ctx);
+      if (!handoff) return;
+      await emailAdapterClass.deliver(handoff);
+      // emailAdapterClass.deliver() internally:
+      //   1. Resolves target userIds → email addresses
+      //   2. Checks user preferences against tags/category
+      //   3. Applies rate limiting
+      //   4. Logs the delivery attempt
+      //   5. Fans out to ALL registered integrations (Resend, SES, Console...)
+    });
+  }
+  // same for notify, websocket, chat, sms...
+}
+```
+
+The handler author never sees this plumbing. They write callbacks that return typed handoffs. The infrastructure connects everything.
 
 As patterns emerge across events (e.g., "look up org admins" repeating), extract **targeting helpers** — but don't abstract prematurely. Let the seams reveal themselves after 5-10 events exist.
 
