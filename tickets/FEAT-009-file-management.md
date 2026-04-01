@@ -291,7 +291,29 @@ ResourceBinding: {
 }
 ```
 
-`sourceModel = "Url"` follows the same pattern as `EmailOwnerModel.default` and `InquiryResourceModel.admin` — an enum value with no FK field in the registry. The `url` field is required when `sourceModel = "Url"` but isn't a foreign key — it's just a string validated at the app level.
+`sourceModel = "Url"` follows the same pattern as `EmailOwnerModel.default` and `InquiryResourceModel.admin` — an enum value with no FK field in the registry. The `url` field is required when `sourceModel = "Url"` but isn't a foreign key — it's validated via a custom rule in db middleware (same layer as the false polymorphism hook):
+
+```typescript
+// DB middleware — custom validation for ResourceBinding Url source
+// Runs alongside the false polymorphism hook on create/update
+{
+  model: 'ResourceBinding',
+  action: ['create', 'update'],
+  validate(data) {
+    if (data.sourceModel === 'Url') {
+      if (!data.url) throw new Error('ResourceBinding with sourceModel "Url" requires url');
+      if (data.fileId) throw new Error('ResourceBinding with sourceModel "Url" cannot have fileId');
+      // URL format validation (basic — protocol + domain)
+    }
+    if (data.sourceModel === 'File') {
+      if (data.url) throw new Error('ResourceBinding with sourceModel "File" cannot have url');
+      // fileId presence is enforced by the false polymorphism hook via fkMap
+    }
+  },
+}
+```
+
+The false polymorphism hook handles `File` → `fileId` via the registry. The custom rule handles `Url` → `url` plus cross-field exclusion (can't have both). One layer, one pass, same middleware.
 
 **Managed (`File`) vs external (`Url`):**
 
