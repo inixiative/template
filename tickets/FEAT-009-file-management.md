@@ -328,58 +328,109 @@ const key = `${file.path}/${file.filename}`;
 
 **S3 keys stay in sync with logical paths via a durable move job.**
 
-Moves are a multi-step process that can fail at any point. A `FileMoveJob` record
-makes the intent durable so it can be resumed from wherever it left off.
+Moves are a multi-step process that can fail at any point. A durable job record
+makes the intent resumable from wherever it left off.
+
+All durable file operations — moves, lazy copies, and future job types — share a single `FileJob` table with a `type` discriminator. One table, one sweeper, one reconciliation loop.
 
 ```prisma
-model FileMoveJob {
-  id        String   @id @default(uuid())
-  fileId    String
-  oldKey    String                        // before state — where S3 object is now
-  newKey    String                        // after state — where it should end up
-  oldPath   String
-  newPath   String
-  done      Boolean  @default(false)      // terminal flag
-  attempts  Int      @default(0)
-  error     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model FileJob {
+  id              String    @id @default(uuid())
+  type            String                          // "move" | "lazy_copy" (extensible for future ops)
+  fileId          String                          // the file being acted on (source for copy, subject for move)
+
+  // Shared fields — every job has a before/after S3 key pair
+  sourceKey       String                          // current S3 location (move: old key, copy: source key)
+  targetKey       String                          // desired S3 location (move: new key, copy: destination key)
+  sourcePath      String?                         // logical path before (move only)
+  targetPath      String?                         // logical path after (move only)
+
+  // Lazy copy specific (null for moves)
+  newFileId       String?                         // the snapshot File record (created upfront, status: "pending")
+  reason          String?                         // "access_revoked" | "access_expired" | "source_deleted"
+  triggeredBy     String?                         // userId who caused the revocation/deletion
+  dependentId     String?                         // granteeId who gets the copy
+  dependentModel  String?                         // "User" | "Organization" | "Space"
+
+  // Job lifecycle
+  done            Boolean   @default(false)       // terminal flag
+  attempts        Int       @default(0)
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 ```
 
-**Reconciliation — before/after is the whole contract:**
+**Why one table:**
+- Same durability contract (Postgres = intent, BullMQ = fast path, sweeper = safety net)
+- Same idempotent reconciliation philosophy (check actual state, converge)
+- One sweeper loop picks up all stalled jobs by type
+- New file operations (e.g., bulk copy, cross-scope adopt) just add a new `type` — no new table, no new sweeper
 
-The worker doesn't track intermediate flags. It checks actual state of S3 and DB
-against the before/after pair and does whatever's missing. Every action is
-idempotent. Safe to run unlimited times from any starting point.
+**Reconciliation — dispatch by type, each handler is idempotent:**
 
 ```typescript
-async function reconcileMoveJob(job: FileMoveJob, db, s3) {
-  // 1. Does new key exist in S3? No → copy it.
-  const newExists = await s3.headObject(job.newKey).catch(() => false);
-  if (!newExists) {
-    await s3.copyObject(job.oldKey, job.newKey);
-    if (!await s3.headObject(job.newKey).catch(() => false)) return; // retry next cycle
+async function reconcileFileJob(job: FileJob, db, s3) {
+  switch (job.type) {
+    case 'move': return reconcileMove(job, db, s3);
+    case 'lazy_copy': return reconcileLazyCopy(job, db, s3);
+    default: throw new Error(`Unknown FileJob type: ${job.type}`);
+  }
+}
+
+async function reconcileMove(job: FileJob, db, s3) {
+  // 1. Does target key exist in S3? No → copy it.
+  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
+  if (!targetExists) {
+    await s3.copyObject(job.sourceKey, job.targetKey);
+    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
   }
 
-  // 2. Does DB point to new key? No → swap it.
+  // 2. Does DB point to target key? No → swap it.
   const file = await db.file.findUnique({ where: { id: job.fileId } });
-  if (file.key !== job.newKey) {
+  if (file.key !== job.targetKey) {
     await db.file.update({
       where: { id: job.fileId },
-      data: { key: job.newKey, path: job.newPath },
+      data: { key: job.targetKey, path: job.targetPath },
     });
   }
 
-  // 3. Does old key still exist in S3? Yes → delete it.
-  await s3.deleteObject(job.oldKey);   // idempotent — no error if already gone
+  // 3. Does source key still exist in S3? Yes → delete it.
+  await s3.deleteObject(job.sourceKey);   // idempotent — no error if already gone
 
   // All three conditions met → done
-  await db.fileMoveJob.update({ where: { id: job.id }, data: { done: true } });
+  await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
+}
+
+async function reconcileLazyCopy(job: FileJob, db, s3) {
+  // 1. Does target key exist in S3? No → copy it.
+  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
+  if (!targetExists) {
+    await s3.copyObject(job.sourceKey, job.targetKey);
+    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
+  }
+
+  // 2. Is the new File record active? No → activate it.
+  const newFile = await db.file.findUnique({ where: { id: job.newFileId } });
+  if (newFile.status !== 'active') {
+    await db.file.update({
+      where: { id: job.newFileId },
+      data: { status: 'active' },
+    });
+  }
+
+  // 3. Are ResourceBindings repointed? No → repoint them.
+  await db.resourceBinding.updateMany({
+    where: { fileId: job.fileId, resourceOwnerId: job.dependentId },
+    data: { fileId: job.newFileId },
+  });
+
+  // All three conditions met → done
+  await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
 }
 ```
 
-**Three questions, three idempotent actions.** `oldKey`/`newKey` define the
+**Three questions, three idempotent actions.** `sourceKey`/`targetKey` define the
 desired state. The worker just converges reality toward it. If it crashes
 at any point, the next run re-checks and picks up where it left off.
 
@@ -397,16 +448,16 @@ at any point, the next run re-checks and picks up where it left off.
 ```
 Request path (fast):
   1. Postgres transaction:
-     - Create FileMoveJob (oldKey/newKey, oldPath/newPath)
+     - Create FileJob (type: "move", sourceKey/targetKey, sourcePath/targetPath)
      - File.path and File.key stay unchanged (reads work, S3 key valid)
-  2. Enqueue BullMQ job with FileMoveJob.id
-  3. BullMQ worker runs reconcileMoveJob:
+  2. Enqueue BullMQ job with FileJob.id
+  3. BullMQ worker runs reconcileFileJob → dispatches to reconcileMove:
      copy S3 → update File.path + File.key in DB → delete old S3 key
 
 Sweeper path (safety net):
   - Cron runs every N minutes (same sweeper as section 16)
-  - Picks up FileMoveJob records NOT in terminal state (done/failed)
-  - Advances from wherever they stopped
+  - Picks up FileJob records NOT in terminal state (done/failed)
+  - Dispatches by type — same reconciliation functions
   - Catches anything BullMQ drops (Redis flush, worker crash, lost job)
 ```
 
@@ -702,59 +753,9 @@ A new system folder per scope that holds lazy-copied files:
 
 Properties: `system: true`, `visibility: "visible"`. Users can see their preserved copies and move them elsewhere if they want. The folder is a landing zone, not a jail.
 
-#### FileLazyCopyJob (Durability)
+#### Durability
 
-Same durable job pattern as FileMoveJob — Postgres record is the intent, BullMQ is the fast path, sweeper catches anything dropped.
-
-```prisma
-model FileLazyCopyJob {
-  id              String   @id @default(uuid())
-  sourceFileId    String                        // original file being copied from
-  newFileId       String                        // the snapshot File record (created upfront, status: "pending")
-  sourceKey       String                        // S3 key to copy from
-  newKey          String                        // S3 key to copy to
-  reason          String                        // "access_revoked" | "access_expired" | "source_deleted"
-  triggeredBy     String                        // userId who caused the revocation/deletion
-  dependentId     String                        // granteeId who gets the copy
-  dependentModel  String                        // "User" | "Organization" | "Space"
-  done            Boolean  @default(false)
-  attempts        Int      @default(0)
-  error           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-```
-
-Reconciliation (idempotent, same philosophy as FileMoveJob):
-
-```typescript
-async function reconcileLazyCopyJob(job: FileLazyCopyJob, db, s3) {
-  // 1. Does new key exist in S3? No → copy it.
-  const newExists = await s3.headObject(job.newKey).catch(() => false);
-  if (!newExists) {
-    await s3.copyObject(job.sourceKey, job.newKey);
-    if (!await s3.headObject(job.newKey).catch(() => false)) return; // retry next cycle
-  }
-
-  // 2. Is the new File record active? No → activate it.
-  const newFile = await db.file.findUnique({ where: { id: job.newFileId } });
-  if (newFile.status !== 'active') {
-    await db.file.update({
-      where: { id: job.newFileId },
-      data: { status: 'active' },
-    });
-  }
-
-  // 3. Are ResourceBindings repointed? No → repoint them.
-  await db.resourceBinding.updateMany({
-    where: { fileId: job.sourceFileId, resourceOwnerId: job.dependentId },
-    data: { fileId: job.newFileId },
-  });
-
-  // All three conditions met → done
-  await db.fileLazyCopyJob.update({ where: { id: job.id }, data: { done: true } });
-}
-```
+Lazy copy uses the unified `FileJob` table (section 3.5) with `type: "lazy_copy"`. Same Postgres-as-intent, BullMQ fast path, sweeper safety net. The `reconcileLazyCopy` handler is defined alongside `reconcileMove` — one sweeper loop, one dispatch.
 
 #### UX indicators
 
@@ -776,15 +777,14 @@ Preserved copies must be clearly distinguishable from live files:
    b) Does User B's FilePermission have preserveOnRevoke = true?
 
 3. If yes to either:
-   a) Create FileLazyCopyJob record (durable intent — same pattern as FileMoveJob)
-   b) Create new File record owned by User B (status: "pending", snapshot fields populated)
-   c) Enqueue BullMQ job with FileLazyCopyJob.id
-   d) BullMQ worker (or sweeper fallback) runs reconcileLazyCopyJob:
+   a) Create new File record owned by User B (status: "pending", snapshot fields populated)
+   b) Create FileJob record (type: "lazy_copy", durable intent)
+   c) Enqueue BullMQ job with FileJob.id
+   d) BullMQ worker (or sweeper fallback) runs reconcileLazyCopy:
       - Copy S3 bytes to User B's __preserved/ folder
       - Repoint User B's ResourceBindings from File X → new snapshot File
       - Mark new File as active, mark job as done
-   Same durability model as FileMoveJob: Postgres record is source of truth,
-   BullMQ is the fast path, sweeper is the safety net. Fully idempotent.
+   Same unified FileJob table, same sweeper, fully idempotent.
 
 4. Revoke/expire/soft-delete proceeds as normal
    (User B's copy is independent — the original can be fully deleted)
@@ -1099,7 +1099,7 @@ Uses the existing split-detail pane component from the template.
 
 Models, upload/download, and the hard systems rules that everything else depends on.
 
-- [ ] Prisma models (File, Folder, FilePermission, FileMoveJob, FileLazyCopyJob)
+- [ ] Prisma models (File, Folder, FilePermission, FileJob)
 - [ ] S3 client service (system + user buckets) + NoopStorageClient
 - [ ] Materialized path builder + traversal helpers
 - [ ] System folder auto-creation hooks (org, space, org_user, user)
@@ -1114,12 +1114,12 @@ Models, upload/download, and the hard systems rules that everything else depends
 - [ ] Duplicate/collision handling (policy: allow same name, ids are canonical)
 - [ ] Delete/reference safety (cannot hard delete while bound or shared; soft delete only)
 - [ ] Trash lifecycle (soft delete → retention window → orphan sweeper hard deletes)
-- [ ] S3 reconciliation job (orphan sweeper — section 16)
+- [ ] S3 reconciliation job (orphan sweeper + FileJob sweeper — section 16)
 - [ ] File-specific audit events (upload, download, move, copy, share, delete, restore)
 - [ ] `preserveOnRevoke` field on FilePermission (default true)
 - [ ] `sourceFileId`, `snapshotAt`, `snapshotReason`, `snapshotBy` fields on File
 - [ ] `__preserved/` system folder auto-creation (on first lazy copy or with scope creation)
-- [ ] Lazy copy job (durable, idempotent — same pattern as FileMoveJob)
+- [ ] Lazy copy via unified FileJob (type: "lazy_copy", same table as moves)
 - [ ] Lazy copy trigger on FilePermission revoke/expire and File soft-delete
 - [ ] "Shared with me" virtual view query (FilePermission-based, folders + individual files)
 
@@ -1311,9 +1311,8 @@ S3 objects can become orphaned when moves fail partway, uploads are abandoned, o
 |-------------|-----------|--------|
 | **Stale pending uploads** | `File.status = "pending"` older than 1h | HEAD check → mark active or failed |
 | **Failed uploads** | `File.status = "failed"` older than 24h | Hard delete DB record + S3 object |
-| **Stalled move jobs** | `FileMoveJob.done = false`, `updatedAt` older than 5m | Run `reconcileMoveJob` (idempotent) |
-| **Stalled lazy copy jobs** | `FileLazyCopyJob.done = false`, `updatedAt` older than 5m | Run `reconcileLazyCopyJob` (idempotent) |
-| **Failed move jobs** | `FileMoveJob.done = false`, `error IS NOT NULL` | Alert for manual review; old key still works |
+| **Stalled file jobs** | `FileJob.done = false`, `updatedAt` older than 5m | Run `reconcileFileJob` — dispatches by type (idempotent) |
+| **Failed file jobs** | `FileJob.done = false`, `error IS NOT NULL` | Alert for manual review; source key still works |
 | **Move remnants** | S3 objects at old keys after completed moves | Cross-reference DB keys, delete unmatched |
 | **Soft-deleted files past retention** | `File.deletedAt` older than retention period | Hard delete DB record + S3 object |
 | **S3 objects with no DB record** | Periodic bucket scan vs File table | Quarantine (tag, don't delete immediately) → delete after grace period |
