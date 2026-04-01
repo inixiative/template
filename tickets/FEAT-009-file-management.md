@@ -621,6 +621,138 @@ Only regular members/viewers and cross-scope sharing require FilePermission reco
 - FilePermissions remain (for potential restore)
 - S3 objects NOT deleted immediately — cleanup job handles retention
 
+### Lazy Copy (Copy-on-Revoke)
+
+When a user is given access to a file they don't own, they can use it — bind it as a logo, reference it in a space, depend on it. Today that creates a tension: either you hard-copy the file immediately (independent but never updated) or you use a live pointer (stays current but breaks if access is revoked or the file is deleted).
+
+Lazy copy is a third semantic: **use the live original, but automatically create a local copy if the source becomes inaccessible.** The user stays up-to-date while access exists. If access is revoked or the file is deleted, dependent users get a snapshot copy so nothing breaks.
+
+**Why this should be the default:**
+- If a user had access, they could have copied the file at any time. Revoking access without preserving their dependencies just breaks things for no real gain.
+- The real value of revocation is cutting off *future* access, not retroactively removing what someone already built on.
+- Prevents broken ResourceBindings, missing logos, dead references — the kinds of silent failures that erode trust.
+
+#### Triggers
+
+Lazy copy fires when **any** of these occur and there are active dependents:
+
+| Event | What happens |
+|-------|-------------|
+| **FilePermission revoked** (`revokedAt` set) | Users/entities who lose access but have active dependencies get copies |
+| **FilePermission expired** (`expiresAt` passed) | Same — expiry is just automatic revocation |
+| **File soft-deleted** (`deletedAt` set) | All external dependents (anyone other than the storage owner) get copies |
+
+#### What counts as a dependent
+
+Two ways a user/entity can be a dependent:
+
+1. **Active ResourceBinding** (automatic) — if entity X has a ResourceBinding pointing at this file (logo, avatar, attachment, etc.), they're a dependent. This is the primary trigger — bindings would break without the copy.
+
+2. **`preserveOnRevoke` flag on FilePermission** (opt-in) — even without a ResourceBinding, a user can express "I want to keep watching this file, and if my access ever goes away, give me a copy." This is an option on the FilePermission itself — essentially a subscription to lazy copy.
+
+```prisma
+model FilePermission {
+  // ... existing fields ...
+  preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
+}
+```
+
+Default is `true` — opt-out rather than opt-in. Users who explicitly don't want preservation can set it to `false`.
+
+#### What the copy looks like
+
+The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
+
+| Field | Value |
+|-------|-------|
+| `organizationId` | Dependent's org (or null for personal) |
+| `uploadedBy` | System (not the original uploader) |
+| `folderId` | System folder: `__preserved/` within the dependent's scope |
+| `path` | `{dependent_scope}/__preserved/{file_id}/{filename}` |
+| `key` | Mirrors path (new S3 key, new bytes copied from original) |
+| `status` | `active` |
+| `sourceFileId` | Original file ID — provenance tracking |
+| `snapshotAt` | Timestamp when the copy was created |
+| `snapshotReason` | `access_revoked` \| `access_expired` \| `source_deleted` |
+| `snapshotBy` | userId who triggered the revocation/deletion (for audit) |
+
+New fields on File for provenance:
+
+```prisma
+model File {
+  // ... existing fields ...
+  sourceFileId     String?                          // if this is a lazy copy, the original file it came from
+  snapshotAt       DateTime?                        // when the copy was created (null = this is a live/original file)
+  snapshotReason   String?                          // "access_revoked" | "access_expired" | "source_deleted"
+  snapshotBy       String?                          // userId who triggered the event that caused the copy
+}
+```
+
+#### `__preserved/` system folder
+
+A new system folder per scope that holds lazy-copied files:
+
+| Scope | System folder | Auto-created |
+|-------|--------------|-------------|
+| User personal | `user_{id}/__preserved/` | On first lazy copy (or with user creation) |
+| Org-scoped user | `org_{id}/org_user_{id}/__preserved/` | On first lazy copy |
+| Org root | `org_{id}/__preserved/` | On first lazy copy |
+| Space | `org_{id}/space_{id}/__preserved/` | On first lazy copy |
+
+Properties: `system: true`, `visibility: "visible"`. Users can see their preserved copies and move them elsewhere if they want. The folder is a landing zone, not a jail.
+
+#### UX indicators
+
+Preserved copies must be clearly distinguishable from live files:
+
+- **Snapshot badge** — visual flag indicating "this is the last version you had access to"
+- **Reason label** — "Access revoked by [user] on [date]" or "Original file deleted by [user] on [date]" or "Access expired on [date]"
+- **Source reference** — link to the original file ID (may show as "no longer accessible" if the user truly can't see it anymore)
+- **No auto-update** — the file is frozen. If someone later re-grants access to the original, the user could choose to switch back to the live version and discard the snapshot.
+
+#### Revocation flow (with lazy copy)
+
+```
+1. Admin revokes FilePermission for User B on File X
+   (or: FilePermission expires, or File X is soft-deleted)
+
+2. System checks: does User B have active dependencies on File X?
+   a) Any ResourceBindings pointing at File X where the resource belongs to User B?
+   b) Does User B's FilePermission have preserveOnRevoke = true?
+
+3. If yes to either:
+   a) Create new File record owned by User B (snapshot fields populated)
+   b) Copy S3 bytes to User B's __preserved/ folder (via durable job, same pattern as FileMoveJob)
+   c) Repoint User B's ResourceBindings from File X → new snapshot File
+   d) Mark new File as active
+
+4. Revoke/expire/soft-delete proceeds as normal
+   (User B's copy is independent — the original can be fully deleted)
+```
+
+#### Interaction with soft-delete and hard-delete
+
+- **Soft delete** triggers lazy copy immediately — don't wait for hard delete, because the retention window is for the *owner* to restore, not for dependents to scramble.
+- **Hard delete** (orphan sweeper) should never encounter files with active external dependencies, because lazy copy already ran at soft-delete time. If it does (edge case), it should block and alert rather than silently break references.
+- The `__preserved/` copies are fully independent files — they follow normal lifecycle rules for their owner's scope.
+
+#### Audit events
+
+| Event | Data |
+|-------|------|
+| `file.lazy_copied` | sourceFileId, newFileId, reason, snapshotBy, dependentId |
+| `file.binding_repointed` | bindingId, oldFileId, newFileId, reason |
+
+### "Shared With Me" Virtual View
+
+Files and folders shared with a user (via FilePermission where the user is grantee) should appear in a navigable virtual view — similar to Google Drive's "Shared with me":
+
+- **Shared folders** appear as a normal folder structure that the user can browse, nested naturally.
+- **Shared individual files** (not inside a shared folder) appear in a flat list, since there's no parent folder context to display them in. Google Drive-style: a list of individually shared files with metadata about who shared them and when.
+- This is a **virtual view**, not a real folder — it's a query against FilePermission where `granteeId = userId` and `granteeModel = "User"`, filtered to active (not revoked, not expired).
+- Shared items are read-only or role-limited based on the FilePermission role.
+- The `__preserved/` folder contents (lazy copies) can also appear here with their snapshot badge, or in the user's own file tree — or both. The preserved files are real files the user owns, so they show up in normal browsing too.
+
 ---
 
 ## 7. Upload Flow (Presigned POST)
@@ -854,6 +986,9 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **Max folder depth** — unbounded? Or cap at N levels?
 - [ ] **System folder names** — what `__` system folders does each scope actually need?
 - [ ] **Cloudflare setup** — part of init script? Or manual DNS setup?
+- [ ] **Lazy copy quota** — do preserved copies count toward the recipient's storage quota? (Probably yes — they own the bytes now)
+- [ ] **Re-grant after lazy copy** — if access is re-granted to the original, should the UI prompt the user to switch back to live and discard the snapshot? Or keep both?
+- [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
 
 ### 12.1 UI Concept: Split-Pane File Browser
 
@@ -921,6 +1056,12 @@ Models, upload/download, and the hard systems rules that everything else depends
 - [ ] Trash lifecycle (soft delete → retention window → orphan sweeper hard deletes)
 - [ ] S3 reconciliation job (orphan sweeper — section 16)
 - [ ] File-specific audit events (upload, download, move, copy, share, delete, restore)
+- [ ] `preserveOnRevoke` field on FilePermission (default true)
+- [ ] `sourceFileId`, `snapshotAt`, `snapshotReason`, `snapshotBy` fields on File
+- [ ] `__preserved/` system folder auto-creation (on first lazy copy or with scope creation)
+- [ ] Lazy copy job (durable, idempotent — same pattern as FileMoveJob)
+- [ ] Lazy copy trigger on FilePermission revoke/expire and File soft-delete
+- [ ] "Shared with me" virtual view query (FilePermission-based, folders + individual files)
 
 ### Phase 2: Usage Layer + Workflow Integration
 
@@ -928,6 +1069,7 @@ ResourceBinding makes files useful in app workflows. This is the SaaS differenti
 
 - [ ] ResourceBinding model (usage layer — section 3.4)
 - [ ] ResourceBinding visibility (public/internal/unlisted)
+- [ ] ResourceBinding repointing on lazy copy (bindings follow the snapshot)
 - [ ] Cloudflare proxy for public files with caching + Cache-Tag purge
 - [ ] Public URL invalidation (Cache-Tag purge on binding removal)
 - [ ] Avatar/logo/banner upload → ResourceBinding (replace URL columns)
@@ -1273,6 +1415,8 @@ File-specific event types for the existing AuditLog system:
 | `file.hard_deleted` | fileId (permanent, by sweeper or admin) |
 | `file.publicized` | fileId, bindingId |
 | `file.unpublicized` | fileId, bindingId |
+| `file.lazy_copied` | sourceFileId, newFileId, reason, snapshotBy, dependentId |
+| `file.binding_repointed` | bindingId, oldFileId, newFileId, reason |
 
 ### Public URL Invalidation
 
