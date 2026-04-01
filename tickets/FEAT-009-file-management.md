@@ -48,6 +48,14 @@ Why three layers:
 - In Drive, "public" is a sharing permission on the file
 - Here, "public" is a property of a ResourceBinding — the same file can be public when bound as a logo and private when bound as an internal attachment
 
+**Intent — bidirectional visibility is the whole point:**
+
+Most SaaS apps treat files as write-once blobs. You upload, get a URL string, paste it into a column, and forget about it. The file and its usages are completely disconnected — the URL *is* the binding, and URLs don't know who's pointing at them. This leads to silent orphans (files nobody uses but nobody can safely delete), broken references (someone deletes a file and three pages lose their banner), and zero visibility in either direction ("what is this file doing?" / "where did this logo come from?").
+
+This system is designed so that **every file knows what it's doing, and every usage knows where it comes from.** File → ResourceBinding gives you "this image is used as a logo on 2 spaces, an attachment on 3 inquiries, and shared with 4 users." ResourceBinding → File gives you "the banner on this space was uploaded by Y, owned by org Z, and has 3 other usages elsewhere." This bidirectional graph is what makes delete safety, lazy copy, access revocation, and lifecycle management possible — you can't orphan silently because the system knows every reference.
+
+**When writing code against this system:** never store a raw URL string to reference a file. Always go through ResourceBinding. If something displays a file, there should be a binding. If there's no binding, the file isn't in use and can be safely cleaned up. This invariant is what keeps the graph complete. The one exception is URL-only bindings (external assets not managed in our storage) — these still go through ResourceBinding, they just don't have a File record behind them.
+
 ---
 
 ## 3. Data Model
@@ -227,12 +235,161 @@ When implemented, ResourceBinding will answer:
 - On what resource? (Organization, Space, User, Event, Inquiry — polymorphic)
 - Is it publicly exposed? (`visibility: internal | public | unlisted`)
 - In what order? (for galleries)
+- How should it be rendered in this context? (media — sizing, crop, etc.)
+- Is this a managed file or an external URL?
 
 **Key principles (for when this is built):**
 - Visibility lives on the binding, not the file or permission. Same file can be public as a logo and private as an attachment.
 - Swapping a logo = update binding to point at different File, not delete + re-upload
 - One File → many ResourceBindings
-- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File
+- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → resolve via `sourceModel` (File lookup or direct URL)
+- **File is optional.** A binding can reference a managed File (full lifecycle, access control, lazy copy) OR an external URL (no lifecycle management, just a pointer). This keeps ResourceBinding as the single source of truth for "what asset is used here" — even when the asset isn't in our storage. The invariant is: if something displays an asset, there's a binding. Always.
+
+```prisma
+model ResourceBinding {
+  id              String    @id @default(uuid())
+  sourceModel     ResourceBindingSourceModel @default(File) // "File" | "Url"
+  fileId          String?   @db.VarChar(36)       // FK to File — required when sourceModel = "File"
+  url             String?                         // external URL — required when sourceModel = "Url"
+  resourceType    String                          // "Organization" | "Space" | "User" | "Event" | "Inquiry" | ...
+  resourceId      String
+  bindingType     String                          // "logo" | "avatar" | "banner" | "attachment" | "cover" | "thumbnail" | "og:image" | "favicon"
+  visibility      String    @default("internal")  // "internal" | "public" | "unlisted"
+  order           Int       @default(0)           // for galleries, ordered lists
+  media           Json?                           // rendering data — dimensions, crop, format, quality
+  conditions      Json?                           // contextual rules — when/where this binding applies
+
+  createdBy       String                          // userId
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  file            File?     @relation(fields: [fileId], references: [id])
+
+  // False polymorphism on source — same pattern as Token.ownerModel, EmailTemplate.ownerModel
+  // sourceModel = "File" → fileId required (real FK with Prisma relation)
+  // sourceModel = "Url"  → url required, no FK (same as EmailOwnerModel.default — enum value with no FK)
+}
+
+enum ResourceBindingSourceModel {
+  File
+  Url
+}
+```
+
+**Registry entry:**
+```typescript
+ResourceBinding: {
+  axes: [
+    {
+      field: 'sourceModel',
+      fkMap: {
+        File: ['fileId'],    // real FK → File model
+        // Url: no FK — url field is required but not an FK (app-level validation)
+      },
+    },
+  ],
+}
+```
+
+`sourceModel = "Url"` follows the same pattern as `EmailOwnerModel.default` and `InquiryResourceModel.admin` — an enum value with no FK field in the registry. The `url` field is required when `sourceModel = "Url"` but isn't a foreign key — it's validated via a custom rule in db middleware (same layer as the false polymorphism hook):
+
+```typescript
+// DB middleware — custom validation for ResourceBinding Url source
+// Runs alongside the false polymorphism hook on create/update
+{
+  model: 'ResourceBinding',
+  action: ['create', 'update'],
+  validate(data) {
+    if (data.sourceModel === 'Url') {
+      if (!data.url) throw new Error('ResourceBinding with sourceModel "Url" requires url');
+      if (data.fileId) throw new Error('ResourceBinding with sourceModel "Url" cannot have fileId');
+      // URL format validation (basic — protocol + domain)
+    }
+    if (data.sourceModel === 'File') {
+      if (data.url) throw new Error('ResourceBinding with sourceModel "File" cannot have url');
+      // fileId presence is enforced by the false polymorphism hook via fkMap
+    }
+  },
+}
+```
+
+The false polymorphism hook handles `File` → `fileId` via the registry. The custom rule handles `Url` → `url` plus cross-field exclusion (can't have both). One layer, one pass, same middleware.
+
+**Managed (`File`) vs external (`Url`):**
+
+| | `sourceModel: File` | `sourceModel: Url` |
+|---|---|---|
+| Required field | `fileId` (FK to File) | `url` (string, app-validated) |
+| Access control | Full (FilePermission, ReBAC) | None — URL is public or externally managed |
+| Lazy copy on revoke | Yes | N/A — nothing to copy |
+| Delete safety | Yes — binding prevents orphaning | No — URL can 404 silently |
+| Lifecycle visibility | Full — "where is this file used?" | Partial — "this resource uses an external URL" |
+| `media`/`conditions` | Yes | Yes — rendering context still applies |
+| Migration path | — | Upload asset, set fileId, set sourceModel to File, clear url |
+
+The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system.
+
+**`media` and `conditions` on the binding:**
+
+The binding carries two kinds of contextual data — *how* to render and *when* to apply. Same instinct as Cloudinary's transformation URLs and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — these are properties of the *usage*, not the *file*. These apply to both managed files and external URLs.
+
+Two separate JSON fields, not one blob:
+
+**`media`** — how this binding should be rendered:
+
+```typescript
+// ResourceBinding.media (Json, nullable)
+{
+  width?: number;           // desired display width (px)
+  height?: number;          // desired display height (px)
+  crop?: 'fill' | 'fit' | 'cover' | 'contain';  // how to fit into dimensions
+  gravity?: 'center' | 'face' | 'top' | 'auto';  // crop anchor point
+  quality?: number;         // 1-100 (for lossy formats)
+  format?: 'webp' | 'avif' | 'png' | 'jpg';      // preferred output format
+  aspectRatio?: string;     // e.g. "16:9", "1:1"
+  // extensible — add fields as rendering needs grow
+}
+```
+
+**`conditions`** — when/where this binding applies:
+
+```typescript
+// ResourceBinding.conditions (Json, nullable)
+{
+  device?: 'mobile' | 'desktop' | 'tablet';       // device-specific bindings
+  viewport?: { min?: number; max?: number };       // breakpoint range (px)
+  locale?: string;          // locale-specific assets (e.g. "ja" logo variant)
+  darkMode?: boolean;       // light/dark mode variant
+  // extensible — feature flags, time-based rules, A/B variants, etc.
+}
+```
+
+**How they work together:** Multiple ResourceBindings can exist for the same `(resourceId, bindingType)` with different conditions. The consumer picks the best match:
+
+```
+Space "Design Team" has two logo bindings:
+  1. file: full-logo.svg,   media: { width: 200 },  conditions: { device: "desktop" }
+  2. file: icon-mark.svg,   media: { width: 40 },   conditions: { device: "mobile" }
+```
+
+When no conditions match or conditions is null, the binding is the default/fallback.
+
+**Typical usage by binding type:**
+
+Both fields are optional — most bindings are simple (just a file in a role). `media` and `conditions` are available when the use case calls for it.
+
+| Binding type | `media` | `conditions` | Example |
+|-------------|---------|-------------|---------|
+| `logo` | width, format | device, darkMode | Full wordmark on desktop, icon-mark on mobile, inverted on dark mode |
+| `avatar` | width, height, crop: fill | — | Always square, always cropped to face |
+| `banner` | width, height, aspectRatio | device, viewport | Hero image at 16:9 on desktop, taller crop on mobile |
+| `cover` | aspectRatio | — | Consistent ratio, browser scales |
+| `thumbnail` | width, height, quality | — | Small, lower quality for fast loading |
+| `attachment` | — | — | Just a file reference, no rendering concerns |
+| `og:image` | width: 1200, height: 630 | — | Fixed OG dimensions per spec |
+| `favicon` | width: 32, format: png | — | Fixed size/format |
+
+**No server-side preprocessing in v2** — `media` is consumed by the frontend to set CSS/`<img>` attributes and request appropriate sizes. The file is served as-is from S3/CDN. Server-side transforms (resize, reformat, derivative generation) are a future capability that could grow from `media` — if we ever add a processing pipeline, the rendering data is already there telling it what to generate. Cloudinary-style on-the-fly transforms are the north star but not a v2 requirement.
 
 **Until v2:** files are just files. No `purpose` field, no binding. Code that needs "the org logo" queries files directly by convention (e.g., folder path or ad-hoc).
 
@@ -328,58 +485,109 @@ const key = `${file.path}/${file.filename}`;
 
 **S3 keys stay in sync with logical paths via a durable move job.**
 
-Moves are a multi-step process that can fail at any point. A `FileMoveJob` record
-makes the intent durable so it can be resumed from wherever it left off.
+Moves are a multi-step process that can fail at any point. A durable job record
+makes the intent resumable from wherever it left off.
+
+All durable file operations — moves, lazy copies, and future job types — share a single `FileJob` table with a `type` discriminator. One table, one sweeper, one reconciliation loop.
 
 ```prisma
-model FileMoveJob {
-  id        String   @id @default(uuid())
-  fileId    String
-  oldKey    String                        // before state — where S3 object is now
-  newKey    String                        // after state — where it should end up
-  oldPath   String
-  newPath   String
-  done      Boolean  @default(false)      // terminal flag
-  attempts  Int      @default(0)
-  error     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model FileJob {
+  id              String    @id @default(uuid())
+  type            String                          // "move" | "lazy_copy" (extensible for future ops)
+  fileId          String                          // the file being acted on (source for copy, subject for move)
+
+  // Shared fields — every job has a before/after S3 key pair
+  sourceKey       String                          // current S3 location (move: old key, copy: source key)
+  targetKey       String                          // desired S3 location (move: new key, copy: destination key)
+  sourcePath      String?                         // logical path before (move only)
+  targetPath      String?                         // logical path after (move only)
+
+  // Lazy copy specific (null for moves)
+  newFileId       String?                         // the snapshot File record (created upfront, status: "pending")
+  reason          String?                         // "access_revoked" | "access_expired" | "source_deleted"
+  triggeredBy     String?                         // userId who caused the revocation/deletion
+  dependentId     String?                         // granteeId who gets the copy
+  dependentModel  String?                         // "User" | "Organization" | "Space"
+
+  // Job lifecycle
+  done            Boolean   @default(false)       // terminal flag
+  attempts        Int       @default(0)
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 ```
 
-**Reconciliation — before/after is the whole contract:**
+**Why one table:**
+- Same durability contract (Postgres = intent, BullMQ = fast path, sweeper = safety net)
+- Same idempotent reconciliation philosophy (check actual state, converge)
+- One sweeper loop picks up all stalled jobs by type
+- New file operations (e.g., bulk copy, cross-scope adopt) just add a new `type` — no new table, no new sweeper
 
-The worker doesn't track intermediate flags. It checks actual state of S3 and DB
-against the before/after pair and does whatever's missing. Every action is
-idempotent. Safe to run unlimited times from any starting point.
+**Reconciliation — dispatch by type, each handler is idempotent:**
 
 ```typescript
-async function reconcileMoveJob(job: FileMoveJob, db, s3) {
-  // 1. Does new key exist in S3? No → copy it.
-  const newExists = await s3.headObject(job.newKey).catch(() => false);
-  if (!newExists) {
-    await s3.copyObject(job.oldKey, job.newKey);
-    if (!await s3.headObject(job.newKey).catch(() => false)) return; // retry next cycle
+async function reconcileFileJob(job: FileJob, db, s3) {
+  switch (job.type) {
+    case 'move': return reconcileMove(job, db, s3);
+    case 'lazy_copy': return reconcileLazyCopy(job, db, s3);
+    default: throw new Error(`Unknown FileJob type: ${job.type}`);
+  }
+}
+
+async function reconcileMove(job: FileJob, db, s3) {
+  // 1. Does target key exist in S3? No → copy it.
+  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
+  if (!targetExists) {
+    await s3.copyObject(job.sourceKey, job.targetKey);
+    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
   }
 
-  // 2. Does DB point to new key? No → swap it.
+  // 2. Does DB point to target key? No → swap it.
   const file = await db.file.findUnique({ where: { id: job.fileId } });
-  if (file.key !== job.newKey) {
+  if (file.key !== job.targetKey) {
     await db.file.update({
       where: { id: job.fileId },
-      data: { key: job.newKey, path: job.newPath },
+      data: { key: job.targetKey, path: job.targetPath },
     });
   }
 
-  // 3. Does old key still exist in S3? Yes → delete it.
-  await s3.deleteObject(job.oldKey);   // idempotent — no error if already gone
+  // 3. Does source key still exist in S3? Yes → delete it.
+  await s3.deleteObject(job.sourceKey);   // idempotent — no error if already gone
 
   // All three conditions met → done
-  await db.fileMoveJob.update({ where: { id: job.id }, data: { done: true } });
+  await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
+}
+
+async function reconcileLazyCopy(job: FileJob, db, s3) {
+  // 1. Does target key exist in S3? No → copy it.
+  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
+  if (!targetExists) {
+    await s3.copyObject(job.sourceKey, job.targetKey);
+    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
+  }
+
+  // 2. Is the new File record active? No → activate it.
+  const newFile = await db.file.findUnique({ where: { id: job.newFileId } });
+  if (newFile.status !== 'active') {
+    await db.file.update({
+      where: { id: job.newFileId },
+      data: { status: 'active' },
+    });
+  }
+
+  // 3. Are ResourceBindings repointed? No → repoint them.
+  await db.resourceBinding.updateMany({
+    where: { fileId: job.fileId, resourceOwnerId: job.dependentId },
+    data: { fileId: job.newFileId },
+  });
+
+  // All three conditions met → done
+  await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
 }
 ```
 
-**Three questions, three idempotent actions.** `oldKey`/`newKey` define the
+**Three questions, three idempotent actions.** `sourceKey`/`targetKey` define the
 desired state. The worker just converges reality toward it. If it crashes
 at any point, the next run re-checks and picks up where it left off.
 
@@ -397,16 +605,16 @@ at any point, the next run re-checks and picks up where it left off.
 ```
 Request path (fast):
   1. Postgres transaction:
-     - Create FileMoveJob (oldKey/newKey, oldPath/newPath)
+     - Create FileJob (type: "move", sourceKey/targetKey, sourcePath/targetPath)
      - File.path and File.key stay unchanged (reads work, S3 key valid)
-  2. Enqueue BullMQ job with FileMoveJob.id
-  3. BullMQ worker runs reconcileMoveJob:
+  2. Enqueue BullMQ job with FileJob.id
+  3. BullMQ worker runs reconcileFileJob → dispatches to reconcileMove:
      copy S3 → update File.path + File.key in DB → delete old S3 key
 
 Sweeper path (safety net):
   - Cron runs every N minutes (same sweeper as section 16)
-  - Picks up FileMoveJob records NOT in terminal state (done/failed)
-  - Advances from wherever they stopped
+  - Picks up FileJob records NOT in terminal state (done/failed)
+  - Dispatches by type — same reconciliation functions
   - Catches anything BullMQ drops (Redis flush, worker crash, lost job)
 ```
 
@@ -620,6 +828,147 @@ Only regular members/viewers and cross-scope sharing require FilePermission reco
 - Files soft-deleted with the space (`deletedAt` set)
 - FilePermissions remain (for potential restore)
 - S3 objects NOT deleted immediately — cleanup job handles retention
+
+### Lazy Copy (Copy-on-Revoke)
+
+When a user is given access to a file they don't own, they can use it — bind it as a logo, reference it in a space, depend on it. Today that creates a tension: either you hard-copy the file immediately (independent but never updated) or you use a live pointer (stays current but breaks if access is revoked or the file is deleted).
+
+Lazy copy is a third semantic: **use the live original, but automatically create a local copy if the source becomes inaccessible.** The user stays up-to-date while access exists. If access is revoked or the file is deleted, dependent users get a snapshot copy so nothing breaks.
+
+**Why this should be the default:**
+- If a user had access, they could have copied the file at any time. Revoking access without preserving their dependencies just breaks things for no real gain.
+- The real value of revocation is cutting off *future* access, not retroactively removing what someone already built on.
+- Prevents broken ResourceBindings, missing logos, dead references — the kinds of silent failures that erode trust.
+
+#### Triggers
+
+Lazy copy fires when **any** of these occur and there are active dependents:
+
+| Event | What happens |
+|-------|-------------|
+| **FilePermission revoked** (`revokedAt` set) | Users/entities who lose access but have active dependencies get copies |
+| **FilePermission expired** (`expiresAt` passed) | Same — expiry is just automatic revocation |
+| **File soft-deleted** (`deletedAt` set) | All external dependents (anyone other than the storage owner) get copies |
+| **File hard-deleted** (orphan sweeper) | Safety net — if any unresolved dependencies remain, copy before destroying bytes |
+
+#### What counts as a dependent
+
+Two ways a user/entity can be a dependent:
+
+1. **Active ResourceBinding** (automatic) — if entity X has a ResourceBinding pointing at this file (logo, avatar, attachment, etc.), they're a dependent. This is the primary trigger — bindings would break without the copy.
+
+2. **`preserveOnRevoke` flag on FilePermission** (opt-in) — even without a ResourceBinding, a user can express "I want to keep watching this file, and if my access ever goes away, give me a copy." This is an option on the FilePermission itself — essentially a subscription to lazy copy.
+
+```prisma
+model FilePermission {
+  // ... existing fields ...
+  preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
+}
+```
+
+Default is `true` — opt-out rather than opt-in. Users who explicitly don't want preservation can set it to `false`.
+
+#### What the copy looks like
+
+The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
+
+| Field | Value |
+|-------|-------|
+| `organizationId` | Dependent's org (or null for personal) |
+| `uploadedBy` | System (not the original uploader) |
+| `folderId` | System folder: `__preserved/` within the dependent's scope |
+| `path` | `{dependent_scope}/__preserved/{file_id}/{filename}` |
+| `key` | Mirrors path (new S3 key, new bytes copied from original) |
+| `status` | `active` |
+| `sourceFileId` | Original file ID — provenance tracking |
+| `snapshotAt` | Timestamp when the copy was created |
+| `snapshotReason` | `access_revoked` \| `access_expired` \| `source_deleted` |
+| `snapshotBy` | userId who triggered the revocation/deletion (for audit) |
+
+New fields on File for provenance:
+
+```prisma
+model File {
+  // ... existing fields ...
+  sourceFileId     String?                          // if this is a lazy copy, the original file it came from
+  snapshotAt       DateTime?                        // when the copy was created (null = this is a live/original file)
+  snapshotReason   String?                          // "access_revoked" | "access_expired" | "source_deleted"
+  snapshotBy       String?                          // userId who triggered the event that caused the copy
+}
+```
+
+#### `__preserved/` system folder
+
+A new system folder per scope that holds lazy-copied files:
+
+| Scope | System folder | Auto-created |
+|-------|--------------|-------------|
+| User personal | `user_{id}/__preserved/` | On first lazy copy (or with user creation) |
+| Org-scoped user | `org_{id}/org_user_{id}/__preserved/` | On first lazy copy |
+| Org root | `org_{id}/__preserved/` | On first lazy copy |
+| Space | `org_{id}/space_{id}/__preserved/` | On first lazy copy |
+
+Properties: `system: true`, `visibility: "visible"`. Users can see their preserved copies and move them elsewhere if they want. The folder is a landing zone, not a jail.
+
+#### Durability
+
+Lazy copy uses the unified `FileJob` table (section 3.5) with `type: "lazy_copy"`. Same Postgres-as-intent, BullMQ fast path, sweeper safety net. The `reconcileLazyCopy` handler is defined alongside `reconcileMove` — one sweeper loop, one dispatch.
+
+#### UX indicators
+
+Preserved copies must be clearly distinguishable from live files:
+
+- **Snapshot badge** — visual flag indicating "this is the last version you had access to"
+- **Reason label** — "Access revoked by [user] on [date]" or "Original file deleted by [user] on [date]" or "Access expired on [date]"
+- **Source reference** — link to the original file ID (may show as "no longer accessible" if the user truly can't see it anymore)
+- **No auto-update** — the file is frozen. The snapshot is the user's copy now. No re-grant flow — if access is later re-granted to the original, the user simply has both: their owned snapshot and renewed live access. No automatic merging or prompting.
+
+#### Revocation flow (with lazy copy)
+
+```
+1. Admin revokes FilePermission for User B on File X
+   (or: FilePermission expires, or File X is soft-deleted)
+
+2. System checks: does User B have active dependencies on File X?
+   a) Any ResourceBindings pointing at File X where the resource belongs to User B?
+   b) Does User B's FilePermission have preserveOnRevoke = true?
+
+3. If yes to either:
+   a) Create new File record owned by User B (status: "pending", snapshot fields populated)
+   b) Create FileJob record (type: "lazy_copy", durable intent)
+   c) Enqueue BullMQ job with FileJob.id
+   d) BullMQ worker (or sweeper fallback) runs reconcileLazyCopy:
+      - Copy S3 bytes to User B's __preserved/ folder
+      - Repoint User B's ResourceBindings from File X → new snapshot File
+      - Mark new File as active, mark job as done
+   Same unified FileJob table, same sweeper, fully idempotent.
+
+4. Revoke/expire/soft-delete proceeds as normal
+   (User B's copy is independent — the original can be fully deleted)
+```
+
+#### Interaction with soft-delete and hard-delete
+
+- **Soft delete** (`deletedAt` set) triggers lazy copy immediately. The retention window is for the *owner* to restore, not for dependents to scramble. Dependents get their copies right away.
+- **Hard delete** (orphan sweeper) also triggers lazy copy as a safety net — if any active external dependencies still exist at hard-delete time (e.g., soft-delete trigger failed, edge case race, or file was hard-deleted without soft-delete), create copies before destroying the bytes. This is defense-in-depth: soft-delete is the primary trigger, hard-delete is the last chance. Never destroy S3 bytes while unresolved dependencies exist.
+- The `__preserved/` copies are fully independent files — they follow normal lifecycle rules for their owner's scope.
+
+#### Audit events
+
+| Event | Data |
+|-------|------|
+| `file.lazy_copied` | sourceFileId, newFileId, reason, snapshotBy, dependentId |
+| `file.binding_repointed` | bindingId, oldFileId, newFileId, reason |
+
+### "Shared With Me" Virtual View
+
+Files and folders shared with a user (via FilePermission where the user is grantee) should appear in a navigable virtual view — similar to Google Drive's "Shared with me":
+
+- **Shared folders** appear as a normal folder structure that the user can browse, nested naturally.
+- **Shared individual files** (not inside a shared folder) appear in a flat list, since there's no parent folder context to display them in. Google Drive-style: a list of individually shared files with metadata about who shared them and when.
+- This is a **virtual view**, not a real folder — it's a query against FilePermission where `granteeId = userId` and `granteeModel = "User"`, filtered to active (not revoked, not expired).
+- Shared items are read-only or role-limited based on the FilePermission role.
+- The `__preserved/` folder contents (lazy copies) can also appear here with their snapshot badge, or in the user's own file tree — or both. The preserved files are real files the user owns, so they show up in normal browsing too.
 
 ---
 
@@ -854,6 +1203,9 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **Max folder depth** — unbounded? Or cap at N levels?
 - [ ] **System folder names** — what `__` system folders does each scope actually need?
 - [ ] **Cloudflare setup** — part of init script? Or manual DNS setup?
+- [ ] **Lazy copy quota** — do preserved copies count toward the recipient's storage quota? (Probably yes — they own the bytes now)
+- [x] **Re-grant after lazy copy** — no special handling. User keeps their snapshot and gets live access back independently. No merging, no prompting.
+- [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
 
 ### 12.1 UI Concept: Split-Pane File Browser
 
@@ -904,7 +1256,7 @@ Uses the existing split-detail pane component from the template.
 
 Models, upload/download, and the hard systems rules that everything else depends on.
 
-- [ ] Prisma models (File, Folder, FilePermission, FileMoveJob)
+- [ ] Prisma models (File, Folder, FilePermission, FileJob)
 - [ ] S3 client service (system + user buckets) + NoopStorageClient
 - [ ] Materialized path builder + traversal helpers
 - [ ] System folder auto-creation hooks (org, space, org_user, user)
@@ -919,8 +1271,14 @@ Models, upload/download, and the hard systems rules that everything else depends
 - [ ] Duplicate/collision handling (policy: allow same name, ids are canonical)
 - [ ] Delete/reference safety (cannot hard delete while bound or shared; soft delete only)
 - [ ] Trash lifecycle (soft delete → retention window → orphan sweeper hard deletes)
-- [ ] S3 reconciliation job (orphan sweeper — section 16)
+- [ ] S3 reconciliation job (orphan sweeper + FileJob sweeper — section 16)
 - [ ] File-specific audit events (upload, download, move, copy, share, delete, restore)
+- [ ] `preserveOnRevoke` field on FilePermission (default true)
+- [ ] `sourceFileId`, `snapshotAt`, `snapshotReason`, `snapshotBy` fields on File
+- [ ] `__preserved/` system folder auto-creation (on first lazy copy or with scope creation)
+- [ ] Lazy copy via unified FileJob (type: "lazy_copy", same table as moves)
+- [ ] Lazy copy trigger on FilePermission revoke/expire and File soft-delete
+- [ ] "Shared with me" virtual view query (FilePermission-based, folders + individual files)
 
 ### Phase 2: Usage Layer + Workflow Integration
 
@@ -928,6 +1286,7 @@ ResourceBinding makes files useful in app workflows. This is the SaaS differenti
 
 - [ ] ResourceBinding model (usage layer — section 3.4)
 - [ ] ResourceBinding visibility (public/internal/unlisted)
+- [ ] ResourceBinding repointing on lazy copy (bindings follow the snapshot)
 - [ ] Cloudflare proxy for public files with caching + Cache-Tag purge
 - [ ] Public URL invalidation (Cache-Tag purge on binding removal)
 - [ ] Avatar/logo/banner upload → ResourceBinding (replace URL columns)
@@ -1109,8 +1468,8 @@ S3 objects can become orphaned when moves fail partway, uploads are abandoned, o
 |-------------|-----------|--------|
 | **Stale pending uploads** | `File.status = "pending"` older than 1h | HEAD check → mark active or failed |
 | **Failed uploads** | `File.status = "failed"` older than 24h | Hard delete DB record + S3 object |
-| **Stalled move jobs** | `FileMoveJob.done = false`, `updatedAt` older than 5m | Run `reconcileMoveJob` (idempotent) |
-| **Failed move jobs** | `FileMoveJob.done = false`, `error IS NOT NULL` | Alert for manual review; old key still works |
+| **Stalled file jobs** | `FileJob.done = false`, `updatedAt` older than 5m | Run `reconcileFileJob` — dispatches by type (idempotent) |
+| **Failed file jobs** | `FileJob.done = false`, `error IS NOT NULL` | Alert for manual review; source key still works |
 | **Move remnants** | S3 objects at old keys after completed moves | Cross-reference DB keys, delete unmatched |
 | **Soft-deleted files past retention** | `File.deletedAt` older than retention period | Hard delete DB record + S3 object |
 | **S3 objects with no DB record** | Periodic bucket scan vs File table | Quarantine (tag, don't delete immediately) → delete after grace period |
@@ -1273,6 +1632,8 @@ File-specific event types for the existing AuditLog system:
 | `file.hard_deleted` | fileId (permanent, by sweeper or admin) |
 | `file.publicized` | fileId, bindingId |
 | `file.unpublicized` | fileId, bindingId |
+| `file.lazy_copied` | sourceFileId, newFileId, reason, snapshotBy, dependentId |
+| `file.binding_repointed` | bindingId, oldFileId, newFileId, reason |
 
 ### Public URL Invalidation
 
