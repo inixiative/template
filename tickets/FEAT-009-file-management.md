@@ -48,6 +48,14 @@ Why three layers:
 - In Drive, "public" is a sharing permission on the file
 - Here, "public" is a property of a ResourceBinding — the same file can be public when bound as a logo and private when bound as an internal attachment
 
+**Intent — bidirectional visibility is the whole point:**
+
+Most SaaS apps treat files as write-once blobs. You upload, get a URL string, paste it into a column, and forget about it. The file and its usages are completely disconnected — the URL *is* the binding, and URLs don't know who's pointing at them. This leads to silent orphans (files nobody uses but nobody can safely delete), broken references (someone deletes a file and three pages lose their banner), and zero visibility in either direction ("what is this file doing?" / "where did this logo come from?").
+
+This system is designed so that **every file knows what it's doing, and every usage knows where it comes from.** File → ResourceBinding gives you "this image is used as a logo on 2 spaces, an attachment on 3 inquiries, and shared with 4 users." ResourceBinding → File gives you "the banner on this space was uploaded by Y, owned by org Z, and has 3 other usages elsewhere." This bidirectional graph is what makes delete safety, lazy copy, access revocation, and lifecycle management possible — you can't orphan silently because the system knows every reference.
+
+**When writing code against this system:** never store a raw URL string to reference a file. Always go through ResourceBinding. If something displays a file, there should be a binding. If there's no binding, the file isn't in use and can be safely cleaned up. This invariant is what keeps the graph complete. The one exception is URL-only bindings (external assets not managed in our storage) — these still go through ResourceBinding, they just don't have a File record behind them.
+
 ---
 
 ## 3. Data Model
@@ -227,28 +235,59 @@ When implemented, ResourceBinding will answer:
 - On what resource? (Organization, Space, User, Event, Inquiry — polymorphic)
 - Is it publicly exposed? (`visibility: internal | public | unlisted`)
 - In what order? (for galleries)
-- How should it be rendered in this context? (display hints — sizing, crop, etc.)
+- How should it be rendered in this context? (media — sizing, crop, etc.)
+- Is this a managed file or an external URL?
 
 **Key principles (for when this is built):**
 - Visibility lives on the binding, not the file or permission. Same file can be public as a logo and private as an attachment.
 - Swapping a logo = update binding to point at different File, not delete + re-upload
 - One File → many ResourceBindings
-- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File
-
-**`media` and `conditions` on the binding:**
-
-The binding carries two kinds of contextual data — *how* to render and *when* to apply. Same instinct as Cloudinary's transformation URLs and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — these are properties of the *usage*, not the *file*.
-
-Two separate JSON fields, not one blob:
+- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File or URL
+- **File is optional.** A binding can reference a managed File (full lifecycle, access control, lazy copy) OR an external URL (no lifecycle management, just a pointer). This keeps ResourceBinding as the single source of truth for "what asset is used here" — even when the asset isn't in our storage. The invariant is: if something displays an asset, there's a binding. Always.
 
 ```prisma
 model ResourceBinding {
-  // ... core fields (fileId, resourceType, resourceId, bindingType, visibility, order) ...
+  id              String    @id @default(uuid())
+  fileId          String?                         // null for URL-only bindings
+  url             String?                         // external URL — used when fileId is null
+  resourceType    String                          // "Organization" | "Space" | "User" | "Event" | "Inquiry" | ...
+  resourceId      String
+  bindingType     String                          // "logo" | "avatar" | "banner" | "attachment" | "cover" | "thumbnail" | "og:image" | "favicon"
+  visibility      String    @default("internal")  // "internal" | "public" | "unlisted"
+  order           Int       @default(0)           // for galleries, ordered lists
+  media           Json?                           // rendering data — dimensions, crop, format, quality
+  conditions      Json?                           // contextual rules — when/where this binding applies
 
-  media       Json?     // rendering data — dimensions, crop, format, quality
-  conditions  Json?     // contextual rules — when/where this binding applies
+  createdBy       String                          // userId
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  file            File?     @relation(fields: [fileId], references: [id])
+
+  // Exactly one of fileId or url must be set (app-level validation)
+  // fileId = managed asset (full lifecycle, access control, lazy copy, delete safety)
+  // url = external reference (no lifecycle, no access control, just a pointer)
 }
 ```
+
+**Managed (fileId) vs external (url):**
+
+| | Managed (`fileId`) | External (`url`) |
+|---|---|---|
+| Access control | Full (FilePermission, ReBAC) | None — URL is public or externally managed |
+| Lazy copy on revoke | Yes | N/A — nothing to copy |
+| Delete safety | Yes — binding prevents orphaning | No — URL can 404 silently |
+| Lifecycle visibility | Full — "where is this file used?" | Partial — "this resource uses an external URL" |
+| `media`/`conditions` | Yes | Yes — rendering context still applies |
+| Migration path | — | Upgrade to managed: upload the asset, set fileId, clear url |
+
+The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system.
+
+**`media` and `conditions` on the binding:**
+
+The binding carries two kinds of contextual data — *how* to render and *when* to apply. Same instinct as Cloudinary's transformation URLs and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — these are properties of the *usage*, not the *file*. These apply to both managed files and external URLs.
+
+Two separate JSON fields, not one blob:
 
 **`media`** — how this binding should be rendered:
 
