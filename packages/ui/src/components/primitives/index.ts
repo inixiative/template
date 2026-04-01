@@ -13,3 +13,5 @@ export * from './Select';
 export * from './SlugInput';
 export * from './Table';
 export * from './ThemeToggle';
+export * from './VirtualScroll';
+export * from './VirtualTable';

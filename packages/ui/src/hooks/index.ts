@@ -35,3 +35,10 @@ export { useMutation, useQuery } from './useQuery';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useThemePersistence } from './useThemePersistence';
 export { useValidateUniqueness } from './useValidateUniqueness';
+export {
+  type UseVirtualTableQueryOptions,
+  type UseVirtualTableQueryResult,
+  type VirtualTablePage,
+  type VirtualTablePageLocation,
+  useVirtualTableQuery,
+} from './useVirtualTableQuery';
