@@ -86,19 +86,71 @@ Adapter classes are delivery categories. Each class has a registry of adapters. 
 
 **Targeted classes** (email, sms, chat, notify, websocket) need per-event targeting logic that varies by event. Different events have fundamentally different audiences: a specific user, all org admins, all space members, a customer segment, etc.
 
-### Targeting: Callbacks First, Patterns Later
+### Handler Pattern: Typed Handoff Callbacks (like Inquiry Handlers)
 
-Each event uses **raw callbacks** for targeting per adapter class. No universal targeting envelope — the logic varies too much between events (single user vs all org admins vs a segment vs broadcast).
+The core design pattern follows the inquiry system: each event is a handler object with **named callback slots per adapter class**. Each callback's job is to transform the event payload into the adapter class's **native input type** and hand it off. The callback owns targeting and formatting. The adapter class owns delivery, retries, error handling, logging, preferences, and fan-out to all registered adapters.
+
+This is exactly how inquiry handlers work: `handleApprove` can do whatever it wants internally, but it returns `Partial<TResolution>` — the contract is in the return type. The inquiry infrastructure then handles the DB transaction, audit logging, status transition, and expiration clearing. The handler doesn't know about any of that.
 
 ```typescript
-defineAppEvent('inquiry.approved', {
+// Each adapter class defines its native message type
+type EmailMessage = { to: string[]; template: string; data: Record<string, unknown> };
+type InAppNotification = { userIds: string[]; title: string; body: string; actionUrl?: string };
+type WSBroadcast = { channels: string[]; data: Record<string, unknown> };
+type ChatMessage = { channel: string; text: string; blocks?: unknown[] };
+type SmsMessage = { to: string[]; body: string };
+
+// The handler interface: one optional typed callback per adapter class
+type AppEventHandler<T> = {
+  schema: z.ZodType<T>;
+  email?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<EmailMessage | null>;
+  notify?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<InAppNotification | null>;
+  websocket?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<WSBroadcast | null>;
+  chat?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<ChatMessage | null>;
+  sms?: (event: AppEventPayload<T>, ctx: EventContext) => Promise<SmsMessage | null>;
+  // Adapter classes not declared are skipped (unless firehose)
+};
+```
+
+**Why typed handoff instead of raw callbacks:**
+
+| Concern | Raw callback (does everything) | Typed handoff (returns message) |
+|---------|-------------------------------|-------------------------------|
+| Retry logic | Each callback implements its own | Adapter class owns it uniformly |
+| Error handling | Inconsistent across events | Uniform per class |
+| Logging/observability | Maybe, maybe not | Adapter class always logs |
+| User preferences | Each callback checks (or forgets) | Adapter class checks once |
+| Rate limiting | Per callback | Per class |
+| Adapter fan-out | Callback knows about Resend + SES | Class broadcasts to all registered adapters |
+
+The callback is flexible (can do async lookups, conditional logic, complex targeting), but the **typed return** constrains it to produce something the adapter class knows how to deliver. This gives uniform behavior without sacrificing flexibility.
+
+**Example handler:**
+
+```typescript
+const inquiryApprovedHandler: AppEventHandler<InquiryApprovedPayload> = {
   schema: inquiryApprovedSchema,
-  // per-class callbacks — full flexibility
-  email: async (e, ctx) => { /* resolve recipients, choose template */ },
-  notify: async (e, ctx) => { /* create in-app notifications */ },
-  websocket: async (e, ctx) => { /* broadcast to relevant channels */ },
-  // classes not listed are skipped (unless firehose)
-})
+
+  email: async (event, ctx) => {
+    const user = await ctx.db.user.findUnique({ where: { id: event.data.targetUserId } });
+    if (!user?.email) return null;
+    return { to: [user.email], template: 'inquiry-approved', data: { type: event.data.type } };
+  },
+
+  notify: async (event) => ({
+    userIds: [event.data.targetUserId],
+    title: 'Inquiry Approved',
+    body: `Your ${event.data.type} request was approved`,
+    actionUrl: `/inquiries/${event.data.inquiryId}`,
+  }),
+
+  websocket: async (event) => ({
+    channels: [`user:${event.actorId}`, `org:${event.data.orgId}`],
+    data: { inquiryId: event.data.inquiryId, type: event.data.type },
+  }),
+
+  // sms, chat: not declared — skipped for this event
+};
 ```
 
 As patterns emerge across events (e.g., "look up org admins" repeating), extract **targeting helpers** — but don't abstract prematurely. Let the seams reveal themselves after 5-10 events exist.
