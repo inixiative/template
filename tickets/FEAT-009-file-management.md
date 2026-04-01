@@ -248,8 +248,9 @@ When implemented, ResourceBinding will answer:
 ```prisma
 model ResourceBinding {
   id              String    @id @default(uuid())
-  sourceId        String                          // fileId OR the URL string itself
-  sourceModel     String    @default("File")      // "File" | "Url"
+  sourceModel     ResourceBindingSourceModel @default(File) // "File" | "Url"
+  fileId          String?   @db.VarChar(36)       // FK to File — required when sourceModel = "File"
+  url             String?                         // external URL — required when sourceModel = "Url"
   resourceType    String                          // "Organization" | "Space" | "User" | "Event" | "Inquiry" | ...
   resourceId      String
   bindingType     String                          // "logo" | "avatar" | "banner" | "attachment" | "cover" | "thumbnail" | "og:image" | "favicon"
@@ -262,25 +263,49 @@ model ResourceBinding {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  // False polymorphism on source — same pattern as Token.ownerModel, FilePermission.targetModel
-  // sourceModel = "File" → sourceId is a fileId (FK validated app-level)
-  // sourceModel = "Url"  → sourceId is the URL string itself (no FK, no File record)
+  file            File?     @relation(fields: [fileId], references: [id])
+
+  // False polymorphism on source — same pattern as Token.ownerModel, EmailTemplate.ownerModel
+  // sourceModel = "File" → fileId required (real FK with Prisma relation)
+  // sourceModel = "Url"  → url required, no FK (same as EmailOwnerModel.default — enum value with no FK)
+}
+
+enum ResourceBindingSourceModel {
+  File
+  Url
 }
 ```
 
+**Registry entry:**
+```typescript
+ResourceBinding: {
+  axes: [
+    {
+      field: 'sourceModel',
+      fkMap: {
+        File: ['fileId'],    // real FK → File model
+        // Url: no FK — url field is required but not an FK (app-level validation)
+      },
+    },
+  ],
+}
+```
+
+`sourceModel = "Url"` follows the same pattern as `EmailOwnerModel.default` and `InquiryResourceModel.admin` — an enum value with no FK field in the registry. The `url` field is required when `sourceModel = "Url"` but isn't a foreign key — it's just a string validated at the app level.
+
 **Managed (`File`) vs external (`Url`):**
 
-| | `sourceModel: "File"` | `sourceModel: "Url"` |
+| | `sourceModel: File` | `sourceModel: Url` |
 |---|---|---|
-| `sourceId` contains | File ID (UUID) | The URL string itself |
+| Required field | `fileId` (FK to File) | `url` (string, app-validated) |
 | Access control | Full (FilePermission, ReBAC) | None — URL is public or externally managed |
 | Lazy copy on revoke | Yes | N/A — nothing to copy |
 | Delete safety | Yes — binding prevents orphaning | No — URL can 404 silently |
 | Lifecycle visibility | Full — "where is this file used?" | Partial — "this resource uses an external URL" |
 | `media`/`conditions` | Yes | Yes — rendering context still applies |
-| Migration path | — | Upload asset, update sourceId to fileId, set sourceModel to "File" |
+| Migration path | — | Upload asset, set fileId, set sourceModel to File, clear url |
 
-The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system. Same false polymorphism pattern used throughout the codebase — one field pair, app-level validation, no nullable columns.
+The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system.
 
 **`media` and `conditions` on the binding:**
 
