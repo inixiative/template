@@ -242,14 +242,14 @@ When implemented, ResourceBinding will answer:
 - Visibility lives on the binding, not the file or permission. Same file can be public as a logo and private as an attachment.
 - Swapping a logo = update binding to point at different File, not delete + re-upload
 - One File → many ResourceBindings
-- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File or URL
+- `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → resolve via `sourceModel` (File lookup or direct URL)
 - **File is optional.** A binding can reference a managed File (full lifecycle, access control, lazy copy) OR an external URL (no lifecycle management, just a pointer). This keeps ResourceBinding as the single source of truth for "what asset is used here" — even when the asset isn't in our storage. The invariant is: if something displays an asset, there's a binding. Always.
 
 ```prisma
 model ResourceBinding {
   id              String    @id @default(uuid())
-  fileId          String?                         // null for URL-only bindings
-  url             String?                         // external URL — used when fileId is null
+  sourceId        String                          // fileId OR the URL string itself
+  sourceModel     String    @default("File")      // "File" | "Url"
   resourceType    String                          // "Organization" | "Space" | "User" | "Event" | "Inquiry" | ...
   resourceId      String
   bindingType     String                          // "logo" | "avatar" | "banner" | "attachment" | "cover" | "thumbnail" | "og:image" | "favicon"
@@ -262,26 +262,25 @@ model ResourceBinding {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  file            File?     @relation(fields: [fileId], references: [id])
-
-  // Exactly one of fileId or url must be set (app-level validation)
-  // fileId = managed asset (full lifecycle, access control, lazy copy, delete safety)
-  // url = external reference (no lifecycle, no access control, just a pointer)
+  // False polymorphism on source — same pattern as Token.ownerModel, FilePermission.targetModel
+  // sourceModel = "File" → sourceId is a fileId (FK validated app-level)
+  // sourceModel = "Url"  → sourceId is the URL string itself (no FK, no File record)
 }
 ```
 
-**Managed (fileId) vs external (url):**
+**Managed (`File`) vs external (`Url`):**
 
-| | Managed (`fileId`) | External (`url`) |
+| | `sourceModel: "File"` | `sourceModel: "Url"` |
 |---|---|---|
+| `sourceId` contains | File ID (UUID) | The URL string itself |
 | Access control | Full (FilePermission, ReBAC) | None — URL is public or externally managed |
 | Lazy copy on revoke | Yes | N/A — nothing to copy |
 | Delete safety | Yes — binding prevents orphaning | No — URL can 404 silently |
 | Lifecycle visibility | Full — "where is this file used?" | Partial — "this resource uses an external URL" |
 | `media`/`conditions` | Yes | Yes — rendering context still applies |
-| Migration path | — | Upgrade to managed: upload the asset, set fileId, clear url |
+| Migration path | — | Upload asset, update sourceId to fileId, set sourceModel to "File" |
 
-The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system.
+The external URL path is a pragmatic escape hatch — not everything needs to be a managed file. But the binding still exists, so you still have visibility into "what asset does this resource use?" and you have a clear migration path when someone wants to bring an external asset into the system. Same false polymorphism pattern used throughout the codebase — one field pair, app-level validation, no nullable columns.
 
 **`media` and `conditions` on the binding:**
 
