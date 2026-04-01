@@ -641,6 +641,7 @@ Lazy copy fires when **any** of these occur and there are active dependents:
 | **FilePermission revoked** (`revokedAt` set) | Users/entities who lose access but have active dependencies get copies |
 | **FilePermission expired** (`expiresAt` passed) | Same — expiry is just automatic revocation |
 | **File soft-deleted** (`deletedAt` set) | All external dependents (anyone other than the storage owner) get copies |
+| **File hard-deleted** (orphan sweeper) | Safety net — if any unresolved dependencies remain, copy before destroying bytes |
 
 #### What counts as a dependent
 
@@ -732,8 +733,8 @@ Preserved copies must be clearly distinguishable from live files:
 
 #### Interaction with soft-delete and hard-delete
 
-- **Soft delete** triggers lazy copy immediately — don't wait for hard delete, because the retention window is for the *owner* to restore, not for dependents to scramble.
-- **Hard delete** (orphan sweeper) should never encounter files with active external dependencies, because lazy copy already ran at soft-delete time. If it does (edge case), it should block and alert rather than silently break references.
+- **Soft delete** (`deletedAt` set) triggers lazy copy immediately. The retention window is for the *owner* to restore, not for dependents to scramble. Dependents get their copies right away.
+- **Hard delete** (orphan sweeper) also triggers lazy copy as a safety net — if any active external dependencies still exist at hard-delete time (e.g., soft-delete trigger failed, edge case race, or file was hard-deleted without soft-delete), create copies before destroying the bytes. This is defense-in-depth: soft-delete is the primary trigger, hard-delete is the last chance. Never destroy S3 bytes while unresolved dependencies exist.
 - The `__preserved/` copies are fully independent files — they follow normal lifecycle rules for their owner's scope.
 
 #### Audit events
