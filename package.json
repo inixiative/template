@@ -57,6 +57,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
+    "@lightpanda/browser": "^1.2.0",
+    "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",
     "@tanstack/router-generator": "^1.166.2",
     "@tanstack/router-plugin": "^1.166.2",
