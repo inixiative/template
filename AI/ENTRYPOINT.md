@@ -14,26 +14,22 @@ Canonical instructions for all coding agents in this repository.
 
 ## 0.1. Decomposition by Default
 
-Do not take shortcuts that collapse distinct concerns into one place.
+Before undertaking any task or planning any approach, decompose first. Do not jump to implementation. Break the problem into its atomic concerns before deciding how to solve it.
 
-**Before adding a field, column, or model**, decompose:
-- Who owns this data?
-- Who controls access to it?
-- Who consumes it, and in what context?
-
-If the answers are different entities or different contexts, they are different models. Never merge distinct concerns into one model for convenience — the convenience is temporary, the coupling is permanent.
-
-**Before writing any implementation**, interrogate the operation:
-- What are the atomic steps? Break the operation into its smallest independent parts.
+**Interrogate the problem:**
+- What are the distinct concerns here? (ownership, access, usage, lifecycle, rendering, etc.)
+- What are the atomic steps of the operation?
 - Which parts change independently? Those are separate responsibilities.
 - Which parts have different lifecycles? (created at different times, deleted at different times, owned by different entities) Those are separate records.
+- Who owns this data? Who controls access to it? Who consumes it, and in what context? If the answers differ, they are different models.
 
-**The lazy instinct to resist:**
+**The lazy instincts to resist:**
 - "Just add a field" — stop. Is this the same concern as the model you're modifying, or a new concern wearing the same clothes?
 - "Just store the URL" — stop. Is something else going to need to know about this reference? Then it's a binding, not a string.
 - "Just copy the logic" — stop. Is this the same operation in a different context, or a genuinely different operation? Same operation = shared abstraction. Different operation = keep separate even if they look similar.
+- "Just put it all in one table/function/component" — stop. Convenience now is coupling later.
 
-When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
+Never merge distinct concerns into one place for convenience — the convenience is temporary, the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
 
 ## 1. Mandatory Task Intake (Always)
 
