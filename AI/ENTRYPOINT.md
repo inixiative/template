@@ -31,6 +31,30 @@ Before undertaking any task or planning any approach, decompose first. Do not ju
 
 Never merge distinct concerns into one place for convenience — the convenience is temporary, the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
 
+## 0.2. Plan Review — Devil's Advocate
+
+After forming a plan but before executing, critically review it. The goal is **refined minimal but deep** — not the simplest thing, not the most comprehensive thing, but exactly decomposed enough to handle real consequences without overbuilding.
+
+Run a devil's advocate pass on your own plan. For non-trivial tasks, use a sub-agent to stress-test the plan independently. Ask:
+
+**Is this lazy-minimal or refined-minimal?**
+- What breaks at the boundaries of this plan? (revocation, deletion, access changes, time, ownership transfer)
+- What's the user's actual experience when this interacts with other parts of the system?
+- Did I stop at the obvious solution, or did I follow the consequences one step further?
+- Is something missing that will silently fail or orphan later?
+
+**Is this speculative-complex or necessarily-complex?**
+- Am I building for a hypothetical future, or for a real consequence I can name?
+- Can I remove a piece of this plan and still handle the real cases?
+- Am I adding layers because the problem requires them, or because it feels thorough?
+
+**Surface, don't solve.** If the review reveals a gap or a question, surface it to the user as a concrete question before proceeding. Do not autonomously expand scope — ask whether the gap matters. The value is in catching the unknown unknowns early, not in inflating the plan.
+
+Example of what to surface:
+- "This plan handles upload and download, but what happens to consumers of this file if it gets deleted while they depend on it?"
+- "This adds the field to the existing model, but access control and rendering context change independently — should these be separate concerns?"
+- "This works for the single-user case, but what happens when an org admin revokes access that affects 50 users with active bindings?"
+
 ## 1. Mandatory Task Intake (Always)
 
 Before editing, restate:
