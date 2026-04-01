@@ -367,13 +367,25 @@ The template ships with all adapter class keys visible but noop/null for unconfi
 - Digest step (aggregation job)
 
 ### Phase 4: In-App Notifications
-- Notification DB schema (userId, title, body, read/unread, type, actionUrl)
-- CRUD API endpoints
-- Notification center UI component
-- WebSocket real-time delivery
-- Read/unread, bulk actions, filtering
+The `notify` adapter class. Handler returns `NotifyHandoff`, adapter class creates DB records and pushes via WebSocket for real-time delivery. Frontend `useAppEvents` hook already exists.
 
-### Phase 5: Optional Novu Adapter
+- Notification DB schema (userId, title, body, read/unread, type, actionUrl, tags, category)
+- CRUD API endpoints (list, markRead, markAllRead, dismiss)
+- Notification center UI component (bell icon → dropdown)
+- WebSocket real-time delivery (push on create, sync read state across tabs)
+- Read/unread, bulk actions, filtering by tags/category
+- Preference checks via tags/category (user opts out of `marketing` → notify adapter skips)
+
+### Phase 5: Email Delivery Tracking (Open/Click)
+Tracking is a feedback loop — signals come back from the email provider after delivery. This lives entirely in the email adapter class, not in event handlers.
+
+- **Outbound**: Email adapter class embeds tracking pixels and rewrites links with tracking URLs
+- **Inbound**: Provider webhooks (Resend, SES, SendGrid all support this) POST back to our API
+- **Recording**: Store delivery events (sent, delivered, opened, clicked, bounced) per message
+- **Feedback as events**: Inbound tracking signals become app events themselves (`email.opened`, `email.clicked`, `email.bounced`) — can trigger further workflows (e.g., "if not opened after 3 days, send SMS")
+- **Handler doesn't know**: Tracking is invisible to the event handler. The handler returns an `EmailHandoff`, the adapter class adds tracking automatically.
+
+### Phase 6: Optional Novu Adapter
 - `NovuWorkflowEngine` adapter for teams wanting the full product
 - Maps workflow definitions to `novu.trigger()` calls
 - Provides visual editor, subscriber preferences, drop-in Inbox
