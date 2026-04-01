@@ -702,6 +702,60 @@ A new system folder per scope that holds lazy-copied files:
 
 Properties: `system: true`, `visibility: "visible"`. Users can see their preserved copies and move them elsewhere if they want. The folder is a landing zone, not a jail.
 
+#### FileLazyCopyJob (Durability)
+
+Same durable job pattern as FileMoveJob — Postgres record is the intent, BullMQ is the fast path, sweeper catches anything dropped.
+
+```prisma
+model FileLazyCopyJob {
+  id              String   @id @default(uuid())
+  sourceFileId    String                        // original file being copied from
+  newFileId       String                        // the snapshot File record (created upfront, status: "pending")
+  sourceKey       String                        // S3 key to copy from
+  newKey          String                        // S3 key to copy to
+  reason          String                        // "access_revoked" | "access_expired" | "source_deleted"
+  triggeredBy     String                        // userId who caused the revocation/deletion
+  dependentId     String                        // granteeId who gets the copy
+  dependentModel  String                        // "User" | "Organization" | "Space"
+  done            Boolean  @default(false)
+  attempts        Int      @default(0)
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+```
+
+Reconciliation (idempotent, same philosophy as FileMoveJob):
+
+```typescript
+async function reconcileLazyCopyJob(job: FileLazyCopyJob, db, s3) {
+  // 1. Does new key exist in S3? No → copy it.
+  const newExists = await s3.headObject(job.newKey).catch(() => false);
+  if (!newExists) {
+    await s3.copyObject(job.sourceKey, job.newKey);
+    if (!await s3.headObject(job.newKey).catch(() => false)) return; // retry next cycle
+  }
+
+  // 2. Is the new File record active? No → activate it.
+  const newFile = await db.file.findUnique({ where: { id: job.newFileId } });
+  if (newFile.status !== 'active') {
+    await db.file.update({
+      where: { id: job.newFileId },
+      data: { status: 'active' },
+    });
+  }
+
+  // 3. Are ResourceBindings repointed? No → repoint them.
+  await db.resourceBinding.updateMany({
+    where: { fileId: job.sourceFileId, resourceOwnerId: job.dependentId },
+    data: { fileId: job.newFileId },
+  });
+
+  // All three conditions met → done
+  await db.fileLazyCopyJob.update({ where: { id: job.id }, data: { done: true } });
+}
+```
+
 #### UX indicators
 
 Preserved copies must be clearly distinguishable from live files:
@@ -709,7 +763,7 @@ Preserved copies must be clearly distinguishable from live files:
 - **Snapshot badge** — visual flag indicating "this is the last version you had access to"
 - **Reason label** — "Access revoked by [user] on [date]" or "Original file deleted by [user] on [date]" or "Access expired on [date]"
 - **Source reference** — link to the original file ID (may show as "no longer accessible" if the user truly can't see it anymore)
-- **No auto-update** — the file is frozen. If someone later re-grants access to the original, the user could choose to switch back to the live version and discard the snapshot.
+- **No auto-update** — the file is frozen. The snapshot is the user's copy now. No re-grant flow — if access is later re-granted to the original, the user simply has both: their owned snapshot and renewed live access. No automatic merging or prompting.
 
 #### Revocation flow (with lazy copy)
 
@@ -722,10 +776,15 @@ Preserved copies must be clearly distinguishable from live files:
    b) Does User B's FilePermission have preserveOnRevoke = true?
 
 3. If yes to either:
-   a) Create new File record owned by User B (snapshot fields populated)
-   b) Copy S3 bytes to User B's __preserved/ folder (via durable job, same pattern as FileMoveJob)
-   c) Repoint User B's ResourceBindings from File X → new snapshot File
-   d) Mark new File as active
+   a) Create FileLazyCopyJob record (durable intent — same pattern as FileMoveJob)
+   b) Create new File record owned by User B (status: "pending", snapshot fields populated)
+   c) Enqueue BullMQ job with FileLazyCopyJob.id
+   d) BullMQ worker (or sweeper fallback) runs reconcileLazyCopyJob:
+      - Copy S3 bytes to User B's __preserved/ folder
+      - Repoint User B's ResourceBindings from File X → new snapshot File
+      - Mark new File as active, mark job as done
+   Same durability model as FileMoveJob: Postgres record is source of truth,
+   BullMQ is the fast path, sweeper is the safety net. Fully idempotent.
 
 4. Revoke/expire/soft-delete proceeds as normal
    (User B's copy is independent — the original can be fully deleted)
@@ -988,7 +1047,7 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **System folder names** — what `__` system folders does each scope actually need?
 - [ ] **Cloudflare setup** — part of init script? Or manual DNS setup?
 - [ ] **Lazy copy quota** — do preserved copies count toward the recipient's storage quota? (Probably yes — they own the bytes now)
-- [ ] **Re-grant after lazy copy** — if access is re-granted to the original, should the UI prompt the user to switch back to live and discard the snapshot? Or keep both?
+- [x] **Re-grant after lazy copy** — no special handling. User keeps their snapshot and gets live access back independently. No merging, no prompting.
 - [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
 
 ### 12.1 UI Concept: Split-Pane File Browser
@@ -1040,7 +1099,7 @@ Uses the existing split-detail pane component from the template.
 
 Models, upload/download, and the hard systems rules that everything else depends on.
 
-- [ ] Prisma models (File, Folder, FilePermission, FileMoveJob)
+- [ ] Prisma models (File, Folder, FilePermission, FileMoveJob, FileLazyCopyJob)
 - [ ] S3 client service (system + user buckets) + NoopStorageClient
 - [ ] Materialized path builder + traversal helpers
 - [ ] System folder auto-creation hooks (org, space, org_user, user)
@@ -1253,6 +1312,7 @@ S3 objects can become orphaned when moves fail partway, uploads are abandoned, o
 | **Stale pending uploads** | `File.status = "pending"` older than 1h | HEAD check → mark active or failed |
 | **Failed uploads** | `File.status = "failed"` older than 24h | Hard delete DB record + S3 object |
 | **Stalled move jobs** | `FileMoveJob.done = false`, `updatedAt` older than 5m | Run `reconcileMoveJob` (idempotent) |
+| **Stalled lazy copy jobs** | `FileLazyCopyJob.done = false`, `updatedAt` older than 5m | Run `reconcileLazyCopyJob` (idempotent) |
 | **Failed move jobs** | `FileMoveJob.done = false`, `error IS NOT NULL` | Alert for manual review; old key still works |
 | **Move remnants** | S3 objects at old keys after completed moves | Cross-reference DB keys, delete unmatched |
 | **Soft-deleted files past retention** | `File.deletedAt` older than retention period | Hard delete DB record + S3 object |
