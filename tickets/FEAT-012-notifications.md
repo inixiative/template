@@ -367,14 +367,18 @@ The template ships with all adapter class keys visible but noop/null for unconfi
 - Digest step (aggregation job)
 
 ### Phase 4: In-App Notifications
-The `notify` adapter class. Handler returns `NotifyHandoff`, adapter class creates DB records and pushes via WebSocket for real-time delivery. Frontend `useAppEvents` hook already exists.
+The `notify` adapter class. Handler returns `NotifyHandoff`, adapter class writes to Redis and pushes via WebSocket for real-time delivery. Frontend `useAppEvents` hook already exists.
 
-- Notification DB schema (userId, title, body, read/unread, type, actionUrl, tags, category)
-- CRUD API endpoints (list, markRead, markAllRead, dismiss)
+**Storage: Redis, not Postgres.** Notifications are ephemeral UI state, not business records. The durable record is the app event itself (audit log captures that). Trying to make notifications durable is trying to make them do too much — you end up with write-heavy read-state updates, merge/digest SQL, cleanup jobs, and schema migrations for what is essentially a transient "hey, look at this."
+
+- Redis sorted set per user (score = timestamp, auto-expire via TTL)
+- Read/dismiss state lives in Redis only — no Postgres writes on "mark as read"
+- API endpoints (list, markRead, markAllRead, dismiss) — all Redis operations
 - Notification center UI component (bell icon → dropdown)
-- WebSocket real-time delivery (push on create, sync read state across tabs)
-- Read/unread, bulk actions, filtering by tags/category
+- WebSocket push on create, sync read state across tabs
+- Filtering by tags/category
 - Preference checks via tags/category (user opts out of `marketing` → notify adapter skips)
+- Merge/digest handled by the adapter class in Redis before notification is created
 
 ### Phase 5: Email Delivery Tracking (Open/Click)
 Tracking is a feedback loop — signals come back from the email provider after delivery. This lives entirely in the email adapter class, not in event handlers.
