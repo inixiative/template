@@ -289,6 +289,21 @@ Space "Design Team" has two logo bindings:
 
 When no conditions match or conditions is null, the binding is the default/fallback.
 
+**Typical usage by binding type:**
+
+Both fields are optional — most bindings are simple (just a file in a role). `media` and `conditions` are available when the use case calls for it.
+
+| Binding type | `media` | `conditions` | Example |
+|-------------|---------|-------------|---------|
+| `logo` | width, format | device, darkMode | Full wordmark on desktop, icon-mark on mobile, inverted on dark mode |
+| `avatar` | width, height, crop: fill | — | Always square, always cropped to face |
+| `banner` | width, height, aspectRatio | device, viewport | Hero image at 16:9 on desktop, taller crop on mobile |
+| `cover` | aspectRatio | — | Consistent ratio, browser scales |
+| `thumbnail` | width, height, quality | — | Small, lower quality for fast loading |
+| `attachment` | — | — | Just a file reference, no rendering concerns |
+| `og:image` | width: 1200, height: 630 | — | Fixed OG dimensions per spec |
+| `favicon` | width: 32, format: png | — | Fixed size/format |
+
 **No server-side preprocessing in v2** — `media` is consumed by the frontend to set CSS/`<img>` attributes and request appropriate sizes. The file is served as-is from S3/CDN. Server-side transforms (resize, reformat, derivative generation) are a future capability that could grow from `media` — if we ever add a processing pipeline, the rendering data is already there telling it what to generate. Cloudinary-style on-the-fly transforms are the north star but not a v2 requirement.
 
 **Until v2:** files are just files. No `purpose` field, no binding. Code that needs "the org logo" queries files directly by convention (e.g., folder path or ad-hoc).
