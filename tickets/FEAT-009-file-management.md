@@ -235,12 +235,25 @@ When implemented, ResourceBinding will answer:
 - One File → many ResourceBindings
 - `Space.logoUrl` becomes a query: `ResourceBinding WHERE resourceType=Space, resourceId=spaceId, bindingType=logo` → File
 
-**Display hints on the binding:**
+**`media` and `conditions` on the binding:**
 
-The binding carries rendering context — the same image bound as a `thumbnail` vs a `hero` vs an `og:image` needs different display parameters. This is the same instinct as Cloudinary's transformation URLs (`w_300,h_200,c_fill,g_face`) and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — the transform is a property of the *usage*, not the *file*.
+The binding carries two kinds of contextual data — *how* to render and *when* to apply. Same instinct as Cloudinary's transformation URLs and Carde's `ResourceImage.css`/`ResourceImage.conditions` fields — these are properties of the *usage*, not the *file*.
+
+Two separate JSON fields, not one blob:
+
+```prisma
+model ResourceBinding {
+  // ... core fields (fileId, resourceType, resourceId, bindingType, visibility, order) ...
+
+  media       Json?     // rendering data — dimensions, crop, format, quality
+  conditions  Json?     // contextual rules — when/where this binding applies
+}
+```
+
+**`media`** — how this binding should be rendered:
 
 ```typescript
-// ResourceBinding.displayHints (Json, nullable)
+// ResourceBinding.media (Json, nullable)
 {
   width?: number;           // desired display width (px)
   height?: number;          // desired display height (px)
@@ -248,11 +261,35 @@ The binding carries rendering context — the same image bound as a `thumbnail` 
   gravity?: 'center' | 'face' | 'top' | 'auto';  // crop anchor point
   quality?: number;         // 1-100 (for lossy formats)
   format?: 'webp' | 'avif' | 'png' | 'jpg';      // preferred output format
+  aspectRatio?: string;     // e.g. "16:9", "1:1"
   // extensible — add fields as rendering needs grow
 }
 ```
 
-**No server-side preprocessing in v2** — display hints are consumed by the frontend to set CSS/`<img>` attributes and request appropriate sizes. The file is served as-is from S3/CDN. Server-side transforms (resize, reformat, derivative generation) are a future capability that could grow from these hints — if we ever add a processing pipeline, the hints are already there telling it what to generate. Cloudinary-style on-the-fly transforms are the north star but not a v2 requirement.
+**`conditions`** — when/where this binding applies:
+
+```typescript
+// ResourceBinding.conditions (Json, nullable)
+{
+  device?: 'mobile' | 'desktop' | 'tablet';       // device-specific bindings
+  viewport?: { min?: number; max?: number };       // breakpoint range (px)
+  locale?: string;          // locale-specific assets (e.g. "ja" logo variant)
+  darkMode?: boolean;       // light/dark mode variant
+  // extensible — feature flags, time-based rules, A/B variants, etc.
+}
+```
+
+**How they work together:** Multiple ResourceBindings can exist for the same `(resourceId, bindingType)` with different conditions. The consumer picks the best match:
+
+```
+Space "Design Team" has two logo bindings:
+  1. file: full-logo.svg,   media: { width: 200 },  conditions: { device: "desktop" }
+  2. file: icon-mark.svg,   media: { width: 40 },   conditions: { device: "mobile" }
+```
+
+When no conditions match or conditions is null, the binding is the default/fallback.
+
+**No server-side preprocessing in v2** — `media` is consumed by the frontend to set CSS/`<img>` attributes and request appropriate sizes. The file is served as-is from S3/CDN. Server-side transforms (resize, reformat, derivative generation) are a future capability that could grow from `media` — if we ever add a processing pipeline, the rendering data is already there telling it what to generate. Cloudinary-style on-the-fly transforms are the north star but not a v2 requirement.
 
 **Until v2:** files are just files. No `purpose` field, no binding. Code that needs "the org logo" queries files directly by convention (e.g., folder path or ad-hoc).
 
