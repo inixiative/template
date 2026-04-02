@@ -10,59 +10,48 @@
 
 ## Overview
 
-A single `editors` slice with a type registry. Each editor is a named sub-namespace under `state.editors.*`, all sharing the same base record shape and actions. New editors are added by registering a name + model type — one store composition line regardless of editor count.
+A single `editors` slice containing typed sub-editors. Each editor is a named sub-namespace under `state.editors.*`, all sharing the same base record shape and actions. `makeEditorSlice<T>(name, set)` generates one editor namespace with the model type passed directly as a generic.
 
 ## Objectives
 
-- Single `editors` slice with registry-driven sub-editors
-- Type-safe per-editor via generic registry map (`name → ModelType`)
-- `state.editors.` autocomplete shows all registered editors
-- Trivial to add new editors — register a name, get full CRUD for free
+- Single `editors` slice with typed sub-editors
+- `makeEditorSlice<T>` takes the model type directly — no indirection
+- `state.editors.` autocomplete shows all composed editors
+- Trivial to add new editors — one `makeEditorSlice` call + one `EditorsSlice` entry
 
 ---
 
 ## Design
 
-### Type Registry
+### Types
 
-A registry maps editor names to their model types. This drives both the runtime shape and TypeScript inference:
-
-```ts
-// Editor registry — add new editors here
-type EditorRegistry = {
-  inquiry: InquiryData;
-  inquiryResponse: InquiryResponseData;
-};
-```
-
-### Record Shape
-
-Every record in every editor has the same minimal shape:
+No registry. Each `makeEditorSlice` call declares its own model type directly:
 
 ```ts
 type EditorRecord<T> = {
   data: T;
   isDirty: boolean;
 };
-```
 
-**Why no `isLoading`/`hasFetched`?** TanStack Query already tracks fetch state. The editor slice is purely form state — it receives data via `set` after a query resolves.
-
-### Slice Shape
-
-```ts
-// Per-editor namespace
 type EditorNamespace<T> = {
   records: Record<string, EditorRecord<T>>;
   set: (id: string, data: T) => void;
   update: (id: string, patch: Partial<T>) => void;
   remove: (id: string) => void;
 };
+```
 
-// The full editors slice — one namespace per registry entry
+**Why no `isLoading`/`hasFetched`?** TanStack Query already tracks fetch state. The editor slice is purely form state — it receives data via `set` after a query resolves.
+
+### EditorsSlice Type
+
+Each app defines its own `EditorsSlice` based on which editors it composes:
+
+```ts
 type EditorsSlice = {
   editors: {
-    [K in keyof EditorRegistry]: EditorNamespace<EditorRegistry[K]>;
+    inquiry: EditorNamespace<InquiryData>;
+    inquiryResponse: EditorNamespace<InquiryResponseData>;
   };
 };
 ```
@@ -102,15 +91,14 @@ state.editors.inquiry.set('new', blankInquiry);
 `makeEditorSlice(name, set)` generates a single editor namespace — one entry under `editors.*`. Each editor calls it independently:
 
 ```ts
-// makeEditorSlice — generates one typed editor namespace
-// K inferred from name literal: makeEditorSlice('inquiry', set)
-//   → K = 'inquiry' → data typed as EditorRegistry['inquiry'] = InquiryData
+// makeEditorSlice — type passed directly, not via registry
+// makeEditorSlice<InquiryData>('inquiry', set)
 //   → set(id, data) expects InquiryData
 //   → update(id, patch) expects Partial<InquiryData>
-const makeEditorSlice = <K extends keyof EditorRegistry>(
-  name: K,
+const makeEditorSlice = <T>(
+  name: string,
   set: StoreApi<AppStore>['setState'],
-): EditorNamespace<EditorRegistry[K]> => ({
+): EditorNamespace<T> => ({
   records: {},
 
   set: (id, data) =>
@@ -175,18 +163,18 @@ const makeEditorSlice = <K extends keyof EditorRegistry>(
 
 ### Editors Slice (Composition)
 
-The `editors` slice assigns each `makeEditorSlice` result to its key:
+The `editors` slice assigns each `makeEditorSlice` result to its key, passing the type directly:
 
 ```ts
 export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
   editors: {
-    inquiry: makeEditorSlice('inquiry', set),
-    inquiryResponse: makeEditorSlice('inquiryResponse', set),
+    inquiry: makeEditorSlice<InquiryData>('inquiry', set),
+    inquiryResponse: makeEditorSlice<InquiryResponseData>('inquiryResponse', set),
   },
 });
 ```
 
-Adding a new editor = one `makeEditorSlice` call + one `EditorRegistry` entry.
+Adding a new editor = one `makeEditorSlice<T>` call + one `EditorsSlice` type entry.
 
 ### Store Composition
 
@@ -211,19 +199,19 @@ export const useAppStore = create(
 import { useShallow } from 'zustand/react/shallow';
 
 // Single record by ID — useShallow for object
-export const useEditorRecord = <K extends keyof EditorRegistry>(name: K, id: string) =>
+export const useEditorRecord = <K extends keyof EditorsSlice['editors']>(name: K, id: string) =>
   useAppStore(useShallow((s) => s.editors[name].records[id]));
 
 // Primitive selector — no useShallow needed
-export const useIsEditorDirty = <K extends keyof EditorRegistry>(name: K, id: string) =>
+export const useIsEditorDirty = <K extends keyof EditorsSlice['editors']>(name: K, id: string) =>
   useAppStore((s) => s.editors[name].records[id]?.isDirty ?? false);
 
 // All records for an editor — useShallow for object
-export const useEditorRecords = <K extends keyof EditorRegistry>(name: K) =>
+export const useEditorRecords = <K extends keyof EditorsSlice['editors']>(name: K) =>
   useAppStore(useShallow((s) => s.editors[name].records));
 
 // Actions for an editor — stable references, no useShallow needed
-export const useEditorActions = <K extends keyof EditorRegistry>(name: K) =>
+export const useEditorActions = <K extends keyof EditorsSlice['editors']>(name: K) =>
   useAppStore(
     useShallow((s) => ({
       set: s.editors[name].set,
@@ -248,11 +236,10 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ## Tasks
 
-### 1. Types & Registry
+### 1. Types
 
-- [ ] Define `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice` types
-- [ ] Define `EditorRegistry` type mapping editor names → model types
-- [ ] First entries: `inquiry: InquiryData`, `inquiryResponse: InquiryResponseData`
+- [ ] Define `EditorRecord<T>`, `EditorNamespace<T>` generic types
+- [ ] Define app-level `EditorsSlice` type listing composed editors
 
 ### 2. Slice Implementation
 
@@ -274,7 +261,6 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ## Open Questions
 
-- Should the `EditorRegistry` live in `packages/ui` (shared) or be defined per-app? If shared, all apps get all editors. If per-app, each app declares only the editors it needs but loses the single-source registry.
 - Custom actions pattern — deferred, but worth spiking when a real need arises.
 
 ---
@@ -291,8 +277,8 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 ## Definition of Done
 
 - [ ] `makeEditorSlice(name, set)` factory + `createEditorsSlice` compositor exist
-- [ ] TypeScript types: `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice`, `EditorRegistry`
-- [ ] At least two editors registered (`inquiry`, `inquiryResponse`)
+- [ ] TypeScript types: `EditorRecord<T>`, `EditorNamespace<T>`, app-level `EditorsSlice`
+- [ ] At least two editors composed (`inquiry`, `inquiryResponse`)
 - [ ] Generic selector hooks exported with `useShallow` where appropriate
 - [ ] DevTools action names work (`editors/inquiry/set`, etc.)
 - [ ] `docs/claude/ZUSTAND.md` updated
@@ -317,4 +303,4 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ## Comments
 
-_Origin: brainstorm session (2026-04-02). Simplified from original spec: dropped `isLoading`/`hasFetched` (TanStack Query's job), dropped `reset` (just re-`set`). Evolved from per-editor root slices to single `editors` slice with type registry for discoverability (`state.editors.` autocomplete). Custom actions deferred._
+_Origin: brainstorm session (2026-04-02). Simplified from original spec: dropped `isLoading`/`hasFetched` (TanStack Query's job), dropped `reset` (just re-`set`). Evolved from per-editor root slices → single `editors` slice with registry → direct generic `makeEditorSlice<T>` (no registry indirection). Custom actions deferred._
