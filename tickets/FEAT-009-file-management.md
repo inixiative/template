@@ -153,7 +153,7 @@ model Folder {
   path            String                          // materialized path
   depth           Int       @default(0)
   system          Boolean   @default(false)        // true = auto-created, can't delete/rename
-  visibility      String    @default("visible")    // visible | admin-only | hidden
+  visibility      String    @default("visible")    // visible | adminOnly | hidden
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -177,7 +177,7 @@ Auto-created via DB hooks when orgs, spaces, and org memberships are created. Ca
 
 ```
 org_{id}/                                     -- system, auto-created with org
-├── __[tbd]/                                  -- system, admin-only (e.g., internal docs, exports)
+├── __[tbd]/                                  -- system, adminOnly (e.g., internal docs, exports)
 ├── __[tbd]/                                  -- system, visible (e.g., shared resources)
 ├── space_{id}/                               -- system, auto-created per space
 │   └── [user-created folders]                -- user, nested freely
@@ -189,7 +189,7 @@ org_{id}/                                     -- system, auto-created with org
 
 **Visibility on system folders:**
 - `visible` — all org members can see and browse
-- `admin-only` — only owners/admins can see (e.g., audit exports, system configs)
+- `adminOnly` — only owners/admins can see (e.g., audit exports, system configs)
 - `hidden` — not shown in file browser (internal system use only)
 
 **User folders** (`system: false`) are created freely within system folders. They can be nested, renamed, moved, and deleted by users with appropriate roles.
@@ -210,6 +210,7 @@ model FilePermission {
   createdBy     String                            // userId who created this permission
   revokedAt     DateTime?                         // null = active, set = revoked
   revokedBy     String?                           // userId who revoked (for audit)
+  fromVersion   Int       @default(1)             // earliest version grantee can access (1 = all, N = from version N)
 
   createdAt     DateTime  @default(now())
 
@@ -425,6 +426,7 @@ Both fields are optional — most bindings are simple (just a file in a role). `
 | `cover` | aspectRatio | — | Consistent ratio, browser scales |
 | `thumbnail` | width, height, quality | — | Small, lower quality for fast loading |
 | `attachment` | — | — | Just a file reference, no rendering concerns |
+| `preserve` | — | — | "I want a copy if this goes away" — manual opt-in to lazy copy, no rendering |
 | `og:image` | width: 1200, height: 630 | — | Fixed OG dimensions per spec |
 | `favicon` | width: 32, format: png | — | Fixed size/format |
 
@@ -502,7 +504,7 @@ user-bucket/
 
   org_{id}/                               -- org root
     file_{id}/org-logo.png
-    __[tbd]/                              -- system folder, admin-only (illustrative)
+    __[tbd]/                              -- system folder, adminOnly (illustrative)
       file_{id}/[example].pdf
 
     org_user_{id}/                        -- user's org-scoped personal space
@@ -893,21 +895,28 @@ Lazy copy fires when **any** of these occur and there are active dependents:
 
 #### What counts as a dependent
 
-Two ways a user/entity can be a dependent:
+**Only ResourceBindings trigger lazy copy.** One mechanism, one trigger — if an entity has a ResourceBinding pointing at this file, they're a dependent. No separate flag on FilePermission.
 
-1. **Active ResourceBinding** (automatic) — if entity X has a ResourceBinding pointing at this file (logo, avatar, attachment, etc.), they're a dependent. This is the primary trigger — bindings would break without the copy.
+This keeps the system simple: bindings are the single source of truth for "who depends on this file." The query is one table scan, not two.
 
-2. **`preserveOnRevoke` flag on FilePermission** (opt-in) — even without a ResourceBinding, a user can express "I want to keep watching this file, and if my access ever goes away, give me a copy." This is an option on the FilePermission itself — essentially a subscription to lazy copy.
+**Manual preservation via `preserve` binding type:**
 
-```prisma
-model FilePermission {
-  // ... existing fields ...
-  preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
-  fromVersion       Int       @default(1)     // earliest version grantee can access (1 = all, current version number = from now onward)
+If a user wants to preserve a file they don't actively use (no logo, no attachment, no avatar — they just want to keep it), they create a ResourceBinding with `bindingType: "preserve"`. This is an explicit opt-in that uses the same mechanism as every other binding:
+
+```
+ResourceBinding {
+  sourceModel: "File"
+  fileId: file_xyz
+  resourceType: "User"         // or "Organization", "Space"
+  resourceId: user_abc
+  bindingType: "preserve"      // "I want a copy if this goes away"
+  visibility: "internal"
 }
 ```
 
-Default is `true` — opt-out rather than opt-in. Users who explicitly don't want preservation can set it to `false`.
+This is lightweight — no rendering, no media, no conditions. Just a declaration: "I depend on this file existing." When access is revoked or the file is deleted, the lazy copy fires for this binding just like any other.
+
+The `preserve` binding shows up in "Shared with me" and in the file's usage graph ("this file is preserved by 3 users"), so you get full bidirectional visibility. No hidden flags on permissions — everything goes through the binding layer.
 
 **`fromVersion`** — the explicit version number the grantee's access starts from, captured at grant creation time:
 
@@ -983,11 +992,10 @@ Preserved copies must be clearly distinguishable from live files:
 1. Admin revokes FilePermission for User B on File X
    (or: FilePermission expires, or File X is soft-deleted)
 
-2. System checks: does User B have active dependencies on File X?
-   a) Any ResourceBindings pointing at File X where the resource belongs to User B?
-   b) Does User B's FilePermission have preserveOnRevoke = true?
+2. System checks: does User B have active ResourceBindings pointing at File X?
+   (includes "preserve" bindings — manual opt-in uses the same mechanism)
 
-3. If yes to either:
+3. If yes:
    a) Create new File record owned by User B (status: "pending", snapshot fields populated)
    b) Create FileJob record (type: "lazyCopy", durable intent)
    c) Enqueue BullMQ job with FileJob.id
@@ -1165,7 +1173,7 @@ for explicit grants on specific files/folders, independent of org/space role.
 | Event | System folder created | Properties |
 |-------|----------------------|------------|
 | Organization created | `org_{id}/` root folder | `system: true`, `visibility: "visible"` |
-| Organization created | `org_{id}/__[tbd]/` (illustrative) | `system: true`, `visibility: "admin-only"` |
+| Organization created | `org_{id}/__[tbd]/` (illustrative) | `system: true`, `visibility: "adminOnly"` |
 | Space created | `org_{id}/space_{id}/` | `system: true`, `visibility: "visible"` |
 | OrgUser created | `org_{id}/org_user_{id}/` | `system: true`, `visibility: "visible"` + FilePermission(user=owner) |
 | User created (global) | `user_{id}/` | `system: true`, `visibility: "visible"` |
@@ -1177,7 +1185,7 @@ for explicit grants on specific files/folders, independent of org/space role.
 ### System folder rules
 
 - `system: true` → cannot be deleted or renamed by users
-- `system: true, visibility: "admin-only"` → only owners/admins see it in the file browser
+- `system: true, visibility: "adminOnly"` → only owners/admins see it in the file browser
 - `system: true, visibility: "hidden"` → not shown in file browser (internal system use only)
 - User folders (`system: false`) can be freely created, nested, renamed, moved, and deleted
 
@@ -1291,11 +1299,11 @@ Both solve the same problem: preventing broken references when access is revoked
 | **Independence** | Full — each copy is a standalone file | Single point — if platform deletes, everyone loses |
 | **Complexity** | High (FileJob fan-out, repointing, version copying) | Low (one ownership update, one S3 move at most) |
 
-**Possible hybrid:** system custody as the default (cheap, no fan-out, bindings stay intact) and lazy copy as an explicit opt-in for users who want full independence and are willing to pay for the storage. `preserveOnRevoke` on FilePermission could control which strategy fires.
+**Possible hybrid:** system custody as the default (cheap, no fan-out, bindings stay intact) and lazy copy as an explicit opt-in for users who want full independence and are willing to pay for the storage. A `preserve` binding could indicate the user wants a full independent copy rather than relying on system custody.
 - [ ] **FileVersion `current` flag concurrency** — two concurrent version uploads can race on setting `current = true/false`. Needs atomic swap in a transaction.
 - [x] **Mutable vs immutable S3 keys** — keeping mutable path-mirroring keys. The debuggability win for superadmins navigating Railway's S3 browser is a daily operational benefit. Moves are rare; the FileJob system handles them cleanly. Not worth trading real-world usability for architectural purity.
 - [ ] **FilePermission orphan cleanup** — false polymorphism means no cascade delete at DB level. Need a cleanup strategy (sweeper, or explicit cleanup on file/folder delete).
-- [ ] **Lazy copy default** — `preserveOnRevoke: true` triggers copies for every revocation by default. At scale this is operationally expensive. Consider whether `false` (opt-in) is saner, or whether fan-out limits make `true` viable.
+- [x] **Lazy copy trigger** — resolved: only ResourceBindings trigger lazy copy. Manual preservation is a `preserve` binding type — same mechanism, no separate flag. No default-on cost concern since users must explicitly create bindings.
 
 ### 12.1 UI Concept: Split-Pane File Browser
 
@@ -1363,7 +1371,7 @@ Models, upload/download, and the hard systems rules that everything else depends
 - [ ] Trash lifecycle (soft delete → retention window → orphan sweeper hard deletes)
 - [ ] S3 reconciliation job (orphan sweeper + FileJob sweeper — section 16)
 - [ ] File-specific audit events (upload, download, move, copy, share, delete, restore)
-- [ ] `preserveOnRevoke` field on FilePermission (default true)
+- [ ] `preserve` binding type on ResourceBinding (manual opt-in for lazy copy without active usage)
 - [ ] `sourceFileId`, `snapshotAt`, `snapshotReason`, `snapshotBy` fields on File
 - [ ] `__preserved/` system folder auto-creation (on first lazy copy or with scope creation)
 - [ ] Lazy copy via unified FileJob (type: "lazyCopy", same table as moves)
@@ -1606,9 +1614,9 @@ async function sweepOrphans(db: PrismaClient, s3: S3Client) {
 
 ### Move remnant detection
 
-Each file move creates a `FileMoveJob` with `oldKey`/`newKey`. The reconciler (`reconcileMoveJob`) is the primary cleanup mechanism — it copies bytes, swaps the DB key, and deletes the old S3 object. If the reconciler completes successfully, no remnants exist.
+Each file move creates a `FileJob` (type: `"move"`) with `sourceKey`/`targetKey`. The reconciler (`reconcileMove`) is the primary cleanup mechanism — it copies bytes, swaps the DB key, and deletes the old S3 object. If the reconciler completes successfully, no remnants exist.
 
-If the reconciler fails partway (e.g., S3 copy succeeded but DB update didn't), the sweeper retries stalled jobs (`done = false`, `updatedAt` older than 5m) by re-running `reconcileMoveJob`, which is fully idempotent — it checks actual S3 and DB state, not flags.
+If the reconciler fails partway (e.g., S3 copy succeeded but DB update didn't), the sweeper retries stalled jobs (`done = false`, `updatedAt` older than 5m) by re-running `reconcileMove`, which is fully idempotent — it checks actual S3 and DB state, not flags.
 
 For edge cases where both BullMQ and the sweeper miss a job (extremely unlikely), the periodic bucket scan catches S3 objects at old keys with no matching DB record. These are quarantined (tagged, not deleted) and hard-deleted after a 7-day grace period.
 
