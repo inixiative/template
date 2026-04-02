@@ -1,9 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 /**
  * Tests for useVirtualTableQuery's pure logic:
  * - locateItem: maps flat index to { pageIndex, indexInPage }
- * - Page count persistence contract via sessionStorage
  */
 
 // --- locateItem logic (extracted for unit testing) ---
@@ -84,65 +83,5 @@ describe('locateItem', () => {
     expect(locateItem(varied, 4)).toEqual({ pageIndex: 2, indexInPage: 0 });
     expect(locateItem(varied, 5)).toEqual({ pageIndex: 2, indexInPage: 1 });
     expect(locateItem(varied, 6)).toBeNull();
-  });
-});
-
-// --- Page count persistence contract ---
-
-const store = new Map<string, string>();
-const mockSessionStorage = {
-  getItem: mock((key: string) => store.get(key) ?? null),
-  setItem: mock((key: string, value: string) => {
-    store.set(key, value);
-  }),
-  removeItem: mock((key: string) => {
-    store.delete(key);
-  }),
-};
-
-beforeEach(() => {
-  store.clear();
-  mockSessionStorage.getItem.mockClear();
-  mockSessionStorage.setItem.mockClear();
-  Object.defineProperty(globalThis, 'sessionStorage', {
-    value: mockSessionStorage,
-    writable: true,
-    configurable: true,
-  });
-});
-
-afterEach(() => {
-  store.clear();
-});
-
-describe('useVirtualTableQuery — page count persistence', () => {
-  it('stores page count under vtq:<restoreKey>', () => {
-    const restoreKey = 'dashboard-users';
-    sessionStorage.setItem(`vtq:${restoreKey}`, '3');
-    expect(sessionStorage.getItem(`vtq:${restoreKey}`)).toBe('3');
-  });
-
-  it('parses saved page count as integer', () => {
-    sessionStorage.setItem('vtq:key', '5');
-    const saved = Number.parseInt(sessionStorage.getItem('vtq:key')!, 10);
-    expect(saved).toBe(5);
-  });
-
-  it('returns null when no saved page count exists', () => {
-    expect(sessionStorage.getItem('vtq:missing')).toBeNull();
-  });
-
-  it('page restore target of 0 means no extra pages to fetch', () => {
-    sessionStorage.setItem('vtq:key', '0');
-    const target = Number.parseInt(sessionStorage.getItem('vtq:key')!, 10);
-    const currentPageCount = 1;
-    expect(target > currentPageCount).toBe(false);
-  });
-
-  it('page restore target > current page count triggers fetch', () => {
-    sessionStorage.setItem('vtq:key', '3');
-    const target = Number.parseInt(sessionStorage.getItem('vtq:key')!, 10);
-    const currentPageCount = 1;
-    expect(target > currentPageCount).toBe(true);
   });
 });

@@ -34,7 +34,6 @@ export { checkPermission, usePermission } from './usePermission';
 export { useMutation, useQuery } from './useQuery';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useThemePersistence } from './useThemePersistence';
-export { useIndexRestore, useScrollRestore } from './useScrollRestore';
 export { useValidateUniqueness } from './useValidateUniqueness';
 export { type VirtualListHandle, useVirtualListCore } from './useVirtualListCore';
 export {

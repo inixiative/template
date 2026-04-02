@@ -49,44 +49,19 @@ describe('VirtualScroll — empty state', () => {
   });
 });
 
-describe('VirtualScroll — layout direction', () => {
-  const buildStyle = (direction: 'vertical' | 'horizontal', maxHeight: number) => {
-    const isHorizontal = direction === 'horizontal';
-    return isHorizontal ? { maxWidth: maxHeight, overflowX: 'auto' } : { maxHeight, overflowY: 'auto' };
-  };
-
-  it('vertical layout uses maxHeight and overflowY', () => {
-    expect(buildStyle('vertical', 400)).toEqual({ maxHeight: 400, overflowY: 'auto' });
-  });
-
-  it('horizontal layout uses maxWidth and overflowX', () => {
-    expect(buildStyle('horizontal', 300)).toEqual({ maxWidth: 300, overflowX: 'auto' });
-  });
-});
-
 describe('VirtualScroll — virtual item positioning', () => {
-  it('vertical items use translateY', () => {
-    const isHorizontal = false;
+  it('items use translateY for vertical positioning', () => {
     const virtualItemStart = 200;
-
-    const style = isHorizontal
-      ? { position: 'absolute', top: 0, left: 0, height: '100%', transform: `translateX(${virtualItemStart}px)` }
-      : { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItemStart}px)` };
+    const style = {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      transform: `translateY(${virtualItemStart}px)`,
+    };
 
     expect(style.transform).toBe('translateY(200px)');
     expect(style.width).toBe('100%');
-  });
-
-  it('horizontal items use translateX', () => {
-    const isHorizontal = true;
-    const virtualItemStart = 150;
-
-    const style = isHorizontal
-      ? { position: 'absolute', top: 0, left: 0, height: '100%', transform: `translateX(${virtualItemStart}px)` }
-      : { position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualItemStart}px)` };
-
-    expect(style.transform).toBe('translateX(150px)');
-    expect(style.height).toBe('100%');
   });
 });
 

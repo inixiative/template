@@ -18,11 +18,6 @@ export type UseVirtualTableQueryOptions<TItem> = {
   queryFn: (pageParam: PageParam) => Promise<VirtualTablePage<TItem>>;
   /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
-  /**
-   * Optional sessionStorage key for persisting loaded page count.
-   * When set, the hook restores previously loaded pages on mount.
-   */
-  restoreKey?: string;
 };
 
 export type VirtualTablePageLocation = {
@@ -56,7 +51,7 @@ export type UseVirtualTableQueryResult<TItem> = {
 export function useVirtualTableQuery<TItem>(
   options: UseVirtualTableQueryOptions<TItem>,
 ): UseVirtualTableQueryResult<TItem> {
-  const { queryKey, queryFn, enabled = true, restoreKey } = options;
+  const { queryKey, queryFn, enabled = true } = options;
 
   const query = useInfiniteQuery<
     VirtualTablePage<TItem>,
@@ -71,38 +66,6 @@ export function useVirtualTableQuery<TItem>(
     getNextPageParam: (lastPage) => lastPage.nextPage,
     enabled,
   });
-
-  // Restore previously loaded pages — fetch one page per effect cycle
-  // to let TanStack Query update its cursor between fetches.
-  const targetPageCountRef = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (!restoreKey || !query.data || query.isFetchingNextPage) return;
-
-    // Read target on first run
-    if (targetPageCountRef.current === null) {
-      try {
-        const saved = sessionStorage.getItem(`vtq:${restoreKey}`);
-        targetPageCountRef.current = saved ? Number.parseInt(saved, 10) : 0;
-      } catch {
-        targetPageCountRef.current = 0;
-      }
-    }
-
-    const target = targetPageCountRef.current;
-    if (target > query.data.pages.length && query.hasNextPage) {
-      query.fetchNextPage();
-    }
-  }, [restoreKey, query.data, query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
-
-  // Persist loaded page count
-  React.useEffect(() => {
-    if (!restoreKey || !query.data) return;
-    try {
-      sessionStorage.setItem(`vtq:${restoreKey}`, String(query.data.pages.length));
-    } catch {
-      // skip
-    }
-  }, [restoreKey, query.data]);
 
   const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 

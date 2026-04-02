@@ -9,6 +9,22 @@ export type VirtualScrollHandle = {
   scrollToItem: (key: string) => boolean;
 };
 
+/**
+ * Virtualized vertical scroll list with infinite-load support.
+ *
+ * Horizontal / carousel layout
+ * ────────────────────────────
+ * This component intentionally only supports vertical scrolling.
+ * For a horizontal infinite carousel, build a dedicated component that:
+ *  1. Wraps useVirtualListCore with `horizontal: true`.
+ *  2. Adds carousel UX affordances (prev/next buttons, snap-to-item,
+ *     page indicators, keyboard arrow navigation).
+ *  3. Manages its own scroll-snap CSS (`scroll-snap-type: x mandatory`
+ *     on the container, `scroll-snap-align: start` on items).
+ *  4. Optionally integrates with onLoadMore for infinite content.
+ * useVirtualListCore already accepts a `horizontal` flag, so the
+ * virtualization layer is ready — only the presentation is missing.
+ */
 export type VirtualScrollProps<T> = {
   items: T[];
   keyExtractor: (item: T) => string;
@@ -19,10 +35,10 @@ export type VirtualScrollProps<T> = {
   isLoadingMore?: boolean;
   hasMore?: boolean;
   loadMoreThreshold?: number;
-  direction?: 'vertical' | 'horizontal';
   overscan?: number;
   show?: boolean | (() => boolean);
-  restoreScrollKey?: string;
+  /** Key for history.state scroll index persistence (back/forward nav only). */
+  scrollStateKey?: string;
   className?: string;
   emptyMessage?: React.ReactNode;
 };
@@ -54,23 +70,20 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       isLoadingMore,
       hasMore,
       loadMoreThreshold = 5,
-      direction = 'vertical',
       overscan = 5,
-      restoreScrollKey,
+      scrollStateKey,
       className,
     },
     ref,
   ) => {
     const scrollRef = React.useRef<HTMLDivElement>(null);
-    const isHorizontal = direction === 'horizontal';
 
     const { virtualizer, virtualItems } = useVirtualListCore({
       itemCount: items.length,
       scrollRef,
       estimateSize: estimateItemHeight,
-      horizontal: isHorizontal,
       overscan,
-      restoreScrollKey,
+      scrollStateKey,
       onLoadMore,
       isLoadingMore,
       hasMore,
@@ -87,14 +100,10 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       <div
         ref={scrollRef}
         className={cn('overflow-auto', className)}
-        style={isHorizontal ? { maxWidth: maxHeight, overflowX: 'auto' } : { maxHeight, overflowY: 'auto' }}
+        style={{ maxHeight, overflowY: 'auto' }}
       >
         <div
-          style={
-            isHorizontal
-              ? { width: virtualizer.getTotalSize(), height: '100%', position: 'relative' }
-              : { height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }
-          }
+          style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}
         >
           {virtualItems.map((virtualItem) => {
             const item = items[virtualItem.index];
@@ -103,23 +112,13 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
                 key={keyExtractor(item)}
                 data-index={virtualItem.index}
                 ref={virtualizer.measureElement}
-                style={
-                  isHorizontal
-                    ? {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        height: '100%',
-                        transform: `translateX(${virtualItem.start}px)`,
-                      }
-                    : {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }
-                }
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
               >
                 {renderItem(item, virtualItem.index)}
               </div>

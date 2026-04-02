@@ -23,7 +23,8 @@ export type VirtualTableProps<T> = {
   isLoadingMore?: boolean;
   hasMore?: boolean;
   loadMoreThreshold?: number;
-  restoreScrollKey?: string;
+  /** Key for history.state scroll index persistence (back/forward nav only). */
+  scrollStateKey?: string;
   className?: string;
 };
 
@@ -55,7 +56,7 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       isLoadingMore,
       hasMore,
       loadMoreThreshold = 5,
-      restoreScrollKey,
+      scrollStateKey,
       className,
     },
     ref,
@@ -67,7 +68,7 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       scrollRef,
       estimateSize: estimateRowHeight,
       overscan: 10,
-      restoreScrollKey,
+      scrollStateKey,
       onLoadMore,
       isLoadingMore,
       hasMore,

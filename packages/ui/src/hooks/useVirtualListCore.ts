@@ -1,6 +1,7 @@
 import { type ScrollToOptions, useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
-import { useIndexRestore } from '@template/ui/hooks/useScrollRestore';
 import * as React from 'react';
+
+const INDEX_DEBOUNCE_MS = 200;
 
 export type VirtualListCoreOptions = {
   itemCount: number;
@@ -8,7 +9,13 @@ export type VirtualListCoreOptions = {
   estimateSize: number;
   horizontal?: boolean;
   overscan?: number;
-  restoreScrollKey?: string;
+  /**
+   * Unique key for this virtual list instance. When set, the top visible
+   * index is persisted to `history.state` so that browser back/forward
+   * navigation restores the scroll position. Fresh navigations (e.g. link
+   * clicks) start from the top because the history entry has no saved index.
+   */
+  scrollStateKey?: string;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
@@ -31,7 +38,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     estimateSize,
     horizontal = false,
     overscan = 5,
-    restoreScrollKey,
+    scrollStateKey,
     onLoadMore,
     isLoadingMore,
     hasMore,
@@ -46,23 +53,46 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     overscan,
   });
 
-  // Stable scrollToIndex reference for useIndexRestore
-  const scrollToIndexFn = React.useCallback(
-    (index: number) => virtualizer.scrollToIndex(index, { align: 'start' }),
-    [virtualizer],
-  );
-
-  const { onVisibleIndexChange } = useIndexRestore(restoreScrollKey, itemCount, scrollToIndexFn, scrollRef);
-
   const virtualItems = virtualizer.getVirtualItems();
 
-  // Persist top visible item index (with change guard inside onVisibleIndexChange)
+  // Restore top visible index from history.state on back/forward navigation.
+  // Fresh navigations have no saved index, so the list starts at the top.
+  const restoredRef = React.useRef(false);
   React.useEffect(() => {
-    const firstItem = virtualItems[0];
-    if (firstItem) {
-      onVisibleIndexChange(firstItem.index);
+    if (!scrollStateKey || restoredRef.current || itemCount === 0) return;
+    restoredRef.current = true;
+    try {
+      const saved = window.history.state?.[scrollStateKey];
+      if (typeof saved === 'number' && saved < itemCount) {
+        virtualizer.scrollToIndex(saved, { align: 'start' });
+      }
+    } catch {
+      // history.state access can throw in sandboxed iframes
     }
-  }, [virtualItems, onVisibleIndexChange]);
+  }, [scrollStateKey, itemCount, virtualizer]);
+
+  // Persist top visible index to history.state (debounced).
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastPersistedRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    if (!scrollStateKey || !restoredRef.current) return;
+    const firstItem = virtualItems[0];
+    if (!firstItem || firstItem.index === lastPersistedRef.current) return;
+    lastPersistedRef.current = firstItem.index;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      try {
+        const state = { ...window.history.state, [scrollStateKey]: firstItem.index };
+        window.history.replaceState(state, '');
+      } catch {
+        // skip
+      }
+    }, INDEX_DEBOUNCE_MS);
+  }, [scrollStateKey, virtualItems]);
+
+  React.useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   // Infinite load trigger
   React.useEffect(() => {
