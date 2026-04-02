@@ -116,6 +116,21 @@ export function useVirtualScrollState(
   const initialIndex = cacheCoversIndex ? saved.index : undefined;
   const savedPageCount = saved?.pageCount ?? 0;
 
+  // When cache is invalid, clear the stale entry from history.state
+  // so subsequent navigations don't try to restore a dead position.
+  const clearedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!cacheInvalid || clearedRef.current) return;
+    clearedRef.current = true;
+    savedRef.current = null;
+    try {
+      const { [stateKey]: _, ...rest } = window.history.state ?? {};
+      window.history.replaceState(rest, '');
+    } catch {
+      // skip
+    }
+  }, [cacheInvalid, stateKey]);
+
   // Suppress writes until restore completes (or is skipped).
   // This prevents a transient `index: 0` from overwriting the saved target.
   const restoreCompleteRef = React.useRef(saved === null);
