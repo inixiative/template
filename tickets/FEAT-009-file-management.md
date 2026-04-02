@@ -493,7 +493,7 @@ All durable file operations — moves, lazy copies, and future job types — sha
 ```prisma
 model FileJob {
   id              String    @id @default(uuid())
-  type            String                          // "move" | "lazy_copy" (extensible for future ops)
+  type            String                          // "move" | "lazyCopy" (extensible for future ops)
   fileId          String                          // the file being acted on (source for copy, subject for move)
 
   // Shared fields — every job has a before/after S3 key pair
@@ -504,7 +504,7 @@ model FileJob {
 
   // Lazy copy specific (null for moves)
   newFileId       String?                         // the snapshot File record (created upfront, status: "pending")
-  reason          String?                         // "access_revoked" | "access_expired" | "source_deleted"
+  reason          String?                         // "accessRevoked" | "accessExpired" | "sourceDeleted"
   triggeredBy     String?                         // userId who caused the revocation/deletion
   dependentId     String?                         // granteeId who gets the copy
   dependentModel  String?                         // "User" | "Organization" | "Space"
@@ -530,7 +530,7 @@ model FileJob {
 async function reconcileFileJob(job: FileJob, db, s3) {
   switch (job.type) {
     case 'move': return reconcileMove(job, db, s3);
-    case 'lazy_copy': return reconcileLazyCopy(job, db, s3);
+    case 'lazyCopy': return reconcileLazyCopy(job, db, s3);
     default: throw new Error(`Unknown FileJob type: ${job.type}`);
   }
 }
@@ -863,7 +863,7 @@ Two ways a user/entity can be a dependent:
 model FilePermission {
   // ... existing fields ...
   preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
-  versionScope      String    @default("all") // "all" = access to every version; "from_grant" = only versions created after grant time
+  versionScope      String    @default("all") // "all" = access to every version; "fromGrant" = only versions created after grant time
 }
 ```
 
@@ -874,15 +874,15 @@ Default is `true` — opt-out rather than opt-in. Users who explicitly don't wan
 | Value | Behavior | Use case |
 |-------|----------|----------|
 | `all` | Access to every version, past and future | Default — full history, the normal share |
-| `from_grant` | Only versions created at or after the time of the grant | "You can use this going forward, but the history before you got access isn't yours" |
+| `fromGrant` | Only versions created at or after the time of the grant | "You can use this going forward, but the history before you got access isn't yours" |
 
-Default is `all`. The `from_grant` scope uses the FilePermission's `createdAt` as the cutoff — only versions with a timestamp >= grant time are visible to the grantee.
+Default is `all`. The `fromGrant` scope uses the FilePermission's `createdAt` as the cutoff — only versions with a timestamp >= grant time are visible to the grantee.
 
 This also prevents the sharer from gaming revocation by replacing the file content with a blank before revoking — the grantee's version access is scoped to what existed during their grant window, and lazy copy preserves all versions they had access to (see below).
 
 #### What the copy looks like
 
-Lazy copy duplicates **all versions the user had access to** based on their `versionScope`, not just the current version. If `versionScope = "all"`, every version is copied. If `versionScope = "from_grant"`, only versions created after the grant time are copied. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
+Lazy copy duplicates **all versions the user had access to** based on their `versionScope`, not just the current version. If `versionScope = "all"`, every version is copied. If `versionScope = "fromGrant"`, only versions created after the grant time are copied. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
 
 The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
 
@@ -896,7 +896,7 @@ The lazy copy creates a **new File record** owned by the dependent user/org, sto
 | `status` | `active` |
 | `sourceFileId` | Original file ID — provenance tracking |
 | `snapshotAt` | Timestamp when the copy was created |
-| `snapshotReason` | `access_revoked` \| `access_expired` \| `source_deleted` |
+| `snapshotReason` | `accessRevoked` \| `accessExpired` \| `sourceDeleted` |
 | `snapshotBy` | userId who triggered the revocation/deletion (for audit) |
 
 New fields on File for provenance:
@@ -906,7 +906,7 @@ model File {
   // ... existing fields ...
   sourceFileId     String?                          // if this is a lazy copy, the original file it came from
   snapshotAt       DateTime?                        // when the copy was created (null = this is a live/original file)
-  snapshotReason   String?                          // "access_revoked" | "access_expired" | "source_deleted"
+  snapshotReason   String?                          // "accessRevoked" | "accessExpired" | "sourceDeleted"
   snapshotBy       String?                          // userId who triggered the event that caused the copy
 }
 ```
@@ -926,7 +926,7 @@ Properties: `system: true`, `visibility: "visible"`. Users can see their preserv
 
 #### Durability
 
-Lazy copy uses the unified `FileJob` table (section 3.5) with `type: "lazy_copy"`. Same Postgres-as-intent, BullMQ fast path, sweeper safety net. The `reconcileLazyCopy` handler is defined alongside `reconcileMove` — one sweeper loop, one dispatch.
+Lazy copy uses the unified `FileJob` table (section 3.5) with `type: "lazyCopy"`. Same Postgres-as-intent, BullMQ fast path, sweeper safety net. The `reconcileLazyCopy` handler is defined alongside `reconcileMove` — one sweeper loop, one dispatch.
 
 #### UX indicators
 
@@ -949,7 +949,7 @@ Preserved copies must be clearly distinguishable from live files:
 
 3. If yes to either:
    a) Create new File record owned by User B (status: "pending", snapshot fields populated)
-   b) Create FileJob record (type: "lazy_copy", durable intent)
+   b) Create FileJob record (type: "lazyCopy", durable intent)
    c) Enqueue BullMQ job with FileJob.id
    d) BullMQ worker (or sweeper fallback) runs reconcileLazyCopy:
       - Copy S3 bytes to User B's __preserved/ folder
@@ -1290,7 +1290,7 @@ Models, upload/download, and the hard systems rules that everything else depends
 - [ ] `preserveOnRevoke` field on FilePermission (default true)
 - [ ] `sourceFileId`, `snapshotAt`, `snapshotReason`, `snapshotBy` fields on File
 - [ ] `__preserved/` system folder auto-creation (on first lazy copy or with scope creation)
-- [ ] Lazy copy via unified FileJob (type: "lazy_copy", same table as moves)
+- [ ] Lazy copy via unified FileJob (type: "lazyCopy", same table as moves)
 - [ ] Lazy copy trigger on FilePermission revoke/expire and File soft-delete
 - [ ] "Shared with me" virtual view query (FilePermission-based, folders + individual files)
 
@@ -1563,7 +1563,7 @@ When a file is "replaced" (e.g., new logo upload), should the File record stay t
 Likely design: `File.version` counter + old S3 keys kept with version suffix (`file_{id}/v1/logo.png`, `file_{id}/v2/logo.png`). Current version is the canonical key. Previous versions are accessible but not default.
 
 **Versioning interacts with FilePermission and lazy copy:**
-- `FilePermission.versionScope` controls which versions a grantee can access (`all` vs `from_grant`)
+- `FilePermission.versionScope` controls which versions a grantee can access (`all` vs `fromGrant`)
 - Lazy copy duplicates all versions within the grantee's version scope, not just the current version
 - This prevents the sharer from replacing content with a blank file before revoking to leave the grantee with nothing
 
