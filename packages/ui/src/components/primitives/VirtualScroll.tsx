@@ -1,4 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useScrollRestore } from '@template/ui/hooks/useScrollRestore';
 import { cn } from '@template/ui/lib/utils';
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
@@ -25,6 +26,8 @@ export type VirtualScrollProps<T> = {
   /** Number of items to render beyond the visible area. Defaults to 5. */
   overscan?: number;
   show?: boolean | (() => boolean);
+  /** When set, persists and restores scroll position across refreshes via sessionStorage. */
+  restoreScrollKey?: string;
   className?: string;
   /** Optional empty state message or element. */
   emptyMessage?: React.ReactNode;
@@ -43,6 +46,7 @@ export const VirtualScroll = <T,>({
   direction = 'vertical',
   overscan = 5,
   show = true,
+  restoreScrollKey,
   className,
   emptyMessage,
 }: VirtualScrollProps<T>) => {
@@ -66,6 +70,7 @@ export const VirtualScroll = <T,>({
       loadMoreThreshold={loadMoreThreshold}
       direction={direction}
       overscan={overscan}
+      restoreScrollKey={restoreScrollKey}
       className={className}
     />
   );
@@ -83,9 +88,12 @@ function VirtualScrollInner<T>({
   loadMoreThreshold = 5,
   direction = 'vertical',
   overscan = 5,
+  restoreScrollKey,
   className,
 }: Omit<VirtualScrollProps<T>, 'show' | 'emptyMessage'>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  useScrollRestore(scrollRef, restoreScrollKey);
   const isHorizontal = direction === 'horizontal';
 
   const virtualizer = useVirtualizer({

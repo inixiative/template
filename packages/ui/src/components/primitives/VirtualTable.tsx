@@ -1,5 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Column } from '@template/ui/components/primitives/Table';
+import { useScrollRestore } from '@template/ui/hooks/useScrollRestore';
 import { cn } from '@template/ui/lib/utils';
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
@@ -23,6 +24,8 @@ export type VirtualTableProps<T> = {
   hasMore?: boolean;
   /** Number of rows from the bottom to trigger onLoadMore. Defaults to 5. */
   loadMoreThreshold?: number;
+  /** When set, persists and restores scroll position across refreshes via sessionStorage. */
+  restoreScrollKey?: string;
   className?: string;
 };
 
@@ -39,6 +42,7 @@ export const VirtualTable = <T,>({
   isLoadingMore,
   hasMore,
   loadMoreThreshold = 5,
+  restoreScrollKey,
   className,
 }: VirtualTableProps<T>) => {
   const shouldShow = typeof show === 'function' ? show() : show;
@@ -60,6 +64,7 @@ export const VirtualTable = <T,>({
       isLoadingMore={isLoadingMore}
       hasMore={hasMore}
       loadMoreThreshold={loadMoreThreshold}
+      restoreScrollKey={restoreScrollKey}
       className={className}
     />
   );
@@ -81,9 +86,12 @@ function VirtualTableInner<T>({
   isLoadingMore,
   hasMore,
   loadMoreThreshold = 5,
+  restoreScrollKey,
   className,
 }: Omit<VirtualTableProps<T>, 'show' | 'emptyMessage'>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  useScrollRestore(scrollRef, restoreScrollKey);
 
   const virtualizer = useVirtualizer({
     count: data.length,

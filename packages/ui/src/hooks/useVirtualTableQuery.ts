@@ -1,5 +1,5 @@
 import type { InfiniteData, QueryKey } from '@tanstack/react-query';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import * as React from 'react';
 
 export type PageParam = number;
@@ -18,6 +18,11 @@ export type UseVirtualTableQueryOptions<TItem> = {
   queryFn: (pageParam: PageParam) => Promise<VirtualTablePage<TItem>>;
   /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
+  /**
+   * Optional sessionStorage key for persisting loaded page count.
+   * When set, the hook restores previously loaded pages on mount.
+   */
+  restoreKey?: string;
 };
 
 export type VirtualTablePageLocation = {
@@ -40,27 +45,18 @@ export type UseVirtualTableQueryResult<TItem> = {
   total: number | undefined;
   /**
    * Given a flat index, returns which page it belongs to and
-   * its index within that page. Useful for optimistic mutations
-   * that need to target a specific page in the query cache.
+   * its index within that page. Useful for building optimistic
+   * mutation targets with useOptimisticMutation + createOptimisticListTarget.
    */
   locateItem: (flatIndex: number) => VirtualTablePageLocation | null;
-  /**
-   * Optimistically update a single item by flat index.
-   * Patches the correct page in the infinite query cache.
-   */
-  optimisticUpdate: (flatIndex: number, updater: (item: TItem) => TItem) => void;
-  /**
-   * Optimistically remove an item by flat index.
-   * Removes from the correct page in the infinite query cache.
-   */
-  optimisticRemove: (flatIndex: number) => void;
+  /** The raw infinite query data, for use with useOptimisticMutation targets. */
+  queryKey: QueryKey;
 };
 
 export function useVirtualTableQuery<TItem>(
   options: UseVirtualTableQueryOptions<TItem>,
 ): UseVirtualTableQueryResult<TItem> {
-  const { queryKey, queryFn, enabled = true } = options;
-  const queryClient = useQueryClient();
+  const { queryKey, queryFn, enabled = true, restoreKey } = options;
 
   const query = useInfiniteQuery<
     VirtualTablePage<TItem>,
@@ -75,6 +71,38 @@ export function useVirtualTableQuery<TItem>(
     getNextPageParam: (lastPage) => lastPage.nextPage,
     enabled,
   });
+
+  // Restore previously loaded pages after initial load
+  const restoredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!restoreKey || restoredRef.current || !query.data || query.isFetchingNextPage) return;
+    restoredRef.current = true;
+
+    try {
+      const saved = sessionStorage.getItem(`vtq:${restoreKey}`);
+      if (!saved) return;
+      const targetPageCount = Number.parseInt(saved, 10);
+      const currentPageCount = query.data.pages.length;
+
+      if (targetPageCount > currentPageCount && query.hasNextPage) {
+        for (let i = currentPageCount; i < targetPageCount; i++) {
+          query.fetchNextPage();
+        }
+      }
+    } catch {
+      // sessionStorage unavailable (SSR, privacy mode) — skip silently
+    }
+  }, [restoreKey, query.data, query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
+
+  // Persist loaded page count
+  React.useEffect(() => {
+    if (!restoreKey || !query.data) return;
+    try {
+      sessionStorage.setItem(`vtq:${restoreKey}`, String(query.data.pages.length));
+    } catch {
+      // skip
+    }
+  }, [restoreKey, query.data]);
 
   const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 
@@ -96,42 +124,6 @@ export function useVirtualTableQuery<TItem>(
     [query.data],
   );
 
-  const optimisticUpdate = React.useCallback(
-    (flatIndex: number, updater: (item: TItem) => TItem) => {
-      const location = locateItem(flatIndex);
-      if (!location) return;
-
-      queryClient.setQueryData<InfiniteData<VirtualTablePage<TItem>>>(queryKey, (old) => {
-        if (!old) return old;
-        const newPages = old.pages.map((page, pi) => {
-          if (pi !== location.pageIndex) return page;
-          const newData = page.data.map((item, ii) => (ii === location.indexInPage ? updater(item) : item));
-          return { ...page, data: newData };
-        });
-        return { ...old, pages: newPages };
-      });
-    },
-    [queryKey, queryClient, locateItem],
-  );
-
-  const optimisticRemove = React.useCallback(
-    (flatIndex: number) => {
-      const location = locateItem(flatIndex);
-      if (!location) return;
-
-      queryClient.setQueryData<InfiniteData<VirtualTablePage<TItem>>>(queryKey, (old) => {
-        if (!old) return old;
-        const newPages = old.pages.map((page, pi) => {
-          if (pi !== location.pageIndex) return page;
-          const newData = page.data.filter((_, ii) => ii !== location.indexInPage);
-          return { ...page, data: newData };
-        });
-        return { ...old, pages: newPages };
-      });
-    },
-    [queryKey, queryClient, locateItem],
-  );
-
   return {
     data,
     isLoading: query.isLoading,
@@ -140,7 +132,6 @@ export function useVirtualTableQuery<TItem>(
     fetchNextPage: () => query.fetchNextPage(),
     total,
     locateItem,
-    optimisticUpdate,
-    optimisticRemove,
+    queryKey,
   };
 }
