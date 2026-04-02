@@ -64,7 +64,10 @@ function useVirtualListEffects(
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  const paddingStart = virtualItems[0]?.start ?? 0;
+  // In window mode, item start/end values include scrollMargin.
+  // Subtract it so padding reflects only the virtual content offset.
+  const margin = virtualizer.options.scrollMargin ?? 0;
+  const paddingStart = Math.max(0, (virtualItems[0]?.start ?? 0) - margin);
   const paddingEnd =
     virtualItems.length > 0
       ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
@@ -130,7 +133,9 @@ function useWindowVirtualList(options: VirtualListCoreOptions): VirtualListCoreR
   // Compute scrollMargin from the container's position on the page.
   // This tells the virtualizer how far from the scroll origin the list starts.
   const [scrollMargin, setScrollMargin] = React.useState(0);
-  React.useEffect(() => {
+  // useLayoutEffect so margin is computed before the browser paints,
+  // avoiding a frame of wrong item positions.
+  React.useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const updateMargin = () => {
@@ -165,6 +170,15 @@ function useWindowVirtualList(options: VirtualListCoreOptions): VirtualListCoreR
  */
 export function useVirtualListCore(options: VirtualListCoreOptions): VirtualListCoreResult {
   const { scrollMode = 'viewport' } = options;
+
+  // Guard: scrollMode must not change after mount (different hooks would execute).
+  const initialScrollMode = React.useRef(scrollMode);
+  if (process.env.NODE_ENV !== 'production' && initialScrollMode.current !== scrollMode) {
+    throw new Error(
+      'useVirtualListCore: scrollMode must not change after mount. ' +
+      'Use key={scrollMode} on the component to force a remount.',
+    );
+  }
 
   if (scrollMode === 'window') {
     // eslint-disable-next-line react-hooks/rules-of-hooks
