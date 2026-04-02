@@ -1671,12 +1671,16 @@ For edge cases where both BullMQ and the sweeper miss a job (extremely unlikely)
 
 ### Versioning & Replace Semantics
 
-Resolved in the core design — File is a container, FileVersion holds content. Replace = create version N+1. Revert = copy old version's bytes to max+1 (with `revertedFrom` provenance). History is append-only, highest version is always current.
+Resolved in the core design — File is a container, FileVersion holds content:
+- **Replace** = create FileVersion at N+1. New highest version is automatically current.
+- **Revert** = new FileVersion record at max+1, pointing at the same S3 key as the old version. No byte copying — just a DB record with `revertedFrom` provenance. Instant, no job needed.
+- **History** is append-only, highest version number is always current (`ORDER BY version DESC LIMIT 1`). No `current` flag, no concurrency hazard.
 
 **Remaining questions:**
 - **Cache invalidation** — CDN needs to know content changed when a new version is uploaded. Cache-Tag purge on `file-{fileId}` should fire on version creation.
 - **`FilePermission.fromVersion`** controls which versions a grantee can access (1 = all, N = from version N onward)
 - Lazy copy duplicates all versions within the grantee's version scope, not just the current version
+- **Shared S3 keys on revert** — a reverted FileVersion shares an S3 key with the original. The sweeper/delete logic must check: before deleting an S3 object, verify no other FileVersion records reference the same key.
 
 ### Reference-Safe Delete
 
@@ -1710,7 +1714,7 @@ SHA-256 hash computed on upload confirmation:
 - **Integrity** — verify S3 bytes match what the client sent
 - **Dedup detection** — "This file already exists in this folder" (advisory, not enforced)
 - **Copy verification** — cross-scope copy can verify source and destination match
-- Store as `File.checksum` (nullable, computed async on confirm)
+- Store as `FileVersion.checksum` (nullable, computed async on confirm)
 
 ### Preview & Derivative Pipeline
 
