@@ -1271,8 +1271,26 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **Lazy copy quota** — do preserved copies count toward the recipient's storage quota? (Probably yes — they own the bytes now)
 - [x] **Re-grant after lazy copy** — no special handling. User keeps their snapshot and gets live access back independently. No merging, no prompting.
 - [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
-- [ ] **Lazy copy fan-out limits** — a folder revocation cascading to 200 files x 50 users x N versions = massive S3 copy storm. Need batch limits, backpressure, progress tracking for the revoking admin. Consider: warn before revoke ("this will create copies for N users"), cap concurrent FileJobs, process in waves.
+- [ ] **Lazy copy vs system custody** — two strategies for preventing broken references on revocation/deletion. Not mutually exclusive — could be system custody as default (cheap) with lazy copy as opt-in (full independence). Decision affects fan-out, storage cost, billing, and ownership model. See below.
+- [ ] **Lazy copy fan-out limits** — if lazy copy is used: a folder revocation cascading to 200 files x 50 users x N versions = massive S3 copy storm. Need batch limits, backpressure, progress tracking for the revoking admin. Consider: warn before revoke ("this will create copies for N users"), cap concurrent FileJobs, process in waves.
 - [ ] **Race window during lazy copy** — between permission revocation and copy completion, ResourceBindings point at a file the user can no longer access. Options: defer revocation until copies complete (revoke is async), or serve from original during grace window (short-lived read-through even after revoke).
+
+**Lazy copy vs system custody — tradeoff analysis:**
+
+Both solve the same problem: preventing broken references when access is revoked or a file is deleted while others depend on it.
+
+| | Lazy copy | System custody |
+|---|---|---|
+| **Mechanism** | Copy bytes to each dependent's scope | Platform takes ownership of the file, keeps serving it |
+| **Fan-out** | N copies per dependent (potentially thousands) | Zero — one file, one ownership transfer |
+| **Storage cost** | Multiplied per dependent | No increase |
+| **Bindings** | Must repoint to new file IDs per dependent | Unchanged — same file, same ID |
+| **Ownership model** | Clean — each dependent owns their copy | Exception to "ownership never changes" — platform takes over |
+| **Billing** | Dependents pay for their copies | Platform pays — custody bucket grows forever |
+| **Independence** | Full — each copy is a standalone file | Single point — if platform deletes, everyone loses |
+| **Complexity** | High (FileJob fan-out, repointing, version copying) | Low (one ownership update, one S3 move at most) |
+
+**Possible hybrid:** system custody as the default (cheap, no fan-out, bindings stay intact) and lazy copy as an explicit opt-in for users who want full independence and are willing to pay for the storage. `preserveOnRevoke` on FilePermission could control which strategy fires.
 - [ ] **FileVersion `current` flag concurrency** — two concurrent version uploads can race on setting `current = true/false`. Needs atomic swap in a transaction.
 - [ ] **Mutable vs immutable S3 keys** — the entire FileJob move system exists because keys mirror paths. Immutable UUID keys (`{fileId}/{versionId}`) would eliminate moves entirely, but lose debuggability in Railway's S3 browser. Worth revisiting at implementation time.
 - [ ] **FilePermission orphan cleanup** — false polymorphism means no cascade delete at DB level. Need a cleanup strategy (sweeper, or explicit cleanup on file/folder delete).
