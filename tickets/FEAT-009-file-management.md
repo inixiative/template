@@ -1272,7 +1272,7 @@ From Zealot's `NoopAssetsClient` pattern:
 - [x] **Re-grant after lazy copy** — no special handling. User keeps their snapshot and gets live access back independently. No merging, no prompting.
 - [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
 - [ ] **Lazy copy vs system custody** — two strategies for preventing broken references on revocation/deletion. Not mutually exclusive — could be system custody as default (cheap) with lazy copy as opt-in (full independence). Decision affects fan-out, storage cost, billing, and ownership model. See below.
-- [ ] **Lazy copy fan-out limits** — if lazy copy is used: a folder revocation cascading to 200 files x 50 users x N versions = massive S3 copy storm. Need batch limits, backpressure, progress tracking for the revoking admin. Consider: warn before revoke ("this will create copies for N users"), cap concurrent FileJobs, process in waves.
+- [ ] **Lazy copy fan-out limits** — theoretical concern at extreme scale (200 files x 50 users). In practice, revocations will typically be a handful of files affecting a few users — this is an uncommon action. Worth having a basic batch limit but don't over-engineer for a scenario that rarely occurs.
 - [ ] **Race window during lazy copy** — between permission revocation and copy completion, ResourceBindings point at a file the user can no longer access. Options: defer revocation until copies complete (revoke is async), or serve from original during grace window (short-lived read-through even after revoke).
 
 **Lazy copy vs system custody — tradeoff analysis:**
@@ -1292,7 +1292,7 @@ Both solve the same problem: preventing broken references when access is revoked
 
 **Possible hybrid:** system custody as the default (cheap, no fan-out, bindings stay intact) and lazy copy as an explicit opt-in for users who want full independence and are willing to pay for the storage. `preserveOnRevoke` on FilePermission could control which strategy fires.
 - [ ] **FileVersion `current` flag concurrency** — two concurrent version uploads can race on setting `current = true/false`. Needs atomic swap in a transaction.
-- [ ] **Mutable vs immutable S3 keys** — the entire FileJob move system exists because keys mirror paths. Immutable UUID keys (`{fileId}/{versionId}`) would eliminate moves entirely, but lose debuggability in Railway's S3 browser. Worth revisiting at implementation time.
+- [x] **Mutable vs immutable S3 keys** — keeping mutable path-mirroring keys. The debuggability win for superadmins navigating Railway's S3 browser is a daily operational benefit. Moves are rare; the FileJob system handles them cleanly. Not worth trading real-world usability for architectural purity.
 - [ ] **FilePermission orphan cleanup** — false polymorphism means no cascade delete at DB level. Need a cleanup strategy (sweeper, or explicit cleanup on file/folder delete).
 - [ ] **Lazy copy default** — `preserveOnRevoke: true` triggers copies for every revocation by default. At scale this is operationally expensive. Consider whether `false` (opt-in) is saner, or whether fan-out limits make `true` viable.
 
