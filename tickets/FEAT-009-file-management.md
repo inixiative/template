@@ -863,12 +863,26 @@ Two ways a user/entity can be a dependent:
 model FilePermission {
   // ... existing fields ...
   preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
+  versionScope      String    @default("all") // "all" = access to every version; "from_grant" = only versions created after grant time
 }
 ```
 
 Default is `true` — opt-out rather than opt-in. Users who explicitly don't want preservation can set it to `false`.
 
+**`versionScope`** controls which versions of a file the grantee can access:
+
+| Value | Behavior | Use case |
+|-------|----------|----------|
+| `all` | Access to every version, past and future | Default — full history, the normal share |
+| `from_grant` | Only versions created at or after the time of the grant | "You can use this going forward, but the history before you got access isn't yours" |
+
+Default is `all`. The `from_grant` scope uses the FilePermission's `createdAt` as the cutoff — only versions with a timestamp >= grant time are visible to the grantee.
+
+This also prevents the sharer from gaming revocation by replacing the file content with a blank before revoking — the grantee's version access is scoped to what existed during their grant window, and lazy copy preserves all versions they had access to (see below).
+
 #### What the copy looks like
+
+Lazy copy duplicates **all versions the user had access to** based on their `versionScope`, not just the current version. If `versionScope = "all"`, every version is copied. If `versionScope = "from_grant"`, only versions created after the grant time are copied. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
 
 The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
 
@@ -1547,6 +1561,11 @@ When a file is "replaced" (e.g., new logo upload), should the File record stay t
 - **Cache invalidation** — CDN needs to know the content changed
 
 Likely design: `File.version` counter + old S3 keys kept with version suffix (`file_{id}/v1/logo.png`, `file_{id}/v2/logo.png`). Current version is the canonical key. Previous versions are accessible but not default.
+
+**Versioning interacts with FilePermission and lazy copy:**
+- `FilePermission.versionScope` controls which versions a grantee can access (`all` vs `from_grant`)
+- Lazy copy duplicates all versions within the grantee's version scope, not just the current version
+- This prevents the sharer from replacing content with a blank file before revoking to leave the grantee with nothing
 
 ### Reference-Safe Delete
 
