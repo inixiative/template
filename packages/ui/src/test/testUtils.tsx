@@ -23,72 +23,79 @@ export const createTestWrapper = (initialState?: Partial<AppStore>) => {
 };
 
 /**
- * Mock DOM environment for hook testing
+ * Mock DOM environment for hook testing.
+ *
+ * Layers a full interactive mock (classList, style, matchMedia) on top of
+ * the minimal stub provided by test/setup.ts. Always replaces the stub —
+ * the preload only exists so libraries like sonner can inject CSS at
+ * module-load time without crashing.
  */
 export const setupDOMEnvironment = () => {
-  if (typeof globalThis.document === 'undefined') {
-    // Create stateful mocks
-    const classes = new Set<string>();
-    const styles = new Map<string, string>();
+  const classes = new Set<string>();
+  const styles = new Map<string, string>();
 
-    const classListMock = {
-      add: (className: string) => classes.add(className),
-      remove: (className: string) => classes.delete(className),
-      contains: (className: string) => classes.has(className),
-      toggle: (className: string, force?: boolean) => {
-        if (force === undefined) {
-          if (classes.has(className)) {
-            classes.delete(className);
-            return false;
-          } else {
-            classes.add(className);
-            return true;
-          }
-        } else if (force) {
-          classes.add(className);
-          return true;
-        } else {
+  const classListMock = {
+    add: (className: string) => classes.add(className),
+    remove: (className: string) => classes.delete(className),
+    contains: (className: string) => classes.has(className),
+    toggle: (className: string, force?: boolean) => {
+      if (force === undefined) {
+        if (classes.has(className)) {
           classes.delete(className);
           return false;
         }
-      },
-      length: 0,
-    };
+        classes.add(className);
+        return true;
+      }
+      if (force) {
+        classes.add(className);
+        return true;
+      }
+      classes.delete(className);
+      return false;
+    },
+    length: 0,
+  };
 
-    const styleMock = {
-      setProperty: (prop: string, value: string) => styles.set(prop, value),
-      removeProperty: (prop: string) => styles.delete(prop),
-      getPropertyValue: (prop: string) => styles.get(prop) || '',
-      length: styles.size,
-      [Symbol.iterator]: function* () {
-        for (const key of styles.keys()) {
-          yield key;
-        }
-      },
-    };
+  const styleMock = {
+    setProperty: (prop: string, value: string) => styles.set(prop, value),
+    removeProperty: (prop: string) => styles.delete(prop),
+    getPropertyValue: (prop: string) => styles.get(prop) || '',
+    length: styles.size,
+    [Symbol.iterator]: function* () {
+      for (const key of styles.keys()) {
+        yield key;
+      }
+    },
+  };
 
-    (globalThis as Record<string, unknown>).document = {
-      documentElement: {
-        classList: classListMock,
-        style: styleMock,
-      },
-      createElement: () => ({ classList: classListMock, style: styleMock }),
-      appendChild: () => {},
-    };
+  const noop = () => {};
+  const headEl = { appendChild: noop };
 
-    (globalThis as Record<string, unknown>).window = {
-      matchMedia: () => ({
-        matches: false,
-        media: '',
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => true,
-      }),
-    };
-  }
+  (globalThis as Record<string, unknown>).document = {
+    documentElement: {
+      classList: classListMock,
+      style: styleMock,
+    },
+    head: headEl,
+    createElement: () => ({ classList: classListMock, style: styleMock, appendChild: noop, styleSheet: null }),
+    createTextNode: (text: string) => ({ textContent: text }),
+    getElementsByTagName: () => [headEl],
+    appendChild: noop,
+  };
+
+  (globalThis as Record<string, unknown>).window = {
+    matchMedia: () => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addListener: noop,
+      removeListener: noop,
+      addEventListener: noop,
+      removeEventListener: noop,
+      dispatchEvent: () => true,
+    }),
+  };
 };
 
 /**
