@@ -12,6 +12,10 @@ export type VirtualScrollHandle = {
 /**
  * Virtualized vertical scroll list with infinite-load support.
  *
+ * Items render in normal document flow (no absolute positioning) using
+ * padding to maintain correct scroll height. This ensures consistent
+ * measurement and compatibility with standard CSS (borders, flex, etc.).
+ *
  * Horizontal / carousel layout
  * ────────────────────────────
  * This component intentionally only supports vertical scrolling.
@@ -36,11 +40,15 @@ export type VirtualScrollProps<T> = {
   hasMore?: boolean;
   loadMoreThreshold?: number;
   overscan?: number;
+  /** Index to scroll to on mount (e.g. from useVirtualScrollState). */
+  initialIndex?: number;
   show?: boolean | (() => boolean);
-  /** Key for history.state scroll index persistence (back/forward nav only). */
-  scrollStateKey?: string;
   className?: string;
   emptyMessage?: React.ReactNode;
+  /** Set to use with useVirtualScrollState for router-driven restoration. */
+  scrollRestorationId?: string;
+  /** Called when the top visible index changes. Wire to useVirtualScrollState. */
+  onTopIndexChange?: (index: number) => void;
 };
 
 export const VirtualScroll = React.forwardRef<VirtualScrollHandle, VirtualScrollProps<unknown>>(
@@ -71,19 +79,21 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       hasMore,
       loadMoreThreshold = 5,
       overscan = 5,
-      scrollStateKey,
+      initialIndex,
       className,
+      scrollRestorationId,
+      onTopIndexChange,
     },
     ref,
   ) => {
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
-    const { virtualizer, virtualItems } = useVirtualListCore({
+    const { virtualizer, virtualItems, topVisibleIndex, paddingStart, paddingEnd } = useVirtualListCore({
       itemCount: items.length,
       scrollRef,
       estimateSize: estimateItemHeight,
       overscan,
-      scrollStateKey,
+      initialIndex,
       onLoadMore,
       isLoadingMore,
       hasMore,
@@ -96,15 +106,19 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       keyExtractor,
     ]);
 
+    // Notify parent of scroll position changes.
+    React.useEffect(() => {
+      onTopIndexChange?.(topVisibleIndex);
+    }, [topVisibleIndex, onTopIndexChange]);
+
     return (
       <div
         ref={scrollRef}
         className={cn('overflow-auto', className)}
         style={{ maxHeight, overflowY: 'auto' }}
+        data-scroll-restoration-id={scrollRestorationId}
       >
-        <div
-          style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}
-        >
+        <div style={{ paddingTop: paddingStart, paddingBottom: paddingEnd }}>
           {virtualItems.map((virtualItem) => {
             const item = items[virtualItem.index];
             return (
@@ -112,13 +126,6 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
                 key={keyExtractor(item)}
                 data-index={virtualItem.index}
                 ref={virtualizer.measureElement}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualItem.start}px)`,
-                }}
               >
                 {renderItem(item, virtualItem.index)}
               </div>

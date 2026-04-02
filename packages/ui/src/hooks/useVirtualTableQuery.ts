@@ -18,14 +18,6 @@ export type UseVirtualTableQueryOptions<TItem> = {
   queryFn: (pageParam: PageParam) => Promise<VirtualTablePage<TItem>>;
   /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
-  /**
-   * Unique key for history.state page count persistence. When set,
-   * the loaded page count is saved to history.state on each fetch.
-   * On back/forward navigation the hook re-fetches pages until it
-   * reaches the previously loaded count. Fresh navigations (link
-   * clicks) start from page 1 because history.state is empty.
-   */
-  stateKey?: string;
 };
 
 export type VirtualTablePageLocation = {
@@ -36,6 +28,8 @@ export type VirtualTablePageLocation = {
 export type UseVirtualTableQueryResult<TItem> = {
   /** Flattened array of all items across loaded pages. */
   data: TItem[];
+  /** Number of pages currently in cache. */
+  pageCount: number;
   /** Whether the initial load is in progress. */
   isLoading: boolean;
   /** Whether a subsequent page is being fetched. */
@@ -56,30 +50,10 @@ export type UseVirtualTableQueryResult<TItem> = {
   queryKey: QueryKey;
 };
 
-/** Read the saved page count from history.state, or 0 if absent. */
-function readSavedPageCount(stateKey: string): number {
-  try {
-    const saved = window.history.state?.[stateKey];
-    return typeof saved === 'number' ? saved : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Write the current page count into history.state. */
-function persistPageCount(stateKey: string, count: number): void {
-  try {
-    const state = { ...window.history.state, [stateKey]: count };
-    window.history.replaceState(state, '');
-  } catch {
-    // sandboxed iframe or SecurityError — skip
-  }
-}
-
 export function useVirtualTableQuery<TItem>(
   options: UseVirtualTableQueryOptions<TItem>,
 ): UseVirtualTableQueryResult<TItem> {
-  const { queryKey, queryFn, enabled = true, stateKey } = options;
+  const { queryKey, queryFn, enabled = true } = options;
 
   const query = useInfiniteQuery<
     VirtualTablePage<TItem>,
@@ -95,31 +69,9 @@ export function useVirtualTableQuery<TItem>(
     enabled,
   });
 
-  // Read the target page count once on mount (before any effects).
-  const targetPageCountRef = React.useRef<number | null>(null);
-  if (targetPageCountRef.current === null) {
-    targetPageCountRef.current = stateKey ? readSavedPageCount(stateKey) : 0;
-  }
-
-  // Re-fetch pages one-at-a-time until we reach the saved count.
-  // Each fetch updates the cursor, so the next effect cycle fetches the next page.
-  const pageCount = query.data?.pages.length ?? 0;
-  React.useEffect(() => {
-    if (!stateKey || query.isFetchingNextPage || !query.hasNextPage) return;
-    const target = targetPageCountRef.current ?? 0;
-    if (pageCount > 0 && pageCount < target) {
-      query.fetchNextPage();
-    }
-  }, [stateKey, pageCount, query.isFetchingNextPage, query.hasNextPage, query.fetchNextPage]);
-
-  // Persist the loaded page count whenever it changes.
-  React.useEffect(() => {
-    if (!stateKey || pageCount === 0) return;
-    persistPageCount(stateKey, pageCount);
-  }, [stateKey, pageCount]);
-
   const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 
+  const pageCount = query.data?.pages.length ?? 0;
   const total = query.data?.pages[0]?.total;
 
   const locateItem = React.useCallback(
@@ -140,6 +92,7 @@ export function useVirtualTableQuery<TItem>(
 
   return {
     data,
+    pageCount,
     isLoading: query.isLoading,
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage,

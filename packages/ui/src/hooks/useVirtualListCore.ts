@@ -7,6 +7,11 @@ export type VirtualListCoreOptions = {
   estimateSize: number;
   horizontal?: boolean;
   overscan?: number;
+  /**
+   * When set, the virtualizer scrolls to this index on mount (once itemCount
+   * covers it). Consumers typically read this from router location state.
+   */
+  initialIndex?: number;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
@@ -16,6 +21,8 @@ export type VirtualListCoreOptions = {
 export type VirtualListCoreResult = {
   virtualizer: Virtualizer<HTMLElement, Element>;
   virtualItems: ReturnType<Virtualizer<HTMLElement, Element>['getVirtualItems']>;
+  /** Index of the topmost visible item. -1 when no items are rendered. */
+  topVisibleIndex: number;
   /** Padding before the first rendered item (px). Use as paddingTop or paddingLeft. */
   paddingStart: number;
   /** Padding after the last rendered item (px). Use as paddingBottom or paddingRight. */
@@ -33,6 +40,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     estimateSize,
     horizontal = false,
     overscan = 5,
+    initialIndex,
     onLoadMore,
     isLoadingMore,
     hasMore,
@@ -49,16 +57,32 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  // Compute padding for the flow-based layout approach.
-  // Items render in normal flow with padding before/after to maintain
-  // correct scroll height without absolute positioning.
+  // Padding for the flow-based layout approach. Items render in normal
+  // flow with padding before/after to maintain correct scroll height.
   const paddingStart = virtualItems[0]?.start ?? 0;
   const paddingEnd =
     virtualItems.length > 0
       ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
 
-  // Infinite load trigger — use derived index to avoid re-running on every render.
+  const topVisibleIndex = virtualItems[0]?.index ?? -1;
+
+  // Restore to initialIndex once data covers it. Uses scrollToIndex's
+  // built-in reconciliation loop to converge on the correct position
+  // as real measurements arrive across frames.
+  const restoredRef = React.useRef(false);
+  const virtualizerRef = React.useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  React.useEffect(() => {
+    if (restoredRef.current || initialIndex == null || initialIndex <= 0) return;
+    if (itemCount > initialIndex) {
+      restoredRef.current = true;
+      virtualizerRef.current.scrollToIndex(initialIndex, { align: 'start' });
+    }
+  }, [initialIndex, itemCount]);
+
+  // Infinite load trigger — uses derived index to avoid re-running on every render.
   const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
   React.useEffect(() => {
     if (!onLoadMore || !hasMore || isLoadingMore) return;
@@ -68,7 +92,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     }
   }, [lastVisibleIndex, itemCount, loadMoreThreshold, onLoadMore, hasMore, isLoadingMore]);
 
-  return { virtualizer, virtualItems, paddingStart, paddingEnd };
+  return { virtualizer, virtualItems, topVisibleIndex, paddingStart, paddingEnd };
 }
 
 /**

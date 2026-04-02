@@ -19,13 +19,18 @@ export type VirtualTableProps<T> = {
   show?: boolean | (() => boolean);
   estimateRowHeight?: number;
   maxHeight?: number;
+  overscan?: number;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
   loadMoreThreshold?: number;
-  /** Key for history.state scroll index persistence (back/forward nav only). */
-  scrollStateKey?: string;
+  /** Index to scroll to on mount (e.g. from useVirtualScrollState). */
+  initialIndex?: number;
   className?: string;
+  /** Set to use with useVirtualScrollState for router-driven restoration. */
+  scrollRestorationId?: string;
+  /** Called when the top visible index changes. Wire to useVirtualScrollState. */
+  onTopIndexChange?: (index: number) => void;
 };
 
 export const VirtualTable = React.forwardRef<VirtualTableHandle, VirtualTableProps<unknown>>(
@@ -52,23 +57,26 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       onRowClick,
       estimateRowHeight = 48,
       maxHeight = 600,
+      overscan = 10,
       onLoadMore,
       isLoadingMore,
       hasMore,
       loadMoreThreshold = 5,
-      scrollStateKey,
+      initialIndex,
       className,
+      scrollRestorationId,
+      onTopIndexChange,
     },
     ref,
   ) => {
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
-    const { virtualizer, virtualItems } = useVirtualListCore({
+    const { virtualizer, virtualItems, topVisibleIndex, paddingStart, paddingEnd } = useVirtualListCore({
       itemCount: data.length,
       scrollRef,
       estimateSize: estimateRowHeight,
-      overscan: 10,
-      scrollStateKey,
+      overscan,
+      initialIndex,
       onLoadMore,
       isLoadingMore,
       hasMore,
@@ -80,10 +88,19 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       return { scrollToRow: handle.scrollToIndex, scrollToItem: handle.scrollToItem };
     }, [virtualizer, data, keyExtractor]);
 
+    // Notify parent of scroll position changes.
+    React.useEffect(() => {
+      onTopIndexChange?.(topVisibleIndex);
+    }, [topVisibleIndex, onTopIndexChange]);
+
     return (
       <div className={cn('border rounded-lg overflow-hidden', className)}>
-        <div ref={scrollRef} style={{ maxHeight, overflow: 'auto' }}>
-          <table className="w-full">
+        <div
+          ref={scrollRef}
+          style={{ maxHeight, overflow: 'auto' }}
+          data-scroll-restoration-id={scrollRestorationId}
+        >
+          <table className="w-full" style={{ tableLayout: 'fixed' }}>
             <thead className="bg-muted/50 border-b sticky top-0 z-10">
               <tr>
                 {columns.map((column) => (
@@ -93,7 +110,12 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y relative" style={{ height: virtualizer.getTotalSize() }}>
+            <tbody>
+              {paddingStart > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={columns.length} style={{ height: paddingStart, padding: 0, border: 'none' }} />
+                </tr>
+              )}
               {virtualItems.map((virtualRow) => {
                 const item = data[virtualRow.index];
                 return (
@@ -101,15 +123,8 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
                     key={keyExtractor(item)}
                     data-index={virtualRow.index}
                     ref={virtualizer.measureElement}
-                    className={cn('hover:bg-muted/30 transition-colors', onRowClick && 'cursor-pointer')}
+                    className={cn('border-b hover:bg-muted/30 transition-colors', onRowClick && 'cursor-pointer')}
                     onClick={onRowClick ? () => onRowClick(item) : undefined}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
                   >
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-3 text-sm">
@@ -121,6 +136,11 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
                   </tr>
                 );
               })}
+              {paddingEnd > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={columns.length} style={{ height: paddingEnd, padding: 0, border: 'none' }} />
+                </tr>
+              )}
             </tbody>
           </table>
           {isLoadingMore && (

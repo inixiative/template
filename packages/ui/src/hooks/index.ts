@@ -37,6 +37,12 @@ export { useThemePersistence } from './useThemePersistence';
 export { useValidateUniqueness } from './useValidateUniqueness';
 export { type VirtualListHandle, useVirtualListCore } from './useVirtualListCore';
 export {
+  type ScrollState,
+  type UseVirtualScrollStateOptions,
+  type UseVirtualScrollStateResult,
+  useVirtualScrollState,
+} from './useVirtualScrollState';
+export {
   type UseVirtualTableQueryOptions,
   type UseVirtualTableQueryResult,
   type VirtualTablePage,
