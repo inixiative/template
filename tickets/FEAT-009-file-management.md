@@ -64,25 +64,28 @@ This system is designed so that **every file knows what it's doing, and every us
 
 The file IS the asset. It holds storage metadata, ownership, and its position in the hierarchy.
 
+File is a **container** — it holds the identity, ownership, hierarchy position, and human-readable name. The actual content (bytes, size, type, metadata) lives on FileVersion. File is what you reference, share, bind, and move. FileVersion is what you upload, download, and render.
+
 ```prisma
 model File {
   id              String    @id @default(uuid())
   organizationId  String?                         // null for user-personal files
-  uploadedBy      String                          // userId or customerRefId
-  uploadedByModel String    @default("User")      // "User" | "CustomerRef"
+  createdBy       String                          // userId or customerRefId who created the container
+  createdByModel  String    @default("User")      // "User" | "CustomerRef"
 
   folderId        String?                         // null = root level (no folder)
   path            String                          // materialized path (MUTABLE — updates on move)
   depth           Int       @default(0)           // 0 = root, 1 = first level, etc.
 
-  key             String    @unique               // S3 object key (MUTABLE — kept in sync with path on move)
-  filename        String                          // original filename
-  contentType     String                          // MIME type
-  size            Int                             // bytes
-  status          String    @default("pending")   // pending | active | failed
+  filename        String                          // display name (the container's name, not the version's)
   title           String?                         // human-readable title
   description     String?
-  metadata        Json?                           // { width, height, duration, pages, etc. }
+
+  // Snapshot fields (set when this File is a lazy copy of another)
+  sourceFileId    String?                         // original file this was copied from
+  snapshotAt      DateTime?                       // when the copy was created
+  snapshotReason  String?                         // "accessRevoked" | "accessExpired" | "sourceDeleted"
+  snapshotBy      String?                         // userId who triggered the event
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -92,30 +95,44 @@ model File {
   folder          Folder?       @relation(fields: [folderId], references: [id])
   permissions     FilePermission[]
   versions        FileVersion[]
-  // bindings     ResourceBinding[]              // v2: usage layer (what role a file plays on a resource)
+  // bindings     ResourceBinding[]              // v2: usage layer
 }
 ```
 
+**What lives on File (the container):**
+- Identity (`id`) — what everything else references
+- Ownership (`organizationId`, `createdBy`) — who pays, who created it
+- Hierarchy (`folderId`, `path`, `depth`) — where it sits in the folder tree
+- Display (`filename`, `title`, `description`) — how it appears to users
+- Snapshot provenance — if this is a lazy copy, where it came from
+
+**What does NOT live on File:**
+- No `key` — S3 keys are per-version
+- No `size`, `contentType`, `metadata` — these change per version
+- No `status` — each version has its own upload lifecycle
+
 **Ownership rules:**
 - `organizationId` set → org owns it, org pays for storage
-- `organizationId` null + `uploadedBy` set → user's personal file, user owns it
+- `organizationId` null + `createdBy` set → user's personal file, user owns it
 - Ownership never changes. If a user uploads to an org, the org owns it.
 
-### 3.1.1 FileVersion (Storage Layer)
+### 3.1.1 FileVersion (Content Layer)
 
-Each version is a separate record with its own S3 key. The File record points to the current version; previous versions are accessible but not default.
+Each version is a separate record with its own S3 key, size, type, and metadata. The version with `current = true` is what gets served by default. Previous versions are retained and accessible.
 
 ```prisma
 model FileVersion {
   id          String    @id @default(uuid())
-  fileId      String
+  fileId      String                            // FK to the container
   version     Int                               // monotonic: 1, 2, 3, ...
   key         String    @unique                 // S3 object key for this version
-  size        Int                               // bytes (may differ per version)
-  contentType String                            // MIME type (may differ if format changes)
-  metadata    Json?                             // version-specific metadata (dimensions, etc.)
+  filename    String                            // original upload filename (may differ from File.filename if renamed)
+  contentType String                            // MIME type
+  size        Int                               // bytes
+  status      String    @default("pending")     // pending | active | failed
+  metadata    Json?                             // { width, height, duration, pages, etc. }
   uploadedBy  String                            // userId who uploaded this version
-  current     Boolean   @default(false)         // true = this is the active version
+  current     Boolean   @default(false)         // true = this is the active/served version
 
   createdAt   DateTime  @default(now())
 
@@ -135,7 +152,7 @@ model FileVersion {
 **Version lifecycle:**
 - Upload creates version 1 (and the File record)
 - Replace creates version N+1, sets `current = true` on new, `current = false` on old
-- File.key stays in sync with the current version's key
+- ResourceBindings and downloads resolve via File → current FileVersion → S3 key
 - Old versions are retained in S3 until the file is hard-deleted or retention expires
 - ResourceBindings always resolve to the current version unless explicitly pinned (future)
 
@@ -520,8 +537,9 @@ user-bucket/
 
 **S3 key = materialized path + filename (kept in sync):**
 ```typescript
-const key = `${file.path}/${file.filename}`;
-// e.g. "org_abc/space_123/assets/file_xyz/banner.png"
+const key = `${file.path}/file_${file.id}/v${version.version}/${version.filename}`;
+// e.g. "org_abc/space_123/file_xyz/v1/banner.png"
+//      "org_abc/space_123/file_xyz/v2/banner.png"
 ```
 
 **S3 keys stay in sync with logical paths via a durable move job.**
@@ -577,54 +595,75 @@ async function reconcileFileJob(job: FileJob, db, s3) {
 }
 
 async function reconcileMove(job: FileJob, db, s3) {
-  // 1. Does target key exist in S3? No → copy it.
-  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
-  if (!targetExists) {
-    await s3.copyObject(job.sourceKey, job.targetKey);
-    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
+  // Moves operate on FileVersions — each version's key must be updated.
+  // The File container's path updates, but keys live on versions.
+
+  // 1. For each FileVersion: does target key exist in S3? No → copy it.
+  const versions = await db.fileVersion.findMany({ where: { fileId: job.fileId } });
+  for (const version of versions) {
+    const newKey = version.key.replace(job.sourcePath, job.targetPath);
+    const exists = await s3.headObject(newKey).catch(() => false);
+    if (!exists) {
+      await s3.copyObject(version.key, newKey);
+      if (!await s3.headObject(newKey).catch(() => false)) return; // retry next cycle
+    }
+    // 2. Does DB version point to new key? No → swap it.
+    if (version.key !== newKey) {
+      await db.fileVersion.update({ where: { id: version.id }, data: { key: newKey } });
+    }
+    // 3. Delete old key
+    await s3.deleteObject(version.key); // idempotent
   }
 
-  // 2. Does DB point to target key? No → swap it.
-  const file = await db.file.findUnique({ where: { id: job.fileId } });
-  if (file.key !== job.targetKey) {
-    await db.file.update({
-      where: { id: job.fileId },
-      data: { key: job.targetKey, path: job.targetPath },
-    });
-  }
+  // 4. Update File container path
+  await db.file.update({
+    where: { id: job.fileId },
+    data: { path: job.targetPath },
+  });
 
-  // 3. Does source key still exist in S3? Yes → delete it.
-  await s3.deleteObject(job.sourceKey);   // idempotent — no error if already gone
-
-  // All three conditions met → done
   await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
 }
 
 async function reconcileLazyCopy(job: FileJob, db, s3) {
-  // 1. Does target key exist in S3? No → copy it.
-  const targetExists = await s3.headObject(job.targetKey).catch(() => false);
-  if (!targetExists) {
-    await s3.copyObject(job.sourceKey, job.targetKey);
-    if (!await s3.headObject(job.targetKey).catch(() => false)) return; // retry next cycle
-  }
+  // Lazy copy creates a new File container + copies all accessible FileVersions.
+  // The new File is already created (status doesn't live on File anymore — it's per-version).
 
-  // 2. Is the new File record active? No → activate it.
-  const newFile = await db.file.findUnique({ where: { id: job.newFileId } });
-  if (newFile.status !== 'active') {
-    await db.file.update({
-      where: { id: job.newFileId },
-      data: { status: 'active' },
+  // 1. Get source versions within the grantee's fromVersion scope
+  const permission = await db.filePermission.findFirst({
+    where: { targetId: job.fileId, granteeId: job.dependentId },
+  });
+  const fromVersion = permission?.fromVersion ?? 1;
+  const sourceVersions = await db.fileVersion.findMany({
+    where: { fileId: job.fileId, version: { gte: fromVersion } },
+  });
+
+  // 2. For each version: copy S3 bytes and create a new FileVersion on the new File
+  for (const version of sourceVersions) {
+    const newKey = version.key.replace(/* source path */, /* target path in __preserved/ */);
+    const exists = await s3.headObject(newKey).catch(() => false);
+    if (!exists) {
+      await s3.copyObject(version.key, newKey);
+      if (!await s3.headObject(newKey).catch(() => false)) return; // retry next cycle
+    }
+    // Create or update the version record on the new File
+    await db.fileVersion.upsert({
+      where: { fileId_version: { fileId: job.newFileId, version: version.version } },
+      create: {
+        fileId: job.newFileId, version: version.version, key: newKey,
+        filename: version.filename, contentType: version.contentType,
+        size: version.size, status: 'active', metadata: version.metadata,
+        uploadedBy: version.uploadedBy, current: version.current,
+      },
+      update: { status: 'active' },
     });
   }
 
-  // 3. Are ResourceBindings repointed? No → repoint them.
-  // dependentModel/dependentId map to ResourceBinding's resourceType/resourceId
+  // 3. Repoint ResourceBindings
   await db.resourceBinding.updateMany({
     where: { fileId: job.fileId, resourceType: job.dependentModel, resourceId: job.dependentId },
     data: { fileId: job.newFileId },
   });
 
-  // All three conditions met → done
   await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
 }
 ```
@@ -648,10 +687,10 @@ at any point, the next run re-checks and picks up where it left off.
 Request path (fast):
   1. Postgres transaction:
      - Create FileJob (type: "move", sourceKey/targetKey, sourcePath/targetPath)
-     - File.path and File.key stay unchanged (reads work, S3 key valid)
+     - File.path stays unchanged, FileVersion keys unchanged (reads work)
   2. Enqueue BullMQ job with FileJob.id
   3. BullMQ worker runs reconcileFileJob → dispatches to reconcileMove:
-     copy S3 → update File.path + File.key in DB → delete old S3 key
+     copy S3 per version → update FileVersion keys + File.path → delete old S3 keys
 
 Sweeper path (safety net):
   - Cron runs every N minutes (same sweeper as section 16)
@@ -933,32 +972,20 @@ This also prevents the sharer from gaming revocation by replacing the file conte
 
 Lazy copy duplicates **all FileVersions the user had access to** (version >= `fromVersion`), not just the current version. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
 
-The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
+The lazy copy creates a **new File container** owned by the dependent user/org, with copies of all accessible FileVersions:
 
-| Field | Value |
+| File field | Value |
 |-------|-------|
 | `organizationId` | Dependent's org (or null for personal) |
-| `uploadedBy` | System (not the original uploader) |
+| `createdBy` | System (not the original uploader) |
 | `folderId` | System folder: `__preserved/` within the dependent's scope |
 | `path` | `{dependent_scope}/__preserved/{file_id}/{filename}` |
-| `key` | Mirrors path (new S3 key, new bytes copied from original) |
-| `status` | `active` |
 | `sourceFileId` | Original file ID — provenance tracking |
 | `snapshotAt` | Timestamp when the copy was created |
 | `snapshotReason` | `accessRevoked` \| `accessExpired` \| `sourceDeleted` |
-| `snapshotBy` | userId who triggered the revocation/deletion (for audit) |
+| `snapshotBy` | userId who triggered the revocation/deletion |
 
-New fields on File for provenance:
-
-```prisma
-model File {
-  // ... existing fields ...
-  sourceFileId     String?                          // if this is a lazy copy, the original file it came from
-  snapshotAt       DateTime?                        // when the copy was created (null = this is a live/original file)
-  snapshotReason   String?                          // "accessRevoked" | "accessExpired" | "sourceDeleted"
-  snapshotBy       String?                          // userId who triggered the event that caused the copy
-}
-```
+Each FileVersion within the grantee's `fromVersion` scope is duplicated as a new FileVersion under the new File container, with new S3 keys in the dependent's scope. The snapshot provenance fields live on the File model itself (see section 3.1).
 
 #### `__preserved/` system folder
 
@@ -1564,8 +1591,8 @@ S3 objects can become orphaned when moves fail partway, uploads are abandoned, o
 
 | Orphan type | Detection | Action |
 |-------------|-----------|--------|
-| **Stale pending uploads** | `File.status = "pending"` older than 1h | HEAD check → mark active or failed |
-| **Failed uploads** | `File.status = "failed"` older than 24h | Hard delete DB record + S3 object |
+| **Stale pending uploads** | `FileVersion.status = "pending"` older than 1h | HEAD check → mark active or failed |
+| **Failed uploads** | `FileVersion.status = "failed"` older than 24h | Hard delete version record + S3 object; if File has no remaining versions, delete File |
 | **Stalled file jobs** | `FileJob.done = false`, `updatedAt` older than 5m | Run `reconcileFileJob` — dispatches by type (idempotent) |
 | **Failed file jobs** | `FileJob.done = false`, `error IS NOT NULL` | Alert for manual review; source key still works |
 | **Move remnants** | S3 objects at old keys after completed moves | Cross-reference DB keys, delete unmatched |
@@ -1577,25 +1604,28 @@ S3 objects can become orphaned when moves fail partway, uploads are abandoned, o
 ```typescript
 // Scheduled job — runs every hour (or cron)
 async function sweepOrphans(db: PrismaClient, s3: S3Client) {
-  // 1. Stale pending → verify or fail
-  const stalePending = await db.file.findMany({
+  // 1. Stale pending versions → verify or fail
+  const stalePending = await db.fileVersion.findMany({
     where: { status: 'pending', createdAt: { lt: oneHourAgo() } },
   });
-  for (const file of stalePending) {
-    const exists = await headObject(s3, file.key);
-    await db.file.update({
-      where: { id: file.id },
+  for (const version of stalePending) {
+    const exists = await headObject(s3, version.key);
+    await db.fileVersion.update({
+      where: { id: version.id },
       data: { status: exists ? 'active' : 'failed' },
     });
   }
 
-  // 2. Failed → hard delete
-  const failed = await db.file.findMany({
+  // 2. Failed versions → hard delete
+  const failed = await db.fileVersion.findMany({
     where: { status: 'failed', createdAt: { lt: oneDayAgo() } },
   });
-  for (const file of failed) {
-    await deleteObject(s3, file.key);
-    await db.file.delete({ where: { id: file.id } });
+  for (const version of failed) {
+    await deleteObject(s3, version.key);
+    await db.fileVersion.delete({ where: { id: version.id } });
+    // If File container has no remaining versions, clean it up too
+    const remaining = await db.fileVersion.count({ where: { fileId: version.fileId } });
+    if (remaining === 0) await db.file.delete({ where: { id: version.fileId } });
   }
 
   // 3. Soft-deleted past retention → hard delete (only if no active references)
