@@ -1,10 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import type { SpaceTheme } from '@template/ui/types';
 
 describe('useSpaceTheme', () => {
   beforeEach(() => {
-    setupDOMEnvironment();
     // Clear all --space-* CSS variables
     const style = document.documentElement.style;
     for (let i = style.length - 1; i >= 0; i--) {
@@ -13,10 +11,6 @@ describe('useSpaceTheme', () => {
         style.removeProperty(prop);
       }
     }
-  });
-
-  afterEach(() => {
-    cleanupDOMEnvironment();
   });
 
   it('should set CSS variables for defined theme properties', () => {
