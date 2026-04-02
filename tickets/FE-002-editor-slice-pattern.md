@@ -99,82 +99,93 @@ state.editors.inquiry.set('new', blankInquiry);
 
 ### Factory
 
-`makeEditorSlice` generates the entire slice from the registry. Each registered name gets its own namespace with records + actions:
+`makeEditorSlice(name, set)` generates a single editor namespace — one entry under `editors.*`. Each editor calls it independently:
 
 ```ts
-export const makeEditorSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
-  editors: Object.fromEntries(
-    editorNames.map((name) => [
-      name,
-      {
-        records: {},
+// makeEditorSlice — generates one editor namespace
+const makeEditorSlice = <K extends keyof EditorRegistry>(
+  name: K,
+  set: StoreApi<AppStore>['setState'],
+): EditorNamespace<EditorRegistry[K]> => ({
+  records: {},
 
-        set: (id, data) =>
-          set(
-            (state) => ({
-              editors: {
-                ...state.editors,
-                [name]: {
-                  ...state.editors[name],
-                  records: {
-                    ...state.editors[name].records,
-                    [id]: { data, isDirty: false },
-                  },
+  set: (id, data) =>
+    set(
+      (state) => ({
+        editors: {
+          ...state.editors,
+          [name]: {
+            ...state.editors[name],
+            records: {
+              ...state.editors[name].records,
+              [id]: { data, isDirty: false },
+            },
+          },
+        },
+      }),
+      false,
+      `editors/${name}/set`,
+    ),
+
+  update: (id, patch) =>
+    set(
+      (state) => {
+        const existing = state.editors[name].records[id];
+        if (!existing) return state;
+        return {
+          editors: {
+            ...state.editors,
+            [name]: {
+              ...state.editors[name],
+              records: {
+                ...state.editors[name].records,
+                [id]: {
+                  data: { ...existing.data, ...patch },
+                  isDirty: true,
                 },
               },
-            }),
-            false,
-            `editors/${name}/set`,
-          ),
-
-        update: (id, patch) =>
-          set(
-            (state) => {
-              const existing = state.editors[name].records[id];
-              if (!existing) return state;
-              return {
-                editors: {
-                  ...state.editors,
-                  [name]: {
-                    ...state.editors[name],
-                    records: {
-                      ...state.editors[name].records,
-                      [id]: {
-                        data: { ...existing.data, ...patch },
-                        isDirty: true,
-                      },
-                    },
-                  },
-                },
-              };
             },
-            false,
-            `editors/${name}/update`,
-          ),
-
-        remove: (id) =>
-          set(
-            (state) => {
-              const { [id]: _, ...rest } = state.editors[name].records;
-              return {
-                editors: {
-                  ...state.editors,
-                  [name]: { ...state.editors[name], records: rest },
-                },
-              };
-            },
-            false,
-            `editors/${name}/remove`,
-          ),
+          },
+        };
       },
-    ]),
-  ) as EditorsSlice['editors'],
+      false,
+      `editors/${name}/update`,
+    ),
+
+  remove: (id) =>
+    set(
+      (state) => {
+        const { [id]: _, ...rest } = state.editors[name].records;
+        return {
+          editors: {
+            ...state.editors,
+            [name]: { ...state.editors[name], records: rest },
+          },
+        };
+      },
+      false,
+      `editors/${name}/remove`,
+    ),
 });
 ```
 
-### Store Composition
+### Editors Slice (Composition)
 
-One line — all editors come along:
+The `editors` slice composes individual `makeEditorSlice` calls:
+
+```ts
+// createEditorsSlice — composes all editors under state.editors.*
+export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
+  editors: {
+    ...makeEditorSlice('inquiry', set),
+    ...makeEditorSlice('inquiryResponse', set),
+  },
+});
+```
+
+Adding a new editor = one `makeEditorSlice` call + one `EditorRegistry` entry.
+
+### Store Composition
 
 ```ts
 // store/index.ts
@@ -182,7 +193,7 @@ export const useAppStore = create(
   devtools(
     (...a) => ({
       ...createAuthSlice(...a),
-      ...makeEditorSlice(...a),   // all editors in one slice
+      ...createEditorsSlice(...a),
       ...createTenantSlice(...a),
       // ...
     }),
@@ -242,8 +253,8 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ### 2. Slice Implementation
 
-- [ ] Create `packages/ui/src/store/slices/editors.ts` with `makeEditorSlice`
-- [ ] Generate per-editor namespaces from registry names
+- [ ] Create `packages/ui/src/store/slices/editors.ts` with `makeEditorSlice(name, set)` factory
+- [ ] Create `createEditorsSlice` that composes `makeEditorSlice` calls under `state.editors.*`
 - [ ] Export from `packages/ui/src/store/index.ts`
 
 ### 3. Store Composition & Hooks
@@ -276,7 +287,7 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ## Definition of Done
 
-- [ ] `makeEditorSlice` exists with registry-driven generation
+- [ ] `makeEditorSlice(name, set)` factory + `createEditorsSlice` compositor exist
 - [ ] TypeScript types: `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice`, `EditorRegistry`
 - [ ] At least two editors registered (`inquiry`, `inquiryResponse`)
 - [ ] Generic selector hooks exported with `useShallow` where appropriate
