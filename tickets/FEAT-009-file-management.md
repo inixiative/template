@@ -616,8 +616,9 @@ async function reconcileLazyCopy(job: FileJob, db, s3) {
   }
 
   // 3. Are ResourceBindings repointed? No → repoint them.
+  // dependentModel/dependentId map to ResourceBinding's resourceType/resourceId
   await db.resourceBinding.updateMany({
-    where: { fileId: job.fileId, resourceOwnerId: job.dependentId },
+    where: { fileId: job.fileId, resourceType: job.dependentModel, resourceId: job.dependentId },
     data: { fileId: job.newFileId },
   });
 
