@@ -1,5 +1,4 @@
-import { Button } from '@template/ui/components/primitives/Button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 
 export type Column<T> = {
   key: string;
@@ -14,11 +13,7 @@ export type TableProps<T> = {
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
   show?: boolean | (() => boolean);
-  pagination?: {
-    currentPage: number;
-    totalPages: number;
-    onPageChange: (page: number) => void;
-  };
+  pagination?: PaginationProps;
 };
 
 export const Table = <T,>({
@@ -70,33 +65,7 @@ export const Table = <T,>({
         </table>
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Page {pagination.currentPage} of {pagination.totalPages}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === pagination.totalPages}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
+      {pagination && <Pagination {...pagination} />}
     </div>
   );
 };

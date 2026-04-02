@@ -7,6 +7,7 @@ export * from './DropdownMenu';
 export * from './EmptyState';
 export * from './Input';
 export * from './Label';
+export * from './Pagination';
 export * from './PasswordInput';
 export * from './Select';
 export * from './SlugInput';
