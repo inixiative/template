@@ -10,13 +10,12 @@
 
 ## Overview
 
-Add a `makeEditorSlice(name)` factory that generates standardized editor slices for form/model editing state. All editor slices share a base interface (records map, set/update/reset/remove actions, isDirty tracking). This gives every create/edit form in the app a consistent, composable state shape with zero boilerplate.
+Add a `makeEditorSlice(name)` factory that generates standardized editor slices for form/model editing state. All editor slices share a base interface (records map, set/update/remove actions, isDirty tracking). This gives every create/edit form in the app a consistent, composable state shape with zero boilerplate.
 
 ## Objectives
 
 - Establish a reusable editor slice factory with a stable base interface
-- Refactor existing mission editor state to use the factory
-- Make it trivial to add new editor slices (rewards, segments, fan users, etc.)
+- Make it trivial to add new editor slices (inquiry, inquiry response, etc.)
 
 ---
 
@@ -30,14 +29,13 @@ Every editor slice has this exact structure:
 {
   // state — model map keyed by ID ('new' for create, uuid for existing)
   records: {
-    'new':       { data: {...}, isLoading: false, hasFetched: false, isDirty: false },
-    'uuid-123':  { data: {...}, isLoading: false, hasFetched: true,  isDirty: true  },
+    'new':       { data: {...}, isDirty: false },
+    'uuid-123':  { data: {...}, isDirty: true  },
   },
 
   // actions — flat at the slice root
   set: (id, data) => ...,
   update: (id, patch) => ...,
-  reset: (id) => ...,
   remove: (id) => ...,
 }
 ```
@@ -45,18 +43,19 @@ Every editor slice has this exact structure:
 - **`records`** — keyed map of model objects. `'new'` for create, uuid for existing.
 - **`records[id].data`** — the model data (form fields).
 - **`records[id].isDirty`** — `true` when data has been modified from its initial/server state.
-- **`set`** — replace a record entirely (initial load from API). Sets `isDirty: false`.
+- **`set`** — replace a record entirely (initial load from API, or re-set to clear dirty). Sets `isDirty: false`.
 - **`update`** — patch a record (form field changes). Sets `isDirty: true`.
-- **`reset`** — clear to blank (`'new'`) or re-fetch from API (existing). Sets `isDirty: false`.
 - **`remove`** — delete a record from the map (navigation away, cleanup).
+
+**Why no `isLoading`/`hasFetched`?** TanStack Query already tracks fetch state. The editor slice is purely form state — it receives data via `set` after a query resolves.
+
+**Why no `reset`?** Just `set` again with the original data (clears dirty), or `remove` + let the next navigation re-`set`. One less action to maintain.
 
 ### Factory
 
 `makeEditorSlice(name)` generates a complete slice from the base interface. Only override when an editor needs custom actions beyond base CRUD.
 
 ```ts
-const initialRecord = { data: null, isLoading: false, hasFetched: false, isDirty: false };
-
 export const makeEditorSlice = (name) => (set) => ({
   [name]: {
     records: {},
@@ -68,7 +67,7 @@ export const makeEditorSlice = (name) => (set) => ({
             ...state[name],
             records: {
               ...state[name].records,
-              [id]: { data, isLoading: false, hasFetched: true, isDirty: false },
+              [id]: { data, isDirty: false },
             },
           },
         }),
@@ -79,14 +78,14 @@ export const makeEditorSlice = (name) => (set) => ({
     update: (id, patch) =>
       set(
         (state) => {
-          const existing = state[name].records[id] || initialRecord;
+          const existing = state[name].records[id];
+          if (!existing) return state;
           return {
             [name]: {
               ...state[name],
               records: {
                 ...state[name].records,
                 [id]: {
-                  ...existing,
                   data: { ...existing.data, ...patch },
                   isDirty: true,
                 },
@@ -96,21 +95,6 @@ export const makeEditorSlice = (name) => (set) => ({
         },
         false,
         `${name}/update`,
-      ),
-
-    reset: (id) =>
-      set(
-        (state) => ({
-          [name]: {
-            ...state[name],
-            records: {
-              ...state[name].records,
-              [id]: { ...initialRecord },
-            },
-          },
-        }),
-        false,
-        `${name}/reset`,
       ),
 
     remove: (id) =>
@@ -128,24 +112,24 @@ export const makeEditorSlice = (name) => (set) => ({
 
 ### Custom Actions (Extension Pattern)
 
-Slices that need extra actions beyond base CRUD spread the factory and extend:
+Slices that need extra actions beyond the base spread the factory and extend:
 
 ```ts
-export const createSegmentEditorSlice = (set, get, store) => ({
-  ...makeEditorSlice('segmentEditor')(set, get, store),
-  segmentEditor: {
-    ...makeEditorSlice('segmentEditor')(set, get, store).segmentEditor,
+export const createInquiryEditorSlice = (set, get, store) => ({
+  ...makeEditorSlice('inquiryEditor')(set, get, store),
+  inquiryEditor: {
+    ...makeEditorSlice('inquiryEditor')(set, get, store).inquiryEditor,
     duplicate: (sourceId, newId) =>
       set(
         (state) => {
-          const source = state.segmentEditor.records[sourceId];
+          const source = state.inquiryEditor.records[sourceId];
+          if (!source) return state;
           return {
-            segmentEditor: {
-              ...state.segmentEditor,
+            inquiryEditor: {
+              ...state.inquiryEditor,
               records: {
-                ...state.segmentEditor.records,
+                ...state.inquiryEditor.records,
                 [newId]: {
-                  ...source,
                   data: { ...source.data, name: `${source.data.name} (copy)` },
                   isDirty: true,
                 },
@@ -154,7 +138,7 @@ export const createSegmentEditorSlice = (set, get, store) => ({
           };
         },
         false,
-        'segmentEditor/duplicate',
+        'inquiryEditor/duplicate',
       ),
   },
 });
@@ -167,10 +151,10 @@ export const createSegmentEditorSlice = (set, get, store) => ({
 export const useAppStore = create(
   devtools(
     (...a) => ({
-      ...createMissionEditorSlice(...a),
-      ...createRewardsEditorSlice(...a),
+      ...createInquiryEditorSlice(...a),
+      ...createInquiryResponseEditorSlice(...a),
     }),
-    { name: 'AdminDashboardStore', enabled: process.env.ENVIRONMENT !== 'production' },
+    { name: 'AppStore', enabled: process.env.ENVIRONMENT !== 'production' },
   ),
 );
 ```
@@ -181,13 +165,13 @@ export const useAppStore = create(
 import { useShallow } from 'zustand/react/shallow';
 
 // Whole editor — useShallow for object selectors
-export const useMissionEditor = () => useAppStore(useShallow((s) => s.missionEditor));
+export const useInquiryEditor = () => useAppStore(useShallow((s) => s.inquiryEditor));
 
 // Single record by ID — useShallow for object
-export const useMission = (id) => useAppStore(useShallow((s) => s.missionEditor.records[id]));
+export const useInquiry = (id) => useAppStore(useShallow((s) => s.inquiryEditor.records[id]));
 
 // Primitive selector — no useShallow needed
-export const useIsMissionDirty = (id) => useAppStore((s) => s.missionEditor.records[id]?.isDirty ?? false);
+export const useIsInquiryDirty = (id) => useAppStore((s) => s.inquiryEditor.records[id]?.isDirty ?? false);
 ```
 
 ---
@@ -197,15 +181,14 @@ export const useIsMissionDirty = (id) => useAppStore((s) => s.missionEditor.reco
 ### 1. Factory & Types
 
 - [ ] Create `packages/ui/src/store/makeEditorSlice.ts` with the factory function
-- [ ] Define `EditorRecord<T>` and `EditorSlice<T>` types (generic over model data shape)
+- [ ] Define `EditorRecord<T>` type (`{ data: T; isDirty: boolean }`) and `EditorSlice<T>` type
 - [ ] Export from `packages/ui/src/store/index.ts`
 
-### 2. First Consumer: Mission Editor
+### 2. First Consumer: Inquiry Editor
 
-- [ ] Create `slices/missionEditor.ts` using `makeEditorSlice('missionEditor')`
-- [ ] Compose into the app store (admin or whichever app owns missions)
-- [ ] Add selector hooks (`useMissionEditor`, `useMission`, `useIsMissionDirty`)
-- [ ] Refactor existing mission create/edit state to use the new slice
+- [ ] Create `slices/inquiryEditor.ts` using `makeEditorSlice('inquiryEditor')`
+- [ ] Compose into the app store
+- [ ] Add selector hooks (`useInquiryEditor`, `useInquiry`, `useIsInquiryDirty`)
 
 ### 3. Documentation
 
@@ -226,9 +209,7 @@ Recommendation: **Option A** — the factory is generic and app-agnostic, same a
 ## Open Questions
 
 - Should `makeEditorSlice` live in `packages/ui` (shared) or app-local initially?
-- Does the admin app need its own `store/index.ts` created as part of this ticket, or is that a separate concern?
-- Should editor slice types be generic over the model data shape (`EditorSlice<MissionData>`) or use `unknown`/`any` for maximum flexibility?
-- Is the Workflows/Store.ts migration (into app store) in scope or a separate ticket?
+- Should editor slice types be generic over the model data shape (`EditorSlice<InquiryData>`) or use `unknown` for flexibility?
 
 ---
 
@@ -236,19 +217,15 @@ Recommendation: **Option A** — the factory is generic and app-agnostic, same a
 
 | Slice | Purpose |
 |-------|---------|
-| `missionEditor` | Mission create/edit (first consumer) |
-| `rewardsEditor` | Reward create/edit |
-| `segmentEditor` | Segment create/edit (will need custom `duplicate` action) |
-| `fanUserEditor` | Fan user profile editing |
-| `inquiryTemplateEditor` | Inquiry template/definition editing (admin side — structure, fields, rules) |
-| `inquiryResponseEditor` | Inquiry response/submission editing (user side — filling out an inquiry) |
+| `inquiryEditor` | Inquiry source-side editing (structure, fields, rules) — first consumer |
+| `inquiryResponseEditor` | Inquiry target-side editing (filling out / responding to an inquiry) |
 
 ---
 
 ## Definition of Done
 
 - [ ] `makeEditorSlice` factory exists and is exported
-- [ ] TypeScript types for `EditorRecord<T>` and `EditorSlice<T>`
+- [ ] TypeScript types for `EditorRecord<T>` (`{ data: T; isDirty: boolean }`) and `EditorSlice<T>`
 - [ ] At least one editor slice composed into an app store
 - [ ] Selector hooks exported with `useShallow` where appropriate
 - [ ] DevTools action names work (`sliceName/actionName`)
@@ -274,4 +251,4 @@ Recommendation: **Option A** — the factory is generic and app-agnostic, same a
 
 ## Comments
 
-_Origin: brainstorm session (2026-04-02) — Zealot identified the repeating editor state pattern across mission/rewards/segment/fan-user forms. Factory approach eliminates boilerplate while keeping each editor independently composable._
+_Origin: brainstorm session (2026-04-02) — Zealot identified the repeating editor state pattern. Factory approach eliminates boilerplate while keeping each editor independently composable. Simplified from original spec: dropped `isLoading`/`hasFetched` (TanStack Query's job) and `reset` (just re-`set`). Inquiry needs two separate editors — source side vs target/response side._
