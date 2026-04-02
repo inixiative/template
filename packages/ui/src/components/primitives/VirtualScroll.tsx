@@ -93,7 +93,7 @@ function VirtualScrollInner<T>({
 }: Omit<VirtualScrollProps<T>, 'show' | 'emptyMessage'>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  useScrollRestore(scrollRef, restoreScrollKey);
+  useScrollRestore(scrollRef, restoreScrollKey, items.length > 0);
   const isHorizontal = direction === 'horizontal';
 
   const virtualizer = useVirtualizer({

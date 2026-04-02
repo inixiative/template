@@ -91,7 +91,7 @@ function VirtualTableInner<T>({
 }: Omit<VirtualTableProps<T>, 'show' | 'emptyMessage'>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  useScrollRestore(scrollRef, restoreScrollKey);
+  useScrollRestore(scrollRef, restoreScrollKey, data.length > 0);
 
   const virtualizer = useVirtualizer({
     count: data.length,
