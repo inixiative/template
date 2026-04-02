@@ -10,151 +10,183 @@
 
 ## Overview
 
-Add a `makeEditorSlice(name)` factory that generates standardized editor slices for form/model editing state. All editor slices share a base interface (records map, set/update/remove actions, isDirty tracking). This gives every create/edit form in the app a consistent, composable state shape with zero boilerplate.
+A single `editors` slice with a type registry. Each editor is a named sub-namespace under `state.editors.*`, all sharing the same base record shape and actions. New editors are added by registering a name + model type — one store composition line regardless of editor count.
 
 ## Objectives
 
-- Establish a reusable editor slice factory with a stable base interface
-- Make it trivial to add new editor slices (inquiry, inquiry response, etc.)
+- Single `editors` slice with registry-driven sub-editors
+- Type-safe per-editor via generic registry map (`name → ModelType`)
+- `state.editors.` autocomplete shows all registered editors
+- Trivial to add new editors — register a name, get full CRUD for free
 
 ---
 
 ## Design
 
-### Base Interface
+### Type Registry
 
-Every editor slice has this exact structure:
+A registry maps editor names to their model types. This drives both the runtime shape and TypeScript inference:
 
 ```ts
-{
-  // state — model map keyed by ID ('new' for create, uuid for existing)
-  records: {
-    'new':       { data: {...}, isDirty: false },
-    'uuid-123':  { data: {...}, isDirty: true  },
-  },
-
-  // actions — flat at the slice root
-  set: (id, data) => ...,
-  update: (id, patch) => ...,
-  remove: (id) => ...,
-}
+// Editor registry — add new editors here
+type EditorRegistry = {
+  inquiry: InquiryData;
+  inquiryResponse: InquiryResponseData;
+};
 ```
 
-- **`records`** — keyed map of model objects. `'new'` for create, uuid for existing.
-- **`records[id].data`** — the model data (form fields).
-- **`records[id].isDirty`** — `true` when data has been modified from its initial/server state.
-- **`set`** — replace a record entirely (initial load from API, or re-set to clear dirty). Sets `isDirty: false`.
-- **`update`** — patch a record (form field changes). Sets `isDirty: true`.
-- **`remove`** — delete a record from the map (navigation away, cleanup).
+### Record Shape
+
+Every record in every editor has the same minimal shape:
+
+```ts
+type EditorRecord<T> = {
+  data: T;
+  isDirty: boolean;
+};
+```
 
 **Why no `isLoading`/`hasFetched`?** TanStack Query already tracks fetch state. The editor slice is purely form state — it receives data via `set` after a query resolves.
 
-**Why no `reset`?** Just `set` again with the original data (clears dirty), or `remove` + let the next navigation re-`set`. One less action to maintain.
+### Slice Shape
+
+```ts
+// Per-editor namespace
+type EditorNamespace<T> = {
+  records: Record<string, EditorRecord<T>>;
+  set: (id: string, data: T) => void;
+  update: (id: string, patch: Partial<T>) => void;
+  remove: (id: string) => void;
+};
+
+// The full editors slice — one namespace per registry entry
+type EditorsSlice = {
+  editors: {
+    [K in keyof EditorRegistry]: EditorNamespace<EditorRegistry[K]>;
+  };
+};
+```
+
+### State Shape
+
+```ts
+state.editors.inquiry.records['new']        // { data: InquiryData, isDirty: false }
+state.editors.inquiry.records['uuid-123']   // { data: InquiryData, isDirty: true }
+state.editors.inquiryResponse.records['uuid-456']  // { data: InquiryResponseData, isDirty: false }
+```
+
+### Actions
+
+Each editor namespace gets three actions:
+
+- **`set(id, data)`** — replace a record entirely (initial load from API, or re-set to clear dirty). Sets `isDirty: false`.
+- **`update(id, patch)`** — shallow-merge patch into record data. Sets `isDirty: true`. No-ops if record doesn't exist.
+- **`remove(id)`** — delete a record from the map (navigation away, cleanup).
+
+```ts
+// Load from API
+state.editors.inquiry.set('uuid-123', inquiryData);
+
+// User edits a field
+state.editors.inquiry.update('uuid-123', { title: 'New title' });
+
+// Navigate away — cleanup
+state.editors.inquiry.remove('uuid-123');
+
+// Create mode — 'new' as key
+state.editors.inquiry.set('new', blankInquiry);
+```
 
 ### Factory
 
-`makeEditorSlice(name)` generates a complete slice from the base interface. Only override when an editor needs custom actions beyond base CRUD.
+`createEditorsSlice` generates the entire slice from the registry. Each registered name gets its own namespace with records + actions:
 
 ```ts
-export const makeEditorSlice = (name) => (set) => ({
-  [name]: {
-    records: {},
+export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
+  editors: Object.fromEntries(
+    editorNames.map((name) => [
+      name,
+      {
+        records: {},
 
-    set: (id, data) =>
-      set(
-        (state) => ({
-          [name]: {
-            ...state[name],
-            records: {
-              ...state[name].records,
-              [id]: { data, isDirty: false },
-            },
-          },
-        }),
-        false,
-        `${name}/set`,
-      ),
-
-    update: (id, patch) =>
-      set(
-        (state) => {
-          const existing = state[name].records[id];
-          if (!existing) return state;
-          return {
-            [name]: {
-              ...state[name],
-              records: {
-                ...state[name].records,
-                [id]: {
-                  data: { ...existing.data, ...patch },
-                  isDirty: true,
+        set: (id, data) =>
+          set(
+            (state) => ({
+              editors: {
+                ...state.editors,
+                [name]: {
+                  ...state.editors[name],
+                  records: {
+                    ...state.editors[name].records,
+                    [id]: { data, isDirty: false },
+                  },
                 },
               },
-            },
-          };
-        },
-        false,
-        `${name}/update`,
-      ),
+            }),
+            false,
+            `editors/${name}/set`,
+          ),
 
-    remove: (id) =>
-      set(
-        (state) => {
-          const { [id]: _, ...rest } = state[name].records;
-          return { [name]: { ...state[name], records: rest } };
-        },
-        false,
-        `${name}/remove`,
-      ),
-  },
-});
-```
-
-### Custom Actions (Extension Pattern)
-
-Slices that need extra actions beyond the base spread the factory and extend:
-
-```ts
-export const createInquiryEditorSlice = (set, get, store) => ({
-  ...makeEditorSlice('inquiryEditor')(set, get, store),
-  inquiryEditor: {
-    ...makeEditorSlice('inquiryEditor')(set, get, store).inquiryEditor,
-    duplicate: (sourceId, newId) =>
-      set(
-        (state) => {
-          const source = state.inquiryEditor.records[sourceId];
-          if (!source) return state;
-          return {
-            inquiryEditor: {
-              ...state.inquiryEditor,
-              records: {
-                ...state.inquiryEditor.records,
-                [newId]: {
-                  data: { ...source.data, name: `${source.data.name} (copy)` },
-                  isDirty: true,
+        update: (id, patch) =>
+          set(
+            (state) => {
+              const existing = state.editors[name].records[id];
+              if (!existing) return state;
+              return {
+                editors: {
+                  ...state.editors,
+                  [name]: {
+                    ...state.editors[name],
+                    records: {
+                      ...state.editors[name].records,
+                      [id]: {
+                        data: { ...existing.data, ...patch },
+                        isDirty: true,
+                      },
+                    },
+                  },
                 },
-              },
+              };
             },
-          };
-        },
-        false,
-        'inquiryEditor/duplicate',
-      ),
-  },
+            false,
+            `editors/${name}/update`,
+          ),
+
+        remove: (id) =>
+          set(
+            (state) => {
+              const { [id]: _, ...rest } = state.editors[name].records;
+              return {
+                editors: {
+                  ...state.editors,
+                  [name]: { ...state.editors[name], records: rest },
+                },
+              };
+            },
+            false,
+            `editors/${name}/remove`,
+          ),
+      },
+    ]),
+  ) as EditorsSlice['editors'],
 });
 ```
 
 ### Store Composition
+
+One line — all editors come along:
 
 ```ts
 // store/index.ts
 export const useAppStore = create(
   devtools(
     (...a) => ({
-      ...createInquiryEditorSlice(...a),
-      ...createInquiryResponseEditorSlice(...a),
+      ...createAuthSlice(...a),
+      ...createEditorsSlice(...a),   // all editors in one slice
+      ...createTenantSlice(...a),
+      // ...
     }),
-    { name: 'AppStore', enabled: process.env.ENVIRONMENT !== 'production' },
+    { name: 'AppStore' },
   ),
 );
 ```
@@ -164,52 +196,72 @@ export const useAppStore = create(
 ```ts
 import { useShallow } from 'zustand/react/shallow';
 
-// Whole editor — useShallow for object selectors
-export const useInquiryEditor = () => useAppStore(useShallow((s) => s.inquiryEditor));
-
 // Single record by ID — useShallow for object
-export const useInquiry = (id) => useAppStore(useShallow((s) => s.inquiryEditor.records[id]));
+export const useEditorRecord = <K extends keyof EditorRegistry>(name: K, id: string) =>
+  useAppStore(useShallow((s) => s.editors[name].records[id]));
 
 // Primitive selector — no useShallow needed
-export const useIsInquiryDirty = (id) => useAppStore((s) => s.inquiryEditor.records[id]?.isDirty ?? false);
+export const useIsEditorDirty = <K extends keyof EditorRegistry>(name: K, id: string) =>
+  useAppStore((s) => s.editors[name].records[id]?.isDirty ?? false);
+
+// All records for an editor — useShallow for object
+export const useEditorRecords = <K extends keyof EditorRegistry>(name: K) =>
+  useAppStore(useShallow((s) => s.editors[name].records));
+
+// Actions for an editor — stable references, no useShallow needed
+export const useEditorActions = <K extends keyof EditorRegistry>(name: K) =>
+  useAppStore(
+    useShallow((s) => ({
+      set: s.editors[name].set,
+      update: s.editors[name].update,
+      remove: s.editors[name].remove,
+    })),
+  );
 ```
+
+### Custom Actions (Future)
+
+Deferred — base CRUD covers initial needs. When needed, options include:
+- Extend a specific editor namespace after creation
+- Add a second registry layer for editors that need custom actions
+- Or just add helper functions outside the store that compose base actions
+
+### DevTools
+
+Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/update`, etc.
 
 ---
 
 ## Tasks
 
-### 1. Factory & Types
+### 1. Types & Registry
 
-- [ ] Create `packages/ui/src/store/makeEditorSlice.ts` with the factory function
-- [ ] Define `EditorRecord<T>` type (`{ data: T; isDirty: boolean }`) and `EditorSlice<T>` type
+- [ ] Define `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice` types
+- [ ] Define `EditorRegistry` type mapping editor names → model types
+- [ ] First entries: `inquiry: InquiryData`, `inquiryResponse: InquiryResponseData`
+
+### 2. Slice Implementation
+
+- [ ] Create `packages/ui/src/store/slices/editors.ts` with `createEditorsSlice`
+- [ ] Generate per-editor namespaces from registry names
 - [ ] Export from `packages/ui/src/store/index.ts`
 
-### 2. First Consumer: Inquiry Editor
+### 3. Store Composition & Hooks
 
-- [ ] Create `slices/inquiryEditor.ts` using `makeEditorSlice('inquiryEditor')`
-- [ ] Compose into the app store
-- [ ] Add selector hooks (`useInquiryEditor`, `useInquiry`, `useIsInquiryDirty`)
+- [ ] Compose `createEditorsSlice` into app store(s)
+- [ ] Add generic selector hooks (`useEditorRecord`, `useIsEditorDirty`, `useEditorRecords`, `useEditorActions`)
 
-### 3. Documentation
+### 4. Documentation
 
-- [ ] Update `docs/claude/ZUSTAND.md` with Editor Slice section
-- [ ] Document: base interface, factory usage, custom action extension pattern, selector hooks, re-render optimization
+- [ ] Update `docs/claude/ZUSTAND.md` with Editors Slice section
+- [ ] Document: registry pattern, adding new editors, selector hooks, DevTools naming
 
 ---
 
-## Placement Decision
-
-**Open question:** Where does `makeEditorSlice` live?
-
-- **Option A: `packages/ui/src/store/`** — alongside existing shared slice creators. Makes it available to all apps. This is the natural home if editor slices are a shared pattern.
-- **Option B: App-local `store/`** — if only one app needs editor slices initially, keep it local and promote later.
-
-Recommendation: **Option A** — the factory is generic and app-agnostic, same as the existing slice creators.
-
 ## Open Questions
 
-- Should `makeEditorSlice` live in `packages/ui` (shared) or app-local initially?
-- Should editor slice types be generic over the model data shape (`EditorSlice<InquiryData>`) or use `unknown` for flexibility?
+- Should the `EditorRegistry` live in `packages/ui` (shared) or be defined per-app? If shared, all apps get all editors. If per-app, each app declares only the editors it needs but loses the single-source registry.
+- Custom actions pattern — deferred, but worth spiking when a real need arises.
 
 ---
 
@@ -224,11 +276,11 @@ Recommendation: **Option A** — the factory is generic and app-agnostic, same a
 
 ## Definition of Done
 
-- [ ] `makeEditorSlice` factory exists and is exported
-- [ ] TypeScript types for `EditorRecord<T>` (`{ data: T; isDirty: boolean }`) and `EditorSlice<T>`
-- [ ] At least one editor slice composed into an app store
-- [ ] Selector hooks exported with `useShallow` where appropriate
-- [ ] DevTools action names work (`sliceName/actionName`)
+- [ ] `createEditorsSlice` exists with registry-driven generation
+- [ ] TypeScript types: `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice`, `EditorRegistry`
+- [ ] At least two editors registered (`inquiry`, `inquiryResponse`)
+- [ ] Generic selector hooks exported with `useShallow` where appropriate
+- [ ] DevTools action names work (`editors/inquiry/set`, etc.)
 - [ ] `docs/claude/ZUSTAND.md` updated
 - [ ] `bun run check` passes
 
@@ -251,4 +303,4 @@ Recommendation: **Option A** — the factory is generic and app-agnostic, same a
 
 ## Comments
 
-_Origin: brainstorm session (2026-04-02) — Zealot identified the repeating editor state pattern. Factory approach eliminates boilerplate while keeping each editor independently composable. Simplified from original spec: dropped `isLoading`/`hasFetched` (TanStack Query's job) and `reset` (just re-`set`). Inquiry needs two separate editors — source side vs target/response side._
+_Origin: brainstorm session (2026-04-02). Simplified from original spec: dropped `isLoading`/`hasFetched` (TanStack Query's job), dropped `reset` (just re-`set`). Evolved from per-editor root slices to single `editors` slice with type registry for discoverability (`state.editors.` autocomplete). Custom actions deferred._
