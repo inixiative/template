@@ -132,7 +132,7 @@ model FileVersion {
   status      String    @default("pending")     // pending | active | failed
   metadata    Json?                             // { width, height, duration, pages, etc. }
   uploadedBy  String                            // userId who uploaded this version
-  current     Boolean   @default(false)         // true = this is the active/served version
+  revertedFrom Int?                             // if this version is a revert, the version number it was copied from
 
   createdAt   DateTime  @default(now())
 
@@ -142,6 +142,8 @@ model FileVersion {
 }
 ```
 
+**Current version = highest version number.** No `current` flag — `ORDER BY version DESC LIMIT 1` is the canonical query. This eliminates the concurrency hazard of two concurrent uploads racing on a boolean flag, and makes the version history append-only.
+
 **S3 key pattern per version:**
 ```
 {file.path}/file_{id}/v{version}/{filename}
@@ -150,11 +152,11 @@ model FileVersion {
 ```
 
 **Version lifecycle:**
-- Upload creates version 1 (and the File record)
-- Replace creates version N+1, sets `current = true` on new, `current = false` on old
-- ResourceBindings and downloads resolve via File → current FileVersion → S3 key
+- Upload creates version 1 (and the File container)
+- Replace creates version N+1 — the new highest version becomes current automatically
+- Revert = promote an old version to max+1. Version 2 was better? Create version 4 as a copy of version 2's bytes, with `revertedFrom: 2`. History stays linear and append-only — no rewriting, no flag flipping.
+- ResourceBindings and downloads resolve via File → highest FileVersion → S3 key
 - Old versions are retained in S3 until the file is hard-deleted or retention expires
-- ResourceBindings always resolve to the current version unless explicitly pinned (future)
 
 ### 3.2 Folder (Storage Layer)
 
@@ -652,7 +654,7 @@ async function reconcileLazyCopy(job: FileJob, db, s3) {
         fileId: job.newFileId, version: version.version, key: newKey,
         filename: version.filename, contentType: version.contentType,
         size: version.size, status: 'active', metadata: version.metadata,
-        uploadedBy: version.uploadedBy, current: version.current,
+        uploadedBy: version.uploadedBy,
       },
       update: { status: 'active' },
     });
@@ -1327,7 +1329,7 @@ Both solve the same problem: preventing broken references when access is revoked
 | **Complexity** | High (FileJob fan-out, repointing, version copying) | Low (one ownership update, one S3 move at most) |
 
 **Possible hybrid:** system custody as the default (cheap, no fan-out, bindings stay intact) and lazy copy as an explicit opt-in for users who want full independence and are willing to pay for the storage. A `preserve` binding could indicate the user wants a full independent copy rather than relying on system custody.
-- [ ] **FileVersion `current` flag concurrency** — two concurrent version uploads can race on setting `current = true/false`. Needs atomic swap in a transaction.
+- [x] **FileVersion `current` flag concurrency** — resolved: no `current` flag. Highest version number is always current. Append-only, no race condition. Revert = promote old version to max+1.
 - [x] **Mutable vs immutable S3 keys** — keeping mutable path-mirroring keys. The debuggability win for superadmins navigating Railway's S3 browser is a daily operational benefit. Moves are rare; the FileJob system handles them cleanly. Not worth trading real-world usability for architectural purity.
 - [ ] **FilePermission orphan cleanup** — false polymorphism means no cascade delete at DB level. Need a cleanup strategy (sweeper, or explicit cleanup on file/folder delete).
 - [x] **Lazy copy trigger** — resolved: only ResourceBindings trigger lazy copy. Manual preservation is a `preserve` binding type — same mechanism, no separate flag. No default-on cost concern since users must explicitly create bindings.
@@ -1669,17 +1671,12 @@ For edge cases where both BullMQ and the sweeper miss a job (extremely unlikely)
 
 ### Versioning & Replace Semantics
 
-When a file is "replaced" (e.g., new logo upload), should the File record stay the same with new bytes, or create a new File? Matters for:
-- **ResourceBinding stability** — if bindings point to fileId, replacement should keep the id
-- **Audit/history** — previous versions should be recoverable
-- **Cache invalidation** — CDN needs to know the content changed
+Resolved in the core design — File is a container, FileVersion holds content. Replace = create version N+1. Revert = copy old version's bytes to max+1 (with `revertedFrom` provenance). History is append-only, highest version is always current.
 
-Likely design: `File.version` counter + old S3 keys kept with version suffix (`file_{id}/v1/logo.png`, `file_{id}/v2/logo.png`). Current version is the canonical key. Previous versions are accessible but not default.
-
-**Versioning interacts with FilePermission and lazy copy:**
-- `FilePermission.fromVersion` controls which versions a grantee can access (1 = all, N = from version N onward)
+**Remaining questions:**
+- **Cache invalidation** — CDN needs to know content changed when a new version is uploaded. Cache-Tag purge on `file-{fileId}` should fire on version creation.
+- **`FilePermission.fromVersion`** controls which versions a grantee can access (1 = all, N = from version N onward)
 - Lazy copy duplicates all versions within the grantee's version scope, not just the current version
-- This prevents the sharer from replacing content with a blank file before revoking to leave the grantee with nothing
 
 ### Reference-Safe Delete
 
