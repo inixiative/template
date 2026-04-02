@@ -34,6 +34,7 @@ kanban
     INFRA-010-cloudflare-waf-and-asset-serving
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
+    FE-002-editor-slice-pattern
 ```
 
 ## Tickets
@@ -88,6 +89,7 @@ kanban
 
 **Frontend Architecture:**
 - [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
+- [FE-002: Editor Slice Pattern](./FE-002-editor-slice-pattern.md) - `makeEditorSlice` factory for standardized form/model editing state
 
 ---
 
@@ -113,7 +115,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 26
+- **Total Backlog Items**: 27
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -122,7 +124,7 @@ kanban
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
-- **Frontend Architecture**: 1
+- **Frontend Architecture**: 2
 - **Documentation & Discovery**: 2
 - **API Reliability**: 1
 
@@ -140,4 +142,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-03-31_
+_Last Updated: 2026-04-02_
