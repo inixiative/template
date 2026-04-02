@@ -91,6 +91,7 @@ model File {
   organization    Organization? @relation(fields: [organizationId], references: [id])
   folder          Folder?       @relation(fields: [folderId], references: [id])
   permissions     FilePermission[]
+  versions        FileVersion[]
   // bindings     ResourceBinding[]              // v2: usage layer (what role a file plays on a resource)
 }
 ```
@@ -99,6 +100,44 @@ model File {
 - `organizationId` set → org owns it, org pays for storage
 - `organizationId` null + `uploadedBy` set → user's personal file, user owns it
 - Ownership never changes. If a user uploads to an org, the org owns it.
+
+### 3.1.1 FileVersion (Storage Layer)
+
+Each version is a separate record with its own S3 key. The File record points to the current version; previous versions are accessible but not default.
+
+```prisma
+model FileVersion {
+  id          String    @id @default(uuid())
+  fileId      String
+  version     Int                               // monotonic: 1, 2, 3, ...
+  key         String    @unique                 // S3 object key for this version
+  size        Int                               // bytes (may differ per version)
+  contentType String                            // MIME type (may differ if format changes)
+  metadata    Json?                             // version-specific metadata (dimensions, etc.)
+  uploadedBy  String                            // userId who uploaded this version
+  current     Boolean   @default(false)         // true = this is the active version
+
+  createdAt   DateTime  @default(now())
+
+  file        File      @relation(fields: [fileId], references: [id])
+
+  @@unique([fileId, version])                   // one version number per file
+}
+```
+
+**S3 key pattern per version:**
+```
+{file.path}/file_{id}/v{version}/{filename}
+// e.g. org_abc/space_123/file_xyz/v1/logo.png
+//      org_abc/space_123/file_xyz/v2/logo.png
+```
+
+**Version lifecycle:**
+- Upload creates version 1 (and the File record)
+- Replace creates version N+1, sets `current = true` on new, `current = false` on old
+- File.key stays in sync with the current version's key
+- Old versions are retained in S3 until the file is hard-deleted or retention expires
+- ResourceBindings always resolve to the current version unless explicitly pinned (future)
 
 ### 3.2 Folder (Storage Layer)
 
@@ -863,26 +902,26 @@ Two ways a user/entity can be a dependent:
 model FilePermission {
   // ... existing fields ...
   preserveOnRevoke  Boolean   @default(true)  // lazy copy: create a local copy if access is lost
-  versionScope      String    @default("all") // "all" = access to every version; "fromGrant" = only versions created after grant time
+  fromVersion       Int       @default(1)     // earliest version grantee can access (1 = all, current version number = from now onward)
 }
 ```
 
 Default is `true` — opt-out rather than opt-in. Users who explicitly don't want preservation can set it to `false`.
 
-**`versionScope`** controls which versions of a file the grantee can access:
+**`fromVersion`** — the explicit version number the grantee's access starts from, captured at grant creation time:
 
 | Value | Behavior | Use case |
 |-------|----------|----------|
-| `all` | Access to every version, past and future | Default — full history, the normal share |
-| `fromGrant` | Only versions created at or after the time of the grant | "You can use this going forward, but the history before you got access isn't yours" |
+| `1` | Access to every version (1 through latest) | Default — full history, the normal share |
+| `N` (current version at grant time) | Only version N and above | "You can use this going forward, but the history before you got access isn't yours" |
 
-Default is `all`. The `fromGrant` scope uses the FilePermission's `createdAt` as the cutoff — only versions with a timestamp >= grant time are visible to the grantee.
+Set at permission creation time — either `1` (all versions) or the file's current version number at that moment. This is an explicit snapshot of intent, not a timestamp inference. The version number is immutable after grant — it doesn't shift as new versions are created.
 
 This also prevents the sharer from gaming revocation by replacing the file content with a blank before revoking — the grantee's version access is scoped to what existed during their grant window, and lazy copy preserves all versions they had access to (see below).
 
 #### What the copy looks like
 
-Lazy copy duplicates **all versions the user had access to** based on their `versionScope`, not just the current version. If `versionScope = "all"`, every version is copied. If `versionScope = "fromGrant"`, only versions created after the grant time are copied. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
+Lazy copy duplicates **all FileVersions the user had access to** (version >= `fromVersion`), not just the current version. This ensures the snapshot is a complete preservation of what the user could see — the owner can't hollow out the file before revoking to leave the grantee with nothing.
 
 The lazy copy creates a **new File record** owned by the dependent user/org, stored in their scope:
 
@@ -1151,6 +1190,18 @@ for explicit grants on specific files/folders, independent of org/space role.
 - Two buckets per environment: `{project}-system` and `{project}-user`
 - Env vars: `SYSTEM_BUCKET_*` and `USER_BUCKET_*` (NAME, ACCESS_KEY_ID, SECRET_ACCESS_KEY, ENDPOINT, REGION)
 
+### Per-Integration API Keys for Spend Tracking
+
+The adapter pattern (see `packages/shared/src/adapter/`) should support **per-integration segmented API keys** so that spend can be tracked per external service. Instead of a single S3 credential set, each integration (S3 upload, S3 download, S3 move/copy, CDN proxy) can have its own key. This applies broadly across all adapters — not just S3, but email (Resend), error reporting (Sentry), payment (Stripe), verification (Bouncer), etc.
+
+**TODO:** Update the adapter pattern to accept multiple keys per integration, segmented by operation or concern. This enables:
+- Per-operation cost attribution (uploads vs downloads vs copies)
+- Rate limit isolation (a lazy copy storm doesn't exhaust the download key's rate limit)
+- Granular revocation (rotate the upload key without touching downloads)
+- Spend dashboards per integration and per operation type
+
+This is a cross-cutting concern for the adapter layer, not file-system-specific. Captured here because S3 is the first integration where it matters at volume.
+
 ### Dependencies
 
 - `@aws-sdk/client-s3` — S3 operations (type stubs already exist in `optionalDeps.d.ts`)
@@ -1220,6 +1271,12 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **Lazy copy quota** — do preserved copies count toward the recipient's storage quota? (Probably yes — they own the bytes now)
 - [x] **Re-grant after lazy copy** — no special handling. User keeps their snapshot and gets live access back independently. No merging, no prompting.
 - [ ] **`__preserved/` folder creation timing** — create eagerly with scope (simpler) or lazily on first copy (less clutter)?
+- [ ] **Lazy copy fan-out limits** — a folder revocation cascading to 200 files x 50 users x N versions = massive S3 copy storm. Need batch limits, backpressure, progress tracking for the revoking admin. Consider: warn before revoke ("this will create copies for N users"), cap concurrent FileJobs, process in waves.
+- [ ] **Race window during lazy copy** — between permission revocation and copy completion, ResourceBindings point at a file the user can no longer access. Options: defer revocation until copies complete (revoke is async), or serve from original during grace window (short-lived read-through even after revoke).
+- [ ] **FileVersion `current` flag concurrency** — two concurrent version uploads can race on setting `current = true/false`. Needs atomic swap in a transaction.
+- [ ] **Mutable vs immutable S3 keys** — the entire FileJob move system exists because keys mirror paths. Immutable UUID keys (`{fileId}/{versionId}`) would eliminate moves entirely, but lose debuggability in Railway's S3 browser. Worth revisiting at implementation time.
+- [ ] **FilePermission orphan cleanup** — false polymorphism means no cascade delete at DB level. Need a cleanup strategy (sweeper, or explicit cleanup on file/folder delete).
+- [ ] **Lazy copy default** — `preserveOnRevoke: true` triggers copies for every revocation by default. At scale this is operationally expensive. Consider whether `false` (opt-in) is saner, or whether fan-out limits make `true` viable.
 
 ### 12.1 UI Concept: Split-Pane File Browser
 
@@ -1270,7 +1327,7 @@ Uses the existing split-detail pane component from the template.
 
 Models, upload/download, and the hard systems rules that everything else depends on.
 
-- [ ] Prisma models (File, Folder, FilePermission, FileJob)
+- [ ] Prisma models (File, FileVersion, Folder, FilePermission, FileJob)
 - [ ] S3 client service (system + user buckets) + NoopStorageClient
 - [ ] Materialized path builder + traversal helpers
 - [ ] System folder auto-creation hooks (org, space, org_user, user)
@@ -1563,7 +1620,7 @@ When a file is "replaced" (e.g., new logo upload), should the File record stay t
 Likely design: `File.version` counter + old S3 keys kept with version suffix (`file_{id}/v1/logo.png`, `file_{id}/v2/logo.png`). Current version is the canonical key. Previous versions are accessible but not default.
 
 **Versioning interacts with FilePermission and lazy copy:**
-- `FilePermission.versionScope` controls which versions a grantee can access (`all` vs `fromGrant`)
+- `FilePermission.fromVersion` controls which versions a grantee can access (1 = all, N = from version N onward)
 - Lazy copy duplicates all versions within the grantee's version scope, not just the current version
 - This prevents the sharer from replacing content with a blank file before revoking to leave the grantee with nothing
 
