@@ -26,7 +26,6 @@ export function useScrollRestore(
     try {
       const saved = sessionStorage.getItem(`scroll:${key}`);
       if (saved) {
-        // Use rAF to ensure the browser has laid out the content
         requestAnimationFrame(() => {
           el.scrollTop = Number.parseInt(saved, 10);
         });
@@ -59,4 +58,56 @@ export function useScrollRestore(
       el.removeEventListener('scroll', onScroll);
     };
   }, [key, scrollRef]);
+}
+
+const INDEX_DEBOUNCE_MS = 200;
+
+/**
+ * Persists the top visible item index to sessionStorage, and exposes
+ * the saved index for restoration via scrollToIndex.
+ *
+ * Unlike useScrollRestore (pixel-based), this is stable across
+ * re-renders, nested scroll containers, and layout changes.
+ */
+export function useIndexRestore(key: string | undefined): {
+  savedIndex: number | null;
+  markRestored: () => void;
+  persistIndex: (index: number) => void;
+} {
+  const [savedIndex] = React.useState<number | null>(() => {
+    if (!key) return null;
+    try {
+      const saved = sessionStorage.getItem(`vindex:${key}`);
+      return saved ? Number.parseInt(saved, 10) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const restoredRef = React.useRef(false);
+  const markRestored = React.useCallback(() => {
+    restoredRef.current = true;
+  }, []);
+
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const persistIndex = React.useCallback(
+    (index: number) => {
+      if (!key || !restoredRef.current) return;
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        try {
+          sessionStorage.setItem(`vindex:${key}`, String(index));
+        } catch {
+          // skip
+        }
+      }, INDEX_DEBOUNCE_MS);
+    },
+    [key],
+  );
+
+  React.useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  return { savedIndex, markRestored, persistIndex };
 }
