@@ -102,7 +102,11 @@ state.editors.inquiry.set('new', blankInquiry);
 `makeEditorSlice(name, set)` generates a single editor namespace — one entry under `editors.*`. Each editor calls it independently:
 
 ```ts
-// makeEditorSlice — generates one editor namespace
+// makeEditorSlice — generates one typed editor namespace
+// K inferred from name literal: makeEditorSlice('inquiry', set)
+//   → K = 'inquiry' → data typed as EditorRegistry['inquiry'] = InquiryData
+//   → set(id, data) expects InquiryData
+//   → update(id, patch) expects Partial<InquiryData>
 const makeEditorSlice = <K extends keyof EditorRegistry>(
   name: K,
   set: StoreApi<AppStore>['setState'],
@@ -171,14 +175,13 @@ const makeEditorSlice = <K extends keyof EditorRegistry>(
 
 ### Editors Slice (Composition)
 
-The `editors` slice composes individual `makeEditorSlice` calls:
+The `editors` slice assigns each `makeEditorSlice` result to its key:
 
 ```ts
-// createEditorsSlice — composes all editors under state.editors.*
 export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
   editors: {
-    ...makeEditorSlice('inquiry', set),
-    ...makeEditorSlice('inquiryResponse', set),
+    inquiry: makeEditorSlice('inquiry', set),
+    inquiryResponse: makeEditorSlice('inquiryResponse', set),
   },
 });
 ```
