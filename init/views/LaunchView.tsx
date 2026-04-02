@@ -138,6 +138,18 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
           <Text dimColor>From now on, use db:migrate for schema changes.</Text>
         </Box>
         <Box marginTop={1}>
+          <Text bold color="yellow">
+            Post-launch TODO:
+          </Text>
+          <Text dimColor> Enable Vercel preview deploys for PR branches.</Text>
+        </Box>
+        <Box>
+          <Text dimColor> Update git.deploymentEnabled in each app's vercel.json</Text>
+        </Box>
+        <Box>
+          <Text dimColor> (apps/web, apps/admin, apps/superadmin)</Text>
+        </Box>
+        <Box marginTop={1}>
           <Text dimColor>{prompt(['enter'])}</Text>
         </Box>
       </Box>
