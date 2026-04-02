@@ -48,12 +48,17 @@ const PretextSection = React.forwardRef<HTMLDivElement, PretextSectionProps>(
       return () => observer.disconnect();
     }, []);
 
+    // Split prepare (expensive, depends on text/font) from layout (cheap, depends on width)
+    const prepared = React.useMemo(() => {
+      if (!text) return null;
+      return prepareWithSegments(text, font, prepareOptions);
+    }, [text, font, prepareOptions]);
+
     const result = React.useMemo<PretextLayoutResult | null>(() => {
-      if (width === null || width <= 0 || !text) return null;
-      const prepared = prepareWithSegments(text, font, prepareOptions);
+      if (!prepared || width === null || width <= 0) return null;
       const layoutResult = layoutWithLines(prepared, width, lineHeight);
       return { prepared, layout: layoutResult };
-    }, [text, font, lineHeight, width, prepareOptions]);
+    }, [prepared, width, lineHeight]);
 
     const shouldShow = typeof show === 'function' ? show() : show;
     if (!shouldShow) return null;

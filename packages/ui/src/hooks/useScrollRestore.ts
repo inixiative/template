@@ -63,36 +63,55 @@ export function useScrollRestore(
 const INDEX_DEBOUNCE_MS = 200;
 
 /**
- * Persists the top visible item index to sessionStorage, and exposes
- * the saved index for restoration via scrollToIndex.
+ * Persists the top visible item index to sessionStorage, and restores
+ * via a provided scrollToIndex callback once data is ready.
  *
- * Unlike useScrollRestore (pixel-based), this is stable across
- * re-renders, nested scroll containers, and layout changes.
+ * Handles its own lifecycle — consumers just wire it up and call
+ * `onVisibleIndexChange` when the top visible item changes.
  */
-export function useIndexRestore(key: string | undefined): {
-  savedIndex: number | null;
-  markRestored: () => void;
-  persistIndex: (index: number) => void;
+export function useIndexRestore(
+  key: string | undefined,
+  itemCount: number,
+  scrollToIndex: ((index: number) => void) | null,
+): {
+  onVisibleIndexChange: (index: number) => void;
 } {
-  const [savedIndex] = React.useState<number | null>(() => {
-    if (!key) return null;
-    try {
-      const saved = sessionStorage.getItem(`vindex:${key}`);
-      return saved ? Number.parseInt(saved, 10) : null;
-    } catch {
-      return null;
+  // Read saved index once on mount
+  const savedIndexRef = React.useRef<number | null>(null);
+  const initializedRef = React.useRef(false);
+  if (!initializedRef.current) {
+    initializedRef.current = true;
+    if (key) {
+      try {
+        const saved = sessionStorage.getItem(`vindex:${key}`);
+        savedIndexRef.current = saved ? Number.parseInt(saved, 10) : null;
+      } catch {
+        // skip
+      }
     }
-  });
+  }
 
+  // Restore once data and scrollToIndex are available
   const restoredRef = React.useRef(false);
-  const markRestored = React.useCallback(() => {
+  React.useEffect(() => {
+    if (restoredRef.current || itemCount === 0 || !scrollToIndex) return;
+    const saved = savedIndexRef.current;
+    if (saved === null || saved >= itemCount) {
+      restoredRef.current = true;
+      return;
+    }
     restoredRef.current = true;
-  }, []);
+    scrollToIndex(saved);
+  }, [itemCount, scrollToIndex]);
 
+  // Persist with change guard + debounce
+  const lastPersistedRef = React.useRef<number | null>(null);
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const persistIndex = React.useCallback(
+
+  const onVisibleIndexChange = React.useCallback(
     (index: number) => {
-      if (!key || !restoredRef.current) return;
+      if (!key || !restoredRef.current || index === lastPersistedRef.current) return;
+      lastPersistedRef.current = index;
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         try {
@@ -109,5 +128,5 @@ export function useIndexRestore(key: string | undefined): {
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  return { savedIndex, markRestored, persistIndex };
+  return { onVisibleIndexChange };
 }

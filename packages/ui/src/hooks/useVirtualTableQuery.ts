@@ -72,25 +72,25 @@ export function useVirtualTableQuery<TItem>(
     enabled,
   });
 
-  // Restore previously loaded pages after initial load
-  const restoredRef = React.useRef(false);
+  // Restore previously loaded pages — fetch one page per effect cycle
+  // to let TanStack Query update its cursor between fetches.
+  const targetPageCountRef = React.useRef<number | null>(null);
   React.useEffect(() => {
-    if (!restoreKey || restoredRef.current || !query.data || query.isFetchingNextPage) return;
-    restoredRef.current = true;
+    if (!restoreKey || !query.data || query.isFetchingNextPage) return;
 
-    try {
-      const saved = sessionStorage.getItem(`vtq:${restoreKey}`);
-      if (!saved) return;
-      const targetPageCount = Number.parseInt(saved, 10);
-      const currentPageCount = query.data.pages.length;
-
-      if (targetPageCount > currentPageCount && query.hasNextPage) {
-        for (let i = currentPageCount; i < targetPageCount; i++) {
-          query.fetchNextPage();
-        }
+    // Read target on first run
+    if (targetPageCountRef.current === null) {
+      try {
+        const saved = sessionStorage.getItem(`vtq:${restoreKey}`);
+        targetPageCountRef.current = saved ? Number.parseInt(saved, 10) : 0;
+      } catch {
+        targetPageCountRef.current = 0;
       }
-    } catch {
-      // sessionStorage unavailable (SSR, privacy mode) — skip silently
+    }
+
+    const target = targetPageCountRef.current;
+    if (target > query.data.pages.length && query.hasNextPage) {
+      query.fetchNextPage();
     }
   }, [restoreKey, query.data, query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
 
