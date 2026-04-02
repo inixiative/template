@@ -52,7 +52,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     [virtualizer],
   );
 
-  const { onVisibleIndexChange } = useIndexRestore(restoreScrollKey, itemCount, scrollToIndexFn);
+  const { onVisibleIndexChange } = useIndexRestore(restoreScrollKey, itemCount, scrollToIndexFn, scrollRef);
 
   const virtualItems = virtualizer.getVirtualItems();
 

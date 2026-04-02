@@ -73,6 +73,8 @@ export function useIndexRestore(
   key: string | undefined,
   itemCount: number,
   scrollToIndex: ((index: number) => void) | null,
+  /** Scroll container element — scrolled into viewport before internal restore. */
+  containerRef?: React.RefObject<HTMLElement | null>,
 ): {
   onVisibleIndexChange: (index: number) => void;
 } {
@@ -101,8 +103,12 @@ export function useIndexRestore(
       return;
     }
     restoredRef.current = true;
+    // Scroll the container into the viewport first, then restore internal position
+    if (containerRef?.current) {
+      containerRef.current.scrollIntoView({ block: 'nearest' });
+    }
     scrollToIndex(saved);
-  }, [itemCount, scrollToIndex]);
+  }, [itemCount, scrollToIndex, containerRef]);
 
   // Persist with change guard + debounce
   const lastPersistedRef = React.useRef<number | null>(null);
