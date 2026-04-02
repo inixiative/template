@@ -1,4 +1,5 @@
 import type { ScrollToOptions } from '@tanstack/react-virtual';
+import type { ScrollMode } from '@template/ui/hooks/useVirtualListCore';
 import { useVirtualListCore } from '@template/ui/hooks/useVirtualListCore';
 import { cn } from '@template/ui/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -12,9 +13,14 @@ export type VirtualScrollHandle = {
 /**
  * Virtualized vertical scroll list with infinite-load support.
  *
+ * Supports two scroll modes:
+ * - `viewport` (default): Scrolls inside a fixed-height container.
+ *   Use when the list lives in a panel, modal, or sidebar.
+ * - `window`: Items expand the page; the browser scrollbar scrolls.
+ *   Use for full-page lists (feeds, search results, etc.).
+ *
  * Items render in normal document flow (no absolute positioning) using
- * padding to maintain correct scroll height. This ensures consistent
- * measurement and compatibility with standard CSS (borders, flex, etc.).
+ * padding to maintain correct scroll height.
  *
  * Horizontal / carousel layout
  * ────────────────────────────
@@ -34,12 +40,21 @@ export type VirtualScrollProps<T> = {
   keyExtractor: (item: T) => string;
   renderItem: (item: T, index: number) => React.ReactNode;
   estimateItemHeight?: number;
+  /**
+   * Max height of the scroll container. Only applies in `viewport` mode.
+   * Ignored in `window` mode (the page expands naturally).
+   */
   maxHeight?: number;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
   loadMoreThreshold?: number;
   overscan?: number;
+  /**
+   * `viewport` (default): fixed-height scrollable container.
+   * `window`: items expand the page, browser scrollbar scrolls.
+   */
+  scrollMode?: ScrollMode;
   /** Index to scroll to on mount (e.g. from useVirtualScrollState). */
   initialIndex?: number;
   show?: boolean | (() => boolean);
@@ -77,6 +92,7 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       hasMore,
       loadMoreThreshold = 5,
       overscan = 5,
+      scrollMode = 'viewport',
       initialIndex,
       className,
       onTopIndexChange,
@@ -84,12 +100,14 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
     ref,
   ) => {
     const scrollRef = React.useRef<HTMLDivElement>(null);
+    const isWindow = scrollMode === 'window';
 
     const { virtualizer, virtualItems, topVisibleIndex, paddingStart, paddingEnd } = useVirtualListCore({
       itemCount: items.length,
       scrollRef,
       estimateSize: estimateItemHeight,
       overscan,
+      scrollMode,
       initialIndex,
       onLoadMore,
       isLoadingMore,
@@ -117,12 +135,8 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       onTopIndexChange?.(topVisibleIndex);
     }, [topVisibleIndex, onTopIndexChange]);
 
-    return (
-      <div
-        ref={scrollRef}
-        className={cn('overflow-auto', className)}
-        style={{ maxHeight, overflowY: 'auto' }}
-      >
+    const content = (
+      <>
         <div style={{ paddingTop: paddingStart, paddingBottom: paddingEnd }}>
           {virtualItems.map((virtualItem) => {
             const item = items[virtualItem.index];
@@ -144,6 +158,27 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
             <span className="text-sm">Loading more...</span>
           </div>
         )}
+      </>
+    );
+
+    if (isWindow) {
+      // Window mode: no scroll container, items expand the page.
+      // scrollRef is still set for measurement but the actual scroll
+      // element is document.documentElement (handled by useVirtualListCore).
+      return (
+        <div ref={scrollRef} className={className}>
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={scrollRef}
+        className={cn('overflow-auto', className)}
+        style={{ maxHeight, overflowY: 'auto' }}
+      >
+        {content}
       </div>
     );
   },

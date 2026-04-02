@@ -35,7 +35,7 @@ export { useMutation, useQuery } from './useQuery';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useThemePersistence } from './useThemePersistence';
 export { useValidateUniqueness } from './useValidateUniqueness';
-export { type VirtualListHandle, useVirtualListCore } from './useVirtualListCore';
+export { type ScrollMode, type VirtualListHandle, useVirtualListCore } from './useVirtualListCore';
 export {
   type ScrollState,
   type UseVirtualScrollStateOptions,

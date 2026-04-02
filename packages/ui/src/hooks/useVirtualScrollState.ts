@@ -5,6 +5,8 @@ const DEBOUNCE_MS = 150;
 export type ScrollState = {
   /** Top visible item index at time of navigation. */
   index: number;
+  /** Number of loaded pages at time of navigation. */
+  pageCount: number;
 };
 
 export type UseVirtualScrollStateOptions = {
@@ -15,6 +17,8 @@ export type UseVirtualScrollStateOptions = {
   id: string;
   /** Current number of items (data.length). */
   itemCount: number;
+  /** Current number of loaded pages from useVirtualTableQuery. */
+  pageCount: number;
 };
 
 export type UseVirtualScrollStateResult = {
@@ -24,6 +28,12 @@ export type UseVirtualScrollStateResult = {
    * or no saved state exists.
    */
   initialIndex: number | undefined;
+  /**
+   * The saved page count from the previous navigation, or 0 if none.
+   * Consumers can compare this against the current pageCount to determine
+   * if the query cache still has all the data that was loaded before.
+   */
+  savedPageCount: number;
   /**
    * Whether the saved state could not be restored because the cache
    * doesn't cover the saved index. Consumers can use this to skip
@@ -44,21 +54,27 @@ export type UseVirtualScrollStateResult = {
 /**
  * Bridges navigation state with virtualized scroll containers.
  *
- * Reads/writes per-element scroll index to history.state so that:
+ * Reads/writes per-element scroll state (index + pageCount) to
+ * history.state so that:
  * - Back/forward navigation restores the scroll index (if cache is warm)
  * - Fresh navigation (link click) starts from the top
  * - Multiple scroll containers on one page each track independently
  *
  * This hook owns scroll restoration entirely via index-based
  * `scrollToIndex`. It does NOT use TanStack Router's pixel-based
- * scroll restoration (`data-scroll-restoration-id`), because pixel
- * offsets are inaccurate when the virtualizer uses estimated sizes.
+ * scroll restoration, because pixel offsets are inaccurate when
+ * the virtualizer uses estimated sizes.
+ *
+ * The saved `pageCount` lets consumers know how many pages were loaded
+ * at the time of navigation. If the query cache has fewer pages, the
+ * cache has been partially evicted and restoration may be unreliable.
  *
  * Usage:
  * ```tsx
  * const scrollState = useVirtualScrollState({
  *   id: 'users-table',
  *   itemCount: query.data.length,
+ *   pageCount: query.pageCount,
  * });
  *
  * const { topVisibleIndex, ... } = useVirtualListCore({
@@ -74,7 +90,7 @@ export type UseVirtualScrollStateResult = {
 export function useVirtualScrollState(
   options: UseVirtualScrollStateOptions,
 ): UseVirtualScrollStateResult {
-  const { id, itemCount } = options;
+  const { id, itemCount, pageCount } = options;
 
   const stateKey = `vscroll:${id}`;
 
@@ -98,6 +114,7 @@ export function useVirtualScrollState(
   const cacheCoversIndex = saved !== null && itemCount > saved.index;
   const cacheInvalid = saved !== null && !cacheCoversIndex;
   const initialIndex = cacheCoversIndex ? saved.index : undefined;
+  const savedPageCount = saved?.pageCount ?? 0;
 
   // Suppress writes until restore completes (or is skipped).
   // This prevents a transient `index: 0` from overwriting the saved target.
@@ -110,7 +127,10 @@ export function useVirtualScrollState(
     }
   }, [cacheInvalid, cacheCoversIndex]);
 
-  // Persist scroll index to history.state (debounced).
+  // Persist scroll state to history.state (debounced).
+  // pageCount is read via ref to avoid stale closures in the debounce timer.
+  const pageCountRef = React.useRef(pageCount);
+  pageCountRef.current = pageCount;
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastIndexRef = React.useRef<number | null>(null);
 
@@ -121,7 +141,7 @@ export function useVirtualScrollState(
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         try {
-          const state: ScrollState = { index };
+          const state: ScrollState = { index, pageCount: pageCountRef.current };
           const historyState = { ...window.history.state, [stateKey]: state };
           window.history.replaceState(historyState, '');
         } catch {
@@ -138,6 +158,7 @@ export function useVirtualScrollState(
 
   return {
     initialIndex,
+    savedPageCount,
     cacheInvalid,
     onTopIndexChange,
   };

@@ -1,12 +1,28 @@
 import { type ScrollToOptions, useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 
+/**
+ * Scroll mode determines where the scroll container lives:
+ * - `viewport`: A fixed-height div with overflow (scrolls inside a window on the page).
+ * - `window`: The browser window itself (items expand the page, page scrollbar scrolls).
+ */
+export type ScrollMode = 'viewport' | 'window';
+
 export type VirtualListCoreOptions = {
   itemCount: number;
+  /**
+   * Ref to the scroll container element. Required for `viewport` mode.
+   * Ignored in `window` mode (uses document.documentElement automatically).
+   */
   scrollRef: React.RefObject<HTMLElement | null>;
   estimateSize: number;
   horizontal?: boolean;
   overscan?: number;
+  /**
+   * `viewport` (default): scrolls inside a fixed-height container.
+   * `window`: items expand the page; the browser scrollbar is the scroll container.
+   */
+  scrollMode?: ScrollMode;
   /**
    * When set, the virtualizer scrolls to this index on mount (once itemCount
    * covers it). Consumers typically read this from router location state.
@@ -40,6 +56,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     estimateSize,
     horizontal = false,
     overscan = 5,
+    scrollMode = 'viewport',
     initialIndex,
     onLoadMore,
     isLoadingMore,
@@ -47,9 +64,16 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     loadMoreThreshold = 5,
   } = options;
 
+  const getScrollElement = React.useCallback(() => {
+    if (scrollMode === 'window') {
+      return typeof document !== 'undefined' ? document.documentElement : null;
+    }
+    return scrollRef.current;
+  }, [scrollMode, scrollRef]);
+
   const virtualizer = useVirtualizer({
     count: itemCount,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement,
     estimateSize: () => estimateSize,
     horizontal,
     overscan,
