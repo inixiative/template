@@ -33,13 +33,23 @@ type EditorRecord<T> = {
   isDirty: boolean;
 };
 
+type EditorOptions<T> = {
+  defaultData?: T;  // blank state for 'new' records — if provided, set('new') uses this
+};
+
 type EditorNamespace<T> = {
   records: Record<string, EditorRecord<T>>;
-  set: (id: string, data: T) => void;
-  update: (id: string, patch: Partial<T>) => void;
-  remove: (id: string) => void;
+  set: (id: 'new' | string, data?: T) => void;   // data optional when defaultData configured
+  update: (id: string, patch: Partial<T>) => void; // throws if id not in records
+  remove: (id: string) => void;                     // throws if id not in records
 };
 ```
+
+**Key constraints:**
+- **IDs must be `'new'` or UUID v7.** Validated at runtime — other keys throw.
+- **`update` throws if record doesn't exist.** You must `set` first. This prevents silent bugs where an update targets a stale/missing record.
+- **`remove` throws if record doesn't exist.** Same reasoning — if you're removing something that isn't there, something is wrong.
+- **Duplicate `set('new', ...)`** overwrites the previous `'new'` record. Caller's responsibility to guard against this if needed.
 
 **Why no `isLoading`/`hasFetched`?** TanStack Query already tracks fetch state. The editor slice is purely form state — it receives data via `set` after a query resolves.
 
@@ -68,22 +78,38 @@ state.editors.inquiryResponse.records['uuid-456']  // { data: InquiryResponseDat
 
 Each editor namespace gets three actions:
 
-- **`set(id, data)`** — replace a record entirely (initial load from API, or re-set to clear dirty). Sets `isDirty: false`.
-- **`update(id, patch)`** — shallow-merge patch into record data. Sets `isDirty: true`. No-ops if record doesn't exist.
-- **`remove(id)`** — delete a record from the map (navigation away, cleanup).
+- **`set(id, data?)`** — replace a record entirely (initial load from API, or re-set to clear dirty). Sets `isDirty: false`. ID must be `'new'` or UUID v7. If `defaultData` configured, `data` is optional for `'new'`.
+- **`update(id, patch)`** — shallow-merge patch into record data. Sets `isDirty: true`. **Throws if record doesn't exist** — must `set` first.
+- **`remove(id)`** — delete a record from the map. **Throws if record doesn't exist.**
 
 ```ts
-// Load from API
-state.editors.inquiry.set('uuid-123', inquiryData);
+// Load from API — UUID v7 key
+state.editors.inquiry.set('0192d4e0-...', inquiryData);
 
 // User edits a field
-state.editors.inquiry.update('uuid-123', { title: 'New title' });
+state.editors.inquiry.update('0192d4e0-...', { title: 'New title' });
 
 // Navigate away — cleanup
-state.editors.inquiry.remove('uuid-123');
+state.editors.inquiry.remove('0192d4e0-...');
 
-// Create mode — 'new' as key
+// Create mode — 'new' key, uses defaultData if configured
+state.editors.inquiry.set('new');
+
+// Create mode — explicit data
 state.editors.inquiry.set('new', blankInquiry);
+
+// ❌ Throws — invalid key (not 'new' or UUID v7)
+state.editors.inquiry.set('foo', data);
+
+// ❌ Throws — record doesn't exist yet
+state.editors.inquiry.update('0192d4e0-...', { title: 'x' });
+
+// ❌ Throws — record doesn't exist
+state.editors.inquiry.remove('nonexistent');
+
+// ⚠️ Overwrites — duplicate set('new') replaces previous
+state.editors.inquiry.set('new', data1);
+state.editors.inquiry.set('new', data2);  // data1 gone
 ```
 
 ### Factory
@@ -91,17 +117,27 @@ state.editors.inquiry.set('new', blankInquiry);
 `makeEditorSlice(name, set)` generates a single editor namespace — one entry under `editors.*`. Each editor calls it independently:
 
 ```ts
-// makeEditorSlice — type passed directly, not via registry
-// makeEditorSlice<InquiryData>('inquiry', set)
-//   → set(id, data) expects InquiryData
-//   → update(id, patch) expects Partial<InquiryData>
+const UUID_V7_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const assertValidId = (id: string) => {
+  if (id !== 'new' && !UUID_V7_RE.test(id)) {
+    throw new Error(`Editor: invalid key "${id}" — must be 'new' or UUID v7`);
+  }
+};
+
 const makeEditorSlice = <T>(
   name: string,
   set: StoreApi<AppStore>['setState'],
+  options?: EditorOptions<T>,
 ): EditorNamespace<T> => ({
   records: {},
 
-  set: (id, data) =>
+  set: (id, data?) => {
+    assertValidId(id);
+    const resolved = data ?? options?.defaultData;
+    if (resolved === undefined) {
+      throw new Error(`Editor ${name}: set('${id}') called without data and no defaultData configured`);
+    }
     set(
       (state) => ({
         editors: {
@@ -110,20 +146,23 @@ const makeEditorSlice = <T>(
             ...state.editors[name],
             records: {
               ...state.editors[name].records,
-              [id]: { data, isDirty: false },
+              [id]: { data: resolved, isDirty: false },
             },
           },
         },
       }),
       false,
       `editors/${name}/set`,
-    ),
+    );
+  },
 
-  update: (id, patch) =>
+  update: (id, patch) => {
     set(
       (state) => {
         const existing = state.editors[name].records[id];
-        if (!existing) return state;
+        if (!existing) {
+          throw new Error(`Editor ${name}: update('${id}') — record not found. Call set() first.`);
+        }
         return {
           editors: {
             ...state.editors,
@@ -142,11 +181,15 @@ const makeEditorSlice = <T>(
       },
       false,
       `editors/${name}/update`,
-    ),
+    );
+  },
 
-  remove: (id) =>
+  remove: (id) => {
     set(
       (state) => {
+        if (!state.editors[name].records[id]) {
+          throw new Error(`Editor ${name}: remove('${id}') — record not found.`);
+        }
         const { [id]: _, ...rest } = state.editors[name].records;
         return {
           editors: {
@@ -157,7 +200,8 @@ const makeEditorSlice = <T>(
       },
       false,
       `editors/${name}/remove`,
-    ),
+    );
+  },
 });
 ```
 
@@ -168,7 +212,9 @@ The `editors` slice assigns each `makeEditorSlice` result to its key, passing th
 ```ts
 export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
   editors: {
-    inquiry: makeEditorSlice<InquiryData>('inquiry', set),
+    inquiry: makeEditorSlice<InquiryData>('inquiry', set, {
+      defaultData: { title: '', fields: [], rules: [] },  // set('new') uses this
+    }),
     inquiryResponse: makeEditorSlice<InquiryResponseData>('inquiryResponse', set),
   },
 });
