@@ -154,7 +154,7 @@ model FileVersion {
 **Version lifecycle:**
 - Upload creates version 1 (and the File container)
 - Replace creates version N+1 — the new highest version becomes current automatically
-- Revert = promote an old version to max+1. Version 2 was better? Create version 4 as a copy of version 2's bytes, with `revertedFrom: 2`. History stays linear and append-only — no rewriting, no flag flipping.
+- Revert = new FileVersion record at max+1, pointing at the same S3 key as the old version. No byte copying — the S3 object already exists. `revertedFrom: 2` tracks provenance. History stays linear and append-only.
 - ResourceBindings and downloads resolve via File → highest FileVersion → S3 key
 - Old versions are retained in S3 until the file is hard-deleted or retention expires
 
