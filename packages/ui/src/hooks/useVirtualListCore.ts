@@ -1,4 +1,9 @@
-import { type ScrollToOptions, useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
+import {
+  type ScrollToOptions,
+  useVirtualizer,
+  useWindowVirtualizer,
+  type Virtualizer,
+} from '@tanstack/react-virtual';
 import * as React from 'react';
 
 /**
@@ -11,8 +16,9 @@ export type ScrollMode = 'viewport' | 'window';
 export type VirtualListCoreOptions = {
   itemCount: number;
   /**
-   * Ref to the scroll container element. Required for `viewport` mode.
-   * Ignored in `window` mode (uses document.documentElement automatically).
+   * Ref to the scroll container element. Used in `viewport` mode as the
+   * scroll container. In `window` mode, used only to compute `scrollMargin`
+   * (the offset between the page top and the list container).
    */
   scrollRef: React.RefObject<HTMLElement | null>;
   estimateSize: number;
@@ -35,7 +41,7 @@ export type VirtualListCoreOptions = {
 };
 
 export type VirtualListCoreResult = {
-  virtualizer: Virtualizer<HTMLElement, Element>;
+  virtualizer: Virtualizer<HTMLElement, Element> | Virtualizer<Window, Element>;
   virtualItems: ReturnType<Virtualizer<HTMLElement, Element>['getVirtualItems']>;
   /** Index of the topmost visible item. -1 when no items are rendered. */
   topVisibleIndex: number;
@@ -49,40 +55,15 @@ export type VirtualListHandle = {
   scrollToIndex: (index: number, options?: ScrollToOptions) => void;
 };
 
-export function useVirtualListCore(options: VirtualListCoreOptions): VirtualListCoreResult {
-  const {
-    itemCount,
-    scrollRef,
-    estimateSize,
-    horizontal = false,
-    overscan = 5,
-    scrollMode = 'viewport',
-    initialIndex,
-    onLoadMore,
-    isLoadingMore,
-    hasMore,
-    loadMoreThreshold = 5,
-  } = options;
-
-  const getScrollElement = React.useCallback(() => {
-    if (scrollMode === 'window') {
-      return typeof document !== 'undefined' ? document.documentElement : null;
-    }
-    return scrollRef.current;
-  }, [scrollMode, scrollRef]);
-
-  const virtualizer = useVirtualizer({
-    count: itemCount,
-    getScrollElement,
-    estimateSize: () => estimateSize,
-    horizontal,
-    overscan,
-  });
+// Shared post-virtualizer logic (padding, initial restore, infinite scroll).
+function useVirtualListEffects(
+  virtualizer: Virtualizer<HTMLElement, Element> | Virtualizer<Window, Element>,
+  options: VirtualListCoreOptions,
+): Omit<VirtualListCoreResult, 'virtualizer'> {
+  const { itemCount, initialIndex, onLoadMore, isLoadingMore, hasMore, loadMoreThreshold = 5 } = options;
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  // Padding for the flow-based layout approach. Items render in normal
-  // flow with padding before/after to maintain correct scroll height.
   const paddingStart = virtualItems[0]?.start ?? 0;
   const paddingEnd =
     virtualItems.length > 0
@@ -91,15 +72,12 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
 
   const topVisibleIndex = virtualItems[0]?.index ?? -1;
 
-  // Restore to initialIndex once data covers it. Uses scrollToIndex's
-  // built-in reconciliation loop to converge on the correct position
-  // as real measurements arrive across frames.
+  // Restore to initialIndex once data covers it.
   const restoredRef = React.useRef(false);
   const virtualizerRef = React.useRef(virtualizer);
   virtualizerRef.current = virtualizer;
 
   React.useEffect(() => {
-    // Index 0 is the default position — no scroll action needed, just mark restored.
     if (restoredRef.current || initialIndex == null) return;
     if (initialIndex === 0) {
       restoredRef.current = true;
@@ -111,7 +89,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     }
   }, [initialIndex, itemCount]);
 
-  // Infinite load trigger — uses derived index to avoid re-running on every render.
+  // Infinite load trigger.
   const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
   React.useEffect(() => {
     if (!onLoadMore || !hasMore || isLoadingMore) return;
@@ -121,7 +99,79 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     }
   }, [lastVisibleIndex, itemCount, loadMoreThreshold, onLoadMore, hasMore, isLoadingMore]);
 
-  return { virtualizer, virtualItems, topVisibleIndex, paddingStart, paddingEnd };
+  return { virtualItems, topVisibleIndex, paddingStart, paddingEnd };
+}
+
+/**
+ * Viewport-mode virtualizer: scrolls inside a fixed-height container.
+ */
+function useViewportVirtualList(options: VirtualListCoreOptions): VirtualListCoreResult {
+  const { itemCount, scrollRef, estimateSize, horizontal = false, overscan = 5 } = options;
+
+  const virtualizer = useVirtualizer({
+    count: itemCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => estimateSize,
+    horizontal,
+    overscan,
+  });
+
+  const effects = useVirtualListEffects(virtualizer, options);
+  return { virtualizer, ...effects };
+}
+
+/**
+ * Window-mode virtualizer: items expand the page, browser scrollbar scrolls.
+ * Uses `scrollMargin` to account for content above the list container.
+ */
+function useWindowVirtualList(options: VirtualListCoreOptions): VirtualListCoreResult {
+  const { itemCount, scrollRef, estimateSize, horizontal = false, overscan = 5 } = options;
+
+  // Compute scrollMargin from the container's position on the page.
+  // This tells the virtualizer how far from the scroll origin the list starts.
+  const [scrollMargin, setScrollMargin] = React.useState(0);
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const updateMargin = () => {
+      const rect = el.getBoundingClientRect();
+      const margin = horizontal
+        ? rect.left + window.scrollX
+        : rect.top + window.scrollY;
+      setScrollMargin(margin);
+    };
+    updateMargin();
+    // Recalculate on resize in case layout shifts.
+    const observer = new ResizeObserver(updateMargin);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scrollRef, horizontal]);
+
+  const virtualizer = useWindowVirtualizer({
+    count: itemCount,
+    estimateSize: () => estimateSize,
+    horizontal,
+    overscan,
+    scrollMargin,
+  });
+
+  const effects = useVirtualListEffects(virtualizer, options);
+  return { virtualizer, ...effects };
+}
+
+/**
+ * Entry point — selects viewport or window virtualizer based on scrollMode.
+ * Consumers should NOT change scrollMode after mount (unmount/remount instead).
+ */
+export function useVirtualListCore(options: VirtualListCoreOptions): VirtualListCoreResult {
+  const { scrollMode = 'viewport' } = options;
+
+  if (scrollMode === 'window') {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useWindowVirtualList(options);
+  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useViewportVirtualList(options);
 }
 
 /**
@@ -129,7 +179,7 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
  * Used by both VirtualTable and VirtualScroll via useImperativeHandle.
  */
 export function buildScrollHandle<T>(
-  virtualizer: Virtualizer<HTMLElement, Element>,
+  virtualizer: Virtualizer<HTMLElement, Element> | Virtualizer<Window, Element>,
   items: T[],
   keyExtractor: (item: T) => string,
 ): VirtualListHandle & { scrollToItem: (key: string) => boolean } {

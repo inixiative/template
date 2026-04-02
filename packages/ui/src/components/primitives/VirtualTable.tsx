@@ -169,8 +169,9 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
     );
 
     if (isWindow) {
+      // No overflow-hidden — it would break sticky thead in window scroll mode.
       return (
-        <div ref={scrollRef} className={cn('border rounded-lg overflow-hidden', className)}>
+        <div ref={scrollRef} className={cn('border rounded-lg', className)}>
           {tableContent}
           {loader}
         </div>
