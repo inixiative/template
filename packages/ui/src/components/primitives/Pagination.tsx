@@ -75,9 +75,10 @@ export const Pagination = ({
   onPageSizeChange,
   className,
 }: PaginationProps) => {
-  if (totalPages <= 1 && !totalRecords) return null;
-
   const showPageSizeSelector = pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && pageSize;
+
+  if (totalPages <= 1 && !totalRecords && !showPageSizeSelector) return null;
+
   const effectiveOptions = pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS;
 
   // "Showing X-Y of Z results"
@@ -104,6 +105,7 @@ export const Pagination = ({
           <div className="flex items-center gap-2">
             <span>Rows</span>
             <select
+              aria-label="Rows per page"
               className={cn(
                 'h-8 rounded-md border border-input bg-background px-2 text-sm',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
