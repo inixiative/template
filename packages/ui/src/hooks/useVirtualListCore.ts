@@ -1,21 +1,12 @@
 import { type ScrollToOptions, useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 
-const INDEX_DEBOUNCE_MS = 200;
-
 export type VirtualListCoreOptions = {
   itemCount: number;
   scrollRef: React.RefObject<HTMLElement | null>;
   estimateSize: number;
   horizontal?: boolean;
   overscan?: number;
-  /**
-   * Unique key for this virtual list instance. When set, the top visible
-   * index is persisted to `history.state` so that browser back/forward
-   * navigation restores the scroll position. Fresh navigations (e.g. link
-   * clicks) start from the top because the history entry has no saved index.
-   */
-  scrollStateKey?: string;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMore?: boolean;
@@ -25,6 +16,10 @@ export type VirtualListCoreOptions = {
 export type VirtualListCoreResult = {
   virtualizer: Virtualizer<HTMLElement, Element>;
   virtualItems: ReturnType<Virtualizer<HTMLElement, Element>['getVirtualItems']>;
+  /** Padding before the first rendered item (px). Use as paddingTop or paddingLeft. */
+  paddingStart: number;
+  /** Padding after the last rendered item (px). Use as paddingBottom or paddingRight. */
+  paddingEnd: number;
 };
 
 export type VirtualListHandle = {
@@ -38,7 +33,6 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
     estimateSize,
     horizontal = false,
     overscan = 5,
-    scrollStateKey,
     onLoadMore,
     isLoadingMore,
     hasMore,
@@ -55,56 +49,26 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  // Restore top visible index from history.state on back/forward navigation.
-  // Fresh navigations have no saved index, so the list starts at the top.
-  const restoredRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!scrollStateKey || restoredRef.current || itemCount === 0) return;
-    restoredRef.current = true;
-    try {
-      const saved = window.history.state?.[scrollStateKey];
-      if (typeof saved === 'number' && saved < itemCount) {
-        virtualizer.scrollToIndex(saved, { align: 'start' });
-      }
-    } catch {
-      // history.state access can throw in sandboxed iframes
-    }
-  }, [scrollStateKey, itemCount, virtualizer]);
+  // Compute padding for the flow-based layout approach.
+  // Items render in normal flow with padding before/after to maintain
+  // correct scroll height without absolute positioning.
+  const paddingStart = virtualItems[0]?.start ?? 0;
+  const paddingEnd =
+    virtualItems.length > 0
+      ? virtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end ?? 0)
+      : 0;
 
-  // Persist top visible index to history.state (debounced).
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const lastPersistedRef = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (!scrollStateKey || !restoredRef.current) return;
-    const firstItem = virtualItems[0];
-    if (!firstItem || firstItem.index === lastPersistedRef.current) return;
-    lastPersistedRef.current = firstItem.index;
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      try {
-        const state = { ...window.history.state, [scrollStateKey]: firstItem.index };
-        window.history.replaceState(state, '');
-      } catch {
-        // skip
-      }
-    }, INDEX_DEBOUNCE_MS);
-  }, [scrollStateKey, virtualItems]);
-
-  React.useEffect(() => {
-    return () => clearTimeout(timerRef.current);
-  }, []);
-
-  // Infinite load trigger
+  // Infinite load trigger — use derived index to avoid re-running on every render.
+  const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? -1;
   React.useEffect(() => {
     if (!onLoadMore || !hasMore || isLoadingMore) return;
-    const lastItem = virtualItems[virtualItems.length - 1];
-    if (!lastItem) return;
-    if (lastItem.index >= itemCount - loadMoreThreshold) {
+    if (lastVisibleIndex < 0) return;
+    if (lastVisibleIndex >= itemCount - loadMoreThreshold) {
       onLoadMore();
     }
-  }, [virtualItems, itemCount, loadMoreThreshold, onLoadMore, hasMore, isLoadingMore]);
+  }, [lastVisibleIndex, itemCount, loadMoreThreshold, onLoadMore, hasMore, isLoadingMore]);
 
-  return { virtualizer, virtualItems };
+  return { virtualizer, virtualItems, paddingStart, paddingEnd };
 }
 
 /**
