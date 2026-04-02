@@ -99,10 +99,10 @@ state.editors.inquiry.set('new', blankInquiry);
 
 ### Factory
 
-`createEditorsSlice` generates the entire slice from the registry. Each registered name gets its own namespace with records + actions:
+`makeEditorSlice` generates the entire slice from the registry. Each registered name gets its own namespace with records + actions:
 
 ```ts
-export const createEditorsSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
+export const makeEditorSlice: StateCreator<AppStore, [], [], EditorsSlice> = (set) => ({
   editors: Object.fromEntries(
     editorNames.map((name) => [
       name,
@@ -182,7 +182,7 @@ export const useAppStore = create(
   devtools(
     (...a) => ({
       ...createAuthSlice(...a),
-      ...createEditorsSlice(...a),   // all editors in one slice
+      ...makeEditorSlice(...a),   // all editors in one slice
       ...createTenantSlice(...a),
       // ...
     }),
@@ -242,13 +242,13 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ### 2. Slice Implementation
 
-- [ ] Create `packages/ui/src/store/slices/editors.ts` with `createEditorsSlice`
+- [ ] Create `packages/ui/src/store/slices/editors.ts` with `makeEditorSlice`
 - [ ] Generate per-editor namespaces from registry names
 - [ ] Export from `packages/ui/src/store/index.ts`
 
 ### 3. Store Composition & Hooks
 
-- [ ] Compose `createEditorsSlice` into app store(s)
+- [ ] Compose `makeEditorSlice` into app store(s)
 - [ ] Add generic selector hooks (`useEditorRecord`, `useIsEditorDirty`, `useEditorRecords`, `useEditorActions`)
 
 ### 4. Documentation
@@ -276,7 +276,7 @@ Action names auto-namespace: `editors/inquiry/set`, `editors/inquiryResponse/upd
 
 ## Definition of Done
 
-- [ ] `createEditorsSlice` exists with registry-driven generation
+- [ ] `makeEditorSlice` exists with registry-driven generation
 - [ ] TypeScript types: `EditorRecord<T>`, `EditorNamespace<T>`, `EditorsSlice`, `EditorRegistry`
 - [ ] At least two editors registered (`inquiry`, `inquiryResponse`)
 - [ ] Generic selector hooks exported with `useShallow` where appropriate
