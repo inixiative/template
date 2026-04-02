@@ -8,7 +8,6 @@ export * from './EmptyState';
 export * from './Input';
 export * from './Label';
 export * from './PasswordInput';
-export * from './PretextSection';
 export * from './Select';
 export * from './SlugInput';
 export * from './Table';
