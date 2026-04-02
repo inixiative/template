@@ -142,7 +142,7 @@ model FileVersion {
 }
 ```
 
-**Current version = highest version number.** No `current` flag — `ORDER BY version DESC LIMIT 1` is the canonical query. This eliminates the concurrency hazard of two concurrent uploads racing on a boolean flag, and makes the version history append-only.
+**Current version = highest active version number.** No `current` flag — `WHERE status = 'active' ORDER BY version DESC LIMIT 1` is the canonical query. Pending or failed versions are never served. This eliminates the concurrency hazard of two concurrent uploads racing on a boolean flag, makes the version history append-only, and ensures in-progress uploads don't shadow the current version.
 
 **S3 key pattern per version:**
 ```
@@ -155,7 +155,7 @@ model FileVersion {
 - Upload creates version 1 (and the File container)
 - Replace creates version N+1 — the new highest version becomes current automatically
 - Revert = new FileVersion record at max+1, pointing at the same S3 key as the old version. No byte copying — the S3 object already exists. `revertedFrom: 2` tracks provenance. History stays linear and append-only.
-- ResourceBindings and downloads resolve via File → highest FileVersion → S3 key
+- ResourceBindings and downloads resolve via File → highest active FileVersion → S3 key
 - Old versions are retained in S3 until the file is hard-deleted or retention expires
 
 ### 3.2 Folder (Storage Layer)
@@ -557,14 +557,12 @@ model FileJob {
   type            String                          // "move" | "lazyCopy" (extensible for future ops)
   fileId          String                          // the file being acted on (source for copy, subject for move)
 
-  // Shared fields — every job has a before/after S3 key pair
-  sourceKey       String                          // current S3 location (move: old key, copy: source key)
-  targetKey       String                          // desired S3 location (move: new key, copy: destination key)
-  sourcePath      String?                         // logical path before (move only)
-  targetPath      String?                         // logical path after (move only)
+  // Move specific (null for lazy copy)
+  sourcePath      String?                         // logical path before — version keys derived from this
+  targetPath      String?                         // logical path after — version keys rewritten to this
 
   // Lazy copy specific (null for moves)
-  newFileId       String?                         // the snapshot File record (created upfront, status: "pending")
+  newFileId       String?                         // the snapshot File container (created upfront)
   reason          String?                         // "accessRevoked" | "accessExpired" | "sourceDeleted"
   triggeredBy     String?                         // userId who caused the revocation/deletion
   dependentId     String?                         // granteeId who gets the copy
@@ -598,30 +596,48 @@ async function reconcileFileJob(job: FileJob, db, s3) {
 
 async function reconcileMove(job: FileJob, db, s3) {
   // Moves operate on FileVersions — each version's key must be updated.
-  // The File container's path updates, but keys live on versions.
+  // IMPORTANT: reverted versions can share S3 keys with the version they reverted from.
+  // Must deduplicate by S3 key to avoid copying the same object twice or deleting
+  // a key that another version still references.
 
-  // 1. For each FileVersion: does target key exist in S3? No → copy it.
   const versions = await db.fileVersion.findMany({ where: { fileId: job.fileId } });
-  for (const version of versions) {
-    const newKey = version.key.replace(job.sourcePath, job.targetPath);
-    const exists = await s3.headObject(newKey).catch(() => false);
-    if (!exists) {
-      await s3.copyObject(version.key, newKey);
-      if (!await s3.headObject(newKey).catch(() => false)) return; // retry next cycle
-    }
-    // 2. Does DB version point to new key? No → swap it.
-    if (version.key !== newKey) {
-      await db.fileVersion.update({ where: { id: version.id }, data: { key: newKey } });
-    }
-    // 3. Delete old key
-    await s3.deleteObject(version.key); // idempotent
+
+  // Deduplicate: group versions by their current S3 key
+  const byKey = new Map<string, FileVersion[]>();
+  for (const v of versions) {
+    const group = byKey.get(v.key) ?? [];
+    group.push(v);
+    byKey.set(v.key, group);
   }
 
-  // 4. Update File container path
+  // 1. For each unique S3 key: copy to new location
+  const oldKeys: string[] = [];
+  for (const [oldKey, keyVersions] of byKey) {
+    const newKey = oldKey.replace(job.sourcePath, job.targetPath);
+    const exists = await s3.headObject(newKey).catch(() => false);
+    if (!exists) {
+      await s3.copyObject(oldKey, newKey);
+      if (!await s3.headObject(newKey).catch(() => false)) return; // retry next cycle
+    }
+    // 2. Update all version records sharing this key
+    for (const v of keyVersions) {
+      if (v.key !== newKey) {
+        await db.fileVersion.update({ where: { id: v.id }, data: { key: newKey } });
+      }
+    }
+    oldKeys.push(oldKey);
+  }
+
+  // 3. Update File container path
   await db.file.update({
     where: { id: job.fileId },
     data: { path: job.targetPath },
   });
+
+  // 4. Delete old S3 keys AFTER all copies and DB updates are complete
+  for (const oldKey of oldKeys) {
+    await s3.deleteObject(oldKey); // idempotent
+  }
 
   await db.fileJob.update({ where: { id: job.id }, data: { done: true } });
 }
@@ -967,6 +983,8 @@ The `preserve` binding shows up in "Shared with me" and in the file's usage grap
 | `N` (current version at grant time) | Only version N and above | "You can use this going forward, but the history before you got access isn't yours" |
 
 Set at permission creation time — either `1` (all versions) or the file's current version number at that moment. This is an explicit snapshot of intent, not a timestamp inference. The version number is immutable after grant — it doesn't shift as new versions are created.
+
+**`fromVersion` is a floor, not a window.** There is no upper bound. `fromVersion: 3` means "version 3 and all future versions." If the file has 1 version when shared and later gets 20 more, `fromVersion: 1` grants access to all 21. This is intentional — the grant gives ongoing access to the file's evolution, not a frozen range.
 
 This also prevents the sharer from gaming revocation by replacing the file content with a blank before revoking — the grantee's version access is scoped to what existed during their grant window, and lazy copy preserves all versions they had access to (see below).
 
@@ -1674,13 +1692,13 @@ For edge cases where both BullMQ and the sweeper miss a job (extremely unlikely)
 Resolved in the core design — File is a container, FileVersion holds content:
 - **Replace** = create FileVersion at N+1. New highest version is automatically current.
 - **Revert** = new FileVersion record at max+1, pointing at the same S3 key as the old version. No byte copying — just a DB record with `revertedFrom` provenance. Instant, no job needed.
-- **History** is append-only, highest version number is always current (`ORDER BY version DESC LIMIT 1`). No `current` flag, no concurrency hazard.
+- **History** is append-only, highest active version is always current (`WHERE status = 'active' ORDER BY version DESC LIMIT 1`). No `current` flag, no concurrency hazard.
 
 **Remaining questions:**
 - **Cache invalidation** — CDN needs to know content changed when a new version is uploaded. Cache-Tag purge on `file-{fileId}` should fire on version creation.
 - **`FilePermission.fromVersion`** controls which versions a grantee can access (1 = all, N = from version N onward)
 - Lazy copy duplicates all versions within the grantee's version scope, not just the current version
-- **Shared S3 keys on revert** — a reverted FileVersion shares an S3 key with the original. The sweeper/delete logic must check: before deleting an S3 object, verify no other FileVersion records reference the same key.
+- **Shared S3 keys on revert** — a reverted FileVersion shares an S3 key with the original. All operations that delete or move S3 keys must deduplicate by key first — never delete a key while another FileVersion record references it. Move reconciliation groups by key before copying. Sweeper must `COUNT(*) WHERE key = ?` before deleting any S3 object.
 
 ### Reference-Safe Delete
 
