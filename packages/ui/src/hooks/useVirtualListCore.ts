@@ -75,7 +75,12 @@ export function useVirtualListCore(options: VirtualListCoreOptions): VirtualList
   virtualizerRef.current = virtualizer;
 
   React.useEffect(() => {
-    if (restoredRef.current || initialIndex == null || initialIndex <= 0) return;
+    // Index 0 is the default position — no scroll action needed, just mark restored.
+    if (restoredRef.current || initialIndex == null) return;
+    if (initialIndex === 0) {
+      restoredRef.current = true;
+      return;
+    }
     if (itemCount > initialIndex) {
       restoredRef.current = true;
       virtualizerRef.current.scrollToIndex(initialIndex, { align: 'start' });

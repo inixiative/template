@@ -72,7 +72,7 @@ export function useVirtualTableQuery<TItem>(
   const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 
   const pageCount = query.data?.pages.length ?? 0;
-  const total = query.data?.pages[0]?.total;
+  const total = query.data?.pages[query.data.pages.length - 1]?.total;
 
   const locateItem = React.useCallback(
     (flatIndex: number): VirtualTablePageLocation | null => {

@@ -1,4 +1,3 @@
-import { useElementScrollRestoration } from '@tanstack/react-router';
 import * as React from 'react';
 
 const DEBOUNCE_MS = 150;
@@ -6,18 +5,14 @@ const DEBOUNCE_MS = 150;
 export type ScrollState = {
   /** Top visible item index at time of navigation. */
   index: number;
-  /** Number of loaded pages at time of navigation. */
-  pageCount: number;
 };
 
 export type UseVirtualScrollStateOptions = {
   /**
    * Unique identifier for this scroll container. Used as the key in
-   * router location state and as the data-scroll-restoration-id.
+   * history.state for per-element scroll tracking.
    */
   id: string;
-  /** Current number of loaded pages from useVirtualTableQuery. */
-  pageCount: number;
   /** Current number of items (data.length). */
   itemCount: number;
 };
@@ -30,62 +25,58 @@ export type UseVirtualScrollStateResult = {
    */
   initialIndex: number | undefined;
   /**
-   * Ref callback — set as the scroll container's ref. Registers it
-   * for the router's element scroll restoration and provides the
-   * data-scroll-restoration-id attribute.
+   * Whether the saved state could not be restored because the cache
+   * doesn't cover the saved index. Consumers can use this to skip
+   * any other restoration (e.g. pixel-based) and start fresh.
    */
-  scrollRestorationId: string;
-  /**
-   * Whether the router's pixel-based scroll restoration should be
-   * suppressed for this element. True when cache was evicted (saved
-   * index exceeds current itemCount), meaning pixel restore would
-   * overshoot into empty space.
-   */
-  suppressPixelRestore: boolean;
+  cacheInvalid: boolean;
   /**
    * Call this when the top visible index changes (from useVirtualListCore's
    * topVisibleIndex). Debounces writes to history.state.
+   *
+   * Writes are suppressed until the initial restore completes (or is
+   * skipped), preventing a race where a transient `index: 0` overwrites
+   * the saved restore target.
    */
   onTopIndexChange: (index: number) => void;
 };
 
 /**
- * Bridges TanStack Router navigation state with virtualized scroll containers.
+ * Bridges navigation state with virtualized scroll containers.
  *
- * Reads/writes per-element scroll state to history.state so that:
+ * Reads/writes per-element scroll index to history.state so that:
  * - Back/forward navigation restores the scroll index (if cache is warm)
  * - Fresh navigation (link click) starts from the top
  * - Multiple scroll containers on one page each track independently
+ *
+ * This hook owns scroll restoration entirely via index-based
+ * `scrollToIndex`. It does NOT use TanStack Router's pixel-based
+ * scroll restoration (`data-scroll-restoration-id`), because pixel
+ * offsets are inaccurate when the virtualizer uses estimated sizes.
  *
  * Usage:
  * ```tsx
  * const scrollState = useVirtualScrollState({
  *   id: 'users-table',
- *   pageCount: query.pageCount,
  *   itemCount: query.data.length,
  * });
  *
- * const { virtualizer, topVisibleIndex, ... } = useVirtualListCore({
+ * const { topVisibleIndex, ... } = useVirtualListCore({
  *   initialIndex: scrollState.initialIndex,
  *   ...
  * });
  *
- * // Persist scroll position on scroll
  * useEffect(() => {
  *   scrollState.onTopIndexChange(topVisibleIndex);
  * }, [topVisibleIndex, scrollState.onTopIndexChange]);
- *
- * // On the scroll container div:
- * <div data-scroll-restoration-id={scrollState.scrollRestorationId} ... />
  * ```
  */
 export function useVirtualScrollState(
   options: UseVirtualScrollStateOptions,
 ): UseVirtualScrollStateResult {
-  const { id, pageCount, itemCount } = options;
+  const { id, itemCount } = options;
 
   const stateKey = `vscroll:${id}`;
-  const scrollRestorationId = id;
 
   // Read saved state once on mount.
   const savedRef = React.useRef<ScrollState | null>(null);
@@ -102,28 +93,35 @@ export function useVirtualScrollState(
     }
   }
 
-  // Use the router's element scroll restoration to read the saved pixel entry.
-  // When we suppress pixel restore, consumers should ignore the entry.
-  const _scrollEntry = useElementScrollRestoration({ id: scrollRestorationId });
-
   // Determine if we can restore.
   const saved = savedRef.current;
   const cacheCoversIndex = saved !== null && itemCount > saved.index;
-  const suppressPixelRestore = saved !== null && !cacheCoversIndex;
+  const cacheInvalid = saved !== null && !cacheCoversIndex;
   const initialIndex = cacheCoversIndex ? saved.index : undefined;
 
-  // Persist scroll state to history.state (debounced).
+  // Suppress writes until restore completes (or is skipped).
+  // This prevents a transient `index: 0` from overwriting the saved target.
+  const restoreCompleteRef = React.useRef(saved === null);
+  React.useEffect(() => {
+    if (restoreCompleteRef.current) return;
+    // Restore was skipped (cache invalid) or completed (initialIndex consumed).
+    if (cacheInvalid || cacheCoversIndex) {
+      restoreCompleteRef.current = true;
+    }
+  }, [cacheInvalid, cacheCoversIndex]);
+
+  // Persist scroll index to history.state (debounced).
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastIndexRef = React.useRef<number | null>(null);
 
   const onTopIndexChange = React.useCallback(
     (index: number) => {
-      if (index < 0 || index === lastIndexRef.current) return;
+      if (index < 0 || index === lastIndexRef.current || !restoreCompleteRef.current) return;
       lastIndexRef.current = index;
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         try {
-          const state: ScrollState = { index, pageCount };
+          const state: ScrollState = { index };
           const historyState = { ...window.history.state, [stateKey]: state };
           window.history.replaceState(historyState, '');
         } catch {
@@ -131,7 +129,7 @@ export function useVirtualScrollState(
         }
       }, DEBOUNCE_MS);
     },
-    [stateKey, pageCount],
+    [stateKey],
   );
 
   React.useEffect(() => {
@@ -140,8 +138,7 @@ export function useVirtualScrollState(
 
   return {
     initialIndex,
-    scrollRestorationId,
-    suppressPixelRestore,
+    cacheInvalid,
     onTopIndexChange,
   };
 }

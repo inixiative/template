@@ -1,5 +1,5 @@
 import type { ScrollToOptions } from '@tanstack/react-virtual';
-import { buildScrollHandle, useVirtualListCore } from '@template/ui/hooks/useVirtualListCore';
+import { useVirtualListCore } from '@template/ui/hooks/useVirtualListCore';
 import { cn } from '@template/ui/lib/utils';
 import { Loader2 } from 'lucide-react';
 import * as React from 'react';
@@ -45,8 +45,6 @@ export type VirtualScrollProps<T> = {
   show?: boolean | (() => boolean);
   className?: string;
   emptyMessage?: React.ReactNode;
-  /** Set to use with useVirtualScrollState for router-driven restoration. */
-  scrollRestorationId?: string;
   /** Called when the top visible index changes. Wire to useVirtualScrollState. */
   onTopIndexChange?: (index: number) => void;
 };
@@ -81,7 +79,6 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       overscan = 5,
       initialIndex,
       className,
-      scrollRestorationId,
       onTopIndexChange,
     },
     ref,
@@ -100,11 +97,20 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
       loadMoreThreshold,
     });
 
-    React.useImperativeHandle(ref, () => buildScrollHandle(virtualizer, items, keyExtractor), [
-      virtualizer,
-      items,
-      keyExtractor,
-    ]);
+    const virtualizerRef = React.useRef(virtualizer);
+    virtualizerRef.current = virtualizer;
+    const itemsRef = React.useRef(items);
+    itemsRef.current = items;
+
+    React.useImperativeHandle(ref, () => ({
+      scrollToIndex: (index, options) => virtualizerRef.current.scrollToIndex(index, options),
+      scrollToItem: (key) => {
+        const idx = itemsRef.current.findIndex((item) => keyExtractor(item) === key);
+        if (idx === -1) return false;
+        virtualizerRef.current.scrollToIndex(idx, { align: 'start' });
+        return true;
+      },
+    }), [keyExtractor]);
 
     // Notify parent of scroll position changes.
     React.useEffect(() => {
@@ -116,11 +122,11 @@ const VirtualScrollInner = React.forwardRef<VirtualScrollHandle, InnerProps<unkn
         ref={scrollRef}
         className={cn('overflow-auto', className)}
         style={{ maxHeight, overflowY: 'auto' }}
-        data-scroll-restoration-id={scrollRestorationId}
       >
         <div style={{ paddingTop: paddingStart, paddingBottom: paddingEnd }}>
           {virtualItems.map((virtualItem) => {
             const item = items[virtualItem.index];
+            if (!item) return null;
             return (
               <div
                 key={keyExtractor(item)}

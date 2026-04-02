@@ -27,8 +27,6 @@ export type VirtualTableProps<T> = {
   /** Index to scroll to on mount (e.g. from useVirtualScrollState). */
   initialIndex?: number;
   className?: string;
-  /** Set to use with useVirtualScrollState for router-driven restoration. */
-  scrollRestorationId?: string;
   /** Called when the top visible index changes. Wire to useVirtualScrollState. */
   onTopIndexChange?: (index: number) => void;
 };
@@ -64,7 +62,6 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       loadMoreThreshold = 5,
       initialIndex,
       className,
-      scrollRestorationId,
       onTopIndexChange,
     },
     ref,
@@ -83,10 +80,20 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
       loadMoreThreshold,
     });
 
-    React.useImperativeHandle(ref, () => {
-      const handle = buildScrollHandle(virtualizer, data, keyExtractor);
-      return { scrollToRow: handle.scrollToIndex, scrollToItem: handle.scrollToItem };
-    }, [virtualizer, data, keyExtractor]);
+    const virtualizerRef = React.useRef(virtualizer);
+    virtualizerRef.current = virtualizer;
+    const dataRef = React.useRef(data);
+    dataRef.current = data;
+
+    React.useImperativeHandle(ref, () => ({
+      scrollToRow: (index, options) => virtualizerRef.current.scrollToIndex(index, options),
+      scrollToItem: (key) => {
+        const idx = dataRef.current.findIndex((item) => keyExtractor(item) === key);
+        if (idx === -1) return false;
+        virtualizerRef.current.scrollToIndex(idx, { align: 'start' });
+        return true;
+      },
+    }), [keyExtractor]);
 
     // Notify parent of scroll position changes.
     React.useEffect(() => {
@@ -95,13 +102,9 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
 
     return (
       <div className={cn('border rounded-lg overflow-hidden', className)}>
-        <div
-          ref={scrollRef}
-          style={{ maxHeight, overflow: 'auto' }}
-          data-scroll-restoration-id={scrollRestorationId}
-        >
+        <div ref={scrollRef} style={{ maxHeight, overflow: 'auto' }}>
           <table className="w-full" style={{ tableLayout: 'fixed' }}>
-            <thead className="bg-muted/50 border-b sticky top-0 z-10">
+            <thead className="bg-muted border-b sticky top-0 z-10">
               <tr>
                 {columns.map((column) => (
                   <th key={column.key} className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -118,6 +121,7 @@ const VirtualTableInner = React.forwardRef<VirtualTableHandle, InnerProps<unknow
               )}
               {virtualItems.map((virtualRow) => {
                 const item = data[virtualRow.index];
+                if (!item) return null;
                 return (
                   <tr
                     key={keyExtractor(item)}
