@@ -22,7 +22,6 @@ export {
 } from './useAuthStrategy';
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
-export { type FilterState, buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 export { type DataFilters, useDataFilters } from './useDataFilters';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
