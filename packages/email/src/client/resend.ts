@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 
 const FIXTURES_DIR = join(import.meta.dir, '../../tests/fixtures/resend');
 const SANITIZE_KEYS = ['id'];
+const MAX_BATCH_SIZE = 100;
 
 const resendClients = new Map<string, Resend>();
 
@@ -19,9 +20,16 @@ const getResendClient = (apiKey: string): Resend => {
   return resendClient;
 };
 
+const chunk = <T>(arr: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+};
+
 class ResendEmailClient implements EmailClient {
   readonly vcr = new VCR(FIXTURES_DIR, { send: { keys: SANITIZE_KEYS } });
-  readonly maxBatchSize = 100;
   private readonly resend: Resend;
 
   constructor(apiKey: string) {
@@ -34,8 +42,17 @@ class ResendEmailClient implements EmailClient {
   }
 
   async sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
-    if (process.env.NODE_ENV !== 'test') return this._sendBatch(batch);
-    return this.vcr.capture('sendBatch', () => this._sendBatch(batch));
+    if (!batch.length) return [];
+
+    const results: SendEmailResult[] = [];
+    for (const batchChunk of chunk(batch, MAX_BATCH_SIZE)) {
+      if (process.env.NODE_ENV !== 'test') {
+        results.push(...(await this._sendBatch(batchChunk)));
+      } else {
+        results.push(...(await this.vcr.capture('sendBatch', () => this._sendBatch(batchChunk))));
+      }
+    }
+    return results;
   }
 
   private async _send(options: SendEmailOptions): Promise<SendEmailResult> {

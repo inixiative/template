@@ -20,14 +20,6 @@ export type SendEmailPayload = {
   emailContext?: EmailContext;
 };
 
-const chunk = <T>(arr: T[], size: number): T[][] => {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-};
-
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
   const { recipients, from, template, data, senderVars, tags, emailContext } = payload;
   const { log } = ctx;
@@ -56,9 +48,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     return { to: recipient.to, from, subject, html, tags };
   });
 
-  for (const batch of chunk(rendered, client.maxBatchSize)) {
-    await client.sendBatch(batch);
-  }
+  await client.sendBatch(rendered);
 
   log(`Email sent: template=${template} recipients=${recipients.length}`);
 });
