@@ -178,6 +178,28 @@ The helpers should make the `search` vs `searchFields` distinction explicit:
 - `search` (combined mode): one search box, API ORs `contains` across all `searchableFields`
 - `searchFields[field][operator]=value` (field mode): per-field targeted filtering
 
+### Step 8: Fix relation path handling in combined search (BACKEND BUG)
+
+**Problem:** `searchable()` produces flat paths like `organizationUsers.role` for one-to-many relations. But `buildWhereClause` in combined search mode calls `buildNestedPath(field, { contains: search })` which produces `{ organizationUsers: { role: { contains: ... } } }`. Prisma rejects this because `organizationUsers` is an array relation — it needs `{ organizationUsers: { some: { role: { contains: ... } } } }`.
+
+**Why it hasn't broken yet:** No `searchable()` config in the codebase currently includes relation paths. The inquiry searchable fields are all flat scalars. But the `searchable()` helper and its test suite explicitly support relation paths (e.g. `organizationUsers.user.name`), so this is a latent bug that will surface as soon as someone adds a relation path to a searchable config.
+
+**Real use case:** Searching inquiries by the source user's email, the org's name, or the space's name. These are all relation paths through one-to-many joins.
+
+**Fix (backend):** `buildNestedPath` needs to be relation-aware. When a path segment corresponds to a one-to-many relation in the Prisma schema, inject `some` automatically. This requires either:
+- (a) Passing the Prisma runtime data model to `buildNestedPath` so it can detect relation types, or
+- (b) Having `searchable()` encode the relation operator in the path (e.g. `organizationUsers.some.role` instead of `organizationUsers.role`) and having `buildNestedPath` respect it
+
+Option (b) is simpler and keeps the path self-describing. The `searchable()` helper already reads the Prisma data model and knows which fields are relations. It just needs to inject the appropriate operator (`some` for one-to-many, direct nesting for one-to-one/many-to-one).
+
+**Fix (frontend):** `buildRelationPath` (from Step 4) should require the relation operator, matching the backend convention. The `FieldMetadata` type should indicate whether a field is behind a one-to-many or many-to-one relation so the frontend can construct the correct path.
+
+**Files:**
+- `apps/api/src/lib/prisma/searchable.ts` — inject `some`/`is` in paths based on relation type
+- `apps/api/src/lib/prisma/buildWhereClause.ts` — handle paths containing relation operators
+- `apps/api/src/lib/prisma/pathNotation.ts` — `buildNestedPath` may need relation awareness
+- Tests for all of the above
+
 `FieldMetadata.isSearchable` indicates the field is in the `searchableFields` whitelist. In `combined` mode, all searchable fields participate in the top-level `search` param automatically. In `field` mode, each field gets its own `searchFields[field][contains]` entry.
 
 Admin mode uses `filters[...]` which bypasses the whitelist entirely — every field in the response schema is filterable.
