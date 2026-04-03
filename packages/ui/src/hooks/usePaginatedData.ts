@@ -239,19 +239,38 @@ function readInitialState(stateKey: string | undefined, checkUrl: boolean): Pers
 
 const DEBOUNCE_MS = 300;
 
-/** Persist state to history.state (always) and URL params (when shareableUrl). */
+/** Write state to history.state under the given key. */
+function writeToHistoryState(key: string, state: PersistedState): void {
+  try {
+    const historyState = { ...window.history.state, [key]: state };
+    window.history.replaceState(historyState, '');
+  } catch {
+    // sandboxed iframe or SecurityError
+  }
+}
+
+/** Write state to both history.state and URL search params. */
+function writeToHistoryStateAndUrl(key: string | undefined, state: PersistedState): void {
+  try {
+    const url = syncStateToUrl(state);
+    const historyState = key
+      ? { ...window.history.state, [key]: state }
+      : window.history.state;
+    window.history.replaceState(historyState, '', url);
+  } catch {
+    // sandboxed iframe or SecurityError
+  }
+}
+
+/** Persist state on changes, debounced. Writes to history.state always; URL params when shareableUrl. */
 function usePersistState(
   stateKey: string | undefined,
   state: PersistedState,
   shareableUrl: boolean,
 ): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  // Use a ref for current state so the debounce callback reads fresh values.
   const stateRef = useRef(state);
   stateRef.current = state;
-
-  // Debounced persistence.
   const stateKeyRef = useRef(stateKey);
   stateKeyRef.current = stateKey;
 
@@ -261,23 +280,10 @@ function usePersistState(
       const current = stateRef.current;
       const key = stateKeyRef.current;
 
-      if (key) {
-        try {
-          const historyState = { ...window.history.state, [key]: current };
-          window.history.replaceState(
-            historyState,
-            '',
-            shareableUrl ? syncStateToUrl(current) : undefined,
-          );
-        } catch {
-          // skip
-        }
-      } else if (shareableUrl) {
-        try {
-          window.history.replaceState(window.history.state, '', syncStateToUrl(current));
-        } catch {
-          // skip
-        }
+      if (shareableUrl) {
+        writeToHistoryStateAndUrl(key, current);
+      } else if (key) {
+        writeToHistoryState(key, current);
       }
     }, DEBOUNCE_MS);
 
