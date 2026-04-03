@@ -163,7 +163,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
 
 // --- State persistence helpers ---
 
-type PersistedState = {
+export type PersistedState = {
   page?: number;
   pageSize?: number;
   search?: string;
@@ -179,7 +179,7 @@ const URL_PARAMS: Record<keyof PersistedState, string> = {
 };
 
 /** Sync a PersistedState to URL search params. Falsy/default values are removed. */
-function syncStateToUrl(state: PersistedState): string {
+export function syncStateToUrl(state: PersistedState): string {
   const url = new URL(window.location.href);
 
   for (const [key, param] of Object.entries(URL_PARAMS)) {
@@ -202,7 +202,7 @@ function syncStateToUrl(state: PersistedState): string {
 }
 
 /** Read PersistedState from URL search params. */
-function readStateFromUrl(): PersistedState {
+export function readStateFromUrl(): PersistedState {
   const params = new URLSearchParams(window.location.search);
   const state: PersistedState = {};
 
@@ -222,7 +222,7 @@ function readStateFromUrl(): PersistedState {
 }
 
 /** Read initial state from history.state, falling back to URL params. */
-function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
+export function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
   if (typeof window === 'undefined') return {};
 
   // Try history.state first (back/forward navigation).

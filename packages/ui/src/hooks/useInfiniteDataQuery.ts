@@ -85,18 +85,8 @@ export function useInfiniteDataQuery<TItem>(
   }, [query.data]);
 
   const locateItem = React.useCallback(
-    (flatIndex: number): InfiniteDataPageLocation | null => {
-      if (flatIndex < 0 || !query.data) return null;
-      let remaining = flatIndex;
-      for (let pageIndex = 0; pageIndex < query.data.pages.length; pageIndex++) {
-        const page = query.data.pages[pageIndex];
-        if (remaining < page.data.length) {
-          return { pageIndex, indexInPage: remaining };
-        }
-        remaining -= page.data.length;
-      }
-      return null;
-    },
+    (flatIndex: number): InfiniteDataPageLocation | null =>
+      locateItemInPages(query.data?.pages ?? [], flatIndex),
     [query.data],
   );
 
@@ -111,4 +101,24 @@ export function useInfiniteDataQuery<TItem>(
     locateItem,
     queryKey,
   };
+}
+
+/**
+ * Given an array of pages and a flat index, returns which page it
+ * belongs to and its index within that page. Exported for testing.
+ */
+export function locateItemInPages<TItem>(
+  pages: InfiniteDataPage<TItem>[],
+  flatIndex: number,
+): InfiniteDataPageLocation | null {
+  if (flatIndex < 0) return null;
+  let remaining = flatIndex;
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
+    if (remaining < page.data.length) {
+      return { pageIndex, indexInPage: remaining };
+    }
+    remaining -= page.data.length;
+  }
+  return null;
 }

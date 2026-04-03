@@ -208,7 +208,7 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
  *   then finds child `[data-key="3"]`, falling back to the
  *   4th `[data-key]` child (0-indexed) if no key match
  */
-function resolveSectionTarget(sectionId: string): Element | null {
+export function resolveSectionTarget(sectionId: string): Element | null {
   const dotIndex = sectionId.indexOf('.');
   if (dotIndex === -1) {
     return document.querySelector(`[${SECTION_ATTR}="${CSS.escape(sectionId)}"]`);

@@ -1992,170 +1992,238 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 
 ---
 
-## Data Tables
+## Data Hooks
 
-### makeDataTableConfig
+Server data primitives for search, filter, sort, pagination, infinite scroll, scroll restoration, and section navigation. These hooks are presentation-agnostic — they work with Table, card grids, feeds, or any renderer.
 
-Auto-generates DataTable configuration from OpenAPI spec metadata.
+### Architecture
 
-**Features:**
-- Searchable fields from `x-searchable-fields`
-- Orderable fields (auto-detected recursively, no arrays)
-- Enum filters (auto-detected with `in`/`notin` operators)
-- Permission toggles (`canSearch`, `canOrder`)
-- Search modes: `combined` (all fields) or `field` (dropdown)
-
-**Location:** `@template/shared/lib/makeDataTableConfig`
-
-### Basic Usage
-
-```typescript
-import { makeDataTableConfig } from '@template/shared';
-
-function OrganizationsTable() {
-  const config = makeDataTableConfig('adminOrganizationReadMany');
-
-  return (
-    <DataTable
-      searchable={config.canSearch}
-      searchableFields={config.searchableFields}
-      orderable={config.canOrder}
-      orderableFields={config.orderableFields}
-      enumFilters={config.enumFilters}
-      searchMode={config.searchMode}
-    />
-  );
-}
+```
+makeDataConfig(operationId)     → DataConfig (searchable fields, orderable fields, enums)
+    ↓
+useDataFilters(config)          → shared search/filter/sort state + buildFilterQuery
+    ↓
+usePaginatedData({ config })    → filters + page/pageSize + scroll restore + URL sync
+useInfiniteData({ config })     → filters + TanStack infinite query + scroll restore
+    ↓
+Table / Pagination / any renderer
 ```
 
-### With Permissions
+Supporting hooks (used internally or standalone):
+- `useScrollState` — per-element scroll position in history.state
+- `useSectionHash` — root-level URL hash ↔ visible section sync
+- `useInfiniteScrollTrigger` — IntersectionObserver sentinel for load-more
+- `useInfiniteDataQuery` — low-level TanStack Query infinite wrapper
+
+### makeDataConfig
+
+Auto-generates data configuration from the OpenAPI spec.
+
+**Location:** `packages/ui/src/lib/makeDataConfig.ts`
 
 ```typescript
-const hasSearchPermission = usePermission({
-  permissions,
-  model: 'Organization',
-  record: sampleOrg,
-  action: 'search',
-});
+import { makeDataConfig } from '@template/ui/lib/makeDataConfig';
 
-const config = makeDataTableConfig('adminOrganizationReadMany', {
-  canSearch: hasSearchPermission.show,
-  canOrder: hasSearchPermission.show,
-  searchMode: 'field',
+const config = makeDataConfig('adminOrganizationReadMany');
+// { searchableFields, orderableFields, enumFilters, searchMode, canSearch, canOrder }
+```
+
+Options:
+```typescript
+makeDataConfig('operationId', {
+  searchMode: 'field',     // 'combined' (default) | 'field'
+  adminMode: true,         // filters[...] instead of searchFields[...]
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
+  canSearch: false,
+  canOrder: true,
 });
 ```
 
-### Configuration Options
+### usePaginatedData — Page-Number Pagination
 
 ```typescript
-type DataTableOptions = {
-  searchMode?: 'combined' | 'field';  // Default: 'combined'
-  defaultOrderBy?: Array<{
-    field: string;
-    direction: 'asc' | 'desc';
-  }>;
-  canSearch?: boolean;  // Default: true
-  canOrder?: boolean;   // Default: true
-};
+import { usePaginatedData } from '@template/ui/hooks';
+
+const data = usePaginatedData({
+  config: makeDataConfig('adminOrganizationReadMany'),
+  sectionId: 'orgs',          // scroll restore + section hash
+  shareableUrl: true,          // ?page=3&search=acme in URL
+});
+
+const { data: response } = useQuery(queries.orgs.list(data.query));
+
+<Table
+  columns={columns}
+  data={response.items}
+  keyExtractor={(o) => o.id}
+  pagination={data.paginationProps(response.total)}
+  {...data.layoutProps}
+/>
 ```
 
-### Return Type
+Returns: `search`, `filters`, `orderBy`, `page`, `pageSize`, `setSearch`, `setFilter`, `toggleOrderBy`, `setPage`, `setPageSize`, `reset`, `query`, `paginationProps(total)`, `layoutProps`, `sectionId`, `scrollRef`.
+
+### useInfiniteData — Infinite Scroll
 
 ```typescript
-type DataTableConfig = {
-  // From x-searchable-fields in OpenAPI
-  searchableFields: string[];
+import { useInfiniteData } from '@template/ui/hooks';
 
-  // Auto-detected from response schema (recursive, no arrays)
-  orderableFields: string[];
+const feed = useInfiniteData({
+  config: makeDataConfig('activityReadMany'),
+  queryKey: ['activity'],
+  queryFn: (page, filterQuery) => fetchActivity({ ...filterQuery, cursor: page }),
+  sectionId: 'activityFeed',
+});
 
-  // Auto-detected enum fields with values
-  enumFilters: Array<{
-    field: string;
-    values: string[];
-    operators: ['in', 'notin'];
-  }>;
-
-  // Configuration
-  searchMode: 'combined' | 'field';
-  defaultOrderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-
-  // Permissions
-  canSearch: boolean;
-  canOrder: boolean;
-};
+<Table
+  columns={columns}
+  data={feed.data}
+  keyExtractor={(a) => a.id}
+  infiniteScroll={feed.infiniteScrollProps}
+  {...feed.layoutProps}
+/>
 ```
 
-### Auto-Detection
+### Table Component
 
-**Orderable Fields:**
-- Recursively walks response schema
-- Includes nested paths (`organizationUser.role`)
-- Excludes array fields
-- Supports all scalar types
+**Location:** `packages/ui/src/components/primitives/Table.tsx`
 
-**Enum Filters:**
-- Detects `enum: [...]` in schema
-- Extracts values for multiselect
-- Provides `in` and `notin` operators
-- Supports nested enums
-
-**Example Schema → Config:**
+Dumb renderer. Supports both pagination modes, sticky headers, and section hash.
 
 ```typescript
-// OpenAPI schema has:
-// - x-searchable-fields: ['name', 'slug']
-// - status: enum ['draft', 'active', 'archived']
-// - type: enum ['foo', 'bar']
-
-const config = makeDataTableConfig('inquiryReadMany');
-// {
-//   searchableFields: ['name', 'slug'],
-//   orderableFields: ['id', 'name', 'slug', 'status', 'type', 'createdAt', ...],
-//   enumFilters: [
-//     { field: 'status', values: ['draft', 'active', 'archived'], operators: ['in', 'notin'] },
-//     { field: 'type', values: ['foo', 'bar'], operators: ['in', 'notin'] }
-//   ],
-//   canSearch: true,
-//   canOrder: true,
-//   searchMode: 'combined'
-// }
+<Table
+  columns={columns}
+  data={items}
+  keyExtractor={(item) => item.id}
+  // Fixed-page pagination:
+  pagination={controller.paginationProps(total)}
+  // OR infinite scroll:
+  infiniteScroll={{ onLoadMore, hasMore, isLoading }}
+  // Viewport scroll (optional):
+  maxHeight={600}
+  scrollRef={scrollRef}
+  // Section hash (optional):
+  sectionId="usersTable"
+  // Row click:
+  onRowClick={(item) => navigate(`/users/${item.id}`)}
+/>
 ```
 
-### React Hook
+Each `<tr>` gets `data-key={keyExtractor(item)}` for deep linking via `#usersTable.usr_abc123`.
+
+### Pagination Component
+
+**Location:** `packages/ui/src/components/primitives/Pagination.tsx`
 
 ```typescript
-import { useDataTableConfig } from '@template/shared';
-
-function OrganizationsTable() {
-  const hasPermission = usePermission(...);
-
-  const config = useDataTableConfig('adminOrganizationReadMany', {
-    canSearch: hasPermission.show,
-    searchMode: 'field',
-  });
-
-  return <DataTable {...config} />;
-}
+<Pagination
+  currentPage={3}
+  totalPages={10}
+  onPageChange={setPage}
+  totalRecords={200}
+  pageSize={20}
+  pageSizeOptions={[10, 20, 50, 100]}
+  onPageSizeChange={setPageSize}
+/>
 ```
+
+Features: numbered page buttons with ellipsis collapse, first/last/prev/next, per-page selector with `aria-label`, "Showing X–Y of Z" record count.
+
+### Scroll Restoration — useScrollState
+
+**Location:** `packages/ui/src/hooks/useScrollState.ts`
+
+Persists scroll position to `history.state` per element. Back/forward restores position. Fresh navigation starts at top.
+
+```typescript
+// Viewport container:
+const scrollRef = useRef<HTMLDivElement>(null);
+useScrollState({ id: 'usersTable', scrollRef });
+
+// Window scroll:
+useScrollState({ id: 'mainFeed' });
+
+// With data loading:
+useScrollState({ id: 'table', scrollRef, ready: !isLoading });
+
+// Disable:
+useScrollState({ id: 'table', enabled: false });
+```
+
+### Section Hash — useSectionHash
+
+**Location:** `packages/ui/src/hooks/useSectionHash.ts`
+
+Mount once at the app root. Auto-discovers `data-section` elements via MutationObserver. Updates URL hash to the most visible section.
+
+```typescript
+// App root:
+const { activeSection, scrollToSection } = useSectionHash();
+
+// Any component — just add the attribute:
+<section data-section="teamMembers">...</section>
+```
+
+Deep linking with dot notation:
+- `#usersTable` → scrolls to `[data-section="usersTable"]`
+- `#usersTable.usr_abc123` → scrolls to `[data-key="usr_abc123"]` within that section
+- `#usersTable.3` → scrolls to the 4th `[data-key]` child (0-indexed fallback)
+
+Use camelCase for section IDs (they become URL hash fragments).
+
+### Infinite Scroll Trigger — useInfiniteScrollTrigger
+
+**Location:** `packages/ui/src/hooks/useInfiniteScrollTrigger.ts`
+
+IntersectionObserver sentinel. Works with viewport containers and window scroll.
+
+```typescript
+const sentinelRef = useInfiniteScrollTrigger({
+  onLoadMore: fetchNextPage,
+  hasMore: true,
+  isLoading: false,
+  rootMargin: '200px',
+});
+
+<div>
+  {items.map(item => <Card key={item.id} />)}
+  <div ref={sentinelRef} />
+</div>
+```
+
+### State Persistence
+
+| State | Where | When |
+|-------|-------|------|
+| page, pageSize, search, orderBy | `history.state` (always) | Back/forward nav |
+| page, pageSize, search, orderBy | URL params (opt-in `shareableUrl`) | Shared links |
+| scroll position | `history.state` per `scroll:{id}` | Back/forward nav |
+| section hash | URL `#hash` | Deep linking |
+
+`history.state` is per history entry. Multiple data views on one page each get independent keys (`data:usersTable`, `scroll:usersTable`, etc.).
 
 ### Testing
 
-**Location:** `packages/shared/src/lib/makeDataTableConfig.test.ts`
-
-**Coverage:** 14 tests covering:
-- Metadata extraction from OpenAPI
-- Recursive orderable field detection
-- Nested path handling
-- Array exclusion
-- Enum filter detection
-- Permission toggles
-- Defaults and customization
+Run from `packages/ui` (requires `bunfig.toml` for happy-dom preload):
 
 ```bash
-cd packages/shared && bun test src/lib/makeDataTableConfig.test.ts
+cd packages/ui && bun run test
 ```
+
+Or via root:
+
+```bash
+bun run test:fe
+```
+
+Test coverage:
+- `makeDataConfig.test.ts` — 14 tests (OpenAPI metadata extraction)
+- `useDataFilters.test.ts` — 30 tests (filter/sort query serialization)
+- `usePaginatedData.test.ts` — 25+ tests (URL round-trip, hydration chain, section resolution)
+- `useInfiniteDataQuery.test.ts` — 8 tests (page location)
+- `useInfiniteScrollTrigger.test.ts` — 4 tests (callback guards)
+- `Pagination.test.ts` — 17 tests (page range, record count)
+- `serializeBracketQuery.test.ts` — 12 tests (bracket notation)
 
 ---
 
@@ -2241,9 +2309,20 @@ cd packages/shared && bun test src/lib/makeDataTableConfig.test.ts
 - `/packages/ui/src/components/layout/DetailPanel.tsx`
 - `/packages/ui/src/components/layout/MasterDetailLayout.tsx`
 
-### Hooks
-- `/packages/shared/src/hooks/usePermission.ts`
-- `/packages/shared/src/hooks/useOptimisticMutation.ts`
-- `/packages/shared/src/hooks/useLogout.ts`
-- `/packages/shared/src/utils/debounce.ts`
-- `/packages/shared/src/utils/validateUniqueness.ts`
+### Data Hooks
+- `/packages/ui/src/lib/makeDataConfig.ts` — Config factory from OpenAPI spec
+- `/packages/ui/src/hooks/useDataFilters.ts` — Shared search/filter/sort state
+- `/packages/ui/src/hooks/usePaginatedData.ts` — Paginated data controller
+- `/packages/ui/src/hooks/useInfiniteData.ts` — Infinite scroll data controller
+- `/packages/ui/src/hooks/useInfiniteDataQuery.ts` — TanStack Query infinite wrapper
+- `/packages/ui/src/hooks/useInfiniteScrollTrigger.ts` — IntersectionObserver sentinel
+- `/packages/ui/src/hooks/useScrollState.ts` — Per-element scroll position in history.state
+- `/packages/ui/src/hooks/useSectionHash.ts` — Root-level URL hash ↔ section sync
+- `/packages/ui/src/components/primitives/Table.tsx` — Table renderer (pagination + infinite scroll)
+- `/packages/ui/src/components/primitives/Pagination.tsx` — Pagination UI
+
+### Other Hooks
+- `/packages/ui/src/hooks/usePermission.ts`
+- `/packages/ui/src/hooks/useOptimisticMutation.ts`
+- `/packages/ui/src/hooks/useDebounce.ts`
+- `/packages/ui/src/hooks/useValidateUniqueness.ts`

@@ -387,3 +387,29 @@ const response = await fetch(del(`/api/v1/users/${id}`));
 const { data } = await json<User>(response);
 const { data, pagination } = await json<User[]>(response);
 ```
+
+---
+
+## Frontend Testing (happy-dom)
+
+Frontend packages use `@happy-dom/global-registrator` for DOM testing. Each package/app has its own preload:
+
+- `packages/ui/bunfig.toml` → `src/test/setup.ts`
+- `apps/web/bunfig.toml` → `src/test/setup.ts`
+- `apps/admin/bunfig.toml` → `src/test/setup.ts`
+- `apps/superadmin/bunfig.toml` → `src/test/setup.ts`
+
+**Important:** Tests must run from the package directory (bun reads `bunfig.toml` from CWD):
+
+```bash
+# Correct — preload activates:
+cd packages/ui && bun run test
+
+# Also correct — via root scripts:
+bun run test:fe
+
+# WRONG — preload not found, DOM tests fail:
+bun test packages/ui/src
+```
+
+The `setup.ts` file must ONLY call `GlobalRegistrator.register()`. Do not import `@testing-library/react` or other libs — ES module imports are hoisted and those libs evaluate before the DOM exists.
