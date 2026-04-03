@@ -1,17 +1,15 @@
 import * as React from 'react';
 
 const SCROLL_DEBOUNCE_MS = 200;
+const SECTION_ATTR = 'data-section';
+const SECTION_SELECTOR = `[${SECTION_ATTR}]`;
 
 export type UseSectionHashOptions = {
   /**
-   * Map of section IDs to their element refs. The hook observes these
-   * elements and updates the URL hash to the most visible section.
-   * Also scrolls to the matching section on mount if the URL has a hash.
-   *
-   * Memoize this object or define it outside the component to avoid
-   * unnecessary observer recreation on every render.
+   * Whether hash tracking is enabled. Defaults to true.
+   * Set to false to temporarily disable without unmounting.
    */
-  sections: Record<string, React.RefObject<HTMLElement | null>>;
+  enabled?: boolean;
   /**
    * IntersectionObserver threshold. The section with the highest
    * intersection ratio becomes the active hash. Defaults to 0.5.
@@ -27,125 +25,162 @@ export type UseSectionHashResult = {
 };
 
 /**
- * Syncs the URL hash with the most visible section on the page.
+ * Auto-discovers sections in the DOM and syncs the URL hash with the
+ * most visible one. Mount once at the app root — no per-page wiring needed.
  *
- * On mount: if the URL has a hash matching a section ID, scrolls to it.
+ * Sections opt in by adding `data-section="section-id"` to any element:
+ *
+ *   <div data-section="users">...</div>
+ *   <div data-section="activity">...</div>
+ *
+ * The hook uses a MutationObserver to detect sections as they mount/unmount,
+ * and an IntersectionObserver to track which section is most visible.
+ *
+ * On mount: if the URL has a #hash matching a section, scrolls to it.
  * On scroll: updates the URL hash to the most visible section (debounced).
- * On call: scrollToSection programmatically scrolls and updates the hash.
+ * On navigation: new page's sections are auto-discovered as they mount.
  *
- * Usage:
+ * Usage (app root):
  * ```tsx
- * const usersRef = useRef<HTMLDivElement>(null);
- * const logsRef = useRef<HTMLDivElement>(null);
+ * function App() {
+ *   const { activeSection, scrollToSection } = useSectionHash();
+ *   return <RouterProvider ... />;
+ * }
+ * ```
  *
- * // Memoize to avoid observer churn.
- * const sections = useMemo(() => ({ users: usersRef, logs: logsRef }), []);
- *
- * const { activeSection, scrollToSection } = useSectionHash({ sections });
- *
- * return (
- *   <>
- *     <nav>
- *       <a onClick={() => scrollToSection('users')}>Users</a>
- *       <a onClick={() => scrollToSection('logs')}>Logs</a>
- *     </nav>
- *     <div ref={usersRef} id="users">...</div>
- *     <div ref={logsRef} id="logs">...</div>
- *   </>
- * );
+ * Usage (any component):
+ * ```tsx
+ * <section data-section="users">
+ *   <h2>Users</h2>
+ *   <Table ... />
+ * </section>
  * ```
  */
-export function useSectionHash(options: UseSectionHashOptions): UseSectionHashResult {
-  const { sections, threshold = 0.5 } = options;
-
-  // Stabilize the effect dependency on section keys rather than object identity.
-  // This prevents observer churn when the consumer creates a new object each render.
-  const sectionsRef = React.useRef(sections);
-  sectionsRef.current = sections;
-  const sectionKeys = Object.keys(sections).sort().join(',');
+export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionHashResult {
+  const { enabled = true, threshold = 0.5 } = options;
 
   const [activeSection, setActiveSection] = React.useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const hash = window.location.hash.slice(1);
-    return hash && hash in sections ? hash : null;
+    return hash || null;
   });
 
-  // Scroll to section from URL hash on mount.
+  // Track intersection ratios for all observed sections.
+  const ratioMapRef = React.useRef<Map<string, number>>(new Map());
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const intersectionObserverRef = React.useRef<IntersectionObserver | null>(null);
+
+  // Scroll to hash on mount.
   const scrolledOnMountRef = React.useRef(false);
   React.useEffect(() => {
-    if (scrolledOnMountRef.current) return;
+    if (!enabled || scrolledOnMountRef.current) return;
     scrolledOnMountRef.current = true;
 
     const hash = window.location.hash.slice(1);
-    const currentSections = sectionsRef.current;
-    if (!hash || !(hash in currentSections)) return;
+    if (!hash) return;
 
-    const el = currentSections[hash]?.current;
-    if (!el) return;
-
+    // Defer to let the page render sections first.
     requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const el = document.querySelector(`[${SECTION_ATTR}="${CSS.escape(hash)}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
-  }, []);
+  }, [enabled]);
 
-  // Observe sections and update hash to the most visible one.
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const ratioMapRef = React.useRef<Map<string, number>>(new Map());
-
+  // Set up IntersectionObserver + MutationObserver for auto-discovery.
   React.useEffect(() => {
-    const currentSections = sectionsRef.current;
-    const entries = Object.entries(currentSections);
-    if (entries.length === 0) return;
+    if (!enabled) return;
 
-    ratioMapRef.current.clear();
+    const onIntersection: IntersectionObserverCallback = (entries) => {
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).getAttribute(SECTION_ATTR);
+        if (id) {
+          ratioMapRef.current.set(id, entry.intersectionRatio);
+        }
+      }
 
-    const observer = new IntersectionObserver(
-      (ioEntries) => {
-        for (const entry of ioEntries) {
-          const id = (entry.target as HTMLElement).id || findSectionId(entry.target, sectionsRef.current);
-          if (id) {
-            ratioMapRef.current.set(id, entry.intersectionRatio);
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        let bestId: string | null = null;
+        let bestRatio = 0;
+        for (const [id, ratio] of ratioMapRef.current) {
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestId = id;
           }
         }
-
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-          let bestId: string | null = null;
-          let bestRatio = 0;
-          for (const [id, ratio] of ratioMapRef.current) {
-            if (ratio > bestRatio) {
-              bestRatio = ratio;
-              bestId = id;
-            }
+        if (bestId && bestRatio > 0) {
+          setActiveSection(bestId);
+          const newHash = `#${bestId}`;
+          if (window.location.hash !== newHash) {
+            window.history.replaceState(window.history.state, '', newHash);
           }
-          if (bestId && bestRatio > 0) {
-            setActiveSection(bestId);
-            const newHash = `#${bestId}`;
-            if (window.location.hash !== newHash) {
-              window.history.replaceState(window.history.state, '', newHash);
-            }
-          }
-        }, SCROLL_DEBOUNCE_MS);
-      },
-      { threshold: [0, threshold, 1] },
-    );
+        }
+      }, SCROLL_DEBOUNCE_MS);
+    };
 
-    for (const [_, ref] of entries) {
-      if (ref.current) observer.observe(ref.current);
+    const io = new IntersectionObserver(onIntersection, {
+      threshold: [0, threshold, 1],
+    });
+    intersectionObserverRef.current = io;
+
+    // Observe all existing sections.
+    const existing = document.querySelectorAll(SECTION_SELECTOR);
+    for (const el of existing) {
+      io.observe(el);
     }
+
+    // Watch for sections being added/removed from the DOM.
+    const mo = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLElement) {
+            if (node.hasAttribute(SECTION_ATTR)) {
+              io.observe(node);
+            }
+            // Also check descendants (e.g. a subtree was added).
+            for (const child of node.querySelectorAll(SECTION_SELECTOR)) {
+              io.observe(child);
+            }
+          }
+        }
+        for (const node of mutation.removedNodes) {
+          if (node instanceof HTMLElement) {
+            const id = node.getAttribute(SECTION_ATTR);
+            if (id) {
+              io.unobserve(node);
+              ratioMapRef.current.delete(id);
+            }
+            for (const child of node.querySelectorAll(SECTION_SELECTOR)) {
+              const childId = child.getAttribute(SECTION_ATTR);
+              if (childId) {
+                io.unobserve(child);
+                ratioMapRef.current.delete(childId);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    mo.observe(document.body, { childList: true, subtree: true });
 
     return () => {
       clearTimeout(timerRef.current);
-      observer.disconnect();
+      io.disconnect();
+      mo.disconnect();
+      intersectionObserverRef.current = null;
+      ratioMapRef.current.clear();
     };
-  }, [sectionKeys, threshold]);
+  }, [enabled, threshold]);
 
   const scrollToSection = React.useCallback(
     (sectionId: string) => {
-      const ref = sectionsRef.current[sectionId];
-      if (!ref?.current) return;
+      const el = document.querySelector(`[${SECTION_ATTR}="${CSS.escape(sectionId)}"]`);
+      if (!el) return;
 
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveSection(sectionId);
       window.history.replaceState(window.history.state, '', `#${sectionId}`);
     },
@@ -153,15 +188,4 @@ export function useSectionHash(options: UseSectionHashOptions): UseSectionHashRe
   );
 
   return { activeSection, scrollToSection };
-}
-
-/** Find the section ID for an observed element by matching against refs. */
-function findSectionId(
-  element: Element,
-  sections: Record<string, React.RefObject<HTMLElement | null>>,
-): string | null {
-  for (const [id, ref] of Object.entries(sections)) {
-    if (ref.current === element) return id;
-  }
-  return null;
 }
