@@ -84,7 +84,16 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   const [page, setPageRaw] = useState(initialState.page ?? 1);
   const [pageSize, setPageSizeRaw] = useState(initialState.pageSize ?? defaultPageSize);
 
-  const dataFilters = useDataFilters(config, () => setPageRaw(1));
+  // Parse persisted orderBy strings ("field:direction") back to objects.
+  const initialOrderBy = initialState.orderBy?.map((s) => {
+    const [field, direction] = s.split(':');
+    return { field, direction: direction as 'asc' | 'desc' };
+  });
+
+  const dataFilters = useDataFilters(config, () => setPageRaw(1), {
+    search: initialState.search,
+    orderBy: initialOrderBy,
+  });
 
   // Scroll restoration.
   const scrollRef = useRef<HTMLDivElement>(null);

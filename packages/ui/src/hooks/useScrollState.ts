@@ -114,7 +114,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
       }
       restoredRef.current = true;
     });
-  }, [ready, getScrollElement, scrollRef]);
+  }, [enabled, ready, getScrollElement, scrollRef]);
 
   // Clear stale entry if we couldn't restore (not ready after mount).
   React.useEffect(() => {

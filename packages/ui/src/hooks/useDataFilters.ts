@@ -93,8 +93,13 @@ export const buildFilterQuery = (
   return query;
 };
 
+export type DataFiltersInitialState = {
+  search?: string;
+  orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+};
+
 /**
- * Shared search, filter, and sort state for data tables.
+ * Shared search, filter, and sort state for data views.
  * Used by both usePaginatedData and useInfiniteData.
  *
  * `onFiltersChange` is called whenever search, filter, or sort state changes.
@@ -104,11 +109,12 @@ export const buildFilterQuery = (
 export const useDataFilters = (
   config: DataConfig,
   onFiltersChange?: () => void,
+  initialState?: DataFiltersInitialState,
 ): DataFilters => {
-  const [search, setSearchRaw] = useState('');
+  const [search, setSearchRaw] = useState(initialState?.search ?? '');
   const [filters, setFilters] = useState<Record<string, FilterState>>({});
   const [orderBy, setOrderByState] = useState<Array<{ field: string; direction: 'asc' | 'desc' }>>(
-    config.defaultOrderBy ?? [],
+    initialState?.orderBy ?? config.defaultOrderBy ?? [],
   );
 
   const setSearch = (s: string) => {

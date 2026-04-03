@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const useDebounce = <T>(value: T, delay: number = 300): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -19,14 +19,20 @@ export const useDebouncedCallback = <T extends (...args: any[]) => any>(callback
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
+  const delayRef = useRef(delay);
+  delayRef.current = delay;
 
-  // Cleanup on unmount.
   useEffect(() => {
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => callbackRef.current(...args), delay);
-  }) as T;
+  // Stable function identity — never changes across renders.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — refs track current values
+  return useCallback(
+    ((...args: Parameters<T>) => {
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => callbackRef.current(...args), delayRef.current);
+    }) as T,
+    [],
+  );
 };
