@@ -34,18 +34,14 @@ export { checkPermission, usePermission } from './usePermission';
 export { useMutation, useQuery } from './useQuery';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useThemePersistence } from './useThemePersistence';
+export {
+  type InfiniteTablePage,
+  type InfiniteTablePageLocation,
+  type UseInfiniteTableQueryOptions,
+  type UseInfiniteTableQueryResult,
+  useInfiniteTableQuery,
+} from './useInfiniteTableQuery';
+export { useInfiniteScrollTrigger } from './useInfiniteScrollTrigger';
+export { useScrollState } from './useScrollState';
+export { useSectionHash } from './useSectionHash';
 export { useValidateUniqueness } from './useValidateUniqueness';
-export { type ScrollMode, type VirtualListHandle, useVirtualListCore } from './useVirtualListCore';
-export {
-  type ScrollState,
-  type UseVirtualScrollStateOptions,
-  type UseVirtualScrollStateResult,
-  useVirtualScrollState,
-} from './useVirtualScrollState';
-export {
-  type UseVirtualTableQueryOptions,
-  type UseVirtualTableQueryResult,
-  type VirtualTablePage,
-  type VirtualTablePageLocation,
-  useVirtualTableQuery,
-} from './useVirtualTableQuery';

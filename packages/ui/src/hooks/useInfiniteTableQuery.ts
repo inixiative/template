@@ -2,30 +2,28 @@ import type { InfiniteData, QueryKey } from '@tanstack/react-query';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import * as React from 'react';
 
-export type PageParam = number;
-
-export type VirtualTablePage<TItem> = {
+export type InfiniteTablePage<TItem> = {
   data: TItem[];
-  /** Total number of items across all pages, if known. */
+  /** Total number of records across all pages, if known. */
   total?: number;
   /** Next page cursor/number, or undefined if no more pages. */
-  nextPage?: PageParam;
+  nextPage?: number;
 };
 
-export type UseVirtualTableQueryOptions<TItem> = {
+export type UseInfiniteTableQueryOptions<TItem> = {
   queryKey: QueryKey;
   /** Fetch function for a single page. Receives the page param (starts at 0). */
-  queryFn: (pageParam: PageParam) => Promise<VirtualTablePage<TItem>>;
+  queryFn: (pageParam: number) => Promise<InfiniteTablePage<TItem>>;
   /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
 };
 
-export type VirtualTablePageLocation = {
+export type InfiniteTablePageLocation = {
   pageIndex: number;
   indexInPage: number;
 };
 
-export type UseVirtualTableQueryResult<TItem> = {
+export type UseInfiniteTableQueryResult<TItem> = {
   /** Flattened array of all items across loaded pages. */
   data: TItem[];
   /** Number of pages currently in cache. */
@@ -36,31 +34,35 @@ export type UseVirtualTableQueryResult<TItem> = {
   isFetchingNextPage: boolean;
   /** Whether there are more pages available. */
   hasNextPage: boolean;
-  /** Call to fetch the next page. Wire to VirtualTable's onLoadMore. */
+  /** Call to fetch the next page. Wire to useInfiniteScrollTrigger's onLoadMore. */
   fetchNextPage: () => void;
-  /** Total item count from the server, if available. */
+  /** Total record count from the server, if available. */
   total: number | undefined;
   /**
    * Given a flat index, returns which page it belongs to and
-   * its index within that page. Useful for building optimistic
-   * mutation targets with useOptimisticMutation + createOptimisticListTarget.
+   * its index within that page. Useful for optimistic mutations.
    */
-  locateItem: (flatIndex: number) => VirtualTablePageLocation | null;
-  /** The raw infinite query data, for use with useOptimisticMutation targets. */
+  locateItem: (flatIndex: number) => InfiniteTablePageLocation | null;
+  /** The query key, for use with cache mutation APIs. */
   queryKey: QueryKey;
 };
 
-export function useVirtualTableQuery<TItem>(
-  options: UseVirtualTableQueryOptions<TItem>,
-): UseVirtualTableQueryResult<TItem> {
+/**
+ * Wraps TanStack Query's useInfiniteQuery for paginated table data.
+ * Returns a flat data array and pagination state. No virtualization —
+ * all loaded items exist in the DOM.
+ */
+export function useInfiniteTableQuery<TItem>(
+  options: UseInfiniteTableQueryOptions<TItem>,
+): UseInfiniteTableQueryResult<TItem> {
   const { queryKey, queryFn, enabled = true } = options;
 
   const query = useInfiniteQuery<
-    VirtualTablePage<TItem>,
+    InfiniteTablePage<TItem>,
     Error,
-    InfiniteData<VirtualTablePage<TItem>>,
+    InfiniteData<InfiniteTablePage<TItem>>,
     QueryKey,
-    PageParam
+    number
   >({
     queryKey,
     queryFn: ({ pageParam }) => queryFn(pageParam),
@@ -75,7 +77,7 @@ export function useVirtualTableQuery<TItem>(
   const total = query.data?.pages[query.data.pages.length - 1]?.total;
 
   const locateItem = React.useCallback(
-    (flatIndex: number): VirtualTablePageLocation | null => {
+    (flatIndex: number): InfiniteTablePageLocation | null => {
       if (!query.data) return null;
       let remaining = flatIndex;
       for (let pageIndex = 0; pageIndex < query.data.pages.length; pageIndex++) {

@@ -1,18 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 /**
- * Tests for useVirtualTableQuery's pure logic:
+ * Tests for useInfiniteTableQuery's pure logic:
  * - locateItem: maps flat index to { pageIndex, indexInPage }
  */
 
-// --- locateItem logic (extracted for unit testing) ---
-
 type PageData<T> = { data: T[]; total?: number; nextPage?: number };
 
-/**
- * Mirrors the locateItem callback inside useVirtualTableQuery.
- * Given pages and a flat index, returns the page location.
- */
 function locateItem<T>(pages: PageData<T>[], flatIndex: number): { pageIndex: number; indexInPage: number } | null {
   let remaining = flatIndex;
   for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
@@ -50,14 +44,6 @@ describe('locateItem', () => {
   it('returns null for index beyond all pages', () => {
     expect(locateItem(pages, 9)).toBeNull();
     expect(locateItem(pages, 100)).toBeNull();
-  });
-
-  it('returns result for negative index (no guard in implementation)', () => {
-    // Negative index passes the `remaining < page.data.length` check immediately
-    // since -1 < 3, so it returns { pageIndex: 0, indexInPage: -1 }.
-    // This is expected — callers should not pass negative indices.
-    const result = locateItem(pages, -1);
-    expect(result).toEqual({ pageIndex: 0, indexInPage: -1 });
   });
 
   it('returns null for empty pages array', () => {

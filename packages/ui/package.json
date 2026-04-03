@@ -45,7 +45,6 @@
     "@ariakit/react": "^0.4.22",
     "@hey-api/client-fetch": "^0.13.1",
     "@tanstack/react-router": "^1.166.2",
-    "@tanstack/react-virtual": "^3.13.23",
     "@template/permissions": "workspace:*",
     "@template/shared": "workspace:*",
     "better-auth": "^1.5.4",
