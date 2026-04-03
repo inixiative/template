@@ -97,8 +97,13 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
 
   // Persist state to history.state (and optionally URL) on changes.
   const currentState = useMemo(
-    () => ({ page, pageSize, search: dataFilters.search }),
-    [page, pageSize, dataFilters.search],
+    () => ({
+      page,
+      pageSize,
+      search: dataFilters.search,
+      orderBy: dataFilters.orderBy.map(({ field, direction }) => `${field}:${direction}`),
+    }),
+    [page, pageSize, dataFilters.search, dataFilters.orderBy],
   );
   usePersistState(stateKey, currentState, shareableUrl);
 
@@ -153,7 +158,59 @@ type PersistedState = {
   page?: number;
   pageSize?: number;
   search?: string;
+  orderBy?: string[];
 };
+
+/** URL param names for each state field. */
+const URL_PARAMS: Record<keyof PersistedState, string> = {
+  page: 'page',
+  pageSize: 'pageSize',
+  search: 'search',
+  orderBy: 'orderBy',
+};
+
+/** Sync a PersistedState to URL search params. Falsy/default values are removed. */
+function syncStateToUrl(state: PersistedState): string {
+  const url = new URL(window.location.href);
+
+  for (const [key, param] of Object.entries(URL_PARAMS)) {
+    const value = state[key as keyof PersistedState];
+
+    if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      url.searchParams.delete(param);
+    } else if (key === 'page' && value === 1) {
+      // Page 1 is the default — no need to pollute the URL.
+      url.searchParams.delete(param);
+    } else if (Array.isArray(value)) {
+      url.searchParams.delete(param);
+      for (const v of value) url.searchParams.append(param, v);
+    } else {
+      url.searchParams.set(param, String(value));
+    }
+  }
+
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Read PersistedState from URL search params. */
+function readStateFromUrl(): PersistedState {
+  const params = new URLSearchParams(window.location.search);
+  const state: PersistedState = {};
+
+  const page = params.get('page');
+  if (page) state.page = Number.parseInt(page, 10);
+
+  const pageSize = params.get('pageSize');
+  if (pageSize) state.pageSize = Number.parseInt(pageSize, 10);
+
+  const search = params.get('search');
+  if (search) state.search = search;
+
+  const orderBy = params.getAll('orderBy');
+  if (orderBy.length > 0) state.orderBy = orderBy;
+
+  return state;
+}
 
 /** Read initial state from history.state, falling back to URL params. */
 function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
@@ -172,16 +229,9 @@ function readInitialState(stateKey: string | undefined, checkUrl: boolean): Pers
   }
 
   // Fall back to URL params (shared link).
-  if (checkUrl && typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    const state: PersistedState = {};
-    const page = params.get('page');
-    const pageSize = params.get('pageSize');
-    const search = params.get('search');
-    if (page) state.page = Number.parseInt(page, 10);
-    if (pageSize) state.pageSize = Number.parseInt(pageSize, 10);
-    if (search) state.search = search;
-    if (Object.keys(state).length > 0) return state;
+  if (checkUrl) {
+    const fromUrl = readStateFromUrl();
+    if (Object.keys(fromUrl).length > 0) return fromUrl;
   }
 
   return {};
@@ -217,14 +267,14 @@ function usePersistState(
           window.history.replaceState(
             historyState,
             '',
-            shareableUrl ? buildShareableUrl(current) : undefined,
+            shareableUrl ? syncStateToUrl(current) : undefined,
           );
         } catch {
           // skip
         }
       } else if (shareableUrl) {
         try {
-          window.history.replaceState(window.history.state, '', buildShareableUrl(current));
+          window.history.replaceState(window.history.state, '', syncStateToUrl(current));
         } catch {
           // skip
         }
@@ -233,16 +283,4 @@ function usePersistState(
 
     return () => clearTimeout(timerRef.current);
   }, [state, shareableUrl]);
-}
-
-/** Build a URL string with table params merged into the current URL. */
-function buildShareableUrl(state: PersistedState): string {
-  const url = new URL(window.location.href);
-  if (state.page && state.page > 1) url.searchParams.set('page', String(state.page));
-  else url.searchParams.delete('page');
-  if (state.pageSize) url.searchParams.set('pageSize', String(state.pageSize));
-  else url.searchParams.delete('pageSize');
-  if (state.search) url.searchParams.set('search', String(state.search));
-  else url.searchParams.delete('search');
-  return `${url.pathname}${url.search}${url.hash}`;
 }
