@@ -186,6 +186,8 @@ The helpers should make the `search` vs `searchFields` distinction explicit:
 
 **Real use case:** Searching inquiries by the source user's email, the org's name, or the space's name. These are all relation paths through one-to-many joins.
 
+**Design constraint:** Combined search (`search` param) should only support fields that are directly pathable without relation operators — flat scalars and many-to-one relations (e.g. `sourceUser.email` where `sourceUser` is a belongs-to). One-to-many relations (e.g. `organizationUsers.role` where `organizationUsers` is a has-many) require `some`/`every`/`none` and must use `searchFields` mode instead. `searchable()` should validate this at config time and reject one-to-many paths, or separate them into a `searchFields`-only list.
+
 **Fix (backend):** `buildNestedPath` needs to be relation-aware. When a path segment corresponds to a one-to-many relation in the Prisma schema, inject `some` automatically. This requires either:
 - (a) Passing the Prisma runtime data model to `buildNestedPath` so it can detect relation types, or
 - (b) Having `searchable()` encode the relation operator in the path (e.g. `organizationUsers.some.role` instead of `organizationUsers.role`) and having `buildNestedPath` respect it
