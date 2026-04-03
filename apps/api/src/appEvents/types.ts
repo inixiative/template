@@ -50,8 +50,22 @@ export type EmailSenderContext = {
   userId?: string;
 };
 
+type EmailTargetIndividual = {
+  userIds: string[];
+};
+
+type EmailTargetRaw = {
+  raw: string[];
+};
+
+type EmailTargetGroup = {
+  to: { userIds?: string[]; raw?: string[] };
+  cc?: { userIds?: string[]; raw?: string[] };
+  bcc?: { userIds?: string[]; raw?: string[] };
+};
+
 export type EmailHandoff = {
-  target: { userIds: string[] } | { raw: string[] };
+  target: EmailTargetIndividual | EmailTargetRaw | EmailTargetGroup;
   message: { template: string; data: Record<string, unknown> };
   tags: string[];
   category: CommunicationCategory;

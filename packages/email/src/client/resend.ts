@@ -28,6 +28,17 @@ const chunk = <T>(arr: T[], size: number): T[][] => {
   return chunks;
 };
 
+const toResendPayload = (options: SendEmailOptions) => ({
+  to: options.to,
+  cc: options.cc,
+  bcc: options.bcc,
+  from: options.from,
+  subject: options.subject,
+  html: options.html,
+  replyTo: options.replyTo,
+  tags: options.tags?.map((name) => ({ name, value: 'true' })),
+});
+
 class ResendEmailClient implements EmailClient {
   readonly vcr = new VCR(FIXTURES_DIR, { send: { keys: SANITIZE_KEYS } });
   private readonly resend: Resend;
@@ -56,14 +67,7 @@ class ResendEmailClient implements EmailClient {
   }
 
   private async _send(options: SendEmailOptions): Promise<SendEmailResult> {
-    const { data, error } = await this.resend.emails.send({
-      to: options.to,
-      from: options.from,
-      subject: options.subject,
-      html: options.html,
-      replyTo: options.replyTo,
-      tags: options.tags?.map((name) => ({ name, value: 'true' })),
-    });
+    const { data, error } = await this.resend.emails.send(toResendPayload(options));
 
     if (error) {
       throw new Error(`Resend error: ${error.message}`);
@@ -76,16 +80,7 @@ class ResendEmailClient implements EmailClient {
   }
 
   private async _sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
-    const { data, error } = await this.resend.batch.send(
-      batch.map((options) => ({
-        to: options.to,
-        from: options.from,
-        subject: options.subject,
-        html: options.html,
-        replyTo: options.replyTo,
-        tags: options.tags?.map((name) => ({ name, value: 'true' })),
-      })),
-    );
+    const { data, error } = await this.resend.batch.send(batch.map(toResendPayload));
 
     if (error) {
       throw new Error(`Resend batch error: ${error.message}`);
