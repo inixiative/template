@@ -75,9 +75,11 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
 
   const hasSavedPosition = savedRef.current !== null;
 
-  // Resolve the scroll element: explicit ref or window.
+  // Resolve the scroll element: explicit ref (if attached) or window.
+  // A ref with .current === null (e.g. no maxHeight on Table) falls through
+  // to window scroll, same as no ref at all.
   const getScrollElement = React.useCallback((): HTMLElement | null => {
-    if (scrollRef) return scrollRef.current;
+    if (scrollRef?.current) return scrollRef.current;
     return typeof document !== 'undefined' ? document.documentElement : null;
   }, [scrollRef]);
 
@@ -100,7 +102,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
     // will clamp to the max and we still mark it done (the data was ready
     // per the `ready` flag — any shortfall is the caller's responsibility).
     requestAnimationFrame(() => {
-      if (scrollRef) {
+      if (scrollRef?.current) {
         el.scrollTop = saved;
       } else {
         window.scrollTo({ top: saved });
@@ -124,12 +126,13 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
     const el = getScrollElement();
     if (!el) return;
 
-    const target = scrollRef ? el : window;
+    const isElement = scrollRef?.current != null;
+    const target = isElement ? el : window;
 
     const onScroll = () => {
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        const scrollTop = scrollRef ? el.scrollTop : window.scrollY;
+        const scrollTop = isElement ? el.scrollTop : window.scrollY;
         if (scrollTop === lastTopRef.current) return;
         lastTopRef.current = scrollTop;
         try {

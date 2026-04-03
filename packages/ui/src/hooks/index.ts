@@ -22,28 +22,28 @@ export {
 } from './useAuthStrategy';
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
-export { type PaginatedTableController, usePaginatedTableController } from './usePaginatedTableController';
-export { type InfiniteTableController, useInfiniteTableController } from './useInfiniteTableController';
+export { type DataFilters, buildFilterQuery, useDataFilters } from './useDataFilters';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
+export { type InfiniteData, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
+export {
+  type InfiniteDataPage,
+  type InfiniteDataPageLocation,
+  type UseInfiniteDataQueryOptions,
+  type UseInfiniteDataQueryResult,
+  useInfiniteDataQuery,
+} from './useInfiniteDataQuery';
+export { useInfiniteScrollTrigger } from './useInfiniteScrollTrigger';
 export { useInquiryPermission } from './useInquiryPermission';
 export { useLanguage } from './useLanguage';
 export { useMediaQuery } from './useMediaQuery';
 export { createOptimisticListTarget, useOptimisticMutation } from './useOptimisticMutation';
 export { usePageMeta } from './usePageMeta';
+export { type PaginatedData, type UsePaginatedDataOptions, usePaginatedData } from './usePaginatedData';
 export { checkPermission, usePermission } from './usePermission';
 export { useMutation, useQuery } from './useQuery';
-export { useSpaceTheme } from './useSpaceTheme';
-export { useThemePersistence } from './useThemePersistence';
-export {
-  type InfiniteTablePage,
-  type InfiniteTablePageLocation,
-  type UseInfiniteTableQueryOptions,
-  type UseInfiniteTableQueryResult,
-  useInfiniteTableQuery,
-} from './useInfiniteTableQuery';
-export { useInfiniteScrollTrigger } from './useInfiniteScrollTrigger';
 export { useScrollState } from './useScrollState';
 export { useSectionHash } from './useSectionHash';
-export { type TableFilters, useTableFilters } from './useTableFilters';
+export { useSpaceTheme } from './useSpaceTheme';
+export { useThemePersistence } from './useThemePersistence';
 export { useValidateUniqueness } from './useValidateUniqueness';

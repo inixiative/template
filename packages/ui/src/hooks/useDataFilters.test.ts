@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildFilterQuery } from '@template/ui/hooks/useTableFilters';
+import { buildFilterQuery } from '@template/ui/hooks/useDataFilters';
 
 /** Wrapper that adds page/pageSize to buildFilterQuery for test compatibility. */
 const buildQuery = (

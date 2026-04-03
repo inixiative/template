@@ -2,7 +2,7 @@ import type { InfiniteData, QueryKey } from '@tanstack/react-query';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import * as React from 'react';
 
-export type InfiniteTablePage<TItem> = {
+export type InfiniteDataPage<TItem> = {
   data: TItem[];
   /** Total number of records across all pages, if known. */
   total?: number;
@@ -10,20 +10,20 @@ export type InfiniteTablePage<TItem> = {
   nextPage?: number;
 };
 
-export type UseInfiniteTableQueryOptions<TItem> = {
+export type UseInfiniteDataQueryOptions<TItem> = {
   queryKey: QueryKey;
   /** Fetch function for a single page. Receives the page param (starts at 0). */
-  queryFn: (pageParam: number) => Promise<InfiniteTablePage<TItem>>;
+  queryFn: (pageParam: number) => Promise<InfiniteDataPage<TItem>>;
   /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
 };
 
-export type InfiniteTablePageLocation = {
+export type InfiniteDataPageLocation = {
   pageIndex: number;
   indexInPage: number;
 };
 
-export type UseInfiniteTableQueryResult<TItem> = {
+export type UseInfiniteDataQueryResult<TItem> = {
   /** Flattened array of all items across loaded pages. */
   data: TItem[];
   /** Number of pages currently in cache. */
@@ -42,7 +42,7 @@ export type UseInfiniteTableQueryResult<TItem> = {
    * Given a flat index, returns which page it belongs to and
    * its index within that page. Useful for optimistic mutations.
    */
-  locateItem: (flatIndex: number) => InfiniteTablePageLocation | null;
+  locateItem: (flatIndex: number) => InfiniteDataPageLocation | null;
   /** The query key, for use with cache mutation APIs. */
   queryKey: QueryKey;
 };
@@ -52,15 +52,15 @@ export type UseInfiniteTableQueryResult<TItem> = {
  * Returns a flat data array and pagination state. No virtualization —
  * all loaded items exist in the DOM.
  */
-export function useInfiniteTableQuery<TItem>(
-  options: UseInfiniteTableQueryOptions<TItem>,
-): UseInfiniteTableQueryResult<TItem> {
+export function useInfiniteDataQuery<TItem>(
+  options: UseInfiniteDataQueryOptions<TItem>,
+): UseInfiniteDataQueryResult<TItem> {
   const { queryKey, queryFn, enabled = true } = options;
 
   const query = useInfiniteQuery<
-    InfiniteTablePage<TItem>,
+    InfiniteDataPage<TItem>,
     Error,
-    InfiniteData<InfiniteTablePage<TItem>>,
+    InfiniteData<InfiniteDataPage<TItem>>,
     QueryKey,
     number
   >({
@@ -85,7 +85,7 @@ export function useInfiniteTableQuery<TItem>(
   }, [query.data]);
 
   const locateItem = React.useCallback(
-    (flatIndex: number): InfiniteTablePageLocation | null => {
+    (flatIndex: number): InfiniteDataPageLocation | null => {
       if (flatIndex < 0 || !query.data) return null;
       let remaining = flatIndex;
       for (let pageIndex = 0; pageIndex < query.data.pages.length; pageIndex++) {

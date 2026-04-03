@@ -1,5 +1,5 @@
 import { ARRAY_FIELD_OPERATORS, type ArrayFieldOperator } from '@template/shared/bracketQuery';
-import type { DataTableConfig, SearchMode } from '@template/ui/lib/makeDataTableConfig';
+import type { DataConfig, SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 import { useMemo, useState } from 'react';
 
@@ -25,7 +25,7 @@ const setPath = (obj: Record<string, unknown>, path: string[], value: unknown): 
   setPath(obj[head] as Record<string, unknown>, rest, value);
 };
 
-export type TableFilters = {
+export type DataFilters = {
   search: string;
   filters: Record<string, FilterState>;
   orderBy: Array<{ field: string; direction: 'asc' | 'desc' }>;
@@ -101,10 +101,10 @@ export const buildFilterQuery = (
  * Paginated controllers use this to reset to page 1. Infinite controllers
  * use this to reset/invalidate the query.
  */
-export const useTableFilters = (
-  config: DataTableConfig,
+export const useDataFilters = (
+  config: DataConfig,
   onFiltersChange?: () => void,
-): TableFilters => {
+): DataFilters => {
   const [search, setSearchRaw] = useState('');
   const [filters, setFilters] = useState<Record<string, FilterState>>({});
   const [orderBy, setOrderByState] = useState<Array<{ field: string; direction: 'asc' | 'desc' }>>(

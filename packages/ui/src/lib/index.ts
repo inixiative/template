@@ -8,7 +8,7 @@ export { getContextParams } from './getContextParams';
 export * from './inquiries';
 
 export * from './makeContextQueries';
-export * from './makeDataTableConfig';
+export * from './makeDataConfig';
 export * from './routeRedirect';
 export * from './searchParams';
 export * from './serializeBracketQuery';
