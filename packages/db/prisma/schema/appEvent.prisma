@@ -10,7 +10,6 @@ model AppEvent {
 
   // Actor — auto-captured from auditActorContext
   actorUserId      String? @db.VarChar(36)
-  actorUser        User?   @relation("AppEventActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
   actorSpoofUserId String? @db.VarChar(36)
   actorTokenId     String? @db.VarChar(36)
   actorJobName     String?
