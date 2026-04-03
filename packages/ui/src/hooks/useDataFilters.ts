@@ -2,10 +2,6 @@ import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import { type FilterState, buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 import { useMemo, useState } from 'react';
 
-// Re-export so consumers can import from either location.
-export type { FilterState } from '@template/ui/lib/buildFilterQuery';
-export { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
-
 export type DataFiltersInitialState = {
   search?: string;
   orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;

@@ -1,9 +1,6 @@
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 import * as React from 'react';
 
-// Re-export for consumers who import from the hook file.
-export { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
-
 const SCROLL_DEBOUNCE_MS = 200;
 const SECTION_ATTR = 'data-section';
 const SECTION_SELECTOR = `[${SECTION_ATTR}]`;

@@ -13,10 +13,6 @@ import { useScrollState } from '@template/ui/hooks/useScrollState';
 import type * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-// Re-export persistence types/functions so tests can import from either location.
-export type { PersistedState } from '@template/ui/lib/dataStatePersistence';
-export { parseOrderByStrings, readStateFromUrl, syncStateToUrl } from '@template/ui/lib/dataStatePersistence';
-
 export type PaginatedData = DataFilters & {
   page: number;
   pageSize: number;
