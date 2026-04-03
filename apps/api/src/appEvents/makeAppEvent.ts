@@ -1,12 +1,12 @@
 import type { z } from 'zod';
-import { createAppEvent } from '#/events/emit';
-import { registerAppEvent } from '#/events/registry';
+import { createAppEvent } from '#/appEvents/emit';
+import { registerAppEvent } from '#/appEvents/registry';
 import type {
   AppEventOptions,
   AppEventPayload,
   EmailHandoff,
   WSHandoff,
-} from '#/events/types';
+} from '#/appEvents/types';
 
 type AppEventDefinition<T, M = undefined> = {
   type: string;
@@ -31,7 +31,7 @@ export const makeAppEvent = <T, M = undefined>(def: AppEventDefinition<T, M>): A
   if (def.email) {
     const emailCallback = def.email;
     registerAppEvent(def.type, async (event) => {
-      const { deliverEmailHandoffs } = await import('#/events/bridges/email');
+      const { deliverEmailHandoffs } = await import('#/appEvents/bridges/email');
       const meta = (event as AppEventPayload & { _meta?: unknown })._meta as M;
       const handoffs = await emailCallback(event as AppEventPayload<T>, meta);
       if (!handoffs?.length) return;
@@ -42,7 +42,7 @@ export const makeAppEvent = <T, M = undefined>(def: AppEventDefinition<T, M>): A
   if (def.websocket) {
     const wsCallback = def.websocket;
     registerAppEvent(def.type, async (event) => {
-      const { deliverWSHandoffs } = await import('#/events/bridges/websocket');
+      const { deliverWSHandoffs } = await import('#/appEvents/bridges/websocket');
       const meta = (event as AppEventPayload & { _meta?: unknown })._meta as M;
       const handoffs = await wsCallback(event as AppEventPayload<T>, meta);
       if (!handoffs?.length) return;

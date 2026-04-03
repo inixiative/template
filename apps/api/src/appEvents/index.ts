@@ -5,7 +5,7 @@
  */
 
 // Observe bridge — persists every event to AppEvent table
-import '#/events/handlers/observe';
+import '#/appEvents/handlers/observe';
 
 // Typed event definitions (registers bridge handlers via makeAppEvent)
-import '#/events/definitions';
+import '#/appEvents/definitions';

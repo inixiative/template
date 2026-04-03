@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { getHandlers } from '#/events/registry';
-import type { AppEventOptions, AppEventPayload, AppEventType } from '#/events/types';
+import { getHandlers } from '#/appEvents/registry';
+import type { AppEventOptions, AppEventPayload, AppEventType } from '#/appEvents/types';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
 export const createAppEvent = async (

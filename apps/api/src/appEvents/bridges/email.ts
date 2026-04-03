@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { resolveFromAddress } from '#/events/bridges/resolveFromAddress';
-import type { AppEventPayload, EmailContext, EmailHandoff } from '#/events/types';
+import { resolveFromAddress } from '#/appEvents/bridges/resolveFromAddress';
+import type { AppEventPayload, EmailContext, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';
 
 type ResolvedRecipient = {

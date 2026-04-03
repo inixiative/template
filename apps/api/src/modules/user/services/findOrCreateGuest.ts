@@ -1,6 +1,6 @@
 import type { User } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
-import { userCreatedEvent } from '#/events/definitions';
+import { userCreatedEvent } from '#/appEvents/definitions';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
 

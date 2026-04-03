@@ -1,4 +1,4 @@
-import type { EmailContext, EmailHandoff } from '#/events/types';
+import type { EmailContext, EmailHandoff } from '#/appEvents/types';
 
 /**
  * Resolve the sender ("from") address for an email.

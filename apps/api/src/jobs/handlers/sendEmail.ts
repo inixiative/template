@@ -1,6 +1,6 @@
 import type { CommunicationCategory } from '@template/db';
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
-import type { EmailContext } from '#/events/types';
+import type { EmailContext } from '#/appEvents/types';
 import { makeJob } from '#/jobs/makeJob';
 
 export type SendEmailPayload = {
@@ -17,7 +17,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
   const { to, from, template, variables, tags, emailContext } = payload;
   const { log } = ctx;
 
-  const { resolveEmailClient } = await import('#/events/bridges/resolveEmailClient');
+  const { resolveEmailClient } = await import('#/appEvents/bridges/resolveEmailClient');
 
   const client = await resolveEmailClient(emailContext ?? {});
 

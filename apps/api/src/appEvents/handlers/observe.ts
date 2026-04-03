@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { registerAppEvent } from '#/events/registry';
-import type { AppEventPayload } from '#/events/types';
+import { registerAppEvent } from '#/appEvents/registry';
+import type { AppEventPayload } from '#/appEvents/types';
 
 /**
  * Observe bridge — persists every event to the AppEvent table.

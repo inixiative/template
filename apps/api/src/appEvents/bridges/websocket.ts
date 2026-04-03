@@ -1,5 +1,5 @@
 import { log } from '@template/shared/logger';
-import type { WSHandoff } from '#/events/types';
+import type { WSHandoff } from '#/appEvents/types';
 import { sendToChannel, sendToUser } from '#/ws';
 
 export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> => {

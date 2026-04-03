@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { makeAppEvent } from '#/events/makeAppEvent';
+import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 

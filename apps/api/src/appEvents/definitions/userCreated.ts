@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { makeAppEvent } from '#/events/makeAppEvent';
+import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export const userCreatedEvent = makeAppEvent({
   type: 'user.created',

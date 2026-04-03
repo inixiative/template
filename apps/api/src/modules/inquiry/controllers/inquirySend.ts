@@ -1,5 +1,5 @@
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { inquirySentEvent } from '#/events/definitions';
+import { inquirySentEvent } from '#/appEvents/definitions';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';

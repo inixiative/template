@@ -1,5 +1,5 @@
 import type { EmailClient } from '@template/email/client';
-import type { EmailContext } from '#/events/types';
+import type { EmailContext } from '#/appEvents/types';
 import { emailClient } from '#/lib/email';
 
 /**

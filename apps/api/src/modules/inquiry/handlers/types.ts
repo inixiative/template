@@ -1,7 +1,7 @@
 import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
-import type { EmailHandoff, WSHandoff } from '#/events/types';
+import type { EmailHandoff, WSHandoff } from '#/appEvents/types';
 import type { BaseResolution } from '#/modules/inquiry/handlers/schemas';
 
 export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;

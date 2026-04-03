@@ -1,4 +1,4 @@
-import type { AppEventHandler, AppEventType } from '#/events/types';
+import type { AppEventHandler, AppEventType } from '#/appEvents/types';
 
 const handlers: Map<AppEventType | '*', AppEventHandler[]> = new Map();
 
