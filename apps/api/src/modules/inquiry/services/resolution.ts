@@ -1,6 +1,7 @@
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
+import { inquiryResolvedEvent } from '#/events/definitions';
 import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
@@ -18,6 +19,7 @@ export const resolveInquiry = async (
   resolutionData: Record<string, unknown>,
 ): Promise<Inquiry> => {
   const db = c.get('db');
+  const user = c.get('user');
 
   auditActorContext.extend({ sourceInquiryId: inquiry.id });
 
@@ -34,7 +36,7 @@ export const resolveInquiry = async (
 
       const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(inquiry.type) : null;
 
-      return db.inquiry.update({
+      const updated = await db.inquiry.update({
         where: { id: inquiry.id },
         data: {
           status,
@@ -43,6 +45,24 @@ export const resolveInquiry = async (
         },
         include: includeInquiryReceived,
       });
+
+      await inquiryResolvedEvent.emit(
+        {
+          inquiryId: inquiry.id,
+          inquiryType: inquiry.type,
+          resolution: status,
+          sourceOrganizationId: inquiry.sourceOrganizationId ?? undefined,
+          sourceUserId: inquiry.sourceUserId ?? undefined,
+          targetUserId: inquiry.targetUserId ?? undefined,
+        },
+        {
+          actorId: user?.id,
+          resourceType: 'Inquiry',
+          resourceId: inquiry.id,
+        },
+      );
+
+      return updated;
     });
   } finally {
     auditActorContext.extend({ sourceInquiryId: null });

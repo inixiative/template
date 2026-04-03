@@ -1,4 +1,5 @@
 import { InquiryStatus } from '@template/db/generated/client/enums';
+import { inquirySentEvent } from '#/events/definitions';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -11,6 +12,7 @@ import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateIn
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
   const db = c.get('db');
+  const user = c.get('user');
   const inquiry = getResource<'inquiry'>(c);
 
   validateInquiryIsDraft(inquiry);
@@ -22,6 +24,22 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
     data: { status: InquiryStatus.sent, sentAt: new Date(), expiresAt: computeExpiresAt(inquiry.type) },
     include: includeInquirySent,
   });
+
+  await inquirySentEvent.emit(
+    {
+      inquiryId: sent.id,
+      inquiryType: sent.type,
+      sourceOrganizationId: sent.sourceOrganizationId ?? undefined,
+      sourceUserId: sent.sourceUserId ?? undefined,
+      targetUserId: sent.targetUserId ?? undefined,
+      targetModel: sent.targetModel,
+    },
+    {
+      actorId: user?.id,
+      resourceType: 'Inquiry',
+      resourceId: sent.id,
+    },
+  );
 
   const handler = inquiryHandlers[inquiry.type];
   if (await handler.autoApprove(db, sent)) {

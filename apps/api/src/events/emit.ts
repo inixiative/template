@@ -1,4 +1,5 @@
 import { db } from '@template/db';
+import { log } from '@template/shared/logger';
 import { getHandlers } from '#/events/registry';
 import type { AppEventOptions, AppEventPayload, AppEventType } from '#/events/types';
 
@@ -19,7 +20,13 @@ export const createAppEvent = async (
   if (!eventHandlers.length) return;
 
   const runHandlers = async (): Promise<void> => {
-    await Promise.all(eventHandlers.map((h) => h(event)));
+    const results = await Promise.allSettled(eventHandlers.map((h) => h(event)));
+
+    for (const [i, result] of results.entries()) {
+      if (result.status === 'rejected') {
+        log.error(`App event handler failed [${type}] handler=${i}`, { error: result.reason });
+      }
+    }
   };
 
   if (db.isInTxn()) {
