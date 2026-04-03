@@ -22,7 +22,8 @@ export {
 } from './useAuthStrategy';
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
-export { type DataTableController, type FilterState, useDataTableController } from './useDataTableController';
+export { type DataTableController, type FilterState, useDataTableController, usePaginatedTableController } from './useDataTableController';
+export { type InfiniteTableController, useInfiniteTableController } from './useInfiniteTableController';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
 export { useInquiryPermission } from './useInquiryPermission';
@@ -44,4 +45,5 @@ export {
 export { useInfiniteScrollTrigger } from './useInfiniteScrollTrigger';
 export { useScrollState } from './useScrollState';
 export { useSectionHash } from './useSectionHash';
+export { type TableFilters, useTableFilters } from './useTableFilters';
 export { useValidateUniqueness } from './useValidateUniqueness';

@@ -45,6 +45,8 @@ export type TableProps<T> = {
    * Pass this to useScrollState to enable scroll position restoration.
    */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
+  /** Stamps data-section on the outer container for useSectionHash auto-discovery. */
+  sectionId?: string;
   className?: string;
 };
 
@@ -59,6 +61,7 @@ export const Table = <T,>({
   infiniteScroll,
   maxHeight,
   scrollRef,
+  sectionId,
   className,
 }: TableProps<T>) => {
   // Hooks must be called unconditionally, before any early returns.
@@ -79,7 +82,7 @@ export const Table = <T,>({
   const isViewport = maxHeight != null;
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('space-y-4', className)} data-section={sectionId}>
       <div
         ref={isViewport ? scrollRef : undefined}
         className="border rounded-lg overflow-hidden"
