@@ -2,6 +2,7 @@ import { Pagination, type PaginationProps } from '@template/ui/components/primit
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
 import { Loader2 } from 'lucide-react';
+import * as React from 'react';
 
 export type Column<T> = {
   key: string;
@@ -37,6 +38,11 @@ export type TableProps<T> = {
    * to fit all rows and scrolls with the page.
    */
   maxHeight?: number;
+  /**
+   * Ref to the scroll container (the overflow div when maxHeight is set).
+   * Pass this to useScrollState to enable scroll position restoration.
+   */
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
   className?: string;
 };
 
@@ -50,6 +56,7 @@ export const Table = <T,>({
   pagination,
   infiniteScroll,
   maxHeight,
+  scrollRef,
   className,
 }: TableProps<T>) => {
   const shouldShow = typeof show === 'function' ? show() : show;
@@ -74,6 +81,7 @@ export const Table = <T,>({
   return (
     <div className={cn('space-y-4', className)}>
       <div
+        ref={isViewport ? scrollRef : undefined}
         className="border rounded-lg overflow-hidden"
         style={isViewport ? { maxHeight, overflow: 'auto' } : undefined}
       >
