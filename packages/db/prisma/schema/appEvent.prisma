@@ -29,4 +29,8 @@ model AppEvent {
   @@index([actorUserId])
   @@index([resourceType, resourceId])
   @@index([createdAt])
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 }
