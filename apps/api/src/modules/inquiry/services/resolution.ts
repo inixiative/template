@@ -54,6 +54,7 @@ export const resolveInquiry = async (
           sourceOrganizationId: inquiry.sourceOrganizationId ?? undefined,
           sourceUserId: inquiry.sourceUserId ?? undefined,
           targetUserId: inquiry.targetUserId ?? undefined,
+          inquiry: updated as unknown as Record<string, unknown>,
         },
         {
           actorId: user?.id,

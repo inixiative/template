@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { makeAppEvent } from '#/events/makeAppEvent';
+import { inquiryHandlers } from '#/modules/inquiry/handlers';
 
 export const inquirySentEvent = makeAppEvent({
   type: 'inquiry.sent',
@@ -10,42 +11,16 @@ export const inquirySentEvent = makeAppEvent({
     sourceUserId: z.string().optional(),
     targetUserId: z.string().optional(),
     targetModel: z.string(),
+    inquiry: z.record(z.unknown()),
   }),
   email: async (event) => {
-    if (event.data.inquiryType !== 'inviteOrganizationUser') return null;
-    if (!event.data.targetUserId) return null;
-
-    return [
-      {
-        target: { userIds: [event.data.targetUserId] },
-        message: {
-          template: 'org-invitation',
-          data: {
-            inquiryId: event.data.inquiryId,
-            sourceOrganizationId: event.data.sourceOrganizationId,
-            sourceUserId: event.data.sourceUserId,
-          },
-        },
-        tags: ['inquiry', 'invitation'],
-        category: 'system' as const,
-        context: { organizationId: event.data.sourceOrganizationId },
-      },
-    ];
+    const handler = inquiryHandlers[event.data.inquiryType as keyof typeof inquiryHandlers];
+    if (!handler?.onSent) return null;
+    return handler.onSent(event.data.inquiry as never) ?? null;
   },
   websocket: async (event) => {
-    if (!event.data.targetUserId) return null;
-
-    return [
-      {
-        target: { userIds: [event.data.targetUserId] },
-        message: {
-          data: {
-            event: 'inquiry.sent',
-            inquiryId: event.data.inquiryId,
-            type: event.data.inquiryType,
-          },
-        },
-      },
-    ];
+    const handler = inquiryHandlers[event.data.inquiryType as keyof typeof inquiryHandlers];
+    if (!handler?.onSentWS) return null;
+    return handler.onSentWS(event.data.inquiry as never) ?? null;
   },
 });

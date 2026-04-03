@@ -33,6 +33,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
       sourceUserId: sent.sourceUserId ?? undefined,
       targetUserId: sent.targetUserId ?? undefined,
       targetModel: sent.targetModel,
+      inquiry: sent as unknown as Record<string, unknown>,
     },
     {
       actorId: user?.id,
