@@ -28,10 +28,11 @@ export type UseSectionHashResult = {
  * Auto-discovers sections in the DOM and syncs the URL hash with the
  * most visible one. Mount once at the app root — no per-page wiring needed.
  *
- * Sections opt in by adding `data-section="section-id"` to any element:
+ * Sections opt in by adding `data-section` to any element. Use camelCase
+ * for section IDs (they become URL hash fragments):
  *
  *   <div data-section="users">...</div>
- *   <div data-section="activity">...</div>
+ *   <div data-section="activityLog">...</div>
  *
  * The hook uses a MutationObserver to detect sections as they mount/unmount,
  * and an IntersectionObserver to track which section is most visible.
@@ -39,6 +40,10 @@ export type UseSectionHashResult = {
  * On mount: if the URL has a #hash matching a section, scrolls to it.
  * On scroll: updates the URL hash to the most visible section (debounced).
  * On navigation: new page's sections are auto-discovered as they mount.
+ *
+ * Dot notation for deep linking into rows/children:
+ *   scrollToSection('usersTable.usr_abc123')  → #usersTable.usr_abc123
+ *   scrollToSection('usersTable.3')           → 4th [data-key] child
  *
  * Usage (app root):
  * ```tsx
@@ -50,8 +55,8 @@ export type UseSectionHashResult = {
  *
  * Usage (any component):
  * ```tsx
- * <section data-section="users">
- *   <h2>Users</h2>
+ * <section data-section="teamMembers">
+ *   <h2>Team Members</h2>
  *   <Table ... />
  * </section>
  * ```
@@ -197,9 +202,9 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
  * Resolves a section target from a potentially dot-notated ID.
  *
  * - `"users"` → finds `[data-section="users"]`
- * - `"users-table.row-42"` → finds `[data-section="users-table"]`,
- *   then finds child `[data-key="row-42"]` within it
- * - `"users-table.3"` → finds `[data-section="users-table"]`,
+ * - `"usersTable.usr_abc123"` → finds `[data-section="usersTable"]`,
+ *   then finds child `[data-key="usr_abc123"]` within it
+ * - `"usersTable.3"` → finds `[data-section="usersTable"]`,
  *   then finds child `[data-key="3"]`, falling back to the
  *   4th `[data-key]` child (0-indexed) if no key match
  */
