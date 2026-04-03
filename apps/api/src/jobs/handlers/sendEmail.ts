@@ -1,5 +1,4 @@
 import type { CommunicationCategory } from '@template/db';
-import type { EmailClient } from '@template/email/client';
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import type { EmailContext } from '#/appEvents/types';
@@ -57,44 +56,9 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     return { to: recipient.to, from, subject, html, tags };
   });
 
-  if (client.sendBatch && rendered.length > 1) {
-    const batchSize = client.maxBatchSize ?? 100;
-    for (const batch of chunk(rendered, batchSize)) {
-      await sendBatch(client, batch, log);
-    }
-  } else {
-    for (const email of rendered) {
-      await sendSingle(client, email, log);
-    }
+  for (const batch of chunk(rendered, client.maxBatchSize)) {
+    await client.sendBatch(batch);
   }
 
   log(`Email sent: template=${template} recipients=${recipients.length}`);
 });
-
-const sendBatch = async (
-  client: EmailClient,
-  batch: { to: string; from: string; subject: string; html: string; tags?: string[] }[],
-  log: (msg: string) => void,
-): Promise<void> => {
-  try {
-    await client.sendBatch!(batch);
-    log(`Batch sent: ${batch.length} emails`);
-  } catch (err) {
-    log(`Batch failed, falling back to individual sends: ${err}`);
-    for (const email of batch) {
-      await sendSingle(client, email, log);
-    }
-  }
-};
-
-const sendSingle = async (
-  client: EmailClient,
-  email: { to: string; from: string; subject: string; html: string; tags?: string[] },
-  log: (msg: string) => void,
-): Promise<void> => {
-  const result = await client.send(email);
-  if (!result.success) {
-    log(`Email send failed: to=${email.to}`);
-    throw new Error(`Email delivery failed for ${email.to}`);
-  }
-};
