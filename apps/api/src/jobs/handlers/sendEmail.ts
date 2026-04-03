@@ -1,24 +1,41 @@
 import type { CommunicationCategory } from '@template/db';
+import type { EmailClient } from '@template/email/client';
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
+import mjml2html from 'mjml';
 import type { EmailContext } from '#/appEvents/types';
 import { makeJob } from '#/jobs/makeJob';
 
-export type SendEmailPayload = {
+type Recipient = {
   to: string;
+  name: string;
+};
+
+export type SendEmailPayload = {
+  recipients: Recipient[];
   from: string;
   template: string;
-  variables: Variables;
+  data: Record<string, unknown>;
+  senderVars: Record<string, unknown>;
   tags?: string[];
   category: CommunicationCategory;
   emailContext?: EmailContext;
 };
 
+const chunk = <T>(arr: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+};
+
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { to, from, template, variables, tags, emailContext } = payload;
+  const { recipients, from, template, data, senderVars, tags, emailContext } = payload;
   const { log } = ctx;
 
-  const { resolveEmailClient } = await import('#/appEvents/bridges/resolveEmailClient');
+  if (!recipients.length) return;
 
+  const { resolveEmailClient } = await import('#/appEvents/bridges/resolveEmailClient');
   const client = await resolveEmailClient(emailContext ?? {});
 
   const composed = await composeTemplate(template, {
@@ -26,24 +43,58 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     locale: 'en',
   });
 
-  const mjml = interpolate(composed.mjml, variables);
-  const subject = interpolate(composed.subject, variables);
+  const rendered = recipients.map((recipient) => {
+    const variables: Variables = {
+      sender: senderVars,
+      recipient: { name: recipient.name, email: recipient.to },
+      data,
+    };
 
-  const mjml2html = (await import('mjml')).default;
-  const { html } = mjml2html(mjml, { validationLevel: 'skip' });
+    const mjml = interpolate(composed.mjml, variables);
+    const subject = interpolate(composed.subject, variables);
+    const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-  const result = await client.send({
-    to,
-    from,
-    subject,
-    html,
-    tags,
+    return { to: recipient.to, from, subject, html, tags };
   });
 
-  if (result.success) {
-    log(`Email sent: template=${template} to=${to} id=${result.id}`);
+  if (client.sendBatch && rendered.length > 1) {
+    const batchSize = client.maxBatchSize ?? 100;
+    for (const batch of chunk(rendered, batchSize)) {
+      await sendBatch(client, batch, log);
+    }
   } else {
-    log(`Email send failed: template=${template} to=${to}`);
-    throw new Error(`Email delivery failed for ${to}`);
+    for (const email of rendered) {
+      await sendSingle(client, email, log);
+    }
   }
+
+  log(`Email sent: template=${template} recipients=${recipients.length}`);
 });
+
+const sendBatch = async (
+  client: EmailClient,
+  batch: { to: string; from: string; subject: string; html: string; tags?: string[] }[],
+  log: (msg: string) => void,
+): Promise<void> => {
+  try {
+    await client.sendBatch!(batch);
+    log(`Batch sent: ${batch.length} emails`);
+  } catch (err) {
+    log(`Batch failed, falling back to individual sends: ${err}`);
+    for (const email of batch) {
+      await sendSingle(client, email, log);
+    }
+  }
+};
+
+const sendSingle = async (
+  client: EmailClient,
+  email: { to: string; from: string; subject: string; html: string; tags?: string[] },
+  log: (msg: string) => void,
+): Promise<void> => {
+  const result = await client.send(email);
+  if (!result.success) {
+    log(`Email send failed: to=${email.to}`);
+    throw new Error(`Email delivery failed for ${email.to}`);
+  }
+};

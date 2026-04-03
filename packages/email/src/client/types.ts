@@ -15,4 +15,6 @@ export type SendEmailResult = {
 
 export type EmailClient = {
   send: (options: SendEmailOptions) => Promise<SendEmailResult>;
+  sendBatch?: (options: SendEmailOptions[]) => Promise<SendEmailResult[]>;
+  maxBatchSize?: number;
 };

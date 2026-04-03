@@ -21,6 +21,7 @@ const getResendClient = (apiKey: string): Resend => {
 
 class ResendEmailClient implements EmailClient {
   readonly vcr = new VCR(FIXTURES_DIR, { send: { keys: SANITIZE_KEYS } });
+  readonly maxBatchSize = 100;
   private readonly resend: Resend;
 
   constructor(apiKey: string) {
@@ -30,6 +31,11 @@ class ResendEmailClient implements EmailClient {
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
     if (process.env.NODE_ENV !== 'test') return this._send(options);
     return this.vcr.capture('send', () => this._send(options));
+  }
+
+  async sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
+    if (process.env.NODE_ENV !== 'test') return this._sendBatch(batch);
+    return this.vcr.capture('sendBatch', () => this._sendBatch(batch));
   }
 
   private async _send(options: SendEmailOptions): Promise<SendEmailResult> {
@@ -50,6 +56,28 @@ class ResendEmailClient implements EmailClient {
       id: data?.id ?? '',
       success: true,
     };
+  }
+
+  private async _sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
+    const { data, error } = await this.resend.batch.send(
+      batch.map((options) => ({
+        to: options.to,
+        from: options.from,
+        subject: options.subject,
+        html: options.html,
+        replyTo: options.replyTo,
+        tags: options.tags?.map((name) => ({ name, value: 'true' })),
+      })),
+    );
+
+    if (error) {
+      throw new Error(`Resend batch error: ${error.message}`);
+    }
+
+    return (data?.data ?? []).map((d) => ({
+      id: d.id,
+      success: true,
+    }));
   }
 }
 

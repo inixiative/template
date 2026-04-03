@@ -5,7 +5,7 @@ import type { AppEventPayload, EmailContext, EmailHandoff } from '#/appEvents/ty
 import { enqueueJob } from '#/jobs/enqueue';
 
 type ResolvedRecipient = {
-  email: string;
+  to: string;
   name: string;
 };
 
@@ -16,7 +16,7 @@ const resolveSenderVars = (): Record<string, unknown> => ({
 
 const resolveTargets = async (handoff: EmailHandoff): Promise<ResolvedRecipient[]> => {
   if ('raw' in handoff.target) {
-    return handoff.target.raw.map((email) => ({ email, name: '' }));
+    return handoff.target.raw.map((email) => ({ to: email, name: '' }));
   }
 
   const { userIds } = handoff.target;
@@ -29,7 +29,7 @@ const resolveTargets = async (handoff: EmailHandoff): Promise<ResolvedRecipient[
 
   return users
     .filter((u): u is typeof u & { email: string } => !!u.email)
-    .map((u) => ({ email: u.email, name: u.name ?? '' }));
+    .map((u) => ({ to: u.email, name: u.name ?? '' }));
 };
 
 const buildEmailContext = (event: AppEventPayload, handoff: EmailHandoff): EmailContext => {
@@ -57,26 +57,19 @@ export const deliverEmailHandoffs = async (
 
       const from = await resolveFromAddress(ctx, handoff);
 
-      const jobs = await Promise.all(
-        recipients.map((recipient) =>
-          enqueueJob('sendEmail', {
-            to: recipient.email,
-            from,
-            template: handoff.message.template,
-            variables: {
-              sender: resolveSenderVars(),
-              recipient: { name: recipient.name, email: recipient.email },
-              data: handoff.message.data,
-            },
-            tags: handoff.tags,
-            category: handoff.category,
-            emailContext: ctx,
-          }),
-        ),
-      );
+      const job = await enqueueJob('sendEmail', {
+        recipients,
+        from,
+        template: handoff.message.template,
+        data: handoff.message.data,
+        senderVars: resolveSenderVars(),
+        tags: handoff.tags,
+        category: handoff.category,
+        emailContext: ctx,
+      });
 
       log.info(
-        `Email bridge: event=${event.type} template=${handoff.message.template} recipients=${recipients.length} jobs=[${jobs.map((j) => j.jobId).join(',')}]`,
+        `Email bridge: event=${event.type} template=${handoff.message.template} recipients=${recipients.length} job=${job.jobId}`,
       );
     } catch (err) {
       log.error(`Email bridge failed for event=${event.type} template=${handoff.message.template}`, { error: err });
