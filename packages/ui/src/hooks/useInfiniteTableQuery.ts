@@ -74,11 +74,19 @@ export function useInfiniteTableQuery<TItem>(
   const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 
   const pageCount = query.data?.pages.length ?? 0;
-  const total = query.data?.pages[query.data.pages.length - 1]?.total;
+
+  // Read total from the most recent page that includes it.
+  const total = React.useMemo(() => {
+    if (!query.data) return undefined;
+    for (let i = query.data.pages.length - 1; i >= 0; i--) {
+      if (query.data.pages[i].total !== undefined) return query.data.pages[i].total;
+    }
+    return undefined;
+  }, [query.data]);
 
   const locateItem = React.useCallback(
     (flatIndex: number): InfiniteTablePageLocation | null => {
-      if (!query.data) return null;
+      if (flatIndex < 0 || !query.data) return null;
       let remaining = flatIndex;
       for (let pageIndex = 0; pageIndex < query.data.pages.length; pageIndex++) {
         const page = query.data.pages[pageIndex];

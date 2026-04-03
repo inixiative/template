@@ -7,6 +7,9 @@ export type UseSectionHashOptions = {
    * Map of section IDs to their element refs. The hook observes these
    * elements and updates the URL hash to the most visible section.
    * Also scrolls to the matching section on mount if the URL has a hash.
+   *
+   * Memoize this object or define it outside the component to avoid
+   * unnecessary observer recreation on every render.
    */
   sections: Record<string, React.RefObject<HTMLElement | null>>;
   /**
@@ -35,9 +38,10 @@ export type UseSectionHashResult = {
  * const usersRef = useRef<HTMLDivElement>(null);
  * const logsRef = useRef<HTMLDivElement>(null);
  *
- * const { activeSection, scrollToSection } = useSectionHash({
- *   sections: { users: usersRef, logs: logsRef },
- * });
+ * // Memoize to avoid observer churn.
+ * const sections = useMemo(() => ({ users: usersRef, logs: logsRef }), []);
+ *
+ * const { activeSection, scrollToSection } = useSectionHash({ sections });
  *
  * return (
  *   <>
@@ -54,6 +58,12 @@ export type UseSectionHashResult = {
 export function useSectionHash(options: UseSectionHashOptions): UseSectionHashResult {
   const { sections, threshold = 0.5 } = options;
 
+  // Stabilize the effect dependency on section keys rather than object identity.
+  // This prevents observer churn when the consumer creates a new object each render.
+  const sectionsRef = React.useRef(sections);
+  sectionsRef.current = sections;
+  const sectionKeys = Object.keys(sections).sort().join(',');
+
   const [activeSection, setActiveSection] = React.useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const hash = window.location.hash.slice(1);
@@ -67,35 +77,37 @@ export function useSectionHash(options: UseSectionHashOptions): UseSectionHashRe
     scrolledOnMountRef.current = true;
 
     const hash = window.location.hash.slice(1);
-    if (!hash || !(hash in sections)) return;
+    const currentSections = sectionsRef.current;
+    if (!hash || !(hash in currentSections)) return;
 
-    const el = sections[hash]?.current;
+    const el = currentSections[hash]?.current;
     if (!el) return;
 
-    // Defer to let the page render first.
     requestAnimationFrame(() => {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  }, [sections]);
+  }, []);
 
   // Observe sections and update hash to the most visible one.
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const ratioMapRef = React.useRef<Map<string, number>>(new Map());
 
   React.useEffect(() => {
-    const entries = Object.entries(sections);
+    const currentSections = sectionsRef.current;
+    const entries = Object.entries(currentSections);
     if (entries.length === 0) return;
+
+    ratioMapRef.current.clear();
 
     const observer = new IntersectionObserver(
       (ioEntries) => {
         for (const entry of ioEntries) {
-          const id = (entry.target as HTMLElement).id || findSectionId(entry.target, sections);
+          const id = (entry.target as HTMLElement).id || findSectionId(entry.target, sectionsRef.current);
           if (id) {
             ratioMapRef.current.set(id, entry.intersectionRatio);
           }
         }
 
-        // Debounce hash update to avoid thrashing during fast scroll.
         clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => {
           let bestId: string | null = null;
@@ -108,7 +120,6 @@ export function useSectionHash(options: UseSectionHashOptions): UseSectionHashRe
           }
           if (bestId && bestRatio > 0) {
             setActiveSection(bestId);
-            // Update hash without triggering a scroll.
             const newHash = `#${bestId}`;
             if (window.location.hash !== newHash) {
               window.history.replaceState(window.history.state, '', newHash);
@@ -127,18 +138,18 @@ export function useSectionHash(options: UseSectionHashOptions): UseSectionHashRe
       clearTimeout(timerRef.current);
       observer.disconnect();
     };
-  }, [sections, threshold]);
+  }, [sectionKeys, threshold]);
 
   const scrollToSection = React.useCallback(
     (sectionId: string) => {
-      const ref = sections[sectionId];
+      const ref = sectionsRef.current[sectionId];
       if (!ref?.current) return;
 
       ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveSection(sectionId);
       window.history.replaceState(window.history.state, '', `#${sectionId}`);
     },
-    [sections],
+    [],
   );
 
   return { activeSection, scrollToSection };

@@ -21,6 +21,8 @@ export type InfiniteScrollProps = {
   rootMargin?: string;
 };
 
+const noop = () => {};
+
 export type TableProps<T> = {
   columns: Column<T>[];
   data: T[];
@@ -59,22 +61,20 @@ export const Table = <T,>({
   scrollRef,
   className,
 }: TableProps<T>) => {
+  // Hooks must be called unconditionally, before any early returns.
+  const sentinelRef = useInfiniteScrollTrigger({
+    onLoadMore: infiniteScroll?.onLoadMore ?? noop,
+    hasMore: infiniteScroll?.hasMore ?? false,
+    isLoading: infiniteScroll?.isLoading ?? false,
+    rootMargin: infiniteScroll?.rootMargin,
+  });
+
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
   if (data.length === 0 && !infiniteScroll?.isLoading) {
     return <div className="text-center py-8 text-muted-foreground">{emptyMessage || 'No data available'}</div>;
   }
-
-  const sentinelRef = infiniteScroll
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    ? useInfiniteScrollTrigger({
-        onLoadMore: infiniteScroll.onLoadMore,
-        hasMore: infiniteScroll.hasMore,
-        isLoading: infiniteScroll.isLoading,
-        rootMargin: infiniteScroll.rootMargin,
-      })
-    : null;
 
   const isViewport = maxHeight != null;
 

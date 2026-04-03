@@ -85,21 +85,27 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
   const restoredRef = React.useRef(false);
   React.useEffect(() => {
     if (restoredRef.current || !ready) return;
-    restoredRef.current = true;
 
     const saved = savedRef.current;
-    if (saved === null || saved === 0) return;
+    if (saved === null || saved === 0) {
+      restoredRef.current = true;
+      return;
+    }
 
     const el = getScrollElement();
     if (!el) return;
 
-    // Use requestAnimationFrame to ensure the DOM has settled.
+    // Mark restored inside the rAF so it only happens after the scroll
+    // actually executes. If the DOM isn't tall enough yet, the scroll
+    // will clamp to the max and we still mark it done (the data was ready
+    // per the `ready` flag — any shortfall is the caller's responsibility).
     requestAnimationFrame(() => {
       if (scrollRef) {
         el.scrollTop = saved;
       } else {
         window.scrollTo({ top: saved });
       }
+      restoredRef.current = true;
     });
   }, [ready, getScrollElement, scrollRef]);
 
