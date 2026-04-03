@@ -50,22 +50,24 @@ export type EmailSenderContext = {
   userId?: string;
 };
 
-type EmailTargetIndividual = {
-  userIds: string[];
+export type ResolvedRecipient = {
+  to: string;
+  name: string;
 };
 
-type EmailTargetRaw = {
-  raw: string[];
-};
-
-type EmailTargetGroup = {
-  to: { userIds?: string[]; raw?: string[] };
-  cc?: { userIds?: string[]; raw?: string[] };
-  bcc?: { userIds?: string[]; raw?: string[] };
-};
+export type EmailTarget =
+  | { userIds: string[] }
+  | { raw: string[] }
+  | { orgRole: { organizationId: string; role: string } }
+  | { spaceRole: { spaceId: string; role: string } };
 
 export type EmailHandoff = {
-  target: EmailTargetIndividual | EmailTargetRaw | EmailTargetGroup;
+  target: EmailTarget | EmailTarget[];
+  group?: {
+    to: EmailTarget | EmailTarget[];
+    cc?: EmailTarget | EmailTarget[];
+    bcc?: EmailTarget | EmailTarget[];
+  };
   message: { template: string; data: Record<string, unknown> };
   tags: string[];
   category: CommunicationCategory;
