@@ -1,144 +1,158 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import { buildFilterQuery } from '@template/ui/hooks/useDataFilters';
+import {
+  parseOrderByStrings,
+  readStateFromUrl,
+  syncStateToUrl,
+} from '@template/ui/hooks/usePaginatedData';
 import { resolveSectionTarget } from '@template/ui/hooks/useSectionHash';
 
 /**
- * Tests for usePaginatedData URL sync, section hash resolution,
- * and the full hydration chain. Imports actual functions from source
- * instead of redefining logic.
- *
- * Note: syncStateToUrl and readStateFromUrl require `window.location`
- * which isn't available in non-DOM test environment when run from root.
- * Those functions are tested via the pure param helpers below.
- * resolveSectionTarget requires happy-dom (run from packages/ui).
+ * All imports from source — no local copies of logic.
  */
 
-// --- URL param helpers (pure, no window dependency) ---
+// --- syncStateToUrl ---
 
-type PersistedState = {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-  orderBy?: string[];
-};
-
-/** Convert state to URLSearchParams (mirrors syncStateToUrl logic). */
-function toParams(state: PersistedState): URLSearchParams {
-  const params = new URLSearchParams();
-  if (state.page != null && state.page > 1) params.set('page', String(state.page));
-  if (state.pageSize != null) params.set('pageSize', String(state.pageSize));
-  if (state.search) params.set('search', state.search);
-  if (state.orderBy) for (const v of state.orderBy) params.append('orderBy', v);
-  return params;
-}
-
-/** Convert URLSearchParams to state (mirrors readStateFromUrl logic). */
-function fromParams(params: URLSearchParams): PersistedState {
-  const state: PersistedState = {};
-  const page = params.get('page');
-  if (page) state.page = Number.parseInt(page, 10);
-  const pageSize = params.get('pageSize');
-  if (pageSize) state.pageSize = Number.parseInt(pageSize, 10);
-  const search = params.get('search');
-  if (search) state.search = search;
-  const orderBy = params.getAll('orderBy');
-  if (orderBy.length > 0) state.orderBy = orderBy;
-  return state;
-}
-
-// TODO: These helpers mirror private functions in usePaginatedData.
-// When syncStateToUrl/readStateFromUrl can be tested directly
-// (requires window.location), replace these with direct imports.
-
-// --- URL param serialization ---
-
-describe('URL param serialization', () => {
+describe('syncStateToUrl', () => {
   it('page 1 is omitted (default)', () => {
-    expect(toParams({ page: 1 }).has('page')).toBe(false);
+    const url = syncStateToUrl({ page: 1, pageSize: 20 });
+    expect(url).not.toContain('page=');
+    expect(url).toContain('pageSize=20');
   });
 
   it('page > 1 is included', () => {
-    expect(toParams({ page: 3 }).get('page')).toBe('3');
-  });
-
-  it('pageSize is included', () => {
-    expect(toParams({ pageSize: 50 }).get('pageSize')).toBe('50');
+    const url = syncStateToUrl({ page: 3 });
+    expect(url).toContain('page=3');
   });
 
   it('search is included when non-empty', () => {
-    expect(toParams({ search: 'acme' }).get('search')).toBe('acme');
+    const url = syncStateToUrl({ search: 'acme' });
+    expect(url).toContain('search=acme');
   });
 
   it('empty search is omitted', () => {
-    expect(toParams({ search: '' }).has('search')).toBe(false);
+    const url = syncStateToUrl({ search: '' });
+    expect(url).not.toContain('search=');
   });
 
   it('orderBy as repeated params', () => {
-    expect(toParams({ orderBy: ['createdAt:desc', 'name:asc'] }).getAll('orderBy'))
-      .toEqual(['createdAt:desc', 'name:asc']);
+    const url = syncStateToUrl({ orderBy: ['createdAt:desc', 'name:asc'] });
+    expect(url).toContain('orderBy=');
   });
 
-  it('full state round-trips', () => {
-    const original: PersistedState = {
-      page: 5, pageSize: 100, search: 'hello world',
-      orderBy: ['createdAt:desc', 'name:asc'],
-    };
-    expect(fromParams(toParams(original))).toEqual(original);
-  });
-
-  it('special chars round-trip', () => {
-    const original: PersistedState = { search: 'foo & bar = baz' };
-    expect(fromParams(toParams(original)).search).toBe('foo & bar = baz');
+  it('empty state produces clean URL', () => {
+    const url = syncStateToUrl({});
+    expect(url).not.toContain('page=');
+    expect(url).not.toContain('search=');
+    expect(url).not.toContain('orderBy=');
   });
 });
 
-// --- orderBy string parsing ---
+// --- readStateFromUrl (pass search string directly) ---
 
-function parseOrderBy(strings: string[]): Array<{ field: string; direction: 'asc' | 'desc' }> {
-  return strings.map((s) => {
-    const [field, direction] = s.split(':');
-    return { field, direction: direction as 'asc' | 'desc' };
+describe('readStateFromUrl', () => {
+  it('reads page', () => {
+    expect(readStateFromUrl('?page=3').page).toBe(3);
   });
-}
 
-describe('orderBy parsing', () => {
+  it('reads pageSize', () => {
+    expect(readStateFromUrl('?pageSize=50').pageSize).toBe(50);
+  });
+
+  it('reads search', () => {
+    expect(readStateFromUrl('?search=hello').search).toBe('hello');
+  });
+
+  it('reads multiple orderBy', () => {
+    expect(readStateFromUrl('?orderBy=a:asc&orderBy=b:desc').orderBy).toEqual(['a:asc', 'b:desc']);
+  });
+
+  it('returns empty for no params', () => {
+    expect(readStateFromUrl('')).toEqual({});
+  });
+
+  it('ignores unrelated params', () => {
+    const state = readStateFromUrl('?org=abc&page=2');
+    expect(state.page).toBe(2);
+    expect(state).not.toHaveProperty('org');
+  });
+});
+
+// --- Round-trip ---
+
+describe('URL round-trip', () => {
+  it('full state round-trips', () => {
+    const original = { page: 5, pageSize: 100, search: 'hello world', orderBy: ['createdAt:desc', 'name:asc'] };
+    const url = syncStateToUrl(original);
+    // Extract search string from the URL
+    const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+    const restored = readStateFromUrl(searchString);
+    expect(restored).toEqual(original);
+  });
+
+  it('special chars round-trip', () => {
+    const original = { search: 'foo & bar = baz' };
+    const url = syncStateToUrl(original);
+    const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+    expect(readStateFromUrl(searchString).search).toBe('foo & bar = baz');
+  });
+
+  it('page 1 omitted but defaults back to undefined', () => {
+    const url = syncStateToUrl({ page: 1, pageSize: 20 });
+    const searchString = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+    const restored = readStateFromUrl(searchString);
+    expect(restored.page).toBeUndefined(); // page 1 not in URL
+    expect(restored.pageSize).toBe(20);
+  });
+});
+
+// --- parseOrderByStrings ---
+
+describe('parseOrderByStrings', () => {
   it('parses single field', () => {
-    expect(parseOrderBy(['createdAt:desc'])).toEqual([{ field: 'createdAt', direction: 'desc' }]);
+    expect(parseOrderByStrings(['createdAt:desc'])).toEqual([
+      { field: 'createdAt', direction: 'desc' },
+    ]);
+  });
+
+  it('parses multiple fields', () => {
+    expect(parseOrderByStrings(['name:asc', 'createdAt:desc'])).toEqual([
+      { field: 'name', direction: 'asc' },
+      { field: 'createdAt', direction: 'desc' },
+    ]);
   });
 
   it('parses relation path', () => {
-    expect(parseOrderBy(['organizationUser.role:asc'])).toEqual([
+    expect(parseOrderByStrings(['organizationUser.role:asc'])).toEqual([
       { field: 'organizationUser.role', direction: 'asc' },
     ]);
   });
 
   it('handles empty', () => {
-    expect(parseOrderBy([])).toEqual([]);
+    expect(parseOrderByStrings([])).toEqual([]);
   });
 });
 
 // --- Full hydration chain ---
 
-describe('hydration chain: URL → state → filters → query', () => {
+describe('hydration chain: URL → filters → query', () => {
   it('shared URL hydrates into correct server query', () => {
-    const persisted = fromParams(new URLSearchParams('page=3&pageSize=50&search=acme&orderBy=createdAt:desc'));
-
-    const orderByObjects = parseOrderBy(persisted.orderBy!);
-
-    const filterQuery = buildFilterQuery(
-      persisted.search!, 'combined', ['name', 'email'], {}, orderByObjects,
-    );
-
+    const persisted = readStateFromUrl('?page=3&pageSize=50&search=acme&orderBy=createdAt:desc');
+    const orderByObjects = parseOrderByStrings(persisted.orderBy!);
+    const filterQuery = buildFilterQuery(persisted.search!, 'combined', ['name', 'email'], {}, orderByObjects);
     const query: Record<string, unknown> = { ...filterQuery, page: persisted.page, pageSize: persisted.pageSize };
+
     expect(query).toEqual({
       search: 'acme', orderBy: ['createdAt:desc'], page: 3, pageSize: 50,
     });
   });
 
   it('empty URL produces default query', () => {
-    const persisted = fromParams(new URLSearchParams(''));
+    const persisted = readStateFromUrl('');
     const filterQuery = buildFilterQuery('', 'combined', [], {}, []);
-    const query: Record<string, unknown> = { ...filterQuery, page: persisted.page ?? 1, pageSize: persisted.pageSize ?? 20 };
+    const query: Record<string, unknown> = {
+      ...filterQuery, page: persisted.page ?? 1, pageSize: persisted.pageSize ?? 20,
+    };
     expect(query).toEqual({ page: 1, pageSize: 20 });
   });
 });
@@ -146,12 +160,12 @@ describe('hydration chain: URL → state → filters → query', () => {
 // --- history.state key contracts ---
 
 describe('history.state keys', () => {
-  it('scroll state uses scroll: prefix', () => {
-    expect(`scroll:${'usersTable'}`).toBe('scroll:usersTable');
+  it('scroll uses scroll: prefix', () => {
+    expect(`scroll:usersTable`).toBe('scroll:usersTable');
   });
 
-  it('data state uses data: prefix', () => {
-    expect(`data:${'usersTable'}`).toBe('data:usersTable');
+  it('data uses data: prefix', () => {
+    expect(`data:usersTable`).toBe('data:usersTable');
   });
 
   it('multiple keys coexist', () => {
@@ -164,18 +178,18 @@ describe('history.state keys', () => {
   });
 });
 
-// --- resolveSectionTarget (requires happy-dom) ---
+// --- resolveSectionTarget ---
 
 describe('resolveSectionTarget', () => {
-  it('resolves simple section by data-section', () => {
+  afterEach(() => {
+    for (const el of document.body.querySelectorAll('[data-section]')) el.remove();
+  });
+
+  it('resolves simple section', () => {
     const el = document.createElement('div');
     el.setAttribute('data-section', 'users');
     document.body.appendChild(el);
-
-    const target = resolveSectionTarget('users');
-    expect(target).toBe(el);
-
-    document.body.removeChild(el);
+    expect(resolveSectionTarget('users')).toBe(el);
   });
 
   it('resolves dot-notated child by data-key', () => {
@@ -185,11 +199,7 @@ describe('resolveSectionTarget', () => {
     child.setAttribute('data-key', 'usr_abc');
     parent.appendChild(child);
     document.body.appendChild(parent);
-
-    const target = resolveSectionTarget('usersTable.usr_abc');
-    expect(target).toBe(child);
-
-    document.body.removeChild(parent);
+    expect(resolveSectionTarget('usersTable.usr_abc')).toBe(child);
   });
 
   it('resolves numeric index fallback', () => {
@@ -201,12 +211,7 @@ describe('resolveSectionTarget', () => {
       parent.appendChild(row);
     }
     document.body.appendChild(parent);
-
-    // Numeric index: 3rd data-key child (0-indexed)
-    const target = resolveSectionTarget('items.3');
-    expect(target?.getAttribute('data-key')).toBe('item-3');
-
-    document.body.removeChild(parent);
+    expect(resolveSectionTarget('items.3')?.getAttribute('data-key')).toBe('item-3');
   });
 
   it('returns null for missing section', () => {
@@ -217,22 +222,16 @@ describe('resolveSectionTarget', () => {
     const parent = document.createElement('div');
     parent.setAttribute('data-section', 'table');
     document.body.appendChild(parent);
-
     expect(resolveSectionTarget('table.missing')).toBeNull();
-
-    document.body.removeChild(parent);
   });
 
-  it('returns null for out-of-range numeric index', () => {
+  it('returns null for out-of-range index', () => {
     const parent = document.createElement('div');
     parent.setAttribute('data-section', 'items');
     const row = document.createElement('div');
     row.setAttribute('data-key', 'only');
     parent.appendChild(row);
     document.body.appendChild(parent);
-
     expect(resolveSectionTarget('items.99')).toBeNull();
-
-    document.body.removeChild(parent);
   });
 });

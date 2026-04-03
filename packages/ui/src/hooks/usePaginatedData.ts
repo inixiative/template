@@ -84,11 +84,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   const [page, setPageRaw] = useState(initialState.page ?? 1);
   const [pageSize, setPageSizeRaw] = useState(initialState.pageSize ?? defaultPageSize);
 
-  // Parse persisted orderBy strings ("field:direction") back to objects.
-  const initialOrderBy = initialState.orderBy?.map((s) => {
-    const [field, direction] = s.split(':');
-    return { field, direction: direction as 'asc' | 'desc' };
-  });
+  const initialOrderBy = initialState.orderBy ? parseOrderByStrings(initialState.orderBy) : undefined;
 
   const dataFilters = useDataFilters(config, () => setPageRaw(1), {
     search: initialState.search,
@@ -161,6 +157,18 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   };
 };
 
+// --- Pure helpers (exported for testing) ---
+
+/** Parse "field:direction" strings back to orderBy objects. */
+export function parseOrderByStrings(
+  strings: string[],
+): Array<{ field: string; direction: 'asc' | 'desc' }> {
+  return strings.map((s) => {
+    const [field, direction] = s.split(':');
+    return { field, direction: direction as 'asc' | 'desc' };
+  });
+}
+
 // --- State persistence helpers ---
 
 export type PersistedState = {
@@ -201,9 +209,9 @@ export function syncStateToUrl(state: PersistedState): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** Read PersistedState from URL search params. */
-export function readStateFromUrl(): PersistedState {
-  const params = new URLSearchParams(window.location.search);
+/** Read PersistedState from URL search params. Pass searchString for testing. */
+export function readStateFromUrl(searchString?: string): PersistedState {
+  const params = new URLSearchParams(searchString ?? window.location.search);
   const state: PersistedState = {};
 
   const page = params.get('page');
