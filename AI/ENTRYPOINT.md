@@ -3,7 +3,17 @@
 Canonical instructions for all coding agents in this repository.
 `AGENTS.md` and `CLAUDE.md` should symlink to this file.
 
-## 0. Critical Guardrails
+## 0. Purpose and Priority
+
+**This is a template, not a product.** Developer experience (DX) is the #1 priority. Every decision — naming, file structure, API design, decomposition — should optimize for the next developer who reads the code.
+
+- **Naming matters.** If a name doesn't clearly describe what the thing does, rename it. Do not leave misleading or generic names for convenience.
+- **One file, one concern.** Each file should have a single clear purpose. If a file has multiple exported functions that serve different consumers, split them. The cost of an extra file is near zero; the cost of hunting through a multi-purpose file is real.
+- **No premature features.** Do not build things nobody is using yet unless they are foundational patterns that every app page will need. When in doubt, ask.
+- **No continuous support debt.** Build things that are self-explanatory and do not require hand-holding. If a consumer needs to read the source code to understand the API, the API is wrong.
+- **Adversarial reviews should run regularly.** After any significant implementation, run an adversarial review in the background against the full scope of changes. Do not wait for the user to ask. Flag issues proactively.
+
+## 0.0 Critical Guardrails
 
 - Do not bypass failures by editing CI rules/fixtures.
 - Protected paths: `scripts/ci/rules/**`, `scripts/ci/run-ci-rules.sh`, `scripts/ci/rule-violations/**`.

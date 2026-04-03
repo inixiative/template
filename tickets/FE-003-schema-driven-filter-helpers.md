@@ -97,11 +97,12 @@ Type inference rules:
 
 ### Step 3: Operator-per-type mapping
 
-**File:** New `packages/ui/src/lib/filterHelpers.ts`
+**File:** New `packages/ui/src/lib/operatorsForFieldType.ts`
+
+One file, one function:
 
 ```ts
-/** Returns valid operators for a given field type. */
-export function operatorsForType(type: FieldType): FieldOperator[];
+export function operatorsForFieldType(type: FieldType): FieldOperator[];
 ```
 
 Mapping:
@@ -110,26 +111,39 @@ Mapping:
 - `date` → `equals`, `lt`, `lte`, `gt`, `gte`, `not`
 - `enum` → `equals`, `in`, `notIn`
 - `boolean` → `equals`, `not`
+- `json` → `equals` (top-level only — see Step 6)
 - `relation` → (no direct operators — relations use path segments: `some`, `every`, `none`)
 
-### Step 4: Relation path helpers
+### Step 4: Relation path builder
 
-**File:** Same `packages/ui/src/lib/filterHelpers.ts`
+**File:** New `packages/ui/src/lib/buildRelationPath.ts`
+
+One file, one function:
 
 ```ts
 import type { RelationOperator } from '@template/shared/bracketQuery';
 
-/** Build a dot-notation filter path through a relation. */
-export function relationPath(
+/** Build a dot-notation filter path through a Prisma relation. */
+export function buildRelationPath(
   relation: string,
   operator: RelationOperator,
   field: string,
 ): string;
-// relationPath('tokens', 'some', 'name') → 'tokens.some.name'
-
-/** Check if a field path is filterable against a DataConfig. */
-export function isFilterable(config: DataConfig, path: string): boolean;
+// buildRelationPath('tokens', 'some', 'name') → 'tokens.some.name'
 ```
+
+### Step 4b: Field filterability check
+
+**File:** New `packages/ui/src/lib/isFieldFilterable.ts`
+
+One file, one function:
+
+```ts
+/** Check if a field path is filterable against a DataConfig. */
+export function isFieldFilterable(config: DataConfig, path: string): boolean;
+```
+
+Returns true if the path is in `searchableFields` (non-admin) or if `adminMode` is true (admin can filter anything).
 
 ### Step 5: Extend DataConfig with field metadata
 
@@ -147,20 +161,45 @@ export type DataConfig = {
 
 ---
 
-## Files
+### Step 6: JSON field support
+
+**Scope:** Top-level JSON fields only. The OpenAPI spec types these as `object` or `Record<string, unknown>`. Prisma supports `equals` on JSON columns and `path`-based queries for PostgreSQL (`jsonb`), but the OpenAPI spec does not describe the JSON structure.
+
+**Approach:**
+- `FieldType: 'json'` for fields typed as `object` without defined properties
+- `operatorsForFieldType('json')` returns `['equals']` (exact match only)
+- Document that deep JSON filtering (`jsonPath` queries) is not auto-discovered and requires manual `setFilter` calls with the appropriate Prisma JSON path syntax
+- Admin mode can pass JSON path filters directly via `filters[...]` since it bypasses validation
+
+### Step 7: Search mode awareness
+
+The helpers should make the `search` vs `searchFields` distinction explicit:
+
+- `search` (combined mode): one search box, API ORs `contains` across all `searchableFields`
+- `searchFields[field][operator]=value` (field mode): per-field targeted filtering
+
+`FieldMetadata.isSearchable` indicates the field is in the `searchableFields` whitelist. In `combined` mode, all searchable fields participate in the top-level `search` param automatically. In `field` mode, each field gets its own `searchFields[field][contains]` entry.
+
+Admin mode uses `filters[...]` which bypasses the whitelist entirely — every field in the response schema is filterable.
+
+---
+
+## Files (one file, one concern)
 
 | Action | File | What |
 |--------|------|------|
-| Modify | `packages/ui/src/hooks/useDataFilters.ts` | `FilterState.operator` → `FieldOperator` |
-| Create | `packages/ui/src/lib/getFieldMetadata.ts` | Per-field type/operator extraction |
-| Create | `packages/ui/src/lib/filterHelpers.ts` | `operatorsForType`, `relationPath`, `isFilterable` |
+| Modify | `packages/ui/src/lib/buildFilterQuery.ts` | `FilterState.operator` → `FieldOperator` |
+| Create | `packages/ui/src/lib/getFieldMetadata.ts` | Per-field type/operator extraction from OpenAPI |
+| Create | `packages/ui/src/lib/operatorsForFieldType.ts` | Type → valid operators mapping |
+| Create | `packages/ui/src/lib/buildRelationPath.ts` | Dot-notation path builder for Prisma relations |
+| Create | `packages/ui/src/lib/isFieldFilterable.ts` | Check field filterability against config |
 | Modify | `packages/ui/src/lib/makeDataConfig.ts` | Add `fields: FieldMetadata[]` |
-| Create | Tests for each new file |
+| Create | Tests for each new file (one test file per source file) |
 
 ## Non-goals
 
 - Filter builder UI component (separate ticket — this provides the data layer)
-- JSON field deep filtering (OpenAPI doesn't describe JSON internals)
+- Deep JSON path querying auto-discovery (JSON structure not in OpenAPI spec)
 - Client-side filtering (this is for server-side query construction)
 
 ## Dependencies
