@@ -7,10 +7,7 @@ export type BaseAppEventType =
   | 'user.updated'
   | 'user.verificationRequested'
   | 'inquiry.sent'
-  | 'inquiry.resolved'
-  | 'inquiry.approved'
-  | 'inquiry.denied'
-  | 'inquiry.changesRequested';
+  | 'inquiry.resolved';
 
 export type AppEventType = BaseAppEventType | (string & {});
 

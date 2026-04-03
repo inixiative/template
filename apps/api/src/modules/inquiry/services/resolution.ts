@@ -53,9 +53,8 @@ export const resolveInquiry = async (
           sourceOrganizationId: inquiry.sourceOrganizationId ?? undefined,
           sourceUserId: inquiry.sourceUserId ?? undefined,
           targetUserId: inquiry.targetUserId ?? undefined,
-          inquiry: updated as unknown as Record<string, unknown>,
         },
-        { resourceType: 'Inquiry', resourceId: inquiry.id },
+        { resourceType: 'Inquiry', resourceId: inquiry.id, meta: updated },
       );
 
       return updated;

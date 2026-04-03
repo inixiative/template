@@ -1,8 +1,19 @@
 import { z } from 'zod';
 import { makeAppEvent } from '#/events/makeAppEvent';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
+import type { Inquiry } from '#/modules/inquiry/handlers/types';
 
-export const inquirySentEvent = makeAppEvent({
+export const inquirySentEvent = makeAppEvent<
+  {
+    inquiryId: string;
+    inquiryType: string;
+    sourceOrganizationId?: string;
+    sourceUserId?: string;
+    targetUserId?: string;
+    targetModel: string;
+  },
+  Inquiry
+>({
   type: 'inquiry.sent',
   schema: z.object({
     inquiryId: z.string(),
@@ -11,16 +22,15 @@ export const inquirySentEvent = makeAppEvent({
     sourceUserId: z.string().optional(),
     targetUserId: z.string().optional(),
     targetModel: z.string(),
-    inquiry: z.record(z.unknown()),
   }),
-  email: async (event) => {
-    const handler = inquiryHandlers[event.data.inquiryType as keyof typeof inquiryHandlers];
+  email: async (_event, inquiry) => {
+    const handler = inquiryHandlers[inquiry.type as keyof typeof inquiryHandlers];
     if (!handler?.onSent) return null;
-    return handler.onSent(event.data.inquiry as never) ?? null;
+    return handler.onSent(inquiry) ?? null;
   },
-  websocket: async (event) => {
-    const handler = inquiryHandlers[event.data.inquiryType as keyof typeof inquiryHandlers];
+  websocket: async (_event, inquiry) => {
+    const handler = inquiryHandlers[inquiry.type as keyof typeof inquiryHandlers];
     if (!handler?.onSentWS) return null;
-    return handler.onSentWS(event.data.inquiry as never) ?? null;
+    return handler.onSentWS(inquiry) ?? null;
   },
 });

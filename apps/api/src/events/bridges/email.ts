@@ -9,6 +9,11 @@ type ResolvedRecipient = {
   name: string;
 };
 
+const resolveSenderVars = (): Record<string, unknown> => ({
+  platformName: process.env.PLATFORM_NAME ?? 'Template',
+  address: process.env.PLATFORM_ADDRESS ?? '',
+});
+
 const resolveTargets = async (handoff: EmailHandoff): Promise<ResolvedRecipient[]> => {
   if ('raw' in handoff.target) {
     return handoff.target.raw.map((email) => ({ email, name: '' }));
@@ -59,7 +64,7 @@ export const deliverEmailHandoffs = async (
             from,
             template: handoff.message.template,
             variables: {
-              sender: {},
+              sender: resolveSenderVars(),
               recipient: { name: recipient.name, email: recipient.email },
               data: handoff.message.data,
             },

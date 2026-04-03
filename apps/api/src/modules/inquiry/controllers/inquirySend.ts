@@ -32,9 +32,8 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
       sourceUserId: sent.sourceUserId ?? undefined,
       targetUserId: sent.targetUserId ?? undefined,
       targetModel: sent.targetModel,
-      inquiry: sent as unknown as Record<string, unknown>,
     },
-    { resourceType: 'Inquiry', resourceId: sent.id },
+    { resourceType: 'Inquiry', resourceId: sent.id, meta: sent },
   );
 
   const handler = inquiryHandlers[inquiry.type];

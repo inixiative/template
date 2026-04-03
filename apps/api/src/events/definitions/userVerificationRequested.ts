@@ -12,7 +12,10 @@ export const userVerificationRequestedEvent = makeAppEvent({
       target: { userIds: [event.data.userId] },
       message: {
         template: 'email-verification',
-        data: { verificationUrl: event.data.verificationUrl },
+        data: {
+          buttonUrl: event.data.verificationUrl,
+          buttonText: 'Verify Email',
+        },
       },
       tags: ['auth', 'verification'],
       category: 'system' as const,

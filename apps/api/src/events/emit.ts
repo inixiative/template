@@ -8,16 +8,19 @@ export const createAppEvent = async (
   type: AppEventType,
   data: Record<string, unknown>,
   options?: AppEventOptions,
+  meta?: unknown,
 ): Promise<void> => {
   const actor = auditActorContext.getScope() ?? nullAuditActor;
 
-  const event: AppEventPayload = {
+  const event: AppEventPayload & { _meta?: unknown } = {
     type,
     actor,
     ...options,
     data,
     timestamp: new Date().toISOString(),
   };
+
+  if (meta !== undefined) event._meta = meta;
 
   const eventHandlers = getHandlers(type);
 

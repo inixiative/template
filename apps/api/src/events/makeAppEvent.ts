@@ -8,26 +8,32 @@ import type {
   WSHandoff,
 } from '#/events/types';
 
-type AppEventDefinition<T> = {
+type AppEventDefinition<T, M = undefined> = {
   type: string;
   schema: z.ZodType<T>;
-  email?: (event: AppEventPayload<T>) => Promise<EmailHandoff[] | null>;
-  websocket?: (event: AppEventPayload<T>) => Promise<WSHandoff[] | null>;
-  on?: Array<(event: AppEventPayload<T>) => Promise<void> | void>;
+  email?: (event: AppEventPayload<T>, meta: M) => Promise<EmailHandoff[] | null>;
+  websocket?: (event: AppEventPayload<T>, meta: M) => Promise<WSHandoff[] | null>;
+  on?: Array<(event: AppEventPayload<T>, meta: M) => Promise<void> | void>;
 };
 
-type AppEvent<T> = {
+type EmitOptions = AppEventOptions & {
+  /** Opaque context passed to bridge callbacks but NOT persisted to the event store. */
+  meta?: unknown;
+};
+
+type AppEvent<T, M = undefined> = {
   type: string;
   schema: z.ZodType<T>;
-  emit: (data: T, options?: AppEventOptions) => Promise<void>;
+  emit: (data: T, options?: M extends undefined ? EmitOptions : EmitOptions & { meta: M }) => Promise<void>;
 };
 
-export const makeAppEvent = <T>(def: AppEventDefinition<T>): AppEvent<T> => {
+export const makeAppEvent = <T, M = undefined>(def: AppEventDefinition<T, M>): AppEvent<T, M> => {
   if (def.email) {
     const emailCallback = def.email;
     registerAppEvent(def.type, async (event) => {
       const { deliverEmailHandoffs } = await import('#/events/bridges/email');
-      const handoffs = await emailCallback(event as AppEventPayload<T>);
+      const meta = (event as AppEventPayload & { _meta?: unknown })._meta as M;
+      const handoffs = await emailCallback(event as AppEventPayload<T>, meta);
       if (!handoffs?.length) return;
       await deliverEmailHandoffs(event, handoffs);
     });
@@ -37,7 +43,8 @@ export const makeAppEvent = <T>(def: AppEventDefinition<T>): AppEvent<T> => {
     const wsCallback = def.websocket;
     registerAppEvent(def.type, async (event) => {
       const { deliverWSHandoffs } = await import('#/events/bridges/websocket');
-      const handoffs = await wsCallback(event as AppEventPayload<T>);
+      const meta = (event as AppEventPayload & { _meta?: unknown })._meta as M;
+      const handoffs = await wsCallback(event as AppEventPayload<T>, meta);
       if (!handoffs?.length) return;
       await deliverWSHandoffs(handoffs);
     });
@@ -45,16 +52,20 @@ export const makeAppEvent = <T>(def: AppEventDefinition<T>): AppEvent<T> => {
 
   if (def.on) {
     for (const callback of def.on) {
-      registerAppEvent(def.type, (event) => callback(event as AppEventPayload<T>));
+      registerAppEvent(def.type, (event) => {
+        const meta = (event as AppEventPayload & { _meta?: unknown })._meta as M;
+        return callback(event as AppEventPayload<T>, meta);
+      });
     }
   }
 
   return {
     type: def.type,
     schema: def.schema,
-    emit: async (data: T, options?: AppEventOptions) => {
+    emit: async (data: T, options?: EmitOptions & { meta?: M }) => {
       const parsed = def.schema.parse(data);
-      await createAppEvent(def.type, parsed as Record<string, unknown>, options);
+      const { meta, ...eventOptions } = options ?? {};
+      await createAppEvent(def.type, parsed as Record<string, unknown>, eventOptions, meta);
     },
-  };
+  } as AppEvent<T, M>;
 };

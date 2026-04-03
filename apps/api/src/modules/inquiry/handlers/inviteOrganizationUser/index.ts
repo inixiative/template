@@ -46,16 +46,16 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   onSent: (inquiry) => {
     if (!inquiry.targetUserId) return null;
     const content = contentSchema.parse(inquiry.content);
+    const invitationUrl = `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`;
     return [
       {
         target: { userIds: [inquiry.targetUserId] },
         message: {
           template: 'org-invitation',
           data: {
-            inquiryId: inquiry.id,
-            sourceOrganizationId: inquiry.sourceOrganizationId,
-            sourceUserId: inquiry.sourceUserId,
             role: content.role,
+            buttonUrl: invitationUrl,
+            buttonText: 'Accept Invitation',
           },
         },
         tags: ['inquiry', 'invitation'],

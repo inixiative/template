@@ -16,18 +16,23 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
   const existing = await db.user.findUnique({ where: { email: normalized } });
   if (existing) return existing;
 
-  const guest = await db.user.create({
-    data: {
-      email: normalized,
-      name,
-      emailVerified: false,
-    },
+  return db.txn(async () => {
+    const doubleCheck = await db.user.findUnique({ where: { email: normalized } });
+    if (doubleCheck) return doubleCheck;
+
+    const guest = await db.user.create({
+      data: {
+        email: normalized,
+        name,
+        emailVerified: false,
+      },
+    });
+
+    await userCreatedEvent.emit(
+      { userId: guest.id, isGuest: true },
+      { resourceType: 'User', resourceId: guest.id },
+    );
+
+    return guest;
   });
-
-  await userCreatedEvent.emit(
-    { userId: guest.id, isGuest: true },
-    { resourceType: 'User', resourceId: guest.id },
-  );
-
-  return guest;
 };
