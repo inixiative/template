@@ -99,6 +99,7 @@ export const Table = <T,>({
             {data.map((item) => (
               <tr
                 key={keyExtractor(item)}
+                data-key={keyExtractor(item)}
                 className={cn('hover:bg-muted/30 transition-colors', onRowClick && 'cursor-pointer')}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
               >

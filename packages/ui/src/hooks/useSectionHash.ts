@@ -81,7 +81,7 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
 
     // Defer to let the page render sections first.
     requestAnimationFrame(() => {
-      const el = document.querySelector(`[${SECTION_ATTR}="${CSS.escape(hash)}"]`);
+      const el = resolveSectionTarget(hash);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -177,15 +177,56 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
 
   const scrollToSection = React.useCallback(
     (sectionId: string) => {
-      const el = document.querySelector(`[${SECTION_ATTR}="${CSS.escape(sectionId)}"]`);
-      if (!el) return;
+      const target = resolveSectionTarget(sectionId);
+      if (!target) return;
 
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setActiveSection(sectionId);
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Active section is the top-level part (before the first dot).
+      const topLevelSection = sectionId.split('.')[0];
+      setActiveSection(topLevelSection);
       window.history.replaceState(window.history.state, '', `#${sectionId}`);
     },
     [],
   );
 
   return { activeSection, scrollToSection };
+}
+
+/**
+ * Resolves a section target from a potentially dot-notated ID.
+ *
+ * - `"users"` → finds `[data-section="users"]`
+ * - `"users-table.row-42"` → finds `[data-section="users-table"]`,
+ *   then finds child `[data-key="row-42"]` within it
+ * - `"users-table.3"` → finds `[data-section="users-table"]`,
+ *   then finds child `[data-key="3"]`, falling back to the
+ *   4th `[data-key]` child (0-indexed) if no key match
+ */
+function resolveSectionTarget(sectionId: string): Element | null {
+  const dotIndex = sectionId.indexOf('.');
+  if (dotIndex === -1) {
+    return document.querySelector(`[${SECTION_ATTR}="${CSS.escape(sectionId)}"]`);
+  }
+
+  const parentId = sectionId.slice(0, dotIndex);
+  const childKey = sectionId.slice(dotIndex + 1);
+
+  const parent = document.querySelector(`[${SECTION_ATTR}="${CSS.escape(parentId)}"]`);
+  if (!parent) return null;
+
+  // Try by data-key first.
+  const byKey = parent.querySelector(`[data-key="${CSS.escape(childKey)}"]`);
+  if (byKey) return byKey;
+
+  // Fall back to numeric index into data-key children.
+  const numIndex = Number.parseInt(childKey, 10);
+  if (!Number.isNaN(numIndex)) {
+    const children = parent.querySelectorAll('[data-key]');
+    if (numIndex >= 0 && numIndex < children.length) {
+      return children[numIndex];
+    }
+  }
+
+  return null;
 }
