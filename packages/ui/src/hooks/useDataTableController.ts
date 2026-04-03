@@ -1,29 +1,9 @@
-import { ARRAY_FIELD_OPERATORS, type ArrayFieldOperator } from '@template/shared/bracketQuery';
 import type { DataTableConfig, SearchMode } from '@template/ui/lib/makeDataTableConfig';
-import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
+import { type FilterState, type TableFilters, buildFilterQuery, useTableFilters } from '@template/ui/hooks/useTableFilters';
 import { useMemo, useState } from 'react';
 
-export type FilterState = {
-  /** Array operators (in/notIn) take all values; scalar operators (contains/equals/startsWith/endsWith) use values[0] */
-  operator: ArrayFieldOperator | 'equals' | 'contains' | 'startsWith' | 'endsWith';
-  values: string[];
-};
-
-/**
- * Recursively set a value at a dot-notation path in a nested object.
- * 'sourceUser.email' → { sourceUser: { email: value } }
- */
-const setPath = (obj: Record<string, unknown>, path: string[], value: unknown): void => {
-  if (path.length === 1) {
-    obj[path[0]] = value;
-    return;
-  }
-  const [head, ...rest] = path;
-  if (!obj[head] || typeof obj[head] !== 'object' || Array.isArray(obj[head])) {
-    obj[head] = {};
-  }
-  setPath(obj[head] as Record<string, unknown>, rest, value);
-};
+// Re-export for backward compatibility.
+export type { FilterState } from '@template/ui/hooks/useTableFilters';
 
 export type DataTableController = {
   search: string;
@@ -39,8 +19,7 @@ export type DataTableController = {
   reset: () => void;
   /**
    * Pass as the `query` argument to context query factories.
-   * Contains pre-serialized bracket-notation keys for nested searchFields,
-   * so the hey-api client can handle them as flat string params.
+   * Includes page, pageSize, and serialized filter/sort params.
    */
   query: Record<string, unknown>;
 };
@@ -48,13 +27,9 @@ export type DataTableController = {
 const DEFAULT_PAGE_SIZE = 20;
 
 /**
- * Serialize controller state into the flat query object the SDK expects.
- *
- * Bracket-notation keys (e.g. 'searchFields[status][in]') are pre-serialized
- * here because hey-api's deepObject serializer only handles one level of nesting.
- * serializeBracketQuery handles the recursive bracket expansion, then we convert
- * URLSearchParams → Record<string, string | string[]> so the SDK can repeat array
- * values as separate query params (searchFields[x][in]=a&searchFields[x][in]=b).
+ * Backward-compatible buildQuery — adds page/pageSize to the filter query.
+ * Kept for existing test coverage. New code should use buildFilterQuery
+ * from useTableFilters directly.
  */
 export const buildQuery = (
   search: string,
@@ -65,64 +40,21 @@ export const buildQuery = (
   page: number,
   pageSize: number,
   adminMode = false,
-): Record<string, unknown> => {
-  const query: Record<string, unknown> = { page, pageSize };
-
-  // Combined search: top-level param, API ORs contains across all searchable fields.
-  // Requires searchable fields to be configured, and is not available in adminMode
-  // (which uses filters[...] for direct Prisma — no equivalent broad-search facility).
-  if (search && searchMode === 'combined' && !adminMode && searchableFields.length > 0) {
-    query.search = search;
-  }
-
-  // Build nested filter object for bracket serialization
-  const nested: Record<string, unknown> = {};
-
-  // Field mode: targeted contains per searchable field
-  if (search && searchMode === 'field') {
-    for (const field of searchableFields) {
-      nested[field] = { contains: search };
-    }
-  }
-
-  // Filters: supports flat fields (status), dot-notation relations (sourceUser.email)
-  // Array operators (in/notIn) pass the full values array; scalar operators use values[0]
-  for (const [field, { operator, values }] of Object.entries(filters)) {
-    if (values.length > 0) {
-      const filterValue = (ARRAY_FIELD_OPERATORS as readonly string[]).includes(operator)
-        ? { [operator]: values }
-        : { [operator]: values[0] };
-      setPath(nested, field.split('.'), filterValue);
-    }
-  }
-
-  // adminMode → filters[...] (direct Prisma, no validation)
-  // non-admin  → searchFields[...] (validated against searchableFields whitelist)
-  const bracketPrefix = adminMode ? 'filters' : 'searchFields';
-
-  if (Object.keys(nested).length > 0) {
-    const params = serializeBracketQuery({ [bracketPrefix]: nested });
-    for (const key of new Set(params.keys())) {
-      const allValues = params.getAll(key);
-      query[key] = allValues.length === 1 ? allValues[0] : allValues;
-    }
-  }
-
-  // orderBy: 'field:direction' string array
-  if (orderBy.length > 0) {
-    query.orderBy = orderBy.map(({ field, direction }) => `${field}:${direction}`);
-  }
-
-  return query;
-};
+): Record<string, unknown> => ({
+  ...buildFilterQuery(search, searchMode, searchableFields, filters, orderBy, adminMode),
+  page,
+  pageSize,
+});
 
 /**
- * Manages search, filter, sort, and pagination state for server-side data tables.
+ * Manages search, filter, sort, and pagination state for server-side
+ * paginated data tables.
  *
- * Pass `controller.query` as the second argument to context query factories:
- *   const queries = tokenContextQueries(context, controller.query);
+ * This is the paginated variant — page number is tracked in state
+ * and included in the query object. For infinite scroll tables,
+ * use useInfiniteTableController instead.
  *
- * Config is treated as stable — pass a memoized or module-level config.
+ * @alias usePaginatedTableController
  */
 export const useDataTableController = (
   config: DataTableConfig,
@@ -130,39 +62,10 @@ export const useDataTableController = (
 ): DataTableController => {
   const defaultPageSize = options?.defaultPageSize ?? DEFAULT_PAGE_SIZE;
 
-  const [search, setSearchRaw] = useState('');
-  const [filters, setFilters] = useState<Record<string, FilterState>>({});
-  const [orderBy, setOrderByState] = useState<Array<{ field: string; direction: 'asc' | 'desc' }>>(
-    config.defaultOrderBy ?? [],
-  );
   const [page, setPageRaw] = useState(1);
   const [pageSize, setPageSizeRaw] = useState(defaultPageSize);
 
-  const setSearch = (s: string) => {
-    setSearchRaw(s);
-    setPageRaw(1);
-  };
-
-  const setFilter = (field: string, state: FilterState | null) => {
-    setFilters((prev) => {
-      if (!state || state.values.length === 0) {
-        const { [field]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [field]: state };
-    });
-    setPageRaw(1);
-  };
-
-  // Cycles: none → asc → desc → none (removes field from sort)
-  const toggleOrderBy = (field: string) => {
-    setOrderByState((prev) => {
-      const existing = prev.find((o) => o.field === field);
-      if (!existing) return [...prev, { field, direction: 'asc' }];
-      if (existing.direction === 'asc') return prev.map((o) => (o.field === field ? { ...o, direction: 'desc' } : o));
-      return prev.filter((o) => o.field !== field);
-    });
-  };
+  const tableFilters = useTableFilters(config, () => setPageRaw(1));
 
   const setPage = (p: number) => setPageRaw(p);
 
@@ -172,34 +75,31 @@ export const useDataTableController = (
   };
 
   const reset = () => {
-    setSearchRaw('');
-    setFilters({});
-    setOrderByState(config.defaultOrderBy ?? []);
+    tableFilters.reset();
     setPageRaw(1);
     setPageSizeRaw(defaultPageSize);
   };
 
-  const { searchMode, searchableFields, adminMode } = config;
-
   const query = useMemo(
-    () => buildQuery(search, searchMode, searchableFields, filters, orderBy, page, pageSize, adminMode),
-    // searchableFields is a stable array reference from makeDataTableConfig (module-level const)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [search, searchMode, searchableFields, filters, orderBy, page, pageSize, adminMode],
+    () => ({ ...tableFilters.filterQuery, page, pageSize }),
+    [tableFilters.filterQuery, page, pageSize],
   );
 
   return {
-    search,
-    filters,
-    orderBy,
+    search: tableFilters.search,
+    filters: tableFilters.filters,
+    orderBy: tableFilters.orderBy,
     page,
     pageSize,
-    setSearch,
-    setFilter,
-    toggleOrderBy,
+    setSearch: tableFilters.setSearch,
+    setFilter: tableFilters.setFilter,
+    toggleOrderBy: tableFilters.toggleOrderBy,
     setPage,
     setPageSize,
     reset,
     query,
   };
 };
+
+/** @alias useDataTableController */
+export const usePaginatedTableController = useDataTableController;
