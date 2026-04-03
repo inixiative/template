@@ -165,8 +165,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 11: Configure Web branches
-    // Branch routing is handled by custom staging environments (branchMatcher).
-    // git.deploymentEnabled is a vercel.json config, not available via REST API.
+    // Branch deploy config lives in apps/web/vercel.json (git.deploymentEnabled).
+    // Currently only main deploys; feature branches are skipped to avoid build costs.
+    // TODO: When launched, enable preview deploys for PR branches by updating vercel.json
+    // or adding a prod branch. See: https://vercel.com/docs/projects/overview#git
     if (!(await isComplete('vercel', 'configureWebBranches'))) {
       await markComplete('vercel', 'configureWebBranches');
       await syncConfig();
@@ -290,7 +292,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 19: Configure Admin branches (auto-complete — handled by custom environments)
+    /// Step 19: Configure Admin branches
+    // Branch deploy config lives in apps/admin/vercel.json (git.deploymentEnabled).
+    // Currently only main deploys; feature branches skipped to avoid build costs.
+    // TODO: Enable preview deploys for PR branches when launched.
     if (!(await isComplete('vercel', 'configureAdminBranches'))) {
       await markComplete('vercel', 'configureAdminBranches');
       await syncConfig();
@@ -420,7 +425,10 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    // Step 27: Configure Superadmin branches (auto-complete — handled by custom environments)
+    /// Step 27: Configure Superadmin branches
+    // Branch deploy config lives in apps/superadmin/vercel.json (git.deploymentEnabled).
+    // Currently only main deploys; feature branches skipped to avoid build costs.
+    // TODO: Enable preview deploys for PR branches when launched.
     if (!(await isComplete('vercel', 'configureSuperadminBranches'))) {
       await markComplete('vercel', 'configureSuperadminBranches');
       await syncConfig();

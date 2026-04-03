@@ -2,7 +2,7 @@ import { type EnumFilter, getQueryMetadataByOperation } from '@template/ui/lib/g
 
 export type SearchMode = 'combined' | 'field';
 
-export type DataTableConfig = {
+export type DataConfig = {
   searchableFields: string[];
   searchMode: SearchMode;
   /** Admin mode: filters serialize under filters[...] (direct Prisma, no validation).
@@ -15,7 +15,7 @@ export type DataTableConfig = {
   canOrder: boolean;
 };
 
-export type DataTableOptions = {
+export type DataConfigOptions = {
   searchMode?: SearchMode;
   adminMode?: boolean;
   defaultOrderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
@@ -24,15 +24,18 @@ export type DataTableOptions = {
 };
 
 /**
- * Create DataTable configuration from API metadata.
+ * Create data configuration from API metadata.
  *
- * Features:
+ * Reads the OpenAPI spec for the given operation and extracts:
  * - Searchable fields from x-searchable-fields
  * - Orderable fields (auto-detected, recursive, no arrays)
  * - Enum filters (auto-detected with in/notIn ops)
  * - Permission toggles (canSearch, canOrder)
+ *
+ * Works with usePaginatedData, useInfiniteData, or any consumer
+ * that needs to know what an API endpoint supports for filtering.
  */
-export const makeDataTableConfig = (operationId: string, options?: DataTableOptions): DataTableConfig => {
+export const makeDataConfig = (operationId: string, options?: DataConfigOptions): DataConfig => {
   const metadata = getQueryMetadataByOperation(operationId);
   const adminMode = options?.adminMode ?? false;
   const searchableFields = metadata.searchableFields ?? [];
@@ -44,7 +47,6 @@ export const makeDataTableConfig = (operationId: string, options?: DataTableOpti
     searchMode: options?.searchMode ?? 'combined',
     adminMode,
     defaultOrderBy: options?.defaultOrderBy,
-    // Search requires searchable fields; adminMode only supports field-specific filters (no broad search)
     canSearch: options?.canSearch ?? (!adminMode && searchableFields.length > 0),
     canOrder: options?.canOrder ?? true,
   };

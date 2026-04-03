@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { cleanupDOMEnvironment, setupDOMEnvironment } from '@template/ui/test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 describe('useDarkMode', () => {
   const applyTheme = (theme: 'light' | 'dark' | 'system') => {
@@ -14,12 +13,7 @@ describe('useDarkMode', () => {
   };
 
   beforeEach(() => {
-    setupDOMEnvironment();
     document.documentElement.classList.remove('dark');
-  });
-
-  afterEach(() => {
-    cleanupDOMEnvironment();
   });
 
   it('should add dark class when theme is dark', () => {

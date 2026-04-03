@@ -1,5 +1,3 @@
-/**@jsdom*/
-
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { UseNavigateResult } from '@tanstack/react-router';
 import type { NavConfig, NavItem } from '@template/ui/components/layout/navigationTypes';

@@ -430,7 +430,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Done (Primitives)
 
-- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, PasswordInput, Select, SlugInput, Table, ThemeToggle
+- ✅ **Core Primitives** - Avatar, Badge, Breadcrumb, Button, Card, DropdownMenu, EmptyState, Input, Label, Pagination, PasswordInput, Select, SlugInput, Table, ThemeToggle
 
 - ✅ **AppShell** - Main application layout with sidebar, header, and breadcrumb navigation. Wires to Zustand store for current user, org, space
 
@@ -440,7 +440,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **ContextSelector** - Dropdown for switching organizations and spaces, updates URL params and global state
 
-- ✅ **DataTable** - Table primitive with sorting, filtering, pagination, row selection via @tanstack/react-table. Configuration builder reduces setup boilerplate
+- ✅ **Table + Pagination** - Table primitive with fixed-page pagination (page numbers, per-page selector, record count) and infinite scroll (IntersectionObserver sentinel). Supports viewport scroll with sticky headers and window scroll. All items rendered in DOM (no virtualization) so text selection, Ctrl+F, and copy-paste work.
+
+- ✅ **Data Hooks** - `usePaginatedData` and `useInfiniteData` manage search, filter, sort, and pagination state. `makeDataConfig` auto-generates configuration from the OpenAPI spec (searchable fields, orderable fields, enum filters). Scroll position persisted in `history.state` for back/forward restoration. Optional shareable URL sync (`?page=3&search=acme`).
+
+- ✅ **Section Hash Navigation** - `useSectionHash` auto-discovers `data-section` elements via MutationObserver, syncs URL hash to most visible section. Dot-notation deep linking (`#usersTable.usr_abc123`) scrolls to specific rows.
 
 ### In Progress
 
@@ -535,7 +539,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Route Templates** - Pre-built patterns (readRoute, createRoute, updateRoute) reduce API definition from ~100 lines to ~20 lines. Enforces consistency while eliminating boilerplate
 
-- ✅ **DataTable Configuration Builder** - Rapid table creation for list views. Declarative config generates sorting, filtering, pagination, selection. Reduces table setup from 100+ lines to 10-20 lines
+- ✅ **Data Config Builder** - `makeDataConfig(operationId)` reads the OpenAPI spec and auto-generates searchable fields, orderable fields, and enum filters. One line of config per table/list view. `usePaginatedData` and `useInfiniteData` consume the config and produce query objects, pagination props, and scroll restoration
 
 - ✅ **Route Guards** - Reusable auth/permission checks with automatic redirects and context preservation. Drop `beforeLoad: requireAuth()` in route definition - done
 

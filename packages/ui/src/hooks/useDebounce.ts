@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const useDebounce = <T>(value: T, delay: number = 300): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -16,11 +16,23 @@ export const useDebounce = <T>(value: T, delay: number = 300): T => {
 
 // biome-ignore lint/suspicious/noExplicitAny: generic callback constraint — any[] required to match any function signature
 export const useDebouncedCallback = <T extends (...args: any[]) => any>(callback: T, delay: number = 300): T => {
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  const delayRef = useRef(delay);
+  delayRef.current = delay;
 
-  return ((...args: Parameters<T>) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    const id = setTimeout(() => callback(...args), delay);
-    setTimeoutId(id);
-  }) as T;
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  // Stable function identity — never changes across renders.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — refs track current values
+  return useCallback(
+    ((...args: Parameters<T>) => {
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => callbackRef.current(...args), delayRef.current);
+    }) as T,
+    [],
+  );
 };

@@ -38,15 +38,16 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "bun test src/",
     "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureApiClientIndex.ts && bun run generate:msw",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {
-    "@template/permissions": "workspace:*",
-    "@template/shared": "workspace:*",
     "@ariakit/react": "^0.4.22",
     "@hey-api/client-fetch": "^0.13.1",
     "@tanstack/react-router": "^1.166.2",
+    "@template/permissions": "workspace:*",
+    "@template/shared": "workspace:*",
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -57,6 +58,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.8.9",
     "@hey-api/openapi-ts": "^0.94.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.90.21",
