@@ -31,6 +31,7 @@ model User {
   auditLogsAsActor      AuditLog[] @relation("AuditLogActorUser")
   auditLogsAsSpoofActor AuditLog[] @relation("AuditLogActorSpoofUser")
   auditLogsAsSubject    AuditLog[] @relation("AuditLogSubjectUser")
+  appEventsAsActor      AppEvent[] @relation("AppEventActorUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

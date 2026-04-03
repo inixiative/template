@@ -12,7 +12,6 @@ import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateIn
 
 export const inquirySendController = makeController(inquirySendRoute, async (c, respond) => {
   const db = c.get('db');
-  const user = c.get('user');
   const inquiry = getResource<'inquiry'>(c);
 
   validateInquiryIsDraft(inquiry);
@@ -35,11 +34,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
       targetModel: sent.targetModel,
       inquiry: sent as unknown as Record<string, unknown>,
     },
-    {
-      actorId: user?.id,
-      resourceType: 'Inquiry',
-      resourceId: sent.id,
-    },
+    { resourceType: 'Inquiry', resourceId: sent.id },
   );
 
   const handler = inquiryHandlers[inquiry.type];

@@ -11,7 +11,6 @@ type GuestParams = {
 
 export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }: GuestParams): Promise<User> => {
   const db = c.get('db');
-  const actor = c.get('user');
   const normalized = normalizeEmail(email);
 
   const existing = await db.user.findUnique({ where: { email: normalized } });
@@ -27,7 +26,7 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
 
   await userCreatedEvent.emit(
     { userId: guest.id, isGuest: true },
-    { actorId: actor?.id, resourceType: 'User', resourceId: guest.id },
+    { resourceType: 'User', resourceId: guest.id },
   );
 
   return guest;

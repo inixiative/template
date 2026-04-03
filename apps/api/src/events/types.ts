@@ -14,9 +14,19 @@ export type BaseAppEventType =
 
 export type AppEventType = BaseAppEventType | (string & {});
 
+export type AppEventActor = {
+  actorUserId: string | null;
+  actorSpoofUserId: string | null;
+  actorTokenId: string | null;
+  actorJobName: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  sourceInquiryId: string | null;
+};
+
 export type AppEventPayload<T = Record<string, unknown>> = {
   type: AppEventType;
-  actorId?: string;
+  actor: AppEventActor;
   resourceType?: string;
   resourceId?: string;
   data: T;
@@ -26,7 +36,6 @@ export type AppEventPayload<T = Record<string, unknown>> = {
 export type AppEventHandler = (event: AppEventPayload) => Promise<void> | void;
 
 export type AppEventOptions = {
-  actorId?: string;
   resourceType?: string;
   resourceId?: string;
 };

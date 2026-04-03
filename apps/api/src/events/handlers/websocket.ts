@@ -13,8 +13,8 @@ import { sendToChannel, sendToUser } from '#/ws';
  * TODO: Remove once all events are defined via makeAppEvent with explicit targeting.
  */
 registerAppEvent('*', async (event: AppEventPayload) => {
-  if (event.actorId) {
-    sendToUser(event.actorId, event);
+  if (event.actor.actorUserId) {
+    sendToUser(event.actor.actorUserId, event);
   }
 
   if (event.resourceType && event.resourceId) {

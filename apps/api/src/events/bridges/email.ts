@@ -29,7 +29,7 @@ const resolveTargets = async (handoff: EmailHandoff): Promise<ResolvedRecipient[
 
 const buildEmailContext = (event: AppEventPayload, handoff: EmailHandoff): EmailContext => {
   return {
-    userId: event.actorId,
+    userId: event.actor.actorUserId ?? undefined,
     organizationId: undefined,
     spaceId: undefined,
     ...handoff.context,

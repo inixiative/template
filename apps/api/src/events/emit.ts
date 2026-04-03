@@ -2,14 +2,18 @@ import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 import { getHandlers } from '#/events/registry';
 import type { AppEventOptions, AppEventPayload, AppEventType } from '#/events/types';
+import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
 export const createAppEvent = async (
   type: AppEventType,
   data: Record<string, unknown>,
   options?: AppEventOptions,
 ): Promise<void> => {
+  const actor = auditActorContext.getScope() ?? nullAuditActor;
+
   const event: AppEventPayload = {
     type,
+    actor,
     ...options,
     data,
     timestamp: new Date().toISOString(),

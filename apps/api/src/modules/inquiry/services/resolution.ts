@@ -19,7 +19,6 @@ export const resolveInquiry = async (
   resolutionData: Record<string, unknown>,
 ): Promise<Inquiry> => {
   const db = c.get('db');
-  const user = c.get('user');
 
   auditActorContext.extend({ sourceInquiryId: inquiry.id });
 
@@ -56,11 +55,7 @@ export const resolveInquiry = async (
           targetUserId: inquiry.targetUserId ?? undefined,
           inquiry: updated as unknown as Record<string, unknown>,
         },
-        {
-          actorId: user?.id,
-          resourceType: 'Inquiry',
-          resourceId: inquiry.id,
-        },
+        { resourceType: 'Inquiry', resourceId: inquiry.id },
       );
 
       return updated;

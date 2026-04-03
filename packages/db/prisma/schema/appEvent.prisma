@@ -1,0 +1,32 @@
+// ============================================================================
+// APP EVENT - Persistent log of all domain events
+// ============================================================================
+
+model AppEvent {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  type String
+
+  // Actor — auto-captured from auditActorContext
+  actorUserId      String? @db.VarChar(36)
+  actorUser        User?   @relation("AppEventActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorSpoofUserId String? @db.VarChar(36)
+  actorTokenId     String? @db.VarChar(36)
+  actorJobName     String?
+  ipAddress        String?
+  userAgent        String?
+  sourceInquiryId  String? @db.VarChar(36)
+
+  // Resource reference (optional)
+  resourceType String?
+  resourceId   String? @db.VarChar(36)
+
+  // Domain payload
+  data Json @default("{}")
+
+  @@index([type])
+  @@index([actorUserId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}
