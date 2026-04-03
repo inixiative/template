@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 /**
- * Tests for useInfiniteTableQuery's pure logic:
+ * Tests for useInfiniteDataQuery's pure logic:
  * - locateItem: maps flat index to { pageIndex, indexInPage }
  */
 

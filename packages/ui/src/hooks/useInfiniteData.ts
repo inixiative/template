@@ -1,6 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query';
 import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import type { InfiniteScrollProps } from '@template/ui/components/primitives/Table';
+import * as React from 'react';
 import {
   type InfiniteDataPage,
   useInfiniteDataQuery,
@@ -25,7 +26,7 @@ export type UseInfiniteDataOptions<TItem> = {
   scrollRestore?: boolean;
 };
 
-export type InfiniteData<TItem> = DataFilters & {
+export type InfiniteDataResult<TItem> = DataFilters & {
   /** Flattened array of all items across loaded pages. */
   data: TItem[];
   /** Number of pages currently in cache. */
@@ -78,7 +79,7 @@ export type InfiniteData<TItem> = DataFilters & {
  */
 export function useInfiniteData<TItem>(
   options: UseInfiniteDataOptions<TItem>,
-): InfiniteData<TItem> {
+): InfiniteDataResult<TItem> {
   const { config, queryKey, queryFn, enabled = true, sectionId, scrollRestore } = options;
 
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
@@ -99,17 +100,18 @@ export function useInfiniteData<TItem>(
   const scrollRef = useRef<HTMLDivElement>(null);
   useScrollState({
     id: sectionId ?? 'default',
-    scrollRef: shouldRestoreScroll ? scrollRef : undefined,
+    scrollRef,
     ready: !query.isLoading,
+    enabled: shouldRestoreScroll,
   });
 
-  const infiniteScrollProps: InfiniteScrollProps = {
+  const infiniteScrollProps: InfiniteScrollProps = React.useMemo(() => ({
     onLoadMore: query.fetchNextPage,
     hasMore: query.hasNextPage,
     isLoading: query.isFetchingNextPage,
-  };
+  }), [query.fetchNextPage, query.hasNextPage, query.isFetchingNextPage]);
 
-  const layoutProps = { sectionId, scrollRef };
+  const layoutProps = React.useMemo(() => ({ sectionId, scrollRef }), [sectionId]);
 
   return {
     ...dataFilters,

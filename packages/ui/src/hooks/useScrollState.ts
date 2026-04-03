@@ -24,6 +24,11 @@ export type UseScrollStateOptions = {
    * When false, restoration is deferred. Defaults to true.
    */
   ready?: boolean;
+  /**
+   * Whether scroll state tracking is enabled. When false, the hook
+   * does nothing (no restore, no persist). Defaults to true.
+   */
+  enabled?: boolean;
 };
 
 export type UseScrollStateResult = {
@@ -54,14 +59,14 @@ export type UseScrollStateResult = {
  * ```
  */
 export function useScrollState(options: UseScrollStateOptions): UseScrollStateResult {
-  const { id, scrollRef, ready = true } = options;
+  const { id, scrollRef, ready = true, enabled = true } = options;
 
   const stateKey = `scroll:${id}`;
 
-  // Read saved position once on mount.
+  // Read saved position once on mount (only when enabled).
   const savedRef = React.useRef<number | null>(null);
   const initializedRef = React.useRef(false);
-  if (!initializedRef.current) {
+  if (!initializedRef.current && enabled) {
     initializedRef.current = true;
     try {
       const raw = window.history.state?.[stateKey];
@@ -86,7 +91,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
   // Restore scroll position once ready.
   const restoredRef = React.useRef(false);
   React.useEffect(() => {
-    if (restoredRef.current || !ready) return;
+    if (!enabled || restoredRef.current || !ready) return;
 
     const saved = savedRef.current;
     if (saved === null || saved === 0) {
@@ -123,6 +128,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
   const lastTopRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
+    if (!enabled) return;
     const el = getScrollElement();
     if (!el) return;
 

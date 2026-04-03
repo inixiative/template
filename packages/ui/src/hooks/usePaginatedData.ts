@@ -2,7 +2,8 @@ import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import type { PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
-import { useMemo, useRef, useState } from 'react';
+import type * as React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export type PaginatedData = DataFilters & {
   page: number;
@@ -89,8 +90,9 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   const scrollRef = useRef<HTMLDivElement>(null);
   useScrollState({
     id: sectionId ?? 'default',
-    scrollRef: shouldRestoreScroll ? scrollRef : undefined,
+    scrollRef,
     ready: true,
+    enabled: shouldRestoreScroll,
   });
 
   // Persist state to history.state (and optionally URL) on changes.
@@ -128,7 +130,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
     onPageSizeChange: setPageSize,
   });
 
-  const layoutProps = { sectionId, scrollRef };
+  const layoutProps = useMemo(() => ({ sectionId, scrollRef }), [sectionId]);
 
   return {
     ...dataFilters,
@@ -155,6 +157,8 @@ type PersistedState = {
 
 /** Read initial state from history.state, falling back to URL params. */
 function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
+  if (typeof window === 'undefined') return {};
+
   // Try history.state first (back/forward navigation).
   if (stateKey) {
     try {
@@ -201,14 +205,12 @@ function usePersistState(
   const stateKeyRef = useRef(stateKey);
   stateKeyRef.current = stateKey;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: debounce triggers on state changes
-  useMemo(() => {
+  useEffect(() => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       const current = stateRef.current;
       const key = stateKeyRef.current;
 
-      // Always write to history.state.
       if (key) {
         try {
           const historyState = { ...window.history.state, [key]: current };
@@ -228,6 +230,8 @@ function usePersistState(
         }
       }
     }, DEBOUNCE_MS);
+
+    return () => clearTimeout(timerRef.current);
   }, [state, shareableUrl]);
 }
 

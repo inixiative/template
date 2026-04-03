@@ -95,7 +95,7 @@ export const buildFilterQuery = (
 
 /**
  * Shared search, filter, and sort state for data tables.
- * Used by both usePaginatedTableController and useInfiniteTableController.
+ * Used by both usePaginatedData and useInfiniteData.
  *
  * `onFiltersChange` is called whenever search, filter, or sort state changes.
  * Paginated controllers use this to reset to page 1. Infinite controllers

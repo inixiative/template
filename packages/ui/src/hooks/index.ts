@@ -25,7 +25,7 @@ export { useDarkMode } from './useDarkMode';
 export { type DataFilters, buildFilterQuery, useDataFilters } from './useDataFilters';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';
-export { type InfiniteData, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
+export { type InfiniteDataResult, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
 export {
   type InfiniteDataPage,
   type InfiniteDataPageLocation,
