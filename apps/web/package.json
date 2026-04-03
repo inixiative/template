@@ -28,6 +28,7 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.8.9",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/router-plugin": "*",
     "@types/lodash-es": "^4.17.12",
