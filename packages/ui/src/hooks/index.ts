@@ -22,7 +22,7 @@ export {
 } from './useAuthStrategy';
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
-export { type DataTableController, type FilterState, useDataTableController, usePaginatedTableController } from './useDataTableController';
+export { type PaginatedTableController, usePaginatedTableController } from './usePaginatedTableController';
 export { type InfiniteTableController, useInfiniteTableController } from './useInfiniteTableController';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
 export { useEventRefetch } from './useEventRefetch';

@@ -1,13 +1,29 @@
 import { describe, expect, it } from 'bun:test';
-import { buildQuery } from '@template/ui/hooks/useDataTableController';
+import { buildFilterQuery } from '@template/ui/hooks/useTableFilters';
+
+/** Wrapper that adds page/pageSize to buildFilterQuery for test compatibility. */
+const buildQuery = (
+  search: string,
+  searchMode: 'combined' | 'field',
+  searchableFields: string[],
+  filters: Parameters<typeof buildFilterQuery>[3],
+  orderBy: Parameters<typeof buildFilterQuery>[4],
+  page: number,
+  pageSize: number,
+  adminMode = false,
+): Record<string, unknown> => ({
+  ...buildFilterQuery(search, searchMode, searchableFields, filters, orderBy, adminMode),
+  page,
+  pageSize,
+});
 
 // Shorthand helpers
 const q = (
   search = '',
   mode: 'combined' | 'field' = 'combined',
   fields: string[] = [],
-  filters: Parameters<typeof buildQuery>[3] = {},
-  orderBy: Parameters<typeof buildQuery>[4] = [],
+  filters: Parameters<typeof buildFilterQuery>[3] = {},
+  orderBy: Parameters<typeof buildFilterQuery>[4] = [],
   page = 1,
   pageSize = 20,
 ) => buildQuery(search, mode, fields, filters, orderBy, page, pageSize);
