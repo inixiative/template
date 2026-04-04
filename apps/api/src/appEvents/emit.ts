@@ -1,5 +1,4 @@
 import { db } from '@template/db';
-import { log } from '@template/shared/logger';
 import type { AppEventPayloads } from '#/appEvents/handlers';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { AppEventOptions, AppEventPayload } from '#/appEvents/types';
@@ -24,15 +23,9 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   const handler = appEventHandlers[name];
   if (!handler) return;
 
-  const runHandler = () => handler(event);
-
   if (db.isInTxn()) {
-    db.onCommit(runHandler);
+    db.onCommit(() => handler(event));
   } else {
-    try {
-      await runHandler();
-    } catch (err) {
-      log.error(`App event handler failed [${name}]`, { error: err });
-    }
+    await handler(event);
   }
 };
