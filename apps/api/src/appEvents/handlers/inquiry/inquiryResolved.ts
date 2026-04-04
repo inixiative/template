@@ -5,7 +5,7 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 export type InquiryResolvedPayload = Inquiry & { _resolution: 'approved' | 'denied' | 'changesRequested' };
 
 const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
-  const handler = inquiryHandlers[data.type as keyof typeof inquiryHandlers];
+  const handler = inquiryHandlers[data.type];
   if (!handler?.appEvents) return null;
 
   if (data._resolution === 'approved') return handler.appEvents.approved;
@@ -16,10 +16,7 @@ const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
 
 export const inquiryResolved = makeAppEvent<InquiryResolvedPayload>({
   email: (data) => getLifecycleHandlers(data)?.email?.(data) ?? null,
-  websocket: (data) => {
-    const handler = inquiryHandlers[data.type as keyof typeof inquiryHandlers];
-    return handler?.appEvents?.resolved?.websocket?.(data) ?? null;
-  },
+  websocket: (data) => inquiryHandlers[data.type]?.appEvents?.resolved?.websocket?.(data) ?? null,
   observe: (data) => ({
     inquiryId: data.id,
     type: data.type,

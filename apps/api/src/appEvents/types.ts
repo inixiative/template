@@ -1,5 +1,3 @@
-import type { EmailTarget } from '@template/email/targeting';
-
 export type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 
 export type AppEventActor = {
@@ -60,5 +58,8 @@ export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
   observe?: (data: T) => ObserveData | null;
+  sms?: (data: T) => unknown;
+  chat?: (data: T) => unknown;
+  notify?: (data: T) => unknown;
   cb?: Array<(data: T) => Promise<void> | void>;
 };

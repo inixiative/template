@@ -24,6 +24,5 @@ export const createConsoleClient = (): EmailClient => {
       }
       return results;
     },
-    maxBatchSize: 1,
   };
 };

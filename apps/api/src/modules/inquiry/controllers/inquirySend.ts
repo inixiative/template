@@ -24,7 +24,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
     include: includeInquirySent,
   });
 
-  await emitAppEvent('inquiry.sent', sent as unknown as Record<string, unknown>, {
+  await emitAppEvent('inquiry.sent', sent, {
     resourceType: 'Inquiry',
     resourceId: sent.id,
   });

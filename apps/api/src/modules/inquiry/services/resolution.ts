@@ -47,7 +47,7 @@ export const resolveInquiry = async (
 
       await emitAppEvent(
         'inquiry.resolved',
-        { ...updated, _resolution: status } as unknown as Record<string, unknown>,
+        { ...updated, _resolution: status },
         { resourceType: 'Inquiry', resourceId: inquiry.id },
       );
 

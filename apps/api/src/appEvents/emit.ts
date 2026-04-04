@@ -6,7 +6,7 @@ import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
 export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   name: K,
-  data: AppEventPayloads[K],
+  data: AppEventPayloads[K] & Record<string, unknown>,
   options?: AppEventOptions,
 ): Promise<void> => {
   const actor = auditActorContext.getScope() ?? nullAuditActor;

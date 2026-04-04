@@ -1,3 +1,5 @@
+import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
+import { deliverWSHandoffs } from '#/appEvents/bridges/websocket';
 import { observeRegistry } from '#/lib/observe';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 
@@ -11,16 +13,13 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     if (handler.observe) {
       const observeData = handler.observe(data);
       if (observeData) {
-        tasks.push(
-          observeRegistry.broadcast((adapter) => adapter.record(event, observeData)).then(() => {}),
-        );
+        tasks.push(observeRegistry.broadcast((adapter) => adapter.record(event, observeData)).then(() => {}));
       }
     }
 
     if (handler.email) {
       const handoffs = handler.email(data);
       if (handoffs?.length) {
-        const { deliverEmailHandoffs } = await import('#/appEvents/bridges/email');
         for (const handoff of handoffs) {
           tasks.push(deliverEmailHandoffs(event, [handoff]));
         }
@@ -30,7 +29,6 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     if (handler.websocket) {
       const handoffs = handler.websocket(data);
       if (handoffs?.length) {
-        const { deliverWSHandoffs } = await import('#/appEvents/bridges/websocket');
         for (const handoff of handoffs) {
           tasks.push(deliverWSHandoffs([handoff]));
         }

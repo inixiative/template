@@ -1,10 +1,5 @@
-import { z } from 'zod';
-import { Role } from '@template/db/generated/client/enums';
+import { contentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
-
-const contentSchema = z.object({
-  role: z.nativeEnum(Role).default('member'),
-});
 
 export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
   sent: {
@@ -22,7 +17,7 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
             buttonText: 'Accept Invitation',
           },
           sender: {
-            ownerModel: 'Organization' as const,
+            ownerModel: 'Organization',
             organizationId: inquiry.sourceOrganizationId ?? undefined,
           },
           tags: ['inviteOrganizationUser'],

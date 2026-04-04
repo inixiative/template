@@ -8,7 +8,7 @@ import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 type InviteOrganizationUserContent = z.infer<typeof contentSchema>;
 
-const contentSchema = z.object({
+export const contentSchema = z.object({
   role: z.nativeEnum(Role).default('member'),
 });
 

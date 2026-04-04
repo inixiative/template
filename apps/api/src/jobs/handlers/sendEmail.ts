@@ -1,6 +1,7 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
-import { resolveTargets, resolveTargetsToAddresses, type EmailTarget } from '@template/email/targeting';
+import type { EmailTarget } from '@template/email/targeting';
+import { resolveTargets, resolveTargetsToAddresses } from '#/lib/resolveTargets';
 import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
@@ -48,7 +49,7 @@ const verifyAddresses = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { to, cc, bcc, template, data, sender, tags } = payload;
+  const { to, cc, bcc, template, data, tags } = payload;
   const { log } = ctx;
 
   const [recipients, ccAddresses, bccAddresses, from] = await Promise.all([
