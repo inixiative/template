@@ -6,14 +6,15 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
     email: (inquiry) => {
       if (!inquiry.targetUserId) return null;
       const content = contentSchema.parse(inquiry.content);
-      const invitationUrl = `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`;
       return [
         {
           to: [{ userIds: [inquiry.targetUserId] }],
           template: 'org-invitation',
           data: {
+            organizationName: inquiry.sourceOrganization?.name ?? '',
+            inviterName: inquiry.sourceUser?.name ?? '',
             role: content.role,
-            buttonUrl: invitationUrl,
+            buttonUrl: `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`,
             buttonText: 'Accept Invitation',
           },
           sender: {

@@ -5,7 +5,7 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
-import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import type { AppEnv } from '#/types/appEnv';
@@ -42,7 +42,7 @@ export const resolveInquiry = async (
           resolution: { ...resolutionData, ...approvalOutput } as Prisma.InputJsonValue,
           expiresAt,
         },
-        include: includeInquiryReceived,
+        include: includeInquiryResponse,
       });
 
       await emitAppEvent(

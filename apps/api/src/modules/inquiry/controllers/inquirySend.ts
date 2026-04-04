@@ -4,7 +4,7 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
+import { includeInquiryResponse, includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquirySendRoute } from '#/modules/inquiry/routes/inquirySend';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
@@ -21,7 +21,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
   const sent = await db.inquiry.update({
     where: { id: inquiry.id },
     data: { status: InquiryStatus.sent, sentAt: new Date(), expiresAt: computeExpiresAt(inquiry.type) },
-    include: includeInquirySent,
+    include: includeInquiryResponse,
   });
 
   await emitAppEvent('inquiry.sent', sent, {
@@ -35,7 +35,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
 
     const approved = await db.inquiry.findUniqueOrThrow({
       where: { id: sent.id },
-      include: includeInquirySent,
+      include: includeInquiryResponse,
     });
 
     return respond.ok(approved);
