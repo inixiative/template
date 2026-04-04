@@ -2,7 +2,7 @@ import { composeTemplate, interpolate, type Variables } from '@template/email/re
 import mjml2html from 'mjml';
 import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
 import type { EmailTarget } from '#/appEvents/types';
-import { emailVerifier, resolveEmailClient, resolveFromAddress } from '#/lib/email';
+import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
 export type SendEmailPayload = {
@@ -66,7 +66,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!validRecipients.length) return;
 
-  const client = await resolveEmailClient();
+  const client = emailRegistry.getOrDefault(undefined, emailRegistry.names()[0]);
 
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
   const senderData = senderVars();
