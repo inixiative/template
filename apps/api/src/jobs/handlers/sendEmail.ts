@@ -1,10 +1,11 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
+import type { ResolvedRecipient } from '#/appEvents/types';
 import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
 export type SendEmailPayload = {
-  to: string[];
+  recipients: ResolvedRecipient[];
   cc?: string[];
   bcc?: string[];
   from: string;
@@ -48,28 +49,37 @@ const verifyAddresses = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { to: rawTo, cc, bcc, from, template, data, tags } = payload;
+  const { recipients, cc, bcc, from, template, data, tags } = payload;
   const { log } = ctx;
 
-  const to = await verifyAddresses(rawTo, log);
-  if (!to.length) return;
+  if (!recipients.length) return;
+
+  const verified = await verifyAddresses(recipients.map((r) => r.to), log);
+  const validRecipients = recipients.filter((r) => verified.includes(r.to));
+
+  if (!validRecipients.length) return;
 
   const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
   const client = await resolveEmailClient({});
 
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
+  const sender = senderVars();
 
-  const variables: Variables = {
-    sender: senderVars(),
-    recipient: { email: to[0] },
-    data,
-  };
+  const rendered = validRecipients.map((recipient) => {
+    const variables: Variables = {
+      sender,
+      recipient: { name: recipient.name, email: recipient.to },
+      data,
+    };
 
-  const mjml = interpolate(composed.mjml, variables);
-  const subject = interpolate(composed.subject, variables);
-  const { html } = mjml2html(mjml, { validationLevel: 'skip' });
+    const mjml = interpolate(composed.mjml, variables);
+    const subject = interpolate(composed.subject, variables);
+    const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-  await client.send({ to, cc, bcc, from, subject, html, tags });
+    return { to: recipient.to, cc, bcc, from, subject, html, tags };
+  });
 
-  log(`Email sent: template=${template} to=${to.length}`);
+  await client.sendBatch(rendered);
+
+  log(`Email sent: template=${template} recipients=${rendered.length}`);
 });
