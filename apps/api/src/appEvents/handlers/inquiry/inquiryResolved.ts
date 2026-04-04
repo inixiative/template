@@ -1,8 +1,8 @@
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import type { InquiryWithReceivedIncludes } from '#/modules/inquiry/handlers/types';
 
-export type InquiryResolvedPayload = Inquiry & { _resolution: 'approved' | 'denied' | 'changesRequested' };
+export type InquiryResolvedPayload = InquiryWithReceivedIncludes & { _resolution: 'approved' | 'denied' | 'changesRequested' };
 
 const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
   const handler = inquiryHandlers[data.type];

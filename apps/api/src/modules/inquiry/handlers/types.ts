@@ -3,15 +3,18 @@ import type { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
 import type { BaseResolution } from '#/modules/inquiry/handlers/schemas';
+import type { includeInquiryReceived, includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 
 export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;
+export type InquiryWithSentIncludes = Prisma.InquiryGetPayload<{ include: typeof includeInquirySent }>;
+export type InquiryWithReceivedIncludes = Prisma.InquiryGetPayload<{ include: typeof includeInquiryReceived }>;
 
 export type InquiryAppEvents = {
-  sent?: AppEventHandlerDefinition<Inquiry>;
-  approved?: AppEventHandlerDefinition<Inquiry>;
-  denied?: AppEventHandlerDefinition<Inquiry>;
-  changesRequested?: AppEventHandlerDefinition<Inquiry>;
-  resolved?: AppEventHandlerDefinition<Inquiry>;
+  sent?: AppEventHandlerDefinition<InquiryWithSentIncludes>;
+  approved?: AppEventHandlerDefinition<InquiryWithReceivedIncludes>;
+  denied?: AppEventHandlerDefinition<InquiryWithReceivedIncludes>;
+  changesRequested?: AppEventHandlerDefinition<InquiryWithReceivedIncludes>;
+  resolved?: AppEventHandlerDefinition<InquiryWithReceivedIncludes>;
 };
 
 export type InquiryHandler<
