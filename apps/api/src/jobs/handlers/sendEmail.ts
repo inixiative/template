@@ -1,16 +1,18 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
-import type { ResolvedRecipient } from '#/appEvents/types';
+import { resolveFromAddress } from '#/appEvents/services/email/resolveFromAddress';
+import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
+import type { EmailTarget, EmailSenderContext } from '#/appEvents/types';
 import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
 export type SendEmailPayload = {
-  recipients: ResolvedRecipient[];
-  cc?: string[];
-  bcc?: string[];
-  from: string;
+  to: EmailTarget[];
+  cc?: EmailTarget[];
+  bcc?: EmailTarget[];
   template: string;
   data: Record<string, unknown>;
+  sender?: EmailSenderContext;
   tags: string[];
 };
 
@@ -49,8 +51,15 @@ const verifyAddresses = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { recipients, cc, bcc, from, template, data, tags } = payload;
+  const { to, cc, bcc, template, data, sender, tags } = payload;
   const { log } = ctx;
+
+  const [recipients, ccAddresses, bccAddresses, from] = await Promise.all([
+    resolveTargets(to),
+    cc?.length ? resolveTargetsToAddresses(cc) : undefined,
+    bcc?.length ? resolveTargetsToAddresses(bcc) : undefined,
+    resolveFromAddress(sender ?? {}, payload),
+  ]);
 
   if (!recipients.length) return;
 
@@ -63,11 +72,11 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
   const client = await resolveEmailClient({});
 
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
-  const sender = senderVars();
+  const senderData = senderVars();
 
   const rendered = validRecipients.map((recipient) => {
     const variables: Variables = {
-      sender,
+      sender: senderData,
       recipient: { name: recipient.name, email: recipient.to },
       data,
     };
@@ -76,7 +85,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    return { to: recipient.to, cc, bcc, from, subject, html, tags };
+    return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
   });
 
   await client.sendBatch(rendered);
