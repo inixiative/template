@@ -1,15 +1,5 @@
 import type { CommunicationCategory } from '@template/db';
 
-export type AppEventName =
-  | 'user.created'
-  | 'user.signedUp'
-  | 'user.verified'
-  | 'user.updated'
-  | 'user.verificationRequested'
-  | 'inquiry.sent'
-  | 'inquiry.resolved'
-  | (string & {});
-
 export type AppEventActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
@@ -21,7 +11,7 @@ export type AppEventActor = {
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
-  name: AppEventName;
+  name: string;
   actor: AppEventActor;
   resourceType?: string;
   resourceId?: string;

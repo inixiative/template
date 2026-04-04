@@ -1,11 +1,11 @@
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
-type UserCreatedData = {
+export type UserCreatedPayload = {
   userId: string;
   isGuest: boolean;
 };
 
-makeAppEvent<UserCreatedData>('user.created', {
+makeAppEvent<UserCreatedPayload>('user.created', {
   email: (data) => [
     {
       target: { userIds: [data.userId] },

@@ -1,11 +1,11 @@
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
-type UserVerificationRequestedData = {
+export type UserVerificationRequestedPayload = {
   userId: string;
   verificationUrl: string;
 };
 
-makeAppEvent<UserVerificationRequestedData>('user.verificationRequested', {
+makeAppEvent<UserVerificationRequestedPayload>('user.verificationRequested', {
   email: (data) => [
     {
       target: { userIds: [data.userId] },
