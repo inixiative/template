@@ -19,86 +19,99 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
 
 describe('makeAppEvent', () => {
   it('returns a handler function', () => {
-    const handler = makeAppEvent({ observe: () => ({ test: true }) });
+    const handler = makeAppEvent({});
     expect(typeof handler).toBe('function');
   });
 
-  it('calls observe callback with event data', async () => {
-    const observeFn = mock(() => ({ observed: true }));
-    const handler = makeAppEvent({ observe: observeFn });
+  describe('observe', () => {
+    it('calls observe callback with event data', async () => {
+      const observeFn = mock(() => ({ observed: true }));
+      const handler = makeAppEvent({ observe: observeFn });
 
-    await handler(createEvent('test.event', { foo: 'bar' }));
+      await handler(createEvent('test', { foo: 'bar' }));
 
-    expect(observeFn).toHaveBeenCalledWith({ foo: 'bar' });
+      expect(observeFn).toHaveBeenCalledWith({ foo: 'bar' });
+    });
+
+    it('skips observe when callback returns null', async () => {
+      const handler = makeAppEvent({ observe: () => null });
+      await handler(createEvent('test', {}));
+    });
   });
 
-  it('calls email callback and passes handoffs to bridge', async () => {
-    const emailFn = mock(() => [
-      {
-        to: [{ userIds: ['user-1'] }],
-        template: 'test-template',
-        data: { key: 'value' },
-      },
-    ]);
+  describe('email', () => {
+    it('calls email callback with event data', async () => {
+      const emailFn = mock(() => [
+        { to: [{ userIds: ['user-1'] }], template: 'test', data: {} },
+      ]);
 
-    const handler = makeAppEvent({ email: emailFn });
+      const handler = makeAppEvent({ email: emailFn });
+      await handler(createEvent('test', { key: 'val' }));
 
-    await handler(createEvent('test.event', { foo: 'bar' }));
+      expect(emailFn).toHaveBeenCalledWith({ key: 'val' });
+    });
 
-    expect(emailFn).toHaveBeenCalledWith({ foo: 'bar' });
+    it('skips when callback returns null', async () => {
+      const handler = makeAppEvent({ email: () => null });
+      await handler(createEvent('test', {}));
+    });
+
+    it('skips when callback returns empty array', async () => {
+      const handler = makeAppEvent({ email: () => [] });
+      await handler(createEvent('test', {}));
+    });
   });
 
-  it('calls websocket callback', async () => {
-    const wsFn = mock(() => [
-      {
-        target: { userIds: ['user-1'] },
-        message: { data: { event: 'test' } },
-      },
-    ]);
+  describe('websocket', () => {
+    it('calls websocket callback with event data', async () => {
+      const wsFn = mock(() => [
+        { target: { userIds: ['user-1'] }, message: { data: { test: true } } },
+      ]);
 
-    const handler = makeAppEvent({ websocket: wsFn });
+      const handler = makeAppEvent({ websocket: wsFn });
+      await handler(createEvent('test', { key: 'val' }));
 
-    await handler(createEvent('test.event', { foo: 'bar' }));
+      expect(wsFn).toHaveBeenCalledWith({ key: 'val' });
+    });
 
-    expect(wsFn).toHaveBeenCalledWith({ foo: 'bar' });
+    it('skips when callback returns null', async () => {
+      const handler = makeAppEvent({ websocket: () => null });
+      await handler(createEvent('test', {}));
+    });
   });
 
-  it('calls cb callbacks', async () => {
-    const cb1 = mock(async () => {});
-    const cb2 = mock(async () => {});
+  describe('cb', () => {
+    it('calls all callbacks with event data', async () => {
+      const cb1 = mock(async () => {});
+      const cb2 = mock(async () => {});
 
-    const handler = makeAppEvent({ cb: [cb1, cb2] });
+      const handler = makeAppEvent({ cb: [cb1, cb2] });
+      await handler(createEvent('test', { x: 1 }));
 
-    await handler(createEvent('test.event', { foo: 'bar' }));
-
-    expect(cb1).toHaveBeenCalledWith({ foo: 'bar' });
-    expect(cb2).toHaveBeenCalledWith({ foo: 'bar' });
+      expect(cb1).toHaveBeenCalledWith({ x: 1 });
+      expect(cb2).toHaveBeenCalledWith({ x: 1 });
+    });
   });
 
-  it('skips email bridge when callback returns null', async () => {
-    const emailFn = mock(() => null);
-    const handler = makeAppEvent({ email: emailFn });
+  describe('bridge isolation', () => {
+    it('one bridge failing does not prevent others from running', async () => {
+      const cbSuccess = mock(async () => {});
 
-    await handler(createEvent('test.event', {}));
+      const handler = makeAppEvent({
+        observe: () => { throw new Error('observe boom'); },
+        cb: [cbSuccess],
+      });
 
-    expect(emailFn).toHaveBeenCalled();
+      await handler(createEvent('test', {}));
+
+      expect(cbSuccess).toHaveBeenCalled();
+    });
   });
 
-  it('skips email bridge when callback returns empty array', async () => {
-    const emailFn = mock(() => []);
-    const handler = makeAppEvent({ email: emailFn });
-
-    await handler(createEvent('test.event', {}));
-
-    expect(emailFn).toHaveBeenCalled();
-  });
-
-  it('skips observe when callback returns null', async () => {
-    const observeFn = mock(() => null);
-    const handler = makeAppEvent({ observe: observeFn });
-
-    await handler(createEvent('test.event', {}));
-
-    expect(observeFn).toHaveBeenCalled();
+  describe('empty handler', () => {
+    it('completes without error when no bridges defined', async () => {
+      const handler = makeAppEvent({});
+      await handler(createEvent('test', {}));
+    });
   });
 });

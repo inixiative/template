@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
+import { emitAppEvent } from '#/appEvents/emit';
+import { auditActorContext } from '#/lib/auditActorContext';
 
 describe('emitAppEvent', () => {
   const originalHandlers = { ...appEventHandlers };
@@ -11,8 +13,6 @@ describe('emitAppEvent', () => {
   });
 
   it('dispatches to the correct handler by name', async () => {
-    const { emitAppEvent } = await import('#/appEvents/emit');
-
     const mockHandler = mock(async () => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
@@ -22,14 +22,9 @@ describe('emitAppEvent', () => {
     const event = mockHandler.mock.calls[0][0];
     expect(event.name).toBe('user.created');
     expect(event.data).toEqual({ userId: 'test-id', isGuest: false });
-    expect(event.actor).toBeDefined();
-    expect(event.timestamp).toBeDefined();
   });
 
   it('auto-enriches actor from auditActorContext', async () => {
-    const { emitAppEvent } = await import('#/appEvents/emit');
-    const { auditActorContext } = await import('#/lib/auditActorContext');
-
     const mockHandler = mock(async () => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
@@ -37,10 +32,10 @@ describe('emitAppEvent', () => {
       {
         actorUserId: 'actor-123',
         actorSpoofUserId: null,
-        actorTokenId: null,
+        actorTokenId: 'token-456',
         actorJobName: null,
         ipAddress: '10.0.0.1',
-        userAgent: 'TestAgent',
+        userAgent: 'TestAgent/1.0',
         sourceInquiryId: null,
       },
       () => emitAppEvent('user.created', { userId: 'test-id', isGuest: true }),
@@ -48,13 +43,23 @@ describe('emitAppEvent', () => {
 
     const event = mockHandler.mock.calls[0][0];
     expect(event.actor.actorUserId).toBe('actor-123');
+    expect(event.actor.actorTokenId).toBe('token-456');
     expect(event.actor.ipAddress).toBe('10.0.0.1');
-    expect(event.actor.userAgent).toBe('TestAgent');
+    expect(event.actor.userAgent).toBe('TestAgent/1.0');
+  });
+
+  it('uses nullAuditActor when no context scope', async () => {
+    const mockHandler = mock(async () => {});
+    appEventHandlers[AppEventName.userCreated] = mockHandler;
+
+    await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
+
+    const event = mockHandler.mock.calls[0][0];
+    expect(event.actor.actorUserId).toBeNull();
+    expect(event.actor.ipAddress).toBeNull();
   });
 
   it('includes resourceType and resourceId from options', async () => {
-    const { emitAppEvent } = await import('#/appEvents/emit');
-
     const mockHandler = mock(async () => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
@@ -68,8 +73,20 @@ describe('emitAppEvent', () => {
     expect(event.resourceId).toBe('test-id');
   });
 
+  it('sets timestamp', async () => {
+    const mockHandler = mock(async () => {});
+    appEventHandlers[AppEventName.userCreated] = mockHandler;
+
+    const before = new Date().toISOString();
+    await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
+    const after = new Date().toISOString();
+
+    const event = mockHandler.mock.calls[0][0];
+    expect(event.timestamp >= before).toBe(true);
+    expect(event.timestamp <= after).toBe(true);
+  });
+
   it('does nothing for unknown event names', async () => {
-    const { emitAppEvent } = await import('#/appEvents/emit');
     await emitAppEvent('nonexistent.event' as never, {} as never);
   });
 });
