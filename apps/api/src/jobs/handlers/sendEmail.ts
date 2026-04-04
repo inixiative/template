@@ -82,14 +82,14 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags: [] });
+    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags: [template] });
   } else {
     const rendered = recipients.map((recipient) => {
       const variables: Variables = { sender, recipient: { name: recipient.name, email: recipient.to }, data };
       const mjml = interpolate(composed.mjml, variables);
       const subject = interpolate(composed.subject, variables);
       const { html } = mjml2html(mjml, { validationLevel: 'skip' });
-      return { to: recipient.to, from, subject, html, tags: [] };
+      return { to: recipient.to, from, subject, html, tags: [template] };
     });
 
     await client.sendBatch(rendered);
