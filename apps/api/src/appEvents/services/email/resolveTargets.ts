@@ -8,9 +8,7 @@ const resolveUserIds = async (userIds: string[]): Promise<ResolvedRecipient[]> =
     where: { id: { in: userIds } },
     select: { email: true, name: true },
   });
-  return users
-    .filter((u): u is typeof u & { email: string } => !!u.email)
-    .map((u) => ({ to: u.email, name: u.name ?? '' }));
+  return users.map((u) => ({ to: u.email, name: u.name ?? '' }));
 };
 
 const resolveOrgRole = async (organizationId: string, role: string): Promise<ResolvedRecipient[]> => {
@@ -19,9 +17,7 @@ const resolveOrgRole = async (organizationId: string, role: string): Promise<Res
     where: { organizationId, role: { in: roles as never } },
     select: { user: { select: { email: true, name: true } } },
   });
-  return orgUsers
-    .filter((ou): ou is typeof ou & { user: { email: string } } => !!ou.user.email)
-    .map((ou) => ({ to: ou.user.email, name: ou.user.name ?? '' }));
+  return orgUsers.map((ou) => ({ to: ou.user.email, name: ou.user.name ?? '' }));
 };
 
 const resolveSpaceRole = async (spaceId: string, role: string): Promise<ResolvedRecipient[]> => {
@@ -30,9 +26,7 @@ const resolveSpaceRole = async (spaceId: string, role: string): Promise<Resolved
     where: { spaceId, role: { in: roles as never } },
     select: { user: { select: { email: true, name: true } } },
   });
-  return spaceUsers
-    .filter((su): su is typeof su & { user: { email: string } } => !!su.user.email)
-    .map((su) => ({ to: su.user.email, name: su.user.name ?? '' }));
+  return spaceUsers.map((su) => ({ to: su.user.email, name: su.user.name ?? '' }));
 };
 
 const resolveOne = async (target: EmailTarget): Promise<ResolvedRecipient[]> => {
@@ -43,9 +37,8 @@ const resolveOne = async (target: EmailTarget): Promise<ResolvedRecipient[]> => 
   return [];
 };
 
-export const resolveTargets = async (targets: EmailTarget | EmailTarget[]): Promise<ResolvedRecipient[]> => {
-  const list = Array.isArray(targets) ? targets : [targets];
-  const results = await Promise.all(list.map(resolveOne));
+export const resolveTargets = async (targets: EmailTarget[]): Promise<ResolvedRecipient[]> => {
+  const results = await Promise.all(targets.map(resolveOne));
   const flat = results.flat();
 
   const seen = new Set<string>();
@@ -56,7 +49,7 @@ export const resolveTargets = async (targets: EmailTarget | EmailTarget[]): Prom
   });
 };
 
-export const resolveTargetsToAddresses = async (targets: EmailTarget | EmailTarget[]): Promise<string[]> => {
+export const resolveTargetsToAddresses = async (targets: EmailTarget[]): Promise<string[]> => {
   const recipients = await resolveTargets(targets);
   return recipients.map((r) => r.to);
 };
