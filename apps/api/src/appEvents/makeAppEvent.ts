@@ -1,4 +1,4 @@
-import { observeAdapter } from '#/appEvents/services/observe';
+import { observeRegistry } from '#/appEvents/services/observe';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
@@ -10,7 +10,11 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
 
     if (handler.observe) {
       const observeData = handler.observe(data);
-      if (observeData) tasks.push(observeAdapter.record(event, observeData));
+      if (observeData) {
+        tasks.push(
+          observeRegistry.broadcast((adapter) => adapter.record(event, observeData)).then(() => {}),
+        );
+      }
     }
 
     if (handler.email) {
