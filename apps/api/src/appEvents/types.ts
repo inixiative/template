@@ -75,5 +75,5 @@ export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
   observe?: (data: T) => ObserveData | null;
-  on?: Array<(data: T) => Promise<void> | void>;
+  cb?: Array<(data: T) => Promise<void> | void>;
 };

@@ -1,4 +1,4 @@
-import { dbObserveAdapter } from '#/appEvents/services/observe/dbAdapter';
+import { observeAdapter } from '#/appEvents/services/observe';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
@@ -10,14 +10,16 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
 
     if (handler.observe) {
       const observeData = handler.observe(data);
-      if (observeData) tasks.push(dbObserveAdapter.record(event, observeData));
+      if (observeData) tasks.push(observeAdapter.record(event, observeData));
     }
 
     if (handler.email) {
       const handoffs = handler.email(data);
       if (handoffs?.length) {
         const { deliverEmailHandoffs } = await import('#/appEvents/bridges/email');
-        tasks.push(deliverEmailHandoffs(event, handoffs));
+        for (const handoff of handoffs) {
+          tasks.push(deliverEmailHandoffs(event, [handoff]));
+        }
       }
     }
 
@@ -25,12 +27,14 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
       const handoffs = handler.websocket(data);
       if (handoffs?.length) {
         const { deliverWSHandoffs } = await import('#/appEvents/bridges/websocket');
-        tasks.push(deliverWSHandoffs(handoffs));
+        for (const handoff of handoffs) {
+          tasks.push(deliverWSHandoffs([handoff]));
+        }
       }
     }
 
-    if (handler.on) {
-      for (const callback of handler.on) {
+    if (handler.cb) {
+      for (const callback of handler.cb) {
         tasks.push(Promise.resolve(callback(data)));
       }
     }
