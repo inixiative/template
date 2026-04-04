@@ -5,8 +5,6 @@ import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
 
-import '#/appEvents';
-
 export const app = new OpenAPIHono<AppEnv>();
 
 // Make app available in context

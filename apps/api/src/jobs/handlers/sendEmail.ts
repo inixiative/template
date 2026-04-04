@@ -1,9 +1,8 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
-import { resolveFromAddress } from '#/appEvents/services/email/resolveFromAddress';
 import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
-import type { EmailTarget, EmailSenderContext } from '#/appEvents/types';
-import { emailVerifier } from '#/lib/email';
+import type { EmailTarget } from '#/appEvents/types';
+import { emailVerifier, resolveEmailClient, resolveFromAddress } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
 export type SendEmailPayload = {
@@ -12,7 +11,6 @@ export type SendEmailPayload = {
   bcc?: EmailTarget[];
   template: string;
   data: Record<string, unknown>;
-  sender?: EmailSenderContext;
   tags: string[];
 };
 
@@ -58,7 +56,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     resolveTargets(to),
     cc?.length ? resolveTargetsToAddresses(cc) : undefined,
     bcc?.length ? resolveTargetsToAddresses(bcc) : undefined,
-    resolveFromAddress(sender ?? {}, payload),
+    resolveFromAddress(),
   ]);
 
   if (!recipients.length) return;
@@ -68,8 +66,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!validRecipients.length) return;
 
-  const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
-  const client = await resolveEmailClient({});
+  const client = await resolveEmailClient();
 
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
   const senderData = senderVars();

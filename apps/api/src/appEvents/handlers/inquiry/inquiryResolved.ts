@@ -4,16 +4,27 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 
 export type InquiryResolvedPayload = Inquiry & { _resolution: 'approved' | 'denied' | 'changesRequested' };
 
-makeAppEvent<InquiryResolvedPayload>('inquiry.resolved', {
-  email: (data) => {
-    const handler = inquiryHandlers[data.type as keyof typeof inquiryHandlers];
+const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
+  const handler = inquiryHandlers[data.type as keyof typeof inquiryHandlers];
+  if (!handler?.appEvents) return null;
 
-    if (data._resolution === 'approved') return handler?.appEvents?.approved?.email?.(data) ?? null;
-    if (data._resolution === 'denied') return handler?.appEvents?.denied?.email?.(data) ?? null;
-    return null;
-  },
+  if (data._resolution === 'approved') return handler.appEvents.approved;
+  if (data._resolution === 'denied') return handler.appEvents.denied;
+  if (data._resolution === 'changesRequested') return handler.appEvents.changesRequested;
+  return null;
+};
+
+export const inquiryResolved = makeAppEvent<InquiryResolvedPayload>({
+  email: (data) => getLifecycleHandlers(data)?.email?.(data) ?? null,
   websocket: (data) => {
     const handler = inquiryHandlers[data.type as keyof typeof inquiryHandlers];
     return handler?.appEvents?.resolved?.websocket?.(data) ?? null;
   },
+  observe: (data) => ({
+    inquiryId: data.id,
+    type: data.type,
+    resolution: data._resolution,
+    sourceOrganizationId: data.sourceOrganizationId,
+    targetUserId: data.targetUserId,
+  }),
 });

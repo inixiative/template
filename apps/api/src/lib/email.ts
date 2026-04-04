@@ -17,3 +17,11 @@ const createEmailVerifier = (): EmailVerifier => {
 
 export const emailClient: EmailClient = createEmailClient();
 export const emailVerifier: EmailVerifier = createEmailVerifier();
+
+export const resolveEmailClient = async (): Promise<EmailClient> => {
+  return emailClient;
+};
+
+export const resolveFromAddress = async (): Promise<string> => {
+  return process.env.DEFAULT_FROM_EMAIL ?? 'noreply@example.com';
+};

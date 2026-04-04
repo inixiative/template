@@ -5,7 +5,7 @@ export type UserVerificationRequestedPayload = {
   verificationUrl: string;
 };
 
-makeAppEvent<UserVerificationRequestedPayload>('user.verificationRequested', {
+export const userVerificationRequested = makeAppEvent<UserVerificationRequestedPayload>({
   email: (data) => [
     {
       to: [{ userIds: [data.userId] }],
@@ -16,4 +16,5 @@ makeAppEvent<UserVerificationRequestedPayload>('user.verificationRequested', {
       },
     },
   ],
+  observe: (data) => ({ userId: data.userId }),
 });

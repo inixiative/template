@@ -10,6 +10,7 @@ export type InquiryAppEvents = {
   sent?: AppEventHandlerDefinition<Inquiry>;
   approved?: AppEventHandlerDefinition<Inquiry>;
   denied?: AppEventHandlerDefinition<Inquiry>;
+  changesRequested?: AppEventHandlerDefinition<Inquiry>;
   resolved?: AppEventHandlerDefinition<Inquiry>;
 };
 

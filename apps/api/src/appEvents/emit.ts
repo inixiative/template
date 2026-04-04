@@ -1,7 +1,7 @@
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 import type { AppEventPayloads } from '#/appEvents/handlers';
-import { getHandlers } from '#/appEvents/registry';
+import { appEventHandlers } from '#/appEvents/handlers';
 import type { AppEventOptions, AppEventPayload } from '#/appEvents/types';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
@@ -21,23 +21,18 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
     timestamp: new Date().toISOString(),
   };
 
-  const eventHandlers = getHandlers(name);
+  const handler = appEventHandlers[name];
+  if (!handler) return;
 
-  if (!eventHandlers.length) return;
-
-  const runHandlers = async (): Promise<void> => {
-    const results = await Promise.allSettled(eventHandlers.map((h) => h(event)));
-
-    for (const [i, result] of results.entries()) {
-      if (result.status === 'rejected') {
-        log.error(`App event handler failed [${name}] handler=${i}`, { error: result.reason });
-      }
-    }
-  };
+  const runHandler = () => handler(event);
 
   if (db.isInTxn()) {
-    db.onCommit(runHandlers);
+    db.onCommit(runHandler);
   } else {
-    await runHandlers();
+    try {
+      await runHandler();
+    } catch (err) {
+      log.error(`App event handler failed [${name}]`, { error: err });
+    }
   }
 };

@@ -1,14 +1,11 @@
-// Handler registrations (side-effect imports — registers bridges via makeAppEvent)
-import '#/appEvents/handlers/inquiry/inquiryResolved';
-import '#/appEvents/handlers/inquiry/inquirySent';
-import '#/appEvents/handlers/user/userCreated';
-import '#/appEvents/handlers/user/userVerificationRequested';
-
-// Re-export payload types for the central map
-export type { InquiryResolvedPayload } from '#/appEvents/handlers/inquiry/inquiryResolved';
-export type { InquirySentPayload } from '#/appEvents/handlers/inquiry/inquirySent';
-export type { UserCreatedPayload } from '#/appEvents/handlers/user/userCreated';
-export type { UserVerificationRequestedPayload } from '#/appEvents/handlers/user/userVerificationRequested';
+import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
+import { inquiryResolved, type InquiryResolvedPayload } from '#/appEvents/handlers/inquiry/inquiryResolved';
+import { inquirySent, type InquirySentPayload } from '#/appEvents/handlers/inquiry/inquirySent';
+import { userCreated, type UserCreatedPayload } from '#/appEvents/handlers/user/userCreated';
+import {
+  userVerificationRequested,
+  type UserVerificationRequestedPayload,
+} from '#/appEvents/handlers/user/userVerificationRequested';
 
 export type AppEventPayloads = {
   'inquiry.sent': InquirySentPayload;
@@ -25,3 +22,10 @@ export const AppEventName = {
 } as const;
 
 export type AppEventName = (typeof AppEventName)[keyof typeof AppEventName];
+
+export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
+  'inquiry.sent': inquirySent,
+  'inquiry.resolved': inquiryResolved,
+  'user.created': userCreated,
+  'user.verificationRequested': userVerificationRequested,
+};

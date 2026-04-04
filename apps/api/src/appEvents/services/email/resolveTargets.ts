@@ -1,12 +1,6 @@
 import { db } from '@template/db';
-import { roleHierarchy } from '@template/permissions';
+import { rolesAtOrAbove } from '@template/permissions';
 import type { EmailTarget, ResolvedRecipient } from '#/appEvents/types';
-
-const rolesAtOrAbove = (role: string): string[] => {
-  const idx = roleHierarchy.indexOf(role as (typeof roleHierarchy)[number]);
-  if (idx === -1) return [role];
-  return roleHierarchy.slice(idx) as unknown as string[];
-};
 
 const resolveUserIds = async (userIds: string[]): Promise<ResolvedRecipient[]> => {
   if (!userIds.length) return [];

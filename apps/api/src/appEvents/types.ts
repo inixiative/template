@@ -65,8 +65,15 @@ export type WSHandoff = {
   message: { data: Record<string, unknown> };
 };
 
+export type ObserveData = Record<string, unknown>;
+
+export type ObserveAdapter = {
+  record: (event: AppEventPayload, data: ObserveData) => Promise<void>;
+};
+
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
+  observe?: (data: T) => ObserveData | null;
   on?: Array<(data: T) => Promise<void> | void>;
 };

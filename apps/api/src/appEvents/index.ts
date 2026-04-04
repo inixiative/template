@@ -1,5 +1,2 @@
-// Bridges (wildcard handlers)
-import '#/appEvents/bridges/observe';
-
-// Handlers (per-event definitions)
-import '#/appEvents/handlers';
+export { emitAppEvent } from '#/appEvents/emit';
+export { AppEventName, type AppEventPayloads } from '#/appEvents/handlers';

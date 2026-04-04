@@ -1,10 +1,17 @@
-import { registerAppEvent } from '#/appEvents/registry';
-import type { AppEventHandlerDefinition } from '#/appEvents/types';
+import { dbObserveAdapter } from '#/appEvents/services/observe/dbAdapter';
+import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 
-export const makeAppEvent = <T>(name: string, handler: AppEventHandlerDefinition<T>): void => {
-  registerAppEvent(name, async (event) => {
+export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
+
+export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
+  return async (event: AppEventPayload) => {
     const data = event.data as T;
     const tasks: Promise<void>[] = [];
+
+    if (handler.observe) {
+      const observeData = handler.observe(data);
+      if (observeData) tasks.push(dbObserveAdapter.record(event, observeData));
+    }
 
     if (handler.email) {
       const handoffs = handler.email(data);
@@ -29,5 +36,5 @@ export const makeAppEvent = <T>(name: string, handler: AppEventHandlerDefinition
     }
 
     await Promise.all(tasks);
-  });
+  };
 };

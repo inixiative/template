@@ -4,7 +4,7 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 
 export type InquirySentPayload = Inquiry;
 
-makeAppEvent<InquirySentPayload>('inquiry.sent', {
+export const inquirySent = makeAppEvent<InquirySentPayload>({
   email: (inquiry) => {
     const handler = inquiryHandlers[inquiry.type as keyof typeof inquiryHandlers];
     return handler?.appEvents?.sent?.email?.(inquiry) ?? null;
@@ -13,4 +13,11 @@ makeAppEvent<InquirySentPayload>('inquiry.sent', {
     const handler = inquiryHandlers[inquiry.type as keyof typeof inquiryHandlers];
     return handler?.appEvents?.sent?.websocket?.(inquiry) ?? null;
   },
+  observe: (inquiry) => ({
+    inquiryId: inquiry.id,
+    type: inquiry.type,
+    sourceOrganizationId: inquiry.sourceOrganizationId,
+    targetUserId: inquiry.targetUserId,
+    targetModel: inquiry.targetModel,
+  }),
 });
