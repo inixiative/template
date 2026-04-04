@@ -35,7 +35,7 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
       include: includeInquiryResponse,
     });
 
-    await emitAppEvent('inquiry.sent', { ...approved, _autoApproved: true }, {
+    await emitAppEvent('inquiry.sent', approved, {
       resourceType: 'Inquiry',
       resourceId: approved.id,
     });
