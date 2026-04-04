@@ -3,15 +3,15 @@ import mjml2html from 'mjml';
 import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
-type Recipient = {
-  to: string;
+type EmailDelivery = {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
   name: string;
 };
 
 export type SendEmailPayload = {
-  recipients: Recipient[];
-  cc?: string[];
-  bcc?: string[];
+  deliveries: EmailDelivery[];
   from: string;
   template: string;
   data: Record<string, unknown>;
@@ -23,44 +23,41 @@ const senderVars = (): Record<string, unknown> => ({
   address: process.env.PLATFORM_ADDRESS ?? '',
 });
 
-const verifyRecipients = async (
-  recipients: Recipient[],
+const verifyAddresses = async (
+  addresses: string[],
   log: (msg: string) => void,
-): Promise<Recipient[]> => {
-  const verified: Recipient[] = [];
+): Promise<string[]> => {
+  const verified: string[] = [];
 
-  for (const recipient of recipients) {
-    const result = await emailVerifier.verify(recipient.to);
+  for (const address of addresses) {
+    const result = await emailVerifier.verify(address);
 
     if (result.status === 'undeliverable') {
-      log(`Skipping undeliverable: ${recipient.to} (${result.reason})`);
+      log(`Skipping undeliverable: ${address} (${result.reason})`);
       continue;
     }
 
     if (result.isDisposable) {
-      log(`Skipping disposable: ${recipient.to}`);
+      log(`Skipping disposable: ${address}`);
       continue;
     }
 
     if (result.status === 'risky') {
-      log(`Sending to risky address: ${recipient.to} (${result.reason})`);
+      log(`Sending to risky address: ${address} (${result.reason})`);
     }
 
-    verified.push(recipient);
+    verified.push(address);
   }
 
   return verified;
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { recipients: rawRecipients, cc, bcc, from, template, data, tags } = payload;
+  const { deliveries, from, template, data, tags } = payload;
   const { log } = ctx;
 
-  const recipients = await verifyRecipients(rawRecipients, log);
-  if (!recipients.length) {
-    log(`All recipients filtered by verification for template=${template}`);
-    return;
-  }
+  const valid = deliveries.filter((d) => d.to.length);
+  if (!valid.length) return;
 
   const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
   const client = await resolveEmailClient({});
@@ -72,10 +69,15 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   const sender = senderVars();
 
-  if (cc?.length || bcc?.length) {
+  const rendered = [];
+
+  for (const delivery of valid) {
+    const to = await verifyAddresses(delivery.to, log);
+    if (!to.length) continue;
+
     const variables: Variables = {
       sender,
-      recipient: { name: recipients[0]?.name ?? '', email: recipients[0]?.to ?? '' },
+      recipient: { name: delivery.name, email: to[0] },
       data,
     };
 
@@ -83,18 +85,15 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags });
-  } else {
-    const rendered = recipients.map((recipient) => {
-      const variables: Variables = { sender, recipient: { name: recipient.name, email: recipient.to }, data };
-      const mjml = interpolate(composed.mjml, variables);
-      const subject = interpolate(composed.subject, variables);
-      const { html } = mjml2html(mjml, { validationLevel: 'skip' });
-      return { to: recipient.to, from, subject, html, tags };
-    });
-
-    await client.sendBatch(rendered);
+    rendered.push({ to, cc: delivery.cc, bcc: delivery.bcc, from, subject, html, tags });
   }
 
-  log(`Email sent: template=${template} recipients=${recipients.length}`);
+  if (!rendered.length) {
+    log(`All deliveries filtered by verification for template=${template}`);
+    return;
+  }
+
+  await client.sendBatch(rendered);
+
+  log(`Email sent: template=${template} deliveries=${rendered.length}`);
 });

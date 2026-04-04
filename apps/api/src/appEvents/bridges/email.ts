@@ -13,23 +13,23 @@ const buildTags = (event: AppEventPayload, handoff: EmailHandoff): string[] => [
 const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Promise<void> => {
   const from = await resolveFromAddress(handoff.sender ?? {}, handoff);
   const tags = buildTags(event, handoff);
-  const recipients = await resolveTargets(handoff.to);
+
+  const resolved = await resolveTargets(handoff.to);
   const cc = handoff.cc?.length ? await resolveTargetsToAddresses(handoff.cc) : undefined;
   const bcc = handoff.bcc?.length ? await resolveTargetsToAddresses(handoff.bcc) : undefined;
 
-  if (!recipients.length) return;
-
-  const job = await enqueueJob('sendEmail', {
-    recipients,
+  const deliveries = resolved.map((r) => ({
+    to: [r.to],
     cc,
     bcc,
-    from,
-    template: handoff.template,
-    data: handoff.data,
-    tags,
-  });
+    name: r.name,
+  }));
 
-  log.info(`Email bridge: ${event.name} → ${handoff.template} to=${recipients.length} job=${job.jobId}`);
+  if (!deliveries.length) return;
+
+  const job = await enqueueJob('sendEmail', { deliveries, from, template: handoff.template, data: handoff.data, tags });
+
+  log.info(`Email bridge: ${event.name} → ${handoff.template} deliveries=${deliveries.length} job=${job.jobId}`);
 };
 
 export const deliverEmailHandoffs = async (
