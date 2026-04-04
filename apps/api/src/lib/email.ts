@@ -1,11 +1,19 @@
 import { createConsoleClient, createResendClient, type EmailClient } from '@template/email/client';
+import {
+  createBouncerVerifier,
+  createNoopVerifier,
+  type EmailVerifier,
+} from '@template/email/client/verification';
 
 const createEmailClient = (): EmailClient => {
-  if (process.env.RESEND_API_KEY) {
-    return createResendClient(process.env.RESEND_API_KEY);
-  }
-
+  if (process.env.RESEND_API_KEY) return createResendClient(process.env.RESEND_API_KEY);
   return createConsoleClient();
 };
 
+const createEmailVerifier = (): EmailVerifier => {
+  if (process.env.BOUNCER_API_KEY) return createBouncerVerifier(process.env.BOUNCER_API_KEY);
+  return createNoopVerifier();
+};
+
 export const emailClient: EmailClient = createEmailClient();
+export const emailVerifier: EmailVerifier = createEmailVerifier();

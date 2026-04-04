@@ -2,6 +2,7 @@ import type { CommunicationCategory } from '@template/db';
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import type { EmailContext } from '#/appEvents/types';
+import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
 type Recipient = {
@@ -26,11 +27,44 @@ const senderVars = (): Record<string, unknown> => ({
   address: process.env.PLATFORM_ADDRESS ?? '',
 });
 
+const verifyRecipients = async (
+  recipients: Recipient[],
+  log: (msg: string) => void,
+): Promise<Recipient[]> => {
+  const verified: Recipient[] = [];
+
+  for (const recipient of recipients) {
+    const result = await emailVerifier.verify(recipient.to);
+
+    if (result.status === 'undeliverable') {
+      log(`Skipping undeliverable: ${recipient.to} (${result.reason})`);
+      continue;
+    }
+
+    if (result.isDisposable) {
+      log(`Skipping disposable: ${recipient.to}`);
+      continue;
+    }
+
+    if (result.status === 'risky') {
+      log(`Sending to risky address: ${recipient.to} (${result.reason})`);
+    }
+
+    verified.push(recipient);
+  }
+
+  return verified;
+};
+
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { recipients, cc, bcc, from, template, data, tags, emailContext } = payload;
+  const { recipients: rawRecipients, cc, bcc, from, template, data, tags, emailContext } = payload;
   const { log } = ctx;
 
-  if (!recipients.length) return;
+  const recipients = await verifyRecipients(rawRecipients, log);
+  if (!recipients.length) {
+    log(`All recipients filtered by verification for template=${template}`);
+    return;
+  }
 
   const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
   const client = await resolveEmailClient(emailContext ?? {});
