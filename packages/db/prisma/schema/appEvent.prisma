@@ -6,7 +6,7 @@ model AppEvent {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime @default(now())
 
-  type String
+  name String
 
   // Actor — auto-captured from auditActorContext
   actorUserId      String? @db.VarChar(36)
@@ -24,7 +24,7 @@ model AppEvent {
   // Domain payload
   data Json @default("{}")
 
-  @@index([type])
+  @@index([name])
   @@index([actorUserId])
   @@index([resourceType, resourceId])
   @@index([createdAt])

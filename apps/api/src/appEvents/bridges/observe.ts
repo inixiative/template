@@ -7,7 +7,7 @@ registerAppEvent('*', async (event: AppEventPayload) => {
   try {
     await db.appEvent.create({
       data: {
-        type: event.name,
+        name: event.name,
         actorUserId: event.actor.actorUserId,
         actorSpoofUserId: event.actor.actorSpoofUserId,
         actorTokenId: event.actor.actorTokenId,
