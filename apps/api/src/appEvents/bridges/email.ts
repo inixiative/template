@@ -1,6 +1,6 @@
 import { log } from '@template/shared/logger';
 import { resolveFromAddress } from '#/appEvents/services/email/resolveFromAddress';
-import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
+import { resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
 import type { AppEventPayload, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -11,25 +11,26 @@ const buildTags = (event: AppEventPayload, handoff: EmailHandoff): string[] => [
 ];
 
 const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Promise<void> => {
-  const from = await resolveFromAddress(handoff.sender ?? {}, handoff);
-  const tags = buildTags(event, handoff);
+  const [to, cc, bcc, from] = await Promise.all([
+    resolveTargetsToAddresses(handoff.to),
+    handoff.cc?.length ? resolveTargetsToAddresses(handoff.cc) : undefined,
+    handoff.bcc?.length ? resolveTargetsToAddresses(handoff.bcc) : undefined,
+    resolveFromAddress(handoff.sender ?? {}, handoff),
+  ]);
 
-  const resolved = await resolveTargets(handoff.to);
-  const cc = handoff.cc?.length ? await resolveTargetsToAddresses(handoff.cc) : undefined;
-  const bcc = handoff.bcc?.length ? await resolveTargetsToAddresses(handoff.bcc) : undefined;
+  if (!to.length) return;
 
-  const deliveries = resolved.map((r) => ({
-    to: [r.to],
+  const job = await enqueueJob('sendEmail', {
+    to,
     cc,
     bcc,
-    name: r.name,
-  }));
+    from,
+    template: handoff.template,
+    data: handoff.data,
+    tags: buildTags(event, handoff),
+  });
 
-  if (!deliveries.length) return;
-
-  const job = await enqueueJob('sendEmail', { deliveries, from, template: handoff.template, data: handoff.data, tags });
-
-  log.info(`Email bridge: ${event.name} → ${handoff.template} deliveries=${deliveries.length} job=${job.jobId}`);
+  log.info(`Email bridge: ${event.name} → ${handoff.template} to=${to.length} job=${job.jobId}`);
 };
 
 export const deliverEmailHandoffs = async (

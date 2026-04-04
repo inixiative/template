@@ -3,15 +3,10 @@ import mjml2html from 'mjml';
 import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
-type EmailDelivery = {
+export type SendEmailPayload = {
   to: string[];
   cc?: string[];
   bcc?: string[];
-  name: string;
-};
-
-export type SendEmailPayload = {
-  deliveries: EmailDelivery[];
   from: string;
   template: string;
   data: Record<string, unknown>;
@@ -43,7 +38,7 @@ const verifyAddresses = async (
     }
 
     if (result.status === 'risky') {
-      log(`Sending to risky address: ${address} (${result.reason})`);
+      log(`Sending to risky: ${address} (${result.reason})`);
     }
 
     verified.push(address);
@@ -53,47 +48,28 @@ const verifyAddresses = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { deliveries, from, template, data, tags } = payload;
+  const { to: rawTo, cc, bcc, from, template, data, tags } = payload;
   const { log } = ctx;
 
-  const valid = deliveries.filter((d) => d.to.length);
-  if (!valid.length) return;
+  const to = await verifyAddresses(rawTo, log);
+  if (!to.length) return;
 
   const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
   const client = await resolveEmailClient({});
 
-  const composed = await composeTemplate(template, {
-    ownerModel: 'default',
-    locale: 'en',
-  });
+  const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
 
-  const sender = senderVars();
+  const variables: Variables = {
+    sender: senderVars(),
+    recipient: { email: to[0] },
+    data,
+  };
 
-  const rendered = [];
+  const mjml = interpolate(composed.mjml, variables);
+  const subject = interpolate(composed.subject, variables);
+  const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-  for (const delivery of valid) {
-    const to = await verifyAddresses(delivery.to, log);
-    if (!to.length) continue;
+  await client.send({ to, cc, bcc, from, subject, html, tags });
 
-    const variables: Variables = {
-      sender,
-      recipient: { name: delivery.name, email: to[0] },
-      data,
-    };
-
-    const mjml = interpolate(composed.mjml, variables);
-    const subject = interpolate(composed.subject, variables);
-    const { html } = mjml2html(mjml, { validationLevel: 'skip' });
-
-    rendered.push({ to, cc: delivery.cc, bcc: delivery.bcc, from, subject, html, tags });
-  }
-
-  if (!rendered.length) {
-    log(`All deliveries filtered by verification for template=${template}`);
-    return;
-  }
-
-  await client.sendBatch(rendered);
-
-  log(`Email sent: template=${template} deliveries=${rendered.length}`);
+  log(`Email sent: template=${template} to=${to.length}`);
 });
