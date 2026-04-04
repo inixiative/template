@@ -57,6 +57,7 @@ export type EmailHandoff = {
   template: string;
   data: Record<string, unknown>;
   sender?: EmailSenderContext;
+  tags?: string[];
 };
 
 export type WSHandoff = {

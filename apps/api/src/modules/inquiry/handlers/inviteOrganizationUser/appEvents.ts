@@ -25,6 +25,7 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
             ownerModel: 'Organization' as const,
             organizationId: inquiry.sourceOrganizationId ?? undefined,
           },
+          tags: ['inviteOrganizationUser'],
         },
       ];
     },

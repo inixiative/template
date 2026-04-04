@@ -4,11 +4,17 @@ import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/
 import type { AppEventPayload, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';
 
+const buildTags = (event: AppEventPayload, handoff: EmailHandoff): string[] => [
+  event.name,
+  handoff.template,
+  ...(handoff.tags ?? []),
+];
+
 const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Promise<void> => {
   const from = await resolveFromAddress(handoff.sender ?? {}, handoff);
-  const isGroup = handoff.cc?.length || handoff.bcc?.length;
+  const tags = buildTags(event, handoff);
 
-  if (isGroup) {
+  if (handoff.cc?.length || handoff.bcc?.length) {
     const [to, cc, bcc] = await Promise.all([
       resolveTargetsToAddresses(handoff.to),
       handoff.cc ? resolveTargetsToAddresses(handoff.cc) : [],
@@ -24,7 +30,7 @@ const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Pr
       from,
       template: handoff.template,
       data: handoff.data,
-      eventName: event.name,
+      tags,
     });
 
     log.info(`Email bridge: ${event.name} → ${handoff.template} group to=${to.length} cc=${cc.length} bcc=${bcc.length} job=${job.jobId}`);
@@ -38,7 +44,7 @@ const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Pr
       from,
       template: handoff.template,
       data: handoff.data,
-      eventName: event.name,
+      tags,
     });
 
     log.info(`Email bridge: ${event.name} → ${handoff.template} recipients=${recipients.length} job=${job.jobId}`);
