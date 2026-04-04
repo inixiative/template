@@ -1,4 +1,4 @@
-import { observeRegistry } from '#/appEvents/services/observe';
+import { observeRegistry } from '#/lib/observe';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;

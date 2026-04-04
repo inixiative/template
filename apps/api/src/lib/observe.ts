@@ -1,7 +1,8 @@
 import { db } from '@template/db';
+import { makeBroadcastRegistry } from '@template/shared/adapter';
 import type { AppEventPayload, ObserveAdapter, ObserveData } from '#/appEvents/types';
 
-export const createDbObserveAdapter = (): ObserveAdapter => ({
+const createDbObserveAdapter = (): ObserveAdapter => ({
   record: async (event: AppEventPayload, data: ObserveData) => {
     await db.appEvent.create({
       data: {
@@ -21,4 +22,6 @@ export const createDbObserveAdapter = (): ObserveAdapter => ({
   },
 });
 
-export const dbObserveAdapter = createDbObserveAdapter();
+export const observeRegistry = makeBroadcastRegistry<ObserveAdapter>();
+
+observeRegistry.register('db', createDbObserveAdapter());
