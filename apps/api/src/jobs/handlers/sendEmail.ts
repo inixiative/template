@@ -66,8 +66,10 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!validRecipients.length) return;
 
+  // Stub: always uses first registered adapter. Future: resolve per-tenant via sender context.
   const client = emailRegistry.getOrDefault(undefined, emailRegistry.names()[0]);
 
+  // Stub: always default templates, en locale. Future: resolve from sender.ownerModel + locale.
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
   const senderData = senderVars();
 
