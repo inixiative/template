@@ -1,23 +1,15 @@
-import { db } from '@template/db';
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 import type { AppEventPayload, ObserveAdapter, ObserveData } from '#/appEvents/types';
+import { enqueueJob } from '#/jobs/enqueue';
 
 const createDbObserveAdapter = (): ObserveAdapter => ({
   record: async (event: AppEventPayload, data: ObserveData) => {
-    await db.appEvent.create({
-      data: {
-        name: event.name,
-        actorUserId: event.actor.actorUserId,
-        actorSpoofUserId: event.actor.actorSpoofUserId,
-        actorTokenId: event.actor.actorTokenId,
-        actorJobName: event.actor.actorJobName,
-        ipAddress: event.actor.ipAddress,
-        userAgent: event.actor.userAgent,
-        sourceInquiryId: event.actor.sourceInquiryId,
-        resourceType: event.resourceType,
-        resourceId: event.resourceId,
-        data: data as object,
-      },
+    await enqueueJob('recordAppEvent', {
+      name: event.name,
+      actor: event.actor,
+      resourceType: event.resourceType,
+      resourceId: event.resourceId,
+      data,
     });
   },
 });

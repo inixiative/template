@@ -1,11 +1,13 @@
 import { cleanStaleAuditLogs } from '#/jobs/handlers/cleanStaleAuditLogs';
 import { cleanStaleWebhooks } from '#/jobs/handlers/cleanStaleWebhooks';
+import { type RecordAppEventPayload, recordAppEvent } from '#/jobs/handlers/recordAppEvent';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
 import { type SendEmailPayload, sendEmail } from '#/jobs/handlers/sendEmail';
 import { type SendWebhookPayload, sendWebhook } from '#/jobs/handlers/sendWebhook';
 import type { JobHandler } from '#/jobs/types';
 
 export const JobHandlerName = {
+  recordAppEvent: 'recordAppEvent',
   sendEmail: 'sendEmail',
   sendWebhook: 'sendWebhook',
   rotateEncryptionKeys: 'rotateEncryptionKeys',
@@ -16,6 +18,7 @@ export const JobHandlerName = {
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
 
 export type JobPayloads = {
+  recordAppEvent: RecordAppEventPayload;
   sendEmail: SendEmailPayload;
   sendWebhook: SendWebhookPayload;
   rotateEncryptionKeys: undefined;
@@ -28,6 +31,7 @@ export type JobHandlers = {
 };
 
 export const jobHandlers: JobHandlers = {
+  recordAppEvent,
   sendEmail,
   sendWebhook,
   rotateEncryptionKeys,

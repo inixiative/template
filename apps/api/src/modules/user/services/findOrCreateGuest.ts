@@ -13,24 +13,19 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
   const db = c.get('db');
   const normalized = normalizeEmail(email);
 
-  const user = await db.user.upsert({
-    where: { email: normalized },
-    update: {},
-    create: {
-      email: normalized,
-      name,
-      emailVerified: false,
-    },
-  });
+  const existing = await db.user.findUnique({ where: { email: normalized } });
+  if (existing) return existing;
 
-  const isNew = Date.now() - user.createdAt.getTime() < 5000;
-
-  if (isNew) {
-    await emitAppEvent('user.created', { userId: user.id, isGuest: true }, {
-      resourceType: 'User',
-      resourceId: user.id,
+  return db.txn(async () => {
+    const guest = await db.user.create({
+      data: { email: normalized, name, emailVerified: false },
     });
-  }
 
-  return user;
+    await emitAppEvent('user.created', { userId: guest.id, isGuest: true }, {
+      resourceType: 'User',
+      resourceId: guest.id,
+    });
+
+    return guest;
+  });
 };
