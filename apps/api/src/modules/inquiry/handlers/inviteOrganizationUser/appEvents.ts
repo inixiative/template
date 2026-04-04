@@ -14,17 +14,13 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       const invitationUrl = `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`;
       return [
         {
-          target: { userIds: [inquiry.targetUserId] },
-          message: {
-            template: 'org-invitation',
-            data: {
-              role: content.role,
-              buttonUrl: invitationUrl,
-              buttonText: 'Accept Invitation',
-            },
+          to: [{ userIds: [inquiry.targetUserId] }],
+          template: 'org-invitation',
+          data: {
+            role: content.role,
+            buttonUrl: invitationUrl,
+            buttonText: 'Accept Invitation',
           },
-          tags: ['inquiry', 'invitation'],
-          category: 'system' as const,
           sender: {
             ownerModel: 'Organization' as const,
             organizationId: inquiry.sourceOrganizationId ?? undefined,
@@ -37,13 +33,7 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       return [
         {
           target: { userIds: [inquiry.targetUserId] },
-          message: {
-            data: {
-              event: 'inquiry.sent',
-              inquiryId: inquiry.id,
-              type: inquiry.type,
-            },
-          },
+          message: { data: { event: 'inquiry.sent', inquiryId: inquiry.id, type: inquiry.type } },
         },
       ];
     },
@@ -57,14 +47,7 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       return [
         {
           target: { userIds: targets },
-          message: {
-            data: {
-              event: 'inquiry.resolved',
-              inquiryId: inquiry.id,
-              type: inquiry.type,
-              status: inquiry.status,
-            },
-          },
+          message: { data: { event: 'inquiry.resolved', inquiryId: inquiry.id, type: inquiry.type, status: inquiry.status } },
         },
       ];
     },

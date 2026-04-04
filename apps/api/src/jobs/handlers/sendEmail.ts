@@ -1,7 +1,5 @@
-import type { CommunicationCategory } from '@template/db';
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
-import type { EmailContext } from '#/appEvents/types';
 import { emailVerifier } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
@@ -17,9 +15,6 @@ export type SendEmailPayload = {
   from: string;
   template: string;
   data: Record<string, unknown>;
-  tags?: string[];
-  category: CommunicationCategory;
-  emailContext?: EmailContext;
 };
 
 const senderVars = (): Record<string, unknown> => ({
@@ -57,7 +52,7 @@ const verifyRecipients = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { recipients: rawRecipients, cc, bcc, from, template, data, tags, emailContext } = payload;
+  const { recipients: rawRecipients, cc, bcc, from, template, data } = payload;
   const { log } = ctx;
 
   const recipients = await verifyRecipients(rawRecipients, log);
@@ -67,7 +62,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
   }
 
   const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
-  const client = await resolveEmailClient(emailContext ?? {});
+  const client = await resolveEmailClient({});
 
   const composed = await composeTemplate(template, {
     ownerModel: 'default',
@@ -87,14 +82,14 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags });
+    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags: [] });
   } else {
     const rendered = recipients.map((recipient) => {
       const variables: Variables = { sender, recipient: { name: recipient.name, email: recipient.to }, data };
       const mjml = interpolate(composed.mjml, variables);
       const subject = interpolate(composed.subject, variables);
       const { html } = mjml2html(mjml, { validationLevel: 'skip' });
-      return { to: recipient.to, from, subject, html, tags };
+      return { to: recipient.to, from, subject, html, tags: [] };
     });
 
     await client.sendBatch(rendered);

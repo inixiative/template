@@ -8,16 +8,12 @@ export type UserVerificationRequestedPayload = {
 makeAppEvent<UserVerificationRequestedPayload>('user.verificationRequested', {
   email: (data) => [
     {
-      target: { userIds: [data.userId] },
-      message: {
-        template: 'email-verification',
-        data: {
-          buttonUrl: data.verificationUrl,
-          buttonText: 'Verify Email',
-        },
+      to: [{ userIds: [data.userId] }],
+      template: 'email-verification',
+      data: {
+        buttonUrl: data.verificationUrl,
+        buttonText: 'Verify Email',
       },
-      tags: ['auth', 'verification'],
-      category: 'system' as const,
     },
   ],
 });

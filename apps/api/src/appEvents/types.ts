@@ -51,18 +51,12 @@ export type EmailTarget =
   | { spaceRole: { spaceId: string; role: string } };
 
 export type EmailHandoff = {
-  target: EmailTarget | EmailTarget[];
-  group?: {
-    to: EmailTarget | EmailTarget[];
-    cc?: EmailTarget | EmailTarget[];
-    bcc?: EmailTarget | EmailTarget[];
-  };
-  message: { template: string; data: Record<string, unknown> };
-  tags: string[];
-  category: CommunicationCategory;
-  from?: string;
+  to: EmailTarget[];
+  cc?: EmailTarget[];
+  bcc?: EmailTarget[];
+  template: string;
+  data: Record<string, unknown>;
   sender?: EmailSenderContext;
-  context?: EmailContext;
 };
 
 export type WSHandoff = {
