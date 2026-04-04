@@ -1,4 +1,6 @@
-import type { CommunicationCategory } from '@template/db';
+import type { EmailTarget } from '@template/email/targeting';
+
+export type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -26,29 +28,12 @@ export type AppEventOptions = {
   resourceId?: string;
 };
 
-export type EmailContext = {
-  userId?: string;
-  organizationId?: string;
-  spaceId?: string;
-};
-
 export type EmailSenderContext = {
   ownerModel: 'default' | 'Organization' | 'Space' | 'User';
   organizationId?: string;
   spaceId?: string;
   userId?: string;
 };
-
-export type ResolvedRecipient = {
-  to: string;
-  name: string;
-};
-
-export type EmailTarget =
-  | { userIds: string[] }
-  | { raw: string[] }
-  | { orgRole: { organizationId: string; role: string } }
-  | { spaceRole: { spaceId: string; role: string } };
 
 export type EmailHandoff = {
   to: EmailTarget[];

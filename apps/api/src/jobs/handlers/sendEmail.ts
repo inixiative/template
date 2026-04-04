@@ -1,7 +1,6 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
-import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
-import type { EmailTarget } from '#/appEvents/types';
+import { resolveTargets, resolveTargetsToAddresses, type EmailTarget } from '@template/email/targeting';
 import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { makeJob } from '#/jobs/makeJob';
 
