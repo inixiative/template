@@ -111,7 +111,26 @@ Testing-specific pattern discovery:
 - Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/permissions`, `/packages/email`
 - Docs source of truth: `/docs/claude/*`
 
-## 6. Core Engineering Standards
+## 6. App Events & Side Effects
+
+Business logic NEVER calls email, SMS, analytics, or notification services directly. All side effects go through app events.
+
+**Why:** Every SaaS starts with direct calls (`sendEmail()` in controllers), accumulates coupling (adding SMS means touching every controller), hits reliability issues (email provider down → API fails), and eventually migrates to an event bus. We skip that migration.
+
+**Pattern:** `emitAppEvent(name, data)` → handler → bridges (email/websocket/observe) → BullMQ jobs → external services. Nothing synchronous hits external services in the request path.
+
+**Key rules:**
+- `emitAppEvent` mirrors `enqueueJob` — typed name, typed payload, centralized map in `appEvents/handlers/index.ts`.
+- `makeAppEvent(handler)` returns a handler function — like `makeJob`.
+- Each bridge (email, websocket, observe) is independent via `Promise.allSettled`.
+- Actor context auto-enriches from `auditActorContext` (AsyncLocalStorage) — never pass actorId manually.
+- Events inside `db.txn()` defer to `onCommit`. Events outside run immediately.
+- Adapter registries use `makeBroadcastRegistry` — `get()` for pick-one, `broadcast()` for fan-out.
+- Observe always goes through a BullMQ job (`recordAppEvent`), never sync DB writes in request path.
+- Email targeting is declarative (`userIds`, `orgRole`, `spaceRole`, `raw`) — resolution happens in the job worker.
+- Read `docs/claude/APP_EVENTS.md` before modifying the event system.
+
+## 7. Core Engineering Standards
 
 - Reuse existing utilities/types before introducing new ones.
 - Avoid signature churn; prefer additive optional fields.
@@ -131,7 +150,7 @@ Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 - Observability
 - Minimal docs updates when behavior/contracts change
 
-## 7. Imports and Exports
+## 8. Imports and Exports
 
 - In apps: use `#/` for app-local imports.
 - In packages: use `@template/<pkg>/*` absolute imports.
@@ -140,7 +159,7 @@ Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 - Package code must not use `#/`, `##/`, or `~/`.
 - Prefer package subpath imports over broad root imports.
 
-## 8. Frontend/Store/Auth Conventions
+## 9. Frontend/Store/Auth Conventions
 
 - Zustand slice composition is standard.
 - Web/Admin: tenant-context aware slices.
@@ -149,7 +168,7 @@ Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 - OAuth/provider credentials must support encrypt/decrypt (not hashing).
 - Platform role `superadmin` is explicit bypass in permission checks.
 
-## 9. Testing and Validation
+## 10. Testing and Validation
 
 Use focused checks first:
 
@@ -175,7 +194,7 @@ Rule fixture layout:
 - `scripts/ci/rule-violations/<rule>/pass[/<case>]`
 - `scripts/ci/rule-violations/<rule>/fail[/<case>]`
 
-## 10. Quick Doc Routing
+## 11. Quick Doc Routing
 
 Read docs based on task type:
 
@@ -184,11 +203,12 @@ Read docs based on task type:
 - Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`, `docs/claude/AUTHENTICATION.md`
 - Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
 - Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
+- App events/email/notifications: `docs/claude/APP_EVENTS.md`
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
 
-## 11. AI Memory System (MuninnDB)
+## 12. AI Memory System (MuninnDB)
 
 Two MCP-connected memory stores. Use both intelligently:
 
@@ -208,12 +228,12 @@ New dev onboarding: `bun run init` → Railway Setup generates `.mcp.json`.
 See `AI/agents/_muninndb.md` for full connection details per agent.
 See `AI/agents/_claude.md` and `AI/agents/_codex.md` for agent-specific startup sequences.
 
-## 12. Tickets and AI Workspace
+## 13. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
 - Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
 
-## 13. Change Checklist
+## 14. Change Checklist
 
 1. Confirm pattern in nearby modules.
 2. Implement minimal fix with existing utilities/types.

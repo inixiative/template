@@ -325,74 +325,64 @@ The template ships with all adapter class keys visible but noop/null for unconfi
 
 ## Current State
 
-**Exists (infrastructure):**
-- Event emit/registry/handler system (`apps/api/src/events/`)
-- WebSocket broadcast handler (wildcard `*`)
-- Frontend hooks (`useAppEvents`, `useEventRefetch`)
-- 3 placeholder types: `user.signedUp`, `user.verified`, `user.updated`
-- Adapter primitives (`makeAdapterRouter`, `makeAdapterRegistry`)
-- Email adapter (Resend + Console)
-- Error reporter adapter (Sentry + Console)
-- BullMQ job system with typed handlers
+**Shipped (Phase 1 — PR `claude/review-tickets-3MRIU`):**
+- `emitAppEvent(name, data, options?)` — typed, auto-enriches actor from `auditActorContext`
+- `makeAppEvent(handler)` — returns `AppEventHandlerFn`, wired via centralized barrel
+- `AppEventPayloads` map + `AppEventName` const (mirrors `JobPayloads`/`JobHandlerName`)
+- Bridges: email (enqueues `sendEmail` job), websocket (targeted channels/users), observe (enqueues `recordAppEvent` job)
+- `BroadcastRegistry<A>` — unified adapter primitive (pick-one or broadcast-all)
+- Email registry (`lib/email.ts`): Resend + Console adapters
+- Observe registry (`lib/observe.ts`): DB adapter (writes to `AppEvent` table via job)
+- Bouncer email verification in `sendEmail` job (skip undeliverable/disposable)
+- `EmailClient.sendBatch` — required interface, Resend chunks at 100, Console loops
+- `EmailTarget` union: `userIds`, `raw`, `orgRole`, `spaceRole` with role escalation
+- `InquiryHandler.appEvents` key — per-type notification callbacks (sent/approved/denied/changesRequested/resolved)
+- System email template seeds: email-verification, org-invitation, welcome + shared MJML components
+- `AppEvent` Prisma model — persistent event log (name, actor, resource, data)
+- Transaction-aware: defers to `db.onCommit()` inside transactions
+- `Promise.allSettled` in `makeAppEvent` — bridge failure isolation
+- Wired into: inquiry send, inquiry resolve, BetterAuth verification, guest user creation
+- `inquiry.sent` emits after auto-approve check (passes approved state if auto-approved)
 
-**Missing:**
-- Zero `createAppEvent()` calls in any business logic
-- No typed payloads per event (everything is `Record<string, unknown>`)
-- No adapter class registries
-- No workflow primitives (delay, digest, skip)
-- No connection between events and inquiry/job lifecycles
-- No firehose adapter pattern
-- No in-app notification system (DB schema, API, UI)
+**Remaining (this ticket):**
 
----
+### Phase 1 Remaining
+- [ ] Sender context resolution — `EmailSenderContext` flows through types but job ignores it. Need to wire `sender.ownerModel` to `composeTemplate` + `resolveFromAddress` for org-scoped templates/senders
+- [ ] Template hydration strategy — currently manual per-handler. Need standard pattern for "given a template, resolve its variable dependencies"
+- [ ] Unsubscribe mechanism — `CommunicationCategory` (system/promotional) is on templates. Need: preference model, unsubscribe endpoint, footer link. Review Carde patterns
+- [ ] `EmailSender` + `EmailProvider` models — BYOE cascade (Space → Org → User → platform). False polymorphism pattern. Encrypted credentials like `AuthProvider`
+- [ ] Rename frontend `useAppEvents` → `useWebSocket`
+- [ ] Smart query invalidation — `useEventRefetch` should find the page containing the affected record, not blow away the whole cache
+- [ ] Auto-connect `useWebSocketSession` hook + root layout integration
+- [ ] Locale resolution — hardcoded `en`, should consult recipient preference
+- [ ] Test coverage — basic tests exist, need integration tests for full pipeline
 
-## Implementation Phases
-
-### Phase 1: Typed Event Foundation
-- Typed `AppEventPayloads` map (like `JobPayloads`)
-- `defineAppEvent()` with schema + per-class callbacks
-- Adapter class registry infrastructure
-- Wire `createAppEvent()` calls into inquiry lifecycle (sent, approved, denied, canceled)
-- Wire into user lifecycle (signedUp, verified)
-
-### Phase 2: Adapter Classes
-- Formalize email, websocket, notify adapter class interfaces
-- Firehose adapter pattern (register globally, receive all events)
-- Stub all classes with noop defaults
+### Phase 2: Additional Bridges
+- [ ] SMS bridge stub + adapter registry
+- [ ] Chat bridge stub (Slack, Teams, Discord) + adapter registry
+- [ ] Notify bridge (in-app notifications) — Redis-backed, WebSocket push
 
 ### Phase 3: Workflow Primitives
-- Sequential step execution via BullMQ job chains
-- Delay step (BullMQ delay option)
-- Skip/condition step
-- Digest step (aggregation job)
+- [ ] Sequential steps via BullMQ job chains
+- [ ] Delay step
+- [ ] Skip/condition step
+- [ ] Digest/batch step
 
 ### Phase 4: In-App Notifications
-The `notify` adapter class. Handler returns `NotifyHandoff`, adapter class writes to Redis and pushes via WebSocket for real-time delivery. Frontend `useAppEvents` hook already exists.
+- [ ] Redis sorted set per user
+- [ ] API endpoints (list, markRead, markAllRead, dismiss)
+- [ ] Notification center UI component
+- [ ] WebSocket push on create
+- [ ] Preference checks via tags/category
 
-**Storage: Redis, not Postgres.** Notifications are ephemeral UI state, not business records. The durable record is the app event itself (audit log captures that). Trying to make notifications durable is trying to make them do too much — you end up with write-heavy read-state updates, merge/digest SQL, cleanup jobs, and schema migrations for what is essentially a transient "hey, look at this."
-
-- Redis sorted set per user (score = timestamp, auto-expire via TTL)
-- Read/dismiss state lives in Redis only — no Postgres writes on "mark as read"
-- API endpoints (list, markRead, markAllRead, dismiss) — all Redis operations
-- Notification center UI component (bell icon → dropdown)
-- WebSocket push on create, sync read state across tabs
-- Filtering by tags/category
-- Preference checks via tags/category (user opts out of `marketing` → notify adapter skips)
-- Merge/digest handled by the adapter class in Redis before notification is created
-
-### Phase 5: Email Delivery Tracking (Open/Click)
-Tracking is a feedback loop — signals come back from the email provider after delivery. This lives entirely in the email adapter class, not in event handlers.
-
-- **Outbound**: Email adapter class embeds tracking pixels and rewrites links with tracking URLs
-- **Inbound**: Provider webhooks (Resend, SES, SendGrid all support this) POST back to our API
-- **Recording**: Store delivery events (sent, delivered, opened, clicked, bounced) per message
-- **Feedback as events**: Inbound tracking signals become app events themselves (`email.opened`, `email.clicked`, `email.bounced`) — can trigger further workflows (e.g., "if not opened after 3 days, send SMS")
-- **Handler doesn't know**: Tracking is invisible to the event handler. The handler returns an `EmailHandoff`, the adapter class adds tracking automatically.
+### Phase 5: Email Delivery Tracking
+- [ ] Outbound tracking pixels + link rewriting
+- [ ] Inbound provider webhooks
+- [ ] Delivery event storage
+- [ ] Feedback as app events
 
 ### Phase 6: Optional Novu Adapter
-- `NovuWorkflowEngine` adapter for teams wanting the full product
-- Maps workflow definitions to `novu.trigger()` calls
-- Provides visual editor, subscriber preferences, drop-in Inbox
+- [ ] Map workflow definitions to `novu.trigger()`
 
 ---
 

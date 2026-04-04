@@ -32,6 +32,7 @@ export {
   isSuperadmin,
   lesserRole,
   roleHierarchy,
+  rolesAtOrAbove,
   roleToStandardAction,
 } from './roles/shared';
 // Space permissions

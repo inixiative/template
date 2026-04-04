@@ -1,5 +1,7 @@
 import type { SeedFile } from '../seed';
 import { accountSeeds } from './account.seed';
+import { emailComponentSeeds } from './emailComponent.seed';
+import { emailTemplateSeeds } from './emailTemplate.seed';
 import { organizationSeeds } from './organization.seed';
 import { organizationUserSeeds } from './organizationUser.seed';
 import { spaceSeeds } from './space.seed';
@@ -16,6 +18,8 @@ const seeds: SeedFile[] = [
   spaceSeeds, // 5. Spaces (depends on orgs)
   spaceUserSeeds, // 6. Space users (depends on users + spaces)
   tokenSeeds, // 7. Tokens (depends on users, orgs, spaces)
+  emailComponentSeeds, // 8. Email components (no dependencies)
+  emailTemplateSeeds, // 9. Email templates (references components by slug, not FK)
 ];
 
 export { seeds };

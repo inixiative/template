@@ -57,3 +57,9 @@ const roleActionMap: Record<Role, Action> = {
 };
 
 export const roleToStandardAction = (role: Role): Action => roleActionMap[role];
+
+export const rolesAtOrAbove = (role: Role | string): Role[] => {
+  const idx = roleHierarchy.indexOf(role as (typeof roleHierarchy)[number]);
+  if (idx === -1) return [role as Role];
+  return roleHierarchy.slice(idx) as unknown as Role[];
+};

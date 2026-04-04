@@ -2,12 +2,13 @@ import type { Db, OrganizationId, UserId } from '@template/db';
 import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 import { z } from 'zod';
 import { makeError } from '#/lib/errors';
+import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/inviteOrganizationUser/appEvents';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 type InviteOrganizationUserContent = z.infer<typeof contentSchema>;
 
-const contentSchema = z.object({
+export const contentSchema = z.object({
   role: z.nativeEnum(Role).default('member'),
 });
 
@@ -42,4 +43,6 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
       },
     });
   },
+
+  appEvents: inviteOrganizationUserAppEvents,
 };
