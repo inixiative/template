@@ -28,7 +28,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!recipients.length) return;
 
-  const { resolveEmailClient } = await import('#/appEvents/bridges/resolveEmailClient');
+  const { resolveEmailClient } = await import('#/appEvents/services/email/resolveEmailClient');
   const client = await resolveEmailClient(emailContext ?? {});
 
   const composed = await composeTemplate(template, {

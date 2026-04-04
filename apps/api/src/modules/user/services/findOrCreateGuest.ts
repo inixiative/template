@@ -1,6 +1,6 @@
 import type { User } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
-import { userCreatedEvent } from '#/appEvents/definitions';
+import { emitAppEvent } from '#/appEvents/emit';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -26,10 +26,10 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
   const isNew = Date.now() - user.createdAt.getTime() < 5000;
 
   if (isNew) {
-    await userCreatedEvent.emit(
-      { userId: user.id, isGuest: true },
-      { resourceType: 'User', resourceId: user.id },
-    );
+    await emitAppEvent('user.created', { userId: user.id, isGuest: true }, {
+      resourceType: 'User',
+      resourceId: user.id,
+    });
   }
 
   return user;

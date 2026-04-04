@@ -1,28 +1,26 @@
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 import { getHandlers } from '#/appEvents/registry';
-import type { AppEventOptions, AppEventPayload, AppEventType } from '#/appEvents/types';
+import type { AppEventName, AppEventOptions, AppEventPayload } from '#/appEvents/types';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 
-export const createAppEvent = async (
-  type: AppEventType,
+export const emitAppEvent = async (
+  name: AppEventName,
   data: Record<string, unknown>,
   options?: AppEventOptions,
-  meta?: unknown,
 ): Promise<void> => {
   const actor = auditActorContext.getScope() ?? nullAuditActor;
 
-  const event: AppEventPayload & { _meta?: unknown } = {
-    type,
+  const event: AppEventPayload = {
+    name,
     actor,
-    ...options,
+    resourceType: options?.resourceType,
+    resourceId: options?.resourceId,
     data,
     timestamp: new Date().toISOString(),
   };
 
-  if (meta !== undefined) event._meta = meta;
-
-  const eventHandlers = getHandlers(type);
+  const eventHandlers = getHandlers(name);
 
   if (!eventHandlers.length) return;
 
@@ -31,7 +29,7 @@ export const createAppEvent = async (
 
     for (const [i, result] of results.entries()) {
       if (result.status === 'rejected') {
-        log.error(`App event handler failed [${type}] handler=${i}`, { error: result.reason });
+        log.error(`App event handler failed [${name}] handler=${i}`, { error: result.reason });
       }
     }
   };

@@ -1,6 +1,6 @@
 import { log } from '@template/shared/logger';
-import { resolveFromAddress } from '#/appEvents/bridges/resolveFromAddress';
-import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/bridges/resolveTargets';
+import { resolveFromAddress } from '#/appEvents/services/email/resolveFromAddress';
+import { resolveTargets, resolveTargetsToAddresses } from '#/appEvents/services/email/resolveTargets';
 import type { AppEventPayload, EmailContext, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -37,7 +37,7 @@ export const deliverEmailHandoffs = async (
         ]);
 
         if (!to.length) {
-          log.debug(`Email bridge: no recipients for event=${event.type} template=${handoff.message.template}`);
+          log.debug(`Email bridge: no recipients for event=${event.name} template=${handoff.message.template}`);
           continue;
         }
 
@@ -55,13 +55,13 @@ export const deliverEmailHandoffs = async (
         });
 
         log.info(
-          `Email bridge: event=${event.type} template=${handoff.message.template} group to=${to.length} cc=${cc.length} bcc=${bcc.length} job=${job.jobId}`,
+          `Email bridge: event=${event.name} template=${handoff.message.template} group to=${to.length} cc=${cc.length} bcc=${bcc.length} job=${job.jobId}`,
         );
       } else {
         const recipients = await resolveTargets(handoff.target);
 
         if (!recipients.length) {
-          log.debug(`Email bridge: no recipients for event=${event.type} template=${handoff.message.template}`);
+          log.debug(`Email bridge: no recipients for event=${event.name} template=${handoff.message.template}`);
           continue;
         }
 
@@ -77,11 +77,11 @@ export const deliverEmailHandoffs = async (
         });
 
         log.info(
-          `Email bridge: event=${event.type} template=${handoff.message.template} recipients=${recipients.length} job=${job.jobId}`,
+          `Email bridge: event=${event.name} template=${handoff.message.template} recipients=${recipients.length} job=${job.jobId}`,
         );
       }
     } catch (err) {
-      log.error(`Email bridge failed for event=${event.type} template=${handoff.message.template}`, { error: err });
+      log.error(`Email bridge failed for event=${event.name} template=${handoff.message.template}`, { error: err });
     }
   }
 };

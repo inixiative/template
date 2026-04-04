@@ -1,7 +1,7 @@
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
-import { inquiryResolvedEvent } from '#/appEvents/definitions';
+import { emitAppEvent } from '#/appEvents/emit';
 import { auditActorContext } from '#/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
@@ -45,16 +45,10 @@ export const resolveInquiry = async (
         include: includeInquiryReceived,
       });
 
-      await inquiryResolvedEvent.emit(
-        {
-          inquiryId: inquiry.id,
-          inquiryType: inquiry.type,
-          resolution: status,
-          sourceOrganizationId: inquiry.sourceOrganizationId ?? undefined,
-          sourceUserId: inquiry.sourceUserId ?? undefined,
-          targetUserId: inquiry.targetUserId ?? undefined,
-        },
-        { resourceType: 'Inquiry', resourceId: inquiry.id, meta: updated },
+      await emitAppEvent(
+        'inquiry.resolved',
+        { ...updated, _resolution: status } as unknown as Record<string, unknown>,
+        { resourceType: 'Inquiry', resourceId: inquiry.id },
       );
 
       return updated;

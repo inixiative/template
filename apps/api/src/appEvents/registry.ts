@@ -1,14 +1,14 @@
-import type { AppEventHandler, AppEventType } from '#/appEvents/types';
+import type { AppEventHandler, AppEventName } from '#/appEvents/types';
 
-const handlers: Map<AppEventType | '*', AppEventHandler[]> = new Map();
+const handlers: Map<AppEventName | '*', AppEventHandler[]> = new Map();
 
-export const registerAppEvent = (type: AppEventType | '*', handler: AppEventHandler): void => {
-  const existing = handlers.get(type) ?? [];
-  handlers.set(type, [...existing, handler]);
+export const registerAppEvent = (name: AppEventName | '*', handler: AppEventHandler): void => {
+  const existing = handlers.get(name) ?? [];
+  handlers.set(name, [...existing, handler]);
 };
 
-export const getHandlers = (type: AppEventType): AppEventHandler[] => {
-  const specific = handlers.get(type) ?? [];
+export const getHandlers = (name: AppEventName): AppEventHandler[] => {
+  const specific = handlers.get(name) ?? [];
   const global = handlers.get('*') ?? [];
   return [...specific, ...global];
 };

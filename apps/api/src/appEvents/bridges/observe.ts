@@ -3,21 +3,11 @@ import { log } from '@template/shared/logger';
 import { registerAppEvent } from '#/appEvents/registry';
 import type { AppEventPayload } from '#/appEvents/types';
 
-/**
- * Observe bridge — persists every event to the AppEvent table.
- *
- * This is the base observability layer. Every event gets a durable record
- * with full actor context (auto-captured from auditActorContext), resource
- * reference, and domain payload.
- *
- * Future adapters (Segment, Datadog, Prometheus) can read from this table
- * or register as additional wildcard handlers alongside this one.
- */
 registerAppEvent('*', async (event: AppEventPayload) => {
   try {
     await db.appEvent.create({
       data: {
-        type: event.type,
+        type: event.name,
         actorUserId: event.actor.actorUserId,
         actorSpoofUserId: event.actor.actorSpoofUserId,
         actorTokenId: event.actor.actorTokenId,
@@ -31,6 +21,6 @@ registerAppEvent('*', async (event: AppEventPayload) => {
       },
     });
   } catch (err) {
-    log.error(`Observe bridge: failed to persist event=${event.type}`, { error: err });
+    log.error(`Observe bridge: failed to persist event=${event.name}`, { error: err });
   }
 });

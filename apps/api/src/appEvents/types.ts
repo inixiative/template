@@ -1,15 +1,14 @@
 import type { CommunicationCategory } from '@template/db';
 
-export type BaseAppEventType =
+export type AppEventName =
   | 'user.created'
   | 'user.signedUp'
   | 'user.verified'
   | 'user.updated'
   | 'user.verificationRequested'
   | 'inquiry.sent'
-  | 'inquiry.resolved';
-
-export type AppEventType = BaseAppEventType | (string & {});
+  | 'inquiry.resolved'
+  | (string & {});
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -22,7 +21,7 @@ export type AppEventActor = {
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
-  type: AppEventType;
+  name: AppEventName;
   actor: AppEventActor;
   resourceType?: string;
   resourceId?: string;
@@ -79,4 +78,10 @@ export type EmailHandoff = {
 export type WSHandoff = {
   target: { channels: string[] } | { userIds: string[] };
   message: { data: Record<string, unknown> };
+};
+
+export type AppEventHandlerDefinition<T = unknown> = {
+  email?: (data: T) => EmailHandoff[] | null;
+  websocket?: (data: T) => WSHandoff[] | null;
+  on?: Array<(data: T) => Promise<void> | void>;
 };

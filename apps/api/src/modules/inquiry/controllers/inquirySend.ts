@@ -1,5 +1,5 @@
 import { InquiryStatus } from '@template/db/generated/client/enums';
-import { inquirySentEvent } from '#/appEvents/definitions';
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -24,17 +24,10 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
     include: includeInquirySent,
   });
 
-  await inquirySentEvent.emit(
-    {
-      inquiryId: sent.id,
-      inquiryType: sent.type,
-      sourceOrganizationId: sent.sourceOrganizationId ?? undefined,
-      sourceUserId: sent.sourceUserId ?? undefined,
-      targetUserId: sent.targetUserId ?? undefined,
-      targetModel: sent.targetModel,
-    },
-    { resourceType: 'Inquiry', resourceId: sent.id, meta: sent },
-  );
+  await emitAppEvent('inquiry.sent', sent as unknown as Record<string, unknown>, {
+    resourceType: 'Inquiry',
+    resourceId: sent.id,
+  });
 
   const handler = inquiryHandlers[inquiry.type];
   if (await handler.autoApprove(db, sent)) {
