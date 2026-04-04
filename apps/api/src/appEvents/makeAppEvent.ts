@@ -41,6 +41,6 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
       }
     }
 
-    await Promise.all(tasks);
+    await Promise.allSettled(tasks);
   };
 };

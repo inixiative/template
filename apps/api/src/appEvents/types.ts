@@ -19,7 +19,6 @@ export type AppEventPayload<T = Record<string, unknown>> = {
   timestamp: string;
 };
 
-export type AppEventHandler = (event: AppEventPayload) => Promise<void> | void;
 
 export type AppEventOptions = {
   resourceType?: string;
@@ -58,8 +57,6 @@ export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
   observe?: (data: T) => ObserveData | null;
-  sms?: (data: T) => unknown;
-  chat?: (data: T) => unknown;
-  notify?: (data: T) => unknown;
+
   cb?: Array<(data: T) => Promise<void> | void>;
 };
