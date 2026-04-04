@@ -15,6 +15,7 @@ export type SendEmailPayload = {
   from: string;
   template: string;
   data: Record<string, unknown>;
+  eventName: string;
 };
 
 const senderVars = (): Record<string, unknown> => ({
@@ -52,7 +53,7 @@ const verifyRecipients = async (
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { recipients: rawRecipients, cc, bcc, from, template, data } = payload;
+  const { recipients: rawRecipients, cc, bcc, from, template, data, eventName } = payload;
   const { log } = ctx;
 
   const recipients = await verifyRecipients(rawRecipients, log);
@@ -82,14 +83,14 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags: [template] });
+    await client.send({ to: recipients.map((r) => r.to), cc, bcc, from, subject, html, tags: [eventName, template] });
   } else {
     const rendered = recipients.map((recipient) => {
       const variables: Variables = { sender, recipient: { name: recipient.name, email: recipient.to }, data };
       const mjml = interpolate(composed.mjml, variables);
       const subject = interpolate(composed.subject, variables);
       const { html } = mjml2html(mjml, { validationLevel: 'skip' });
-      return { to: recipient.to, from, subject, html, tags: [template] };
+      return { to: recipient.to, from, subject, html, tags: [eventName, template] };
     });
 
     await client.sendBatch(rendered);

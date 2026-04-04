@@ -24,6 +24,7 @@ const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Pr
       from,
       template: handoff.template,
       data: handoff.data,
+      eventName: event.name,
     });
 
     log.info(`Email bridge: ${event.name} → ${handoff.template} group to=${to.length} cc=${cc.length} bcc=${bcc.length} job=${job.jobId}`);
@@ -37,6 +38,7 @@ const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Pr
       from,
       template: handoff.template,
       data: handoff.data,
+      eventName: event.name,
     });
 
     log.info(`Email bridge: ${event.name} → ${handoff.template} recipients=${recipients.length} job=${job.jobId}`);
