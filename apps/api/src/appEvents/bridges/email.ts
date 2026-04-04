@@ -13,42 +13,23 @@ const buildTags = (event: AppEventPayload, handoff: EmailHandoff): string[] => [
 const deliverHandoff = async (event: AppEventPayload, handoff: EmailHandoff): Promise<void> => {
   const from = await resolveFromAddress(handoff.sender ?? {}, handoff);
   const tags = buildTags(event, handoff);
+  const recipients = await resolveTargets(handoff.to);
+  const cc = handoff.cc?.length ? await resolveTargetsToAddresses(handoff.cc) : undefined;
+  const bcc = handoff.bcc?.length ? await resolveTargetsToAddresses(handoff.bcc) : undefined;
 
-  if (handoff.cc?.length || handoff.bcc?.length) {
-    const [to, cc, bcc] = await Promise.all([
-      resolveTargetsToAddresses(handoff.to),
-      handoff.cc ? resolveTargetsToAddresses(handoff.cc) : [],
-      handoff.bcc ? resolveTargetsToAddresses(handoff.bcc) : [],
-    ]);
+  if (!recipients.length) return;
 
-    if (!to.length) return;
+  const job = await enqueueJob('sendEmail', {
+    recipients,
+    cc,
+    bcc,
+    from,
+    template: handoff.template,
+    data: handoff.data,
+    tags,
+  });
 
-    const job = await enqueueJob('sendEmail', {
-      recipients: to.map((email) => ({ to: email, name: '' })),
-      cc,
-      bcc,
-      from,
-      template: handoff.template,
-      data: handoff.data,
-      tags,
-    });
-
-    log.info(`Email bridge: ${event.name} → ${handoff.template} group to=${to.length} cc=${cc.length} bcc=${bcc.length} job=${job.jobId}`);
-  } else {
-    const recipients = await resolveTargets(handoff.to);
-
-    if (!recipients.length) return;
-
-    const job = await enqueueJob('sendEmail', {
-      recipients,
-      from,
-      template: handoff.template,
-      data: handoff.data,
-      tags,
-    });
-
-    log.info(`Email bridge: ${event.name} → ${handoff.template} recipients=${recipients.length} job=${job.jobId}`);
-  }
+  log.info(`Email bridge: ${event.name} → ${handoff.template} to=${recipients.length} job=${job.jobId}`);
 };
 
 export const deliverEmailHandoffs = async (
