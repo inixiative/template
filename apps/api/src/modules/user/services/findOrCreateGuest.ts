@@ -13,10 +13,10 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
   const db = c.get('db');
   const normalized = normalizeEmail(email);
 
-  const existing = await db.user.findUnique({ where: { email: normalized } });
-  if (existing) return existing;
-
   return db.txn(async () => {
+    const existing = await db.user.findUnique({ where: { email: normalized } });
+    if (existing) return existing;
+
     const guest = await db.user.create({
       data: { email: normalized, name, emailVerified: false },
     });
