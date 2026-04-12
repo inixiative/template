@@ -1,4 +1,6 @@
-export type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
+import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
+
+export type { EmailTarget, ResolvedRecipient };
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -42,9 +44,12 @@ export type EmailHandoff = {
   tags?: string[];
 };
 
+// ARCHITECTURAL SKETCH — NOT PRODUCTION READY.
+// Shape is an AI-drafted stub; targeting + message envelope need a human
+// architectural pass before features depend on it. See bridges/websocket.ts.
 export type WSHandoff = {
   target: { channels: string[] } | { userIds: string[] };
-  message: { data: Record<string, unknown> };
+  message: { type: string; data: Record<string, unknown> };
 };
 
 export type ObserveData = Record<string, unknown>;

@@ -1,8 +1,9 @@
-import { db } from '@template/db';
+import type { Db } from '@template/db';
 import { rolesAtOrAbove } from '@template/permissions';
-import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting/types';
+import type { Role } from '@template/db/generated/client/enums';
+import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 
-const resolveUserIds = async (userIds: string[]): Promise<ResolvedRecipient[]> => {
+const resolveUserIds = async (db: Db, userIds: string[]): Promise<ResolvedRecipient[]> => {
   if (!userIds.length) return [];
   const users = await db.user.findMany({
     where: { id: { in: userIds } },
@@ -11,34 +12,34 @@ const resolveUserIds = async (userIds: string[]): Promise<ResolvedRecipient[]> =
   return users.map((u) => ({ to: u.email, name: u.name ?? '' }));
 };
 
-const resolveOrgRole = async (organizationId: string, role: string): Promise<ResolvedRecipient[]> => {
+const resolveOrgRole = async (db: Db, organizationId: string, role: Role): Promise<ResolvedRecipient[]> => {
   const roles = rolesAtOrAbove(role);
   const orgUsers = await db.organizationUser.findMany({
-    where: { organizationId, role: { in: roles as never } },
+    where: { organizationId, role: { in: roles } },
     select: { user: { select: { email: true, name: true } } },
   });
   return orgUsers.map((ou) => ({ to: ou.user.email, name: ou.user.name ?? '' }));
 };
 
-const resolveSpaceRole = async (spaceId: string, role: string): Promise<ResolvedRecipient[]> => {
+const resolveSpaceRole = async (db: Db, spaceId: string, role: Role): Promise<ResolvedRecipient[]> => {
   const roles = rolesAtOrAbove(role);
   const spaceUsers = await db.spaceUser.findMany({
-    where: { spaceId, role: { in: roles as never } },
+    where: { spaceId, role: { in: roles } },
     select: { user: { select: { email: true, name: true } } },
   });
   return spaceUsers.map((su) => ({ to: su.user.email, name: su.user.name ?? '' }));
 };
 
-const resolveOne = async (target: EmailTarget): Promise<ResolvedRecipient[]> => {
-  if ('userIds' in target) return resolveUserIds(target.userIds);
+const resolveOne = async (db: Db, target: EmailTarget): Promise<ResolvedRecipient[]> => {
+  if ('userIds' in target) return resolveUserIds(db, target.userIds);
   if ('raw' in target) return target.raw.map((email) => ({ to: email, name: '' }));
-  if ('orgRole' in target) return resolveOrgRole(target.orgRole.organizationId, target.orgRole.role);
-  if ('spaceRole' in target) return resolveSpaceRole(target.spaceRole.spaceId, target.spaceRole.role);
+  if ('orgRole' in target) return resolveOrgRole(db, target.orgRole.organizationId, target.orgRole.role);
+  if ('spaceRole' in target) return resolveSpaceRole(db, target.spaceRole.spaceId, target.spaceRole.role);
   return [];
 };
 
-export const resolveTargets = async (targets: EmailTarget[]): Promise<ResolvedRecipient[]> => {
-  const results = await Promise.all(targets.map(resolveOne));
+export const resolveTargets = async (db: Db, targets: EmailTarget[]): Promise<ResolvedRecipient[]> => {
+  const results = await Promise.all(targets.map((t) => resolveOne(db, t)));
   const flat = results.flat();
 
   const seen = new Set<string>();
@@ -49,7 +50,7 @@ export const resolveTargets = async (targets: EmailTarget[]): Promise<ResolvedRe
   });
 };
 
-export const resolveTargetsToAddresses = async (targets: EmailTarget[]): Promise<string[]> => {
-  const recipients = await resolveTargets(targets);
+export const resolveTargetsToAddresses = async (db: Db, targets: EmailTarget[]): Promise<string[]> => {
+  const recipients = await resolveTargets(db, targets);
   return recipients.map((r) => r.to);
 };

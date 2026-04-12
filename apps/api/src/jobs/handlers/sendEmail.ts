@@ -50,12 +50,12 @@ const verifyAddresses = async (
 
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
   const { to, cc, bcc, template, data, tags } = payload;
-  const { log } = ctx;
+  const { db, log } = ctx;
 
   const [recipients, ccAddresses, bccAddresses, from] = await Promise.all([
-    resolveTargets(to),
-    cc?.length ? resolveTargetsToAddresses(cc) : undefined,
-    bcc?.length ? resolveTargetsToAddresses(bcc) : undefined,
+    resolveTargets(db, to),
+    cc?.length ? resolveTargetsToAddresses(db, cc) : undefined,
+    bcc?.length ? resolveTargetsToAddresses(db, bcc) : undefined,
     resolveFromAddress(),
   ]);
 
@@ -66,8 +66,13 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!validRecipients.length) return;
 
+  const verifiedCc = ccAddresses?.length ? await verifyAddresses(ccAddresses, log) : undefined;
+  const verifiedBcc = bccAddresses?.length ? await verifyAddresses(bccAddresses, log) : undefined;
+
+  const defaultAdapterName = emailRegistry.names()[0];
+  if (defaultAdapterName === undefined) throw new Error('No email adapters are registered');
   // Stub: always uses first registered adapter. Future: resolve per-tenant via sender context.
-  const client = emailRegistry.getOrDefault(undefined, emailRegistry.names()[0]);
+  const client = emailRegistry.getOrDefault(undefined, defaultAdapterName);
 
   // Stub: always default templates, en locale. Future: resolve from sender.ownerModel + locale.
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
@@ -84,7 +89,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     const subject = interpolate(composed.subject, variables);
     const { html } = mjml2html(mjml, { validationLevel: 'skip' });
 
-    return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
+    return { to: recipient.to, cc: verifiedCc, bcc: verifiedBcc, from, subject, html, tags };
   });
 
   await client.sendBatch(rendered);

@@ -65,7 +65,7 @@ describe('makeAppEvent', () => {
   describe('websocket', () => {
     it('calls websocket callback with event data', async () => {
       const wsFn = mock(() => [
-        { target: { userIds: ['user-1'] }, message: { data: { test: true } } },
+        { target: { userIds: ['user-1'] }, message: { type: 'test', data: { test: true } } },
       ]);
 
       const handler = makeAppEvent({ websocket: wsFn });

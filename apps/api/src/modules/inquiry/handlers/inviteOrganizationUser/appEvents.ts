@@ -30,7 +30,10 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       return [
         {
           target: { userIds: [inquiry.targetUserId] },
-          message: { data: { event: 'inquiry.sent', inquiryId: inquiry.id, type: inquiry.type } },
+          message: {
+            type: 'inquiry.sent',
+            data: { inquiryId: inquiry.id, inquiryType: inquiry.type },
+          },
         },
       ];
     },
@@ -44,7 +47,10 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       return [
         {
           target: { userIds: targets },
-          message: { data: { event: 'inquiry.resolved', inquiryId: inquiry.id, type: inquiry.type, status: inquiry.status } },
+          message: {
+            type: 'inquiry.resolved',
+            data: { inquiryId: inquiry.id, inquiryType: inquiry.type, status: inquiry.status },
+          },
         },
       ];
     },

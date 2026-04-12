@@ -5,39 +5,40 @@ import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/typ
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 
+const isolate = <R>(fn: () => R | Promise<R>): Promise<R> => Promise.resolve().then(fn);
+
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<void>[] = [];
+    const tasks: Promise<unknown>[] = [];
 
     if (handler.observe) {
-      const observeData = handler.observe(data);
-      if (observeData) {
-        tasks.push(observeRegistry.broadcast((adapter) => adapter.record(event, observeData)).then(() => {}));
-      }
+      tasks.push(
+        isolate(() => handler.observe!(data)).then((observeData) => {
+          if (observeData) return observeRegistry.broadcast((adapter) => adapter.record(event, observeData));
+        }),
+      );
     }
 
     if (handler.email) {
-      const handoffs = handler.email(data);
-      if (handoffs?.length) {
-        for (const handoff of handoffs) {
-          tasks.push(deliverEmailHandoffs(event, [handoff]));
-        }
-      }
+      tasks.push(
+        isolate(() => handler.email!(data)).then((handoffs) => {
+          if (handoffs?.length) return Promise.all(handoffs.map((h) => deliverEmailHandoffs(event, [h])));
+        }),
+      );
     }
 
     if (handler.websocket) {
-      const handoffs = handler.websocket(data);
-      if (handoffs?.length) {
-        for (const handoff of handoffs) {
-          tasks.push(deliverWSHandoffs([handoff]));
-        }
-      }
+      tasks.push(
+        isolate(() => handler.websocket!(data)).then((handoffs) => {
+          if (handoffs?.length) return Promise.all(handoffs.map((h) => deliverWSHandoffs([h])));
+        }),
+      );
     }
 
     if (handler.cb) {
       for (const callback of handler.cb) {
-        tasks.push(Promise.resolve(callback(data)));
+        tasks.push(isolate(() => callback(data)));
       }
     }
 
