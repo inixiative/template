@@ -1,5 +1,6 @@
 import type { User } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
+import { emitAppEvent } from '#/appEvents/emit';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -12,13 +13,19 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
   const db = c.get('db');
   const normalized = normalizeEmail(email);
 
-  return db.user.upsert({
-    where: { email: normalized },
-    update: {},
-    create: {
-      email: normalized,
-      name,
-      emailVerified: false,
-    },
+  const existing = await db.user.findUnique({ where: { email: normalized } });
+  if (existing) return existing;
+
+  return db.txn(async () => {
+    const guest = await db.user.create({
+      data: { email: normalized, name, emailVerified: false },
+    });
+
+    await emitAppEvent('user.created', { userId: guest.id, isGuest: true }, {
+      resourceType: 'User',
+      resourceId: guest.id,
+    });
+
+    return guest;
   });
 };

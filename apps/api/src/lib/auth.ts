@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { uuidv7 } from 'uuidv7';
+import { emitAppEvent } from '#/appEvents/emit';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
@@ -15,7 +16,10 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    requireEmailVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url });
+    },
   },
 
   socialProviders: {
