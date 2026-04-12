@@ -1,6 +1,7 @@
+import type { EmailSenderContext, SendEmailInput } from '@template/email/send';
 import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 
-export type { EmailTarget, ResolvedRecipient };
+export type { EmailSenderContext, EmailTarget, ResolvedRecipient };
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -27,22 +28,7 @@ export type AppEventOptions = {
   resourceId?: string;
 };
 
-export type EmailSenderContext = {
-  ownerModel: 'default' | 'Organization' | 'Space' | 'User';
-  organizationId?: string;
-  spaceId?: string;
-  userId?: string;
-};
-
-export type EmailHandoff = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
-  template: string;
-  data: Record<string, unknown>;
-  sender?: EmailSenderContext;
-  tags?: string[];
-};
+export type EmailHandoff = SendEmailInput;
 
 // ARCHITECTURAL SKETCH — NOT PRODUCTION READY.
 // Shape is an AI-drafted stub; targeting + message envelope need a human

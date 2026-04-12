@@ -30,6 +30,7 @@
     "@prisma/instrumentation": "^7.4.2",
     "@sentry/bun": "^10.42.0",
     "@template/db": "workspace:*",
+    "@template/email": "workspace:*",
     "@template/permissions": "workspace:*",
     "@template/shared": "workspace:*",
     "better-auth": "^1.5.4",
