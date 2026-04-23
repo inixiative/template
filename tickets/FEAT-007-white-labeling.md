@@ -4,7 +4,7 @@
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-02-06
-**Updated**: 2026-02-06
+**Updated**: 2026-04-23
 
 ---
 
@@ -50,6 +50,47 @@ Key capabilities needed:
 - **Preview**: Live theme preview in admin
 - **Fallback**: Default theme if none configured
 
+#### Component-Level Semantic Tokens (Proposed)
+
+Our current three-tier CSS variable system (`--app-*` → `--space-*` → `--primary`) handles color indirection and tenant overrides well. The next step is adding **component-level semantic tokens** following the pattern described in CloudProduce's design system writeup (Philipp Hertel, 2026-04-14).
+
+**What we have today:**
+Components reference generic tokens (`--primary`, `--card`, `--muted`) and decide their own state styling via Tailwind classes and CVA variants. Hover, disabled, and active states are scattered across component code.
+
+**What the proposal adds:**
+A semantic token layer where skins declare per-component, per-state mappings:
+
+```css
+/* Inside a skin class or :root */
+--primaryButtonFillDefault:  var(--primary);
+--primaryButtonFillHover:    var(--primary-3);
+--primaryButtonFillDisabled: var(--muted);
+--primaryButtonLabelDefault: var(--primary-foreground);
+--inputStrokeActive:         var(--ring);
+--inputStrokeError:          var(--error);
+--cardBackgroundLight:       var(--card);
+```
+
+Components then reference only these semantic tokens — they never pick their own state colors. The naming convention is `--<component><Property><State>` (e.g., `--primaryButtonFillHover`).
+
+**Why this matters for white-labeling:**
+- Tenant skins can control not just "what's primary" but "what does a disabled button look like in my brand"
+- Every new component is automatically themeable — authors don't think about it
+- Changing how dark mode treats a specific state is one line in the skin, not a grep across components
+
+**What's already in place:**
+- Three-tier variable indirection (works as-is)
+- `color-mix()` shade generation (works as-is)
+- `.dark` class toggle with mode-specific values (works as-is)
+- `useSpaceTheme` hook for dynamic tenant overrides (works as-is)
+
+**What needs to be built:**
+- [ ] Define the semantic token vocabulary (inventory all component states: Default, Hover, Pressed, Disabled, Active, Error)
+- [ ] Add semantic token declarations to `theme.css` (light + dark)
+- [ ] Update `useSpaceTheme` to support space-level semantic token overrides
+- [ ] Migrate core components (Button, Input, Card) to reference semantic tokens instead of generic tokens
+- [ ] Enforce "no generic tokens in component code" via lint or review convention
+
 ### Branding
 - **Logo upload**: Space/Org logos
 - **Favicon**: Custom favicons per domain
@@ -68,4 +109,16 @@ Key capabilities needed:
 
 ---
 
-_Stub ticket - expand when prioritized_
+## Comments
+
+### 2026-04-23 — Design System Writeup Review (Aron)
+
+Reviewed Philipp Hertel's CloudProduce engineering writeup on their two-level CSS variable design system. Compared it against our existing `theme.css` implementation.
+
+**Finding:** Our three-tier system (`--app-*` → `--space-*` → active tokens) already follows the core pattern — CSS variable indirection, class-based dark mode toggle, no React re-renders, `color-mix()` shade generation. The architecture is sound.
+
+**Gap:** We stop at generic design tokens (`--primary`, `--card`, `--muted`). The writeup advocates an additional component-level semantic token layer (`--primaryButtonFillHover`, `--inputStrokeError`, etc.) where skins own the mapping from meaning to value, and components are completely ignorant of the palette.
+
+**Recommendation:** When this ticket is prioritized, start by inventorying component states and defining the semantic token naming convention (`--<component><Property><State>`), then migrate Button/Input/Card as a proof of concept before rolling out to the full component library.
+
+Reference: `design-system-writeup.pdf` (CloudProduce, 2026-04-14)
