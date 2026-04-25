@@ -562,7 +562,6 @@ export const setupRailway = async (
 
     // Step 26: Store prod API URL in Infisical (creates domain if needed)
     if (!(await isComplete('railway', 'storeProdApiUrl'))) {
-      await onStepComplete?.('Ensuring prod API domain...');
       const prodApiUrl = await railwayApi.ensureServiceDomain(prodApiServiceId, prodEnv.id);
       await setSecretAsync(infisicalProjectId, 'prod', 'API_URL', prodApiUrl, '/');
       await setSecretAsync(infisicalProjectId, 'prod', 'VITE_API_URL', prodApiUrl, '/');
@@ -572,7 +571,6 @@ export const setupRailway = async (
 
     // Step 27: Store staging API URL in Infisical (creates domain if needed)
     if (!(await isComplete('railway', 'storeStagingApiUrl'))) {
-      await onStepComplete?.('Ensuring staging API domain...');
       const stagingApiUrl = await railwayApi.ensureServiceDomain(stagingApiServiceId, stagingEnv.id);
       await setSecretAsync(infisicalProjectId, 'staging', 'API_URL', stagingApiUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_API_URL', stagingApiUrl, '/');

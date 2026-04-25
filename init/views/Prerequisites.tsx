@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
@@ -10,7 +10,19 @@ import {
   checkPlanetScaleSessionAsync,
   checkRailwaySessionAsync,
   checkVercelSessionAsync,
+  getInstallCommand,
 } from '../utils/checkPrerequisites';
+
+const LOGIN_COMMANDS: Record<string, string> = {
+  gh: 'gh auth login',
+  infisical: 'infisical login',
+  pscale: 'pscale auth login',
+  vercel: 'vercel login',
+  railway: 'railway login',
+  docker: 'open -a Docker  # then wait for the daemon to start',
+};
+
+type Failure = { label: string; reason: 'not-installed' | 'not-authed' | 'docker-down'; cliCommand: string };
 
 type PrerequisitesProps = {
   onComplete: () => void;
@@ -268,21 +280,66 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
     });
   }, []);
 
-  // Check completion
+  // Build a list of what failed, with the command to fix each
+  const failures = useMemo<Failure[]>(() => {
+    const out: Failure[] = [];
+    const cliRow = (label: string, cliCommand: string, check: Check) => {
+      if (check.status === 'failed') out.push({ label, cliCommand, reason: 'not-installed' });
+    };
+    const sessionRow = (label: string, cliCommand: string, cli: Check, sess: Check) => {
+      // If CLI itself failed we already reported install above; only flag auth when CLI is OK but session isn't.
+      if (cli.status === 'success' && sess.status === 'failed')
+        out.push({ label, cliCommand, reason: 'not-authed' });
+    };
+
+    cliRow('Bun', 'bun', bunCLI);
+    cliRow('Git', 'git', gitCLI);
+    cliRow('GitHub CLI', 'gh', ghCLI);
+    cliRow('Docker', 'docker', dockerCLI);
+    cliRow('Infisical CLI', 'infisical', infisicalCLI);
+    cliRow('PlanetScale CLI', 'pscale', pscaleCLI);
+    cliRow('Vercel CLI', 'vercel', vercelCLI);
+    cliRow('Railway CLI', 'railway', railwayCLI);
+
+    if (dockerCLI.status === 'success' && dockerRunning.status === 'failed')
+      out.push({ label: 'Docker daemon', cliCommand: 'docker', reason: 'docker-down' });
+    sessionRow('GitHub', 'gh', ghCLI, ghSession);
+    sessionRow('Infisical', 'infisical', infisicalCLI, infisicalSession);
+    sessionRow('PlanetScale', 'pscale', pscaleCLI, pscaleSession);
+    sessionRow('Vercel', 'vercel', vercelCLI, vercelSession);
+    sessionRow('Railway', 'railway', railwayCLI, railwaySession);
+
+    return out;
+  }, [
+    bunCLI,
+    gitCLI,
+    ghCLI,
+    dockerCLI,
+    dockerRunning,
+    infisicalCLI,
+    pscaleCLI,
+    vercelCLI,
+    railwayCLI,
+    ghSession,
+    infisicalSession,
+    pscaleSession,
+    vercelSession,
+    railwaySession,
+  ]);
+
+  // Auto-advance only when everything passes; on failure, stay on screen until user dismisses.
   useEffect(() => {
     if (!allDone) return;
-
-    const delay = allPassed ? 800 : 100;
-    const timer = setTimeout(() => {
-      if (allPassed) {
-        onComplete();
-      } else {
-        process.exit(1);
-      }
-    }, delay);
-
+    if (!allPassed) return;
+    const timer = setTimeout(() => onComplete(), 800);
     return () => clearTimeout(timer);
   }, [allDone, allPassed, onComplete]);
+
+  // Pressing Enter / Esc / q after a failure exits cleanly with code 1 (so callers know it failed).
+  useInput((input, key) => {
+    if (!allDone || allPassed) return;
+    if (key.return || key.escape || input === 'q') process.exit(1);
+  });
 
   const renderCheck = (check: Check, name: string) => {
     if (check.status === 'pending') return <Text dimColor>− {name}</Text>;
@@ -339,6 +396,39 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
           <Text color="green" bold>
             ✓ All prerequisites met!
           </Text>
+        </Box>
+      )}
+
+      {allDone && !allPassed && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color="red" bold>
+            ✗ Prerequisites failed — fix the items below and re-run `bun run init`:
+          </Text>
+          <Box flexDirection="column" marginTop={1} marginLeft={2}>
+            {failures.map((f) => {
+              const cmd =
+                f.reason === 'not-installed'
+                  ? getInstallCommand(f.cliCommand)
+                  : LOGIN_COMMANDS[f.cliCommand] ?? `# fix ${f.cliCommand} manually`;
+              const heading =
+                f.reason === 'not-installed'
+                  ? `${f.label} — not installed`
+                  : f.reason === 'docker-down'
+                    ? `${f.label} — daemon not running`
+                    : `${f.label} — not authenticated`;
+              return (
+                <Box key={`${f.label}-${f.reason}`} flexDirection="column" marginBottom={1}>
+                  <Text color="red">• {heading}</Text>
+                  <Box marginLeft={2}>
+                    <Text color="cyan">{cmd}</Text>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>Press Enter / Esc / q to exit.</Text>
+          </Box>
         </Box>
       )}
     </Box>

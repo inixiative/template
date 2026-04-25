@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 export type ProjectConfig = {
@@ -655,8 +656,21 @@ const normalizePlanetScaleProgress = (
  */
 export const getProjectConfig = async (): Promise<ProjectConfig> => {
   const useInternal = process.env.USE_INTERNAL_CONFIG === 'true';
-  const configFile = useInternal ? 'project.config.template-internal.ts' : 'project.config.ts';
-  const configPath = join(process.cwd(), configFile);
+  let configFile = useInternal ? 'project.config.template-internal.ts' : 'project.config.ts';
+  let configPath = join(process.cwd(), configFile);
+
+  // Graceful fallback: if USE_INTERNAL_CONFIG=true but the internal file is missing
+  // (the common case for template consumers — internal config is only for template
+  // development), fall back to the regular project.config.ts instead of crashing.
+  if (useInternal && !existsSync(configPath)) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[init] USE_INTERNAL_CONFIG=true but ${configFile} not found — falling back to project.config.ts. ` +
+        `Set USE_INTERNAL_CONFIG=false in .env.init to silence this warning.`,
+    );
+    configFile = 'project.config.ts';
+    configPath = join(process.cwd(), configFile);
+  }
 
   try {
     // Bust import cache with timestamp to get fresh config
@@ -762,8 +776,10 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
  */
 export const getProjectConfigPath = (): string => {
   const useInternal = process.env.USE_INTERNAL_CONFIG === 'true';
-  const configFile = useInternal ? 'project.config.template-internal.ts' : 'project.config.ts';
-  return join(process.cwd(), configFile);
+  const internalPath = join(process.cwd(), 'project.config.template-internal.ts');
+  // Same fallback as getProjectConfig: prefer internal only when it actually exists.
+  if (useInternal && existsSync(internalPath)) return internalPath;
+  return join(process.cwd(), 'project.config.ts');
 };
 
 /**

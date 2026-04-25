@@ -17,6 +17,20 @@ if (!existsSync(envInitPath) && existsSync(envInitExamplePath)) {
 // we always exit even if Ink's exitOnCtrlC handler is blocked by a hung exec.
 process.on('SIGINT', () => process.exit(0));
 
+// Surface async errors instead of letting them silently kill the TUI.
+// Without these, an unhandled rejection in any check causes Bun to exit
+// with a stale Ink frame still on screen and no diagnostic.
+process.on('unhandledRejection', (reason) => {
+  // eslint-disable-next-line no-console
+  console.error('\n[init] UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (error) => {
+  // eslint-disable-next-line no-console
+  console.error('\n[init] UNCAUGHT EXCEPTION:', error);
+  process.exit(1);
+});
+
 // Render the app and wait for it to exit
 (async () => {
   try {
@@ -27,9 +41,11 @@ process.on('SIGINT', () => process.exit(0));
       process.stdin.ref(); // Prevent process from exiting
     }
 
+    // patchConsole=false so error output lands in the terminal instead of
+    // being swallowed by Ink. Re-enable once init is stable.
     const instance = render(<App />, {
       exitOnCtrlC: true,
-      patchConsole: true,
+      patchConsole: false,
     });
 
     await instance.waitUntilExit();
