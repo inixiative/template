@@ -241,6 +241,16 @@ const defaultConfig: ProjectConfig = {
     },
     error: '',
   },
+  features: {
+    staging: { enabled: true },
+  },
+  providers: {
+    frontend: 'vercel',
+    database: 'planetscale',
+    backend: 'railway',
+    redis: 'railway',
+    email: 'resend',
+  },
 };
 
 export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {

@@ -133,56 +133,53 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const bouncerStatus = getBouncerStatus(cfg);
       const launchStatus = getLaunchStatus(cfg);
 
-      const updatedItems = [
+      // Provider/feature-aware menu — only show steps for providers actually selected.
+      // Settings menu lets the user switch providers + toggle staging; choices marked
+      // "coming soon" can't actually be selected so the visible-step set still maps
+      // 1:1 onto implemented setup flows.
+      const usePlanetScale = cfg.providers.database === 'planetscale';
+      const useVercel = cfg.providers.frontend === 'vercel';
+      const useResend = cfg.providers.email === 'resend';
+
+      const candidates: (MenuItem | null)[] = [
         {
-          label: '1. Project Configuration',
-          value: 'project-config',
-          status: projectConfigStatus,
+          label: 'Settings',
+          value: 'settings',
+          status: 'pending',
+          progressDetails: [
+            cfg.features.staging.enabled ? 'staging on' : 'staging off',
+            `frontend: ${cfg.providers.frontend}`,
+            `database: ${cfg.providers.database}`,
+            `backend: ${cfg.providers.backend}`,
+          ],
         },
-        {
-          label: '2. Infisical Setup',
-          value: 'infisical',
-          status: infisicalStatus.status,
-          progressDetails: infisicalStatus.details,
-        },
-        {
-          label: '3. PlanetScale Setup',
-          value: 'planetscale',
-          status: planetscaleStatus.status,
-          progressDetails: planetscaleStatus.details,
-        },
-        {
-          label: '4. Railway Setup',
-          value: 'railway',
-          status: railwayStatus.status,
-          progressDetails: railwayStatus.details,
-        },
-        {
-          label: '5. Vercel Setup',
-          value: 'vercel',
-          status: vercelStatus.status,
-          progressDetails: vercelStatus.details,
-        },
-        {
-          label: '6. Resend Setup',
-          value: 'resend',
-          status: resendStatus.status,
-          progressDetails: resendStatus.details,
-        },
-        {
-          label: '7. Bouncer Setup',
-          value: 'bouncer',
-          status: bouncerStatus.status,
-          progressDetails: bouncerStatus.details,
-        },
-        { label: '8. Optional Integrations', value: 'integrations', status: 'pending' },
-        { label: '9. DNS Configuration', value: 'dns', status: 'pending' },
-        { label: '10. Database Seeding', value: 'seeding', status: 'pending' },
-        { label: '11. GitHub Actions Setup', value: 'github-actions', status: 'pending' },
-        { label: '12. Launch', value: 'launch', status: launchStatus },
-        { label: '13. Documentation Generation', value: 'documentation', status: 'pending' },
-        { label: '14. Exit', value: 'exit', status: 'pending' },
+        { label: 'Project Configuration', value: 'project-config', status: projectConfigStatus },
+        { label: 'Infisical Setup', value: 'infisical', status: infisicalStatus.status, progressDetails: infisicalStatus.details },
+        usePlanetScale
+          ? { label: 'PlanetScale Setup', value: 'planetscale', status: planetscaleStatus.status, progressDetails: planetscaleStatus.details }
+          : null,
+        { label: 'Railway Setup', value: 'railway', status: railwayStatus.status, progressDetails: railwayStatus.details },
+        useVercel
+          ? { label: 'Vercel Setup', value: 'vercel', status: vercelStatus.status, progressDetails: vercelStatus.details }
+          : null,
+        useResend
+          ? { label: 'Resend Setup', value: 'resend', status: resendStatus.status, progressDetails: resendStatus.details }
+          : null,
+        useResend
+          ? { label: 'Bouncer Setup', value: 'bouncer', status: bouncerStatus.status, progressDetails: bouncerStatus.details }
+          : null,
+        { label: 'Optional Integrations', value: 'integrations', status: 'pending' },
+        { label: 'DNS Configuration', value: 'dns', status: 'pending' },
+        { label: 'Database Seeding', value: 'seeding', status: 'pending' },
+        { label: 'GitHub Actions Setup', value: 'github-actions', status: 'pending' },
+        { label: 'Launch', value: 'launch', status: launchStatus },
+        { label: 'Documentation Generation', value: 'documentation', status: 'pending' },
+        { label: 'Exit', value: 'exit', status: 'pending' },
       ];
+
+      const updatedItems = candidates
+        .filter((item): item is MenuItem => item !== null)
+        .map((item, idx) => ({ ...item, label: `${idx}. ${item.label}` }));
 
       setItems(updatedItems as MenuItem[]);
     };

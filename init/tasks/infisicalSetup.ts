@@ -136,8 +136,13 @@ export const setupInfisical = async (
       // Suppressed for TUI: console.log('  ✓ Environments already configured (skipping)');
     }
 
+    // Feature gate: when staging is disabled, skip every staging-scoped folder
+    // and inheritance import. The root + prod folders still get created.
+    const stagingEnabled = config.features.staging.enabled;
+
     // Step 4: Create folder structure
     for (const step of infisicalFolderSteps) {
+      if (!stagingEnabled && step.environment === 'staging') continue;
       if (await isComplete('infisical', step.action)) continue;
 
       await infisicalApi.createFolder(projectId, step.environment, step.app, '/');
@@ -147,6 +152,10 @@ export const setupInfisical = async (
 
     // Step 5: Set up inheritance chains
     for (const step of infisicalInheritanceSteps) {
+      // Per the steps catalog, every staging-touching import has destination=staging,
+      // so guarding only on destinationEnvironment is sufficient (and keeps TS narrowing
+      // happy since prod-destination entries can never have a staging source).
+      if (!stagingEnabled && step.destinationEnvironment === 'staging') continue;
       if (await isComplete('infisical', step.action)) continue;
 
       await infisicalApi.createSecretImport(
@@ -164,7 +173,9 @@ export const setupInfisical = async (
     // These are idempotent upserts and keep env behavior consistent across reruns.
     await setSecretAsync(projectId, 'root', 'NODE_ENV', 'production', '/');
     await setSecretAsync(projectId, 'prod', 'ENVIRONMENT', 'prod', '/api');
-    await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
+    if (stagingEnabled) {
+      await setSecretAsync(projectId, 'staging', 'ENVIRONMENT', 'staging', '/api');
+    }
 
     for (const step of infisicalIdentitySecretSteps) {
       if (await isComplete('infisical', step.action)) continue;
@@ -184,6 +195,7 @@ export const setupInfisical = async (
 
     // Step 6: Ensure API auth secrets exist for deploy environments
     for (const step of infisicalApiAuthSecretSteps) {
+      if (!stagingEnabled && step.environment === 'staging') continue;
       if (await isComplete('infisical', step.action)) continue;
 
       let hasValidSecret = false;

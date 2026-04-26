@@ -238,10 +238,38 @@ export type ProjectConfig = {
     };
     error: string;
   };
+  features: {
+    staging: { enabled: boolean };
+  };
+  providers: {
+    frontend: FrontendProvider;
+    database: DatabaseProvider;
+    backend: BackendProvider;
+    redis: RedisProvider;
+    email: EmailProvider;
+  };
 };
+
+export type FrontendProvider = 'vercel' | 'cloudflare-pages' | 'netlify';
+export type DatabaseProvider = 'planetscale' | 'railway-postgres' | 'neon' | 'supabase';
+export type BackendProvider = 'railway' | 'fly' | 'render';
+export type RedisProvider = 'railway' | 'upstash';
+export type EmailProvider = 'resend' | 'postmark' | 'ses' | 'none';
 
 type LegacyProjectConfig = Partial<ProjectConfig> & {
   email?: ProjectConfig['resend'];
+};
+
+const defaultFeatures: ProjectConfig['features'] = {
+  staging: { enabled: true },
+};
+
+const defaultProviders: ProjectConfig['providers'] = {
+  frontend: 'vercel',
+  database: 'planetscale',
+  backend: 'railway',
+  redis: 'railway',
+  email: 'resend',
 };
 
 const defaultResendProgress: ProjectConfig['resend']['progress'] = {
@@ -761,6 +789,19 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         progress: normalizeVercelProgress(config.vercel?.progress),
         error: config.vercel?.error ?? '',
       },
+      features: {
+        staging: {
+          enabled:
+            (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+        },
+      },
+      providers: {
+        frontend: config.providers?.frontend ?? defaultProviders.frontend,
+        database: config.providers?.database ?? defaultProviders.database,
+        backend: config.providers?.backend ?? defaultProviders.backend,
+        redis: config.providers?.redis ?? defaultProviders.redis,
+        email: config.providers?.email ?? defaultProviders.email,
+      },
     };
   } catch (error) {
     throw new Error(
@@ -836,6 +877,19 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
         ...defaultVercelProgress,
         ...config.vercel.progress,
       },
+    },
+    features: {
+      staging: {
+        enabled:
+          (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+      },
+    },
+    providers: {
+      frontend: config.providers?.frontend ?? defaultProviders.frontend,
+      database: config.providers?.database ?? defaultProviders.database,
+      backend: config.providers?.backend ?? defaultProviders.backend,
+      redis: config.providers?.redis ?? defaultProviders.redis,
+      email: config.providers?.email ?? defaultProviders.email,
     },
   };
 

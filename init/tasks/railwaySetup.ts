@@ -82,6 +82,11 @@ export const setupRailway = async (
     let prodRedisVolumeId = config.railway.prodRedisVolumeId;
     let stagingRedisVolumeId = config.railway.stagingRedisVolumeId;
 
+    // Feature gate: when features.staging.enabled is false, skip every staging
+    // substep so we provision a single production environment only. Solo /
+    // nonprofit projects often don't need a permanent staging env.
+    const stagingEnabled = config.features.staging.enabled;
+
     // Step 1: Store workspace and mark selected
     if (!(await isComplete('railway', 'selectWorkspace'))) {
       workspaceId = selectedWorkspaceId;
@@ -167,7 +172,7 @@ export const setupRailway = async (
     }
 
     // Step 3d: Ensure "staging" environment exists
-    if (!(await isComplete('railway', 'ensureStagingEnvironment'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingEnvironment'))) {
       if (!stagingEnv) {
         try {
           stagingEnv = await railwayApi.createEnvironment(projectId, 'staging', prodEnv?.id);
@@ -187,7 +192,7 @@ export const setupRailway = async (
     }
 
     // Step 3e: Store staging environment ID in Infisical
-    if (!(await isComplete('railway', 'storeStagingEnvironmentIdSecret'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'storeStagingEnvironmentIdSecret'))) {
       if (!stagingEnv) {
         throw new Error('Staging environment not found. Check Railway dashboard and retry.');
       }
@@ -262,7 +267,7 @@ export const setupRailway = async (
     }
 
     // Step 8: Ensure staging Redis service exists
-    if (!(await isComplete('railway', 'ensureStagingRedisService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingRedisService'))) {
       if (!stagingRedisServiceId) {
         const stagingRedis = await retryWithTimeout(
           () => railwayApi.createRedis(projectId, stagingEnv.id, stagingEnv.name),
@@ -284,7 +289,7 @@ export const setupRailway = async (
     }
 
     // Step 9: Capture staging Redis volume ID
-    if (!(await isComplete('railway', 'captureStagingRedisVolume'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'captureStagingRedisVolume'))) {
       if (!stagingRedisVolumeId) {
         const volume = await railwayApi.getServiceVolume(projectId, `${configProjectName}-staging-redis`);
         if (!volume) {
@@ -299,7 +304,7 @@ export const setupRailway = async (
     }
 
     // Step 10: Rename staging Redis service
-    if (!(await isComplete('railway', 'renameStagingRedisService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'renameStagingRedisService'))) {
       if (!stagingRedisServiceId) {
         throw new Error('Staging Redis service not found. Retry Railway setup.');
       }
@@ -310,7 +315,7 @@ export const setupRailway = async (
     }
 
     // Step 11: Rename staging Redis volume
-    if (!(await isComplete('railway', 'renameStagingRedisVolume'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'renameStagingRedisVolume'))) {
       if (!stagingRedisVolumeId) {
         throw new Error('Staging Redis volume not found. Retry Railway setup.');
       }
@@ -337,7 +342,7 @@ export const setupRailway = async (
     }
 
     // Step 13: Store staging Redis URL in Infisical
-    if (!(await isComplete('railway', 'storeStagingRedisUrl'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'storeStagingRedisUrl'))) {
       const stagingRedisUrl = await retryWithTimeout(
         () => railwayApi.getRedisUrl(stagingRedisServiceId, stagingEnv.id, stagingEnv.name, projectId),
         {
@@ -479,7 +484,7 @@ export const setupRailway = async (
     }
 
     // Step 20: Ensure staging API service exists
-    if (!(await isComplete('railway', 'ensureStagingApiService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingApiService'))) {
       if (!stagingApiServiceId) {
         const stagingApiService = await railwayApi.createService(
           projectId,
@@ -495,14 +500,14 @@ export const setupRailway = async (
     }
 
     // Step 21: Store staging API service ID in Infisical
-    if (!(await isComplete('railway', 'storeStagingApiServiceIdSecret'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'storeStagingApiServiceIdSecret'))) {
       await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_API_SERVICE_ID', stagingApiServiceId);
       await markComplete('railway', 'storeStagingApiServiceIdSecret');
       await onStepComplete?.();
     }
 
     // Step 22: Ensure staging API service sync before GitHub connect
-    if (!(await isComplete('railway', 'createInfisicalSyncStagingApi'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'createInfisicalSyncStagingApi'))) {
       await infisicalRailwayApi.ensureRailwaySync({
         infisicalProjectId,
         connectionId: resolvedConnectionId,
@@ -521,14 +526,14 @@ export const setupRailway = async (
     }
 
     // Step 23: Configure staging API service instance
-    if (!(await isComplete('railway', 'configureStagingApiService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'configureStagingApiService'))) {
       await railwayApi.updateServiceInstanceConfig(stagingApiServiceId, stagingEnv.id, API_SERVICE_CONFIG);
       await markComplete('railway', 'configureStagingApiService');
       await onStepComplete?.();
     }
 
     // Step 24: Connect staging API to GitHub
-    if (!(await isComplete('railway', 'connectStagingApiGithub'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'connectStagingApiGithub'))) {
       const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(stagingApiServiceId, stagingEnv.id);
       if (!isAlreadyConnected) {
         await railwayApi.connectServiceToGitHub(stagingApiServiceId, stagingEnv.id, githubRepo, 'main');
@@ -554,7 +559,7 @@ export const setupRailway = async (
     }
 
     // Step 25: Ensure staging API deployment exists
-    if (!(await isComplete('railway', 'ensureStagingApiDeployment'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingApiDeployment'))) {
       await ensureServiceDeployment(stagingApiServiceId, stagingEnv.id);
       await markComplete('railway', 'ensureStagingApiDeployment');
       await onStepComplete?.();
@@ -570,7 +575,7 @@ export const setupRailway = async (
     }
 
     // Step 27: Store staging API URL in Infisical (creates domain if needed)
-    if (!(await isComplete('railway', 'storeStagingApiUrl'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'storeStagingApiUrl'))) {
       const stagingApiUrl = await railwayApi.ensureServiceDomain(stagingApiServiceId, stagingEnv.id);
       await setSecretAsync(infisicalProjectId, 'staging', 'API_URL', stagingApiUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_API_URL', stagingApiUrl, '/');
@@ -661,7 +666,7 @@ export const setupRailway = async (
     }
 
     // Step 34: Ensure staging Worker service exists
-    if (!(await isComplete('railway', 'ensureStagingWorkerService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingWorkerService'))) {
       if (!stagingWorkerServiceId) {
         const stagingWorkerService = await railwayApi.createService(
           projectId,
@@ -677,14 +682,14 @@ export const setupRailway = async (
     }
 
     // Step 35: Store staging Worker service ID in Infisical
-    if (!(await isComplete('railway', 'storeStagingWorkerServiceIdSecret'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'storeStagingWorkerServiceIdSecret'))) {
       await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_STAGING_WORKER_SERVICE_ID', stagingWorkerServiceId);
       await markComplete('railway', 'storeStagingWorkerServiceIdSecret');
       await onStepComplete?.();
     }
 
     // Step 36: Ensure staging Worker service sync before GitHub connect
-    if (!(await isComplete('railway', 'createInfisicalSyncStagingWorker'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'createInfisicalSyncStagingWorker'))) {
       await infisicalRailwayApi.ensureRailwaySync({
         infisicalProjectId,
         connectionId: resolvedConnectionId,
@@ -703,14 +708,14 @@ export const setupRailway = async (
     }
 
     // Step 37: Configure staging Worker service instance
-    if (!(await isComplete('railway', 'configureStagingWorkerService'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'configureStagingWorkerService'))) {
       await railwayApi.updateServiceInstanceConfig(stagingWorkerServiceId, stagingEnv.id, WORKER_SERVICE_CONFIG);
       await markComplete('railway', 'configureStagingWorkerService');
       await onStepComplete?.();
     }
 
     // Step 38: Connect staging Worker to GitHub
-    if (!(await isComplete('railway', 'connectStagingWorkerGithub'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'connectStagingWorkerGithub'))) {
       const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(stagingWorkerServiceId, stagingEnv.id);
       if (!isAlreadyConnected) {
         await railwayApi.connectServiceToGitHub(stagingWorkerServiceId, stagingEnv.id, githubRepo, 'main');
@@ -736,7 +741,7 @@ export const setupRailway = async (
     }
 
     // Step 39: Ensure staging Worker deployment exists
-    if (!(await isComplete('railway', 'ensureStagingWorkerDeployment'))) {
+    if (stagingEnabled && !(await isComplete('railway', 'ensureStagingWorkerDeployment'))) {
       await ensureServiceDeployment(stagingWorkerServiceId, stagingEnv.id);
       await markComplete('railway', 'ensureStagingWorkerDeployment');
       await onStepComplete?.();

@@ -11,6 +11,7 @@ import { ProjectConfigView } from './views/ProjectConfigView';
 import { RailwaySetupView } from './views/RailwaySetupView';
 import { BouncerSetupView } from './views/BouncerSetupView';
 import { ResendSetupView } from './views/ResendSetupView';
+import { SettingsView } from './views/SettingsView';
 import { VercelSetupView } from './views/VercelSetupView';
 
 type AppState = 'prerequisites' | 'menu' | 'task';
@@ -56,6 +57,9 @@ export const App: React.FC = () => {
 
         {state === 'task' && (
           <>
+            {currentTask === 'settings' && (
+              <SettingsView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'project-config' && (
               <ProjectConfigView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
@@ -78,7 +82,8 @@ export const App: React.FC = () => {
               <BouncerSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
             {currentTask === 'launch' && <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
-            {currentTask !== 'project-config' &&
+            {currentTask !== 'settings' &&
+              currentTask !== 'project-config' &&
               currentTask !== 'infisical' &&
               currentTask !== 'planetscale' &&
               currentTask !== 'railway' &&
