@@ -5,6 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
+# Load .env so child scripts (wait-postgres, wait-redis, docker-compose templating)
+# inherit PROJECT_NAME / COMPOSE_PROJECT_NAME. Without this, wait-postgres falls
+# back to the literal "template" container name and times out.
+if [ -f "$ROOT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 # Check if project has been launched (config is committed, so grep is reliable)
 if [ "$USE_INTERNAL_CONFIG" = "true" ]; then
   CONFIG_FILE="$ROOT_DIR/project.config.template-internal.ts"

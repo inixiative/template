@@ -67,8 +67,12 @@ export const renameProject = async (oldName: string, newName: string, onStepComp
   // 2. Replace @scope/ references in all source files
   if (!(await isComplete('project', 'updateImports'))) {
     try {
+      // Include JSON (tsconfig, package.json), Prisma, TOML, YAML so workspace
+      // path mappings, package metadata, and config files get renamed too.
+      // Without these, tsconfigs keep @${oldName}/ aliases and the rename
+      // appears successful but leaves broken imports across the codebase.
       const { stdout } = await execAsync(
-        "find apps packages scripts docs init -path 'scripts/ci' -prune -o -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' \\) -print",
+        "find apps packages scripts docs init -path 'scripts/ci' -prune -o -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.prisma' -o -name '*.toml' -o -name '*.yml' -o -name '*.yaml' \\) -print",
         { encoding: 'utf-8' },
       );
       const files = stdout.trim().split('\n').filter(Boolean);

@@ -1,5 +1,5 @@
 {
-  "name": "@template/shared",
+  "name": "@monorepo/shared",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -13,9 +13,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./utils": "./src/utils/index.ts",
+    "./utils/*": "./src/utils/*.ts",
     "./bracketQuery": "./src/lib/bracketQuery/index.ts",
+    "./errors": "./src/errors/index.ts",
     "./lib": "./src/lib/index.ts",
     "./logger": "./src/logger/index.ts",
+    "./logger/*": "./src/logger/*.ts",
     "./adapter": "./src/adapter/index.ts",
     "./vcr": "./src/vcr.ts",
     "./styles/theme.css": "./styles/theme.css"
