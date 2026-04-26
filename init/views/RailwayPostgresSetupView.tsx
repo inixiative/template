@@ -60,8 +60,12 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
     if (running) return;
     if (key.escape) return onCancel();
     if (key.return) {
-      if (setupState === 'complete') return onComplete();
-      return handleRun();
+      // Enter dismisses to the menu unless we're truly starting fresh —
+      // simpler than gating on 'complete' detection which depends on
+      // skipped-step accounting and was unreliable when the staging group
+      // was rendered as ⊘ skipped. Use R to re-run / restart.
+      if (setupState === 'new') return handleRun();
+      return onComplete();
     }
     if (input === 'r' || input === 'R') return handleRestart();
   });
