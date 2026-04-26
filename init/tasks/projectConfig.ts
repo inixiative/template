@@ -29,6 +29,23 @@ export const updateProjectConfig = async (data: ProjectConfigData): Promise<void
 export const renameProject = async (oldName: string, newName: string, onStepComplete?: StepCallback): Promise<void> => {
   const fromName = oldName === '' || oldName === 'template' ? 'template' : oldName;
   if (oldName === newName) {
+    // Nothing to rename — but mark every substep complete so the UI reflects
+    // the true state ("✓ all done") instead of dashes that imply pending work.
+    // Otherwise re-running init after the rename was already done (manually or
+    // in a previous session) leaves stale `false` flags in project.config.ts.
+    for (const step of [
+      'updatePackages',
+      'updateImports',
+      'updateReadme',
+      'updateTsconfigs',
+      'updateEnvFiles',
+      'cleanInstall',
+    ] as const) {
+      if (!(await isComplete('project', step))) {
+        await markComplete('project', step);
+        await onStepComplete?.();
+      }
+    }
     return;
   }
 
