@@ -59,6 +59,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
     }
   });
 
+  // Hooks must be called unconditionally — keep useMemo above any early returns.
+  const providerScreen = useMemo(() => {
+    if (screen.kind === 'frontend')
+      return { title: 'Frontend host', options: FRONTEND_PROVIDERS, kind: 'frontend' as const };
+    if (screen.kind === 'database')
+      return { title: 'Database', options: DATABASE_PROVIDERS, kind: 'database' as const };
+    if (screen.kind === 'backend')
+      return { title: 'Backend host', options: BACKEND_PROVIDERS, kind: 'backend' as const };
+    if (screen.kind === 'redis')
+      return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
+    if (screen.kind === 'email')
+      return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
+    return null;
+  }, [screen]);
+
   if (!config) {
     return (
       <Box padding={1}>
@@ -164,15 +179,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
       </Box>
     );
   }
-
-  const providerScreen = useMemo(() => {
-    if (screen.kind === 'frontend') return { title: 'Frontend host', options: FRONTEND_PROVIDERS, kind: 'frontend' as const };
-    if (screen.kind === 'database') return { title: 'Database', options: DATABASE_PROVIDERS, kind: 'database' as const };
-    if (screen.kind === 'backend') return { title: 'Backend host', options: BACKEND_PROVIDERS, kind: 'backend' as const };
-    if (screen.kind === 'redis') return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
-    if (screen.kind === 'email') return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
-    return null;
-  }, [screen]);
 
   if (!providerScreen) return null;
 
