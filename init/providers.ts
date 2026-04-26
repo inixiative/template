@@ -15,7 +15,7 @@ export type ProviderOption<T extends string> = {
 
 export const FRONTEND_PROVIDERS: ProviderOption<FrontendProvider>[] = [
   { value: 'vercel', label: 'Vercel', implemented: true, note: 'Preview deployments per PR' },
-  { value: 'cloudflare-pages', label: 'Cloudflare Pages', implemented: false, note: 'Free tier, fast global CDN' },
+  { value: 'cloudflare-pages', label: 'Cloudflare Pages', implemented: true, note: 'Free tier, fast global CDN' },
   { value: 'netlify', label: 'Netlify', implemented: false },
 ];
 

@@ -106,6 +106,12 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
     ],
   );
 
+  // Core prereqs are required to start init at all. Provider-specific CLIs
+  // (Railway, PlanetScale, Vercel, Wrangler) are checked lazily — when the
+  // user actually selects that provider in Settings or enters a setup view.
+  // This means a user picking "CF Pages + Railway Postgres" doesn't have to
+  // install the Vercel or PlanetScale CLI just to get past prerequisites.
+  // We still RUN the checks for visibility, but they don't block.
   const allPassed = useMemo(
     () =>
       bunCLI.status === 'success' &&
@@ -115,29 +121,8 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
       dockerRunning.status === 'success' &&
       infisicalCLI.status === 'success' &&
       infisicalSession.status === 'success' &&
-      pscaleCLI.status === 'success' &&
-      pscaleSession.status === 'success' &&
-      vercelCLI.status === 'success' &&
-      vercelSession.status === 'success' &&
-      railwayCLI.status === 'success' &&
-      railwaySession.status === 'success' &&
       ghSession.status === 'success',
-    [
-      bunCLI,
-      gitCLI,
-      ghCLI,
-      dockerCLI,
-      dockerRunning,
-      infisicalCLI,
-      pscaleCLI,
-      vercelCLI,
-      railwayCLI,
-      infisicalSession,
-      pscaleSession,
-      vercelSession,
-      railwaySession,
-      ghSession,
-    ],
+    [bunCLI, gitCLI, ghCLI, dockerCLI, dockerRunning, infisicalCLI, infisicalSession, ghSession],
   );
 
   // Fire off all checks on mount

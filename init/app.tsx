@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { ConfigProvider } from './utils/configState';
+import { CloudflarePagesSetupView } from './views/CloudflarePagesSetupView';
 import { InfisicalSetupView } from './views/InfisicalSetupView';
 import { LaunchView } from './views/LaunchView';
 import { MainMenu } from './views/MainMenu';
@@ -79,6 +80,9 @@ export const App: React.FC = () => {
             {currentTask === 'vercel' && (
               <VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
+            {currentTask === 'cloudflare-pages' && (
+              <CloudflarePagesSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'resend' && (
               <ResendSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
@@ -93,6 +97,7 @@ export const App: React.FC = () => {
               currentTask !== 'railway' &&
               currentTask !== 'railway-postgres' &&
               currentTask !== 'vercel' &&
+              currentTask !== 'cloudflare-pages' &&
               currentTask !== 'resend' &&
               currentTask !== 'bouncer' &&
               currentTask !== 'launch' && (

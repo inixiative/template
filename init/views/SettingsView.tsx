@@ -10,6 +10,7 @@ import {
   type ProviderOption,
   REDIS_PROVIDERS,
 } from '../providers';
+import { checkProviderPrereq } from '../utils/checkPrerequisites';
 import { useConfig } from '../utils/configState';
 import {
   type BackendProvider,
@@ -21,6 +22,34 @@ import {
   type RedisProvider,
   writeProjectConfig,
 } from '../utils/getProjectConfig';
+
+// Map provider value → CLI key. Used by SettingsView to lazy-check that
+// the relevant CLI is installed + authenticated before allowing a switch.
+// Values not in this map require no extra CLI (e.g. switching frontend to
+// 'vercel' is fine because vercel CLI was either checked in Prerequisites
+// or the user can install on demand).
+const PROVIDER_CLI: Record<string, 'railway' | 'pscale' | 'vercel' | 'wrangler' | null> = {
+  // frontend
+  vercel: 'vercel',
+  'cloudflare-pages': 'wrangler',
+  netlify: null,
+  // database
+  planetscale: 'pscale',
+  'railway-postgres': 'railway',
+  neon: null,
+  supabase: null,
+  // backend
+  railway: 'railway',
+  fly: null,
+  render: null,
+  // redis (railway+upstash share with backend → null because no separate CLI auth needed)
+  upstash: null,
+  // email — none have CLI prereqs at switch time
+  resend: null,
+  postmark: null,
+  ses: null,
+  none: null,
+};
 
 type SettingsViewProps = {
   onComplete: () => void;
@@ -103,6 +132,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
         setWarning(`${opt.label} support is not implemented yet — keeping current selection.`);
         setScreen({ kind: 'menu' });
         return;
+      }
+      // Provider-aware lazy prereq check: only fires when picking a provider
+      // that needs a CLI we haven't already pinned at startup. If the CLI is
+      // missing or unauthenticated, surface the install/login command and
+      // refuse the switch — better than silently letting the user select a
+      // provider that'll blow up at setup time.
+      const cliKey = PROVIDER_CLI[item.value as string];
+      if (cliKey) {
+        const result = await checkProviderPrereq(cliKey);
+        if (!result.ok) {
+          setWarning(`${opt?.label ?? item.value}: ${result.reason}\n  Fix: ${result.fixCommand}`);
+          setScreen({ kind: 'menu' });
+          return;
+        }
       }
       setWarning(null);
       await writeAndSync((c) => {

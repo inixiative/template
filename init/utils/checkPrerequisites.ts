@@ -107,6 +107,23 @@ export const checkVercelSessionAsync = async (): Promise<InfisicalSession> => {
 };
 
 /**
+ * Check if user is logged into Cloudflare (wrangler)
+ */
+export const checkWranglerSessionAsync = async (): Promise<InfisicalSession> => {
+  try {
+    const { stdout } = await execAsync('wrangler whoami');
+    const output = stdout.trim();
+    const isLoggedIn = output.length > 0 && /associated with the email|account id/i.test(output);
+    return {
+      loggedIn: isLoggedIn,
+      user: isLoggedIn ? 'Authenticated' : undefined,
+    };
+  } catch (_error) {
+    return { loggedIn: false, error: 'Not logged in' };
+  }
+};
+
+/**
  * Check if user is logged into Railway
  */
 export const checkRailwaySessionAsync = async (): Promise<InfisicalSession> => {
@@ -221,8 +238,49 @@ export const getInstallCommand = (cliCommand: string): string => {
     vercel: 'npm install -g vercel',
     pscale: 'brew install planetscale/tap/pscale',
     railway: 'brew install railway',
+    wrangler: 'npm install -g wrangler  # Cloudflare Pages CLI',
     docker: 'brew install --cask docker',
   };
 
   return installCommands[cliCommand] || `# Install ${cliCommand} manually`;
+};
+
+/**
+ * Provider-aware prereq check used by SettingsView when the user picks a
+ * non-default provider. Returns null if everything's good, otherwise a
+ * concrete reason + how to fix.
+ */
+export type ProviderPrereqResult = { ok: true } | { ok: false; reason: string; fixCommand: string };
+
+export const checkProviderPrereq = async (
+  cliKey: 'railway' | 'pscale' | 'vercel' | 'wrangler' | 'infisical' | 'gh' | 'docker',
+): Promise<ProviderPrereqResult> => {
+  const cliVersionFlag = cliKey === 'pscale' ? 'version' : '--version';
+  const cli = await checkCLIAsync(cliKey, cliKey, cliVersionFlag);
+  if (!cli.installed) {
+    return {
+      ok: false,
+      reason: `${cliKey} CLI is not installed`,
+      fixCommand: getInstallCommand(cliKey),
+    };
+  }
+
+  const sessionCheckers = {
+    railway: { check: checkRailwaySessionAsync, login: 'railway login' },
+    pscale: { check: checkPlanetScaleSessionAsync, login: 'pscale auth login' },
+    vercel: { check: checkVercelSessionAsync, login: 'vercel login' },
+    wrangler: { check: checkWranglerSessionAsync, login: 'wrangler login' },
+    infisical: { check: checkInfisicalSessionAsync, login: 'infisical login' },
+    gh: { check: checkGitHubSessionAsync, login: 'gh auth login' },
+    docker: { check: checkDockerRunningAsync, login: 'open -a Docker' },
+  } as const;
+  const session = await sessionCheckers[cliKey].check();
+  if (!session.loggedIn) {
+    return {
+      ok: false,
+      reason: `${cliKey} is installed but you're not authenticated`,
+      fixCommand: sessionCheckers[cliKey].login,
+    };
+  }
+  return { ok: true };
 };

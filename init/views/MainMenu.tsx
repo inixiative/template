@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
 import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
@@ -166,9 +167,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const usePlanetScale = cfg.providers.database === 'planetscale';
       const useRailwayPostgres = cfg.providers.database === 'railway-postgres';
       const useVercel = cfg.providers.frontend === 'vercel';
+      const useCloudflarePages = cfg.providers.frontend === 'cloudflare-pages';
       const useResend = cfg.providers.email === 'resend';
 
       const railwayPostgresStatus = getRailwayPostgresStatus(cfg);
+
+      const cloudflarePagesSummaries = getCloudflarePagesProgressSummaries(cfg);
+      const cloudflarePagesLive = cloudflarePagesSummaries.filter((s) => !s.skipped);
+      const cloudflarePagesProgress: Record<string, boolean> = { ...cfg.cloudflarePages.progress };
+      const cloudflarePagesStatus = getStatusFromSummaries(
+        cloudflarePagesProgress,
+        cloudflarePagesLive,
+        cfg.cloudflarePages.error,
+      );
 
       const candidates: (MenuItem | null)[] = [
         {
@@ -198,6 +209,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           : null,
         useVercel
           ? { label: 'Vercel Setup', value: 'vercel', status: vercelStatus.status, progressDetails: vercelStatus.details }
+          : null,
+        useCloudflarePages
+          ? {
+              label: 'Cloudflare Pages Setup',
+              value: 'cloudflare-pages',
+              status: cloudflarePagesStatus.status,
+              progressDetails: cloudflarePagesStatus.details,
+            }
           : null,
         useResend
           ? { label: 'Resend Setup', value: 'resend', status: resendStatus.status, progressDetails: resendStatus.details }
