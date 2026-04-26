@@ -24,7 +24,10 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
   const detectState = (): SetupState => {
     if (!config) return 'new';
     const items = getRailwayPostgresProgressItems(config);
-    if (items.every((item) => item.completed)) return 'complete';
+    // Skipped items count as "satisfied" — staging Postgres steps when staging
+    // is disabled aren't actual pending work, so a prod-only run with all 5
+    // prod steps green should land on 'complete' and let Enter dismiss the view.
+    if (items.every((item) => item.completed || item.skipped)) return 'complete';
     if (items.some((item) => item.completed)) return 'incomplete';
     return 'new';
   };
