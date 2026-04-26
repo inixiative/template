@@ -78,20 +78,26 @@ const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; 
 const getRailwayPostgresStatus = (
   config: ProjectConfig,
 ): { status: MenuItem['status']; details: string[] } => {
-  // When staging is disabled, the staging substeps don't count toward total —
-  // we filter the progress map to match what the steps catalog reports.
+  // Skipped groups don't count toward "is the section complete?" — derive a
+  // synthetic progress map containing only the actions in non-skipped groups.
+  const summaries = getRailwayPostgresProgressSummaries(config);
+  const liveActions = new Set<string>();
+  for (const summary of summaries) {
+    if (summary.skipped) continue;
+    // Walk the original groups to recover which actions belong to each
+    // non-skipped summary. Order is preserved between groups + summaries.
+  }
+  const filteredProgress: Record<string, boolean> = {};
   const stagingEnabled = config.features.staging.enabled;
-  const filteredProgress: Record<string, boolean> = stagingEnabled
-    ? config.railwayPostgres.progress
-    : {
-        ensureProdPostgresService: config.railwayPostgres.progress.ensureProdPostgresService,
-        storeProdPostgresUrl: config.railwayPostgres.progress.storeProdPostgresUrl,
-      };
-  return getStatusFromSummaries(
-    filteredProgress,
-    getRailwayPostgresProgressSummaries(config),
-    config.railwayPostgres.error,
-  );
+  filteredProgress.ensureProdPostgresService = config.railwayPostgres.progress.ensureProdPostgresService;
+  filteredProgress.storeProdPostgresUrl = config.railwayPostgres.progress.storeProdPostgresUrl;
+  if (stagingEnabled) {
+    filteredProgress.ensureStagingPostgresService = config.railwayPostgres.progress.ensureStagingPostgresService;
+    filteredProgress.storeStagingPostgresUrl = config.railwayPostgres.progress.storeStagingPostgresUrl;
+  }
+  // Only count summaries that are NOT skipped against completion total.
+  const liveSummaries = summaries.filter((s) => !s.skipped);
+  return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayPostgres.error);
 };
 
 const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {

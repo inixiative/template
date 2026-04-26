@@ -6,8 +6,8 @@ type RailwayPostgresProgress = ProjectConfig['railwayPostgres']['progress'];
 type RailwayPostgresProgressGroup = {
   actions: readonly RailwayPostgresAction[];
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
-  // Skip the group entirely when staging is disabled — used for the staging
-  // Postgres group so the menu's progress count reflects "2/2" instead of "2/4".
+  // Marks the group as staging-only. We still emit it when staging is disabled,
+  // but flagged as "skipped" so users see what WOULD run with staging on.
   requiresStaging?: boolean;
 };
 
@@ -41,29 +41,31 @@ export type RailwayPostgresProgressSummary = {
   completed: boolean;
   completedCount: number;
   totalCount: number;
+  skipped: boolean;
 };
 
 export const getRailwayPostgresProgressSummaries = (config: ProjectConfig): RailwayPostgresProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
-  return railwayPostgresProgressGroups
-    .filter((group) => stagingEnabled || !group.requiresStaging)
-    .map((group) => {
-      const completedCount = countCompletedActions(config.railwayPostgres.progress, group.actions);
-      const totalCount = group.actions.length;
-      return {
-        label: group.getLabel(config, completedCount, totalCount),
-        completed: completedCount === totalCount,
-        completedCount,
-        totalCount,
-      };
-    });
+  return railwayPostgresProgressGroups.map((group) => {
+    const skipped = !!group.requiresStaging && !stagingEnabled;
+    const completedCount = countCompletedActions(config.railwayPostgres.progress, group.actions);
+    const totalCount = group.actions.length;
+    return {
+      label: group.getLabel(config, completedCount, totalCount),
+      completed: completedCount === totalCount,
+      completedCount,
+      totalCount,
+      skipped,
+    };
+  });
 };
 
 export const getRailwayPostgresProgressItems = (
   config: ProjectConfig,
-): Array<{ label: string; completed: boolean }> => {
+): Array<{ label: string; completed: boolean; skipped: boolean }> => {
   return getRailwayPostgresProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,
+    skipped: summary.skipped,
   }));
 };

@@ -5,6 +5,10 @@ import type React from 'react';
 export type ProgressItem = {
   label: string;
   completed: boolean;
+  /** When true, the step is intentionally not run (e.g. staging when staging
+   *  is disabled). Rendered with ⊘ + "(skipped)" so users can still see what
+   *  WOULD happen if the relevant feature were enabled. */
+  skipped?: boolean;
 };
 
 type StepProgressProps = {
@@ -26,14 +30,18 @@ type StepProgressProps = {
  *   − pending steps (dimmed)
  */
 export const StepProgress: React.FC<StepProgressProps> = ({ items, running, activeAction, marginLeft = 0 }) => {
-  const currentStepIndex = running ? items.findIndex((item) => !item.completed) : -1;
+  // Skipped items don't affect progression — find the next non-skipped, non-completed step.
+  const currentStepIndex = running
+    ? items.findIndex((item) => !item.completed && !item.skipped)
+    : -1;
 
   return (
     <Box flexDirection="column">
       {items.map((item, i) => {
-        const isCompleted = item.completed;
-        const isInProgress = running && i === currentStepIndex;
-        const isPending = !isCompleted && !isInProgress;
+        const isSkipped = item.skipped === true;
+        const isCompleted = !isSkipped && item.completed;
+        const isInProgress = !isSkipped && running && i === currentStepIndex;
+        const isPending = !isCompleted && !isInProgress && !isSkipped;
 
         return (
           <Box key={item.label} flexDirection="column" marginLeft={marginLeft}>
@@ -45,6 +53,11 @@ export const StepProgress: React.FC<StepProgressProps> = ({ items, running, acti
                 </Text>
               )}
               {isPending && <Text dimColor>− {item.label}</Text>}
+              {isSkipped && (
+                <Text color="yellow" dimColor>
+                  ⊘ {item.label} (skipped)
+                </Text>
+              )}
             </Box>
             {isInProgress && activeAction && (
               <Box marginLeft={4}>
