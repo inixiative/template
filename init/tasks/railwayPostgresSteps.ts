@@ -20,19 +20,31 @@ const countCompletedActions = (
 
 const railwayPostgresProgressGroups: readonly RailwayPostgresProgressGroup[] = [
   {
-    actions: ['ensureProdPostgresService', 'storeProdPostgresUrl'],
+    actions: [
+      'ensureProdPostgresService',
+      'captureProdPostgresVolume',
+      'renameProdPostgresService',
+      'renameProdPostgresVolume',
+      'storeProdPostgresUrl',
+    ],
     getLabel: (config, completedCount, totalCount) =>
       config.railwayPostgres.prodServiceId
-        ? `Prod Postgres provisioned (${completedCount}/${totalCount}): ${config.railwayPostgres.prodServiceId}`
-        : `Prod Postgres provisioned (${completedCount}/${totalCount})`,
+        ? `Prod Postgres ready (${completedCount}/${totalCount}): ${config.railwayPostgres.prodServiceId}`
+        : `Prod Postgres ready (${completedCount}/${totalCount})`,
   },
   {
-    actions: ['ensureStagingPostgresService', 'storeStagingPostgresUrl'],
+    actions: [
+      'ensureStagingPostgresService',
+      'captureStagingPostgresVolume',
+      'renameStagingPostgresService',
+      'renameStagingPostgresVolume',
+      'storeStagingPostgresUrl',
+    ],
     requiresStaging: true,
     getLabel: (config, completedCount, totalCount) =>
       config.railwayPostgres.stagingServiceId
-        ? `Staging Postgres provisioned (${completedCount}/${totalCount}): ${config.railwayPostgres.stagingServiceId}`
-        : `Staging Postgres provisioned (${completedCount}/${totalCount})`,
+        ? `Staging Postgres ready (${completedCount}/${totalCount}): ${config.railwayPostgres.stagingServiceId}`
+        : `Staging Postgres ready (${completedCount}/${totalCount})`,
   },
 ];
 

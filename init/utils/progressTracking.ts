@@ -12,8 +12,14 @@ export type ProgressSection =
 
 export type RailwayPostgresAction =
   | 'ensureProdPostgresService'
+  | 'captureProdPostgresVolume'
+  | 'renameProdPostgresService'
+  | 'renameProdPostgresVolume'
   | 'storeProdPostgresUrl'
   | 'ensureStagingPostgresService'
+  | 'captureStagingPostgresVolume'
+  | 'renameStagingPostgresService'
+  | 'renameStagingPostgresVolume'
   | 'storeStagingPostgresUrl';
 
 export type InfisicalAction =

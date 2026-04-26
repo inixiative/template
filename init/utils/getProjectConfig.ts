@@ -243,12 +243,20 @@ export type ProjectConfig = {
   };
   railwayPostgres: {
     prodServiceId: string;
+    prodVolumeId: string;
     stagingServiceId: string;
+    stagingVolumeId: string;
     configProjectName: string;
     progress: {
       ensureProdPostgresService: boolean;
+      captureProdPostgresVolume: boolean;
+      renameProdPostgresService: boolean;
+      renameProdPostgresVolume: boolean;
       storeProdPostgresUrl: boolean;
       ensureStagingPostgresService: boolean;
+      captureStagingPostgresVolume: boolean;
+      renameStagingPostgresService: boolean;
+      renameStagingPostgresVolume: boolean;
       storeStagingPostgresUrl: boolean;
     };
     error: string;
@@ -278,14 +286,22 @@ const defaultFeatures: ProjectConfig['features'] = {
 
 const defaultRailwayPostgresProgress: ProjectConfig['railwayPostgres']['progress'] = {
   ensureProdPostgresService: false,
+  captureProdPostgresVolume: false,
+  renameProdPostgresService: false,
+  renameProdPostgresVolume: false,
   storeProdPostgresUrl: false,
   ensureStagingPostgresService: false,
+  captureStagingPostgresVolume: false,
+  renameStagingPostgresService: false,
+  renameStagingPostgresVolume: false,
   storeStagingPostgresUrl: false,
 };
 
 const defaultRailwayPostgres: ProjectConfig['railwayPostgres'] = {
   prodServiceId: '',
+  prodVolumeId: '',
   stagingServiceId: '',
+  stagingVolumeId: '',
   configProjectName: '',
   progress: defaultRailwayPostgresProgress,
   error: '',
@@ -831,7 +847,9 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
       },
       railwayPostgres: {
         prodServiceId: config.railwayPostgres?.prodServiceId ?? '',
+        prodVolumeId: config.railwayPostgres?.prodVolumeId ?? '',
         stagingServiceId: config.railwayPostgres?.stagingServiceId ?? '',
+        stagingVolumeId: config.railwayPostgres?.stagingVolumeId ?? '',
         configProjectName: config.railwayPostgres?.configProjectName ?? '',
         progress: {
           ...defaultRailwayPostgresProgress,
