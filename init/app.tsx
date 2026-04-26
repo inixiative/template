@@ -8,6 +8,7 @@ import { MainMenu } from './views/MainMenu';
 import { PlanetScaleSetupView } from './views/PlanetScaleSetupView';
 import { Prerequisites } from './views/Prerequisites';
 import { ProjectConfigView } from './views/ProjectConfigView';
+import { RailwayPostgresSetupView } from './views/RailwayPostgresSetupView';
 import { RailwaySetupView } from './views/RailwaySetupView';
 import { BouncerSetupView } from './views/BouncerSetupView';
 import { ResendSetupView } from './views/ResendSetupView';
@@ -72,6 +73,9 @@ export const App: React.FC = () => {
             {currentTask === 'railway' && (
               <RailwaySetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
+            {currentTask === 'railway-postgres' && (
+              <RailwayPostgresSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
+            )}
             {currentTask === 'vercel' && (
               <VercelSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
@@ -87,6 +91,7 @@ export const App: React.FC = () => {
               currentTask !== 'infisical' &&
               currentTask !== 'planetscale' &&
               currentTask !== 'railway' &&
+              currentTask !== 'railway-postgres' &&
               currentTask !== 'vercel' &&
               currentTask !== 'resend' &&
               currentTask !== 'bouncer' &&

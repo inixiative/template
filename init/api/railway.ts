@@ -39,6 +39,13 @@ export type RailwayRedis = {
   environmentId?: string;
 };
 
+export type RailwayPostgres = {
+  id: string;
+  name: string;
+  projectId: string;
+  environmentId?: string;
+};
+
 export type RailwayDeployment = {
   id: string;
   status: 'BUILDING' | 'DEPLOYING' | 'SUCCESS' | 'FAILED' | 'CRASHED';
@@ -48,6 +55,7 @@ export type RailwayDeployment = {
 class RailwayApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
     getRedisUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
+    getPostgresUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
     getRailwayUserToken: { fn: () => 'REDACTED' },
     getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
   });
@@ -515,6 +523,72 @@ class RailwayApi {
       return redisUrl;
     } catch (error) {
       if (error instanceof Error) throw new Error(`Failed to get Redis URL: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async createPostgres(projectId: string, environmentId: string, environmentName: string): Promise<RailwayPostgres> {
+    if (process.env.NODE_ENV !== 'test') return this._createPostgres(projectId, environmentId, environmentName);
+    return this.vcr.capture('createPostgres', () => this._createPostgres(projectId, environmentId, environmentName));
+  }
+  private async _createPostgres(
+    projectId: string,
+    environmentId: string,
+    environmentName: string,
+  ): Promise<RailwayPostgres> {
+    try {
+      await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
+        encoding: 'utf-8',
+        cwd: process.cwd(),
+        env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+      });
+      const { stdout } = await execAsync(`railway add -d postgres --json`, {
+        encoding: 'utf-8',
+        cwd: process.cwd(),
+        env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+      });
+      const lines = stdout.split('\n');
+      const jsonLine = lines.find((line) => line.trim().startsWith('{'));
+      if (!jsonLine) throw new Error(`No JSON output found. Raw output: ${stdout}`);
+      const data = JSON.parse(jsonLine);
+      return { id: data.serviceId || data.id, name: data.name || 'postgres', projectId, environmentId };
+    } catch (error) {
+      if (error instanceof Error) throw new Error(`Failed to provision Postgres: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async getPostgresUrl(
+    serviceId: string,
+    _environmentId: string,
+    environmentName: string,
+    projectId: string,
+  ): Promise<string> {
+    if (process.env.NODE_ENV !== 'test')
+      return this._getPostgresUrl(serviceId, _environmentId, environmentName, projectId);
+    return this.vcr.capture('getPostgresUrl', () =>
+      this._getPostgresUrl(serviceId, _environmentId, environmentName, projectId),
+    );
+  }
+  private async _getPostgresUrl(
+    serviceId: string,
+    _environmentId: string,
+    environmentName: string,
+    projectId: string,
+  ): Promise<string> {
+    try {
+      const { stdout } = await execAsync(`railway variables list -s ${serviceId} -e ${environmentName} --json`, {
+        encoding: 'utf-8',
+        cwd: process.cwd(),
+        env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+      });
+      const variables = JSON.parse(stdout.trim());
+      // Prefer the private URL (Railway-internal network, faster + free egress).
+      const url = variables.DATABASE_PRIVATE_URL || variables.DATABASE_URL;
+      if (!url) throw new Error('DATABASE_URL not found in service variables');
+      return url;
+    } catch (error) {
+      if (error instanceof Error) throw new Error(`Failed to get Postgres URL: ${error.message}`);
       throw error;
     }
   }

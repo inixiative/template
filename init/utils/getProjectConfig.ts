@@ -241,6 +241,18 @@ export type ProjectConfig = {
   features: {
     staging: { enabled: boolean };
   };
+  railwayPostgres: {
+    prodServiceId: string;
+    stagingServiceId: string;
+    configProjectName: string;
+    progress: {
+      ensureProdPostgresService: boolean;
+      storeProdPostgresUrl: boolean;
+      ensureStagingPostgresService: boolean;
+      storeStagingPostgresUrl: boolean;
+    };
+    error: string;
+  };
   providers: {
     frontend: FrontendProvider;
     database: DatabaseProvider;
@@ -262,6 +274,21 @@ type LegacyProjectConfig = Partial<ProjectConfig> & {
 
 const defaultFeatures: ProjectConfig['features'] = {
   staging: { enabled: true },
+};
+
+const defaultRailwayPostgresProgress: ProjectConfig['railwayPostgres']['progress'] = {
+  ensureProdPostgresService: false,
+  storeProdPostgresUrl: false,
+  ensureStagingPostgresService: false,
+  storeStagingPostgresUrl: false,
+};
+
+const defaultRailwayPostgres: ProjectConfig['railwayPostgres'] = {
+  prodServiceId: '',
+  stagingServiceId: '',
+  configProjectName: '',
+  progress: defaultRailwayPostgresProgress,
+  error: '',
 };
 
 const defaultProviders: ProjectConfig['providers'] = {
@@ -802,6 +829,16 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         redis: config.providers?.redis ?? defaultProviders.redis,
         email: config.providers?.email ?? defaultProviders.email,
       },
+      railwayPostgres: {
+        prodServiceId: config.railwayPostgres?.prodServiceId ?? '',
+        stagingServiceId: config.railwayPostgres?.stagingServiceId ?? '',
+        configProjectName: config.railwayPostgres?.configProjectName ?? '',
+        progress: {
+          ...defaultRailwayPostgresProgress,
+          ...(config.railwayPostgres?.progress ?? {}),
+        },
+        error: config.railwayPostgres?.error ?? '',
+      },
     };
   } catch (error) {
     throw new Error(
@@ -890,6 +927,14 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       backend: config.providers?.backend ?? defaultProviders.backend,
       redis: config.providers?.redis ?? defaultProviders.redis,
       email: config.providers?.email ?? defaultProviders.email,
+    },
+    railwayPostgres: {
+      ...defaultRailwayPostgres,
+      ...(config.railwayPostgres ?? {}),
+      progress: {
+        ...defaultRailwayPostgresProgress,
+        ...(config.railwayPostgres?.progress ?? {}),
+      },
     },
   };
 

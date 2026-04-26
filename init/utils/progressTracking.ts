@@ -1,6 +1,20 @@
 import { getProjectConfig, writeProjectConfig } from './getProjectConfig';
 
-export type ProgressSection = 'project' | 'infisical' | 'planetscale' | 'railway' | 'resend' | 'bouncer' | 'vercel';
+export type ProgressSection =
+  | 'project'
+  | 'infisical'
+  | 'planetscale'
+  | 'railway'
+  | 'railwayPostgres'
+  | 'resend'
+  | 'bouncer'
+  | 'vercel';
+
+export type RailwayPostgresAction =
+  | 'ensureProdPostgresService'
+  | 'storeProdPostgresUrl'
+  | 'ensureStagingPostgresService'
+  | 'storeStagingPostgresUrl';
 
 export type InfisicalAction =
   | 'selectOrg'
@@ -174,6 +188,7 @@ export type ProgressActions = {
   infisical: InfisicalAction;
   planetscale: PlanetScaleAction;
   railway: RailwayAction;
+  railwayPostgres: RailwayPostgresAction;
   resend: ResendAction;
   bouncer: BouncerAction;
   vercel: VercelAction;

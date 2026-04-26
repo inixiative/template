@@ -138,8 +138,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       // "coming soon" can't actually be selected so the visible-step set still maps
       // 1:1 onto implemented setup flows.
       const usePlanetScale = cfg.providers.database === 'planetscale';
+      const useRailwayPostgres = cfg.providers.database === 'railway-postgres';
       const useVercel = cfg.providers.frontend === 'vercel';
       const useResend = cfg.providers.email === 'resend';
+
+      const railwayPgProgress = cfg.railwayPostgres?.progress;
+      const railwayPgCompleted = railwayPgProgress
+        ? Object.values(railwayPgProgress).filter((v) => v === true).length
+        : 0;
+      const railwayPgTotal = cfg.features.staging.enabled ? 4 : 2;
+      const railwayPgStatus: MenuItem['status'] =
+        railwayPgCompleted === 0 ? 'pending' : railwayPgCompleted < railwayPgTotal ? 'incomplete' : 'completed';
 
       const candidates: (MenuItem | null)[] = [
         {
@@ -159,6 +168,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           ? { label: 'PlanetScale Setup', value: 'planetscale', status: planetscaleStatus.status, progressDetails: planetscaleStatus.details }
           : null,
         { label: 'Railway Setup', value: 'railway', status: railwayStatus.status, progressDetails: railwayStatus.details },
+        useRailwayPostgres
+          ? { label: 'Railway Postgres Setup', value: 'railway-postgres', status: railwayPgStatus }
+          : null,
         useVercel
           ? { label: 'Vercel Setup', value: 'vercel', status: vercelStatus.status, progressDetails: vercelStatus.details }
           : null,

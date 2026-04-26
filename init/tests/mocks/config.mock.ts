@@ -251,6 +251,18 @@ const defaultConfig: ProjectConfig = {
     redis: 'railway',
     email: 'resend',
   },
+  railwayPostgres: {
+    prodServiceId: '',
+    stagingServiceId: '',
+    configProjectName: '',
+    progress: {
+      ensureProdPostgresService: false,
+      storeProdPostgresUrl: false,
+      ensureStagingPostgresService: false,
+      storeStagingPostgresUrl: false,
+    },
+    error: '',
+  },
 };
 
 export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {
