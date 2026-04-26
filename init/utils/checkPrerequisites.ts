@@ -235,10 +235,10 @@ export const getInstallCommand = (cliCommand: string): string => {
     git: 'brew install git',
     gh: 'brew install gh',
     infisical: 'brew install infisical/infisical-cli/infisical',
-    vercel: 'npm install -g vercel',
+    vercel: 'bun add -g vercel',
     pscale: 'brew install planetscale/tap/pscale',
     railway: 'brew install railway',
-    wrangler: 'npm install -g wrangler  # Cloudflare Pages CLI',
+    wrangler: 'bun add -g wrangler  # Cloudflare Pages CLI',
     docker: 'brew install --cask docker',
   };
 
