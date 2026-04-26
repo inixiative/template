@@ -1,6 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+// Monotonic counter for dynamic-import cache-busting. Date.now() has
+// millisecond resolution, which is too coarse for tight markComplete loops
+// in init tasks where multiple writes can happen within the same ms — the
+// import returns the cached stale module and earlier writes get clobbered.
+let cacheBustCounter = 0;
+
 export type ProjectConfig = {
   launched: boolean;
   project: {
@@ -744,8 +750,12 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
   }
 
   try {
-    // Bust import cache with timestamp to get fresh config
-    const module = await import(`${configPath}?t=${Date.now()}`);
+    // Bust import cache with monotonic counter (Date.now() has ms resolution
+    // and sequential markComplete calls in a tight loop hit the same value,
+    // so dynamic import returns the cached stale module and the writes get
+    // sequenced against pre-write state, losing earlier writes).
+    cacheBustCounter += 1;
+    const module = await import(`${configPath}?n=${cacheBustCounter}`);
     const config = module.projectConfig as LegacyProjectConfig;
     const resendConfig = config.resend ?? config.email;
 
