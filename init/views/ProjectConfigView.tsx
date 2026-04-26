@@ -89,9 +89,11 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
         await onStepComplete();
       }
 
-      if (newName !== currentConfig.name) {
-        await renameProject(currentConfig.name, newName, onStepComplete);
-      }
+      // Always call renameProject — when oldName === newName it short-circuits
+      // but still ticks every substep flag (updatePackages / updateImports /
+      // updateReadme / updateTsconfigs / updateEnvFiles / cleanInstall) so the
+      // UI shows ✓ instead of dashes after a re-confirm with the same name.
+      await renameProject(currentConfig.name, newName, onStepComplete);
 
       // bun run setup (Docker, Prisma generate, etc.)
       await execAsync('bun run setup');
