@@ -272,6 +272,31 @@ export type ProjectConfig = {
     };
     error: string;
   };
+  cloudflarePages: {
+    accountId: string;
+    accountName: string;
+    webProjectName: string;
+    adminProjectName: string;
+    superadminProjectName: string;
+    configProjectName: string;
+    progress: {
+      selectAccount: boolean;
+      storeApiToken: boolean;
+      createWebProject: boolean;
+      linkWebGitHub: boolean;
+      syncWebEnvProd: boolean;
+      syncWebEnvStaging: boolean;
+      createAdminProject: boolean;
+      linkAdminGitHub: boolean;
+      syncAdminEnvProd: boolean;
+      syncAdminEnvStaging: boolean;
+      createSuperadminProject: boolean;
+      linkSuperadminGitHub: boolean;
+      syncSuperadminEnvProd: boolean;
+      syncSuperadminEnvStaging: boolean;
+    };
+    error: string;
+  };
   providers: {
     frontend: FrontendProvider;
     database: DatabaseProvider;
@@ -320,6 +345,34 @@ const defaultRailwayPostgres: ProjectConfig['railwayPostgres'] = {
   stagingVolumeId: '',
   configProjectName: '',
   progress: defaultRailwayPostgresProgress,
+  error: '',
+};
+
+const defaultCloudflarePagesProgress: ProjectConfig['cloudflarePages']['progress'] = {
+  selectAccount: false,
+  storeApiToken: false,
+  createWebProject: false,
+  linkWebGitHub: false,
+  syncWebEnvProd: false,
+  syncWebEnvStaging: false,
+  createAdminProject: false,
+  linkAdminGitHub: false,
+  syncAdminEnvProd: false,
+  syncAdminEnvStaging: false,
+  createSuperadminProject: false,
+  linkSuperadminGitHub: false,
+  syncSuperadminEnvProd: false,
+  syncSuperadminEnvStaging: false,
+};
+
+const defaultCloudflarePages: ProjectConfig['cloudflarePages'] = {
+  accountId: '',
+  accountName: '',
+  webProjectName: '',
+  adminProjectName: '',
+  superadminProjectName: '',
+  configProjectName: '',
+  progress: defaultCloudflarePagesProgress,
   error: '',
 };
 
@@ -891,6 +944,19 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         },
         error: config.railwayPostgres?.error ?? '',
       },
+      cloudflarePages: {
+        accountId: config.cloudflarePages?.accountId ?? '',
+        accountName: config.cloudflarePages?.accountName ?? '',
+        webProjectName: config.cloudflarePages?.webProjectName ?? '',
+        adminProjectName: config.cloudflarePages?.adminProjectName ?? '',
+        superadminProjectName: config.cloudflarePages?.superadminProjectName ?? '',
+        configProjectName: config.cloudflarePages?.configProjectName ?? '',
+        progress: {
+          ...defaultCloudflarePagesProgress,
+          ...(config.cloudflarePages?.progress ?? {}),
+        },
+        error: config.cloudflarePages?.error ?? '',
+      },
     };
   } catch (error) {
     throw new Error(
@@ -998,6 +1064,14 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       progress: {
         ...defaultRailwayPostgresProgress,
         ...(config.railwayPostgres?.progress ?? {}),
+      },
+    },
+    cloudflarePages: {
+      ...defaultCloudflarePages,
+      ...(config.cloudflarePages ?? {}),
+      progress: {
+        ...defaultCloudflarePagesProgress,
+        ...(config.cloudflarePages?.progress ?? {}),
       },
     },
   };

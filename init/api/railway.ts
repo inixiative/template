@@ -225,25 +225,72 @@ class RailwayApi {
     serviceId: string,
     environmentId: string,
     repo: string,
-    _branch: string,
+    branch: string,
   ): Promise<void> {
-    const data = await this._railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(
+    // Two-step wiring:
+    //   1. serviceInstanceUpdate sets the repo on the service's source — Railway
+    //      uses this to know WHERE to fetch code from at deploy time.
+    //   2. deploymentTriggerCreate creates the auto-deploy-on-push wiring with
+    //      the explicit branch. Without this trigger, Railway treats the GitHub
+    //      link as "connected" but never auto-deploys when commits land.
+    const updateData = await this._railwayGraphQLUser<{ serviceInstanceUpdate: boolean }>(
       `
-        mutation ServiceInstanceUpdate(
-          $serviceId: String!,
-          $environmentId: String!,
-          $input: ServiceInstanceUpdateInput!
-        ) {
+        mutation ServiceInstanceUpdate($serviceId: String!, $environmentId: String!, $input: ServiceInstanceUpdateInput!) {
           serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: $input)
         }
       `,
       { serviceId, environmentId, input: { source: { repo } } },
     );
-    if (!data.serviceInstanceUpdate) {
+    if (!updateData.serviceInstanceUpdate) {
       throw new Error(
-        `Failed to connect service ${serviceId} to GitHub repository ${repo} in environment ${environmentId}`,
+        `Failed to set source on service ${serviceId} for ${repo} in environment ${environmentId}`,
       );
     }
+    // Idempotent trigger create: query existing first, only create if missing.
+    const projectId = await this._serviceProjectId(serviceId);
+    const existing = await this._railwayGraphQLUser<{
+      deploymentTriggers: { edges: Array<{ node: { id: string; branch: string; repository: string } }> };
+    }>(
+      `
+        query Triggers($projectId: String!, $serviceId: String!, $environmentId: String!) {
+          deploymentTriggers(projectId: $projectId, serviceId: $serviceId, environmentId: $environmentId) {
+            edges { node { id branch repository } }
+          }
+        }
+      `,
+      { projectId, serviceId, environmentId },
+    );
+    const hasTrigger = existing.deploymentTriggers.edges.some(
+      (e) => e.node.repository === repo && e.node.branch === branch,
+    );
+    if (!hasTrigger) {
+      await this._railwayGraphQLUser<{ deploymentTriggerCreate: { id: string } }>(
+        `
+          mutation TriggerCreate($input: DeploymentTriggerCreateInput!) {
+            deploymentTriggerCreate(input: $input) { id }
+          }
+        `,
+        {
+          input: {
+            projectId,
+            environmentId,
+            serviceId,
+            provider: 'github',
+            repository: repo,
+            branch,
+            checkSuites: false,
+          },
+        },
+      );
+    }
+  }
+
+  private async _serviceProjectId(serviceId: string): Promise<string> {
+    const data = await this._railwayGraphQLUser<{ service: { projectId: string } }>(
+      `query ServiceProject($id: String!) { service(id: $id) { projectId } }`,
+      { id: serviceId },
+    );
+    return data.service.projectId;
   }
 
   async renameService(serviceId: string, name: string): Promise<void> {

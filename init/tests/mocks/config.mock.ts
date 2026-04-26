@@ -276,6 +276,31 @@ const defaultConfig: ProjectConfig = {
     },
     error: '',
   },
+  cloudflarePages: {
+    accountId: '',
+    accountName: '',
+    webProjectName: '',
+    adminProjectName: '',
+    superadminProjectName: '',
+    configProjectName: '',
+    progress: {
+      selectAccount: false,
+      storeApiToken: false,
+      createWebProject: false,
+      linkWebGitHub: false,
+      syncWebEnvProd: false,
+      syncWebEnvStaging: false,
+      createAdminProject: false,
+      linkAdminGitHub: false,
+      syncAdminEnvProd: false,
+      syncAdminEnvStaging: false,
+      createSuperadminProject: false,
+      linkSuperadminGitHub: false,
+      syncSuperadminEnvProd: false,
+      syncSuperadminEnvStaging: false,
+    },
+    error: '',
+  },
 };
 
 export const createMockConfig = (overrides?: Partial<ProjectConfig>) => {

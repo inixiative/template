@@ -6,9 +6,26 @@ export type ProgressSection =
   | 'planetscale'
   | 'railway'
   | 'railwayPostgres'
+  | 'cloudflarePages'
   | 'resend'
   | 'bouncer'
   | 'vercel';
+
+export type CloudflarePagesAction =
+  | 'selectAccount'
+  | 'storeApiToken'
+  | 'createWebProject'
+  | 'linkWebGitHub'
+  | 'syncWebEnvProd'
+  | 'syncWebEnvStaging'
+  | 'createAdminProject'
+  | 'linkAdminGitHub'
+  | 'syncAdminEnvProd'
+  | 'syncAdminEnvStaging'
+  | 'createSuperadminProject'
+  | 'linkSuperadminGitHub'
+  | 'syncSuperadminEnvProd'
+  | 'syncSuperadminEnvStaging';
 
 export type RailwayPostgresAction =
   | 'ensureProdPostgresService'
@@ -195,6 +212,7 @@ export type ProgressActions = {
   planetscale: PlanetScaleAction;
   railway: RailwayAction;
   railwayPostgres: RailwayPostgresAction;
+  cloudflarePages: CloudflarePagesAction;
   resend: ResendAction;
   bouncer: BouncerAction;
   vercel: VercelAction;
