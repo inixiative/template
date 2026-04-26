@@ -20,7 +20,7 @@ export const FRONTEND_PROVIDERS: ProviderOption<FrontendProvider>[] = [
 ];
 
 export const DATABASE_PROVIDERS: ProviderOption<DatabaseProvider>[] = [
-  { value: 'planetscale', label: 'PlanetScale', implemented: true, note: 'MySQL, branching' },
+  { value: 'planetscale', label: 'PlanetScale', implemented: true, note: 'Postgres (Metal), branching' },
   { value: 'railway-postgres', label: 'Railway Postgres', implemented: true, note: 'Bundled with Railway backend' },
   { value: 'neon', label: 'Neon', implemented: false, note: 'Serverless Postgres, generous free tier' },
   { value: 'supabase', label: 'Supabase', implemented: false, note: 'Postgres + auth + storage' },
