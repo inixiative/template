@@ -4,6 +4,7 @@ import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
+import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
 import { getRailwayProgressSummaries } from '../tasks/railwaySteps';
 import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
 import { getResendProgressSummaries } from '../tasks/resendSteps';
@@ -74,6 +75,25 @@ const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; 
   return getStatusFromSummaries(config.railway.progress, getRailwayProgressSummaries(config), config.railway.error);
 };
 
+const getRailwayPostgresStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
+  // When staging is disabled, the staging substeps don't count toward total —
+  // we filter the progress map to match what the steps catalog reports.
+  const stagingEnabled = config.features.staging.enabled;
+  const filteredProgress: Record<string, boolean> = stagingEnabled
+    ? config.railwayPostgres.progress
+    : {
+        ensureProdPostgresService: config.railwayPostgres.progress.ensureProdPostgresService,
+        storeProdPostgresUrl: config.railwayPostgres.progress.storeProdPostgresUrl,
+      };
+  return getStatusFromSummaries(
+    filteredProgress,
+    getRailwayPostgresProgressSummaries(config),
+    config.railwayPostgres.error,
+  );
+};
+
 const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
   return getStatusFromSummaries(config.vercel.progress, getVercelProgressSummaries(config), config.vercel.error);
 };
@@ -142,13 +162,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const useVercel = cfg.providers.frontend === 'vercel';
       const useResend = cfg.providers.email === 'resend';
 
-      const railwayPgProgress = cfg.railwayPostgres?.progress;
-      const railwayPgCompleted = railwayPgProgress
-        ? Object.values(railwayPgProgress).filter((v) => v === true).length
-        : 0;
-      const railwayPgTotal = cfg.features.staging.enabled ? 4 : 2;
-      const railwayPgStatus: MenuItem['status'] =
-        railwayPgCompleted === 0 ? 'pending' : railwayPgCompleted < railwayPgTotal ? 'incomplete' : 'completed';
+      const railwayPostgresStatus = getRailwayPostgresStatus(cfg);
 
       const candidates: (MenuItem | null)[] = [
         {
@@ -169,7 +183,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           : null,
         { label: 'Railway Setup', value: 'railway', status: railwayStatus.status, progressDetails: railwayStatus.details },
         useRailwayPostgres
-          ? { label: 'Railway Postgres Setup', value: 'railway-postgres', status: railwayPgStatus }
+          ? {
+              label: 'Railway Postgres Setup',
+              value: 'railway-postgres',
+              status: railwayPostgresStatus.status,
+              progressDetails: railwayPostgresStatus.details,
+            }
           : null,
         useVercel
           ? { label: 'Vercel Setup', value: 'vercel', status: vercelStatus.status, progressDetails: vercelStatus.details }
@@ -191,7 +210,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 
       const updatedItems = candidates
         .filter((item): item is MenuItem => item !== null)
-        .map((item, idx) => ({ ...item, label: `${idx}. ${item.label}` }));
+        .map((item, idx) => ({ ...item, label: `${idx + 1}. ${item.label}` }));
 
       setItems(updatedItems as MenuItem[]);
     };

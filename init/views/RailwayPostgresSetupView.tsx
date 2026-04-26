@@ -1,8 +1,12 @@
 import { Box, Text, useInput } from 'ink';
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { StepProgress } from '../components/StepProgress';
 import { setupRailwayPostgres } from '../tasks/railwayPostgresSetup';
+import { getRailwayPostgresProgressItems } from '../tasks/railwayPostgresSteps';
+import { updateConfigField } from '../utils/configHelpers';
 import { useConfig } from '../utils/configState';
+import { clearError, clearProgress } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
 type RailwayPostgresSetupViewProps = {
@@ -10,46 +14,53 @@ type RailwayPostgresSetupViewProps = {
   onCancel: () => void;
 };
 
-type Status = 'idle' | 'running' | 'done' | 'error';
+type SetupState = 'new' | 'incomplete' | 'complete';
 
 export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> = ({ onComplete, onCancel }) => {
   const { config, syncConfig } = useConfig();
-  const [status, setStatus] = useState<Status>('idle');
+  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stepCount, setStepCount] = useState(0);
 
-  const stagingEnabled = config?.features.staging.enabled ?? true;
-  const totalSteps = stagingEnabled ? 4 : 2;
+  const detectState = (): SetupState => {
+    if (!config) return 'new';
+    const items = getRailwayPostgresProgressItems(config);
+    if (items.every((item) => item.completed)) return 'complete';
+    if (items.some((item) => item.completed)) return 'incomplete';
+    return 'new';
+  };
+  const setupState = detectState();
 
-  const run = useCallback(async () => {
-    setStatus('running');
+  const handleRun = useCallback(async () => {
+    setRunning(true);
     setError(null);
     try {
-      await setupRailwayPostgres(async () => {
-        setStepCount((c) => c + 1);
-        await syncConfig();
-      });
+      await setupRailwayPostgres(syncConfig);
       await syncConfig();
-      setStatus('done');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setStatus('error');
       await syncConfig();
+    } finally {
+      setRunning(false);
     }
   }, [syncConfig]);
 
-  // Auto-start on mount.
-  useEffect(() => {
-    if (status === 'idle') run();
-  }, [status, run]);
+  const handleRestart = useCallback(async () => {
+    await clearProgress('railwayPostgres');
+    await clearError('railwayPostgres');
+    await updateConfigField('railwayPostgres', 'prodServiceId', '');
+    await updateConfigField('railwayPostgres', 'stagingServiceId', '');
+    await syncConfig();
+    await handleRun();
+  }, [handleRun, syncConfig]);
 
-  useInput((_input, key) => {
-    if (status === 'running') return;
-    if (key.escape) onCancel();
+  useInput((input, key) => {
+    if (running) return;
+    if (key.escape) return onCancel();
     if (key.return) {
-      if (status === 'done') onComplete();
-      else if (status === 'error') run();
+      if (setupState === 'complete') return onComplete();
+      return handleRun();
     }
+    if (input === 'r' || input === 'R') return handleRestart();
   });
 
   if (!config) {
@@ -60,7 +71,8 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
     );
   }
 
-  const progress = config.railwayPostgres.progress;
+  const stagingEnabled = config.features.staging.enabled;
+  const progressItems = getRailwayPostgresProgressItems(config);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -72,53 +84,38 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
 
       <Box marginBottom={1}>
         <Text dimColor>
-          Provisions Postgres databases via the Railway CLI ({stagingEnabled ? 'prod + staging' : 'prod only'}) and
-          stores DATABASE_URL in Infisical at /api.
+          Provisions Postgres via Railway CLI ({stagingEnabled ? 'prod + staging' : 'prod only'}) and stores
+          DATABASE_URL in Infisical at /api.
         </Text>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1} marginLeft={2}>
-        <Text color={progress.ensureProdPostgresService ? 'green' : 'cyan'}>
-          {progress.ensureProdPostgresService ? '✓' : '·'} Provision prod Postgres service
-        </Text>
-        <Text color={progress.storeProdPostgresUrl ? 'green' : 'cyan'}>
-          {progress.storeProdPostgresUrl ? '✓' : '·'} Store prod DATABASE_URL in Infisical
-        </Text>
-        {stagingEnabled && (
-          <>
-            <Text color={progress.ensureStagingPostgresService ? 'green' : 'cyan'}>
-              {progress.ensureStagingPostgresService ? '✓' : '·'} Provision staging Postgres service
-            </Text>
-            <Text color={progress.storeStagingPostgresUrl ? 'green' : 'cyan'}>
-              {progress.storeStagingPostgresUrl ? '✓' : '·'} Store staging DATABASE_URL in Infisical
-            </Text>
-          </>
-        )}
+      <Box marginBottom={1}>
+        <StepProgress items={progressItems} running={running} marginLeft={2} />
       </Box>
 
-      {status === 'running' && (
+      {error && (
         <Box marginBottom={1}>
-          <Text color="cyan">Working… ({stepCount}/{totalSteps})</Text>
+          <Text color="red">✗ {error}</Text>
         </Box>
       )}
 
-      {status === 'done' && (
-        <Box flexDirection="column" marginBottom={1}>
+      {!running && setupState === 'complete' && (
+        <Box marginBottom={1}>
           <Text color="green" bold>
             ✓ Postgres ready — DATABASE_URL stored in Infisical for {stagingEnabled ? 'prod + staging' : 'prod'}.
           </Text>
-          <Box marginTop={1}>
-            <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
-          </Box>
         </Box>
       )}
 
-      {status === 'error' && error && (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text color="red">✗ {error}</Text>
-          <Box marginTop={1}>
-            <Text dimColor>Enter to retry. Esc to go back.</Text>
-          </Box>
+      {!running && (
+        <Box>
+          <Text dimColor>
+            {setupState === 'complete'
+              ? prompt(['enter', 'restart', 'cancel'])
+              : setupState === 'incomplete'
+                ? prompt(['enter', 'restart', 'cancel'])
+                : prompt(['enter', 'cancel'])}
+          </Text>
         </Box>
       )}
     </Box>
