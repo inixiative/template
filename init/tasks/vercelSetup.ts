@@ -46,6 +46,9 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     const webEnabled = projectConfig.features.apps.web.enabled;
     const adminEnabled = projectConfig.features.apps.admin.enabled;
     const superadminEnabled = projectConfig.features.apps.superadmin.enabled;
+    // Skip every staging-env / staging-sync / preview-sync / staging-URL
+    // substep when staging is disabled — paired with per-app gates above.
+    const stagingEnabled = projectConfig.features.staging.enabled;
     let vercelToken = '';
     const teamSlug = (await vercelApi.listTeams()).find((team) => team.id === teamId)?.slug;
 
@@ -148,7 +151,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 9: Create Web staging environment (optional - requires Pro/Enterprise)
-    if (webEnabled && !(await isComplete('vercel', 'createWebStagingEnvironment'))) {
+    if (webEnabled && stagingEnabled && !(await isComplete('vercel', 'createWebStagingEnvironment'))) {
       try {
         await vercelApi.createCustomEnvironment(webProjectId, teamId, 'Staging', 'main');
       } catch (error) {
@@ -200,7 +203,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 13: Create Infisical sync for Web → staging (custom environment via preview + branch)
-    if (webEnabled && !(await isComplete('vercel', 'createWebInfisicalSyncStaging'))) {
+    if (webEnabled && stagingEnabled && !(await isComplete('vercel', 'createWebInfisicalSyncStaging'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -218,7 +221,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 14: Create Infisical sync for Web → preview (optional)
-    if (webEnabled && !(await isComplete('vercel', 'createWebInfisicalSyncPreview'))) {
+    if (webEnabled && stagingEnabled && !(await isComplete('vercel', 'createWebInfisicalSyncPreview'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -243,7 +246,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    if (webEnabled && !(await isComplete('vercel', 'storeStagingWebUrls'))) {
+    if (webEnabled && stagingEnabled && !(await isComplete('vercel', 'storeStagingWebUrls'))) {
       const stagingWebUrl = buildVercelBranchUrl(`${projectName}-web`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'WEB_URL', stagingWebUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_WEB_URL', stagingWebUrl, '/');
@@ -276,7 +279,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 17: Create Admin staging environment (optional - requires Pro/Enterprise)
-    if (adminEnabled && !(await isComplete('vercel', 'createAdminStagingEnvironment'))) {
+    if (adminEnabled && stagingEnabled && !(await isComplete('vercel', 'createAdminStagingEnvironment'))) {
       try {
         await vercelApi.createCustomEnvironment(adminProjectId, teamId, 'Staging', 'main');
       } catch (error) {
@@ -327,7 +330,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 21: Create Infisical sync for Admin → staging (custom environment via preview + branch)
-    if (adminEnabled && !(await isComplete('vercel', 'createAdminInfisicalSyncStaging'))) {
+    if (adminEnabled && stagingEnabled && !(await isComplete('vercel', 'createAdminInfisicalSyncStaging'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -345,7 +348,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 22: Create Infisical sync for Admin → preview
-    if (adminEnabled && !(await isComplete('vercel', 'createAdminInfisicalSyncPreview'))) {
+    if (adminEnabled && stagingEnabled && !(await isComplete('vercel', 'createAdminInfisicalSyncPreview'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -370,7 +373,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    if (adminEnabled && !(await isComplete('vercel', 'storeStagingAdminUrls'))) {
+    if (adminEnabled && stagingEnabled && !(await isComplete('vercel', 'storeStagingAdminUrls'))) {
       const stagingAdminUrl = buildVercelBranchUrl(`${projectName}-admin`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'ADMIN_URL', stagingAdminUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_ADMIN_URL', stagingAdminUrl, '/');
@@ -403,7 +406,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 25: Create Superadmin staging environment (optional - requires Pro/Enterprise)
-    if (superadminEnabled && !(await isComplete('vercel', 'createSuperadminStagingEnvironment'))) {
+    if (superadminEnabled && stagingEnabled && !(await isComplete('vercel', 'createSuperadminStagingEnvironment'))) {
       try {
         await vercelApi.createCustomEnvironment(superadminProjectId, teamId, 'Staging', 'main');
       } catch (error) {
@@ -460,7 +463,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 29: Create Infisical sync for Superadmin → staging (custom environment via preview + branch)
-    if (superadminEnabled && !(await isComplete('vercel', 'createSuperadminInfisicalSyncStaging'))) {
+    if (superadminEnabled && stagingEnabled && !(await isComplete('vercel', 'createSuperadminInfisicalSyncStaging'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -478,7 +481,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 30: Create Infisical sync for Superadmin → preview
-    if (superadminEnabled && !(await isComplete('vercel', 'createSuperadminInfisicalSyncPreview'))) {
+    if (superadminEnabled && stagingEnabled && !(await isComplete('vercel', 'createSuperadminInfisicalSyncPreview'))) {
       await infisicalVercelApi.ensureVercelSync({
         infisicalProjectId,
         connectionId,
@@ -503,7 +506,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
       await syncConfig();
     }
 
-    if (superadminEnabled && !(await isComplete('vercel', 'storeStagingSuperadminUrls'))) {
+    if (superadminEnabled && stagingEnabled && !(await isComplete('vercel', 'storeStagingSuperadminUrls'))) {
       const stagingSuperadminUrl = buildVercelBranchUrl(`${projectName}-superadmin`, 'main', teamSlug);
       await setSecretAsync(infisicalProjectId, 'staging', 'SUPERADMIN_URL', stagingSuperadminUrl, '/');
       await setSecretAsync(infisicalProjectId, 'staging', 'VITE_SUPERADMIN_URL', stagingSuperadminUrl, '/');

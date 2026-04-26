@@ -204,29 +204,61 @@ export type VercelProgressSummary = {
   totalCount: number;
 };
 
-export const getVercelProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+/**
+ * Compute the skipped flag for a Vercel substep based on feature flags:
+ *   - Action references Web → skipped when features.apps.web.enabled is false
+ *   - Action references Admin / Superadmin → same per app
+ *   - Action references Staging / InfisicalSyncStaging / InfisicalSyncPreview /
+ *     storeStaging* → skipped when features.staging.enabled is false (preview is
+ *     staging-tied since CI previews share the staging secret bundle).
+ */
+const isVercelActionSkipped = (config: ProjectConfig, action: VercelAction): boolean => {
+  const stagingEnabled = config.features.staging.enabled;
+  const a = action as string;
+  // Detect app affinity. Order matters: check Superadmin before Admin to avoid
+  // matching 'Superadmin' as 'Admin'.
+  const isSuperadmin = /Superadmin/.test(a);
+  const isAdmin = !isSuperadmin && /Admin/.test(a);
+  const isWeb = /Web/.test(a);
+  if (isSuperadmin && !config.features.apps.superadmin.enabled) return true;
+  if (isAdmin && !config.features.apps.admin.enabled) return true;
+  if (isWeb && !config.features.apps.web.enabled) return true;
+  // Staging/preview gates (only relevant once the app is enabled)
+  const isStaging = /Staging/.test(a) || /SyncPreview$/.test(a);
+  if (isStaging && !stagingEnabled) return true;
+  return false;
+};
+
+export const getVercelProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean; skipped: boolean }> => {
   const bootstrapSummary = getVercelProgressSummaries(config)[0];
 
   return [
     {
       label: bootstrapSummary.label,
       completed: bootstrapSummary.completed,
+      skipped: false,
     },
     ...vercelWebSteps.map((step) => ({
       label: step.getLabel(config),
       completed: config.vercel.progress[step.action],
+      skipped: isVercelActionSkipped(config, step.action),
     })),
     ...vercelAdminSteps.map((step) => ({
       label: step.getLabel(config),
       completed: config.vercel.progress[step.action],
+      skipped: isVercelActionSkipped(config, step.action),
     })),
     ...vercelSuperadminSteps.map((step) => ({
       label: step.getLabel(config),
       completed: config.vercel.progress[step.action],
+      skipped: isVercelActionSkipped(config, step.action),
     })),
     {
       label: 'Setup complete',
       completed: config.vercel.progress.deployProduction,
+      skipped: false,
     },
   ];
 };
