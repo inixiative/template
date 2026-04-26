@@ -246,6 +246,11 @@ export type ProjectConfig = {
   };
   features: {
     staging: { enabled: boolean };
+    apps: {
+      web: { enabled: boolean };
+      admin: { enabled: boolean };
+      superadmin: { enabled: boolean };
+    };
   };
   railwayPostgres: {
     prodServiceId: string;
@@ -288,6 +293,11 @@ type LegacyProjectConfig = Partial<ProjectConfig> & {
 
 const defaultFeatures: ProjectConfig['features'] = {
   staging: { enabled: true },
+  apps: {
+    web: { enabled: true },
+    admin: { enabled: true },
+    superadmin: { enabled: true },
+  },
 };
 
 const defaultRailwayPostgresProgress: ProjectConfig['railwayPostgres']['progress'] = {
@@ -847,6 +857,20 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
           enabled:
             (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
         },
+        apps: {
+          web: {
+            enabled:
+              (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
+          },
+          admin: {
+            enabled:
+              (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
+          },
+          superadmin: {
+            enabled:
+              (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+          },
+        },
       },
       providers: {
         frontend: config.providers?.frontend ?? defaultProviders.frontend,
@@ -947,6 +971,18 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       staging: {
         enabled:
           (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+      },
+      apps: {
+        web: {
+          enabled: (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
+        },
+        admin: {
+          enabled: (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
+        },
+        superadmin: {
+          enabled:
+            (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+        },
       },
     },
     providers: {

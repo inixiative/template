@@ -30,6 +30,9 @@ type SettingsViewProps = {
 type Screen =
   | { kind: 'menu' }
   | { kind: 'staging' }
+  | { kind: 'app-web' }
+  | { kind: 'app-admin' }
+  | { kind: 'app-superadmin' }
   | { kind: 'frontend' }
   | { kind: 'database' }
   | { kind: 'backend' }
@@ -109,10 +112,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
     };
 
   if (screen.kind === 'menu') {
+    const onOff = (b: boolean) => (b ? 'enabled' : 'disabled');
     const items = [
       {
-        label: `Staging environment: ${config.features.staging.enabled ? 'enabled' : 'disabled'}`,
+        label: `Staging environment: ${onOff(config.features.staging.enabled)}`,
         value: 'staging',
+      },
+      {
+        label: `Frontend app — web: ${onOff(config.features.apps.web.enabled)}`,
+        value: 'app-web',
+      },
+      {
+        label: `Frontend app — admin: ${onOff(config.features.apps.admin.enabled)}`,
+        value: 'app-admin',
+      },
+      {
+        label: `Frontend app — superadmin: ${onOff(config.features.apps.superadmin.enabled)}`,
+        value: 'app-superadmin',
       },
       { label: renderProviderRow('Frontend:', FRONTEND_PROVIDERS, config.providers.frontend), value: 'frontend' },
       { label: renderProviderRow('Database:', DATABASE_PROVIDERS, config.providers.database), value: 'database' },
@@ -172,6 +188,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
           onSelect={async (item) => {
             await writeAndSync((c) => {
               c.features.staging.enabled = item.value === 'enabled';
+            });
+            setScreen({ kind: 'menu' });
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // Frontend app toggles — web/admin/superadmin can each be turned off
+  // independently. Disabled apps are skipped by Vercel/CF Pages setup.
+  const appKey = screen.kind === 'app-web' ? 'web'
+    : screen.kind === 'app-admin' ? 'admin'
+    : screen.kind === 'app-superadmin' ? 'superadmin'
+    : null;
+  if (appKey) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Box marginBottom={1}>
+          <Text bold>Frontend app — {appKey}</Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>
+            On = the {appKey} app is provisioned by the frontend provider (Vercel project,
+            CF Pages project, etc.) and gets prod + staging env vars in Infisical.
+          </Text>
+        </Box>
+        <Box marginBottom={1}>
+          <Text dimColor>
+            Off = no provisioning, no env vars. The app source stays in the repo so you
+            can flip it back on later. Useful when you don't need that app in this project.
+          </Text>
+        </Box>
+        <SelectInput
+          items={[
+            { label: 'Enabled', value: 'enabled' },
+            { label: 'Disabled', value: 'disabled' },
+          ]}
+          onSelect={async (item) => {
+            await writeAndSync((c) => {
+              c.features.apps[appKey].enabled = item.value === 'enabled';
             });
             setScreen({ kind: 'menu' });
           }}

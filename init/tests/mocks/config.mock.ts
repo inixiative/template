@@ -243,6 +243,11 @@ const defaultConfig: ProjectConfig = {
   },
   features: {
     staging: { enabled: true },
+    apps: {
+      web: { enabled: true },
+      admin: { enabled: true },
+      superadmin: { enabled: true },
+    },
   },
   providers: {
     frontend: 'vercel',
