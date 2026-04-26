@@ -49,6 +49,9 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Skip every staging-env / staging-sync / preview-sync / staging-URL
     // substep when staging is disabled — paired with per-app gates above.
     const stagingEnabled = projectConfig.features.staging.enabled;
+    // Skip GitHub auto-deploy linking when gitConnectFrontend is off (e.g.
+    // Vercel Hobby + private org repo, manual `vercel --prod` workflow).
+    const gitConnect = projectConfig.features.gitConnectFrontend.enabled;
     let vercelToken = '';
     const teamSlug = (await vercelApi.listTeams()).find((team) => team.id === teamId)?.slug;
 
@@ -167,7 +170,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 10: Link Web project to GitHub
-    if (webEnabled && !(await isComplete('vercel', 'linkWebGitHub'))) {
+    if (webEnabled && gitConnect && !(await isComplete('vercel', 'linkWebGitHub'))) {
       await vercelApi.linkGitHub(webProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkWebGitHub');
@@ -179,7 +182,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Currently only main deploys; feature branches are skipped to avoid build costs.
     // TODO: When launched, enable preview deploys for PR branches by updating vercel.json
     // or adding a prod branch. See: https://vercel.com/docs/projects/overview#git
-    if (webEnabled && !(await isComplete('vercel', 'configureWebBranches'))) {
+    if (webEnabled && gitConnect && !(await isComplete('vercel', 'configureWebBranches'))) {
       await markComplete('vercel', 'configureWebBranches');
       await syncConfig();
     }
@@ -295,7 +298,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 18: Link Admin project to GitHub
-    if (adminEnabled && !(await isComplete('vercel', 'linkAdminGitHub'))) {
+    if (adminEnabled && gitConnect && !(await isComplete('vercel', 'linkAdminGitHub'))) {
       await vercelApi.linkGitHub(adminProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
 
       await markComplete('vercel', 'linkAdminGitHub');
@@ -306,7 +309,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Branch deploy config lives in apps/admin/vercel.json (git.deploymentEnabled).
     // Currently only main deploys; feature branches skipped to avoid build costs.
     // TODO: Enable preview deploys for PR branches when launched.
-    if (adminEnabled && !(await isComplete('vercel', 'configureAdminBranches'))) {
+    if (adminEnabled && gitConnect && !(await isComplete('vercel', 'configureAdminBranches'))) {
       await markComplete('vercel', 'configureAdminBranches');
       await syncConfig();
     }
@@ -422,7 +425,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     }
 
     // Step 26: Link Superadmin project to GitHub
-    if (superadminEnabled && !(await isComplete('vercel', 'linkSuperadminGitHub'))) {
+    if (superadminEnabled && gitConnect && !(await isComplete('vercel', 'linkSuperadminGitHub'))) {
       await vercelApi.linkGitHub(
         superadminProjectId,
         projectConfig.project.organization,
@@ -439,7 +442,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     // Branch deploy config lives in apps/superadmin/vercel.json (git.deploymentEnabled).
     // Currently only main deploys; feature branches skipped to avoid build costs.
     // TODO: Enable preview deploys for PR branches when launched.
-    if (superadminEnabled && !(await isComplete('vercel', 'configureSuperadminBranches'))) {
+    if (superadminEnabled && gitConnect && !(await isComplete('vercel', 'configureSuperadminBranches'))) {
       await markComplete('vercel', 'configureSuperadminBranches');
       await syncConfig();
     }

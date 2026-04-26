@@ -251,6 +251,15 @@ export type ProjectConfig = {
       admin: { enabled: boolean };
       superadmin: { enabled: boolean };
     };
+    /**
+     * Controls whether init wires git-push → frontend-deploy auto-deploy.
+     * When false, init skips Vercel/CF Pages → GitHub link steps and you
+     * deploy via `vercel --prod` / `wrangler pages deploy`. Useful for:
+     *   - Vercel Hobby + private org repo (paywalled git integration)
+     *   - manual-promotion workflows (deploy via CI separately)
+     *   - keeping the repo private without paying for Pro tier
+     */
+    gitConnectFrontend: { enabled: boolean };
   };
   railwayPostgres: {
     prodServiceId: string;
@@ -323,6 +332,7 @@ const defaultFeatures: ProjectConfig['features'] = {
     admin: { enabled: true },
     superadmin: { enabled: true },
   },
+  gitConnectFrontend: { enabled: true },
 };
 
 const defaultRailwayPostgresProgress: ProjectConfig['railwayPostgres']['progress'] = {
@@ -924,6 +934,10 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
               (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
           },
         },
+        gitConnectFrontend: {
+          enabled:
+            (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
+        },
       },
       providers: {
         frontend: config.providers?.frontend ?? defaultProviders.frontend,
@@ -1049,6 +1063,10 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
           enabled:
             (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
         },
+      },
+      gitConnectFrontend: {
+        enabled:
+          (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
       },
     },
     providers: {

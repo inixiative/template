@@ -248,6 +248,7 @@ const defaultConfig: ProjectConfig = {
       admin: { enabled: true },
       superadmin: { enabled: true },
     },
+    gitConnectFrontend: { enabled: true },
   },
   providers: {
     frontend: 'vercel',

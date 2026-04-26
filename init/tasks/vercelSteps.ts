@@ -226,6 +226,10 @@ const isVercelActionSkipped = (config: ProjectConfig, action: VercelAction): boo
   // Staging/preview gates (only relevant once the app is enabled)
   const isStaging = /Staging/.test(a) || /SyncPreview$/.test(a);
   if (isStaging && !stagingEnabled) return true;
+  // GitHub-connect gate: link*GitHub + configure*Branches are skipped when
+  // gitConnectFrontend is off (manual `vercel --prod` workflow).
+  const isGitConnect = /GitHub$/.test(a) || /Branches$/.test(a);
+  if (isGitConnect && !config.features.gitConnectFrontend.enabled) return true;
   return false;
 };
 
