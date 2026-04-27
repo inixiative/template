@@ -12,7 +12,3 @@ export const getHandlers = (type: AppEventType): AppEventHandler[] => {
   const global = handlers.get('*') ?? [];
   return [...specific, ...global];
 };
-
-export const clearHandlers = (): void => {
-  handlers.clear();
-};

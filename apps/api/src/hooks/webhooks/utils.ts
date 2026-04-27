@@ -28,10 +28,6 @@ export const getRelatedWebhookRefs = (model: string): FlexibleRef[] | null => {
   return refs?.length ? refs : null;
 };
 
-export const getModelSubscribers = (model: string): string[] => {
-  return webhookModelSubscribers[model as keyof typeof webhookModelSubscribers] ?? [];
-};
-
 export const isNoOpUpdate = <T extends Record<string, unknown>>(
   model: string,
   currentData: T,

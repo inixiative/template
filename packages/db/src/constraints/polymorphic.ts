@@ -1,5 +1,5 @@
 import { db } from '@template/db/client';
-import { type PolymorphicAxis, PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
+import type { PolymorphicAxis } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 const generateCheckSql = (axis: PolymorphicAxis): string => {
@@ -30,13 +30,4 @@ export const addPolymorphicConstraint = async (model: ModelName, axis: Polymorph
   await db.$executeRawUnsafe(`
     ALTER TABLE "${model}" ADD CONSTRAINT "${name}" ${check};
   `);
-};
-
-export const addAllPolymorphicConstraints = async () => {
-  for (const [model, config] of Object.entries(PolymorphismRegistry)) {
-    if (!config) continue;
-    for (const axis of config.axes) {
-      await addPolymorphicConstraint(model as ModelName, axis);
-    }
-  }
 };

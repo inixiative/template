@@ -42,6 +42,7 @@
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {
+    "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
     "@template/shared": "workspace:*",
     "@ariakit/react": "^0.4.22",

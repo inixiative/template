@@ -1,7 +1,7 @@
 export { actionRoute } from '#/lib/routeTemplates/action';
 export { createRoute } from '#/lib/routeTemplates/create';
 export { deleteRoute } from '#/lib/routeTemplates/delete';
-export { errorResponses, errorSchema } from '#/lib/routeTemplates/errorResponses';
+export { errorResponses } from '#/lib/routeTemplates/errorResponses';
 export { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 export {
   type PaginationMetadata,

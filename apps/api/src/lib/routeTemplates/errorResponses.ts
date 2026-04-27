@@ -18,7 +18,7 @@ const errorDescriptions: { code: string; description: string }[] = [
   { code: '504', description: 'Gateway Timeout' },
 ];
 
-export const errorSchema = z
+const errorSchema = z
   .object({
     error: z.string(),
     message: z.string(),

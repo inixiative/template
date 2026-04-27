@@ -64,10 +64,3 @@ export const initGracefulShutdown = (
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 };
-
-/**
- * Check if shutdown is in progress.
- */
-export const isShutdownInProgress = (): boolean => {
-  return isShuttingDown;
-};

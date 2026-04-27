@@ -1,7 +1,4 @@
-export {
-  type BatchExecutionStrategy,
-  batchExecutionStrategies as BatchExecutionStrategies,
-} from '#/modules/batch/services/executor';
+export type { BatchExecutionStrategy } from '#/modules/batch/services/executor';
 
 export const BatchStatus = {
   success: 'success',

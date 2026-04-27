@@ -14,10 +14,6 @@ export const receivedWebhooks: Array<{
   timestamp: Date;
 }> = [];
 
-export const clearReceivedWebhooks = () => {
-  receivedWebhooks.length = 0;
-};
-
 // Mock webhook receiver endpoint
 testRouter.post('/webhook', async (c) => {
   const body = await c.req.json();
