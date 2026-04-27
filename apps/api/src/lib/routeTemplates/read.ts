@@ -1,4 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
+import { toModelName } from '@template/db';
 import pluralize from 'pluralize';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
@@ -45,7 +46,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, searchableFields),
+    middleware: prepareMiddleware(middleware, skipResource, searchableFields, toModelName(model)),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

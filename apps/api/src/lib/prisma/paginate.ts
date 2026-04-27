@@ -70,12 +70,13 @@ export const paginate = async <
 
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
+  const model = c.get('searchableModel') ?? undefined;
 
   const skipFieldValidation = isSuperadmin(c);
 
   const searchWhere =
     searchableFields?.length || skipFieldValidation
-      ? buildWhereClause({ search, searchFields, searchableFields, skipFieldValidation, orNullFields })
+      ? buildWhereClause({ model, search, searchFields, searchableFields, skipFieldValidation, orNullFields })
       : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

@@ -1,8 +1,15 @@
+import type { ModelName } from '@template/db';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
+import { isEnumPath } from '#/lib/prisma/fieldMetadata';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
+  // Root model the searchable paths are rooted in. When provided, enum
+  // columns are detected via prismaMap and emit exact equality (Prisma
+  // rejects { contains, mode } on enums); when omitted, every searchable
+  // field is treated as a string.
+  model?: ModelName;
   search?: string;
   searchFields?: BracketQueryRecord;
   searchableFields?: readonly string[];
@@ -48,6 +55,7 @@ const validateAndTransformSearchFields = (
   obj: BracketQueryRecord,
   searchableFields: readonly string[],
   skipFieldValidation: boolean,
+  model: ModelName | undefined,
   prefix = '',
   autoContains = true,
   depth = 0,
@@ -68,7 +76,9 @@ const validateAndTransformSearchFields = (
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
         throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
-      result[key] = autoContains ? { contains: value, mode: 'insensitive' as const } : value;
+      // Enum columns can't take { contains, mode } — emit exact equality.
+      const isEnum = model ? isEnumPath(model, currentPath) : false;
+      result[key] = autoContains && !isEnum ? { contains: value, mode: 'insensitive' as const } : value;
     } else if (value === null || typeof value === 'boolean' || typeof value === 'number') {
       if (!validatePathNotation(currentPath)) {
         throw new Error(`Invalid search field: ${currentPath}`);
@@ -102,6 +112,7 @@ const validateAndTransformSearchFields = (
               opValue,
               searchableFields,
               skipFieldValidation,
+              model,
               currentPath,
               false,
               depth + 1,
@@ -132,6 +143,7 @@ const validateAndTransformSearchFields = (
           value,
           searchableFields,
           skipFieldValidation,
+          model,
           currentPath,
           autoContains,
           depth + 1,
@@ -145,6 +157,7 @@ const validateAndTransformSearchFields = (
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
   const {
+    model,
     search,
     searchFields,
     searchableFields = [],
@@ -155,21 +168,35 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const conditions: Record<string, unknown>[] = [];
 
   if (search && searchableFields.length) {
-    const searchConditions = searchableFields.map((field) => {
-      if (!validatePathNotation(field)) {
-        throw new Error(`Invalid searchable field: ${field}`);
-      }
+    // Skip enum fields in the global search OR — substring-match against
+    // an enum is meaningless and Prisma rejects { contains, mode } on
+    // enum columns at runtime. Without a model, we can't tell, so include
+    // every field (no enum filtering).
+    const stringFields = model
+      ? searchableFields.filter((f) => !isEnumPath(model, f))
+      : searchableFields;
+    if (stringFields.length) {
+      const searchConditions = stringFields.map((field) => {
+        if (!validatePathNotation(field)) {
+          throw new Error(`Invalid searchable field: ${field}`);
+        }
 
-      return buildNestedPath(field, {
-        contains: search,
-        mode: 'insensitive' as const,
+        return buildNestedPath(field, {
+          contains: search,
+          mode: 'insensitive' as const,
+        });
       });
-    });
-    conditions.push({ OR: searchConditions });
+      conditions.push({ OR: searchConditions });
+    }
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation);
+    const transformed = validateAndTransformSearchFields(
+      searchFields,
+      searchableFields,
+      skipFieldValidation,
+      model,
+    );
     for (const [key, value] of Object.entries(transformed)) {
       if (orNullFields.includes(key)) {
         conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
