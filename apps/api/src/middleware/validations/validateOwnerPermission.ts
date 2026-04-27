@@ -10,6 +10,9 @@ type Options = {
   userIdField?: string; // defaults to 'userId'
   orgIdField?: string; // defaults to 'organizationId'
   spaceIdField?: string; // defaults to 'spaceId'
+  // When true, any authenticated user can read the resource if it carries
+  // `isPublic === true`. Only applies to read actions; writes always check ownership.
+  isPublicOnRead?: boolean;
 };
 
 type Resource = Record<string, unknown> | null;
@@ -25,11 +28,15 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
     userIdField = 'userId',
     orgIdField = 'organizationId',
     spaceIdField = 'spaceId',
+    isPublicOnRead = false,
   } = options;
 
   const resource = c.get('resource') as Resource;
   const permix = c.get('permix');
   const ownerModel = resource?.[ownerField] as string | undefined;
+
+  // Public-read short-circuit: any authenticated user may read a resource flagged isPublic.
+  if (isPublicOnRead && action === 'read' && resource?.isPublic === true) return next();
 
   if (ownerModel === 'User' || ownerModel === 'OrganizationUser') {
     const userId = resource?.[userIdField] as UserId | undefined;
