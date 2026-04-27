@@ -7,8 +7,9 @@ cd "$ROOT_DIR"
 CHECKS=(
   "./scripts/lint/check-import-aliases.sh"
   "./scripts/lint/check-generated-files.sh"
+  "./scripts/lint/check-finder-duplicates.sh --check"
 )
 
 for check in "${CHECKS[@]}"; do
-  "$check"
+  eval "$check"
 done

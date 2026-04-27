@@ -164,6 +164,10 @@ apps/web/app.config.timestamp_*.js
 **/.next/
 **/node_modules/
 
+# macOS Finder / iCloud conflict-resolution duplicates ("filename 2.ts", "foo 3.json")
+**/* [0-9].*
+**/* [0-9][0-9].*
+
 # Generated artifacts
 **/.tanstack/
 **/routeTree.gen.ts

@@ -15,6 +15,3 @@ export const customerFilterSchema = z.object({
   customerOrganizationId: z.string().uuid().optional(),
   customerSpaceId: z.string().uuid().optional(),
 });
-
-// Combined filters for admin/org views
-export const customerRefFilterSchema = providerFilterSchema.merge(customerFilterSchema);

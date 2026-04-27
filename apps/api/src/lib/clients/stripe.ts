@@ -6,8 +6,15 @@
  * Required environment variables:
  * - STRIPE_SECRET_KEY
  * - STRIPE_WEBHOOK_SECRET (for webhook verification)
+ *
+ * DISABLED: `stripe` is not installed. To enable, run
+ *   `bun add --cwd apps/api stripe`
+ * then uncomment the block below.
  */
 
+export {};
+
+/*
 // Lazy-loaded client
 let __stripeClient: Awaited<ReturnType<typeof createStripeClient>> | null = null;
 
@@ -32,3 +39,4 @@ export const getStripeClient = async () => {
 
 // Re-export types
 export type { Stripe } from 'stripe';
+*/

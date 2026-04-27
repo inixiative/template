@@ -1,7 +1,0 @@
-# bunfig.toml
-
-[paths]
-"src/*" = ["./src/*"]
-
-[test]
-preload = ["./tests/globalSetup.ts"]

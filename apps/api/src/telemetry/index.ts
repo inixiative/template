@@ -1,3 +1,15 @@
+/**
+ * OpenTelemetry SDK setup for traces + metrics, exported via OTLP HTTP.
+ *
+ * DISABLED: the `@opentelemetry/*` packages are listed in apps/api/package.json
+ * but not currently installed (bun.lock is missing them). To enable, run
+ *   `bun install`
+ * to pick up the listed deps, then uncomment the block below.
+ */
+
+export {};
+
+/*
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
@@ -125,3 +137,4 @@ export const injectContext = (headers: Record<string, string>) => {
   propagation.inject(context.active(), headers);
   return headers;
 };
+*/

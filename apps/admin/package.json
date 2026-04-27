@@ -17,14 +17,9 @@
     "@tanstack/react-query": "*",
     "@tanstack/react-router": "*",
     "lucide-react": "*",
-    "better-auth": "^1.5.4",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "lodash-es": "^4.17.23",
     "react": "*",
-    "react-aria-components": "^1.16.0",
-    "react-dom": "*",
-    "tailwind-merge": "^3.5.0"
+    "react-dom": "*"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.9",

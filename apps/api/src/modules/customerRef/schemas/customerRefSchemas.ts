@@ -17,12 +17,6 @@ const providerSchema = {
   }).nullable(),
 };
 
-// Complete CustomerRef with all relations
-export const customerRefCompleteSchema = CustomerRefScalarSchema.extend({
-  ...customerSchema,
-  ...providerSchema,
-});
-
 // CustomerRef from customer's perspective (provider details expanded)
 export const customerRefAsCustomerSchema = CustomerRefScalarSchema.extend({
   ...providerSchema,

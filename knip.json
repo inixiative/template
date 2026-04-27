@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["init/index.tsx", "init/agent.ts"],
+      "ignore": ["scripts/ci/rule-violations/**", "tmp/**"]
+    },
+    "apps/api": {
+      "entry": [
+        "src/index.ts",
+        "src/jobs/worker.ts",
+        "src/modules/**/routes/*.ts",
+        "src/modules/**/controllers/*.ts",
+        "scripts/**/*.ts"
+      ]
+    },
+    "apps/web": {
+      "entry": ["app/main.tsx", "app/routes/**/*.{ts,tsx}", "scripts/**/*.ts"]
+    },
+    "apps/admin": {
+      "entry": ["app/main.tsx", "app/routes/**/*.{ts,tsx}", "scripts/**/*.ts"]
+    },
+    "apps/superadmin": {
+      "entry": ["app/main.tsx", "app/routes/**/*.{ts,tsx}", "scripts/**/*.ts"]
+    },
+    "packages/db": {
+      "entry": ["src/index.ts", "scripts/**/*.ts", "src/test/factories/**/*.ts"],
+      "ignore": ["prisma/**"]
+    }
+  }
+}
