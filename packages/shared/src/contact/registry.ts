@@ -104,7 +104,7 @@ const linkedinDef: ContactTypeDef<LinkedinInput, LinkedinValue> = {
   toUrl: (v) =>
     `https://linkedin.com/${v.classifier === 'personal' ? 'in' : v.classifier}/${v.handle}`,
   subtype: { mode: 'forbidden' }, // classifier lives in `value`
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'LinkedIn' },
 };
 
@@ -125,7 +125,7 @@ const githubDef: ContactTypeDef<GithubInput, GithubValue> = {
   toValueKey: (v) => `${v.classifier}:${v.handle.toLowerCase()}`,
   toUrl: (v) => `https://github.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'GitHub' },
 };
 
@@ -142,7 +142,7 @@ const twitterDef: ContactTypeDef<TwitterInput, TwitterValue> = {
   toValueKey: (v) => v.handle.toLowerCase(),
   toUrl: (v) => `https://x.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'Twitter / X' },
 };
 
@@ -157,7 +157,7 @@ const whatsappDef: ContactTypeDef<WhatsappValue, WhatsappValue> = {
   valueSchema: whatsappStoredSchema,
   toValueKey: (v) => v.jid,
   subtype: { mode: 'forbidden' },
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'WhatsApp' },
 };
 
@@ -174,7 +174,7 @@ const telegramDef: ContactTypeDef<TelegramInput, TelegramValue> = {
   toValueKey: (v) => v.handle.toLowerCase(),
   toUrl: (v) => `https://t.me/${v.handle}`,
   subtype: { mode: 'forbidden' },
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'Telegram' },
 };
 
@@ -189,7 +189,7 @@ const discordDef: ContactTypeDef<DiscordValue, DiscordValue> = {
   valueSchema: discordStoredSchema,
   toValueKey: (v) => v.userId,
   subtype: { mode: 'forbidden' },
-  uniqueness: 'global-within-type',
+  uniqueness: 'per-owner',
   display: { label: 'Discord' },
 };
 

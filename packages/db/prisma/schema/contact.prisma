@@ -9,10 +9,10 @@
 // `${classifier}:${handle}` for handle types).
 //
 // Per-owner uniqueness is enforced by the composite @@unique below.
-// Global-within-type uniqueness (whatsapp/linkedin/twitter/github/telegram/discord)
-// is enforced *at the application layer* by the contactRules hook today.
-// A partial unique index will be added via raw SQL once the project switches
-// from `db push` to `prisma migrate` (post-launch).
+// All types use per-owner uniqueness — global-within-type is intentionally
+// omitted until handle ownership can be verified (OAuth / DNS proof). Without
+// verification, first-claim global locking is an abuse vector and blocks
+// legitimate co-owners (e.g. a founder's personal + their org sharing @acme).
 
 model Contact {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)

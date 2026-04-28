@@ -101,7 +101,7 @@ describe('contactRules hook — email (lowercase normalization)', () => {
   });
 });
 
-describe('contactRules hook — linkedin (URL normalization, global uniqueness)', () => {
+describe('contactRules hook — linkedin (URL normalization, per-owner uniqueness)', () => {
   it('normalizes a pasted URL into {classifier, handle}', async () => {
     const { entity: user } = await createUser();
     const handle = seqHandle('sample');
@@ -117,10 +117,10 @@ describe('contactRules hook — linkedin (URL normalization, global uniqueness)'
     expect(contact.valueKey).toBe(`personal:${handle.toLowerCase()}`);
   });
 
-  it('rejects two users claiming the same linkedin handle (409)', async () => {
+  it('allows two different users to register the same linkedin handle (per-owner)', async () => {
     const { entity: a } = await createUser();
     const { entity: b } = await createUser();
-    const handle = seqHandle('unique');
+    const handle = seqHandle('shared');
     await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
@@ -129,16 +129,15 @@ describe('contactRules hook — linkedin (URL normalization, global uniqueness)'
         value: { classifier: 'personal', handle },
       },
     });
-    const create = async () =>
-      db.contact.create({
-        data: {
-          ownerModel: ContactOwnerModel.User,
-          userId: b.id,
-          type: ContactType.linkedin,
-          value: { classifier: 'personal', handle: handle.toUpperCase() }, // case-insensitive collision
-        },
-      });
-    await expect(create()).rejects.toThrow();
+    const second = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: b.id,
+        type: ContactType.linkedin,
+        value: { classifier: 'personal', handle: handle.toUpperCase() },
+      },
+    });
+    expect(second.valueKey).toBe(`personal:${handle.toLowerCase()}`);
   });
 });
 
