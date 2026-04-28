@@ -16,6 +16,7 @@ model Organization {
   spaceUsers           SpaceUser[]
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
+  contacts             Contact[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   emailComponents      EmailComponent[]
