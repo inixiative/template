@@ -94,7 +94,7 @@ describe('makeAppEvent', () => {
   });
 
   describe('bridge isolation', () => {
-    it('one bridge failing does not prevent others from running', async () => {
+    it('one bridge failing does not prevent others from running, but still rejects', async () => {
       const cbSuccess = mock(async () => {});
 
       const handler = makeAppEvent({
@@ -102,9 +102,28 @@ describe('makeAppEvent', () => {
         cb: [cbSuccess],
       });
 
-      await handler(createEvent('test', {}));
+      await expect(handler(createEvent('test', {}))).rejects.toThrow('observe boom');
 
       expect(cbSuccess).toHaveBeenCalled();
+    });
+
+    it('waits for sibling bridges before rejecting', async () => {
+      const callOrder: string[] = [];
+
+      const handler = makeAppEvent({
+        cb: [
+          async () => {
+            throw new Error('cb boom');
+          },
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            callOrder.push('slow sibling');
+          },
+        ],
+      });
+
+      await expect(handler(createEvent('test', {}))).rejects.toThrow('cb boom');
+      expect(callOrder).toEqual(['slow sibling']);
     });
   });
 
