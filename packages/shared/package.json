@@ -27,7 +27,7 @@
     "@hey-api/client-fetch": "^0.13.1",
     "clsx": "^2.1.1",
     "consola": "^3.4.2",
-    "lodash-es": "^4.17.23",
+    "lodash-es": "^4.18.1",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"
   },

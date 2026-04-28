@@ -18,11 +18,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^1.2.0",
+    "@inixiative/json-rules": "^1.3.3",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
-    "lodash-es": "^4.17.23",
-    "mjml": "^4.18.0",
+    "lodash-es": "^4.18.1",
+    "mjml": "^5.1.0",
     "resend": "^6.9.3"
   },
   "devDependencies": {
