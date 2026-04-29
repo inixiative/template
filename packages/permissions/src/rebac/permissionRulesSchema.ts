@@ -1,3 +1,5 @@
+import type { AccessorName } from '@template/db';
+import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
 
 // Recursive Zod schema for an `ActionRule` envelope. Validates the SHAPE only:
@@ -17,26 +19,23 @@ const actionRuleSchema: z.ZodType = z.lazy(() =>
 );
 
 /**
- * Build a Zod schema for a `permissionRules: Json?` column on a model with a
- * known set of action keys. Used at the API boundary to validate client input
- * for resources whose owners can author per-row permission overrides.
- *
- * @param overridableActions Action names whose row-level rules clients may set.
- *                           Typically a subset like `['read']` — granting
- *                           additional `manage`/`delete` paths via row rules
- *                           is usually not desired (effectively transfers
- *                           ownership). Models choose what's safe to expose.
+ * Build a Zod schema for a `permissionRules: Json?` column on a model.
+ * Valid action keys are derived from the model's rebac schema entry — no
+ * second source of truth to maintain. Pass `pick` to narrow further.
  *
  * @example
- *   permissionRules: buildPermissionRulesSchema(['read']),
- *   // Accepts: { read: { self: 'userId' } }, { read: { all: [] } }
- *   // Rejects: { delete: ... }, { read: { foo: 'bar' } }, arbitrary JSON
+ *   // All actions defined for `contact` in rebacSchema
+ *   permissionRules: buildPermissionRulesSchema('contact'),
+ *
+ *   // Only `read` is row-overridable (sharing); manage/delete owner-only
+ *   permissionRules: buildPermissionRulesSchema('contact', ['read']),
  */
-export const buildPermissionRulesSchema = <T extends string>(overridableActions: readonly T[]) =>
-  z
-    .record(
-      z.enum(overridableActions as readonly [T, ...T[]]),
-      actionRuleSchema,
-    )
+export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly string[]) => {
+  const schemaActions = Object.keys(rebacSchema[model]?.actions ?? {});
+  const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;
+  if (allowed.length === 0) return z.never().nullable().optional();
+  return z
+    .record(z.enum(allowed as [string, ...string[]]), actionRuleSchema)
     .nullable()
     .optional();
+};
