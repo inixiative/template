@@ -77,6 +77,94 @@ export const parseTelegramUrl = (url: string): TelegramValue => {
   return { handle: parts[1]!.replace(/^@/, '') };
 };
 
+export type InstagramValue = { handle: string };
+export const parseInstagramUrl = (url: string): InstagramValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'instagram.com' || !parts[1])
+    throw new Error(`Unrecognized Instagram URL: ${url}`);
+  return { handle: parts[1]! };
+};
+
+export type FacebookValue = { handle: string };
+export const parseFacebookUrl = (url: string): FacebookValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'facebook.com' || !parts[1])
+    throw new Error(`Unrecognized Facebook URL: ${url}`);
+  return { handle: parts[1]! };
+};
+
+export type YoutubeValue = { handle: string };
+export const parseYoutubeUrl = (url: string): YoutubeValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'youtube.com' || !parts[1])
+    throw new Error(`Unrecognized YouTube URL: ${url}`);
+  const seg = parts[1]!;
+  if (seg.startsWith('@')) return { handle: seg.slice(1) };
+  if ((seg === 'c' || seg === 'user') && parts[2]) return { handle: parts[2]! };
+  if (seg === 'channel') throw new Error('YouTube channel IDs are not supported; use the @handle URL');
+  return { handle: seg };
+};
+
+export type TiktokValue = { handle: string };
+export const parseTiktokUrl = (url: string): TiktokValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'tiktok.com' || !parts[1])
+    throw new Error(`Unrecognized TikTok URL: ${url}`);
+  return { handle: parts[1]!.replace(/^@/, '') };
+};
+
+export type BlueskyValue = { handle: string };
+export const parseBlueskyUrl = (url: string): BlueskyValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'bsky.app' || parts[1] !== 'profile' || !parts[2])
+    throw new Error(`Unrecognized Bluesky URL: ${url}`);
+  return { handle: parts[2]! };
+};
+
+export type ThreadsValue = { handle: string };
+export const parseThreadsUrl = (url: string): ThreadsValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts[0]?.toLowerCase() !== 'threads.net' || !parts[1])
+    throw new Error(`Unrecognized Threads URL: ${url}`);
+  return { handle: parts[1]!.replace(/^@/, '') };
+};
+
+export type RedditValue = { handle: string };
+export const parseRedditUrl = (url: string): RedditValue => {
+  const stripped = trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)));
+  const parts = stripped.split('/').filter(Boolean);
+  if (
+    parts[0]?.toLowerCase() !== 'reddit.com' ||
+    (parts[1] !== 'u' && parts[1] !== 'user') ||
+    !parts[2]
+  )
+    throw new Error(`Unrecognized Reddit URL: ${url}`);
+  return { handle: parts[2]! };
+};
+
+export type MastodonValue = { handle: string; server: string };
+export const parseMastodonHandle = (input: string): MastodonValue => {
+  // @handle@server.tld or handle@server.tld
+  const normalized = input.replace(/^@/, '');
+  const atIdx = normalized.indexOf('@');
+  if (atIdx > 0) {
+    return { handle: normalized.slice(0, atIdx), server: normalized.slice(atIdx + 1).toLowerCase() };
+  }
+  // https://server.tld/@handle
+  const stripped = trimSlashes(stripQueryAndFragment(input.replace(/^https?:\/\//i, '')));
+  const parts = stripped.split('/').filter(Boolean);
+  if (parts.length < 2) throw new Error(`Unrecognized Mastodon input: ${input}`);
+  const handlePart = parts[1]!.replace(/^@/, '');
+  if (!handlePart) throw new Error(`Unrecognized Mastodon input: ${input}`);
+  return { handle: handlePart, server: parts[0]!.toLowerCase() };
+};
+
 // Best-effort URL canonicalization for `website` valueKey:
 //  - lowercases the host
 //  - strips protocol and www.

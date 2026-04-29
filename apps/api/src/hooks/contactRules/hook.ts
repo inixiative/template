@@ -6,14 +6,12 @@ type ContactRow = Record<string, unknown> & {
   type?: string;
   value?: unknown;
   subtype?: string | null;
-  isPrimary?: boolean;
+  sortOrder?: number | null;
   ownerModel?: string;
   userId?: string | null;
   organizationId?: string | null;
   spaceId?: string | null;
 };
-
-const ownerKeyFields = ['userId', 'organizationId', 'spaceId'] as const;
 
 const ownerWhereFromRow = (row: ContactRow) => ({
   userId: row.userId ?? null,
@@ -87,21 +85,14 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclus
     }
   }
 
-  // isPrimary uniqueness per (owner, type) — clear other primaries before this row sticks.
-  if (row.isPrimary === true && row.type) {
+  // Auto-assign sortOrder on create if caller didn't supply one.
+  if (!isUpdate && row.type && row.sortOrder == null) {
     const ownerWhere = ownerWhereFromRow(row);
-    if (ownerKeyFields.some((k) => ownerWhere[k] !== null)) {
-      await db.contact.updateManyAndReturn({
-        where: {
-          ...ownerWhere,
-          type: row.type as never,
-          isPrimary: true,
-          deletedAt: null,
-          ...(idForExclusion ? { NOT: { id: idForExclusion } } : {}),
-        },
-        data: { isPrimary: false },
-      });
-    }
+    const agg = await db.contact.aggregate({
+      where: { ...ownerWhere, type: row.type as never, deletedAt: null },
+      _max: { sortOrder: true },
+    });
+    row.sortOrder = (agg._max.sortOrder ?? 0) + 1;
   }
 };
 

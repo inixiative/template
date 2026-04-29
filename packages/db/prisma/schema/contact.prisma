@@ -9,7 +9,9 @@
 // `${classifier}:${handle}` for handle types).
 //
 // Per-owner uniqueness is enforced by the composite @@unique below.
-// Global-within-type uniqueness (whatsapp/linkedin/twitter/github/telegram/discord)
+// Global-within-type uniqueness (handle/identity types: linkedin/twitter/github/
+// whatsapp/telegram/discord/instagram/facebook/youtube/tiktok/bluesky/threads/
+// reddit/signal/mastodon/line/wechat/viber/skype)
 // is enforced *at the application layer* by the contactRules hook today.
 // A partial unique index will be added via raw SQL once the project switches
 // from `db push` to `prisma migrate` (post-launch).
@@ -34,7 +36,7 @@ model Contact {
   subtype String?    // semantics depend on type — see shared/contact/registry
 
   label     String?
-  isPrimary Boolean @default(false)
+  sortOrder Int     @default(0)
   // When true, any authenticated user may read this Contact even if they are
   // not the owner. Write/delete still require owner.manage regardless.
   isPublic  Boolean @default(false)
@@ -69,4 +71,17 @@ enum ContactType {
   whatsapp
   telegram
   discord
+  instagram
+  facebook
+  youtube
+  tiktok
+  bluesky
+  threads
+  reddit
+  signal
+  mastodon
+  line
+  wechat
+  viber
+  skype
 }

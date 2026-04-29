@@ -10,7 +10,7 @@ export const contactCreateBodySchema = z.object({
   // value is loose at the API boundary (URL paste, etc.); the contactRules
   // hook normalizes via the type registry and owns validation.
   value: z.any(),
-  isPrimary: z.boolean().optional(),
+  sortOrder: z.number().int().min(1).optional(),
   isPublic: z.boolean().optional(),
   source: z.string().optional(),
 });

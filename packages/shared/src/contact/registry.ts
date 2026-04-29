@@ -2,14 +2,30 @@ import type { ContactType } from '@template/db/generated/client/enums';
 import { CountryCodeSchema } from '@template/shared/reference/countries';
 import {
   canonicalUrl,
+  type BlueskyValue,
+  type FacebookValue,
   type GithubValue,
+  type InstagramValue,
   type LinkedinValue,
+  type MastodonValue,
+  parseBlueskyUrl,
+  parseFacebookUrl,
   parseGithubUrl,
+  parseInstagramUrl,
   parseLinkedinUrl,
+  parseMastodonHandle,
+  parseRedditUrl,
   parseTelegramUrl,
+  parseThreadsUrl,
+  parseTiktokUrl,
   parseTwitterUrl,
+  parseYoutubeUrl,
+  type RedditValue,
   type TelegramValue,
+  type ThreadsValue,
+  type TiktokValue,
   type TwitterValue,
+  type YoutubeValue,
 } from '@template/shared/contact/parsers';
 import { z } from 'zod';
 
@@ -193,6 +209,151 @@ const discordDef: ContactTypeDef<DiscordValue, DiscordValue> = {
   display: { label: 'Discord' },
 };
 
+// ── New platform defs ────────────────────────────────────────────────────────
+
+const handleStoredSchema = z.object({ handle: z.string().min(1) });
+type HandleInput = { handle: string } | { url: string };
+
+const makeHandleDef = (
+  label: string,
+  parseUrl: (url: string) => { handle: string },
+  toUrl: (v: { handle: string }) => string,
+): ContactTypeDef<HandleInput, { handle: string }> => ({
+  inputSchema: z.union([z.object({ url: z.string().url() }), handleStoredSchema]) as z.ZodType<HandleInput>,
+  parseInput: (input) => ('url' in input ? parseUrl(input.url) : input),
+  valueSchema: handleStoredSchema,
+  toValueKey: (v) => v.handle.toLowerCase(),
+  toUrl,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label },
+});
+
+const instagramDef = makeHandleDef(
+  'Instagram',
+  parseInstagramUrl,
+  (v: InstagramValue) => `https://instagram.com/${v.handle}`,
+);
+
+const facebookDef = makeHandleDef(
+  'Facebook',
+  parseFacebookUrl,
+  (v: FacebookValue) => `https://facebook.com/${v.handle}`,
+);
+
+const youtubeDef = makeHandleDef(
+  'YouTube',
+  parseYoutubeUrl,
+  (v: YoutubeValue) => `https://youtube.com/@${v.handle}`,
+);
+
+const tiktokDef = makeHandleDef(
+  'TikTok',
+  parseTiktokUrl,
+  (v: TiktokValue) => `https://tiktok.com/@${v.handle}`,
+);
+
+const blueskyDef = makeHandleDef(
+  'Bluesky',
+  parseBlueskyUrl,
+  (v: BlueskyValue) => `https://bsky.app/profile/${v.handle}`,
+);
+
+const threadsDef = makeHandleDef(
+  'Threads',
+  parseThreadsUrl,
+  (v: ThreadsValue) => `https://threads.net/@${v.handle}`,
+);
+
+const redditDef = makeHandleDef(
+  'Reddit',
+  parseRedditUrl,
+  (v: RedditValue) => `https://www.reddit.com/u/${v.handle}`,
+);
+
+const mastodonStoredSchema = z.object({
+  handle: z.string().min(1),
+  server: z.string().min(1),
+});
+type MastodonInput = MastodonValue | { url: string };
+const mastodonInputSchema: z.ZodType<MastodonInput> = z.union([
+  z.object({ url: z.string() }),
+  mastodonStoredSchema,
+]);
+const mastodonDef: ContactTypeDef<MastodonInput, MastodonValue> = {
+  inputSchema: mastodonInputSchema,
+  parseInput: (input) => ('url' in input ? parseMastodonHandle(input.url) : input),
+  valueSchema: mastodonStoredSchema,
+  toValueKey: (v) => `${v.handle.toLowerCase()}@${v.server.toLowerCase()}`,
+  toUrl: (v) => `https://${v.server}/@${v.handle}`,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'Mastodon' },
+};
+
+const e164Schema = z.string().regex(/^\+\d{7,15}$/, 'must be E.164 (+ followed by 7–15 digits)');
+
+export type SignalValue = { e164: string };
+const signalStoredSchema = z.object({ e164: e164Schema });
+const signalDef: ContactTypeDef<SignalValue, SignalValue> = {
+  inputSchema: signalStoredSchema,
+  parseInput: (v) => v,
+  valueSchema: signalStoredSchema,
+  toValueKey: (v) => v.e164,
+  toUrl: (v) => `https://signal.me/#p/${v.e164}`,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'Signal' },
+};
+
+export type ViberValue = { e164: string };
+const viberStoredSchema = z.object({ e164: e164Schema });
+const viberDef: ContactTypeDef<ViberValue, ViberValue> = {
+  inputSchema: viberStoredSchema,
+  parseInput: (v) => v,
+  valueSchema: viberStoredSchema,
+  toValueKey: (v) => v.e164,
+  toUrl: (v) => `viber://chat?number=${encodeURIComponent(v.e164)}`,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'Viber' },
+};
+
+export type LineValue = { lineId: string };
+const lineDef: ContactTypeDef<LineValue, LineValue> = {
+  inputSchema: z.object({ lineId: z.string().min(1) }),
+  parseInput: (v) => v,
+  valueSchema: z.object({ lineId: z.string().min(1) }),
+  toValueKey: (v) => v.lineId.toLowerCase(),
+  toUrl: (v) => `https://line.me/ti/p/~${v.lineId}`,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'LINE' },
+};
+
+export type WechatValue = { wechatId: string };
+const wechatDef: ContactTypeDef<WechatValue, WechatValue> = {
+  inputSchema: z.object({ wechatId: z.string().min(1) }),
+  parseInput: (v) => v,
+  valueSchema: z.object({ wechatId: z.string().min(1) }),
+  toValueKey: (v) => v.wechatId.toLowerCase(),
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'WeChat' },
+};
+
+export type SkypeValue = { skypeId: string };
+const skypeDef: ContactTypeDef<SkypeValue, SkypeValue> = {
+  inputSchema: z.object({ skypeId: z.string().min(1) }),
+  parseInput: (v) => v,
+  valueSchema: z.object({ skypeId: z.string().min(1) }),
+  toValueKey: (v) => v.skypeId.toLowerCase(),
+  toUrl: (v) => `https://join.skype.com/invite/${v.skypeId}`,
+  subtype: { mode: 'forbidden' },
+  uniqueness: 'global-within-type',
+  display: { label: 'Skype' },
+};
+
 // ── Registry ────────────────────────────────────────────────────────────────
 // biome-ignore lint/suspicious/noExplicitAny: per-type generics are heterogeneous; consumers narrow via ContactType.
 export const ContactRegistry: Record<ContactType, ContactTypeDef<any, any>> = {
@@ -205,4 +366,17 @@ export const ContactRegistry: Record<ContactType, ContactTypeDef<any, any>> = {
   whatsapp: whatsappDef,
   telegram: telegramDef,
   discord: discordDef,
+  instagram: instagramDef,
+  facebook: facebookDef,
+  youtube: youtubeDef,
+  tiktok: tiktokDef,
+  bluesky: blueskyDef,
+  threads: threadsDef,
+  reddit: redditDef,
+  signal: signalDef,
+  mastodon: mastodonDef,
+  line: lineDef,
+  wechat: wechatDef,
+  viber: viberDef,
+  skype: skypeDef,
 };
