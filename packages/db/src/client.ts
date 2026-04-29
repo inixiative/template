@@ -19,6 +19,17 @@ const store = new AsyncLocalStorage<StoreData>();
 
 let __raw: Db | null = null;
 
+const throwIfFailures = (context: string, errors: unknown[]): void => {
+  if (errors.length === 0) return;
+
+  if (errors.length === 1) {
+    const error = errors[0];
+    throw error instanceof Error ? error : new Error(`${context}: ${String(error)}`);
+  }
+
+  throw new AggregateError(errors, `${context}: ${errors.length} callback failures`);
+};
+
 const createClient = (): Db => {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter, log: ['error'] });
@@ -68,7 +79,22 @@ const dbMethods = {
         if (totalCallbacks > 0) {
           const start = performance.now();
           for (const batch of s.afterCommitBatches) {
-            await resolveAll(batch.fns as (() => Promise<void>)[], batch.concurrency);
+            const results = await resolveAll(
+              batch.fns.map((fn) => async () => {
+                try {
+                  await fn();
+                  return null;
+                } catch (error) {
+                  return error;
+                }
+              }),
+              batch.concurrency,
+            );
+
+            throwIfFailures(
+              'db.onCommit() callback failed',
+              results.filter((result) => result !== null),
+            );
           }
           const duration = performance.now() - start;
           const slowThreshold = s.scopeContext === 'worker' ? 30000 : 5000;

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
-import { ErrorBoundary, RouteError } from '@monorepo/ui/components';
-import { useAppStore } from '@monorepo/ui/store';
+import { ErrorBoundary, RouteError } from '@template/ui/components';
+import { useAppStore } from '@template/ui/store';
 
 const PublicLayout = () => {
   const appName = useAppStore((state) => state.ui.appName);

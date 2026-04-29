@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { db } from '@template/db';
 import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
 import { emitAppEvent } from '#/appEvents/emit';
 import { auditActorContext } from '#/lib/auditActorContext';
@@ -88,5 +89,20 @@ describe('emitAppEvent', () => {
 
   it('does nothing for unknown event names', async () => {
     await emitAppEvent('nonexistent.event' as never, {} as never);
+  });
+
+  it('rejects after commit when a deferred handler fails', async () => {
+    const mockHandler = mock(async () => {
+      throw new Error('deferred handler boom');
+    });
+    appEventHandlers[AppEventName.userCreated] = mockHandler;
+
+    await expect(
+      db.txn(async () => {
+        await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
+      }),
+    ).rejects.toThrow('deferred handler boom');
+
+    expect(mockHandler).toHaveBeenCalledTimes(1);
   });
 });

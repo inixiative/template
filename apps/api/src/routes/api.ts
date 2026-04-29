@@ -8,6 +8,7 @@ import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
+import { contactRouter } from '#/modules/contact';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';

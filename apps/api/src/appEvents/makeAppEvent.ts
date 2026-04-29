@@ -5,6 +5,17 @@ import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/typ
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 
+const throwIfFailures = (errors: unknown[]): void => {
+  if (errors.length === 0) return;
+
+  if (errors.length === 1) {
+    const error = errors[0];
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+
+  throw new AggregateError(errors, `${errors.length} app event bridge failures`);
+};
+
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
@@ -41,6 +52,7 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
       }
     }
 
-    await Promise.allSettled(tasks);
+    const results = await Promise.allSettled(tasks);
+    throwIfFailures(results.filter((result) => result.status === 'rejected').map((result) => result.reason));
   };
 };

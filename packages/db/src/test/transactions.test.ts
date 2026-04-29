@@ -247,5 +247,25 @@ describe('transactions', () => {
         }),
       ).rejects.toThrow('Callback error');
     });
+
+    it('waits for sibling callbacks in the same batch before throwing', async () => {
+      const callOrder: string[] = [];
+
+      await expect(
+        db.txn(async () => {
+          db.onCommit([
+            async () => {
+              throw new Error('Callback error');
+            },
+            async () => {
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              callOrder.push('slow sibling');
+            },
+          ]);
+        }),
+      ).rejects.toThrow('Callback error');
+
+      expect(callOrder).toEqual(['slow sibling']);
+    });
   });
 });
