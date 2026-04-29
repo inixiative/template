@@ -88,8 +88,12 @@ export const renameProject = async (oldName: string, newName: string, onStepComp
       // path mappings, package metadata, and config files get renamed too.
       // Without these, tsconfigs keep @${oldName}/ aliases and the rename
       // appears successful but leaves broken imports across the codebase.
+      // sync-from-template.sh is excluded from the @scope rewrite — its
+      // @template/ literals are the upstream prefix and must stay literal so
+      // forks can keep using the script to pull template commits. See header
+      // comment in scripts/sync-from-template.sh.
       const { stdout } = await execAsync(
-        "find apps packages scripts docs init -path 'scripts/ci' -prune -o -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.prisma' -o -name '*.toml' -o -name '*.yml' -o -name '*.yaml' \\) -print",
+        "find apps packages scripts docs init \\( -path 'scripts/ci' -o -name 'sync-from-template.sh' \\) -prune -o -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.prisma' -o -name '*.toml' -o -name '*.yml' -o -name '*.yaml' \\) -print",
         { encoding: 'utf-8' },
       );
       const files = stdout.trim().split('\n').filter(Boolean);
