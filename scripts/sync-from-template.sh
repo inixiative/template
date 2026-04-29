@@ -29,6 +29,12 @@ set -euo pipefail
 TEMPLATE_REMOTE="${TEMPLATE_REMOTE:-https://github.com/inixiative/template.git}"
 SYNC_MARKER=".template-sync"
 
+# Upstream package prefix to rewrite. Constructed at runtime via printf so the
+# literal "@template/" never appears in this file — that means a sed pipeline
+# rewriting "@template/" → something else (this script's own pipeline, or a
+# manual one-shot port between repos) won't accidentally mangle the script.
+UPSTREAM_PREFIX="$(printf '@%s/' template)"
+
 # Local prefix from this repo's root package.json (e.g. "monorepo" → @monorepo/*)
 LOCAL_PREFIX="$(node -p "require('./package.json').name" 2>/dev/null || true)"
 if [ -z "$LOCAL_PREFIX" ]; then
@@ -79,11 +85,11 @@ if [ "$COUNT" = "0" ]; then
 fi
 
 echo "porting $COUNT commit(s) from $RANGE"
-echo "rewriting @template/ → @${LOCAL_PREFIX}/"
+echo "rewriting ${UPSTREAM_PREFIX} → @${LOCAL_PREFIX}/"
 
 set +e
 git format-patch "$RANGE" --stdout \
-  | sed -E "s|@template/|@${LOCAL_PREFIX}/|g" \
+  | sed -E "s|${UPSTREAM_PREFIX}|@${LOCAL_PREFIX}/|g" \
   | git am -3 --keep-cr
 AM_STATUS=$?
 set -e
