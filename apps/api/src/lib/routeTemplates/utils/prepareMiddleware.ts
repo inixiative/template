@@ -1,4 +1,4 @@
-import type { ModelName } from '@template/db';
+import type { AccessorName } from '@template/db';
 import type { MiddlewareHandler } from 'hono';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
 import { searchableFieldsMiddleware } from '#/middleware/resources/searchableFieldsMiddleware';
@@ -7,7 +7,7 @@ export const prepareMiddleware = (
   middleware: MiddlewareHandler | MiddlewareHandler[] | undefined,
   skipId = true,
   searchableFields?: readonly string[],
-  model?: ModelName,
+  model?: AccessorName,
 ): MiddlewareHandler[] | undefined => {
   const middlewareArray = Array.isArray(middleware) ? middleware : middleware ? [middleware] : [];
   const resourceMiddleware = skipId ? [] : [resourceContextMiddleware()];

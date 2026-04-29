@@ -1,5 +1,5 @@
 import type { RouteConfig } from '@hono/zod-openapi';
-import type { Db, ModelName, Prisma } from '@template/db';
+import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -28,10 +28,9 @@ export type AppVars = {
   permix: Permix;
   requestId: string;
   resource: unknown;
-  resourceType: string | null;
+  resourceType: AccessorName | null;
   routeConfig: RouteConfig | null;
   searchableFields: readonly string[] | null;
-  searchableModel: ModelName | null;
   bracketQuery: BracketQueryRecord;
 };
 

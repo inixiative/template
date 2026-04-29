@@ -12,7 +12,10 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   valueKey: true,
   verifiedAt: true,
 }).extend({
+  // Loose at the API boundary; contactRules hook normalizes via type registry.
   value: z.any(),
+  // Has @default in Prisma — opt-in on create.
+  isPrimary: z.boolean().optional(),
 });
 
 export const contactUpdateBodySchema = contactCreateBodySchema.partial();
