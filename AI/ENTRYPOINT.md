@@ -22,6 +22,24 @@ Canonical instructions for all coding agents in this repository.
 - Prefer minimal, targeted changes over redesigns.
 - Do not run git commands unless the user explicitly asks.
 
+## 0.05. Find the Template Solution Before Reinventing
+
+Before writing any new helper, schema, middleware, type, validator, or where-clause builder: **point at the existing template primitive that solves this**, and only deviate when you can articulate the gap in writing.
+
+The template's vocabulary is the answer to most problems:
+- Body/response schemas → generated `XxxScalarInputSchema` / `XxxScalarSchema` from `@template/db`. Use `.pick()` / `.omit()` / `.extend()` — never re-spell fields by hand.
+- Routes → `readRoute` / `createRoute` / `updateRoute` / `deleteRoute` / `actionRoute`. Never raw `createRoute()` from `@hono/zod-openapi`.
+- List endpoints → `paginate(c, delegate)` handles pagination, ordering, search, and filters via `buildWhereClause` from bracket-notation query params (`?type[in]=phone,email`). Don't manually destructure `c.req.valid('query')` and rebuild a where clause.
+- Validation → Zod `parse()` throws `ZodError`; the error middleware turns it into 422 automatically. Don't `safeParse` + custom `HTTPException`.
+- Permissions → `validateOwnerPermission`, `validatePermission`, `validateActor`, `validateUser`, `validateSuperadmin`. Compose them. Never extend a generic primitive with a model-specific flag (e.g. an `isPublicOnRead?: boolean` option). If you need model-specific behavior, write a model-specific middleware that composes the generic one.
+- Polymorphism → `PolymorphismRegistry` is the source of truth for owner FKs. Don't hardcode `['userId', 'organizationId', 'spaceId']` — derive from the registry.
+- Model row types → `Prisma.XxxGetPayload<{}>` (or its variant). Don't write `Record<string, unknown> & { id?: string; ... }` ad-hoc shapes.
+- Uniqueness → `@@unique` constraints throw `P2002` on conflict. Don't `findFirst` + manual 409.
+
+If you can't find the primitive in <5 minutes, ask before writing your own. **A custom code block is a bug until proven otherwise.**
+
+When called out for one instance of this anti-pattern, sweep — find every other place the same pattern repeats and fix all of them in one pass, not a single fix at a time.
+
 ## 0.1. Decomposition by Default
 
 Before undertaking any task or planning any approach, decompose first. Do not jump to implementation. Break the problem into its atomic concerns before deciding how to solve it.
