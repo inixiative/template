@@ -13,5 +13,5 @@ export const signalDef: ContactTypeDef<SignalValue, SignalValue> = {
   toValueKey: (v) => v.handle.toLowerCase(),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Signal', icon: 'Signal' },
+  display: { label: 'Signal', icon: 'simple-icons:signal' },
 };

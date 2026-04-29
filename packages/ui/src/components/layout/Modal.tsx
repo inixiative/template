@@ -1,5 +1,6 @@
 import { cn } from '@template/ui/lib/utils';
-import { X } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export type ModalSize = 'small' | 'large';
 
@@ -42,7 +43,7 @@ export const Modal = ({ open, isOpen, onClose, size = 'small', title, children, 
             className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
             aria-label="Close modal"
           >
-            <X className="h-5 w-5" />
+            <Icon icon="lucide:x" className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>

@@ -22,5 +22,5 @@ export const githubDef: ContactTypeDef<GithubInput, GithubValue> = {
   toUrl: (v) => `https://github.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'GitHub', icon: 'Github' },
+  display: { label: 'GitHub', icon: 'simple-icons:github' },
 };

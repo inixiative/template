@@ -6,13 +6,14 @@ import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
-import { Chrome, Github, Key, Shield } from 'lucide-react';
-import { useState } from 'react';
 
-const providerIcons: Record<string, typeof Chrome> = {
-  google: Chrome,
-  github: Github,
-  saml: Shield,
+import { useState } from 'react';
+import { Icon } from '@iconify/react';
+
+const providerIcons: Record<string, string> = {
+  google: 'simple-icons:google',
+  github: 'simple-icons:github',
+  saml: 'lucide:shield',
 };
 
 export type SignupFormProps = {
@@ -94,7 +95,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
             <>
               <div className="space-y-2">
                 {enabledProviders.map((provider) => {
-                  const Icon = providerIcons[provider.provider.toLowerCase()] || Key;
+                  const iconSlug = providerIcons[provider.provider.toLowerCase()] || 'lucide:key';
                   return (
                     <Button
                       key={provider.provider}
@@ -104,7 +105,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
                       onClick={() => handleOAuthClick(provider.provider)}
                       disabled={isLoading}
                     >
-                      <Icon className="h-4 w-4 mr-2" />
+                      <Icon icon={iconSlug} className="h-4 w-4 mr-2" />
                       Continue with {provider.name}
                     </Button>
                   );

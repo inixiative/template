@@ -14,5 +14,5 @@ export const youtubeDef: ContactTypeDef<Input, YoutubeValue> = {
   toUrl: (v) => `https://youtube.com/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'YouTube', icon: 'Youtube' },
+  display: { label: 'YouTube', icon: 'simple-icons:youtube' },
 };

@@ -6,17 +6,27 @@ import { z } from 'zod';
 // - delegation strings, { rel, action }, { self }, { any }, { all } structures
 // - the inner json-rules Condition under `{ rule: ... }` is passed through as
 //   unknown — runtime json-rules `check()` validates it when the rule fires.
-const actionRuleSchema: z.ZodType = z.lazy(() =>
+const actionRuleBase: z.ZodType = z.lazy(() =>
   z.union([
     z.string(), // delegate to another action on the same model
     z.null(),
     z.object({ rel: z.string(), action: z.string() }).strict(),
     z.object({ self: z.string() }).strict(),
     z.object({ rule: z.unknown() }).strict(),
-    z.object({ any: z.array(actionRuleSchema) }).strict(),
-    z.object({ all: z.array(actionRuleSchema) }).strict(),
+    z.object({ any: z.array(actionRuleBase) }).strict(),
+    z.object({ all: z.array(actionRuleBase) }).strict(),
   ]),
 );
+
+// Register a $ref name so zod-to-openapi can break the recursion when api
+// boots and serializes its OpenAPI spec. The `.openapi()` method is patched
+// onto zod's prototype by @hono/zod-openapi at runtime; we cast to access it
+// without forcing this package to depend on @hono/zod-openapi.
+const withOpenApiRef = actionRuleBase as z.ZodType & {
+  openapi?: (name: string) => z.ZodType;
+};
+const actionRuleSchema: z.ZodType =
+  withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
 
 /**
  * Build a Zod schema for a `permissionRules: Json?` column on a model.

@@ -13,5 +13,5 @@ export const wechatDef: ContactTypeDef<WechatValue, WechatValue> = {
   toValueKey: (v) => v.handle.toLowerCase(),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'WeChat', icon: 'MessageCircle' },
+  display: { label: 'WeChat', icon: 'simple-icons:wechat' },
 };

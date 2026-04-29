@@ -1,6 +1,7 @@
 import { Button } from '@template/ui/components/primitives/Button';
 import { cn } from '@template/ui/lib/utils';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export type PaginationProps = {
   currentPage: number;
@@ -135,7 +136,7 @@ export const Pagination = ({
             disabled={currentPage === 1}
             aria-label="First page"
           >
-            <ChevronsLeft className="h-4 w-4" />
+            <Icon icon="lucide:chevrons-left" className="h-4 w-4" />
           </Button>
 
           {/* Previous page */}
@@ -147,7 +148,7 @@ export const Pagination = ({
             disabled={currentPage === 1}
             aria-label="Previous page"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <Icon icon="lucide:chevron-left" className="h-4 w-4" />
           </Button>
 
           {/* Page numbers */}
@@ -180,7 +181,7 @@ export const Pagination = ({
             disabled={currentPage === totalPages}
             aria-label="Next page"
           >
-            <ChevronRight className="h-4 w-4" />
+            <Icon icon="lucide:chevron-right" className="h-4 w-4" />
           </Button>
 
           {/* Last page */}
@@ -192,7 +193,7 @@ export const Pagination = ({
             disabled={currentPage === totalPages}
             aria-label="Last page"
           >
-            <ChevronsRight className="h-4 w-4" />
+            <Icon icon="lucide:chevrons-right" className="h-4 w-4" />
           </Button>
         </div>
       )}

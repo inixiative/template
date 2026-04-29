@@ -14,5 +14,5 @@ export const blueskyDef: ContactTypeDef<Input, BlueskyValue> = {
   toUrl: (v) => `https://bsky.app/profile/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Bluesky', icon: 'Cloud' },
+  display: { label: 'Bluesky', icon: 'simple-icons:bluesky' },
 };

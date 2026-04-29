@@ -3,8 +3,9 @@ import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 import { findRoute } from '@template/ui/lib/findRoute';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+
 import { useEffect, useMemo, useState } from 'react';
+import { Icon } from '@iconify/react';
 
 export type SidebarProps = {
   className?: string;
@@ -65,7 +66,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
     const hasChildren = item.items && item.items.length > 0;
     const isExpanded = expandedItems.has(item.label);
     const isActive = activeChain.includes(item);
-    const Icon = item.icon;
+    const iconSlug = item.icon;
 
     return (
       <div key={item.label}>
@@ -82,7 +83,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
               !item.path && 'cursor-default',
             )}
           >
-            {Icon && <Icon className="h-4 w-4 shrink-0" />}
+            {iconSlug && <Icon icon={iconSlug} className="h-4 w-4 shrink-0" />}
             <span className="flex-1 text-left truncate">{item.label}</span>
           </button>
           {hasChildren && (
@@ -92,9 +93,9 @@ export const Sidebar = ({ className }: SidebarProps) => {
               className="p-2 hover:bg-accent/50 rounded-md transition-colors"
             >
               {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <Icon icon="lucide:chevron-down" className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <Icon icon="lucide:chevron-right" className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
           )}

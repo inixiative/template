@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-import { AlertTriangle } from 'lucide-react';
+
 import { Component, type ReactNode } from 'react';
+import { Icon } from '@iconify/react';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -38,7 +39,7 @@ export const RouteError = ({ error }: { error: unknown }) => {
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <Icon icon="lucide:alert-triangle" className="h-5 w-5 shrink-0" />
             {err.message}
           </CardTitle>
         </CardHeader>

@@ -45,6 +45,7 @@
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@hey-api/client-fetch": "^0.13.1",
+    "@iconify/react": "^6.0.2",
     "@tanstack/react-router": "^1.166.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
@@ -52,7 +53,6 @@
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.577.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",

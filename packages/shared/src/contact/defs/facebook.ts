@@ -14,5 +14,5 @@ export const facebookDef: ContactTypeDef<Input, FacebookValue> = {
   toUrl: (v) => `https://facebook.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Facebook', icon: 'Facebook' },
+  display: { label: 'Facebook', icon: 'simple-icons:facebook' },
 };

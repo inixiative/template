@@ -14,5 +14,5 @@ export const instagramDef: ContactTypeDef<Input, InstagramValue> = {
   toUrl: (v) => `https://instagram.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Instagram', icon: 'Instagram' },
+  display: { label: 'Instagram', icon: 'simple-icons:instagram' },
 };

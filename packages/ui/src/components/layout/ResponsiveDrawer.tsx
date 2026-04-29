@@ -1,7 +1,8 @@
 import { Modal } from '@template/ui/components/layout/Modal';
 import { useBreakpoint } from '@template/ui/hooks/useMediaQuery';
 import { cn } from '@template/ui/lib/utils';
-import { X } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export type ResponsiveDrawerProps = {
   open: boolean;
@@ -45,7 +46,7 @@ export const ResponsiveDrawer = ({
               className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
               aria-label="Close drawer"
             >
-              <X className="h-5 w-5" />
+              <Icon icon="lucide:x" className="h-5 w-5" />
             </button>
           </div>
           <div className="p-4">{children}</div>

@@ -1,13 +1,12 @@
 import type { NavItem } from '@template/ui/components';
-import { Key, Settings, User, Webhook } from 'lucide-react';
 
 export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
-  icon: Settings,
+  icon: 'lucide:settings',
   items: [
-    { label: 'Profile', path: '/profile', icon: User },
-    { label: 'Tokens', path: '/tokens', icon: Key },
-    { label: 'Webhooks', path: '/webhooks', icon: Webhook },
+    { label: 'Profile', path: '/profile', icon: 'lucide:user' },
+    { label: 'Tokens', path: '/tokens', icon: 'lucide:key' },
+    { label: 'Webhooks', path: '/webhooks', icon: 'lucide:webhook' },
   ],
 };

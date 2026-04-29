@@ -1,48 +1,47 @@
 import type { NavItem } from '@template/ui/components';
 import { getContextParams } from '@template/ui/lib';
-import { ArrowRightLeft, Key, RefreshCw, Settings, ShieldCheck, User, Webhook } from 'lucide-react';
 
 export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
-  icon: Settings,
+  icon: 'lucide:settings',
   access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
   items: [
     {
       label: 'Profile',
       path: '/profile',
-      icon: User,
+      icon: 'lucide:user',
       access: (permissions, context) => permissions.check(...getContextParams(context), 'manage'),
     },
     {
       label: 'Tokens',
       path: '/tokens',
-      icon: Key,
+      icon: 'lucide:key',
       access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
       label: 'Webhooks',
       path: '/webhooks',
-      icon: Webhook,
+      icon: 'lucide:webhook',
       access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
       label: 'Auth Providers',
       path: '/authProviders',
-      icon: ShieldCheck,
+      icon: 'lucide:shield-check',
       access: (permissions, context) =>
         !!context.organization && permissions.check(...getContextParams(context), 'own'),
     },
     {
       label: 'Update',
       path: '/update',
-      icon: RefreshCw,
+      icon: 'lucide:refresh-cw',
       access: (permissions, context) => !!context.space && permissions.check(...getContextParams(context), 'manage'),
     },
     {
       label: 'Transfer',
       path: '/transfer',
-      icon: ArrowRightLeft,
+      icon: 'lucide:arrow-right-left',
       access: (permissions, context) =>
         !!context.space &&
         !!context.organization &&

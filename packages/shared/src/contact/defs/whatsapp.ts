@@ -15,5 +15,5 @@ export const whatsappDef: ContactTypeDef<WhatsappValue, WhatsappValue> = {
   toValueKey: (v) => v.jid,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'WhatsApp', icon: 'MessageCircle' },
+  display: { label: 'WhatsApp', icon: 'simple-icons:whatsapp' },
 };

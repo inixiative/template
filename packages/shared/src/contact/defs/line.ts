@@ -13,5 +13,5 @@ export const lineDef: ContactTypeDef<LineValue, LineValue> = {
   toValueKey: (v) => v.handle.toLowerCase(),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'LINE', icon: 'MessageCircle' },
+  display: { label: 'LINE', icon: 'simple-icons:line' },
 };

@@ -14,5 +14,5 @@ export const redditDef: ContactTypeDef<Input, RedditValue> = {
   toUrl: (v) => `https://reddit.com/user/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Reddit', icon: 'MessageCircle' },
+  display: { label: 'Reddit', icon: 'simple-icons:reddit' },
 };

@@ -14,5 +14,5 @@ export const threadsDef: ContactTypeDef<Input, ThreadsValue> = {
   toUrl: (v) => `https://threads.net/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Threads', icon: 'AtSign' },
+  display: { label: 'Threads', icon: 'simple-icons:threads' },
 };

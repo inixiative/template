@@ -14,5 +14,5 @@ export const tiktokDef: ContactTypeDef<Input, TiktokValue> = {
   toUrl: (v) => `https://tiktok.com/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'TikTok', icon: 'Music2' },
+  display: { label: 'TikTok', icon: 'simple-icons:tiktok' },
 };

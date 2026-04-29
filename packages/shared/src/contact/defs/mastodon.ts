@@ -15,5 +15,5 @@ export const mastodonDef: ContactTypeDef<Input, MastodonValue> = {
   toUrl: (v) => `https://${v.instance}/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Mastodon', icon: 'AtSign' },
+  display: { label: 'Mastodon', icon: 'simple-icons:mastodon' },
 };

@@ -1,9 +1,9 @@
+import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components/primitives/Button';
 import { cn } from '@template/ui/lib/utils';
-import type { LucideIcon } from 'lucide-react';
 
 export type EmptyStateProps = {
-  icon?: LucideIcon;
+  icon?: string;
   title: string;
   description?: string;
   action?: {
@@ -14,15 +14,15 @@ export type EmptyStateProps = {
   show?: boolean | (() => boolean);
 };
 
-export const EmptyState = ({ icon: Icon, title, description, action, className, show = true }: EmptyStateProps) => {
+export const EmptyState = ({ icon, title, description, action, className, show = true }: EmptyStateProps) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
   return (
     <div className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}>
-      {Icon && (
+      {icon && (
         <div className="rounded-full bg-muted p-3 mb-4">
-          <Icon className="h-6 w-6 text-muted-foreground" />
+          <Icon icon={icon} className="h-6 w-6 text-muted-foreground" />
         </div>
       )}
       <h3 className="text-lg font-semibold mb-1">{title}</h3>

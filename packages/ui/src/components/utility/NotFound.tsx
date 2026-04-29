@@ -1,7 +1,8 @@
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-import { AlertTriangle } from 'lucide-react';
+
 import type { ReactNode } from 'react';
+import { Icon } from '@iconify/react';
 
 type NotFoundProps = {
   title?: string;
@@ -25,7 +26,7 @@ export const NotFound = ({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {icon ?? <AlertTriangle className="h-4 w-4" />}
+            {icon ?? <Icon icon="lucide:alert-triangle" className="h-4 w-4" />}
             {title}
           </CardTitle>
         </CardHeader>

@@ -1,7 +1,8 @@
 import { ShareButton } from '@template/ui/components/utility/ShareButton';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { Menu } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export type HeaderProps = {
   onMenuClick?: () => void;
@@ -29,7 +30,7 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
             className="lg:hidden p-2 hover:bg-accent rounded-md transition-colors"
             aria-label="Toggle menu"
           >
-            <Menu className="h-5 w-5" />
+            <Icon icon="lucide:menu" className="h-5 w-5" />
           </button>
         )}
         {logo}

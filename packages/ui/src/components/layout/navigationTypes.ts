@@ -1,6 +1,7 @@
 import type { PermissionsCheck } from '@template/permissions/types';
 import type { PageContext, TenantContext } from '@template/ui/store/types/tenant';
-import type { LucideIcon } from 'lucide-react';
+type LucideIcon = string;
+
 
 export type NavItem = {
   label: string;

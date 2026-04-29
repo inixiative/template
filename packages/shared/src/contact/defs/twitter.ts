@@ -18,5 +18,5 @@ export const twitterDef: ContactTypeDef<TwitterInput, TwitterValue> = {
   toUrl: (v) => `https://x.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Twitter / X', icon: 'Twitter' },
+  display: { label: 'Twitter / X', icon: 'simple-icons:x' },
 };

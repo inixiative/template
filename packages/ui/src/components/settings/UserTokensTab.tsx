@@ -3,8 +3,9 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@templa
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';
-import { Plus, Trash2 } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type Token = {
   id: string;
@@ -49,7 +50,7 @@ export const UserTokensTab = () => {
               onClick={() => handleDelete(token.id)}
               show={checkPermission(permissions, 'token', tokenRecord, 'leave')}
             >
-              <Trash2 className="h-4 w-4" />
+              <Icon icon="lucide:trash2" className="h-4 w-4" />
             </Button>
           </div>
         );
@@ -75,7 +76,7 @@ export const UserTokensTab = () => {
               <p className="text-sm text-muted-foreground mt-1">Create and manage API tokens for programmatic access</p>
             </div>
             <Button onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
               Create Token
             </Button>
           </CardHeader>

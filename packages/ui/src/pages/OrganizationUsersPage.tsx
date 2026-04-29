@@ -16,8 +16,9 @@ import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { Trash2, UserPlus } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
 
@@ -109,7 +110,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               onClick={() => deleteMutation.mutate({ path: { id: orgUser.id } })}
               show={checkPermission(permissions, 'organizationUser', orgUserRecord, 'manage')}
             >
-              <Trash2 className="h-4 w-4 text-destructive" />
+              <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         );
@@ -146,7 +147,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               <p className="text-sm text-muted-foreground mt-1">Manage users and their roles in this organization</p>
             </div>
             <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
-              <UserPlus className="h-4 w-4 mr-2" />
+              <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />
               Invite User
             </Button>
           </CardHeader>
