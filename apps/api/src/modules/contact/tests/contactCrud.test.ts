@@ -100,18 +100,41 @@ describe('Contact CRUD', () => {
       expect(second.status).toBe(201);
     });
 
-    it('strips raw permissionRules from client input (server-authored only)', async () => {
+    it('owner can set permissionRules for whitelisted actions (read)', async () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
           type: 'email',
-          value: { address: `nopr${getNextSeq()}@example.com` },
-          // biome-ignore lint/suspicious/noExplicitAny: testing that extraneous field is dropped
-          permissionRules: { read: { all: [] } } as any,
+          value: { address: `share${getNextSeq()}@example.com` },
+          permissionRules: { read: { all: [] } },
         }),
       );
       const { data } = await json<Contact>(response);
       expect(response.status).toBe(201);
-      expect(data.permissionRules).toBeNull();
+      expect(data.permissionRules).toEqual({ read: { all: [] } });
+    });
+
+    it('rejects permissionRules for non-overridable actions (e.g. delete)', async () => {
+      const response = await fetch(
+        post('/api/v1/me/contacts', {
+          type: 'email',
+          value: { address: `nodel${getNextSeq()}@example.com` },
+          // delete is not in CONTACT_ROW_OVERRIDABLE_ACTIONS — rejected by Zod at the boundary
+          permissionRules: { delete: { all: [] } },
+        }),
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it('rejects malformed permissionRules shape', async () => {
+      const response = await fetch(
+        post('/api/v1/me/contacts', {
+          type: 'email',
+          value: { address: `bad${getNextSeq()}@example.com` },
+          // garbage rule shape — rejected by the recursive ActionRule schema
+          permissionRules: { read: { foo: 'bar' } },
+        }),
+      );
+      expect(response.status).toBe(400);
     });
 
     // Note: same-owner duplicate detection via @@unique is currently a NO-OP
