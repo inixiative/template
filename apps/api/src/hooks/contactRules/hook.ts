@@ -1,6 +1,6 @@
 import { DbAction, db, type HookOptions, HookTiming, PolymorphismRegistry, Prisma, registerDbHook, type SingleAction } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
-import { HTTPException } from 'hono/http-exception';
+import { makeError } from '#/lib/errors';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
@@ -19,23 +19,23 @@ const ownerWhereFromRow = (row: ContactRow): Record<string, string | null> =>
 const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclusion?: string): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
   const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
-  if (!def) throw new HTTPException(422, { message: `Unknown Contact type: ${row.type}` });
+  if (!def) throw makeError({ status: 422, message: `Unknown Contact type: ${row.type}` });
 
   // Subtype rules
   const sub = row.subtype ?? null;
   switch (def.subtype.mode) {
     case 'forbidden':
-      if (sub !== null) throw new HTTPException(422, { message: `Contact type '${row.type}' must not have a subtype` });
+      if (sub !== null) throw makeError({ status: 422, message: `Contact type '${row.type}' must not have a subtype` });
       break;
     case 'required':
-      if (sub === null) throw new HTTPException(422, { message: `Contact type '${row.type}' requires a subtype` });
+      if (sub === null) throw makeError({ status: 422, message: `Contact type '${row.type}' requires a subtype` });
       if (!def.subtype.values.includes(sub)) {
-        throw new HTTPException(422, { message: `Invalid subtype '${sub}' for type '${row.type}'` });
+        throw makeError({ status: 422, message: `Invalid subtype '${sub}' for type '${row.type}'` });
       }
       break;
     case 'optional':
       if (sub !== null && !def.subtype.values.includes(sub)) {
-        throw new HTTPException(422, { message: `Invalid subtype '${sub}' for type '${row.type}'` });
+        throw makeError({ status: 422, message: `Invalid subtype '${sub}' for type '${row.type}'` });
       }
       break;
   }
@@ -53,7 +53,7 @@ const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclu
   }
 
   // isPrimary uniqueness per (owner, type) — clear other primaries before this row sticks.
-  if (row.isPrimary === true && row.type) {
+  if (row.isPrimary === true) {
     const ownerWhere = ownerWhereFromRow(row);
     if (ownerKeyFields.some((k) => ownerWhere[k] !== null)) {
       await db.contact.updateManyAndReturn({
