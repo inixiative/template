@@ -34,7 +34,10 @@ model Contact {
   subtype String?    // semantics depend on type — see shared/contact/registry
 
   label     String?
-  isPrimary Boolean @default(false)
+  // Position within (owner, type) — Carde-style dense ordering. Hook
+  // auto-assigns MAX+1 on create when caller omits it; reorder via
+  // shift-and-renumber (see lib/prisma/orderedList.ts).
+  sortOrder Int @default(0)
 
   value    Json
   valueKey String?
@@ -71,4 +74,17 @@ enum ContactType {
   whatsapp
   telegram
   discord
+  instagram
+  facebook
+  youtube
+  tiktok
+  bluesky
+  threads
+  reddit
+  signal
+  mastodon
+  line
+  wechat
+  viber
+  skype
 }

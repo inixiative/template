@@ -13,5 +13,5 @@ export const emailDef: ContactTypeDef<EmailValue, EmailValue> = {
   toValueKey: (v) => v.address,
   subtype: { mode: 'optional', values: EMAIL_SUBTYPES },
   uniqueness: 'per-owner',
-  display: { label: 'Email' },
+  display: { label: 'Email', icon: 'Mail' },
 };

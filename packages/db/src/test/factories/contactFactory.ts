@@ -7,7 +7,6 @@ const contactFactory = createFactory('Contact', {
     ownerModel: ContactOwnerModel.User,
     type: ContactType.email,
     value: { address: faker.internet.email().toLowerCase() },
-    isPrimary: false,
   }),
   dependencies: {
     // Pass an empty object in overrides to trigger auto-create of the owner.

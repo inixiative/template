@@ -17,7 +17,9 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   permissionRules: true,
 }).extend({
   value: z.any(),
-  isPrimary: z.boolean().optional(),
+  // Position within (owner, type) — has @default(0) in Prisma; hook auto-
+  // assigns MAX+1 when omitted on create.
+  sortOrder: z.number().int().optional(),
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
 });
 

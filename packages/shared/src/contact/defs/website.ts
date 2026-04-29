@@ -14,5 +14,5 @@ export const websiteDef: ContactTypeDef<WebsiteValue, WebsiteValue> = {
   toValueKey: (v) => canonicalUrl(v.url),
   subtype: { mode: 'optional', values: WEBSITE_SUBTYPES },
   uniqueness: 'per-owner',
-  display: { label: 'Website' },
+  display: { label: 'Website', icon: 'Globe' },
 };

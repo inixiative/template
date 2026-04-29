@@ -1,6 +1,7 @@
 import { DbAction, db, type HookOptions, HookTiming, PolymorphismRegistry, Prisma, registerDbHook, type SingleAction } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
 import { makeError } from '#/lib/errors';
+import { nextSortOrder } from '#/lib/prisma/orderedList';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
@@ -16,7 +17,7 @@ const ownerWhereFromRow = (row: ContactRow): Record<string, string | null> =>
 
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.
-const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclusion?: string): Promise<void> => {
+const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclusion?: string): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
   const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
   if (!def) throw makeError({ status: 422, message: `Unknown Contact type: ${row.type}` });
@@ -52,20 +53,12 @@ const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclu
     row.valueKey = def.toValueKey(validated);
   }
 
-  // isPrimary uniqueness per (owner, type) — clear other primaries before this row sticks.
-  if (row.isPrimary === true) {
+  // sortOrder: append to bottom on create when caller didn't supply one.
+  // Reorder is handled at the route layer via reorderInList.
+  if (!isUpdate && row.sortOrder == null) {
     const ownerWhere = ownerWhereFromRow(row);
     if (ownerKeyFields.some((k) => ownerWhere[k] !== null)) {
-      await db.contact.updateManyAndReturn({
-        where: {
-          ...ownerWhere,
-          type: row.type,
-          isPrimary: true,
-          deletedAt: null,
-          ...(idForExclusion ? { NOT: { id: idForExclusion } } : {}),
-        },
-        data: { isPrimary: false },
-      });
+      row.sortOrder = await nextSortOrder(db.contact, { ...ownerWhere, type: row.type });
     }
   }
 };

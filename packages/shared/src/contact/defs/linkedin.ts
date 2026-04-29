@@ -23,5 +23,5 @@ export const linkedinDef: ContactTypeDef<LinkedinInput, LinkedinValue> = {
     `https://linkedin.com/${v.classifier === 'personal' ? 'in' : v.classifier}/${v.handle}`,
   subtype: { mode: 'forbidden' }, // classifier lives in `value`
   uniqueness: 'per-owner',
-  display: { label: 'LinkedIn' },
+  display: { label: 'LinkedIn', icon: 'Linkedin' },
 };

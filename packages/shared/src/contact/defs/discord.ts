@@ -15,5 +15,5 @@ export const discordDef: ContactTypeDef<DiscordValue, DiscordValue> = {
   toValueKey: (v) => v.userId,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Discord' },
+  display: { label: 'Discord', icon: 'MessageSquare' },
 };

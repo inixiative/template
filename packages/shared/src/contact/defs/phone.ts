@@ -17,5 +17,5 @@ export const phoneDef: ContactTypeDef<PhoneValue, PhoneValue> = {
   toValueKey: (v) => v.e164,
   subtype: { mode: 'optional', values: PHONE_SUBTYPES },
   uniqueness: 'per-owner',
-  display: { label: 'Phone' },
+  display: { label: 'Phone', icon: 'Phone' },
 };

@@ -18,5 +18,7 @@ export type ContactTypeDef<TInput, TStored> = {
   toUrl?: (v: TStored) => string;
   subtype: ContactSubtypeRule;
   uniqueness: 'global-within-type' | 'per-owner';
-  display: { label: string };
+  // `icon` is a lucide-react icon name (string). UI maps it to a component
+  // — keeps shared free of react/lucide deps.
+  display: { label: string; icon: string };
 };

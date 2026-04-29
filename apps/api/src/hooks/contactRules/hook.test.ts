@@ -187,31 +187,63 @@ describe('contactRules hook — subtype enforcement', () => {
   });
 });
 
-describe('contactRules hook — isPrimary uniqueness', () => {
-  it('clears the prior primary when a new primary is set', async () => {
+describe('contactRules hook — sortOrder auto-assign', () => {
+  it('appends MAX+1 per (owner, type) when sortOrder omitted', async () => {
     const { entity: user } = await createUser();
     const first = await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
         type: ContactType.phone,
-        isPrimary: true,
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    expect(first.isPrimary).toBe(true);
+    expect(first.sortOrder).toBe(1);
 
-    await db.contact.create({
+    const second = await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
         type: ContactType.phone,
-        isPrimary: true,
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
+    expect(second.sortOrder).toBe(2);
+  });
 
-    const refetched = await db.contact.findUnique({ where: { id: first.id } });
-    expect(refetched?.isPrimary).toBe(false);
+  it('respects explicit sortOrder when caller supplies one', async () => {
+    const { entity: user } = await createUser();
+    const explicit = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        sortOrder: 42,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    expect(explicit.sortOrder).toBe(42);
+  });
+
+  it('scopes ordering by (owner, type) — different types start fresh', async () => {
+    const { entity: user } = await createUser();
+    const phone = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    const email = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.email,
+        value: { address: `sort${getNextSeq()}@example.com` },
+      },
+    });
+    expect(phone.sortOrder).toBeGreaterThan(0);
+    expect(email.sortOrder).toBe(1); // first email for this user — not 2
   });
 });

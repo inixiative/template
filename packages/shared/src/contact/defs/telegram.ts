@@ -18,5 +18,5 @@ export const telegramDef: ContactTypeDef<TelegramInput, TelegramValue> = {
   toUrl: (v) => `https://t.me/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
-  display: { label: 'Telegram' },
+  display: { label: 'Telegram', icon: 'Send' },
 };
