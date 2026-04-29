@@ -1,4 +1,4 @@
-import { type AnyDelegate, type Args, Prisma, type Result, toModelName } from '@template/db';
+import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
@@ -70,8 +70,10 @@ export const paginate = async <
 
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
-  const resourceType = c.get('resourceType');
-  const model = resourceType ? toModelName(resourceType) : undefined;
+  // searchableModel is the search-target model (Inquiry on a /:id/inquiry
+  // submodel route, even though resourceType=Organization). Routes register
+  // it via searchableFieldsMiddleware; non-Prisma module routes pass null.
+  const model = c.get('searchableModel') ?? undefined;
 
   const skipFieldValidation = isSuperadmin(c);
 

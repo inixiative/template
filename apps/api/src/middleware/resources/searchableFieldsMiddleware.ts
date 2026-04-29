@@ -1,14 +1,16 @@
-import type { AccessorName } from '@template/db';
+import type { ModelName } from '@template/db';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
-type Args = { fields: readonly string[]; model?: AccessorName };
+type Args = { fields: readonly string[]; model?: ModelName };
 
-// Stash searchable fields + the route's accessor (resourceType) so paginate
-// can hand them to buildWhereClause. resourceType is unified with what
-// resourceContextMiddleware sets — same key, same shape — so paginate has
-// one source of truth regardless of whether the route has an :id.
+// Stash the searchable fields + the search-target model in context so paginate
+// can hand them to buildWhereClause for prismaMap-driven enum-aware filtering.
+// searchableModel is intentionally distinct from resourceType (the permission
+// owner) — for submodel list routes like /organization/:id/inquiry,
+// resourceType=Organization but searchableModel=Inquiry. They only collapse
+// for non-submodel routes.
 export const searchableFieldsMiddleware = makeMiddleware<Args>(({ fields, model }) => async (c, next) => {
   c.set('searchableFields', fields);
-  if (model) c.set('resourceType', model);
+  c.set('searchableModel', model ?? null);
   await next();
 });

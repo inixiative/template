@@ -1,5 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
-import { type AccessorName, toModelName } from '@template/db';
+import { toModelName } from '@template/db';
 import pluralize from 'pluralize';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
@@ -46,15 +46,13 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(
-      middleware,
-      skipResource,
-      searchableFields,
-      // model is RouteArgs.Module (broader); narrow to AccessorName for routes
-      // that map to a real Prisma model. Non-accessor modules (cache, job, …)
-      // legitimately have no resourceType.
-      toModelName(model) ? (model as AccessorName) : undefined,
-    ),
+    // searchableModel must be the LISTED resource (the submodel on
+    // /:id/<submodel> routes, the model otherwise). Using the route's owner
+    // model breaks enum-aware filtering on submodel lists like
+    // /organization/:id/inquiry, where searchable fields belong to Inquiry,
+    // not Organization. Non-Prisma modules (cache, job, me, …) resolve to
+    // undefined via toModelName.
+    middleware: prepareMiddleware(middleware, skipResource, searchableFields, toModelName(submodel ?? model) ?? undefined),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });
