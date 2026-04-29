@@ -35,12 +35,14 @@ model Contact {
 
   label     String?
   isPrimary Boolean @default(false)
-  // When true, any authenticated user may read this Contact even if they are
-  // not the owner. Write/delete still require owner.manage regardless.
-  isPublic  Boolean @default(false)
 
   value    Json
   valueKey String?
+
+  // Per-row override for the rebac action rules on this resource.
+  // Shape: Record<Action, ActionRule>. Read by check() — row-level wins over
+  // the static rebacSchema for any action present here. Null = schema-only.
+  permissionRules Json?
 
   verifiedAt DateTime?
   source     String?

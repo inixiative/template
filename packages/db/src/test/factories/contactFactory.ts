@@ -8,8 +8,26 @@ const contactFactory = createFactory('Contact', {
     type: ContactType.email,
     value: { address: faker.internet.email().toLowerCase() },
     isPrimary: false,
-    isPublic: false,
   }),
+  dependencies: {
+    // Pass an empty object in overrides to trigger auto-create of the owner.
+    // Format: { targetField: sourceField } — read targetField from dep, set sourceField on Contact.
+    user: {
+      modelName: 'User',
+      foreignKey: { id: 'userId' },
+      required: false,
+    },
+    organization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'organizationId' },
+      required: false,
+    },
+    space: {
+      modelName: 'Space',
+      foreignKey: { id: 'spaceId' },
+      required: false,
+    },
+  },
 });
 
 export const buildContact = contactFactory.build;

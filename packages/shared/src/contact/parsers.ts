@@ -14,7 +14,9 @@ const stripWwwAndProtocol = (url: string): string =>
     .replace(/^https?:\/\//i, '')
     .replace(/^www\./i, '');
 
-export type LinkedinClassifier = 'personal' | 'company' | 'school';
+import type { GithubClassifier } from '@template/shared/contact/constants/github';
+import type { LinkedinClassifier } from '@template/shared/contact/constants/linkedin';
+
 export type LinkedinValue = { classifier: LinkedinClassifier; handle: string };
 
 const LINKEDIN_PREFIX_TO_CLASSIFIER: Record<string, LinkedinClassifier> = {
@@ -38,7 +40,6 @@ export const parseLinkedinUrl = (url: string): LinkedinValue => {
   return { classifier, handle };
 };
 
-export type GithubClassifier = 'user' | 'org';
 export type GithubValue = { classifier: GithubClassifier; handle: string };
 
 // GitHub URLs and bare handles share a slug namespace, but URLs alone don't
