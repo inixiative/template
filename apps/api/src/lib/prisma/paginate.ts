@@ -74,10 +74,14 @@ export const paginate = async <
 
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere =
-    searchableFields?.length || skipFieldValidation
-      ? buildWhereClause({ model, search, searchFields, searchableFields, skipFieldValidation, orNullFields })
-      : {};
+  const searchWhere = buildWhereClause({
+    model,
+    search,
+    searchFields,
+    searchableFields,
+    skipFieldValidation,
+    orNullFields,
+  });
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
   const where = { ...baseWhere, ...searchWhere } as FindManyWhere<T>;
