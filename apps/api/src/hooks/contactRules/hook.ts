@@ -1,29 +1,22 @@
-import { DbAction, db, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
+import { DbAction, db, type HookOptions, HookTiming, PolymorphismRegistry, Prisma, registerDbHook, type SingleAction } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
 import { HTTPException } from 'hono/http-exception';
 
-type ContactRow = Record<string, unknown> & {
-  type?: string;
-  value?: unknown;
-  subtype?: string | null;
-  isPrimary?: boolean;
-  ownerModel?: string;
-  userId?: string | null;
-  organizationId?: string | null;
-  spaceId?: string | null;
-};
+type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
-const ownerKeyFields = ['userId', 'organizationId', 'spaceId'] as const;
+// Derived from the polymorphism registry — single source of truth.
+const ownerKeyFields = [
+  ...new Set(
+    Object.values(PolymorphismRegistry.Contact?.axes[0]?.fkMap ?? {}).flat(),
+  ),
+];
 
-const ownerWhereFromRow = (row: ContactRow) => ({
-  userId: row.userId ?? null,
-  organizationId: row.organizationId ?? null,
-  spaceId: row.spaceId ?? null,
-});
+const ownerWhereFromRow = (row: ContactRow): Record<string, string | null> =>
+  Object.fromEntries(ownerKeyFields.map((k) => [k, (row[k] as string | null | undefined) ?? null]));
 
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.
-const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclusion?: string): Promise<void> => {
+const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclusion?: string): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
   const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
   if (!def) throw new HTTPException(422, { message: `Unknown Contact type: ${row.type}` });
@@ -48,43 +41,15 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclus
   }
 
   // Value: parse loose input → canonical → set valueKey. Skip when value is
-  // absent on update (caller is updating a different field).
+  // absent on update (caller is updating a different field). Per-owner
+  // uniqueness is enforced by the @@unique([ownerModel, userId, …, type, valueKey])
+  // constraint; Prisma throws P2002 on conflict, no manual pre-check needed.
   if (row.value !== undefined) {
-    const parsedInput = def.inputSchema.safeParse(row.value);
-    if (!parsedInput.success) {
-      throw new HTTPException(422, { message: `Invalid Contact.value for type '${row.type}': ${parsedInput.error.message}` });
-    }
-    let canonical: unknown;
-    try {
-      canonical = def.parseInput(parsedInput.data);
-    } catch (e) {
-      throw new HTTPException(422, { message: `Could not normalize Contact.value: ${(e as Error).message}` });
-    }
-    const validated = def.valueSchema.safeParse(canonical);
-    if (!validated.success) {
-      throw new HTTPException(422, { message: `Normalized Contact.value failed schema: ${validated.error.message}` });
-    }
-    row.value = validated.data;
-    row.valueKey = def.toValueKey(validated.data);
-
-    // Global-within-type uniqueness pre-check (for clean 409s; partial unique
-    // index will be the eventual backstop once we cut migrations).
-    if (def.uniqueness === 'global-within-type') {
-      const collision = await db.contact.findFirst({
-        where: {
-          type: row.type as never,
-          valueKey: row.valueKey as string,
-          deletedAt: null,
-          ...(idForExclusion ? { NOT: { id: idForExclusion } } : {}),
-        },
-        select: { id: true },
-      });
-      if (collision) {
-        throw new HTTPException(409, {
-          message: `A Contact with type '${row.type}' and value already exists.`,
-        });
-      }
-    }
+    const input = def.inputSchema.parse(row.value);
+    const canonical = def.parseInput(input);
+    const validated = def.valueSchema.parse(canonical);
+    row.value = validated;
+    row.valueKey = def.toValueKey(validated);
   }
 
   // isPrimary uniqueness per (owner, type) — clear other primaries before this row sticks.
@@ -94,7 +59,7 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclus
       await db.contact.updateManyAndReturn({
         where: {
           ...ownerWhere,
-          type: row.type as never,
+          type: row.type,
           isPrimary: true,
           deletedAt: null,
           ...(idForExclusion ? { NOT: { id: idForExclusion } } : {}),

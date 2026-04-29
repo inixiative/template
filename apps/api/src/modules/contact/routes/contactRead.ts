@@ -5,6 +5,6 @@ import { Modules } from '#/modules/modules';
 
 export const contactReadRoute = readRoute({
   model: Modules.contact,
-  middleware: [validateOwnerPermission({ action: 'read', isPublicOnRead: true })],
+  middleware: [validateOwnerPermission({ action: 'read' })],
   responseSchema: ContactScalarSchema,
 });

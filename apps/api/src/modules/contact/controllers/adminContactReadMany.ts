@@ -6,21 +6,7 @@ export const adminContactReadManyController = makeController(
   adminContactReadManyRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const { ownerModel, userId, organizationId, spaceId, type, isPrimary, isPublic } = c.req.valid('query');
-
-    const { data, pagination } = await paginate(c, db.contact, {
-      where: {
-        deletedAt: null,
-        ...(ownerModel && { ownerModel }),
-        ...(userId && { userId }),
-        ...(organizationId && { organizationId }),
-        ...(spaceId && { spaceId }),
-        ...(type && { type }),
-        ...(isPrimary !== undefined && { isPrimary }),
-        ...(isPublic !== undefined && { isPublic }),
-      },
-    });
-
+    const { data, pagination } = await paginate(c, db.contact);
     return respond.ok(data, { pagination });
   },
 );
