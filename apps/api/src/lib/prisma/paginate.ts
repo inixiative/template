@@ -1,4 +1,4 @@
-import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
+import { type AnyDelegate, type Args, Prisma, type Result, toModelName } from '@template/db';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
@@ -70,7 +70,8 @@ export const paginate = async <
 
   const contextSearchableFields = c.get('searchableFields');
   const searchableFields = contextSearchableFields ?? explicitSearchableFields;
-  const model = c.get('searchableModel') ?? undefined;
+  const resourceType = c.get('resourceType');
+  const model = resourceType ? toModelName(resourceType) : undefined;
 
   const skipFieldValidation = isSuperadmin(c);
 

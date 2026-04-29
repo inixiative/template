@@ -1,5 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
-import { toModelName } from '@template/db';
+import { type AccessorName, toModelName } from '@template/db';
 import pluralize from 'pluralize';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
@@ -46,7 +46,15 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, searchableFields, toModelName(model)),
+    middleware: prepareMiddleware(
+      middleware,
+      skipResource,
+      searchableFields,
+      // model is RouteArgs.Module (broader); narrow to AccessorName for routes
+      // that map to a real Prisma model. Non-accessor modules (cache, job, …)
+      // legitimately have no resourceType.
+      toModelName(model) ? (model as AccessorName) : undefined,
+    ),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });
