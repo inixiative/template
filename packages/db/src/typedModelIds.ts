@@ -34,6 +34,9 @@ export const ModelIdType = {
   // Customers
   CustomerRef: 'CustomerRef',
 
+  // Contacts
+  Contact: 'Contact',
+
   // Inquiries
   Inquiry: 'Inquiry',
 
@@ -77,6 +80,9 @@ export type SpaceUserId = Id<typeof ModelIdType.SpaceUser>;
 // Customers
 export type CustomerRefId = Id<typeof ModelIdType.CustomerRef>;
 
+// Contacts
+export type ContactId = Id<typeof ModelIdType.Contact>;
+
 // Inquiries
 export type InquiryId = Id<typeof ModelIdType.Inquiry>;
 
@@ -118,6 +124,9 @@ export const spaceUserId = (id: string): SpaceUserId => id as SpaceUserId;
 
 // Customers
 export const customerRefId = (id: string): CustomerRefId => id as CustomerRefId;
+
+// Contacts
+export const contactId = (id: string): ContactId => id as ContactId;
 
 // Inquiries
 export const inquiryId = (id: string): InquiryId => id as InquiryId;

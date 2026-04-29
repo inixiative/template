@@ -8,6 +8,7 @@ import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
+import { contactRouter } from '#/modules/contact';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -39,6 +40,7 @@ apiRouter.route('/admin', adminRouter);
 // v1 Routes
 apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
+apiRouter.route('/v1/contact', contactRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);
