@@ -35,10 +35,9 @@ describe('Contact CRUD', () => {
     await cleanupTouchedTables(db);
   });
 
-  // helpers
   const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
 
-  describe('POST /me/contact', () => {
+  describe('POST /me/contacts', () => {
     it('creates a phone contact owned by the current user', async () => {
       const response = await fetch(
         post('/api/v1/me/contacts', {
@@ -47,7 +46,6 @@ describe('Contact CRUD', () => {
         }),
       );
       const { data } = await json<Contact>(response);
-
       expect(response.status).toBe(201);
       expect(data.userId).toBe(user.id);
       expect(data.ownerModel).toBe('User');
@@ -63,7 +61,6 @@ describe('Contact CRUD', () => {
         }),
       );
       const { data } = await json<Contact>(response);
-
       expect(response.status).toBe(201);
       expect(data.value).toEqual({ classifier: 'personal', handle });
       expect(data.valueKey).toBe(`personal:${handle.toLowerCase()}`);
@@ -79,16 +76,16 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(422);
     });
 
-    it('rejects duplicate global linkedin handle (409)', async () => {
-      const handle = `dup${getNextSeq()}`;
-      await fetch(
+    it('allows two users to claim the same linkedin handle (per-owner uniqueness)', async () => {
+      const handle = `coowned${getNextSeq()}`;
+      const first = await fetch(
         post('/api/v1/me/contacts', {
           type: 'linkedin',
           value: { classifier: 'personal', handle },
         }),
       );
+      expect(first.status).toBe(201);
 
-      // Different user, same handle
       const { entity: otherUser } = await createUser();
       const otherHarness = createTestApp({
         mockUser: otherUser,
@@ -97,18 +94,36 @@ describe('Contact CRUD', () => {
       const second = await otherHarness.fetch(
         post('/api/v1/me/contacts', {
           type: 'linkedin',
-          value: { classifier: 'personal', handle: handle.toUpperCase() },
+          value: { classifier: 'personal', handle },
         }),
       );
-      expect(second.status).toBe(409);
+      expect(second.status).toBe(201);
     });
+
+    it('strips raw permissionRules from client input (server-authored only)', async () => {
+      const response = await fetch(
+        post('/api/v1/me/contacts', {
+          type: 'email',
+          value: { address: `nopr${getNextSeq()}@example.com` },
+          // biome-ignore lint/suspicious/noExplicitAny: testing that extraneous field is dropped
+          permissionRules: { read: { all: [] } } as any,
+        }),
+      );
+      const { data } = await json<Contact>(response);
+      expect(response.status).toBe(201);
+      expect(data.permissionRules).toBeNull();
+    });
+
+    // Note: same-owner duplicate detection via @@unique is currently a NO-OP
+    // when the polymorphic FKs include NULLs (Postgres treats NULL as distinct).
+    // Needs `NullsNotDistinct` or a per-ownerModel partial unique index — follow-up.
   });
 
   describe('GET /contact/:id', () => {
     it('reads own contact', async () => {
       const { entity: contact } = await createContact({
+        user,
         ownerModel: 'User',
-        userId: user.id,
         type: 'email',
         value: { address: `read${getNextSeq()}@example.com` },
       });
@@ -121,8 +136,8 @@ describe('Contact CRUD', () => {
     it('rejects reading another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
+        user: otherUser,
         ownerModel: 'User',
-        userId: otherUser.id,
         type: 'email',
         value: { address: `priv${getNextSeq()}@example.com` },
       });
@@ -130,14 +145,15 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(403);
     });
 
-    it('reads ANOTHER user contact when isPublic=true', async () => {
+    it('grants read on another user contact when permissionRules.read passes', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
+        user: otherUser,
         ownerModel: 'User',
-        userId: otherUser.id,
         type: 'website',
         value: { url: `https://pub${getNextSeq()}.example.com` },
-        isPublic: true,
+        // Vacuously-true rule = open to any authenticated requester (server-authored only)
+        permissionRules: { read: { all: [] } as never },
       });
       const response = await fetch(get(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(200);
@@ -145,8 +161,8 @@ describe('Contact CRUD', () => {
 
     it('reads org contact as org member', async () => {
       const { entity: contact } = await createContact({
+        organization: org,
         ownerModel: 'Organization',
-        organizationId: org.id,
         type: 'email',
         value: { address: `orgmail${getNextSeq()}@example.com` },
       });
@@ -158,8 +174,8 @@ describe('Contact CRUD', () => {
   describe('PATCH /contact/:id', () => {
     it('updates own contact label + isPrimary', async () => {
       const { entity: contact } = await createContact({
+        user,
         ownerModel: 'User',
-        userId: user.id,
         type: 'email',
         value: { address: `upd${getNextSeq()}@example.com` },
       });
@@ -173,8 +189,8 @@ describe('Contact CRUD', () => {
     it('rejects updating another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
+        user: otherUser,
         ownerModel: 'User',
-        userId: otherUser.id,
         type: 'email',
         value: { address: `noupd${getNextSeq()}@example.com` },
       });
@@ -182,15 +198,16 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(403);
     });
 
-    it('does not allow public-read contacts to be written by non-owner', async () => {
+    it('permissionRules grants read but writes still owner-gated', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
+        user: otherUser,
         ownerModel: 'User',
-        userId: otherUser.id,
         type: 'website',
         value: { url: `https://wpub${getNextSeq()}.example.com` },
-        isPublic: true,
+        permissionRules: { read: { all: [] } as never },
       });
+      // Read passes (per the rule), but PATCH (manage) requires owner — denied.
       const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Hijack' }));
       expect(response.status).toBe(403);
     });
@@ -199,8 +216,8 @@ describe('Contact CRUD', () => {
   describe('DELETE /contact/:id', () => {
     it('deletes own contact', async () => {
       const { entity: contact } = await createContact({
+        user,
         ownerModel: 'User',
-        userId: user.id,
         type: 'email',
         value: { address: `del${getNextSeq()}@example.com` },
       });
@@ -211,8 +228,8 @@ describe('Contact CRUD', () => {
     it('rejects deleting another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
+        user: otherUser,
         ownerModel: 'User',
-        userId: otherUser.id,
         type: 'email',
         value: { address: `nodel${getNextSeq()}@example.com` },
       });

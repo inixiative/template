@@ -70,27 +70,58 @@ const processContactRow = async (row: ContactRow, _isUpdate: boolean, idForExclu
   }
 };
 
-const extractCreateRow = (args: unknown): ContactRow | ContactRow[] | null => {
-  if (!args || typeof args !== 'object') return null;
+// Returns a contact row from createMany / create args (data: T | T[] form).
+const extractCreateRows = (args: unknown): ContactRow[] => {
+  if (!args || typeof args !== 'object') return [];
   const a = args as Record<string, unknown>;
-  if (a.data) return a.data as ContactRow | ContactRow[];
-  return a as ContactRow;
+  if (a.data === undefined) return [];
+  return Array.isArray(a.data) ? (a.data as ContactRow[]) : [a.data as ContactRow];
+};
+
+const mirrorComputed = (target: ContactRow, source: ContactRow): void => {
+  if (source.valueKey !== undefined) target.valueKey = source.valueKey;
+  if (source.value !== undefined && target.value !== undefined) target.value = source.value;
 };
 
 export const registerContactRulesHook = () => {
+  // Pure create paths — args.data is the row (or array of rows).
   registerDbHook(
     'contactRules:create',
     'Contact',
     HookTiming.before,
-    [DbAction.create, DbAction.createManyAndReturn, DbAction.upsert],
+    [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      const data = extractCreateRow(args);
-      if (!data) return;
-      const rows = Array.isArray(data) ? data : [data];
-      for (const row of rows) await processContactRow(row, false);
+      for (const row of extractCreateRows(args)) await processContactRow(row, false);
     },
   );
 
+  // Upsert: args is `{ where, create, update }`. Both create and update paths
+  // need normalization — only one fires depending on row existence, but we
+  // can't know until Prisma runs, so treat both: validate `create` as a fresh
+  // row, validate `update` shadow-merged with previous (if available).
+  registerDbHook(
+    'contactRules:upsert',
+    'Contact',
+    HookTiming.before,
+    [DbAction.upsert],
+    async (options) => {
+      const { args, previous } = options as HookOptions & { action: SingleAction };
+      if (!args || typeof args !== 'object') return;
+      const a = args as Record<string, unknown>;
+      const create = a.create as ContactRow | undefined;
+      const update = a.update as ContactRow | undefined;
+      if (create) await processContactRow(create, false);
+      if (update) {
+        const prev = previous as ContactRow | undefined;
+        const merged: ContactRow = { ...(prev ?? {}), ...update };
+        await processContactRow(merged, true, prev?.id as string | undefined);
+        mirrorComputed(update, merged);
+      }
+    },
+  );
+
+  // Update paths — args.data is the partial update; merge with previous for
+  // type-aware validation, then mirror hook-computed fields back into args.data.
   registerDbHook(
     'contactRules:update',
     'Contact',
@@ -103,12 +134,9 @@ export const registerContactRulesHook = () => {
       const data = a.data as ContactRow | undefined;
       if (!data) return;
       const prev = previous as ContactRow | undefined;
-      // shadow-merge previous + update so type-aware validation works on partial updates
       const merged: ContactRow = { ...(prev ?? {}), ...data };
       await processContactRow(merged, true, prev?.id as string | undefined);
-      // Mirror computed fields back into the update payload so they persist.
-      if (merged.valueKey !== undefined) data.valueKey = merged.valueKey;
-      if (merged.value !== undefined && data.value !== undefined) data.value = merged.value;
+      mirrorComputed(data, merged);
     },
   );
 };

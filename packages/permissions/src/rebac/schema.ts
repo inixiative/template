@@ -1,4 +1,5 @@
 import { Operator } from '@inixiative/json-rules';
+import { ownerActions } from '@template/permissions/rebac/owners';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -43,6 +44,11 @@ export const rebacSchema: RebacSchema = {
       },
     },
   },
+
+  // Owner-polymorphic models: per-row permissionRules are merged additively
+  // over the standard owner-walk by check() — see packages/permissions/src/rebac/owners.ts.
+  contact: { actions: ownerActions() },
+  webhookSubscription: { actions: ownerActions() },
 
   organizationUser: {
     actions: {
