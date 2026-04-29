@@ -7,7 +7,6 @@ configs, golden rules), the seed lives here so new environments don't start blan
 
 | Folder | Seeds | Target |
 |--------|-------|--------|
-| `__template/muninndb/` | Initial golden memory entries | Seeded into MuninnDB team vault on `bun run init` |
 | `__template/volumes/` | Volume config defaults | `volumes/` (gitignored) |
 
 ## Usage

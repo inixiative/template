@@ -2,27 +2,9 @@
 
 ## Startup sequence
 
-1. Query `muninndb_team` for prior context on the current task domain
-2. Query `muninndb_local` for current session state
-3. Read task from `tickets/` if applicable
-4. Check `AI/rules/` for domain-specific conventions
-
-## MCP connection
-
-After `bun run setup`, `.mcp.json` is written with:
-- `muninndb_local` → `http://localhost:8750/mcp`
-- `muninndb_team` → Railway URL with team token
-
-If `.mcp.json` is missing, run `bun run init` → Railway Setup to regenerate it.
-
-## Memory discipline
-
-| Write here | When |
-|------------|------|
-| `muninndb_local` | In-progress debug, drafts, session state |
-| `muninndb_team` | Validated patterns, architectural decisions, resolved bugs |
-
-Promote local → team only after a finding is verified (working code, confirmed pattern).
+1. Read `AI/ENTRYPOINT.md` (canonical rules)
+2. Read task from `tickets/` if applicable
+3. Check `AI/rules/` for domain-specific conventions
 
 ## Subagent patterns
 
@@ -33,11 +15,10 @@ Promote local → team only after a finding is verified (working code, confirmed
 ## Skills
 
 Stored in `.claude/commands/`. Invoke with `/skill-name`.
-See `AI/ENTRYPOINT.md` §10 for doc routing before implementing.
+See `AI/ENTRYPOINT.md` §11 for doc routing before implementing.
 
 ## Handoff to Codex
 
 Leave structured context in:
 - PR description (implementation state, decisions made)
-- `muninndb_team` (validated findings)
 - Ticket in `tickets/` if task is ongoing
