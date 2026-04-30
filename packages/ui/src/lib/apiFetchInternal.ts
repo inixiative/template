@@ -1,6 +1,7 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { type Client, createClient } from '@template/ui/apiClient/client';
 import { getToken } from '@template/ui/lib/auth/token';
+import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 /**
  * Extracts the success type from SDK union types
@@ -80,6 +81,13 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
       baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
       headers,
       throwOnError,
+      // hey-api's default querySerializer (and even style:'form' explode)
+      // throws on any nested object/array — pathSerializer.gen.ts:118.
+      // Override with our bracket serializer so nested filter shapes like
+      // searchFields = { targetModel: { in: ['admin'] } } encode as
+      // searchFields[targetModel][in]=admin. Output for flat params
+      // matches hey-api's default exactly.
+      querySerializer: (params) => serializeBracketQuery(params as Record<string, unknown>).toString(),
     });
 
     // Hono generates :id style paths in the OpenAPI spec, but hey-api's
