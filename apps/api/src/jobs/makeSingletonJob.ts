@@ -15,7 +15,9 @@ export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>)
     const acquired = await redis.set(lockKey, '1', 'EX', lockTTL, 'NX');
     if (!acquired) return;
 
-    const heartbeat = setInterval(() => redis.expire(lockKey, lockTTL).catch(() => {}), 120000);
+    // Heartbeat at 1/5 the TTL so a single missed refresh doesn't release the lock.
+    // At TTL=300s, refresh every 60s → tolerates up to 4 missed heartbeats before expiry.
+    const heartbeat = setInterval(() => redis.expire(lockKey, lockTTL).catch(() => {}), 60000);
 
     try {
       await handler(ctx, ...args);

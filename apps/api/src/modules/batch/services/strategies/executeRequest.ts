@@ -30,6 +30,12 @@ export const executeRequest = async (
   if (request.path.startsWith('http://') || request.path.startsWith('https://')) {
     throw new Error('Absolute URLs are not allowed in batch requests');
   }
+  // Block protocol-relative ("//evil.com/foo") and require sub-requests to
+  // target the API surface. `app.fetch` keeps everything internal, but
+  // accepting arbitrary paths lets callers probe routes outside the namespace.
+  if (request.path.startsWith('//') || !request.path.startsWith('/api/')) {
+    throw new Error('Batch sub-request path must start with /api/');
+  }
 
   const mergedHeaders = {
     ...sharedHeaders,
