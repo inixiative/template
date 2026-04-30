@@ -12,7 +12,7 @@ const AuthenticatedLayout = () => {
   }
 
   return (
-    <AppShell lockedContext={true}>
+    <AppShell lockedContext={true} showSpoofControls={false}>
       <ErrorBoundary>
         <Outlet />
       </ErrorBoundary>

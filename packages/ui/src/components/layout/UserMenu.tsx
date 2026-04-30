@@ -16,9 +16,14 @@ import { useState } from 'react';
 
 export type UserMenuProps = {
   className?: string;
+  // Spoofing impersonates a non-superadmin user. The superadmin app is for
+  // platform management as the superadmin themselves — spoofing in there
+  // would mean "view superadmin as a non-superadmin", which is a 403 by
+  // design. Hide the controls in the superadmin app; they belong in admin/web.
+  showSpoofControls?: boolean;
 };
 
-export const UserMenu = ({ className }: UserMenuProps) => {
+export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps) => {
   const [spoofEmail, setSpoofEmail] = useState('');
 
   // Read all state from Zustand store
@@ -70,7 +75,7 @@ export const UserMenu = ({ className }: UserMenuProps) => {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        {(isSuperadmin || isSpoofing) && (
+        {showSpoofControls && (isSuperadmin || isSpoofing) && (
           <>
             <DropdownMenuLabel>Spoof User</DropdownMenuLabel>
             <div className="px-2 py-2 space-y-2">

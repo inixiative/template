@@ -10,10 +10,11 @@ import { useState } from 'react';
 export type AppShellProps = {
   onSupport?: () => void;
   lockedContext?: boolean;
+  showSpoofControls?: boolean;
   children: React.ReactNode;
 };
 
-export const AppShell = ({ onSupport, lockedContext = false, children }: AppShellProps) => {
+export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls = true, children }: AppShellProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -43,7 +44,7 @@ export const AppShell = ({ onSupport, lockedContext = false, children }: AppShel
               </button>
             )}
             <div className="p-2">
-              <UserMenu />
+              <UserMenu showSpoofControls={showSpoofControls} />
             </div>
           </div>
         </div>
