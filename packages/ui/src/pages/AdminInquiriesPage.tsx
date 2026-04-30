@@ -51,7 +51,7 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
     queryFn: apiQuery((opts: Parameters<typeof adminInquiryReadMany>[0]) => adminInquiryReadMany(opts)),
   });
 
-  const inquiries = data?.data ?? [];
+  const inquiries = Array.isArray(data?.data) ? data.data : [];
 
   const statusDropdown = !filters?.statuses && (
     <select
