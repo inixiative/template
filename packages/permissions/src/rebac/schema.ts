@@ -68,9 +68,14 @@ export const rebacSchema: RebacSchema = {
     },
   },
 
+  // Token has 5 owner rels (user / org / orgUser / space / spaceUser) — each
+  // delegates to the same action on the owner side, so a user managing their
+  // own org transitively manages org-owned tokens.
   token: {
     actions: {
-      // Self-delete for tokens with userId (User, OrgUser, SpaceUser)
+      ...ownerActions(['user', 'organization', 'organizationUser', 'space', 'spaceUser']),
+      // Standalone path for "delete my own token" routes that shouldn't
+      // require full manage on the owner.
       leave: { self: 'userId' },
     },
   },
