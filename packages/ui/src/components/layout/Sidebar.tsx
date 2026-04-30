@@ -56,6 +56,11 @@ export const Sidebar = ({ className }: SidebarProps) => {
     });
   };
 
+  // Static map so Tailwind's JIT keeps these classes. Depth 0 has no extra
+  // padding; each nested level adds another step to make the parent/child
+  // hierarchy visible.
+  const DEPTH_PADDING: Record<number, string> = { 1: 'pl-9', 2: 'pl-14', 3: 'pl-20' };
+
   const renderItem = (item: NavItem, depth: number = 0, parentPath: string = '') => {
     // Don't render if no access or if it's an alias (hidden from sidebar)
     if (item.alias) return null;
@@ -75,7 +80,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
             onClick={() => fullPath && navigatePreservingContext(fullPath)}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-              depth > 0 && 'pl-9',
+              DEPTH_PADDING[depth],
               isActive
                 ? 'bg-accent text-accent-foreground font-medium'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
