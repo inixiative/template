@@ -148,6 +148,10 @@ dist
 # Project-specific Claude instructions
 CLAUDE.local.md
 
+# Claude Code agent worktrees (per-machine; other .claude/ files like
+# settings.json or shared agent prompts can still be tracked).
+.claude/worktrees/
+
 # Template internal config (for template development only)
 project.config.template-internal.ts
 
