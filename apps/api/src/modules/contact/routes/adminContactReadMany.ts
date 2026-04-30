@@ -8,6 +8,5 @@ export const adminContactReadManyRoute = readRoute({
   paginate: true,
   skipId: true,
   admin: true,
-  searchableFields: ['type', 'subtype', 'label', 'valueKey'],
   responseSchema: ContactScalarSchema,
 });
