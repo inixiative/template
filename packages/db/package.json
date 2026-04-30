@@ -28,7 +28,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "NODE_ENV=development bun run prisma/seed.ts",
+    "db:seed": "bun run prisma/seed.ts",
     "db:truncate:webhooks": "bun run prisma/truncateWebhookSubscriptions.ts",
     "typecheck": "tsc --noEmit"
   },
