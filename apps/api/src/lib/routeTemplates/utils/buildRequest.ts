@@ -82,6 +82,7 @@ export const buildRequest = <const T extends RouteArgs>(
     skipId = false,
     paginate = false,
     many = false,
+    admin = false,
     searchableFields,
   } = args;
 
@@ -98,10 +99,15 @@ export const buildRequest = <const T extends RouteArgs>(
   }
 
   if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
-  if (searchableFields?.length) {
+  // Admin routes have unlocked search at runtime (paginate.ts skips field
+  // validation when isSuperadmin), so always expose the searchFields schema
+  // for them — without it the SDK doesn't generate a bracket-style
+  // querySerializer and the client errors on nested filter objects.
+  // Non-admin routes still gate searchFields on an explicit allowlist.
+  if (admin || searchableFields?.length) {
     const searchSchema = z.object({
       search: simpleSearchSchema,
-      searchFields: createAdvancedSearchSchema(searchableFields),
+      searchFields: createAdvancedSearchSchema(searchableFields ?? []),
     });
     querySchema = querySchema.merge(searchSchema);
   }
