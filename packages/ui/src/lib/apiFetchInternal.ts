@@ -77,8 +77,9 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     if (token) headers.Authorization = `Bearer ${token}`;
     if (options?.spoofUserEmail) headers['x-spoof-user-email'] = options.spoofUserEmail;
 
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const scopedClient = createClient({
-      baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+      baseUrl,
       headers,
       throwOnError,
       // hey-api's default querySerializer (and even style:'form' explode)
@@ -110,8 +111,13 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
       | TVariables
       | undefined;
 
+    // hey-api's generated createQueryKey injects `baseUrl` (from the default
+    // un-configured client) into queryKey[0]; spreading that here would
+    // override the scopedClient's baseUrl and turn admin endpoints into
+    // relative URLs against the page origin. Force the scoped baseUrl.
     const mergedOptions = {
       ...((vars ?? {}) as Record<string, unknown>),
+      baseUrl,
       client: scopedClient,
       throwOnError,
     } as RequestOptionsFor<TVariables>;
