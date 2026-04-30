@@ -68,15 +68,41 @@ export const rebacSchema: RebacSchema = {
     },
   },
 
-  // Token has 5 owner rels (user / org / orgUser / space / spaceUser) — each
-  // delegates to the same action on the owner side, so a user managing their
-  // own org transitively manages org-owned tokens.
+  // Tokens carry a `role` field — assigning/revoking one inherits the
+  // org/space `assign` semantics: high roles need own on the owner, others
+  // need manage. Encoded against the token's row so the role rule resolves
+  // locally and only the seat check walks to the owner.
   token: {
     actions: {
-      ...ownerActions(['user', 'organization', 'organizationUser', 'space', 'spaceUser']),
-      // Standalone path for "delete my own token" routes that shouldn't
-      // require full manage on the owner.
+      // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
       leave: { self: 'userId' },
+      // Owner-side assign, role-aware.
+      assign: {
+        any: [
+          {
+            all: [
+              { rule: { field: 'role', operator: Operator.in, value: highRoles } },
+              {
+                any: [
+                  { rel: 'organization', action: 'own' },
+                  { rel: 'space', action: 'own' },
+                ],
+              },
+            ],
+          },
+          {
+            all: [
+              { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
+              {
+                any: [
+                  { rel: 'organization', action: 'manage' },
+                  { rel: 'space', action: 'manage' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     },
   },
 

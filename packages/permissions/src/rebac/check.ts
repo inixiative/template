@@ -82,8 +82,11 @@ export const check = (
   }
 
   if ('rule' in rule) return checkRule(rule.rule, record) === true;
-  if ('any' in rule) return rule.any.some((r) => check(permix, schema, model, record, r, visited));
-  if ('all' in rule) return rule.all.every((r) => check(permix, schema, model, record, r, visited));
+  // Fork the visited set per branch — parallel paths through `any`/`all`
+  // aren't cycles. Cycle detection still fires within a single branch's
+  // chain (rel-walks pass `visited` through directly).
+  if ('any' in rule) return rule.any.some((r) => check(permix, schema, model, record, r, new Set(visited)));
+  if ('all' in rule) return rule.all.every((r) => check(permix, schema, model, record, r, new Set(visited)));
 
   return false;
 };
