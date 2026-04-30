@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { contactUpdateRoute } from '#/modules/contact/routes/contactUpdate';
@@ -9,7 +10,7 @@ export const contactUpdateController = makeController(contactUpdateRoute, async 
 
   const updated = await db.contact.update({
     where: { id: contact.id },
-    data: body as never, // contactRules hook validates + normalizes per-type
+    data: body as Prisma.ContactUncheckedUpdateInput,
   });
 
   return respond.ok(updated);

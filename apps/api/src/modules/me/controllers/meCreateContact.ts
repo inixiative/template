@@ -1,3 +1,4 @@
+import type { Prisma } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateContactRoute } from '#/modules/me/routes/meCreateContact';
 
@@ -11,10 +12,9 @@ export const meCreateContactController = makeController(
     const contact = await db.contact.create({
       data: {
         ...body,
-        value: body.value, // contactRules hook validates + normalizes per-type
         ownerModel: 'User',
         userId: user.id,
-      } as never,
+      } as Prisma.ContactUncheckedCreateInput,
     });
 
     return respond.created(contact);

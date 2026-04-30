@@ -5,6 +5,10 @@ import type { ActionRule, ModelPermission } from '@template/permissions/rebac/ty
 // space). For each action, OR over the owner relations — only the populated
 // FK resolves; the others' rel returns false (no record found).
 //
+// Each action delegates to the SAME action on the owner — the read =>
+// operate => manage => own chain lives on the owner side (User/Org/Space)
+// and is reused as-is.
+//
 // Usage:
 //   contact: { actions: ownerActions() }
 //   emailTemplate: { actions: ownerActions(['organization', 'space']) }
@@ -18,7 +22,7 @@ export const ownerActions = (
   return {
     own: fanout('own'),
     manage: fanout('manage'),
-    operate: 'manage',
+    operate: fanout('operate'),
     read: fanout('read'),
   };
 };
