@@ -52,7 +52,10 @@ export const upsertDomain = async (apiKey: string, domainName: string): Promise<
     });
     return data as ResendDomain;
   } catch (error) {
-    if (error instanceof Error && (error.message.includes('already exists') || error.message.includes('registered already'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('already exists') || error.message.includes('registered already'))
+    ) {
       const data = await resendFetch(apiKey, '/domains');
       const domains = (data as { data: ResendDomain[] }).data ?? [];
       const existing = domains.find((d) => d.name === domainName);

@@ -1,9 +1,8 @@
+import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
-import { Icon } from '@iconify/react';
-
 
 export type UnauthorizedProps = {
   title?: string;

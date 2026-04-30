@@ -9,7 +9,7 @@ const config = createMockConfig();
 
 const cloneDefaultConfig = (): ProjectConfig => structuredClone(defaultConfig);
 const liveTeamId = process.env.VERCEL_TEAM_ID ?? 'team_123';
-const liveTeamSlug = process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
+const _liveTeamSlug = process.env.VERCEL_TEAM_NAME?.toLowerCase().replace(/\s+/g, '-') ?? 'template-team';
 
 config.install();
 

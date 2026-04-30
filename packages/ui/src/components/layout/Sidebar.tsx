@@ -1,11 +1,10 @@
+import { Icon } from '@iconify/react';
 import { useLocation } from '@tanstack/react-router';
 import type { NavItem } from '@template/ui/components/layout/navigationTypes';
 import { findRoute } from '@template/ui/lib/findRoute';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-
 import { useEffect, useMemo, useState } from 'react';
-import { Icon } from '@iconify/react';
 
 export type SidebarProps = {
   className?: string;

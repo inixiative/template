@@ -1,9 +1,8 @@
+import { Icon } from '@iconify/react';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
-
-import * as React from 'react';
-import { Icon } from '@iconify/react';
+import type * as React from 'react';
 
 export type Column<T> = {
   key: string;

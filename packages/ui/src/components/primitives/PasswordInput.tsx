@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react';
 import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
-
 import * as React from 'react';
-import { Icon } from '@iconify/react';
 
 export type PasswordInputProps = Omit<InputProps, 'type'>;
 

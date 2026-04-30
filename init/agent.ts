@@ -10,7 +10,7 @@ import { setupPlanetScale } from './tasks/planetscaleSetup';
 import { renameProject, updateProjectConfig } from './tasks/projectConfig';
 import { setupRailway } from './tasks/railwaySetup';
 import { updateConfigField } from './utils/configHelpers';
-import { getProjectConfig, writeProjectConfig } from './utils/getProjectConfig';
+import { getProjectConfig } from './utils/getProjectConfig';
 import { isComplete, markComplete } from './utils/progressTracking';
 
 export type InitConfig = {

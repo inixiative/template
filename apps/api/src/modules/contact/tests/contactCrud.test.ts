@@ -22,10 +22,7 @@ describe('Contact CRUD', () => {
     const harness = createTestApp({
       mockUser: user,
       mockOrganizationUsers: [orgUser],
-      mount: [
-        (app) => app.route('/api/v1/contact', contactRouter),
-        (app) => app.route('/api/v1/me', meRouter),
-      ],
+      mount: [(app) => app.route('/api/v1/contact', contactRouter), (app) => app.route('/api/v1/me', meRouter)],
     });
     fetch = harness.fetch;
     db = harness.db;

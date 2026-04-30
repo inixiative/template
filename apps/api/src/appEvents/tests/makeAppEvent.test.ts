@@ -41,9 +41,7 @@ describe('makeAppEvent', () => {
 
   describe('email', () => {
     it('calls email callback with event data', async () => {
-      const emailFn = mock(() => [
-        { to: [{ userIds: ['user-1'] }], template: 'test', data: {} },
-      ]);
+      const emailFn = mock(() => [{ to: [{ userIds: ['user-1'] }], template: 'test', data: {} }]);
 
       const handler = makeAppEvent({ email: emailFn });
       await handler(createEvent('test', { key: 'val' }));
@@ -64,9 +62,7 @@ describe('makeAppEvent', () => {
 
   describe('websocket', () => {
     it('calls websocket callback with event data', async () => {
-      const wsFn = mock(() => [
-        { target: { userIds: ['user-1'] }, message: { data: { test: true } } },
-      ]);
+      const wsFn = mock(() => [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }]);
 
       const handler = makeAppEvent({ websocket: wsFn });
       await handler(createEvent('test', { key: 'val' }));
@@ -98,7 +94,9 @@ describe('makeAppEvent', () => {
       const cbSuccess = mock(async () => {});
 
       const handler = makeAppEvent({
-        observe: () => { throw new Error('observe boom'); },
+        observe: () => {
+          throw new Error('observe boom');
+        },
         cb: [cbSuccess],
       });
 

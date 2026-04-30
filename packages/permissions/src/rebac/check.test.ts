@@ -805,10 +805,7 @@ describe('rebac check', () => {
         // Either self or some attribute predicate would grant
         permissionRules: {
           read: {
-            any: [
-              { self: 'userId' },
-              { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
-            ],
+            any: [{ self: 'userId' }, { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } }],
           },
         },
       };

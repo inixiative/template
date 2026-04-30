@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react';
 import { Modal } from '@template/ui/components/layout/Modal';
 import { useBreakpoint } from '@template/ui/hooks/useMediaQuery';
 import { cn } from '@template/ui/lib/utils';
-import { Icon } from '@iconify/react';
-
 
 export type ResponsiveDrawerProps = {
   open: boolean;

@@ -30,5 +30,4 @@ const lookupField = (modelName: string, path: string): FieldDef | undefined => {
  * Used by buildWhereClause to switch emission from { contains, mode } to
  * exact equality on enum columns (Prisma rejects contains+mode on enums).
  */
-export const isEnumPath = (modelName: string, path: string): boolean =>
-  lookupField(modelName, path)?.kind === 'enum';
+export const isEnumPath = (modelName: string, path: string): boolean => lookupField(modelName, path)?.kind === 'enum';

@@ -396,24 +396,24 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
                 {'   '}2. Pick the account/org that owns the repo:{' '}
                 <Text color="yellow">{config?.project.organization}</Text>
               </Text>
-              <Text>{'   '}   (NOT your personal account if the repo is in an org)</Text>
+              <Text>{'   '} (NOT your personal account if the repo is in an org)</Text>
               <Text>{'   '}3. Choose "Only select repositories" → pick:</Text>
               <Text>
-                {'   '}   <Text color="yellow">{config?.project.organization}/{config?.project.name}</Text>
+                {'   '}{' '}
+                <Text color="yellow">
+                  {config?.project.organization}/{config?.project.name}
+                </Text>
               </Text>
-              <Text>{'   '}   (Or "All repositories" if you'll add more under this org)</Text>
+              <Text>{'   '} (Or "All repositories" if you'll add more under this org)</Text>
               <Text>{'   '}4. Click "Install" at the bottom of the page</Text>
             </Box>
 
             <Box flexDirection="column" marginTop={1} marginLeft={2}>
+              <Text dimColor>Note: A only links your GitHub identity to Railway. B is what actually grants</Text>
+              <Text dimColor>Railway permission to read the repo and deploy. Both are required.</Text>
               <Text dimColor>
-                Note: A only links your GitHub identity to Railway. B is what actually grants
-              </Text>
-              <Text dimColor>
-                Railway permission to read the repo and deploy. Both are required.
-              </Text>
-              <Text dimColor>
-                Already installed? Verify at https://github.com/organizations/{config?.project.organization}/settings/installations
+                Already installed? Verify at https://github.com/organizations/{config?.project.organization}
+                /settings/installations
               </Text>
             </Box>
 

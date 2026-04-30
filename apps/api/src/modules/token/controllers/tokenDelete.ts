@@ -15,8 +15,7 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
   // rebac — see token's entry in packages/permissions/src/rebac/schema.ts.
   const hydrated = await hydrate(db, 'token', token);
   const canDelete =
-    check(permix, rebacSchema, 'token', hydrated, 'leave') ||
-    check(permix, rebacSchema, 'token', hydrated, 'assign');
+    check(permix, rebacSchema, 'token', hydrated, 'leave') || check(permix, rebacSchema, 'token', hydrated, 'assign');
   if (!canDelete) throw makeError({ status: 403, message: 'Access denied' });
 
   await db.token.delete({ where: { id: token.id } });

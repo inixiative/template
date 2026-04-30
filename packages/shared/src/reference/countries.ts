@@ -264,15 +264,10 @@ export type Country = (typeof COUNTRIES)[number];
 export type CountryCode = Country['code'];
 
 export const COUNTRY_CODES = COUNTRIES.map((c) => c.code) as readonly CountryCode[];
-export const countryByCode: ReadonlyMap<CountryCode, Country> = new Map(
-  COUNTRIES.map((c) => [c.code, c]),
-);
+export const countryByCode: ReadonlyMap<CountryCode, Country> = new Map(COUNTRIES.map((c) => [c.code, c]));
 
-export const CountryCodeSchema = z.enum(
-  COUNTRY_CODES as readonly [CountryCode, ...CountryCode[]],
-);
+export const CountryCodeSchema = z.enum(COUNTRY_CODES as readonly [CountryCode, ...CountryCode[]]);
 
 export const callingCodeFor = (code: CountryCode): string => countryByCode.get(code)!.callingCode;
 export const countryNameFor = (code: CountryCode): string => countryByCode.get(code)!.name;
-export const isCountryCode = (value: string): value is CountryCode =>
-  countryByCode.has(value as CountryCode);
+export const isCountryCode = (value: string): value is CountryCode => countryByCode.has(value as CountryCode);

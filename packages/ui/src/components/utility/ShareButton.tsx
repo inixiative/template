@@ -1,7 +1,6 @@
-import { Button } from '@template/ui/components/primitives/Button';
-
-import { useState } from 'react';
 import { Icon } from '@iconify/react';
+import { Button } from '@template/ui/components/primitives/Button';
+import { useState } from 'react';
 
 export type ShareButtonProps = {
   className?: string;

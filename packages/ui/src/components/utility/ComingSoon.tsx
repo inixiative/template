@@ -1,7 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-
-import type { ReactNode } from 'react';
 import { Icon } from '@iconify/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import type { ReactNode } from 'react';
 
 type ComingSoonProps = {
   title: string;

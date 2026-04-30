@@ -30,7 +30,7 @@ export type SaveTemplateResult = {
  * Save a template - validates MJML, parses components, saves all.
  */
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
-  validateMjml(input.mjml);
+  await validateMjml(input.mjml);
 
   const ctx: SaveContext = {
     ownerModel: input.ownerModel,

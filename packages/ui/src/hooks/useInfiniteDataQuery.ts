@@ -85,8 +85,7 @@ export function useInfiniteDataQuery<TItem>(
   }, [query.data]);
 
   const locateItem = React.useCallback(
-    (flatIndex: number): InfiniteDataPageLocation | null =>
-      locateItemInPages(query.data?.pages ?? [], flatIndex),
+    (flatIndex: number): InfiniteDataPageLocation | null => locateItemInPages(query.data?.pages ?? [], flatIndex),
     [query.data],
   );
 

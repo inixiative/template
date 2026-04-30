@@ -31,9 +31,7 @@ type StepProgressProps = {
  */
 export const StepProgress: React.FC<StepProgressProps> = ({ items, running, activeAction, marginLeft = 0 }) => {
   // Skipped items don't affect progression — find the next non-skipped, non-completed step.
-  const currentStepIndex = running
-    ? items.findIndex((item) => !item.completed && !item.skipped)
-    : -1;
+  const currentStepIndex = running ? items.findIndex((item) => !item.completed && !item.skipped) : -1;
 
   return (
     <Box flexDirection="column">

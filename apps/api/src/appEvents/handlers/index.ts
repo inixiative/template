@@ -1,11 +1,11 @@
-import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
-import { inquiryResolved, type InquiryResolvedPayload } from '#/appEvents/handlers/inquiry/inquiryResolved';
-import { inquirySent, type InquirySentPayload } from '#/appEvents/handlers/inquiry/inquirySent';
-import { userCreated, type UserCreatedPayload } from '#/appEvents/handlers/user/userCreated';
+import { type InquiryResolvedPayload, inquiryResolved } from '#/appEvents/handlers/inquiry/inquiryResolved';
+import { type InquirySentPayload, inquirySent } from '#/appEvents/handlers/inquiry/inquirySent';
+import { type UserCreatedPayload, userCreated } from '#/appEvents/handlers/user/userCreated';
 import {
-  userVerificationRequested,
   type UserVerificationRequestedPayload,
+  userVerificationRequested,
 } from '#/appEvents/handlers/user/userVerificationRequested';
+import type { AppEventHandlerFn } from '#/appEvents/makeAppEvent';
 
 export type AppEventPayloads = {
   'inquiry.sent': InquirySentPayload;

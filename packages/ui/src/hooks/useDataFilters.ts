@@ -1,5 +1,5 @@
+import { buildFilterQuery, type FilterState } from '@template/ui/lib/buildFilterQuery';
 import type { DataConfig } from '@template/ui/lib/makeDataConfig';
-import { type FilterState, buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 import { useMemo, useState } from 'react';
 
 export type DataFiltersInitialState = {

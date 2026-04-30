@@ -2,10 +2,7 @@ import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClien
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
-import {
-  receivedInquiryContextQueries,
-  sentInquiryContextQueries,
-} from '@template/ui/lib/inquiries/contextQueries';
+import { receivedInquiryContextQueries, sentInquiryContextQueries } from '@template/ui/lib/inquiries/contextQueries';
 import {
   INQUIRY_STATUS_COLORS,
   INQUIRY_TYPE_LABELS,

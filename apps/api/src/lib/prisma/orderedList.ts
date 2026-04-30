@@ -1,4 +1,4 @@
-import { type AnyDelegate, type Args } from '@template/db';
+import type { AnyDelegate, Args } from '@template/db';
 
 // Carde-style dense ordering helpers for a model with an integer `sortOrder`-
 // like column scoped to some grouping (e.g. (ownerModel, userId, type) for

@@ -97,9 +97,7 @@ export function writeToHistoryState(key: string, state: PersistedState): void {
 export function writeToHistoryStateAndUrl(key: string | undefined, state: PersistedState): void {
   try {
     const url = syncStateToUrl(state);
-    const historyState = key
-      ? { ...window.history.state, [key]: state }
-      : window.history.state;
+    const historyState = key ? { ...window.history.state, [key]: state } : window.history.state;
     window.history.replaceState(historyState, '', url);
   } catch {
     // sandboxed iframe or SecurityError
@@ -107,9 +105,7 @@ export function writeToHistoryStateAndUrl(key: string | undefined, state: Persis
 }
 
 /** Parse "field:direction" strings back to orderBy objects. */
-export function parseOrderByStrings(
-  strings: string[],
-): Array<{ field: string; direction: 'asc' | 'desc' }> {
+export function parseOrderByStrings(strings: string[]): Array<{ field: string; direction: 'asc' | 'desc' }> {
   return strings.map((s) => {
     const [field, direction] = s.split(':');
     return { field, direction: direction as 'asc' | 'desc' };

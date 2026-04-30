@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
@@ -6,9 +7,7 @@ import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 const providerIcons: Record<string, string> = {
   google: 'simple-icons:google',

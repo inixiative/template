@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import type {
   MeCreateWebhookSubscriptionData,
   MeReadManyWebhookSubscriptionsResponse,
@@ -10,9 +11,7 @@ import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@te
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type WebhookSubscription =
   | MeReadManyWebhookSubscriptionsResponse['data'][number]

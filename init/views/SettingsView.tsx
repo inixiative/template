@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   BACKEND_PROVIDERS,
   DATABASE_PROVIDERS,
@@ -99,10 +99,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
       return { title: 'Database', options: DATABASE_PROVIDERS, kind: 'database' as const };
     if (screen.kind === 'backend')
       return { title: 'Backend host', options: BACKEND_PROVIDERS, kind: 'backend' as const };
-    if (screen.kind === 'redis')
-      return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
-    if (screen.kind === 'email')
-      return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
+    if (screen.kind === 'redis') return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
+    if (screen.kind === 'email') return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
     return null;
   }, [screen]);
 
@@ -122,10 +120,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
   };
 
   const onPickProvider =
-    <T extends string>(
-      kind: keyof ProjectConfig['providers'],
-      options: ProviderOption<T>[],
-    ) =>
+    <T extends string>(kind: keyof ProjectConfig['providers'], options: ProviderOption<T>[]) =>
     async (item: { value: T }) => {
       const opt = options.find((o) => o.value === item.value);
       if (opt && !opt.implemented) {
@@ -241,10 +236,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
 
   // Frontend app toggles — web/admin/superadmin can each be turned off
   // independently. Disabled apps are skipped by Vercel/CF Pages setup.
-  const appKey = screen.kind === 'app-web' ? 'web'
-    : screen.kind === 'app-admin' ? 'admin'
-    : screen.kind === 'app-superadmin' ? 'superadmin'
-    : null;
+  const appKey =
+    screen.kind === 'app-web'
+      ? 'web'
+      : screen.kind === 'app-admin'
+        ? 'admin'
+        : screen.kind === 'app-superadmin'
+          ? 'superadmin'
+          : null;
   if (appKey) {
     return (
       <Box flexDirection="column" padding={1}>
@@ -253,14 +252,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
         </Box>
         <Box marginBottom={1}>
           <Text dimColor>
-            On = the {appKey} app is provisioned by the frontend provider (Vercel project,
-            CF Pages project, etc.) and gets prod + staging env vars in Infisical.
+            On = the {appKey} app is provisioned by the frontend provider (Vercel project, CF Pages project, etc.) and
+            gets prod + staging env vars in Infisical.
           </Text>
         </Box>
         <Box marginBottom={1}>
           <Text dimColor>
-            Off = no provisioning, no env vars. The app source stays in the repo so you
-            can flip it back on later. Useful when you don't need that app in this project.
+            Off = no provisioning, no env vars. The app source stays in the repo so you can flip it back on later.
+            Useful when you don't need that app in this project.
           </Text>
         </Box>
         <SelectInput
@@ -288,7 +287,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
       </Box>
       <SelectInput
         items={providerScreen.options.map((o) => ({ label: formatLabel(o), value: o.value }))}
-        onSelect={onPickProvider(providerScreen.kind, providerScreen.options as ProviderOption<FrontendProvider | DatabaseProvider | BackendProvider | RedisProvider | EmailProvider>[])}
+        onSelect={onPickProvider(
+          providerScreen.kind,
+          providerScreen.options as ProviderOption<
+            FrontendProvider | DatabaseProvider | BackendProvider | RedisProvider | EmailProvider
+          >[],
+        )}
       />
       <Box marginTop={1}>
         <Text dimColor>Esc to go back without changing.</Text>
@@ -296,5 +300,3 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
     </Box>
   );
 };
-
-export default SettingsView;

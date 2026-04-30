@@ -3,7 +3,6 @@ import {
   filterIgnoredFields,
   type WebhookModel,
   webhookEnabledModels,
-  webhookModelSubscribers,
   webhookRelatedModels,
 } from '@template/db';
 import { isEqual } from 'lodash-es';

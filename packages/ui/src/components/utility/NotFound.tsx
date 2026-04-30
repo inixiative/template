@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-
 import type { ReactNode } from 'react';
-import { Icon } from '@iconify/react';
 
 type NotFoundProps = {
   title?: string;

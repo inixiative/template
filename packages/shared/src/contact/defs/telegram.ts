@@ -5,10 +5,7 @@ import { z } from 'zod';
 const telegramStored = z.object({ handle: z.string().min(1) });
 
 type TelegramInput = TelegramValue | { url: string };
-const telegramInput: z.ZodType<TelegramInput> = z.union([
-  z.object({ url: z.string().url() }),
-  telegramStored,
-]);
+const telegramInput: z.ZodType<TelegramInput> = z.union([z.object({ url: z.string().url() }), telegramStored]);
 
 export const telegramDef: ContactTypeDef<TelegramInput, TelegramValue> = {
   inputSchema: telegramInput,

@@ -78,7 +78,7 @@ class VercelApi {
       );
 
       return teams;
-    } catch (error) {
+    } catch (_error) {
       return [];
     }
   }
@@ -159,7 +159,7 @@ class VercelApi {
       const endpoint = `/v1/integrations/git-namespaces?provider=github`;
       const result = await this._vercelAPI(endpoint, 'GET');
       return result;
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -202,16 +202,15 @@ class VercelApi {
     projectId: string,
     org: string,
     repo: string,
-    branch: string = 'main',
+    _branch: string = 'main',
     teamId?: string,
   ): Promise<void> {
     try {
       const teamFlag = teamId ? `--scope ${teamId}` : '';
 
-      const { stdout: linkOut, stderr: linkErr } = await execAsync(
-        `vercel link --project ${projectId} ${teamFlag} --yes`,
-        { encoding: 'utf-8' },
-      );
+      await execAsync(`vercel link --project ${projectId} ${teamFlag} --yes`, {
+        encoding: 'utf-8',
+      });
 
       const gitUrl = `https://github.com/${org}/${repo}`;
 
@@ -293,9 +292,7 @@ class VercelApi {
     },
   ): Promise<void> {
     if (process.env.NODE_ENV !== 'test') return this._updateProjectSettings(projectId, teamId, settings);
-    return this.vcr.capture('updateProjectSettings', () =>
-      this._updateProjectSettings(projectId, teamId, settings),
-    );
+    return this.vcr.capture('updateProjectSettings', () => this._updateProjectSettings(projectId, teamId, settings));
   }
   private async _updateProjectSettings(
     projectId: string,

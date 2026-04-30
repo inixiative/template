@@ -44,7 +44,9 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       return [
         {
           target: { userIds: targets },
-          message: { data: { event: 'inquiry.resolved', inquiryId: inquiry.id, type: inquiry.type, status: inquiry.status } },
+          message: {
+            data: { event: 'inquiry.resolved', inquiryId: inquiry.id, type: inquiry.type, status: inquiry.status },
+          },
         },
       ];
     },

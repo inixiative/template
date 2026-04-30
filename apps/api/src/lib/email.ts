@@ -1,10 +1,6 @@
-import { makeBroadcastRegistry } from '@template/shared/adapter';
 import { createConsoleClient, createResendClient, type EmailClient } from '@template/email/client';
-import {
-  createBouncerVerifier,
-  createNoopVerifier,
-  type EmailVerifier,
-} from '@template/email/client/verification';
+import { createBouncerVerifier, createNoopVerifier, type EmailVerifier } from '@template/email/client/verification';
+import { makeBroadcastRegistry } from '@template/shared/adapter';
 
 export const emailRegistry = makeBroadcastRegistry<EmailClient>();
 

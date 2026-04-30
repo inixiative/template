@@ -1,12 +1,11 @@
+import { Icon } from '@iconify/react';
 import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
 import { cn } from '@template/ui/lib/utils';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 export type AppShellProps = {
   onSupport?: () => void;

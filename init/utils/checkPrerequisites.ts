@@ -181,4 +181,3 @@ export const checkDockerRunningAsync = async (): Promise<InfisicalSession> => {
     };
   }
 };
-

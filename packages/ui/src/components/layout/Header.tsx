@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react';
 import { ShareButton } from '@template/ui/components/utility/ShareButton';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { Icon } from '@iconify/react';
-
 
 export type HeaderProps = {
   onMenuClick?: () => void;

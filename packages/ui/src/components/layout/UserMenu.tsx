@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/primitives/Avatar';
 import { Button } from '@template/ui/components/primitives/Button';
 import {
@@ -11,9 +12,7 @@ import {
 import { Input } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 export type UserMenuProps = {
   className?: string;

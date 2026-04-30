@@ -1,7 +1,6 @@
+import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components/primitives/Button';
 import { cn } from '@template/ui/lib/utils';
-import { Icon } from '@iconify/react';
-
 
 export type PaginationProps = {
   currentPage: number;
@@ -25,11 +24,7 @@ const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
  * Shows first, last, current ± siblings, with ellipses for gaps.
  * e.g. [1, '...', 4, 5, 6, '...', 20]
  */
-export function buildPageRange(
-  currentPage: number,
-  totalPages: number,
-  siblings = 1,
-): (number | '...')[] {
+export function buildPageRange(currentPage: number, totalPages: number, siblings = 1): (number | '...')[] {
   if (totalPages <= 1) return [];
 
   const pages: (number | '...')[] = [];
@@ -83,13 +78,14 @@ export const Pagination = ({
   const effectiveOptions = pageSizeOptions ?? DEFAULT_PAGE_SIZE_OPTIONS;
 
   // "Showing X-Y of Z results"
-  const recordRange = totalRecords != null && pageSize != null
-    ? {
-        from: (currentPage - 1) * pageSize + 1,
-        to: Math.min(currentPage * pageSize, totalRecords),
-        total: totalRecords,
-      }
-    : null;
+  const recordRange =
+    totalRecords != null && pageSize != null
+      ? {
+          from: (currentPage - 1) * pageSize + 1,
+          to: Math.min(currentPage * pageSize, totalRecords),
+          total: totalRecords,
+        }
+      : null;
 
   const pages = buildPageRange(currentPage, totalPages);
 
@@ -154,6 +150,7 @@ export const Pagination = ({
           {/* Page numbers */}
           {pages.map((page, i) =>
             page === '...' ? (
+              // biome-ignore lint/suspicious/noArrayIndexKey: ellipses have no identity beyond their slot in the rendered list.
               <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground">
                 …
               </span>

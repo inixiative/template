@@ -1,5 +1,5 @@
 import { resolveMx, resolveTxt } from 'dns/promises';
-import { type ResendDomain, type ResendDnsRecord, getDomain, upsertDomain, verifyDomain } from '../api/resend';
+import { getDomain, type ResendDnsRecord, type ResendDomain, upsertDomain, verifyDomain } from '../api/resend';
 import { updateConfigField } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { markComplete } from '../utils/progressTracking';

@@ -1,7 +1,6 @@
+import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';
-import { Icon } from '@iconify/react';
-
 
 export const FullscreenLayout = ({ children }: { children: React.ReactNode }) => {
   const { navigatePreservingContext } = useAppStore((state) => state.navigation);

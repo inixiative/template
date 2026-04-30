@@ -1,11 +1,8 @@
 import { ContactScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { CONTACT_UPDATE_IMMUTABLE_FIELDS, contactUpdateBodySchema } from '#/modules/contact/schemas/contactSchemas';
 import { Modules } from '#/modules/modules';
-import {
-  CONTACT_UPDATE_IMMUTABLE_FIELDS,
-  contactUpdateBodySchema,
-} from '#/modules/contact/schemas/contactSchemas';
 
 export const contactUpdateRoute = updateRoute({
   model: Modules.contact,

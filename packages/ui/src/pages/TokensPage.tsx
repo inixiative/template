@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import type {
   MeCreateTokenData,
   MeReadManyTokensResponse,
@@ -11,9 +12,7 @@ import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@te
 import { tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type Token =
   | MeReadManyTokensResponse['data'][number]

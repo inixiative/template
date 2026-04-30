@@ -1,7 +1,6 @@
-import { cn } from '@template/ui/lib/utils';
-
-import * as React from 'react';
 import { Icon } from '@iconify/react';
+import { cn } from '@template/ui/lib/utils';
+import * as React from 'react';
 
 const Breadcrumb = React.forwardRef<
   HTMLElement,
@@ -73,10 +72,10 @@ BreadcrumbEllipsis.displayName = 'BreadcrumbEllipsis';
 
 export {
   Breadcrumb,
-  BreadcrumbList,
+  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbLink,
+  BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-  BreadcrumbEllipsis,
 };

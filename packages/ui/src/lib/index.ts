@@ -1,14 +1,13 @@
 export * from './apiQuery';
 export * from './auth';
 export * from './buildBreadcrumbs';
+export * from './buildFilterQuery';
 export * from './checkContextPermission';
+export * from './dataStatePersistence';
 export * from './enumOptions';
 export * from './findRoute';
 export { getContextParams } from './getContextParams';
 export * from './inquiries';
-
-export * from './buildFilterQuery';
-export * from './dataStatePersistence';
 export * from './makeContextQueries';
 export * from './makeDataConfig';
 export * from './resolveSectionTarget';

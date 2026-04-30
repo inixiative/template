@@ -181,21 +181,17 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
     };
   }, [enabled, threshold]);
 
-  const scrollToSection = React.useCallback(
-    (sectionId: string) => {
-      const target = resolveSectionTarget(sectionId);
-      if (!target) return;
+  const scrollToSection = React.useCallback((sectionId: string) => {
+    const target = resolveSectionTarget(sectionId);
+    if (!target) return;
 
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      // Active section is the top-level part (before the first dot).
-      const topLevelSection = sectionId.split('.')[0];
-      setActiveSection(topLevelSection);
-      window.history.replaceState(window.history.state, '', `#${sectionId}`);
-    },
-    [],
-  );
+    // Active section is the top-level part (before the first dot).
+    const topLevelSection = sectionId.split('.')[0];
+    setActiveSection(topLevelSection);
+    window.history.replaceState(window.history.state, '', `#${sectionId}`);
+  }, []);
 
   return { activeSection, scrollToSection };
 }
-

@@ -1,11 +1,10 @@
+import { Icon } from '@iconify/react';
 import type { MeCreateTokenData } from '@template/ui/apiClient';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type Token = {
   id: string;

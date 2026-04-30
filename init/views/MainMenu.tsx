@@ -2,12 +2,12 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
 import { getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
 import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
 import { getRailwayProgressSummaries } from '../tasks/railwaySteps';
-import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
 import { getResendProgressSummaries } from '../tasks/resendSteps';
 import { getVercelProgressSummaries } from '../tasks/vercelSteps';
 import { useConfig } from '../utils/configState';
@@ -76,13 +76,11 @@ const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; 
   return getStatusFromSummaries(config.railway.progress, getRailwayProgressSummaries(config), config.railway.error);
 };
 
-const getRailwayPostgresStatus = (
-  config: ProjectConfig,
-): { status: MenuItem['status']; details: string[] } => {
+const getRailwayPostgresStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
   // Skipped groups don't count toward "is the section complete?" — derive a
   // synthetic progress map containing only the actions in non-skipped groups.
   const summaries = getRailwayPostgresProgressSummaries(config);
-  const liveActions = new Set<string>();
+  const _liveActions = new Set<string>();
   for (const summary of summaries) {
     if (summary.skipped) continue;
     // Walk the original groups to recover which actions belong to each
@@ -194,11 +192,26 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
           ],
         },
         { label: 'Project Configuration', value: 'project-config', status: projectConfigStatus },
-        { label: 'Infisical Setup', value: 'infisical', status: infisicalStatus.status, progressDetails: infisicalStatus.details },
+        {
+          label: 'Infisical Setup',
+          value: 'infisical',
+          status: infisicalStatus.status,
+          progressDetails: infisicalStatus.details,
+        },
         usePlanetScale
-          ? { label: 'PlanetScale Setup', value: 'planetscale', status: planetscaleStatus.status, progressDetails: planetscaleStatus.details }
+          ? {
+              label: 'PlanetScale Setup',
+              value: 'planetscale',
+              status: planetscaleStatus.status,
+              progressDetails: planetscaleStatus.details,
+            }
           : null,
-        { label: 'Railway Setup', value: 'railway', status: railwayStatus.status, progressDetails: railwayStatus.details },
+        {
+          label: 'Railway Setup',
+          value: 'railway',
+          status: railwayStatus.status,
+          progressDetails: railwayStatus.details,
+        },
         useRailwayPostgres
           ? {
               label: 'Railway Postgres Setup',
@@ -208,7 +221,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
             }
           : null,
         useVercel
-          ? { label: 'Vercel Setup', value: 'vercel', status: vercelStatus.status, progressDetails: vercelStatus.details }
+          ? {
+              label: 'Vercel Setup',
+              value: 'vercel',
+              status: vercelStatus.status,
+              progressDetails: vercelStatus.details,
+            }
           : null,
         useCloudflarePages
           ? {
@@ -219,10 +237,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
             }
           : null,
         useResend
-          ? { label: 'Resend Setup', value: 'resend', status: resendStatus.status, progressDetails: resendStatus.details }
+          ? {
+              label: 'Resend Setup',
+              value: 'resend',
+              status: resendStatus.status,
+              progressDetails: resendStatus.details,
+            }
           : null,
         useResend
-          ? { label: 'Bouncer Setup', value: 'bouncer', status: bouncerStatus.status, progressDetails: bouncerStatus.details }
+          ? {
+              label: 'Bouncer Setup',
+              value: 'bouncer',
+              status: bouncerStatus.status,
+              progressDetails: bouncerStatus.details,
+            }
           : null,
         // Tail items: not yet implemented or deliberately deferred. Tagged
         // (coming soon) so users know these are placeholders, not bugs.

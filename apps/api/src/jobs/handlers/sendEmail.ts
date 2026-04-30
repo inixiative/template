@@ -1,9 +1,9 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
-import mjml2html from 'mjml';
 import type { EmailTarget } from '@template/email/targeting';
-import { resolveTargets, resolveTargetsToAddresses } from '#/lib/resolveTargets';
-import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
+import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
+import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
+import { resolveTargets, resolveTargetsToAddresses } from '#/lib/resolveTargets';
 
 export type SendEmailPayload = {
   to: EmailTarget[];
@@ -19,10 +19,7 @@ const senderVars = (): Record<string, unknown> => ({
   address: process.env.PLATFORM_ADDRESS ?? '',
 });
 
-const verifyAddresses = async (
-  addresses: string[],
-  log: (msg: string) => void,
-): Promise<string[]> => {
+const verifyAddresses = async (addresses: string[], log: (msg: string) => void): Promise<string[]> => {
   const verified: string[] = [];
 
   for (const address of addresses) {
@@ -61,7 +58,10 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!recipients.length) return;
 
-  const verified = await verifyAddresses(recipients.map((r) => r.to), log);
+  const verified = await verifyAddresses(
+    recipients.map((r) => r.to),
+    log,
+  );
   const validRecipients = recipients.filter((r) => verified.includes(r.to));
 
   if (!validRecipients.length) return;

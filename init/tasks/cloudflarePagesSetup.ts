@@ -1,8 +1,8 @@
 import { cloudflareApi } from '../api/cloudflare';
 import { updateConfigField } from '../utils/configHelpers';
+import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { clearError, isComplete, markComplete, setError } from '../utils/progressTracking';
-import { execAsync } from '../utils/exec';
 import { getSecretAsync, setSecretAsync } from './infisicalSetup';
 
 type AppKey = 'web' | 'admin' | 'superadmin';
@@ -63,10 +63,38 @@ export const setupCloudflarePages = async (
 
     const accountId = (await getProjectConfig()).cloudflarePages.accountId;
 
-    const apps: { key: AppKey; createAction: 'createWebProject' | 'createAdminProject' | 'createSuperadminProject'; linkAction: 'linkWebGitHub' | 'linkAdminGitHub' | 'linkSuperadminGitHub'; envProdAction: 'syncWebEnvProd' | 'syncAdminEnvProd' | 'syncSuperadminEnvProd'; envStagingAction: 'syncWebEnvStaging' | 'syncAdminEnvStaging' | 'syncSuperadminEnvStaging'; projectField: 'webProjectName' | 'adminProjectName' | 'superadminProjectName' }[] = [
-      { key: 'web', createAction: 'createWebProject', linkAction: 'linkWebGitHub', envProdAction: 'syncWebEnvProd', envStagingAction: 'syncWebEnvStaging', projectField: 'webProjectName' },
-      { key: 'admin', createAction: 'createAdminProject', linkAction: 'linkAdminGitHub', envProdAction: 'syncAdminEnvProd', envStagingAction: 'syncAdminEnvStaging', projectField: 'adminProjectName' },
-      { key: 'superadmin', createAction: 'createSuperadminProject', linkAction: 'linkSuperadminGitHub', envProdAction: 'syncSuperadminEnvProd', envStagingAction: 'syncSuperadminEnvStaging', projectField: 'superadminProjectName' },
+    const apps: {
+      key: AppKey;
+      createAction: 'createWebProject' | 'createAdminProject' | 'createSuperadminProject';
+      linkAction: 'linkWebGitHub' | 'linkAdminGitHub' | 'linkSuperadminGitHub';
+      envProdAction: 'syncWebEnvProd' | 'syncAdminEnvProd' | 'syncSuperadminEnvProd';
+      envStagingAction: 'syncWebEnvStaging' | 'syncAdminEnvStaging' | 'syncSuperadminEnvStaging';
+      projectField: 'webProjectName' | 'adminProjectName' | 'superadminProjectName';
+    }[] = [
+      {
+        key: 'web',
+        createAction: 'createWebProject',
+        linkAction: 'linkWebGitHub',
+        envProdAction: 'syncWebEnvProd',
+        envStagingAction: 'syncWebEnvStaging',
+        projectField: 'webProjectName',
+      },
+      {
+        key: 'admin',
+        createAction: 'createAdminProject',
+        linkAction: 'linkAdminGitHub',
+        envProdAction: 'syncAdminEnvProd',
+        envStagingAction: 'syncAdminEnvStaging',
+        projectField: 'adminProjectName',
+      },
+      {
+        key: 'superadmin',
+        createAction: 'createSuperadminProject',
+        linkAction: 'linkSuperadminGitHub',
+        envProdAction: 'syncSuperadminEnvProd',
+        envStagingAction: 'syncSuperadminEnvStaging',
+        projectField: 'superadminProjectName',
+      },
     ];
 
     for (const app of apps) {

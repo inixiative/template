@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { ConfigProvider } from './utils/configState';
+import { BouncerSetupView } from './views/BouncerSetupView';
 import { CloudflarePagesSetupView } from './views/CloudflarePagesSetupView';
 import { InfisicalSetupView } from './views/InfisicalSetupView';
 import { LaunchView } from './views/LaunchView';
@@ -11,7 +12,6 @@ import { Prerequisites } from './views/Prerequisites';
 import { ProjectConfigView } from './views/ProjectConfigView';
 import { RailwayPostgresSetupView } from './views/RailwayPostgresSetupView';
 import { RailwaySetupView } from './views/RailwaySetupView';
-import { BouncerSetupView } from './views/BouncerSetupView';
 import { ResendSetupView } from './views/ResendSetupView';
 import { SettingsView } from './views/SettingsView';
 import { VercelSetupView } from './views/VercelSetupView';
@@ -59,9 +59,7 @@ export const App: React.FC = () => {
 
         {state === 'task' && (
           <>
-            {currentTask === 'settings' && (
-              <SettingsView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
-            )}
+            {currentTask === 'settings' && <SettingsView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
             {currentTask === 'project-config' && (
               <ProjectConfigView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}

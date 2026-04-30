@@ -1,15 +1,13 @@
-import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import type { PaginationProps } from '@template/ui/components/primitives/Pagination';
+import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
+import { useScrollState } from '@template/ui/hooks/useScrollState';
 import {
-  type PersistedState,
   parseOrderByStrings,
   readInitialState,
-  syncStateToUrl,
   writeToHistoryState,
   writeToHistoryStateAndUrl,
 } from '@template/ui/lib/dataStatePersistence';
-import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
-import { useScrollState } from '@template/ui/hooks/useScrollState';
+import type { DataConfig } from '@template/ui/lib/makeDataConfig';
 import type * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -63,13 +61,7 @@ const DEBOUNCE_MS = 300;
  * ```
  */
 export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedData => {
-  const {
-    config,
-    sectionId,
-    shareableUrl = false,
-    scrollRestore,
-    defaultPageSize: defaultPageSizeOption,
-  } = options;
+  const { config, sectionId, shareableUrl = false, scrollRestore, defaultPageSize: defaultPageSizeOption } = options;
 
   const defaultPageSize = defaultPageSizeOption ?? DEFAULT_PAGE_SIZE;
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
@@ -126,7 +118,7 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timerRef.current);
-  }, [currentState, shareableUrl]);
+  }, [shareableUrl]);
 
   const setPage = (p: number) => setPageRaw(p);
 

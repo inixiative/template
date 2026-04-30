@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import { useMutation } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
@@ -16,9 +17,7 @@ import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
 

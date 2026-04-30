@@ -2,8 +2,8 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { StepProgress } from '../components/StepProgress';
 import { getDomain } from '../api/resend';
+import { StepProgress } from '../components/StepProgress';
 import {
   confirmResendDnsSetup,
   type DnsVerificationResult,
@@ -455,10 +455,11 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
               ) : (
                 <Text color="yellow">⚠ DNS verification incomplete:</Text>
               )}
-              {verificationResult.failedRecords.map((record, i) => (
-                <Text key={`fail-${i}-${record.type}-${record.name}`} color="red">
+              {verificationResult.failedRecords.map((record) => (
+                <Text key={`fail-${record.type}-${record.name}`} color="red">
                   {'  '}
-                  {record.type} {record.name} — {record.status === 'not_propagated' ? 'not found in DNS' : record.status}
+                  {record.type} {record.name} —{' '}
+                  {record.status === 'not_propagated' ? 'not found in DNS' : record.status}
                 </Text>
               ))}
               {verificationResult.failedRecords.length === 0 && (
@@ -469,7 +470,9 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
             </Box>
           )}
           <Text dimColor>
-            {verificationResult ? 'Press Enter to retry verification.' : 'Once DNS is configured, press Enter to verify.'}
+            {verificationResult
+              ? 'Press Enter to retry verification.'
+              : 'Once DNS is configured, press Enter to verify.'}
           </Text>
           <Box marginTop={1}>
             <Text dimColor>{prompt(['enter', 'restart', 'cancel'])}</Text>

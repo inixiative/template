@@ -1,6 +1,5 @@
-import { cn } from '@template/ui/lib/utils';
 import { Icon } from '@iconify/react';
-
+import { cn } from '@template/ui/lib/utils';
 
 export type ModalSize = 'small' | 'large';
 

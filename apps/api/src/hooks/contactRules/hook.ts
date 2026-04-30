@@ -1,4 +1,13 @@
-import { DbAction, db, type HookOptions, HookTiming, PolymorphismRegistry, Prisma, registerDbHook, type SingleAction } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  PolymorphismRegistry,
+  type Prisma,
+  registerDbHook,
+  type SingleAction,
+} from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
 import { makeError } from '#/lib/errors';
 import { nextSortOrder } from '#/lib/prisma/orderedList';
@@ -6,18 +15,14 @@ import { nextSortOrder } from '#/lib/prisma/orderedList';
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
 // Derived from the polymorphism registry — single source of truth.
-const ownerKeyFields = [
-  ...new Set(
-    Object.values(PolymorphismRegistry.Contact?.axes[0]?.fkMap ?? {}).flat(),
-  ),
-];
+const ownerKeyFields = [...new Set(Object.values(PolymorphismRegistry.Contact?.axes[0]?.fkMap ?? {}).flat())];
 
 const ownerWhereFromRow = (row: ContactRow): Record<string, string | null> =>
   Object.fromEntries(ownerKeyFields.map((k) => [k, (row[k] as string | null | undefined) ?? null]));
 
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.
-const processContactRow = async (row: ContactRow, isUpdate: boolean, idForExclusion?: string): Promise<void> => {
+const processContactRow = async (row: ContactRow, isUpdate: boolean, _idForExclusion?: string): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
   const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
   if (!def) throw makeError({ status: 422, message: `Unknown Contact type: ${row.type}` });
@@ -92,26 +97,20 @@ export const registerContactRulesHook = () => {
   // need normalization — only one fires depending on row existence, but we
   // can't know until Prisma runs, so treat both: validate `create` as a fresh
   // row, validate `update` shadow-merged with previous (if available).
-  registerDbHook(
-    'contactRules:upsert',
-    'Contact',
-    HookTiming.before,
-    [DbAction.upsert],
-    async (options) => {
-      const { args, previous } = options as HookOptions & { action: SingleAction };
-      if (!args || typeof args !== 'object') return;
-      const a = args as Record<string, unknown>;
-      const create = a.create as ContactRow | undefined;
-      const update = a.update as ContactRow | undefined;
-      if (create) await processContactRow(create, false);
-      if (update) {
-        const prev = previous as ContactRow | undefined;
-        const merged: ContactRow = { ...(prev ?? {}), ...update };
-        await processContactRow(merged, true, prev?.id as string | undefined);
-        mirrorComputed(update, merged);
-      }
-    },
-  );
+  registerDbHook('contactRules:upsert', 'Contact', HookTiming.before, [DbAction.upsert], async (options) => {
+    const { args, previous } = options as HookOptions & { action: SingleAction };
+    if (!args || typeof args !== 'object') return;
+    const a = args as Record<string, unknown>;
+    const create = a.create as ContactRow | undefined;
+    const update = a.update as ContactRow | undefined;
+    if (create) await processContactRow(create, false);
+    if (update) {
+      const prev = previous as ContactRow | undefined;
+      const merged: ContactRow = { ...(prev ?? {}), ...update };
+      await processContactRow(merged, true, prev?.id as string | undefined);
+      mirrorComputed(update, merged);
+    }
+  });
 
   // Update paths — args.data is the partial update; merge with previous for
   // type-aware validation, then mirror hook-computed fields back into args.data.

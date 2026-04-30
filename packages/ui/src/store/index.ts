@@ -6,7 +6,7 @@ import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { AppStore } from './types';
+import type { AppStore } from '@template/ui/store/types';
 
 // Export slice creators
 export { createAuthSlice } from '@template/ui/store/slices/auth';

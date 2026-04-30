@@ -242,9 +242,7 @@ class RailwayApi {
       { serviceId, environmentId, input: { source: { repo } } },
     );
     if (!updateData.serviceInstanceUpdate) {
-      throw new Error(
-        `Failed to set source on service ${serviceId} for ${repo} in environment ${environmentId}`,
-      );
+      throw new Error(`Failed to set source on service ${serviceId} for ${repo} in environment ${environmentId}`);
     }
     // Idempotent trigger create: query existing first, only create if missing.
     const projectId = await this._serviceProjectId(serviceId);

@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { infisicalApi } from '../../api/infisical';
 import { planetscaleApi } from '../../api/planetscale';
-import { createMockConfig, createMockSystem, defaultConfig } from '../../tests/mocks';
+import { createMockConfig, createMockSystem } from '../../tests/mocks';
 
 // Create service mocks
 const config = createMockConfig();

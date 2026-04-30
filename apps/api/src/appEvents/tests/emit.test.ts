@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
-import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
 import { emitAppEvent } from '#/appEvents/emit';
+import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
 import { auditActorContext } from '#/lib/auditActorContext';
 
 describe('emitAppEvent', () => {
@@ -64,10 +64,14 @@ describe('emitAppEvent', () => {
     const mockHandler = mock(async () => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
-    await emitAppEvent('user.created', { userId: 'test-id', isGuest: false }, {
-      resourceType: 'User',
-      resourceId: 'test-id',
-    });
+    await emitAppEvent(
+      'user.created',
+      { userId: 'test-id', isGuest: false },
+      {
+        resourceType: 'User',
+        resourceId: 'test-id',
+      },
+    );
 
     const event = mockHandler.mock.calls[0][0];
     expect(event.resourceType).toBe('User');

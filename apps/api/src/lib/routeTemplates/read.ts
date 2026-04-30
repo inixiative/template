@@ -52,7 +52,12 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
     // /organization/:id/inquiry, where searchable fields belong to Inquiry,
     // not Organization. Non-Prisma modules (cache, job, me, …) resolve to
     // undefined via toModelName.
-    middleware: prepareMiddleware(middleware, skipResource, searchableFields, toModelName(submodel ?? model) ?? undefined),
+    middleware: prepareMiddleware(
+      middleware,
+      skipResource,
+      searchableFields,
+      toModelName(submodel ?? model) ?? undefined,
+    ),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

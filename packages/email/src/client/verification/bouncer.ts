@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { VCR } from '@template/shared/vcr';
 import type { EmailVerifier, VerificationResult, VerificationStatus } from '@template/email/client/verification/types';
+import { VCR } from '@template/shared/vcr';
 
 type BouncerResponse = {
   email: string;

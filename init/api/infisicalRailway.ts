@@ -125,9 +125,7 @@ class InfisicalRailwayApi {
       );
     }
     if ((existing.folder?.path || '') !== input.infisicalSecretPath) {
-      mismatches.push(
-        `secretPath: expected "${input.infisicalSecretPath}", got "${existing.folder?.path || ''}"`,
-      );
+      mismatches.push(`secretPath: expected "${input.infisicalSecretPath}", got "${existing.folder?.path || ''}"`);
     }
 
     const destinationConfig = existing.destinationConfig || {};
@@ -180,9 +178,7 @@ class InfisicalRailwayApi {
     return data.secretSyncs ?? [];
   }
 
-  private async _listRailwayConnections(
-    infisicalProjectId: string,
-  ): Promise<Array<{ id: string; name: string }>> {
+  private async _listRailwayConnections(infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> {
     const infisicalToken = await getInfisicalToken();
 
     const response = await fetch(

@@ -19,9 +19,7 @@ const groups: readonly Group[] = [
   {
     actions: ['selectAccount'],
     getLabel: (cfg) =>
-      cfg.cloudflarePages.accountName
-        ? `Account selected: ${cfg.cloudflarePages.accountName}`
-        : 'Account selected',
+      cfg.cloudflarePages.accountName ? `Account selected: ${cfg.cloudflarePages.accountName}` : 'Account selected',
   },
   {
     actions: ['storeApiToken'],

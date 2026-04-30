@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
-import {
-  parseOrderByStrings,
-  readStateFromUrl,
-  syncStateToUrl,
-} from '@template/ui/lib/dataStatePersistence';
+import { parseOrderByStrings, readStateFromUrl, syncStateToUrl } from '@template/ui/lib/dataStatePersistence';
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 
 /**
@@ -110,9 +106,7 @@ describe('URL round-trip', () => {
 
 describe('parseOrderByStrings', () => {
   it('parses single field', () => {
-    expect(parseOrderByStrings(['createdAt:desc'])).toEqual([
-      { field: 'createdAt', direction: 'desc' },
-    ]);
+    expect(parseOrderByStrings(['createdAt:desc'])).toEqual([{ field: 'createdAt', direction: 'desc' }]);
   });
 
   it('parses multiple fields', () => {
@@ -143,7 +137,10 @@ describe('hydration chain: URL → filters → query', () => {
     const query: Record<string, unknown> = { ...filterQuery, page: persisted.page, pageSize: persisted.pageSize };
 
     expect(query).toEqual({
-      search: 'acme', orderBy: ['createdAt:desc'], page: 3, pageSize: 50,
+      search: 'acme',
+      orderBy: ['createdAt:desc'],
+      page: 3,
+      pageSize: 50,
     });
   });
 
@@ -151,7 +148,9 @@ describe('hydration chain: URL → filters → query', () => {
     const persisted = readStateFromUrl('');
     const filterQuery = buildFilterQuery('', 'combined', [], {}, []);
     const query: Record<string, unknown> = {
-      ...filterQuery, page: persisted.page ?? 1, pageSize: persisted.pageSize ?? 20,
+      ...filterQuery,
+      page: persisted.page ?? 1,
+      pageSize: persisted.pageSize ?? 20,
     };
     expect(query).toEqual({ page: 1, pageSize: 20 });
   });

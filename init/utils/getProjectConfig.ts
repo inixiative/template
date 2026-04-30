@@ -858,7 +858,7 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
       },
       bouncer: {
         configProjectName: (config as Record<string, unknown>).bouncer
-          ? ((config as Record<string, unknown>).bouncer as Record<string, string>).configProjectName ?? ''
+          ? (((config as Record<string, unknown>).bouncer as Record<string, string>).configProjectName ?? '')
           : '',
         progress: normalizeBouncerProgress(
           ((config as Record<string, unknown>).bouncer as Record<string, unknown>)?.progress as
@@ -866,7 +866,7 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
             | undefined,
         ),
         error: (config as Record<string, unknown>).bouncer
-          ? ((config as Record<string, unknown>).bouncer as Record<string, string>).error ?? ''
+          ? (((config as Record<string, unknown>).bouncer as Record<string, string>).error ?? '')
           : '',
       },
       infisical: {
@@ -917,21 +917,17 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
       },
       features: {
         staging: {
-          enabled:
-            (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+          enabled: (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
         },
         apps: {
           web: {
-            enabled:
-              (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
+            enabled: (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
           },
           admin: {
-            enabled:
-              (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
+            enabled: (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
           },
           superadmin: {
-            enabled:
-              (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+            enabled: (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
           },
         },
         gitConnectFrontend: {
@@ -1049,8 +1045,7 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
     },
     features: {
       staging: {
-        enabled:
-          (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+        enabled: (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
       },
       apps: {
         web: {
@@ -1060,13 +1055,11 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
           enabled: (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
         },
         superadmin: {
-          enabled:
-            (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+          enabled: (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
         },
       },
       gitConnectFrontend: {
-        enabled:
-          (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
+        enabled: (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
       },
     },
     providers: {

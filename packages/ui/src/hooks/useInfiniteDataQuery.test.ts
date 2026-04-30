@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { locateItemInPages, type InfiniteDataPage } from '@template/ui/hooks/useInfiniteDataQuery';
+import { type InfiniteDataPage, locateItemInPages } from '@template/ui/hooks/useInfiniteDataQuery';
 
 describe('locateItemInPages', () => {
   const pages: InfiniteDataPage<string>[] = [

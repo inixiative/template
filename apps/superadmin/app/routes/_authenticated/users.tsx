@@ -1,7 +1,6 @@
+import { Icon } from '@iconify/react';
 import { createFileRoute } from '@tanstack/react-router';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
-import { Icon } from '@iconify/react';
-
 
 const UsersPage = () => {
   return (

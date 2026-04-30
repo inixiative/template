@@ -1,4 +1,6 @@
-export type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
+import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
+
+export type { EmailTarget, ResolvedRecipient };
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -18,7 +20,6 @@ export type AppEventPayload<T = Record<string, unknown>> = {
   data: T;
   timestamp: string;
 };
-
 
 export type AppEventOptions = {
   resourceType?: string;

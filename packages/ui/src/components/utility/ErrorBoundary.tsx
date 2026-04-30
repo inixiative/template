@@ -1,7 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-
-import { Component, type ReactNode } from 'react';
 import { Icon } from '@iconify/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import { Component, type ReactNode } from 'react';
 
 type ErrorBoundaryProps = {
   children: ReactNode;

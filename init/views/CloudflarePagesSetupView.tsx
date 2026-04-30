@@ -3,7 +3,7 @@ import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { cloudflareApi, type CFAccount } from '../api/cloudflare';
+import { type CFAccount, cloudflareApi } from '../api/cloudflare';
 import { StepProgress } from '../components/StepProgress';
 import { setupCloudflarePages } from '../tasks/cloudflarePagesSetup';
 import { getCloudflarePagesProgressItems } from '../tasks/cloudflarePagesSteps';
@@ -27,7 +27,7 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
 
   // Skip the token prompt if storeApiToken is already complete (re-enter scenario).
   useEffect(() => {
-    if (config && config.cloudflarePages.progress.storeApiToken && config.cloudflarePages.accountId) {
+    if (config?.cloudflarePages.progress.storeApiToken && config.cloudflarePages.accountId) {
       setAccountId(config.cloudflarePages.accountId);
       setView('status');
     }
@@ -86,7 +86,7 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
     if (view === 'status') {
       if (key.return) {
         // Dismiss when there's any progress already; trigger run on a fresh start.
-        if (config && config.cloudflarePages.progress.selectAccount) return onComplete();
+        if (config?.cloudflarePages.progress.selectAccount) return onComplete();
         return handleRun();
       }
       if (input === 'r' || input === 'R') return handleRestart();
@@ -110,9 +110,7 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
           </Text>
         </Box>
         <Box marginBottom={1}>
-          <Text dimColor>
-            Paste a Cloudflare API token with these permissions:
-          </Text>
+          <Text dimColor>Paste a Cloudflare API token with these permissions:</Text>
         </Box>
         <Box marginLeft={2} flexDirection="column" marginBottom={1}>
           <Text dimColor>• Account → Cloudflare Pages → Edit</Text>
@@ -169,8 +167,7 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
       </Box>
       <Box marginBottom={1}>
         <Text dimColor>
-          Per-app Pages projects linked to GitHub. VITE_-prefixed env vars sync from Infisical at /
-          {'<app>'}.
+          Per-app Pages projects linked to GitHub. VITE_-prefixed env vars sync from Infisical at /{'<app>'}.
         </Text>
       </Box>
       <Box marginBottom={1}>
@@ -202,5 +199,3 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
     </Box>
   );
 };
-
-export default CloudflarePagesSetupView;

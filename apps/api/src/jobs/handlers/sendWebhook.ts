@@ -14,7 +14,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   const { db, log } = ctx;
 
   const subscription = await db.webhookSubscription.findUnique({ where: { id: subscriptionId } });
-  if (!subscription || !subscription.isActive) {
+  if (!subscription?.isActive) {
     log(`Webhook subscription ${subscriptionId} not found or inactive - skipping`);
     return;
   }

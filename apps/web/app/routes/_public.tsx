@@ -17,10 +17,7 @@ const PublicLayout = () => {
             </Link>
             <nav className="flex gap-6">
               {adminUrl && (
-                <a
-                  href={adminUrl}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <a href={adminUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Admin
                 </a>
               )}

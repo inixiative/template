@@ -273,8 +273,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
     };
     const sessionRow = (label: string, cliCommand: string, cli: Check, sess: Check) => {
       // If CLI itself failed we already reported install above; only flag auth when CLI is OK but session isn't.
-      if (cli.status === 'success' && sess.status === 'failed')
-        out.push({ label, cliCommand, reason: 'not-authed' });
+      if (cli.status === 'success' && sess.status === 'failed') out.push({ label, cliCommand, reason: 'not-authed' });
     };
 
     cliRow('Bun', 'bun', bunCLI);
@@ -394,7 +393,7 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
               const cmd =
                 f.reason === 'not-installed'
                   ? getInstallCommand(f.cliCommand)
-                  : LOGIN_COMMANDS[f.cliCommand] ?? `# fix ${f.cliCommand} manually`;
+                  : (LOGIN_COMMANDS[f.cliCommand] ?? `# fix ${f.cliCommand} manually`);
               const heading =
                 f.reason === 'not-installed'
                   ? `${f.label} — not installed`

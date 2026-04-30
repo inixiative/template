@@ -1,8 +1,7 @@
+import { Icon } from '@iconify/react';
 import { Button, Input, Label, Modal, SlugInput } from '@template/ui/components';
 import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';
-
 import { memo, useState } from 'react';
-import { Icon } from '@iconify/react';
 
 export const CreateOrganizationModal = memo(
   ({

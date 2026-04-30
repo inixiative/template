@@ -51,6 +51,7 @@
       "!**/_old",
       "!**/.next",
       "!**/.turbo",
+      "!**/.claude",
       "!**/*.gen.ts",
       "!**/*.gen.json",
       "!**/*.generated.ts",

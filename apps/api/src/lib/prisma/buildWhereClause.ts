@@ -172,9 +172,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     // an enum is meaningless and Prisma rejects { contains, mode } on
     // enum columns at runtime. Without a model, we can't tell, so include
     // every field (no enum filtering).
-    const stringFields = model
-      ? searchableFields.filter((f) => !isEnumPath(model, f))
-      : searchableFields;
+    const stringFields = model ? searchableFields.filter((f) => !isEnumPath(model, f)) : searchableFields;
     if (stringFields.length) {
       const searchConditions = stringFields.map((field) => {
         if (!validatePathNotation(field)) {
@@ -191,12 +189,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(
-      searchFields,
-      searchableFields,
-      skipFieldValidation,
-      model,
-    );
+    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
     for (const [key, value] of Object.entries(transformed)) {
       if (orNullFields.includes(key)) {
         conditions.push({ OR: [{ [key]: value }, { [key]: null }] });

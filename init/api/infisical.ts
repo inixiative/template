@@ -309,12 +309,7 @@ class InfisicalApi {
       }
     }
   }
-  async getSecret(
-    projectId: string,
-    environment: string,
-    key: string,
-    path: string = '/',
-  ): Promise<string> {
+  async getSecret(projectId: string, environment: string, key: string, path: string = '/'): Promise<string> {
     if (process.env.NODE_ENV !== 'test') return this._getSecret(projectId, environment, key, path);
     return this.vcr.capture('getSecret', () => this._getSecret(projectId, environment, key, path));
   }

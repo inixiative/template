@@ -167,15 +167,10 @@ export type Currency = (typeof CURRENCIES)[number];
 export type CurrencyCode = Currency['code'];
 
 export const CURRENCY_CODES = CURRENCIES.map((c) => c.code) as readonly CurrencyCode[];
-export const currencyByCode: ReadonlyMap<CurrencyCode, Currency> = new Map(
-  CURRENCIES.map((c) => [c.code, c]),
-);
+export const currencyByCode: ReadonlyMap<CurrencyCode, Currency> = new Map(CURRENCIES.map((c) => [c.code, c]));
 
-export const CurrencyCodeSchema = z.enum(
-  CURRENCY_CODES as readonly [CurrencyCode, ...CurrencyCode[]],
-);
+export const CurrencyCodeSchema = z.enum(CURRENCY_CODES as readonly [CurrencyCode, ...CurrencyCode[]]);
 
 export const decimalsFor = (code: CurrencyCode): number => currencyByCode.get(code)!.decimals;
 export const symbolFor = (code: CurrencyCode): string => currencyByCode.get(code)!.symbol;
-export const isCurrencyCode = (value: string): value is CurrencyCode =>
-  currencyByCode.has(value as CurrencyCode);
+export const isCurrencyCode = (value: string): value is CurrencyCode => currencyByCode.has(value as CurrencyCode);

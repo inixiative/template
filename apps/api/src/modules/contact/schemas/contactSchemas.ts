@@ -19,10 +19,7 @@ export const CONTACT_CREATE_IMMUTABLE_FIELDS = [
 // Update-only addition: `type` drives valueKey/registry parsing — flipping
 // it after create silently breaks (ownerModel, ..., type, valueKey)
 // uniqueness and would re-derive valueKey under a different schema.
-export const CONTACT_UPDATE_IMMUTABLE_FIELDS = [
-  'type',
-  ...CONTACT_CREATE_IMMUTABLE_FIELDS,
-] as const;
+export const CONTACT_UPDATE_IMMUTABLE_FIELDS = ['type', ...CONTACT_CREATE_IMMUTABLE_FIELDS] as const;
 
 // Server-authored / hook-computed / route-injected fields are omitted.
 // `permissionRules` is replaced with a validated schema picked from the

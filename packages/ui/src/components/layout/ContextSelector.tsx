@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,9 +8,7 @@ import {
 } from '@template/ui/components/primitives/DropdownMenu';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 export type ContextType = 'user' | 'organization' | 'space' | 'public';
 
@@ -146,7 +145,11 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   <span className="flex-1 truncate">
                     {org.name} ({spaces.length})
                   </span>
-                  {isExpanded ? <Icon icon="lucide:chevron-up" className="h-4 w-4" /> : <Icon icon="lucide:chevron-down" className="h-4 w-4" />}
+                  {isExpanded ? (
+                    <Icon icon="lucide:chevron-up" className="h-4 w-4" />
+                  ) : (
+                    <Icon icon="lucide:chevron-down" className="h-4 w-4" />
+                  )}
                 </div>
 
                 {isExpanded && (

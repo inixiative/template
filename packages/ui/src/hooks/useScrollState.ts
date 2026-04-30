@@ -156,7 +156,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
       clearTimeout(timerRef.current);
       target.removeEventListener('scroll', onScroll);
     };
-  }, [stateKey, getScrollElement, scrollRef]);
+  }, [stateKey, getScrollElement, scrollRef, enabled]);
 
   // Cleanup timer on unmount.
   React.useEffect(() => {

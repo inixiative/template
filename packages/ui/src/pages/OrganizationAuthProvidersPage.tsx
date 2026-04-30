@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import {
   type AuthProviderDeleteData,
   type AuthProviderUpdateData,
@@ -16,9 +17,7 @@ import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@te
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type AuthProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];
 

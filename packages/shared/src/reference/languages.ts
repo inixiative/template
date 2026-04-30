@@ -193,13 +193,8 @@ export type Language = (typeof LANGUAGES)[number];
 export type LanguageCode = Language['code'];
 
 export const LANGUAGE_CODES = LANGUAGES.map((l) => l.code) as readonly LanguageCode[];
-export const languageByCode: ReadonlyMap<LanguageCode, Language> = new Map(
-  LANGUAGES.map((l) => [l.code, l]),
-);
+export const languageByCode: ReadonlyMap<LanguageCode, Language> = new Map(LANGUAGES.map((l) => [l.code, l]));
 
-export const LanguageCodeSchema = z.enum(
-  LANGUAGE_CODES as readonly [LanguageCode, ...LanguageCode[]],
-);
+export const LanguageCodeSchema = z.enum(LANGUAGE_CODES as readonly [LanguageCode, ...LanguageCode[]]);
 
-export const isLanguageCode = (value: string): value is LanguageCode =>
-  languageByCode.has(value as LanguageCode);
+export const isLanguageCode = (value: string): value is LanguageCode => languageByCode.has(value as LanguageCode);

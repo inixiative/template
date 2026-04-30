@@ -16,7 +16,7 @@ export type WSMessage =
 
 export type WSSocket = ServerWebSocket<WSData>;
 
-export type AppEventPayload = {
-  type: string;
-  [key: string]: unknown;
-};
+// Wire format for outbound websocket messages. The shape is opaque to the
+// transport layer — handlers in #/appEvents/handlers decide what fields the
+// frontend will see (typically `event` + handler-specific data).
+export type AppEventPayload = Record<string, unknown>;

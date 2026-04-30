@@ -1,6 +1,6 @@
 import { db } from '@template/db';
-import { rolesAtOrAbove } from '@template/permissions';
 import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting/types';
+import { rolesAtOrAbove } from '@template/permissions';
 
 const resolveUserIds = async (userIds: string[]): Promise<ResolvedRecipient[]> => {
   if (!userIds.length) return [];

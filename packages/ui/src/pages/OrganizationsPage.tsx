@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import {
   type MeReadManyOrganizationsResponse,
   meReadManyOrganizations,
@@ -14,9 +15,7 @@ import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-
 import { useMemo, useState } from 'react';
-import { Icon } from '@iconify/react';
 
 type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number];
 

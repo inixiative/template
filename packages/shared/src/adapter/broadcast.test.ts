@@ -38,8 +38,16 @@ describe('makeBroadcastRegistry', () => {
     const results: number[] = [];
     const registry = makeBroadcastRegistry<{ process: (n: number) => Promise<void> }>();
 
-    registry.register('a', { process: async (n) => { results.push(n * 2); } });
-    registry.register('b', { process: async (n) => { results.push(n * 3); } });
+    registry.register('a', {
+      process: async (n) => {
+        results.push(n * 2);
+      },
+    });
+    registry.register('b', {
+      process: async (n) => {
+        results.push(n * 3);
+      },
+    });
 
     await registry.broadcast((adapter) => adapter.process(5));
 
@@ -50,8 +58,16 @@ describe('makeBroadcastRegistry', () => {
     const results: string[] = [];
     const registry = makeBroadcastRegistry<{ run: () => Promise<void> }>();
 
-    registry.register('fails', { run: async () => { throw new Error('boom'); } });
-    registry.register('succeeds', { run: async () => { results.push('ok'); } });
+    registry.register('fails', {
+      run: async () => {
+        throw new Error('boom');
+      },
+    });
+    registry.register('succeeds', {
+      run: async () => {
+        results.push('ok');
+      },
+    });
 
     const settled = await registry.broadcast((a) => a.run());
 

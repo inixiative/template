@@ -65,7 +65,11 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
       await markComplete('vercel', 'selectTeam');
       await syncConfig();
-    } else if (!projectConfig.vercel.teamId || !projectConfig.vercel.teamName || !projectConfig.vercel.configProjectName) {
+    } else if (
+      !projectConfig.vercel.teamId ||
+      !projectConfig.vercel.teamName ||
+      !projectConfig.vercel.configProjectName
+    ) {
       // Defensive: re-populate config values if they were lost
       await updateConfigFields('vercel', { teamId, teamName, configProjectName: projectName });
       await syncConfig();
@@ -135,7 +139,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     if (webEnabled && !(await isComplete('vercel', 'createWebProject'))) {
       const webProjectName = `${projectName}-web`;
       const existing = await vercelApi.getProject(webProjectName, teamId);
-      const webProject = existing ?? await vercelApi.createProject(webProjectName, teamId);
+      const webProject = existing ?? (await vercelApi.createProject(webProjectName, teamId));
 
       webProjectId = webProject.id;
       await updateConfigField('vercel', 'webProjectId', webProjectId);
@@ -171,7 +175,13 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 10: Link Web project to GitHub
     if (webEnabled && gitConnect && !(await isComplete('vercel', 'linkWebGitHub'))) {
-      await vercelApi.linkGitHub(webProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
+      await vercelApi.linkGitHub(
+        webProjectId,
+        projectConfig.project.organization,
+        projectConfig.project.name,
+        'main',
+        teamId,
+      );
 
       await markComplete('vercel', 'linkWebGitHub');
       await syncConfig();
@@ -263,7 +273,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     if (adminEnabled && !(await isComplete('vercel', 'createAdminProject'))) {
       const adminProjectName = `${projectName}-admin`;
       const existing = await vercelApi.getProject(adminProjectName, teamId);
-      const adminProject = existing ?? await vercelApi.createProject(adminProjectName, teamId);
+      const adminProject = existing ?? (await vercelApi.createProject(adminProjectName, teamId));
 
       adminProjectId = adminProject.id;
       await updateConfigField('vercel', 'adminProjectId', adminProjectId);
@@ -299,7 +309,13 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
 
     // Step 18: Link Admin project to GitHub
     if (adminEnabled && gitConnect && !(await isComplete('vercel', 'linkAdminGitHub'))) {
-      await vercelApi.linkGitHub(adminProjectId, projectConfig.project.organization, projectConfig.project.name, 'main', teamId);
+      await vercelApi.linkGitHub(
+        adminProjectId,
+        projectConfig.project.organization,
+        projectConfig.project.name,
+        'main',
+        teamId,
+      );
 
       await markComplete('vercel', 'linkAdminGitHub');
       await syncConfig();
@@ -390,7 +406,7 @@ export const setupVercel = async (teamId: string, teamName: string, syncConfig: 
     if (superadminEnabled && !(await isComplete('vercel', 'createSuperadminProject'))) {
       const superadminProjectName = `${projectName}-superadmin`;
       const existing = await vercelApi.getProject(superadminProjectName, teamId);
-      const superadminProject = existing ?? await vercelApi.createProject(superadminProjectName, teamId);
+      const superadminProject = existing ?? (await vercelApi.createProject(superadminProjectName, teamId));
 
       superadminProjectId = superadminProject.id;
       await updateConfigField('vercel', 'superadminProjectId', superadminProjectId);

@@ -128,5 +128,3 @@ export const RailwayPostgresSetupView: React.FC<RailwayPostgresSetupViewProps> =
     </Box>
   );
 };
-
-export default RailwayPostgresSetupView;

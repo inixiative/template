@@ -25,8 +25,7 @@ const actionRuleBase: z.ZodType = z.lazy(() =>
 const withOpenApiRef = actionRuleBase as z.ZodType & {
   openapi?: (name: string) => z.ZodType;
 };
-const actionRuleSchema: z.ZodType =
-  withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
+const actionRuleSchema: z.ZodType = withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
 
 /**
  * Build a Zod schema for a `permissionRules: Json?` column on a model.

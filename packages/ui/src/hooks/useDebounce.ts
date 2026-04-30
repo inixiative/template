@@ -26,8 +26,8 @@ export const useDebouncedCallback = <T extends (...args: any[]) => any>(callback
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  // Stable function identity — never changes across renders.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — refs track current values
+  // Stable function identity — never changes across renders. Refs track
+  // the current callback / delay so the debounced function never stales.
   return useCallback(
     ((...args: Parameters<T>) => {
       clearTimeout(timerRef.current);

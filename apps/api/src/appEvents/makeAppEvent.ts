@@ -1,7 +1,7 @@
 import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
 import { deliverWSHandoffs } from '#/appEvents/bridges/websocket';
-import { observeRegistry } from '#/lib/observe';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
+import { observeRegistry } from '#/lib/observe';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 

@@ -1,7 +1,7 @@
 import '#tests/mocks/queue';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Db, db } from '@template/db';
-import type { OrganizationUser, SpaceUser, User, UserId } from '@template/db/generated/client/client';
+import { type Db, db, type UserId } from '@template/db';
+import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
