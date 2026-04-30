@@ -704,4 +704,141 @@ describe('rebac check', () => {
       expect(() => check(permix, cyclicSchema, 'space', space as { id: string }, 'own')).toThrow(/Cycle detected/);
     });
   });
+
+  describe('row-level permissionRules (additive extension)', () => {
+    // Contact-shaped schema: read inherits all the way up from manage from own.
+    // The owner (User-self) and admins-via-org pass via schema. Row-level
+    // permissionRules can grant additional read paths without restricting.
+    const schema: RebacSchema = {
+      contact: {
+        actions: {
+          own: null,
+          manage: 'own',
+          read: 'manage',
+        },
+      },
+      organization: {
+        actions: { own: null, manage: 'own', read: 'manage' },
+      },
+    };
+
+    it('null permissionRules behaves like schema-only', () => {
+      const record = { id: 'c-1', userId: 'user-1', permissionRules: null };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(false);
+    });
+
+    it('row rule for one action does not affect another action', () => {
+      // Row rule keyed under `delete` is irrelevant when checking `read`.
+      // Schema requires own (not granted) and there's no read row rule → deny.
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { delete: { all: [] } as never },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(false);
+    });
+
+    it('grants access via row rule that schema would deny', () => {
+      // Schema requires own → no direct permission means denied. Row rule
+      // grants any authenticated check via tautology rule.
+      permix.setUserId('user-1' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { self: 'userId' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+
+    it('grants when only schema rule passes (row rule does not match)', async () => {
+      // Schema grants via direct permission. Row rule is a self-check that
+      // would fail (different userId), but additive merge keeps schema floor.
+      await permix.setup({ resource: 'contact', id: 'c-1', actions: { own: true } });
+      permix.setUserId('different-user' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { self: 'userId' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+
+    it('grants when both schema and row rule pass', async () => {
+      await permix.setup({ resource: 'contact', id: 'c-1', actions: { own: true } });
+      permix.setUserId('user-1' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { self: 'userId' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+
+    it('denies when neither schema nor row rule grants', () => {
+      permix.setUserId('user-2' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { self: 'userId' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(false);
+    });
+
+    it('row rule with { rel, action } delegates to related model rebac', async () => {
+      // Schema would deny (no contact.read direct). Row rule says: anyone
+      // who can read the contact's organization can also read it.
+      await permix.setup({ resource: 'organization', id: 'org-1', actions: { read: true } });
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        organization: { id: 'org-1' },
+        permissionRules: { read: { rel: 'organization', action: 'read' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+
+    it('row rule with composed any/all works via additive merge', () => {
+      permix.setUserId('user-1' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        // Either self or some attribute predicate would grant
+        permissionRules: {
+          read: {
+            any: [
+              { self: 'userId' },
+              { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
+            ],
+          },
+        },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+
+    it('row rule does not affect actions other than the keyed one', async () => {
+      // Row rule grants `read` but the request asks for `manage`. The merge
+      // happens per action — manage falls back to schema only.
+      permix.setUserId('user-1' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { all: [] } as never }, // would grant read
+      };
+      expect(check(permix, schema, 'contact', record, 'manage')).toBe(false);
+    });
+
+    it('schema floor: row rule cannot restrict below the schema default', async () => {
+      // Schema grants read via own (direct permission). Row rule says self
+      // must equal userId — but the requesting user is different. Additive
+      // merge keeps the schema path open.
+      await permix.setup({ resource: 'contact', id: 'c-1', actions: { own: true } });
+      permix.setUserId('different-user' as UserId);
+      const record = {
+        id: 'c-1',
+        userId: 'user-1',
+        permissionRules: { read: { self: 'userId' } },
+      };
+      expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
+    });
+  });
 });

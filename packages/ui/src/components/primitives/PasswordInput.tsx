@@ -1,7 +1,8 @@
 import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
-import { Eye, EyeOff } from 'lucide-react';
+
 import * as React from 'react';
+import { Icon } from '@iconify/react';
 
 export type PasswordInputProps = Omit<InputProps, 'type'>;
 
@@ -24,7 +25,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(({ 
         tabIndex={-1}
         aria-label={visible ? 'Hide password' : 'Show password'}
       >
-        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        {visible ? <Icon icon="lucide:eye-off" className="h-4 w-4" /> : <Icon icon="lucide:eye" className="h-4 w-4" />}
       </button>
     </div>
   );

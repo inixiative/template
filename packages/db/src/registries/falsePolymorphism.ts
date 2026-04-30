@@ -73,6 +73,19 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
     ],
   },
 
+  Contact: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
   WebhookSubscription: {
     axes: [
       {

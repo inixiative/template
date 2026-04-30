@@ -4,8 +4,9 @@ import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
 import { cn } from '@template/ui/lib/utils';
-import { HelpCircle } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 export type AppShellProps = {
   onSupport?: () => void;
@@ -38,7 +39,7 @@ export const AppShell = ({ onSupport, lockedContext = false, children }: AppShel
                 onClick={onSupport}
                 className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-sm"
               >
-                <HelpCircle className="h-4 w-4 shrink-0" />
+                <Icon icon="lucide:help-circle" className="h-4 w-4 shrink-0" />
                 <span>Support</span>
               </button>
             )}

@@ -11,8 +11,9 @@ import {
 import { Input } from '@template/ui/components/primitives/Input';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { LogOut, Settings } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 export type UserMenuProps = {
   className?: string;
@@ -66,7 +67,7 @@ export const UserMenu = ({ className }: UserMenuProps) => {
 
       <DropdownMenuContent className="w-56" align="start">
         <DropdownMenuItem onClick={() => navigatePreservingSpoof('/settings')}>
-          <Settings className="h-4 w-4 mr-2" />
+          <Icon icon="lucide:settings" className="h-4 w-4 mr-2" />
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -99,7 +100,7 @@ export const UserMenu = ({ className }: UserMenuProps) => {
           </>
         )}
         <DropdownMenuItem onClick={logout}>
-          <LogOut className="h-4 w-4 mr-2" />
+          <Icon icon="lucide:log-out" className="h-4 w-4 mr-2" />
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

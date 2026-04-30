@@ -1,6 +1,7 @@
 import { Button } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';
-import { ArrowLeft } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export const FullscreenLayout = ({ children }: { children: React.ReactNode }) => {
   const { navigatePreservingContext } = useAppStore((state) => state.navigation);
@@ -14,7 +15,7 @@ export const FullscreenLayout = ({ children }: { children: React.ReactNode }) =>
           onClick={() => navigatePreservingContext('..')}
           className="bg-background/80 backdrop-blur-sm"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <Icon icon="lucide:arrow-left" className="h-5 w-5" />
         </Button>
       </div>
       <div className="h-full w-full">{children}</div>

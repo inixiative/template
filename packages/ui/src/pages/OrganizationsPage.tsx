@@ -14,8 +14,9 @@ import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { Plus, Trash2 } from 'lucide-react';
+
 import { useMemo, useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number];
 
@@ -98,7 +99,7 @@ export const OrganizationsPage = () => {
                 }}
                 show={checkPermission(permissions, 'organization', org, 'own')}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
               </Button>
             </div>
           );
@@ -127,7 +128,7 @@ export const OrganizationsPage = () => {
               <p className="text-sm text-muted-foreground mt-1">View organizations you belong to</p>
             </div>
             <Button onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
               Create Organization
             </Button>
           </CardHeader>

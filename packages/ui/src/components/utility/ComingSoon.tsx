@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
-import { Construction } from 'lucide-react';
+
 import type { ReactNode } from 'react';
+import { Icon } from '@iconify/react';
 
 type ComingSoonProps = {
   title: string;
@@ -15,7 +16,7 @@ export const ComingSoon = ({ title, description, icon, className }: ComingSoonPr
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {icon ?? <Construction className="h-4 w-4" />}
+            {icon ?? <Icon icon="lucide:construction" className="h-4 w-4" />}
             {title}
           </CardTitle>
         </CardHeader>

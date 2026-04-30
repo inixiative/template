@@ -20,6 +20,16 @@
     "./logger": "./src/logger/index.ts",
     "./logger/*": "./src/logger/*.ts",
     "./adapter": "./src/adapter/index.ts",
+    "./contact": "./src/contact/index.ts",
+    "./contact/parsers": "./src/contact/parsers/index.ts",
+    "./contact/parsers/*": "./src/contact/parsers/*.ts",
+    "./contact/constants": "./src/contact/constants/index.ts",
+    "./contact/constants/*": "./src/contact/constants/*.ts",
+    "./contact/defs": "./src/contact/defs/index.ts",
+    "./contact/defs/*": "./src/contact/defs/*.ts",
+    "./contact/*": "./src/contact/*.ts",
+    "./reference": "./src/reference/index.ts",
+    "./reference/*": "./src/reference/*.ts",
     "./vcr": "./src/vcr.ts",
     "./styles/theme.css": "./styles/theme.css"
   },
@@ -29,6 +39,7 @@
     "consola": "^3.4.2",
     "lodash-es": "^4.18.1",
     "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

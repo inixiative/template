@@ -22,9 +22,12 @@ const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: s
  * Flow:
  * 1. Superadmin bypass (if permix.isSuperadmin)
  * 2. Direct permission check (permix.check)
- * 3. Schema delegation (action inherits from another action)
- * 4. Relation traversal (space.own → organization.own)
- * 5. JSON rule evaluation (attribute-based checks)
+ * 3. Row-level extension: `record.permissionRules?.[action]` is OR'd with the
+ *    schema rule for that action — additive only (the schema default is the
+ *    floor; row rules can grant additional paths but never restrict).
+ * 4. Schema delegation (action inherits from another action)
+ * 5. Relation traversal (space.own → organization.own)
+ * 6. JSON rule evaluation (attribute-based checks)
  */
 export const check = (
   permix: Permix,
@@ -40,8 +43,13 @@ export const check = (
   if (isNil(actionOrRule)) return false;
   if (typeof actionOrRule === 'string') {
     if (permix.check(model, actionOrRule as Action, record.id)) return true;
-    const delegateRule = schema[model]?.actions[actionOrRule] ?? null;
-    return check(permix, schema, model, record, delegateRule, visited);
+    const schemaRule = schema[model]?.actions[actionOrRule] ?? null;
+    // Row-level extension: any resource carrying `permissionRules: Json?`
+    // contributes an additive ActionRule for any action. Either path grants.
+    const rowRules = record.permissionRules as Record<string, ActionRule> | null | undefined;
+    const rowRule = rowRules?.[actionOrRule];
+    const merged: ActionRule = rowRule !== undefined ? { any: [schemaRule, rowRule] } : schemaRule;
+    return check(permix, schema, model, record, merged, visited);
   }
 
   const rule = actionOrRule;
@@ -74,8 +82,11 @@ export const check = (
   }
 
   if ('rule' in rule) return checkRule(rule.rule, record) === true;
-  if ('any' in rule) return rule.any.some((r) => check(permix, schema, model, record, r, visited));
-  if ('all' in rule) return rule.all.every((r) => check(permix, schema, model, record, r, visited));
+  // Fork the visited set per branch — parallel paths through `any`/`all`
+  // aren't cycles. Cycle detection still fires within a single branch's
+  // chain (rel-walks pass `visited` through directly).
+  if ('any' in rule) return rule.any.some((r) => check(permix, schema, model, record, r, new Set(visited)));
+  if ('all' in rule) return rule.all.every((r) => check(permix, schema, model, record, r, new Set(visited)));
 
   return false;
 };

@@ -7,8 +7,9 @@ import {
 } from '@template/ui/components/primitives/DropdownMenu';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
-import { Boxes, Building2, Check, ChevronDown, ChevronsUpDown, ChevronUp, Settings, User } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 export type ContextType = 'user' | 'organization' | 'space' | 'public';
 
@@ -87,7 +88,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
             <div className="font-semibold truncate">{currentLabel}</div>
             <div className="text-xs text-muted-foreground capitalize">{current.type}</div>
           </div>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Icon icon="lucide:chevrons-up-down" className="h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
       </DropdownMenuTrigger>
 
@@ -106,9 +107,9 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => tenant.setOrganization(org.id)}
                   className={cn('cursor-pointer', isCurrentOrg && 'bg-accent text-accent-foreground')}
                 >
-                  <Building2 className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{org.name}</span>
-                  {isCurrentOrg && <Check className="h-4 w-4 ml-2" />}
+                  {isCurrentOrg && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
                 </DropdownMenuItem>
               );
             }
@@ -125,9 +126,9 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => tenant.setSpace(space.id)}
                   className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                 >
-                  <Building2 className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{space.name}</span>
-                  {isCurrentSpace && <Check className="h-4 w-4 ml-2" />}
+                  {isCurrentSpace && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
                 </DropdownMenuItem>
               );
             }
@@ -141,11 +142,11 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => toggleOrg(org.id)}
                   className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"
                 >
-                  <Building2 className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">
                     {org.name} ({spaces.length})
                   </span>
-                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {isExpanded ? <Icon icon="lucide:chevron-up" className="h-4 w-4" /> : <Icon icon="lucide:chevron-down" className="h-4 w-4" />}
                 </div>
 
                 {isExpanded && (
@@ -163,7 +164,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                           className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                         >
                           <span className="flex-1 truncate">{space.name}</span>
-                          {isCurrentSpace && <Check className="h-4 w-4 ml-2" />}
+                          {isCurrentSpace && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
                         </DropdownMenuItem>
                       );
                     })}
@@ -172,7 +173,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                       onClick={() => tenant.setOrganization(org.id)}
                       className="cursor-pointer border-t"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
+                      <Icon icon="lucide:settings" className="h-4 w-4 mr-2" />
                       <span>Manage</span>
                     </DropdownMenuItem>
                   </div>
@@ -188,14 +189,14 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
           onClick={tenant.setUser}
           className={cn('cursor-pointer', current.type === 'user' && 'bg-accent text-accent-foreground')}
         >
-          <User className="h-4 w-4 mr-2" />
+          <Icon icon="lucide:user" className="h-4 w-4 mr-2" />
           <span className="flex-1">Personal</span>
-          {current.type === 'user' && <Check className="h-4 w-4 ml-2" />}
+          {current.type === 'user' && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
         </DropdownMenuItem>
 
         {onManageOrganizations && (
           <DropdownMenuItem onClick={onManageOrganizations} className="cursor-pointer">
-            <Boxes className="h-4 w-4 mr-2" />
+            <Icon icon="lucide:boxes" className="h-4 w-4 mr-2" />
             <span>Your Organizations</span>
           </DropdownMenuItem>
         )}

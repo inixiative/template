@@ -10,8 +10,9 @@ import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@te
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
-import { Plus, Trash2 } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type WebhookSubscription =
   | MeReadManyWebhookSubscriptionsResponse['data'][number]
@@ -74,7 +75,7 @@ export const WebhooksPage = () => {
       render: (item: WebhookSubscription) => (
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
@@ -103,7 +104,7 @@ export const WebhooksPage = () => {
                 </p>
               </div>
               <Button onClick={() => setIsModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
+                <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
                 Create Webhook
               </Button>
             </div>

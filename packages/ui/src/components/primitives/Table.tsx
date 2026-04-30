@@ -1,8 +1,9 @@
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
-import { Loader2 } from 'lucide-react';
+
 import * as React from 'react';
+import { Icon } from '@iconify/react';
 
 export type Column<T> = {
   key: string;
@@ -124,7 +125,7 @@ export const Table = <T,>({
             <div ref={sentinelRef} aria-hidden="true" />
             {infiniteScroll.isLoading && (
               <div className="flex items-center justify-center py-4 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Icon icon="lucide:loader2" className="h-4 w-4 animate-spin mr-2" />
                 <span className="text-sm">Loading more...</span>
               </div>
             )}

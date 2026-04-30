@@ -1,4 +1,5 @@
 import { Operator } from '@inixiative/json-rules';
+import { ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -44,6 +45,11 @@ export const rebacSchema: RebacSchema = {
     },
   },
 
+  // Owner-polymorphic models: per-row permissionRules are merged additively
+  // over the standard owner-walk by check() — see packages/permissions/src/rebac/ownerActions.ts.
+  contact: { actions: ownerActions() },
+  webhookSubscription: { actions: ownerActions() },
+
   organizationUser: {
     actions: {
       read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
@@ -62,10 +68,41 @@ export const rebacSchema: RebacSchema = {
     },
   },
 
+  // Tokens carry a `role` field — assigning/revoking one inherits the
+  // org/space `assign` semantics: high roles need own on the owner, others
+  // need manage. Encoded against the token's row so the role rule resolves
+  // locally and only the seat check walks to the owner.
   token: {
     actions: {
-      // Self-delete for tokens with userId (User, OrgUser, SpaceUser)
+      // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
       leave: { self: 'userId' },
+      // Owner-side assign, role-aware.
+      assign: {
+        any: [
+          {
+            all: [
+              { rule: { field: 'role', operator: Operator.in, value: highRoles } },
+              {
+                any: [
+                  { rel: 'organization', action: 'own' },
+                  { rel: 'space', action: 'own' },
+                ],
+              },
+            ],
+          },
+          {
+            all: [
+              { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
+              {
+                any: [
+                  { rel: 'organization', action: 'manage' },
+                  { rel: 'space', action: 'manage' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     },
   },
 

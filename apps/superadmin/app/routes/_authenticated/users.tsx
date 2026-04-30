@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
-import { UserPlus } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 const UsersPage = () => {
   return (
@@ -11,7 +12,7 @@ const UsersPage = () => {
           <p className="text-muted-foreground">View and manage all users across the platform</p>
         </div>
         <Button>
-          <UserPlus className="h-4 w-4 mr-2" />
+          <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />
           Add User
         </Button>
       </div>

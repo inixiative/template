@@ -1,4 +1,3 @@
-import type { AccessorName } from '@template/db';
 import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
@@ -11,15 +10,14 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
   const token = getResource<'token'>(c);
   const permix = c.get('permix');
 
-  const canLeave = check(permix, rebacSchema, 'token', token, 'leave');
-  if (!canLeave) {
-    const [ownerId, ownerType] = token.spaceId
-      ? [token.spaceId, 'space' as AccessorName]
-      : [token.organizationId, 'organization' as AccessorName];
-    const owner = await hydrate(db, ownerType, { id: ownerId! });
-    if (!check(permix, rebacSchema, ownerType, { ...owner, role: token.role }, 'assign'))
-      throw makeError({ status: 403, message: 'Access denied' });
-  }
+  // `leave` covers self-delete (any userId-bearing token); `assign` covers
+  // owner-side delete with the token's role baked in. Both paths live in
+  // rebac — see token's entry in packages/permissions/src/rebac/schema.ts.
+  const hydrated = await hydrate(db, 'token', token);
+  const canDelete =
+    check(permix, rebacSchema, 'token', hydrated, 'leave') ||
+    check(permix, rebacSchema, 'token', hydrated, 'assign');
+  if (!canDelete) throw makeError({ status: 403, message: 'Access denied' });
 
   await db.token.delete({ where: { id: token.id } });
 

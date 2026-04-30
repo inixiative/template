@@ -2,7 +2,8 @@ import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';
-import { AlertTriangle } from 'lucide-react';
+import { Icon } from '@iconify/react';
+
 
 export type UnauthorizedProps = {
   title?: string;
@@ -44,7 +45,7 @@ export const Unauthorized = ({
       <Card className="max-w-md w-full">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
+            <Icon icon="lucide:alert-triangle" className="h-6 w-6 text-destructive" />
             <CardTitle>{title}</CardTitle>
           </div>
         </CardHeader>

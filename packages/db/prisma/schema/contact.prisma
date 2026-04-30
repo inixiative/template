@@ -1,0 +1,90 @@
+// ============================================================================
+// CONTACT - Unified contact-info entries (phone, email, social handles, …)
+// ============================================================================
+// Owner is false-polymorphic: User | Organization | Space (one FK populated to
+// match `ownerModel`, enforced by the falsePolymorphism hook + registry entry).
+// `value` is JSON whose shape varies by `type`; validation lives in the
+// shared/contact/registry. `valueKey` is the canonical projection of `value`
+// used for indexing and uniqueness (e.g. E.164 for phones, jid for whatsapp,
+// `${classifier}:${handle}` for handle types).
+//
+// Per-owner uniqueness is enforced by the composite @@unique below.
+// All types use per-owner uniqueness — global-within-type is intentionally
+// omitted until handle ownership can be verified (OAuth / DNS proof). Without
+// verification, first-claim global locking is an abuse vector and blocks
+// legitimate co-owners (e.g. a founder's personal + their org sharing @acme).
+
+model Contact {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Owner — false polymorphism, exactly one FK matches the discriminator.
+  ownerModel     ContactOwnerModel
+  userId         String? @db.VarChar(36)
+  organizationId String? @db.VarChar(36)
+  spaceId        String? @db.VarChar(36)
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  type    ContactType
+  subtype String?    // semantics depend on type — see shared/contact/registry
+
+  label     String?
+  // Position within (owner, type) — Carde-style dense ordering. Hook
+  // auto-assigns MAX+1 on create when caller omits it; reorder via
+  // shift-and-renumber (see lib/prisma/orderedList.ts).
+  sortOrder Int @default(0)
+
+  value    Json
+  valueKey String?
+
+  // Per-row override for the rebac action rules on this resource.
+  // Shape: Record<Action, ActionRule>. Read by check() — row-level wins over
+  // the static rebacSchema for any action present here. Null = schema-only.
+  permissionRules Json?
+
+  verifiedAt DateTime?
+  source     String?
+
+  @@unique([ownerModel, userId, organizationId, spaceId, type, valueKey])
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([type, valueKey])
+}
+
+enum ContactOwnerModel {
+  User
+  Organization
+  Space
+}
+
+enum ContactType {
+  phone
+  email
+  website
+  linkedin
+  twitter
+  github
+  whatsapp
+  telegram
+  discord
+  instagram
+  facebook
+  youtube
+  tiktok
+  bluesky
+  threads
+  reddit
+  signal
+  mastodon
+  line
+  wechat
+  viber
+  skype
+}

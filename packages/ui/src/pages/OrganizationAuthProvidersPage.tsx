@@ -16,8 +16,9 @@ import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@te
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 type AuthProvider = OrganizationReadAuthProviderResponses[200]['data']['organization'][number];
 
@@ -121,10 +122,10 @@ export const OrganizationAuthProvidersPage = () => {
               setIsModalOpen(true);
             }}
           >
-            <Pencil className="h-4 w-4" />
+            <Icon icon="lucide:pencil" className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
@@ -167,7 +168,7 @@ export const OrganizationAuthProvidersPage = () => {
                   </p>
                 </div>
                 <Button onClick={() => setIsModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
                   Add Provider
                 </Button>
               </div>
