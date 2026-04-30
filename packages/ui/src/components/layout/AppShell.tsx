@@ -59,7 +59,7 @@ export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls =
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
         <Breadcrumbs className="px-6 py-3 border-b" />
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

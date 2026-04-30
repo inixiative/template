@@ -78,18 +78,16 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     if (options?.spoofUserEmail) headers['x-spoof-user-email'] = options.spoofUserEmail;
 
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const scopedClient = createClient({
-      baseUrl,
-      headers,
-      throwOnError,
-      // hey-api's default querySerializer (and even style:'form' explode)
-      // throws on any nested object/array — pathSerializer.gen.ts:118.
-      // Override with our bracket serializer so nested filter shapes like
-      // searchFields = { targetModel: { in: ['admin'] } } encode as
-      // searchFields[targetModel][in]=admin. Output for flat params
-      // matches hey-api's default exactly.
-      querySerializer: (params) => serializeBracketQuery(params as Record<string, unknown>).toString(),
-    });
+    // hey-api's default querySerializer (and even style:'form' explode)
+    // throws on any nested object/array — pathSerializer.gen.ts:118.
+    // Bracket-encode nested filter shapes like
+    // searchFields = { targetModel: { in: ['admin'] } } as
+    // searchFields[targetModel][in]=admin. Output for flat params matches
+    // hey-api's default exactly.
+    const querySerializer = (params: Record<string, unknown>) =>
+      serializeBracketQuery(params).toString();
+
+    const scopedClient = createClient({ baseUrl, headers, throwOnError, querySerializer });
 
     // Hono generates :id style paths in the OpenAPI spec, but hey-api's
     // defaultPathSerializer only handles {id} style. Fix all parametric endpoints.
@@ -115,12 +113,21 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     // un-configured client) into queryKey[0]; spreading that here would
     // override the scopedClient's baseUrl and turn admin endpoints into
     // relative URLs against the page origin. Force the scoped baseUrl.
+    //
+    // Same problem with querySerializer: every generated SDK function
+    // hardcodes a per-call `querySerializer: { parameters: { searchFields: ... } }`
+    // (a QuerySerializerOptions object, not a function), and the client merge
+    // spreads per-call last — so the scoped bracket function is replaced by
+    // hey-api's default object-driven serializer, which throws on any nested
+    // shape ("Deeply-nested arrays/objects aren't supported"). Force the
+    // scoped function in mergedOptions so it wins.
     const mergedOptions = {
       ...((vars ?? {}) as Record<string, unknown>),
       baseUrl,
+      querySerializer,
       client: scopedClient,
       throwOnError,
-    } as RequestOptionsFor<TVariables>;
+    } as unknown as RequestOptionsFor<TVariables>;
 
     const result = await fn(mergedOptions);
 
