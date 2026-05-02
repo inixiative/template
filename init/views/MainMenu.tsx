@@ -3,7 +3,10 @@ import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
-import { getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
+import {
+  getCloudflarePagesLiveActions,
+  getCloudflarePagesProgressSummaries,
+} from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
 import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
@@ -172,7 +175,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 
       const cloudflarePagesSummaries = getCloudflarePagesProgressSummaries(cfg);
       const cloudflarePagesLive = cloudflarePagesSummaries.filter((s) => !s.skipped);
-      const cloudflarePagesProgress: Record<string, boolean> = { ...cfg.cloudflarePages.progress };
+      // Filter the progress map down to actions in non-skipped groups so
+      // disabled web/admin/staging steps don't drag the section's
+      // completion total up forever.
+      const cloudflarePagesLiveActions = getCloudflarePagesLiveActions(cfg);
+      const cloudflarePagesProgress: Record<string, boolean> = Object.fromEntries(
+        cloudflarePagesLiveActions.map((a) => [a, cfg.cloudflarePages.progress[a] === true]),
+      );
       const cloudflarePagesStatus = getStatusFromSummaries(
         cloudflarePagesProgress,
         cloudflarePagesLive,

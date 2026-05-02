@@ -119,3 +119,20 @@ export const getCloudflarePagesProgressItems = (
     skipped: s.skipped,
   }));
 };
+
+/**
+ * Actions belonging to non-skipped groups (live apps + staging-when-enabled).
+ * Use this to derive a filtered progress map for completion %, so disabled
+ * web/admin/staging steps don't drag the section to "incomplete".
+ */
+export const getCloudflarePagesLiveActions = (config: ProjectConfig): readonly CloudflarePagesAction[] => {
+  const stagingEnabled = config.features.staging.enabled;
+  const live: CloudflarePagesAction[] = [];
+  for (const g of groups) {
+    const appDisabled = g.appKey ? !config.features.apps[g.appKey].enabled : false;
+    const stagingMissing = !!g.requiresStaging && !stagingEnabled;
+    if (appDisabled || stagingMissing) continue;
+    for (const a of g.actions) live.push(a);
+  }
+  return live;
+};

@@ -112,7 +112,11 @@ export const setupCloudflarePages = async (
             githubRepo,
             productionBranch: 'main',
             rootDir: `apps/${app.key}`,
-            buildCommand: `bun install --frozen-lockfile && bun run --cwd apps/${app.key} build`,
+            // CF runs commands inside rootDir (apps/<app>), so `--cwd apps/<app>`
+            // would resolve to apps/<app>/apps/<app>. Step back to the repo root
+            // for install + workspace-aware build, mirroring the Vercel build
+            // pattern. destinationDir stays relative to rootDir (apps/<app>/dist).
+            buildCommand: `cd ../.. && bun install --frozen-lockfile && bun run --filter=${app.key} build`,
             destinationDir: 'dist',
           });
         }
