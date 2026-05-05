@@ -60,24 +60,6 @@ describe('emitAppEvent', () => {
     expect(event.actor.ipAddress).toBeNull();
   });
 
-  it('includes resourceType and resourceId from options', async () => {
-    const mockHandler = mock(async () => {});
-    appEventHandlers[AppEventName.userCreated] = mockHandler;
-
-    await emitAppEvent(
-      'user.created',
-      { userId: 'test-id', isGuest: false },
-      {
-        resourceType: 'User',
-        resourceId: 'test-id',
-      },
-    );
-
-    const event = mockHandler.mock.calls[0][0];
-    expect(event.resourceType).toBe('User');
-    expect(event.resourceId).toBe('test-id');
-  });
-
   it('sets timestamp', async () => {
     const mockHandler = mock(async () => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;

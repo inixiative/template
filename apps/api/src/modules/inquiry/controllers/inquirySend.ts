@@ -35,18 +35,12 @@ export const inquirySendController = makeController(inquirySendRoute, async (c, 
       include: includeInquirySent,
     });
 
-    await emitAppEvent('inquiry.sent', approved, {
-      resourceType: 'Inquiry',
-      resourceId: approved.id,
-    });
+    await emitAppEvent('inquiry.sent', approved);
 
     return respond.ok(approved);
   }
 
-  await emitAppEvent('inquiry.sent', sent, {
-    resourceType: 'Inquiry',
-    resourceId: sent.id,
-  });
+  await emitAppEvent('inquiry.sent', sent);
 
   return respond.ok(sent);
 });

@@ -7,8 +7,6 @@ const createDbObserveAdapter = (): ObserveAdapter => ({
     await enqueueJob('recordAppEvent', {
       name: event.name,
       actor: event.actor,
-      resourceType: event.resourceType,
-      resourceId: event.resourceId,
       data,
     });
   },

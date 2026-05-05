@@ -21,14 +21,7 @@ export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }:
       data: { email: normalized, name, emailVerified: false },
     });
 
-    await emitAppEvent(
-      'user.created',
-      { userId: guest.id, isGuest: true },
-      {
-        resourceType: 'User',
-        resourceId: guest.id,
-      },
-    );
+    await emitAppEvent('user.created', { userId: guest.id, isGuest: true });
 
     return guest;
   });

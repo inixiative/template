@@ -56,7 +56,6 @@ export const resolveInquiry = async (
       await emitAppEvent(
         'inquiry.resolved',
         { ...updated, _resolution: status },
-        { resourceType: 'Inquiry', resourceId: fresh.id },
       );
 
       return updated;

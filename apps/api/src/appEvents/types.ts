@@ -15,15 +15,8 @@ export type AppEventActor = {
 export type AppEventPayload<T = Record<string, unknown>> = {
   name: string;
   actor: AppEventActor;
-  resourceType?: string;
-  resourceId?: string;
   data: T;
   timestamp: string;
-};
-
-export type AppEventOptions = {
-  resourceType?: string;
-  resourceId?: string;
 };
 
 export type EmailSenderContext = {

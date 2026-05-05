@@ -17,16 +17,11 @@ model AppEvent {
   userAgent        String?
   sourceInquiryId  String? @db.VarChar(36)
 
-  // Resource reference (optional)
-  resourceType String?
-  resourceId   String? @db.VarChar(36)
-
   // Domain payload
   data Json @default("{}")
 
   @@index([name])
   @@index([actorUserId])
-  @@index([resourceType, resourceId])
   @@index([createdAt])
 
   // ==========================================================================
