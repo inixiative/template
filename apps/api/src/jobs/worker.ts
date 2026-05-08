@@ -1,3 +1,4 @@
+import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';

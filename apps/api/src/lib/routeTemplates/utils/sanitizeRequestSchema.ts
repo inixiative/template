@@ -22,5 +22,10 @@ export const sanitizeRequestSchema = <T extends ZodSchema>(
   const allSanitizeKeys = [...BASE_SANITIZE_KEYS, ...additionalSanitizeKeys];
   const sanitizedShape = omit(schema.shape, allSanitizeKeys);
   const transformedShape = transformJsonFields(sanitizedShape);
-  return z.object(transformedShape) as SanitizedSchema<T>;
+  // Preserve the input schema's catchall (e.g. `.passthrough()`) so per-route
+  // shapes that intentionally allow extra keys (e.g. inquiryResolve forwarding
+  // handler-specific resolution fields) keep working after sanitize.
+  const rebuilt = z.object(transformedShape);
+  const catchall = (schema as { _def?: { catchall?: z.ZodTypeAny } })._def?.catchall;
+  return (catchall ? rebuilt.catchall(catchall) : rebuilt) as SanitizedSchema<T>;
 };

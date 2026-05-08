@@ -1,3 +1,4 @@
+import '#/config/env';
 import { getRedisClient } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { app } from '#/app';

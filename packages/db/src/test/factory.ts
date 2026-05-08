@@ -28,6 +28,7 @@
 
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db/client';
+import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
   BuildContext,
@@ -175,13 +176,34 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       if (dep.foreignKey && ctx[depAccessor]) {
         const depEntity = ctx[depAccessor] as Record<string, unknown>;
 
+        // Two protections layered here:
+        // 1. Scalar overrides win — when a model has two deps that share a
+        //    modelName (e.g. Inquiry's sourceUser + targetUser both → User),
+        //    they also share `ctx[depAccessor]`, so the second iteration
+        //    would clobber an explicit FK override.
+        // 2. Polymorphism gate — for polymorphic models, an FK is only valid
+        //    when the discriminator value selects it. Don't auto-pull a FK
+        //    from incidental ctx if the discriminator forbids it (e.g.
+        //    Inquiry { targetModel: 'admin' } must not gain a
+        //    targetOrganizationId just because orgCtx carries one).
+        const polyConfig = PolymorphismRegistry[modelName];
+        const fkAllowed = (fkField: string): boolean => {
+          if (!polyConfig) return true;
+          const axis = polyConfig.axes.find((a) => Object.values(a.fkMap).flat().includes(fkField));
+          if (!axis) return true;
+          const discriminator = merged[axis.field] as string | undefined;
+          if (!discriminator) return true;
+          return (axis.fkMap[discriminator as keyof typeof axis.fkMap] ?? []).includes(fkField);
+        };
+
         if (typeof dep.foreignKey === 'string') {
-          // Simple: source = target (e.g., "organizationId")
-          merged[dep.foreignKey] = depEntity[dep.foreignKey];
+          if (!(dep.foreignKey in scalarFields) && fkAllowed(dep.foreignKey)) {
+            merged[dep.foreignKey] = depEntity[dep.foreignKey];
+          }
         } else {
-          // Mapped: { targetField: sourceField }
-          // e.g., { id: "userId" } means set merged.userId = depEntity.id
           for (const [targetField, sourceField] of Object.entries(dep.foreignKey)) {
+            if (sourceField in scalarFields) continue;
+            if (!fkAllowed(sourceField)) continue;
             merged[sourceField] = depEntity[targetField];
           }
         }

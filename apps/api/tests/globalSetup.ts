@@ -1,3 +1,5 @@
+import '#/config/env';
+import '#tests/mocks/queue';
 import { db } from '@template/db';
 
 /**

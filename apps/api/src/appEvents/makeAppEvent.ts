@@ -21,34 +21,46 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     const data = event.data as T;
     const tasks: Promise<void>[] = [];
 
+    // Wrap each bridge in an async IIFE so a synchronous throw from the
+    // user-supplied selector (handler.observe(data) etc.) becomes a Promise
+    // rejection captured by Promise.allSettled below — otherwise it would
+    // bubble before sibling bridges enqueue, breaking bridge isolation.
     if (handler.observe) {
-      const observeData = handler.observe(data);
-      if (observeData) {
-        tasks.push(observeRegistry.broadcast((adapter) => adapter.record(event, observeData)).then(() => {}));
-      }
+      tasks.push(
+        (async () => {
+          const observeData = handler.observe!(data);
+          if (observeData) {
+            await observeRegistry.broadcast((adapter) => adapter.record(event, observeData));
+          }
+        })(),
+      );
     }
 
     if (handler.email) {
-      const handoffs = handler.email(data);
-      if (handoffs?.length) {
-        for (const handoff of handoffs) {
-          tasks.push(deliverEmailHandoffs(event, [handoff]));
-        }
-      }
+      tasks.push(
+        (async () => {
+          const handoffs = handler.email!(data);
+          if (handoffs?.length) {
+            await Promise.all(handoffs.map((h) => deliverEmailHandoffs(event, [h])));
+          }
+        })(),
+      );
     }
 
     if (handler.websocket) {
-      const handoffs = handler.websocket(data);
-      if (handoffs?.length) {
-        for (const handoff of handoffs) {
-          tasks.push(deliverWSHandoffs([handoff]));
-        }
-      }
+      tasks.push(
+        (async () => {
+          const handoffs = handler.websocket!(data);
+          if (handoffs?.length) {
+            await Promise.all(handoffs.map((h) => deliverWSHandoffs([h])));
+          }
+        })(),
+      );
     }
 
     if (handler.cb) {
       for (const callback of handler.cb) {
-        tasks.push(Promise.resolve(callback(data)));
+        tasks.push(Promise.resolve().then(() => callback(data)));
       }
     }
 
