@@ -1,4 +1,3 @@
-import '#tests/mocks/queue';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db, type UserId } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';

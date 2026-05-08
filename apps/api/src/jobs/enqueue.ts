@@ -1,5 +1,7 @@
 import { redisNamespace } from '@template/db';
 import { log } from '@template/shared/logger';
+import { isTest } from '@template/shared/utils';
+import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
@@ -36,6 +38,18 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   const { type = JobType.adhoc, id, ...jobOptions } = options || {};
 
   const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
+
+  // In test, skip BullMQ entirely. Handlers that want to be tested are tested
+  // directly via createTestWorker().run(). Production code that calls
+  // enqueueJob shouldn't have to know about cmsgpack, ioredis-mock, or the
+  // BullMQ Lua VM — and we don't want module-level mocks leaking across
+  // tests. Tests of the queue ITSELF use the real queue (or a fake injected
+  // via DI).
+  if (isTest) {
+    const jobId = id ?? uuidv7();
+    return { jobId, name: handlerName };
+  }
+
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
 
   if (dedupeKey) await signalSupersededJobs(dedupeKey);

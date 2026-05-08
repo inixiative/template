@@ -1,4 +1,3 @@
-import '#tests/mocks/queue';
 import { mock } from 'bun:test';
 import { db } from '@template/db';
 import type { Job } from 'bullmq';

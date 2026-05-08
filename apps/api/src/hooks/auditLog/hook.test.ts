@@ -1,4 +1,3 @@
-import '#tests/mocks/queue';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
