@@ -5,11 +5,14 @@ export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>)
   return async (ctx, ...args: JobHandlerArgs<TPayload>) => {
     const { queue, job } = ctx;
     const redis = queue.redis;
-    const jobData = job.data;
 
-    if (!jobData.id) throw new Error('Singleton job missing id');
+    // Lock key prefers `data.id` (cron path: row's uuidv7) so a single handler
+    // can serve multiple singleton lanes (e.g. one cron job per row). Falls
+    // back to `job.name` so ad-hoc/test invocations work without faking an id.
+    const lockId = (job.data as { id?: string } | undefined)?.id ?? job.name;
+    if (!lockId) throw new Error('Singleton job missing id and name');
 
-    const lockKey = `${redisNamespace.job}:lock:${jobData.id}`;
+    const lockKey = `${redisNamespace.job}:lock:${lockId}`;
     const lockTTL = 300;
 
     const acquired = await redis.set(lockKey, '1', 'EX', lockTTL, 'NX');
