@@ -711,6 +711,7 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `webhookSubscription.prisma` - Webhook configurations
 - `inquiry.prisma` - False polymorphic inquiry system
 - `customer.prisma` - Customer references
+- `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 
 **Communications:**
 - See [COMMUNICATIONS.md](COMMUNICATIONS.md#database-models) for email template models

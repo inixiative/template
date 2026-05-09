@@ -8,6 +8,7 @@
 - [Webhooks](#webhooks)
 - [Cache Invalidation](#cache-invalidation)
 - [False Polymorphism](#false-polymorphism)
+- [Contact Rules](#contact-rules)
 - [Rules Registry](#rules-registry)
 - [Immutable Fields](#immutable-fields)
 
@@ -66,6 +67,7 @@ Located in `apps/api/src/hooks/`:
 | `immutableFields` | Prevents FK field updates |
 | `rules` | Declarative validation |
 | `falsePolymorphism` | Type enum + FK validation |
+| `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
 
 All registered via `registerHooks()` in entry points.
 
@@ -304,6 +306,44 @@ await db.token.create({
 });
 // → Error: Invalid ownerModel value on Token
 ```
+
+---
+
+## Contact Rules
+
+`contactRules` is a per-type validation + normalization hook for the `Contact` model. Unlike `rules` (one declarative condition per model), Contact has 22 types (phone, email, linkedin, github, telegram, …) each with their own input shape, canonical storage shape, and `valueKey` projection. The hook delegates to a registry instead of growing one giant rule.
+
+```typescript
+// packages/shared/src/contact/registry.ts
+import { ContactRegistry } from '@template/shared/contact';
+
+// Each entry implements ContactTypeDef<TInput, TStored>:
+// - inputSchema:  loose accept (URL paste, structured input)
+// - parseInput:   normalize loose → canonical
+// - valueSchema:  strict canonical (post-parse safety net)
+// - toValueKey:   projection used for indexing + uniqueness
+// - subtype:      'forbidden' | 'optional' | 'required'
+// - uniqueness:   'global-within-type' | 'per-owner'
+// - display:      { label, icon (iconify slug) }
+```
+
+The hook fires for `create`, `createManyAndReturn`, `upsert`, `update`, and `updateManyAndReturn`. For each row it:
+
+1. Looks up the def from `ContactRegistry[row.type]` (422 if unknown).
+2. Enforces the subtype rule.
+3. Parses `value` through `inputSchema` → `parseInput` → `valueSchema`.
+4. Sets `valueKey = def.toValueKey(canonical)` so the per-owner unique constraint resolves.
+5. On create, auto-assigns `sortOrder = MAX+1` within `(owner, type)` if the caller omitted it (uses `nextSortOrder` from `apps/api/src/lib/prisma/orderedList.ts`).
+
+Update paths shadow-merge the partial update with `previous` so type-aware validation runs against the merged record, then mirror hook-computed fields (`value`, `valueKey`) back into `args.data`.
+
+### Adding a Contact Type
+
+1. Drop a def file in `packages/shared/src/contact/defs/<type>.ts` exporting `<type>Def: ContactTypeDef<...>`.
+2. Add the type literal to the `ContactType` enum in `packages/db/prisma/schema/contact.prisma` and regenerate.
+3. Register the def in `ContactRegistry` (`packages/shared/src/contact/registry.ts`).
+
+No controller, route, or hook change needed — the hook discovers new types through the registry.
 
 ---
 

@@ -10,6 +10,8 @@
 - [Permission Checks](#permission-checks)
 - [Entitlements](#entitlements)
 - [REBAC](#rebac)
+- [Owner-Polymorphic Models](#owner-polymorphic-models)
+- [Row-Level Overrides](#row-level-overrides)
 - [Space Permissions](#space-permissions)
 - [Validation Middleware](#validation-middleware)
 - [Role Assignment](#role-assignment)
@@ -575,6 +577,86 @@ Use dot-path when you want a stricter check that bypasses intermediate delegatio
 // 4. own → { rel: 'organization', action: 'own' } (delegate to org)
 // 5. Check organization.own
 ```
+
+---
+
+## Owner-Polymorphic Models
+
+Models with nullable FKs to multiple owners (Contact, WebhookSubscription, etc.) use the `ownerActions()` helper instead of writing the same fan-out for every action:
+
+```typescript
+// packages/permissions/src/rebac/ownerActions.ts
+import { ownerActions } from '@template/permissions/rebac/ownerActions';
+
+// Default: fan out across user/organization/space
+contact: { actions: ownerActions() },
+
+// Pick a subset
+emailTemplate: { actions: ownerActions(['organization', 'space']) },
+
+// Compose with custom actions
+contact: { actions: { ...ownerActions(), share: { ... } } },
+```
+
+For each of `own`/`manage`/`operate`/`read`, the helper expands to `{ any: [{ rel: 'user', action }, { rel: 'organization', action }, { rel: 'space', action }] }`. Only the populated FK resolves — `rel` returns false for the other relations because the record isn't loaded — so the `any` collapses to the actual owner's chain.
+
+This is what makes the `read → operate → manage → own` chain on User/Org/Space reusable as-is for every owner-polymorphic resource.
+
+---
+
+## Row-Level Overrides
+
+Some resources need per-row sharing on top of the schema-default permissions — e.g. a user wants to make one specific contact readable by anyone, without changing the rule for all their contacts. The pattern is a `permissionRules: Json?` column on the resource that `check()` merges additively with the schema rule.
+
+### Schema
+
+```prisma
+model Contact {
+  // ...
+  permissionRules Json?  // Record<Action, ActionRule> | null
+}
+```
+
+### How `check()` merges
+
+Inside `packages/permissions/src/rebac/check.ts`, when resolving an action by name:
+
+```typescript
+const schemaRule = schema[model]?.actions[actionOrRule] ?? null;
+const rowRule    = record.permissionRules?.[actionOrRule];
+const merged: ActionRule = rowRule !== undefined
+  ? { any: [schemaRule, rowRule] }   // OR — additive only
+  : schemaRule;
+return check(permix, schema, model, record, merged, visited);
+```
+
+**Additive only.** Row rules can grant additional paths but never restrict — the schema rule is the floor. A row rule like `read: { all: [] }` (vacuously true) opens the row to any authenticated requester; setting `read: null` doesn't take read away from the owner.
+
+### Boundary validation
+
+Rows arrive over the API, so route schemas validate the shape before it lands in the DB. Use `buildPermissionRulesSchema(model, pick?)` from `@template/permissions/rebac/permissionRulesSchema` — it derives the valid action keys from `rebacSchema[model].actions` so there's no second source of truth:
+
+```typescript
+// apps/api/src/modules/contact/schemas/contactSchemas.ts
+import { buildPermissionRulesSchema } from '@template/permissions/rebac/permissionRulesSchema';
+
+export const contactCreateBodySchema = ContactScalarInputSchema.omit({ ... }).extend({
+  // Only `read` is row-overridable — granting manage/delete via row rules
+  // would effectively transfer ownership, so those stay owner-gated.
+  permissionRules: buildPermissionRulesSchema('contact', ['read']),
+});
+```
+
+The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ self }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
+
+### When to use it
+
+Row-level overrides solve a specific need: opt-in sharing of individual records without changing the schema rule for everyone. Use it when:
+
+- The resource has natural per-row access decisions (sharing a contact, publishing an asset).
+- The set of overridable actions is narrow — typically `read` only. Exposing `manage`/`delete` row rules effectively lets owners delegate ownership, which usually shouldn't be a row decision.
+
+Don't use it as a substitute for proper rebac modeling. If every row needs the same override, that belongs in the schema rule.
 
 ---
 

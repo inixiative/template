@@ -2,7 +2,7 @@
 
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
-**Last Updated:** 2026-03-18
+**Last Updated:** 2026-05-09
 
 ## How to Read This
 
@@ -191,7 +191,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
 
-- ✅ **18 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog
+- ✅ **19 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -379,6 +379,30 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Status Tracking** - Full state machine. `sentAt` set once on first send (historical). `expiresAt` set on send via `computeExpiresAt(type)`, cleared when moved back to draft
 - ✅ **Audit Lineage** - `sourceInquiryId` set in actor context during resolution so all side-effect mutations link back to the causal inquiry
 - 🟡 **UI and flow completion** (ticket FEAT-001) - Invitation flow, approval UI, and onboarding integrations in progress
+
+---
+
+## Contact System
+
+**Unified contact-info entries (phone, email, social handles, …) for any owner.** One model, one set of routes, one validation pipeline — instead of bespoke columns scattered across User/Organization/Space and a different shape per channel. New contact types are added by registering a per-type def, not by changing the schema.
+
+- ✅ **Single Contact Model** - One `Contact` table covers phone, email, website, and 19 social/messaging handles (linkedin, github, twitter, whatsapp, telegram, discord, instagram, facebook, youtube, tiktok, bluesky, threads, reddit, signal, mastodon, line, wechat, viber, skype). False-polymorphic owner: `ownerModel` discriminator + nullable `userId`/`organizationId`/`spaceId`. Per-owner uniqueness enforced by composite `@@unique([ownerModel, userId, organizationId, spaceId, type, valueKey])`
+
+- ✅ **Per-Type Registry** - `ContactRegistry` in `@template/shared/contact` maps each type to a `ContactTypeDef`: a loose `inputSchema` (accepts pasted URLs, structured input, etc.), a `parseInput` normalizer, a strict `valueSchema` for storage, a `toValueKey` projection (E.164 for phones, jid for whatsapp, `${classifier}:${handle}` for handles), an optional `toUrl` for display, and `subtype` rules (`forbidden`/`optional`/`required`). Adding a new contact type = drop a def file in `defs/`, register it, done — no schema change, no controller change
+
+- ✅ **`contactRules` Hook** - Single before-mutation hook validates and normalizes every Contact write across `create`, `createManyAndReturn`, `upsert`, `update`, `updateManyAndReturn`. Looks up the type def, runs subtype rules, parses + canonicalizes `value`, computes `valueKey`, and auto-assigns `sortOrder` (MAX+1 within the owner+type scope) on create. Update paths shadow-merge with `previous` so partial updates validate against the merged record
+
+- ✅ **Ordered List Helpers** - `nextSortOrder(delegate, scope)` returns the next dense ordinal; `reorderInList(delegate, { itemId, fromOrder, toOrder, scope })` does Carde-style shift-and-renumber (park at -1, shift the affected range, place at target). Generic over any model with a sortOrder-like column. Located in `apps/api/src/lib/prisma/orderedList.ts`
+
+- ✅ **Row-Level Permission Overrides** - Optional `permissionRules: Json?` column lets owners share individual rows (e.g. "make this email readable by anyone"). Stored as `Record<Action, ActionRule>`; `check()` OR's the row rule with the schema rule for that action (additive only — row rules can grant, never restrict). Boundary validation via `buildPermissionRulesSchema(model, pick?)` derives valid action keys from the rebac schema; routes typically only expose `read` for sharing, keeping write actions owner-only
+
+- ✅ **`ownerActions()` Helper** - Spreadable rebac action block for owner-polymorphic models. Each of `own`/`manage`/`operate`/`read` fans out across the configured owner relations (default: user/organization/space) — only the populated FK resolves, the others' rel returns false. `contact: { actions: ownerActions() }` is the entire schema entry
+
+- ✅ **Endpoints** - `GET /contact/:id`, `PATCH /contact/:id`, `DELETE /contact/:id`, `GET /admin/contacts`, plus owner-scoped create/list under `POST/GET /me/contacts`, `POST/GET /organization/:id/contacts`, `POST/GET /space/:id/contacts`. Owner FKs are stripped from request bodies via `sanitizeKeys` and re-injected from auth context — clients can't transfer rows across owners
+
+- ✅ **Test Coverage** - `contactCrud.test.ts` covers per-type input normalization, per-owner uniqueness (two users can claim the same handle), `permissionRules` granting cross-user read while writes stay owner-gated, and rejection of permissionRules for non-overridable actions. `contactRules` hook has its own `hook.test.ts` for validation + sortOrder behavior
+
+[Learn more: DATABASE.md](docs/claude/DATABASE.md) | [HOOKS.md](docs/claude/HOOKS.md) | [PERMISSIONS.md](docs/claude/PERMISSIONS.md#row-level-overrides)
 
 ---
 
@@ -663,7 +687,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
   - Shared Packages: ~20,000 lines
 - **Tests:** 93 test files across packages and API (backend focused, frontend tests minimal)
 - **API Endpoints:** 70+ documented REST endpoints with OpenAPI specs
-- **Database Models:** 18 Prisma models with full relations and hooks (auditLog, customerRef included)
+- **Database Models:** 19 Prisma models with full relations and hooks (auditLog, customerRef, contact included)
 - **Frontend Hooks:** 20+ custom hooks for common patterns
 - **UI Components:** 50+ Shadcn UI components with variants
 
