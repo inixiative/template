@@ -71,14 +71,18 @@ const dbMethods = {
           options?.timeout ? { timeout: options.timeout } : undefined,
         );
 
-        // Run afterCommit callbacks with concurrency limits.
-        // This timing is separate from mutation timing in mutationLifeCycle.ts:
-        // - "[db] slow mutation:" = hooks + query (inside txn)
-        // - "[db] afterCommit slow:" = callbacks only (after commit)
-        const totalCallbacks = s.afterCommitBatches.reduce((sum, b) => sum + b.fns.length, 0);
+        // Drain afterCommit callbacks. Snapshot + reset the queue before
+        // iteration so nested db.txn calls (e.g. mutations from inside an
+        // onCommit handler) don't see the parent's pending batches and re-run
+        // them. Nested mutations register their own onCommit batches against
+        // the same scope state, but their own run() snapshots and drains
+        // those before this loop continues — so we don't need a while loop.
+        const batches = s.afterCommitBatches;
+        s.afterCommitBatches = [];
+        const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
         if (totalCallbacks > 0) {
           const start = performance.now();
-          for (const batch of s.afterCommitBatches) {
+          for (const batch of batches) {
             const results = await resolveAll(
               batch.fns.map((fn) => async () => {
                 try {
@@ -99,7 +103,7 @@ const dbMethods = {
           const duration = performance.now() - start;
           const slowThreshold = s.scopeContext === 'worker' ? 30000 : 5000;
           if (duration > slowThreshold) {
-            const types = [...new Set(s.afterCommitBatches.flatMap((b) => b.types ?? []))];
+            const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
             log.warn(
               `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
               LogScope.db,

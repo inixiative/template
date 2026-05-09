@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createWebhookSubscription, getNextSeq } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
@@ -25,6 +25,16 @@ describe('organization/webhookSubscriptions', () => {
     });
     fetch = harness.fetch;
     db = harness.db;
+  });
+
+  beforeEach(() => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      (() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as typeof fetch,
+    );
+  });
+
+  afterEach(() => {
+    mock.restore();
   });
 
   afterAll(async () => {
