@@ -27,8 +27,9 @@ model CustomerRef {
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.
-  // Default ['platform']; `system` bypasses.
-  acceptedKinds Json @default("[\"platform\"]")
+  // Default ['platform','activity'] matches the kind-level policy
+  // (platform + activity opt-out, marketing opt-in); `system` bypasses.
+  acceptedKinds Json @default("[\"platform\", \"activity\"]")
 
   @@index([customerModel])
   @@index([customerUserId])

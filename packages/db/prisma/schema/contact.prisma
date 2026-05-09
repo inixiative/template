@@ -51,11 +51,12 @@ model Contact {
   source     String?
 
   // Communication-kind opt-ins for this specific contact channel.
-  // JSON array of CommunicationKind values. Default ['platform'] — every
-  // new contact gets platform messages; activity and marketing require
-  // explicit opt-in. `system` kind bypasses this list entirely (always
-  // delivered). See `apps/api/src/lib/messaging/canDeliver.ts`.
-  acceptedKinds Json @default("[\"platform\"]")
+  // JSON array of CommunicationKind values. Default ['platform','activity']
+  // matches the kind-level policy: platform + activity are opt-out (on by
+  // default); marketing is opt-in (must be explicitly added). `system` kind
+  // bypasses this list entirely (always delivered).
+  // See `apps/api/src/lib/messaging/canDeliver.ts`.
+  acceptedKinds Json @default("[\"platform\", \"activity\"]")
 
   @@unique([ownerModel, userId, organizationId, spaceId, type, valueKey])
   @@index([ownerModel])
