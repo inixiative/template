@@ -10,10 +10,29 @@ model TagCategory {
     updatedAt   DateTime  @updatedAt
     deletedAt   DateTime?
 
-    name        String    @unique // "audience", "region", "vertical", "cohort", …
+    name        String                                    // "audience", "region", "vertical", "cohort", …
     description String?
 
+    // Owner — same shape as Tag. `platform` = global category, visible
+    // everywhere. PascalCase values scope to a specific row.
+    ownerModel     TagResource @default(platform)
+    userId         String?     @db.VarChar(36)
+    organizationId String?     @db.VarChar(36)
+    spaceId        String?     @db.VarChar(36)
+
+    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
     tags Tag[]
+
+    // Per-owner uniqueness on name (multiple owners can independently have
+    // their own "audience" category without colliding).
+    @@unique([ownerModel, userId, organizationId, spaceId, name])
+    @@index([ownerModel])
+    @@index([userId])
+    @@index([organizationId])
+    @@index([spaceId])
 
     // ==========================================================================
     // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

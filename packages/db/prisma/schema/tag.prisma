@@ -17,6 +17,18 @@ model Tag {
     description String?
     resources   TagResource[]                // mix of PascalCase model names + camelCase use-cases. Empty = unrestricted.
 
+    // Owner — false polymorphism. `platform` (default) means no specific
+    // owner row → visible to everyone. PascalCase values pair to one FK
+    // column. Polymorphism config in registries/falsePolymorphism.ts.
+    ownerModel     TagResource @default(platform)
+    userId         String?     @db.VarChar(36)
+    organizationId String?     @db.VarChar(36)
+    spaceId        String?     @db.VarChar(36)
+
+    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
     tagCategoryId String?     @db.VarChar(36)
     tagCategory   TagCategory? @relation(fields: [tagCategoryId], references: [id], onDelete: SetNull)
 
@@ -24,4 +36,8 @@ model Tag {
 
     @@unique([tagCategoryId, name])           // (category, name) unique; same name in different categories is fine
     @@index([tagCategoryId])
+    @@index([ownerModel])
+    @@index([userId])
+    @@index([organizationId])
+    @@index([spaceId])
 }

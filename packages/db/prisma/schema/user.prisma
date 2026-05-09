@@ -27,6 +27,8 @@ model User {
   webhookSubscriptions WebhookSubscription[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
+  tags                 Tag[]
+  tagCategories        TagCategory[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   providerRefs         CustomerRef[]         @relation("providerRefs")

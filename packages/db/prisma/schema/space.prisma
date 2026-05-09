@@ -29,6 +29,8 @@ model Space {
   webhookSubscriptions WebhookSubscription[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
+  tags                 Tag[]
+  tagCategories        TagCategory[]
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
   customerRefs         CustomerRef[]         @relation("customerRefs")

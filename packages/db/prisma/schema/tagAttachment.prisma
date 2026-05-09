@@ -40,8 +40,13 @@ model TagAttachment {
 // Mixed enum: PascalCase = physical attachment models, camelCase = use-case
 // concepts (only valid for `Tag.resources`, not `TagAttachment.ownerModel`).
 enum TagResource {
+    // SPECIAL — lowercase, no FK. Used as `Tag.ownerModel` for tags that
+    // aren't owned by any specific row (visible everywhere).
+    platform
+
     // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
-    // TagAttachment via the falsePolymorphism registry.
+    // TagAttachment (and Tag, when used as the tag's owner) via the
+    // falsePolymorphism registry.
     User
     Organization
     Space

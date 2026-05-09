@@ -9,7 +9,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin';
+type SpecialOwner = 'default' | 'admin' | 'platform';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -78,6 +78,47 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'ownerModel',
         fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  TagAttachment: {
+    axes: [
+      {
+        field: 'resourceModel',
+        fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  Tag: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          platform: [],
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  TagCategory: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          platform: [],
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
