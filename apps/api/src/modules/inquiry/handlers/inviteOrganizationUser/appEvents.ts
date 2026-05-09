@@ -1,4 +1,4 @@
-import { contentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser';
+import { contentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser/schema';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 
 export const inviteOrganizationUserAppEvents: InquiryAppEvents = {

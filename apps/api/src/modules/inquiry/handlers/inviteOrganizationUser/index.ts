@@ -1,16 +1,10 @@
 import type { Db, OrganizationId, UserId } from '@template/db';
-import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
-import { z } from 'zod';
+import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/inviteOrganizationUser/appEvents';
+import { contentSchema, type InviteOrganizationUserContent } from '#/modules/inquiry/handlers/inviteOrganizationUser/schema';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
-
-type InviteOrganizationUserContent = z.infer<typeof contentSchema>;
-
-export const contentSchema = z.object({
-  role: z.nativeEnum(Role).default('member'),
-});
 
 export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUserContent> = {
   sources: [{ sourceModel: InquiryResourceModel.Organization }],
