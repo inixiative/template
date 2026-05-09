@@ -1,0 +1,57 @@
+// ============================================================================
+// TAG ATTACHMENT - Polymorphic Tag → resource row link
+// ============================================================================
+// Tagging is a generic relation, not ownership — so we use "resource", not
+// "owner". False-polymorphic: `resourceModel` discriminator + nullable FK
+// columns; exactly one FK populated per row, enforced via the
+// falsePolymorphism hook + registry. New attachment models = add a FK column
+// here, add the PascalCase enum value to TagResource, register in
+// `apps/api/src/hooks/falsePolymorphism/registry.ts`.
+
+model TagAttachment {
+    id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt DateTime @default(now())
+
+    // Resource — false polymorphism. resourceModel restricts to PascalCase
+    // entries of TagResource (the model names); camelCase entries
+    // (use-cases) are not valid attachment resources.
+    resourceModel  TagResource
+    userId         String? @db.VarChar(36)
+    organizationId String? @db.VarChar(36)
+    spaceId        String? @db.VarChar(36)
+    // ==========================================================================
+    // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
+    // ==========================================================================
+
+    tagId String @db.VarChar(36)
+
+    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@unique([resourceModel, userId, organizationId, spaceId, tagId])
+    @@index([tagId])
+    @@index([userId])
+    @@index([organizationId])
+    @@index([spaceId])
+}
+
+// Mixed enum: PascalCase = physical attachment models, camelCase = use-case
+// concepts (only valid for `Tag.resources`, not `TagAttachment.ownerModel`).
+enum TagResource {
+    // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
+    // TagAttachment via the falsePolymorphism registry.
+    User
+    Organization
+    Space
+
+    // USE-CASE CONCEPTS — camelCase. Only valid in `Tag.resources`.
+    userMessages
+
+    // ==========================================================================
+    // TEMPLATE ABOVE — Add app-specific resources below.
+    // PascalCase = new attachment models (also add FK + falsePolymorphism entry).
+    // camelCase  = new use-cases (no FK).
+    // ==========================================================================
+}

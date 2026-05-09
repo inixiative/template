@@ -1,0 +1,27 @@
+// ============================================================================
+// TAG - Normalized label with optional category + intended-use resources
+// ============================================================================
+// `Tag.resources` is the intended-use layer (TagResource enum lives in
+// tagAttachment.prisma since it also discriminates TagAttachment.ownerModel).
+// PascalCase entries in TagResource are physical attachment models (User,
+// Organization, …); camelCase entries are use-case concepts (userMessages, …).
+// Empty resources array = unrestricted.
+
+model Tag {
+    id          String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    name        String                       // "founders", "us", "jobs"
+    description String?
+    resources   TagResource[]                // mix of PascalCase model names + camelCase use-cases. Empty = unrestricted.
+
+    tagCategoryId String?     @db.VarChar(36)
+    tagCategory   TagCategory? @relation(fields: [tagCategoryId], references: [id], onDelete: SetNull)
+
+    attachments TagAttachment[]
+
+    @@unique([tagCategoryId, name])           // (category, name) unique; same name in different categories is fine
+    @@index([tagCategoryId])
+}

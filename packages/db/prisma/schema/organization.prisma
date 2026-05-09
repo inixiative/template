@@ -17,6 +17,7 @@ model Organization {
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
   contacts             Contact[]
+  tagAttachments       TagAttachment[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   emailComponents      EmailComponent[]

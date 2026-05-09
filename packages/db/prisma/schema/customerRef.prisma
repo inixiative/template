@@ -25,6 +25,11 @@ model CustomerRef {
   providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
   auditLogs AuditLog[]
 
+  // Per-relationship communication-kind opt-ins. Gates messages alongside
+  // the per-Contact list — both must accept the kind for delivery.
+  // Default ['platform']; `system` bypasses.
+  acceptedKinds Json @default("[\"platform\"]")
+
   @@index([customerModel])
   @@index([customerUserId])
   @@index([customerOrganizationId])

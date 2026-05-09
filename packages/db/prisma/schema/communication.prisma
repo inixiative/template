@@ -1,0 +1,23 @@
+// ============================================================================
+// COMMUNICATION KIND - Universal classification for outbound messages
+// ============================================================================
+// Applies across every transport (chat, email, in-app notification, future
+// SMS / push). The handler-level rules engine (canDeliver) decides whether a
+// given (Contact, kind) pair gets delivered. Defaults:
+//   system    — always delivered (un-mute-able: security, account)
+//   platform  — opt-out (product news, announcements, changelog)
+//   activity  — opt-out (something happened involving you: matches, mentions, replies)
+//   marketing — opt-in only (promo)
+// Forks add their own kinds below the fence and extend canDeliver if their
+// kinds need different policy.
+
+enum CommunicationKind {
+  system
+  platform
+  activity
+  marketing
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific kinds below
+  // ==========================================================================
+}

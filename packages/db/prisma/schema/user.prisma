@@ -26,6 +26,7 @@ model User {
   cronJobsCreated      CronJob[]
   webhookSubscriptions WebhookSubscription[]
   contacts             Contact[]
+  tagAttachments       TagAttachment[]
   inquiriesSent        Inquiry[]             @relation("InquirySource")
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   providerRefs         CustomerRef[]         @relation("providerRefs")

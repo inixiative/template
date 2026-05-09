@@ -1,0 +1,21 @@
+// ============================================================================
+// TAG CATEGORY - Grouping for Tags ("audience", "region", "vertical", …)
+// ============================================================================
+// Categories let the same tag name live in multiple namespaces (e.g.
+// `audience:founders` is distinct from `vertical:founders`).
+
+model TagCategory {
+    id          String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    name        String    @unique // "audience", "region", "vertical", "cohort", …
+    description String?
+
+    tags Tag[]
+
+    // ==========================================================================
+    // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+    // ==========================================================================
+}

@@ -1,4 +1,5 @@
 import { ContactScalarInputSchema, ContactScalarSchema } from '@template/db';
+import { CommunicationKindSchema } from '@template/db/zod/enums/CommunicationKind.schema';
 import { buildPermissionRulesSchema } from '@template/permissions/rebac/permissionRulesSchema';
 import { z } from 'zod';
 
@@ -34,11 +35,14 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   valueKey: true,
   verifiedAt: true,
   permissionRules: true,
+  acceptedKinds: true,
 }).extend({
   // Position within (owner, type) — has @default(0) in Prisma; hook auto-
   // assigns MAX+1 when omitted on create.
   sortOrder: z.number().int().optional(),
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
+  // Optional override of the DB default ['platform']; otherwise applied at insert.
+  acceptedKinds: z.array(CommunicationKindSchema).optional(),
 });
 
 export const contactUpdateBodySchema = contactCreateBodySchema.partial();
