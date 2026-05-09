@@ -1,33 +1,24 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
 
-// Generate test RSA key pair
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
   modulusLength: 2048,
   publicKeyEncoding: { type: 'spki', format: 'pem' },
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
 });
 
-// Track received webhook calls
 const receivedWebhooks: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
-
-// Mock fetch for testing
-const originalFetch = globalThis.fetch;
-let mockFetch: ReturnType<typeof mock>;
 
 describe('sendWebhook handler', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
   let testCounter = 0;
 
-  // Generate unique URL per test to avoid unique constraint
   const getUniqueUrl = (suffix = '') => `http://test-webhook.local/${++testCounter}${suffix}`;
-
-  // Mock log function for worker context
   const mockLog = () => {};
 
   beforeAll(async () => {
@@ -42,32 +33,23 @@ describe('sendWebhook handler', () => {
 
   beforeEach(() => {
     receivedWebhooks.length = 0;
-
-    // Mock fetch to intercept webhook calls
-    mockFetch = mock((url: string, init?: RequestInit) => {
+    spyOn(globalThis, 'fetch').mockImplementation(((url: string, init?: RequestInit) => {
       const headers: Record<string, string> = {};
       if (init?.headers) {
         const h = init.headers as Record<string, string>;
-        for (const [k, v] of Object.entries(h)) {
-          headers[k.toLowerCase()] = v;
-        }
+        for (const [k, v] of Object.entries(h)) headers[k.toLowerCase()] = v;
       }
-
       receivedWebhooks.push({
         url,
         body: init?.body ? JSON.parse(init.body as string) : null,
         headers,
       });
-
-      // Return success by default
       return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    });
-
-    globalThis.fetch = mockFetch as typeof fetch;
+    }) as typeof fetch);
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    mock.restore();
   });
 
   afterAll(async () => {
@@ -94,7 +76,6 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // Check event was created
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
       });
@@ -103,7 +84,6 @@ describe('sendWebhook handler', () => {
       expect(event?.action).toBe('create');
       expect(event?.error).toBeNull();
 
-      // Check webhook was sent
       expect(receivedWebhooks.length).toBe(1);
       expect(receivedWebhooks[0].url).toBe(testUrl);
       expect(receivedWebhooks[0].body).toEqual({
@@ -112,7 +92,6 @@ describe('sendWebhook handler', () => {
         payload: { id: user.id, name: user.name },
       });
 
-      // Check signature header exists
       expect(receivedWebhooks[0].headers['x-webhook-signature']).toBeDefined();
     });
 
@@ -150,10 +129,9 @@ describe('sendWebhook handler', () => {
 
   describe('failed delivery', () => {
     it('creates error event on HTTP error response', async () => {
-      // Mock fetch to return 500 error
-      globalThis.fetch = mock(() =>
-        Promise.resolve(new Response('Server Error', { status: 500, statusText: 'Internal Server Error' })),
-      ) as typeof fetch;
+      spyOn(globalThis, 'fetch').mockImplementation(
+        (() => Promise.resolve(new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }))) as typeof fetch,
+      );
 
       const testUrl = getUniqueUrl('/error');
       const { entity: sub } = await createWebhookSubscription({
@@ -182,8 +160,9 @@ describe('sendWebhook handler', () => {
     });
 
     it('creates error event on network failure', async () => {
-      // Mock fetch to throw network error
-      globalThis.fetch = mock(() => Promise.reject(new Error('Connection refused'))) as typeof fetch;
+      spyOn(globalThis, 'fetch').mockImplementation(
+        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
+      );
 
       const testUrl = getUniqueUrl('/unreachable');
       const { entity: sub } = await createWebhookSubscription({
@@ -231,7 +210,6 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // No event should be created
       const event = await db.webhookEvent.findFirst({
         where: { webhookSubscriptionId: sub.id },
       });
@@ -250,15 +228,15 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // Should not throw, just log warning
       expect(receivedWebhooks.length).toBe(0);
     });
   });
 
   describe('circuit breaker', () => {
     it('disables subscription after 5 consecutive failures', async () => {
-      // Mock fetch to always fail
-      globalThis.fetch = mock(() => Promise.reject(new Error('Connection refused'))) as typeof fetch;
+      spyOn(globalThis, 'fetch').mockImplementation(
+        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
+      );
 
       const testUrl = getUniqueUrl('/circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -269,7 +247,6 @@ describe('sendWebhook handler', () => {
         isActive: true,
       });
 
-      // Create 4 previous failed events - pass context so they link to the same subscription
       for (let i = 0; i < 4; i++) {
         await createWebhookEvent(
           {
@@ -282,7 +259,6 @@ describe('sendWebhook handler', () => {
         );
       }
 
-      // Trigger the 5th failure
       await sendWebhook(
         { db, log: mockLog },
         {
@@ -293,14 +269,14 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // Check subscription is now disabled
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(false);
     });
 
     it('does not disable if a recent success exists', async () => {
-      // Mock fetch to always fail
-      globalThis.fetch = mock(() => Promise.reject(new Error('Connection refused'))) as typeof fetch;
+      spyOn(globalThis, 'fetch').mockImplementation(
+        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
+      );
 
       const testUrl = getUniqueUrl('/no-circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -311,7 +287,6 @@ describe('sendWebhook handler', () => {
         isActive: true,
       });
 
-      // Create 3 failures, then 1 success - pass context so they link to the same subscription
       for (let i = 0; i < 3; i++) {
         await createWebhookEvent(
           {
@@ -332,7 +307,6 @@ describe('sendWebhook handler', () => {
         context,
       );
 
-      // Trigger another failure (this is only the 4th failure total, with 1 success in the middle)
       await sendWebhook(
         { db, log: mockLog },
         {
@@ -343,14 +317,14 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // Subscription should still be active (success was within last 5)
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(true);
     });
 
     it('does not disable if fewer than 5 total events', async () => {
-      // Mock fetch to always fail
-      globalThis.fetch = mock(() => Promise.reject(new Error('Connection refused'))) as typeof fetch;
+      spyOn(globalThis, 'fetch').mockImplementation(
+        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
+      );
 
       const testUrl = getUniqueUrl('/few-events');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -361,7 +335,6 @@ describe('sendWebhook handler', () => {
         isActive: true,
       });
 
-      // Only create 2 previous failures - pass context so they link to the same subscription
       for (let i = 0; i < 2; i++) {
         await createWebhookEvent(
           {
@@ -374,7 +347,6 @@ describe('sendWebhook handler', () => {
         );
       }
 
-      // Trigger the 3rd failure
       await sendWebhook(
         { db, log: mockLog },
         {
@@ -385,7 +357,6 @@ describe('sendWebhook handler', () => {
         },
       );
 
-      // Subscription should still be active (only 3 failures, need 5)
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(true);
     });

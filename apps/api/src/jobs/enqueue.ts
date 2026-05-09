@@ -1,11 +1,12 @@
-import { redisNamespace } from '@template/db';
+import { db, redisNamespace } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
+import type { Job } from 'bullmq';
 import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
-import { type JobData, type JobOptions, JobType } from '#/jobs/types';
+import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];
@@ -39,14 +40,12 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
 
-  // In test, skip BullMQ entirely. Handlers that want to be tested are tested
-  // directly via createTestWorker().run(). Production code that calls
-  // enqueueJob shouldn't have to know about cmsgpack, ioredis-mock, or the
-  // BullMQ Lua VM — and we don't want module-level mocks leaking across
-  // tests. Tests of the queue ITSELF use the real queue (or a fake injected
-  // via DI).
+  // In test, skip BullMQ entirely — just run the handler. Cascading effects
+  // happen for real, errors propagate, no queue infrastructure involved.
   if (isTest) {
     const jobId = id ?? uuidv7();
+    const ctx: WorkerContext = { db, queue, job: { id: jobId, name: handlerName, data: { type, id, payload } } as Job, log: () => {} };
+    await (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload);
     return { jobId, name: handlerName };
   }
 
