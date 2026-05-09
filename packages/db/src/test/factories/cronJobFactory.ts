@@ -8,8 +8,8 @@ const cronJobFactory = createFactory('CronJob', {
     description: faker.lorem.sentence(),
     pattern: '0 0 * * *', // Daily at midnight
     enabled: true,
-    handler: 'sendWebhook',
-    payload: { test: true },
+    handler: 'cleanStaleWebhooks',
+    payload: {},
     maxAttempts: 3,
     backoffMs: 5000,
   }),
