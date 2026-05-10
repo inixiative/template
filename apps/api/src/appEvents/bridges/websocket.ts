@@ -1,5 +1,5 @@
 import type { WSHandoff } from '#/appEvents/types';
-import { sendToChannel, sendToUser } from '#/ws';
+import { sendToChannel, sendToUser } from '#/ws/pubsub';
 
 export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> => {
   for (const handoff of handoffs) {

@@ -1,35 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { QueryFunctionContext } from '@tanstack/react-query';
-
-const createClientMock = mock((config: Record<string, unknown>) => ({
-  config,
-  interceptors: {
-    request: { use: mock(() => {}) },
-  },
-}));
-
-const getTokenMock = mock(() => 'test-token');
-
-mock.module('@template/ui/apiClient/client', () => ({
-  createClient: createClientMock,
-}));
-
-mock.module('@template/ui/lib/auth/token', () => ({
-  getToken: getTokenMock,
-}));
-
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
 
+// Captures the `client` (Hey API client) that apiFetchInternal hands to the
+// SDK function — gives us a real `getConfig()` to assert on instead of
+// stubbing out createClient at the module boundary.
+type SdkOpts = {
+  client?: { getConfig: () => { headers?: Headers | Record<string, string> } };
+  [key: string]: unknown;
+};
+
+const headerMap = (h: Headers | Record<string, string> | undefined): Record<string, string> => {
+  if (!h) return {};
+  if (h instanceof Headers) {
+    const out: Record<string, string> = {};
+    h.forEach((v, k) => {
+      out[k] = v;
+    });
+    return out;
+  }
+  return h;
+};
+
 describe('api transport wrappers', () => {
   const initialAuth = useAppStore.getState().auth;
 
   beforeEach(() => {
-    createClientMock.mockClear();
-    getTokenMock.mockClear();
-    getTokenMock.mockImplementation(() => 'test-token');
     useAppStore.setState((state) => ({
       ...state,
       auth: {
@@ -47,8 +46,8 @@ describe('api transport wrappers', () => {
   });
 
   it('apiFetchInternal forwards request options from generated query keys', async () => {
-    const sdkFn = mock(async (opts: Record<string, unknown>) => opts);
-    const fetcher = apiFetchInternal(sdkFn, { spoofUserEmail: 'spoof@example.com' });
+    const sdkFn = mock(async (opts: SdkOpts) => opts);
+    const fetcher = apiFetchInternal(sdkFn, { token: 'test-token', spoofUserEmail: 'spoof@example.com' });
 
     const result = await fetcher({
       queryKey: [
@@ -73,19 +72,16 @@ describe('api transport wrappers', () => {
         query: { page: 2, pageSize: 50 },
       }),
     );
-    expect(createClientMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer test-token',
-          'Content-Type': 'application/json',
-          'x-spoof-user-email': 'spoof@example.com',
-        }),
-      }),
-    );
+
+    const handedClient = sdkFn.mock.calls[0][0].client!;
+    const headers = headerMap(handedClient.getConfig().headers);
+    expect(headers.authorization).toBe('Bearer test-token');
+    expect(headers['content-type']).toBe('application/json');
+    expect(headers['x-spoof-user-email']).toBe('spoof@example.com');
   });
 
   it('apiFetchInternal forwards direct mutation variables', async () => {
-    const sdkFn = mock(async (opts: Record<string, unknown>) => opts);
+    const sdkFn = mock(async (opts: SdkOpts) => opts);
     const fetcher = apiFetchInternal(sdkFn);
 
     const result = await fetcher({
@@ -191,7 +187,7 @@ describe('api transport wrappers', () => {
       },
     }));
 
-    const sdkFn = mock(async (opts: Record<string, unknown>) => opts);
+    const sdkFn = mock(async (opts: SdkOpts) => opts);
     const queryFn = apiQuery(sdkFn);
 
     await queryFn({
@@ -209,13 +205,9 @@ describe('api transport wrappers', () => {
         query: { search: 'acme' },
       }),
     );
-    expect(createClientMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'x-spoof-user-email': 'store-spoof@example.com',
-        }),
-      }),
-    );
+
+    const handedClient = sdkFn.mock.calls[0][0].client!;
+    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe('store-spoof@example.com');
   });
 
   it('apiMutation reads spoofing state from the app store and forwards vars', async () => {
@@ -227,7 +219,7 @@ describe('api transport wrappers', () => {
       },
     }));
 
-    const sdkFn = mock(async (opts: Record<string, unknown>) => opts);
+    const sdkFn = mock(async (opts: SdkOpts) => opts);
     const mutationFn = apiMutation(sdkFn);
 
     await mutationFn({
@@ -241,12 +233,8 @@ describe('api transport wrappers', () => {
         body: { role: 'admin' },
       }),
     );
-    expect(createClientMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'x-spoof-user-email': 'mutation-spoof@example.com',
-        }),
-      }),
-    );
+
+    const handedClient = sdkFn.mock.calls[0][0].client!;
+    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe('mutation-spoof@example.com');
   });
 });

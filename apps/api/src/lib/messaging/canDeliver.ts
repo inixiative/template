@@ -15,9 +15,10 @@ const accepts = (acceptedKinds: unknown, kind: CommunicationKind): boolean => {
  *   relationship), its `acceptedKinds` must also include the kind. Omit the
  *   third arg when there is no relationship.
  *
- * DB default for both `acceptedKinds` columns is `['platform']`, so a brand
- * new contact + relationship will receive `system` and `platform`. Anything
- * else (activity, marketing, fork-defined) requires explicit opt-in.
+ * DB default for both `acceptedKinds` columns is `['platform', 'activity']`,
+ * so a brand new contact + relationship will receive `system`, `platform`,
+ * and `activity`. `marketing` (and any fork-defined kinds) require explicit
+ * opt-in.
  */
 export const canDeliver = (
   kind: CommunicationKind,

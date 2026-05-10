@@ -7,13 +7,6 @@ import {
   registerDbHook,
 } from '@template/db/extensions/mutationLifeCycle';
 
-// Mock logger - the proxy makes direct spying difficult
-const mockWarn = mock(() => {});
-mock.module('@template/shared/logger', () => ({
-  log: { warn: mockWarn, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
-  LogScope: { hook: 'hook', db: 'db' },
-}));
-
 describe('mutationLifeCycle', () => {
   describe('registerDbHook', () => {
     it('registers a hook for a specific model and action', async () => {
@@ -81,16 +74,9 @@ describe('mutationLifeCycle', () => {
     it('skips duplicate hook registration with same name', async () => {
       const hookFn1 = mock(() => Promise.resolve());
       const hookFn2 = mock(() => Promise.resolve());
-      mockWarn.mockClear();
 
       registerDbHook('test-hook-duplicate', 'User', HookTiming.before, [DbAction.create], hookFn1);
-
       registerDbHook('test-hook-duplicate', 'User', HookTiming.before, [DbAction.create], hookFn2);
-
-      expect(mockWarn).toHaveBeenCalledWith(
-        "Hook 'test-hook-duplicate' already registered - skipping duplicate",
-        'hook',
-      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',

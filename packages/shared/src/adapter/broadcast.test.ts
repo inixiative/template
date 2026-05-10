@@ -54,7 +54,7 @@ describe('makeBroadcastRegistry', () => {
     expect(results.sort()).toEqual([10, 15]);
   });
 
-  it('broadcast uses Promise.allSettled — one failure does not block others', async () => {
+  it('runs every adapter even if one rejects, then surfaces the error', async () => {
     const results: string[] = [];
     const registry = makeBroadcastRegistry<{ run: () => Promise<void> }>();
 
@@ -69,11 +69,26 @@ describe('makeBroadcastRegistry', () => {
       },
     });
 
-    const settled = await registry.broadcast((a) => a.run());
-
+    expect(registry.broadcast((a) => a.run())).rejects.toThrow('boom');
+    // Sibling adapter still ran despite the failure (isolation preserved).
     expect(results).toEqual(['ok']);
-    expect(settled[0].status).toBe('rejected');
-    expect(settled[1].status).toBe('fulfilled');
+  });
+
+  it('aggregates multiple rejections into AggregateError', async () => {
+    const registry = makeBroadcastRegistry<{ run: () => Promise<void> }>();
+    registry.register('a', { run: async () => { throw new Error('a-failed'); } });
+    registry.register('b', { run: async () => { throw new Error('b-failed'); } });
+
+    expect(registry.broadcast((a) => a.run())).rejects.toBeInstanceOf(AggregateError);
+  });
+
+  it('returns fulfilled values when all adapters succeed', async () => {
+    const registry = makeBroadcastRegistry<{ run: () => Promise<number> }>();
+    registry.register('a', { run: async () => 1 });
+    registry.register('b', { run: async () => 2 });
+
+    const values = await registry.broadcast((a) => a.run());
+    expect(values.sort()).toEqual([1, 2]);
   });
 
   it('unregister removes an adapter', () => {

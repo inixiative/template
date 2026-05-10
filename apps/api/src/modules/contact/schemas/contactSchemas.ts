@@ -41,7 +41,7 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({
   // assigns MAX+1 when omitted on create.
   sortOrder: z.number().int().optional(),
   permissionRules: buildPermissionRulesSchema('contact', ['read']),
-  // Optional override of the DB default ['platform']; otherwise applied at insert.
+  // Optional override of the DB default ['platform', 'activity']; otherwise applied at insert.
   acceptedKinds: z.array(CommunicationKindSchema).optional(),
 });
 
