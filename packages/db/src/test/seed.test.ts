@@ -84,9 +84,11 @@ describe('Seed System', () => {
       for (const account of primeAccounts) {
         expect(account).toHaveProperty('password');
         expect(typeof account.password).toBe('string');
-        expect(account.password).not.toBe('');
-        // Should be bcrypt hash (starts with $2a$ or $2b$)
-        expect(account.password).toMatch(/^\$2[ab]\$/);
+        // Format-agnostic: matches bcryptjs (`$2[ab]$…`) and better-auth's
+        // scrypt (`<salt-hex>:<key-hex>`). The point is the password must be
+        // hashed, not stored as plaintext or empty.
+        expect(account.password).not.toBe('asd123!');
+        expect(account.password!.length).toBeGreaterThan(30);
       }
     });
 
