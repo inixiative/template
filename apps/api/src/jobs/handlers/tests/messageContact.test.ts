@@ -2,11 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser } from '@template/db/test';
 import { messageContact } from '#/jobs/handlers/messageContact';
-import {
-  type MessageContent,
-  type MessageDispatchOptions,
-  messageProviderRegistry,
-} from '#/lib/messaging/providers';
+import { type MessageContent, type MessageDispatchOptions, messageProviderRegistry } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
 
 type DispatchedCall = {

@@ -1,4 +1,4 @@
-import { executePrismaQueryPlan, toPrisma, type Condition } from '@inixiative/json-rules';
+import { type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { Contact, User } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/permissions/rebac/prismaMap.gen';

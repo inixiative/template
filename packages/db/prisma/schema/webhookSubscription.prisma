@@ -23,9 +23,13 @@ model WebhookSubscription {
   // Relations
   webhookEvents WebhookEvent[]
 
-  @@unique([userId, model, url])
-  @@unique([organizationId, model, url])
-  @@unique([spaceId, model, url])
+  // Per-owner uniqueness — partial uniques (see Contact for rationale). Plain
+  // single-FK uniques are NULL-distinct so they don't actually prevent
+  // duplicates when the FK isn't populated. Each partial doubles as a lookup
+  // index for that owner column.
+  @@unique([userId, model, url],         where: { userId:         { not: null } })
+  @@unique([organizationId, model, url], where: { organizationId: { not: null } })
+  @@unique([spaceId, model, url],        where: { spaceId:        { not: null } })
   @@index([ownerModel])
   @@index([model])
 

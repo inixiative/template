@@ -28,7 +28,16 @@ model EmailComponent {
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
 
-  @@unique([slug, locale, ownerModel, organizationId, spaceId])
+  // Per-owner uniqueness — partial uniques per ownerModel branch (see Contact
+  // for rationale). default/admin have no FK; Organization populates orgId;
+  // Space populates spaceId (orgId also populated by polymorphism hook).
+  // default + admin are FK-less platform variants; merged into one partial
+  // (keyed on ownerModel) so '(foo,en,default)' and '(foo,en,admin)' coexist
+  // while duplicates within either are blocked. Org/Space partials add the
+  // tenant FK to allow per-tenant duplicates of the same slug/locale.
+  @@unique([slug, locale, ownerModel],     where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailComponent_slug_locale_platform_key")
+  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"),         map: "EmailComponent_slug_locale_organization_key")
+  @@unique([slug, locale, spaceId],        where: raw("\"ownerModel\" = 'Space'"),                map: "EmailComponent_slug_locale_space_key")
   @@index([ownerModel])
   @@index([organizationId])
 }

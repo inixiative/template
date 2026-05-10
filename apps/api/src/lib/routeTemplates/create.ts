@@ -10,8 +10,19 @@ import {
 } from '#/lib/routeTemplates/utils';
 
 export const createRoute = <const T extends RouteArgs>(args: T) => {
-  const { model, submodel, action, description, skipId, many, middleware = [], admin, internal, tags, ...routeArgs } =
-    args;
+  const {
+    model,
+    submodel,
+    action,
+    description,
+    skipId,
+    many,
+    middleware = [],
+    admin,
+    internal,
+    tags,
+    ...routeArgs
+  } = args;
 
   const resourceName = submodel || model;
   const routePath = buildRoutePath({ submodel, action, skipId, many, operation: 'create' });

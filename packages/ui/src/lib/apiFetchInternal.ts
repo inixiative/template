@@ -84,8 +84,7 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     // searchFields = { targetModel: { in: ['admin'] } } as
     // searchFields[targetModel][in]=admin. Output for flat params matches
     // hey-api's default exactly.
-    const querySerializer = (params: Record<string, unknown>) =>
-      serializeBracketQuery(params).toString();
+    const querySerializer = (params: Record<string, unknown>) => serializeBracketQuery(params).toString();
 
     const scopedClient = createClient({ baseUrl, headers, throwOnError, querySerializer });
 

@@ -10,6 +10,7 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
@@ -18,5 +19,6 @@ export const registerHooks = () => {
   registerContactRulesHook();
   registerImmutableFieldsHook();
   registerRulesHook();
+  registerTagOwnerCategoryHook();
   registerWebhookHook();
 };

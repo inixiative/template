@@ -53,10 +53,7 @@ export const resolveInquiry = async (
         include: includeInquiryReceived,
       });
 
-      await emitAppEvent(
-        'inquiry.resolved',
-        { ...updated, _resolution: status },
-      );
+      await emitAppEvent('inquiry.resolved', { ...updated, _resolution: status });
 
       return updated;
     });

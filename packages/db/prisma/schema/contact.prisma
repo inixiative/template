@@ -58,11 +58,14 @@ model Contact {
   // See `apps/api/src/lib/messaging/canDeliver.ts`.
   acceptedKinds Json @default("[\"platform\", \"activity\"]")
 
-  @@unique([ownerModel, userId, organizationId, spaceId, type, valueKey])
+  // Per-owner uniqueness — partial uniques because Postgres treats NULLs as
+  // distinct in composite uniques, so a single composite over the polymorphic
+  // FKs would let `(User, 'u1', null, null, …)` duplicate. Each partial covers
+  // one populated FK and doubles as a lookup index for that owner column.
+  @@unique([userId, type, valueKey],         where: { userId:         { not: null } })
+  @@unique([organizationId, type, valueKey], where: { organizationId: { not: null } })
+  @@unique([spaceId, type, valueKey],        where: { spaceId:        { not: null } })
   @@index([ownerModel])
-  @@index([userId])
-  @@index([organizationId])
-  @@index([spaceId])
   @@index([type, valueKey])
 }
 

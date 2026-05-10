@@ -22,10 +22,7 @@ describe('messageUser handler', () => {
     testDb = harness.db;
 
     // Real adapter, not a mock — registry is the actual wire used by messageUser.
-    const recorder = async (
-      contact: { id: string; type: ContactType },
-      content: MessageContent,
-    ) => {
+    const recorder = async (contact: { id: string; type: ContactType }, content: MessageContent) => {
       dispatched.push({ contactId: contact.id, contactType: contact.type, content });
     };
     messageProviderRegistry.register(ContactType.whatsapp, recorder as never);
@@ -76,7 +73,12 @@ describe('messageUser handler', () => {
       { user },
     );
     await createContact(
-      { ownerModel: 'User', type: ContactType.telegram, value: { handle: '@two' }, acceptedKinds: ['platform', 'marketing'] },
+      {
+        ownerModel: 'User',
+        type: ContactType.telegram,
+        value: { handle: '@two' },
+        acceptedKinds: ['platform', 'marketing'],
+      },
       { user },
     );
 

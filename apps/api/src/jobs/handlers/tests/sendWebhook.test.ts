@@ -129,9 +129,10 @@ describe('sendWebhook handler', () => {
 
   describe('failed delivery', () => {
     it('creates error event on HTTP error response', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation(
-        (() => Promise.resolve(new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }))) as typeof fetch,
-      );
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.resolve(
+          new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }),
+        )) as typeof fetch);
 
       const testUrl = getUniqueUrl('/error');
       const { entity: sub } = await createWebhookSubscription({
@@ -160,9 +161,8 @@ describe('sendWebhook handler', () => {
     });
 
     it('creates error event on network failure', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation(
-        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
-      );
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.reject(new Error('Connection refused'))) as typeof fetch);
 
       const testUrl = getUniqueUrl('/unreachable');
       const { entity: sub } = await createWebhookSubscription({
@@ -234,9 +234,8 @@ describe('sendWebhook handler', () => {
 
   describe('circuit breaker', () => {
     it('disables subscription after 5 consecutive failures', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation(
-        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
-      );
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.reject(new Error('Connection refused'))) as typeof fetch);
 
       const testUrl = getUniqueUrl('/circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -274,9 +273,8 @@ describe('sendWebhook handler', () => {
     });
 
     it('does not disable if a recent success exists', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation(
-        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
-      );
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.reject(new Error('Connection refused'))) as typeof fetch);
 
       const testUrl = getUniqueUrl('/no-circuit-break');
       const { entity: sub, context } = await createWebhookSubscription({
@@ -322,9 +320,8 @@ describe('sendWebhook handler', () => {
     });
 
     it('does not disable if fewer than 5 total events', async () => {
-      spyOn(globalThis, 'fetch').mockImplementation(
-        (() => Promise.reject(new Error('Connection refused'))) as typeof fetch,
-      );
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.reject(new Error('Connection refused'))) as typeof fetch);
 
       const testUrl = getUniqueUrl('/few-events');
       const { entity: sub, context } = await createWebhookSubscription({

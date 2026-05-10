@@ -32,7 +32,11 @@ model EmailTemplate {
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
 
-  @@unique([slug, locale, ownerModel, organizationId, spaceId])
+  // Per-owner uniqueness — partial uniques per ownerModel branch (see
+  // EmailComponent / Contact for rationale).
+  @@unique([slug, locale, ownerModel],     where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailTemplate_slug_locale_platform_key")
+  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"),         map: "EmailTemplate_slug_locale_organization_key")
+  @@unique([slug, locale, spaceId],        where: raw("\"ownerModel\" = 'Space'"),                map: "EmailTemplate_slug_locale_space_key")
   @@index([category])
   @@index([ownerModel])
   @@index([organizationId])

@@ -1,10 +1,10 @@
 import type { Condition } from '@inixiative/json-rules';
 import type { CommunicationKind } from '@template/db/generated/client/enums';
+import { makeJob } from '#/jobs/makeJob';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 import { interpolateContent } from '#/lib/messaging/interpolateContent';
 import { getMessageProviderAdapter, type MessageContent } from '#/lib/messaging/providers';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
-import { makeJob } from '#/jobs/makeJob';
 
 export type MessageUserPayload = {
   rule: Condition;

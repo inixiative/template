@@ -8,12 +8,13 @@ describe('redactFields', () => {
     });
 
     it('defines sensitive fields for Token', () => {
-      expect(HOOK_REDACT_FIELDS.Token).toContain('value');
-      expect(HOOK_REDACT_FIELDS.Token).toContain('hashedValue');
+      expect(HOOK_REDACT_FIELDS.Token).toContain('keyHash');
     });
 
-    it('defines sensitive fields for AuthProvider', () => {
-      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('secrets');
+    it('auto-injects encrypted columns for AuthProvider from encryption registry', () => {
+      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecrets');
+      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsMetadata');
+      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsKeyVersion');
     });
   });
 
@@ -23,14 +24,11 @@ describe('redactFields', () => {
     });
 
     it('returns sensitive fields for Account', () => {
-      const fields = getRedactFields('Account');
-      expect(fields).toContain('password');
+      expect(getRedactFields('Account')).toContain('password');
     });
 
     it('returns sensitive fields for Token', () => {
-      const fields = getRedactFields('Token');
-      expect(fields).toContain('value');
-      expect(fields).toContain('hashedValue');
+      expect(getRedactFields('Token')).toContain('keyHash');
     });
   });
 
@@ -43,13 +41,25 @@ describe('redactFields', () => {
       expect(result.providerId).toBe('google');
     });
 
-    it('replaces sensitive Token fields with [REDACTED]', () => {
-      const data = { id: '1', name: 'my-token', value: 'tok_secret', hashedValue: 'hash123', keyPrefix: 'tok_' };
+    it('replaces Token keyHash with [REDACTED]', () => {
+      const data = { id: '1', name: 'my-token', keyHash: 'hash123', keyPrefix: 'tok_' };
       const result = redactSensitiveFields('Token', data);
-      expect(result.value).toBe('[REDACTED]');
-      expect(result.hashedValue).toBe('[REDACTED]');
+      expect(result.keyHash).toBe('[REDACTED]');
       expect(result.name).toBe('my-token');
       expect(result.keyPrefix).toBe('tok_');
+    });
+
+    it('redacts AuthProvider encrypted columns via auto-inject', () => {
+      const data: Record<string, unknown> = {
+        id: '1',
+        encryptedSecrets: 'cipher',
+        encryptedSecretsMetadata: { iv: 'a', authTag: 'b' },
+        encryptedSecretsKeyVersion: 1,
+      };
+      const result = redactSensitiveFields('AuthProvider', data);
+      expect(result.encryptedSecrets).toBe('[REDACTED]');
+      expect(result.encryptedSecretsMetadata).toBe('[REDACTED]');
+      expect(result.encryptedSecretsKeyVersion).toBe('[REDACTED]');
     });
 
     it('uses custom redact value when provided', () => {

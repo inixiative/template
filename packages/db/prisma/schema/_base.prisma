@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../../src/generated/client"
+  provider        = "prisma-client"
+  output          = "../../src/generated/client"
+  previewFeatures = ["partialIndexes"]
 }
 
 generator zod {

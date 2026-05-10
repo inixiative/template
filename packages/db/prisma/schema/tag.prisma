@@ -29,15 +29,19 @@ model Tag {
     organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
     space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-    tagCategoryId String?     @db.VarChar(36)
-    tagCategory   TagCategory? @relation(fields: [tagCategoryId], references: [id], onDelete: SetNull)
+    tagCategoryId String      @db.VarChar(36)
+    tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
     attachments TagAttachment[]
 
-    @@unique([tagCategoryId, name])           // (category, name) unique; same name in different categories is fine
+    // Per-owner uniqueness on (category, name) — partial uniques (see Contact
+    // for rationale). The platform partial scopes platform-owned tags to one
+    // per (category, name) globally. Tag.ownerModel must match its
+    // tagCategory.ownerModel; enforced by the tagOwnerCategory hook.
+    @@unique([userId, tagCategoryId, name],         where: { userId:         { not: null } })
+    @@unique([organizationId, tagCategoryId, name], where: { organizationId: { not: null } })
+    @@unique([spaceId, tagCategoryId, name],        where: { spaceId:        { not: null } })
+    @@unique([tagCategoryId, name],                 where: raw("\"ownerModel\" = 'platform'"))
     @@index([tagCategoryId])
     @@index([ownerModel])
-    @@index([userId])
-    @@index([organizationId])
-    @@index([spaceId])
 }

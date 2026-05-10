@@ -1,12 +1,26 @@
+import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
+
 /**
  * Sensitive fields to redact in webhook payloads and audit logs.
  * NOT used by cache.
+ *
+ * Encrypted-column triplets are auto-injected from the encryption registry —
+ * ciphertext/AAD shape must never leave the trust boundary.
  */
-export const HOOK_REDACT_FIELDS: Record<string, string[]> = {
+const HOOK_REDACT_FIELDS_BASE: Record<string, string[]> = {
   Account: ['password'],
   Token: ['keyHash'],
-  AuthProvider: ['encryptedSecrets', 'encryptedSecretsMetadata', 'encryptedSecretsKeyVersion'],
 };
+
+const mergeEncryptedFields = (base: Record<string, string[]>): Record<string, string[]> => {
+  const merged: Record<string, string[]> = { ...base };
+  for (const [model, fields] of Object.entries(getEncryptedFieldsByModel())) {
+    merged[model] = [...(merged[model] ?? []), ...fields];
+  }
+  return merged;
+};
+
+export const HOOK_REDACT_FIELDS: Record<string, string[]> = mergeEncryptedFields(HOOK_REDACT_FIELDS_BASE);
 
 export const getRedactFields = (model: string): string[] => HOOK_REDACT_FIELDS[model] ?? [];
 

@@ -31,10 +31,14 @@ model CustomerRef {
   // (platform + activity opt-out, marketing opt-in); `system` bypasses.
   acceptedKinds Json @default("[\"platform\", \"activity\"]")
 
+  // (customer, provider) pair uniqueness — partial uniques across each
+  // populated customer FK paired with each provider FK. Each partial doubles
+  // as a lookup index for that customer column. Add new partials when a new
+  // ProviderModel FK is introduced.
+  @@unique([customerUserId, providerSpaceId],         where: { customerUserId:         { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerOrganizationId, providerSpaceId], where: { customerOrganizationId: { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerSpaceId, providerSpaceId],        where: { customerSpaceId:        { not: null }, providerSpaceId: { not: null } })
   @@index([customerModel])
-  @@index([customerUserId])
-  @@index([customerOrganizationId])
-  @@index([customerSpaceId])
   @@index([providerModel])
   @@index([providerSpaceId])
 

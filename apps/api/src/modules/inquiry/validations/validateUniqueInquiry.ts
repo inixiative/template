@@ -14,11 +14,7 @@ type InquiryShape = Omit<Prisma.InquiryWhereInput, 'id'> & {
 
 type UniqueMode = 'targeted' | 'untargeted';
 
-export const validateUniqueInquiry = async (
-  db: Db,
-  inquiry: InquiryShape,
-  mode: UniqueMode,
-): Promise<void> => {
+export const validateUniqueInquiry = async (db: Db, inquiry: InquiryShape, mode: UniqueMode): Promise<void> => {
   const config = getPolymorphismConfig('Inquiry');
   if (!config) throw new Error('Inquiry polymorphism config missing from registry');
 

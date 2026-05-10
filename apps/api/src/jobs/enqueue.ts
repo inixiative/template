@@ -44,7 +44,12 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   // happen for real, errors propagate, no queue infrastructure involved.
   if (isTest) {
     const jobId = id ?? uuidv7();
-    const ctx: WorkerContext = { db, queue, job: { id: jobId, name: handlerName, data: { type, id, payload } } as Job, log: () => {} };
+    const ctx: WorkerContext = {
+      db,
+      queue,
+      job: { id: jobId, name: handlerName, data: { type, id, payload } } as Job,
+      log: () => {},
+    };
     await (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload);
     return { jobId, name: handlerName };
   }

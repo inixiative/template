@@ -1,5 +1,5 @@
 import { db, type Prisma } from '@template/db';
-import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
+import { ContactOwnerModel, type ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';
 import { makeError } from '#/lib/errors';
 

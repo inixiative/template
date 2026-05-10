@@ -4,9 +4,9 @@ import { createNavigationSlice } from '@template/ui/store/slices/navigation';
 import { createPermissionsSlice } from '@template/ui/store/slices/permissions';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
+import type { AppStore } from '@template/ui/store/types';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { AppStore } from '@template/ui/store/types';
 
 // Export slice creators
 export { createAuthSlice } from '@template/ui/store/slices/auth';

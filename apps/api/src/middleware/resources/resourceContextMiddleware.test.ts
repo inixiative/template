@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { OrganizationScalarSchema } from '@template/db';
-import { type Organization, type User } from '@template/db';
+import { type Organization, OrganizationScalarSchema, type User } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
 import { uuidv7 } from 'uuidv7';
 import { getResource } from '#/lib/context/getResource';

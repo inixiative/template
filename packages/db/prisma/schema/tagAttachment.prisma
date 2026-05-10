@@ -30,11 +30,12 @@ model TagAttachment {
     space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-    @@unique([resourceModel, userId, organizationId, spaceId, tagId])
+    // Per-resource uniqueness — partial uniques (see Contact for rationale).
+    // Each partial doubles as a lookup index for that resource FK.
+    @@unique([userId, tagId],         where: { userId:         { not: null } })
+    @@unique([organizationId, tagId], where: { organizationId: { not: null } })
+    @@unique([spaceId, tagId],        where: { spaceId:        { not: null } })
     @@index([tagId])
-    @@index([userId])
-    @@index([organizationId])
-    @@index([spaceId])
 }
 
 // Mixed enum: PascalCase = physical attachment models, camelCase = use-case

@@ -76,8 +76,16 @@ describe('makeBroadcastRegistry', () => {
 
   it('aggregates multiple rejections into AggregateError', async () => {
     const registry = makeBroadcastRegistry<{ run: () => Promise<void> }>();
-    registry.register('a', { run: async () => { throw new Error('a-failed'); } });
-    registry.register('b', { run: async () => { throw new Error('b-failed'); } });
+    registry.register('a', {
+      run: async () => {
+        throw new Error('a-failed');
+      },
+    });
+    registry.register('b', {
+      run: async () => {
+        throw new Error('b-failed');
+      },
+    });
 
     expect(registry.broadcast((a) => a.run())).rejects.toBeInstanceOf(AggregateError);
   });

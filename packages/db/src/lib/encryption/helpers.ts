@@ -1,6 +1,7 @@
 import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
-import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
+import type { EncryptedFieldConfig, EncryptionKeyring } from '@template/db/lib/encryption/types';
+import type { ModelNameFromAccessor, ModelName as PrismaModelName } from '@template/db/utils/modelNames';
 
 type ModelName = keyof typeof ENCRYPTED_MODELS;
 type KeyName<M extends ModelName> = keyof (typeof ENCRYPTED_MODELS)[M]['keys'] & string;
@@ -35,7 +36,9 @@ export const encryptField = async <M extends ModelName, K extends KeyName<M>>(
   record: Record<K, unknown> & Record<string, unknown>,
 ): Promise<EncryptedFieldPayload<K>> => {
   const modelConfig = ENCRYPTED_MODELS[modelName];
-  const keyConfig = modelConfig.keys[keyName as keyof typeof modelConfig.keys];
+  const keyConfig = modelConfig.keys[keyName as keyof typeof modelConfig.keys] as EncryptedFieldConfig<
+    ModelNameFromAccessor<M> & PrismaModelName
+  >;
   const fields = getFieldNames(String(keyName));
 
   const data = record[keyName];
@@ -58,7 +61,9 @@ export const decryptField = async <M extends ModelName, K extends KeyName<M>>(
   record: EncryptedFieldPayload<K> & Record<string, unknown>,
 ): Promise<unknown> => {
   const modelConfig = ENCRYPTED_MODELS[modelName];
-  const keyConfig = modelConfig.keys[keyName as keyof typeof modelConfig.keys];
+  const keyConfig = modelConfig.keys[keyName as keyof typeof modelConfig.keys] as EncryptedFieldConfig<
+    ModelNameFromAccessor<M> & PrismaModelName
+  >;
   const fields = getFieldNames(String(keyName));
 
   const keyring = getKeyringFromEnv(keyConfig.envPrefix);

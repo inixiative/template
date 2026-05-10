@@ -1,7 +1,9 @@
 import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
 import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
+import type { EncryptedFieldConfig } from '@template/db/lib/encryption/types';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import type { ModelName } from '@template/db/utils/modelNames';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
@@ -15,7 +17,7 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
       const delegate = db[modelConfig.model] as unknown as RuntimeDelegate;
 
       return (Object.keys(modelConfig.keys) as Array<keyof typeof modelConfig.keys>).map(async (keyName) => {
-        const keyConfig = modelConfig.keys[keyName];
+        const keyConfig = modelConfig.keys[keyName] as EncryptedFieldConfig<ModelName>;
         const targetVersion = Number.parseInt(process.env[`${keyConfig.envPrefix}_ENCRYPTION_VERSION`]!, 10);
         const fromVersion = targetVersion - 1;
 

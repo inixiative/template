@@ -1,6 +1,6 @@
+import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'bun:test';
 
 // Regression: admin readMany pages can send nested filters like
 //   query: { searchFields: { targetModel: { in: ['admin'] } } }
@@ -26,8 +26,7 @@ const ADMIN_READ_MANY_FNS = [
   'adminWebhookSubscriptionReadMany',
 ];
 
-const QUERY_SERIALIZER_LITERAL =
-  "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
+const QUERY_SERIALIZER_LITERAL = "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
 
 describe('admin readMany SDK querySerializer', () => {
   const sdk = readFileSync(SDK_PATH, 'utf8');

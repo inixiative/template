@@ -3,8 +3,8 @@ import type { CommunicationKind, ContactType } from '@template/db/generated/clie
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 
 export type MessageContent = {
-  text?: string;       // may contain {{recipient.*}}, {{data.*}}, {{sender.*}}
-  html?: string;       // same — interpolated by messageUser/messageContact before dispatch
+  text?: string; // may contain {{recipient.*}}, {{data.*}}, {{sender.*}}
+  html?: string; // same — interpolated by messageUser/messageContact before dispatch
   mediaUrls?: string[];
   /**
    * Caller-provided template variables. Available as `{{data.*}}` in

@@ -25,6 +25,13 @@ describe('ignoreFields', () => {
       expect(fields).toContain('updatedAt');
       expect(fields).toContain('lastUsedAt');
     });
+
+    it('auto-injects encrypted columns for AuthProvider from encryption registry', () => {
+      const fields = getIgnoreFields('AuthProvider');
+      expect(fields).toContain('encryptedSecrets');
+      expect(fields).toContain('encryptedSecretsMetadata');
+      expect(fields).toContain('encryptedSecretsKeyVersion');
+    });
   });
 
   describe('filterIgnoredFields', () => {

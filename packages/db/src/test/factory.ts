@@ -27,7 +27,6 @@
  */
 
 import { faker } from '@faker-js/faker';
-import { uuidv7 } from 'uuidv7';
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
@@ -45,6 +44,7 @@ import type {
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
+import { uuidv7 } from 'uuidv7';
 
 /**
  * Converts Date fields to ISO strings for API compatibility

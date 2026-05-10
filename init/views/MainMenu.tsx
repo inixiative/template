@@ -3,10 +3,7 @@ import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
-import {
-  getCloudflarePagesLiveActions,
-  getCloudflarePagesProgressSummaries,
-} from '../tasks/cloudflarePagesSteps';
+import { getCloudflarePagesLiveActions, getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
 import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';

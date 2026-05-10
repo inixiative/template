@@ -26,13 +26,14 @@ model TagCategory {
 
     tags Tag[]
 
-    // Per-owner uniqueness on name (multiple owners can independently have
-    // their own "audience" category without colliding).
-    @@unique([ownerModel, userId, organizationId, spaceId, name])
+    // Per-owner uniqueness — partial uniques (see Contact for rationale).
+    // Each partial doubles as a lookup index for that owner FK; the platform
+    // partial scopes uncategorized-tier tag categories to one-per-name globally.
+    @@unique([userId, name],         where: { userId:         { not: null } })
+    @@unique([organizationId, name], where: { organizationId: { not: null } })
+    @@unique([spaceId, name],        where: { spaceId:        { not: null } })
+    @@unique([name],                 where: raw("\"ownerModel\" = 'platform'"))
     @@index([ownerModel])
-    @@index([userId])
-    @@index([organizationId])
-    @@index([spaceId])
 
     // ==========================================================================
     // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

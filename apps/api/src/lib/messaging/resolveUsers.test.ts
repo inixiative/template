@@ -1,13 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
 import { TagResource } from '@template/db/generated/client/enums';
-import {
-  cleanupTouchedTables,
-  createContact,
-  createTag,
-  createTagAttachment,
-  createUser,
-} from '@template/db/test';
+import { cleanupTouchedTables, createContact, createTag, createTagAttachment, createUser } from '@template/db/test';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
 import { createTestApp } from '#tests/createTestApp';
 
@@ -40,14 +34,8 @@ describe('resolveUsers', () => {
       resources: [TagResource.userMessages],
     });
     foundersTag = tag.entity;
-    await createTagAttachment(
-      { resourceModel: TagResource.User },
-      { user: a.entity, tag: tag.entity },
-    );
-    await createTagAttachment(
-      { resourceModel: TagResource.User },
-      { user: b.entity, tag: tag.entity },
-    );
+    await createTagAttachment({ resourceModel: TagResource.User }, { user: a.entity, tag: tag.entity });
+    await createTagAttachment({ resourceModel: TagResource.User }, { user: b.entity, tag: tag.entity });
   });
 
   afterAll(async () => {
