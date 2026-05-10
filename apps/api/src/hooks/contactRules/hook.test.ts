@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -10,6 +10,7 @@ registerContactRulesHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  clearHookRegistry();
 });
 
 // Pad to a 7-digit national number for E.164 (caller supplies a 4-digit "local" piece)

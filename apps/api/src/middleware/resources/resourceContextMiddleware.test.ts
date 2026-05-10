@@ -1,11 +1,28 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Organization, User } from '@template/db';
+import { OrganizationScalarSchema } from '@template/db';
+import { type Organization, type User } from '@template/db';
 import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
-import { getResource, getResourceType } from '#/lib/context/getResource';
-import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
+import { uuidv7 } from 'uuidv7';
+import { getResource } from '#/lib/context/getResource';
+import { readRoute } from '#/lib/routeTemplates';
+import { makeController } from '#/lib/utils/makeController';
+import { Modules } from '#/modules/modules';
 import { createTestApp } from '#tests/createTestApp';
 import { get } from '#tests/utils/request';
+
+// Drives resourceContextMiddleware via the real readRoute template (which
+// auto-attaches the middleware via prepareMiddleware) so the test surface
+// matches what production code uses.
+const orgReadRoute = readRoute({
+  model: Modules.organization,
+  responseSchema: OrganizationScalarSchema,
+});
+
+const orgReadController = makeController(orgReadRoute, async (c, respond) => {
+  const resource = getResource<'organization'>(c);
+  return respond.ok(resource);
+});
 
 describe('resourceContextMiddleware', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -24,17 +41,9 @@ describe('resourceContextMiddleware', () => {
       mockUser: user,
       mount: [
         (app) => {
-          const testRouter = new OpenAPIHono();
-
-          testRouter.use('/:id', resourceContextMiddleware());
-
-          testRouter.get('/:id', (c) => {
-            const resource = getResource<'organization'>(c);
-            const resourceType = getResourceType(c);
-            return c.json({ resource, resourceType });
-          });
-
-          app.route('/api/v1/organization', testRouter);
+          const subrouter = new OpenAPIHono();
+          subrouter.openapi(orgReadRoute, orgReadController);
+          app.route('/api/v1/organization', subrouter);
         },
       ],
     });
@@ -46,26 +55,28 @@ describe('resourceContextMiddleware', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('loads resource into context when id exists', async () => {
+  it('loads the resource into context when the id exists', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(200);
-
-    const { resource, resourceType } = await response.json();
-    expect(resource.id).toBe(org.id);
-    expect(resource.name).toBe(org.name);
-    expect(resourceType).toBe('organization');
+    const body = await response.json();
+    expect(body.data.id).toBe(org.id);
+    expect(body.data.name).toBe(org.name);
   });
 
-  it('returns 404 when resource not found', async () => {
-    const response = await fetch(get('/api/v1/organization/nonexistent-id'));
+  it('returns 400 when the id is not a uuidv7 (and no lookup query is set)', async () => {
+    const response = await fetch(get('/api/v1/organization/not-a-uuid'));
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 404 when the uuid is well-formed but no row matches', async () => {
+    const response = await fetch(get(`/api/v1/organization/${uuidv7()}`));
     expect(response.status).toBe(404);
   });
 
-  it('supports lookup by different field', async () => {
+  it('supports lookup by another field — `?lookup=slug` accepts non-uuid id', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.slug}?lookup=slug`));
     expect(response.status).toBe(200);
-
-    const { resource } = await response.json();
-    expect(resource.id).toBe(org.id);
+    const body = await response.json();
+    expect(body.data.id).toBe(org.id);
   });
 });

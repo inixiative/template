@@ -2,25 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import type { Account, Organization, Space, Token, User } from '@template/db/generated/client/client';
 import type { SeedFile } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
-import { validate as isUUID, version as uuidVersion } from 'uuid';
+import { isUuidV7 } from '@template/shared/utils';
 
 describe('Seed System', () => {
   describe('UUID Validation', () => {
-    test('all seed IDs are valid UUIDs', () => {
+    test('all seed IDs are valid uuidv7', () => {
       for (const { model: _model, records } of seeds) {
         for (const record of records) {
           const id = record.id as string;
-          expect(isUUID(id)).toBe(true);
-        }
-      }
-    });
-
-    test('all seed IDs are UUIDv7', () => {
-      for (const { model: _model, records } of seeds) {
-        for (const record of records) {
-          const id = record.id as string;
-          const version = uuidVersion(id);
-          expect(version).toBe(7);
+          expect(isUuidV7(id)).toBe(true);
         }
       }
     });

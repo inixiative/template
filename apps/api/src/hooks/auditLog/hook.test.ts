@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -10,16 +10,19 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
+import { registerTestTracker } from '@template/db/test/testTracker';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
+registerTestTracker();
 registerAuditLogHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  clearHookRegistry();
 });
 
 describe('auditLog hook', () => {

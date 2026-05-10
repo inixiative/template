@@ -15,9 +15,9 @@
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency } from '@template/shared/utils/concurrency';
+import { isUuidV7 } from '@template/shared/utils/isUuidV7';
 import { resolveAll } from '@template/shared/utils/resolveAll';
 import { omit } from 'lodash-es';
-import { validate as isUUID, version as uuidVersion } from 'uuid';
 import { seeds } from './seeds';
 
 export type SeedFile<T = Record<string, unknown>> = {
@@ -49,15 +49,10 @@ const checkUUIDUniqueness = () => {
       const id = record.id as string;
 
       if (!id) continue;
-      if (!isUUID(id)) {
-        log.error(`Invalid UUID in ${model}:`, LogScope.seed);
+      if (!isUuidV7(id)) {
+        log.error(`Invalid uuidv7 in ${model}:`, LogScope.seed);
         console.error(model, id, record);
-        throw new Error('ID is not a valid UUID');
-      }
-      if (uuidVersion(id) !== 7) {
-        log.error(`Invalid UUID version in ${model} (must be v7):`, LogScope.seed);
-        console.error(model, id, record);
-        throw new Error(`ID must be UUIDv7, got v${uuidVersion(id)}`);
+        throw new Error('ID must be a valid uuidv7');
       }
 
       idDictionary[id] = idDictionary[id] || [];

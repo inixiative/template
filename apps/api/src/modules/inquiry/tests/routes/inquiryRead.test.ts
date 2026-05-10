@@ -8,6 +8,7 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import { uuidv7 } from 'uuidv7';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -96,7 +97,7 @@ describe('GET /api/v1/inquiry/:id', () => {
   });
 
   it('returns 404 for unknown id', async () => {
-    const response = await fetch(get('/api/v1/inquiry/00000000-0000-0000-0000-000000000000'));
+    const response = await fetch(get(`/api/v1/inquiry/${uuidv7()}`));
     expect(response.status).toBe(404);
   });
 });

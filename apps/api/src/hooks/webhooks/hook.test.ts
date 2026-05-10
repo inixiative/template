@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { db } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import { WebhookModel } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
@@ -18,6 +18,7 @@ registerWebhookHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  clearHookRegistry();
 });
 
 afterEach(() => {

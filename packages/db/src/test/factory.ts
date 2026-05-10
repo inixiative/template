@@ -27,6 +27,7 @@
  */
 
 import { faker } from '@faker-js/faker';
+import { uuidv7 } from 'uuidv7';
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
@@ -84,7 +85,10 @@ const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
   const fieldNames = new Set(model.fields.map((f) => f.name));
   const injected: Record<string, unknown> = {};
 
-  if (fieldNames.has('id')) injected.id = faker.string.uuid();
+  // uuidv7 (not faker's v4) — matches the schema's `dbgenerated("uuidv7()")`
+  // default, so factory-created rows share the same id format as production
+  // rows. The middleware enforces v7 when addressing rows by `:id`.
+  if (fieldNames.has('id')) injected.id = uuidv7();
   if (fieldNames.has('createdAt')) injected.createdAt = new Date();
   if (fieldNames.has('updatedAt')) injected.updatedAt = new Date();
   if (fieldNames.has('deletedAt')) injected.deletedAt = null;

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Contact, Organization, OrganizationUser, User } from '@template/db';
+import { clearHookRegistry } from '@template/db';
 import { cleanupTouchedTables, createContact, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -14,6 +16,8 @@ describe('Contact CRUD', () => {
   let orgUser: OrganizationUser;
 
   beforeAll(async () => {
+    registerContactRulesHook();
+
     const { entity, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = entity;
     user = context.user;
@@ -30,6 +34,7 @@ describe('Contact CRUD', () => {
 
   afterAll(async () => {
     await cleanupTouchedTables(db);
+    clearHookRegistry();
   });
 
   const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
