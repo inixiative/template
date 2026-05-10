@@ -1,5 +1,6 @@
 import { PHONE_SUBTYPES } from '@template/shared/contact/constants/phone';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
+import { phoneToStubEmail } from '@template/shared/contact/stubEmail';
 import { CountryCodeSchema } from '@template/shared/reference/countries';
 import { z } from 'zod';
 
@@ -18,4 +19,5 @@ export const phoneDef: ContactTypeDef<PhoneValue, PhoneValue> = {
   subtype: { mode: 'optional', values: PHONE_SUBTYPES },
   uniqueness: 'per-owner',
   display: { label: 'Phone', icon: 'lucide:phone' },
+  toStubEmail: (v) => phoneToStubEmail(v.e164, 'phone'),
 };

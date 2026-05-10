@@ -21,4 +21,10 @@ export type ContactTypeDef<TInput, TStored> = {
   // `icon` is an iconify slug (e.g. `lucide:phone`, `simple-icons:linkedin`).
   // UI passes it straight to <Icon icon={…} /> — keeps shared react-free.
   display: { label: string; icon: string };
+  // Deterministic pseudo-email for stub User creation (e.g. when a bot
+  // observes a message from a JID with no existing User). Implement only
+  // for types whose owners can plausibly be observed before being onboarded
+  // (whatsapp / telegram / phone). Unset means resolveUserByContact will
+  // refuse to stub a User of this type.
+  toStubEmail?: (v: TStored) => string;
 };

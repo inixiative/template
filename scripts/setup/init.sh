@@ -17,6 +17,12 @@ echo "Initializing project: $PROJECT_NAME"
 # - package.json files
 # - imports throughout codebase
 
+# TODO: Rename literal "template" references in env files
+# - .env.test:        template_test → ${PROJECT_NAME}_test
+# - .env.test.example: same
+# - (pg-init.sh + docker-compose.yml are already PROJECT_NAME-driven via
+#    $POSTGRES_DB / ${PROJECT_NAME:-template}, so they need no rename)
+
 # TODO: Generate secrets
 # - BETTER_AUTH_SECRET (openssl rand -base64 32)
 # - WEBHOOK_SIGNING_KEYS (RSA keypair)

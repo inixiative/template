@@ -23,6 +23,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
     middleware = [],
     many = false,
     admin = false,
+    internal = false,
     tags,
     searchableFields,
   } = args;
@@ -32,12 +33,12 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
   const resourceName = submodel ? (many ? pluralize(submodel) : submodel) : many ? pluralize(model) : model;
   const parentContext = submodel ? ` for a ${model}` : '';
   const routePath = buildRoutePath({ submodel, action, skipId, many });
-  const routeTags = buildTags({ model, submodel, tags, admin });
+  const routeTags = buildTags({ model, submodel, tags, admin, internal });
   const skipResource = !hasIdParam(skipId, submodel, many);
 
   const route = createRoute({
     ...args,
-    operationId: buildOperationId({ action: action || 'read', model, submodel, many, admin }),
+    operationId: buildOperationId({ action: action || 'read', model, submodel, many, admin, internal }),
     method: 'get',
     path: routePath,
     tags: routeTags,

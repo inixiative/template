@@ -10,17 +10,18 @@ import {
 } from '#/lib/routeTemplates/utils';
 
 export const createRoute = <const T extends RouteArgs>(args: T) => {
-  const { model, submodel, action, description, skipId, many, middleware = [], admin, tags, ...routeArgs } = args;
+  const { model, submodel, action, description, skipId, many, middleware = [], admin, internal, tags, ...routeArgs } =
+    args;
 
   const resourceName = submodel || model;
   const routePath = buildRoutePath({ submodel, action, skipId, many, operation: 'create' });
-  const routeTags = buildTags({ model, submodel, tags, admin });
+  const routeTags = buildTags({ model, submodel, tags, admin, internal });
   const skipResource = !submodel;
   const skipIdForRequest = skipId || !submodel;
 
   return honoCreateRoute({
     ...routeArgs,
-    operationId: buildOperationId({ action: 'create', model, submodel, admin }),
+    operationId: buildOperationId({ action: 'create', model, submodel, admin, internal }),
     method: 'post',
     path: routePath,
     tags: routeTags,

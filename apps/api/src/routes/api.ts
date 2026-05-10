@@ -18,6 +18,7 @@ import { spaceUserRouter } from '#/modules/spaceUser';
 import { tokenRouter } from '#/modules/token';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
+import { internalRouter } from '#/routes/internal';
 import type { AppEnv } from '#/types/appEnv';
 
 export const apiRouter = new OpenAPIHono<AppEnv>();
@@ -25,6 +26,11 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);
+
+// Internal service-to-service routes (shared-secret auth). Mounted BEFORE
+// the better-auth middlewares so the secret check in internalRouter is the
+// only auth gate — internal callers don't have user sessions or tokens.
+apiRouter.route('/internal', internalRouter);
 
 // Auth routes (better-auth handles its own auth, returns early)
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));

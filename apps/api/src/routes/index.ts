@@ -11,7 +11,7 @@ export const routes = new OpenAPIHono<AppEnv>();
 // Public routes (no auth)
 routes.route('/health', healthRouter);
 
-// API routes (includes /api/auth/* - see api.ts)
+// API routes (includes /api/auth/*, /api/admin/*, /api/internal/* - see api.ts)
 routes.route('/api', apiRouter);
 
 // BullBoard (basic auth configured in bullBoard.ts)

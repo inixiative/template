@@ -12,17 +12,18 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
     skipId = false,
     middleware = [],
     admin = false,
+    internal = false,
     tags,
     ...routeArgs
   } = args;
 
   const resourceName = submodel || model;
   const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/:id/${action}` : '/:id';
-  const routeTags = buildTags({ model, submodel, tags, admin });
+  const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
   return createRoute({
     ...routeArgs,
-    operationId: buildOperationId({ action: action ?? 'delete', model, submodel, admin }),
+    operationId: buildOperationId({ action: action ?? 'delete', model, submodel, admin, internal }),
     method: 'delete',
     path: routePath,
     tags: routeTags,

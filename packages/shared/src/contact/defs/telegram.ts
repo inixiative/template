@@ -1,5 +1,6 @@
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseTelegramUrl, type TelegramValue } from '@template/shared/contact/parsers';
+import { stubEmailDomain } from '@template/shared/contact/stubEmail';
 import { z } from 'zod';
 
 const telegramStored = z.object({ handle: z.string().min(1) });
@@ -16,4 +17,9 @@ export const telegramDef: ContactTypeDef<TelegramInput, TelegramValue> = {
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'Telegram', icon: 'simple-icons:telegram' },
+  // Telegram identity is the handle (username), not a phone — so the stub
+  // email is `${handle}@telegram.${PROJECT_NAME}` rather than going through
+  // phoneToStubEmail. If we ever observe phone-numbered TG accounts
+  // (no username set), revisit the value shape.
+  toStubEmail: (v) => `${v.handle.toLowerCase()}@${stubEmailDomain('telegram')}`,
 };

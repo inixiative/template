@@ -17,6 +17,7 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
     skipId = false,
     middleware = [],
     admin = false,
+    internal = false,
     tags,
     ...routeArgs
   } = args;
@@ -25,11 +26,11 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
 
   const resourceName = submodel || model;
   const routePath = skipId ? `/${action}` : `/:id/${action}`;
-  const routeTags = buildTags({ model, submodel, tags, admin });
+  const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
   return createRoute({
     ...routeArgs,
-    operationId: buildOperationId({ action, model, submodel, admin }),
+    operationId: buildOperationId({ action, model, submodel, admin, internal }),
     method: 'post',
     path: routePath,
     tags: routeTags,

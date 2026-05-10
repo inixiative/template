@@ -7,13 +7,14 @@ type BuildOperationIdArgs = {
   submodel?: string;
   many?: boolean;
   admin?: boolean;
+  internal?: boolean;
 };
 
 const pascalCase = (str: string) => upperFirst(camelCase(str));
 
 /**
  * Builds operationId to match controller naming pattern exactly.
- * Pattern: {admin?}{model}{Action}{Many?}{Submodel}
+ * Pattern: {admin|internal?}{model}{Action}{Many?}{Submodel}
  *
  * Rules:
  * - many: true with submodel → plural submodel (meReadManyOrganizations)
@@ -24,6 +25,7 @@ const pascalCase = (str: string) => upperFirst(camelCase(str));
  *   - meReadManyOrganizations (many + submodel)
  *   - organizationCreateToken (singular submodel)
  *   - adminCronJobReadMany (no submodel)
+ *   - internalChatGroupCreateChatMessage (internal submodel)
  */
 export const buildOperationId = ({
   action,
@@ -31,12 +33,16 @@ export const buildOperationId = ({
   submodel,
   many = false,
   admin = false,
+  internal = false,
 }: BuildOperationIdArgs): string => {
   const parts: string[] = [];
 
-  // Start with admin prefix (lowercase) or model (camelCase)
+  // Start with admin/internal prefix (lowercase) or model (camelCase)
   if (admin) {
     parts.push('admin');
+    parts.push(pascalCase(model));
+  } else if (internal) {
+    parts.push('internal');
     parts.push(pascalCase(model));
   } else {
     parts.push(camelCase(model));
