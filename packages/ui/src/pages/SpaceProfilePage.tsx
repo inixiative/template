@@ -1,4 +1,4 @@
-import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/ui/apiClient';
+import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useOptimisticMutation, useQuery } from '@template/ui/hooks';

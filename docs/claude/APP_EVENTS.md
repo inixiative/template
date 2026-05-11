@@ -20,7 +20,7 @@ This system skips straight to step 4. Business logic emits events. Everything el
 
 ```
 Business logic
-  │  emitAppEvent('inquiry.sent', inquiry, { resourceType, resourceId })
+  │  emitAppEvent('inquiry.sent', inquiry)
   ▼
 emit.ts (auto-enriches actor from auditActorContext)
   ▼

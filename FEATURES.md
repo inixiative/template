@@ -287,7 +287,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Event Broadcasting Pattern** - Infrastructure ready for app events to broadcast over WebSocket. Planned pattern: register app event handler that publishes to relevant channels based on event resource type/ID. Not yet wired up but all plumbing exists
 
-- 🟣 **App Events System** - Event emitter pattern for business events (user.signedUp, resource.updated) planned but not implemented. Would enable decoupled event handlers for notifications, analytics, webhooks, and WebSocket broadcasts. Infrastructure exists (WebSocket, handlers, types) but event emission and registration not built yet. (ticket INFRA-004)
+- ✅ **App Events System** - `emitAppEvent('event.name', data)` for business events; actor context auto-enriches from `auditActorContext` (AsyncLocalStorage). Handlers defined via `makeAppEvent` fan out across bridges in parallel (`Promise.allSettled`): **observe** (BullMQ job → AppEvent audit table), **email** (typed handoffs → sendEmail jobs with declarative targeting), **websocket** (Redis pub/sub channel broadcasts), and **direct callbacks**. Centralized handler map at `apps/api/src/appEvents/handlers/index.ts` mirrors the BullMQ job-handler pattern. Events inside `db.txn()` defer to `onCommit`; events outside fire immediately
 
 - 🟣 **Feature Flags** - Runtime feature toggles not implemented. Would enable gradual rollouts, A/B testing, and emergency kill switches. Could integrate with external services (LaunchDarkly, Unleash) or build internal Redis-backed solution
 

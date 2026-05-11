@@ -3,9 +3,10 @@
 // ============================================================================
 
 model Token {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   name      String
   keyHash   String   @unique

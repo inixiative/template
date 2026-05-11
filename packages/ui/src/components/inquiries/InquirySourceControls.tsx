@@ -1,4 +1,4 @@
-import type { InquirySentItem } from '@template/ui/apiClient';
+import type { InquirySentItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useCancelInquiryMutation, useSendInquiryMutation } from '@template/ui/hooks/inquiry';
 import { useInquiryPermission } from '@template/ui/hooks/useInquiryPermission';

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@template/shared": "workspace:*",
+    "@template/sdk": "workspace:*",
     "@template/ui": "workspace:*",
     "@tanstack/react-query": "*",
     "@tanstack/react-router": "*",

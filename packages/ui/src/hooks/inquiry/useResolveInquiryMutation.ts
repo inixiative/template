@@ -1,4 +1,4 @@
-import { inquiryResolve } from '@template/ui/apiClient';
+import { inquiryResolve } from '@template/sdk';
 import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';

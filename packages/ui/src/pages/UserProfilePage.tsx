@@ -1,4 +1,4 @@
-import { meRead, meReadQueryKey } from '@template/ui/apiClient';
+import { meRead, meReadQueryKey } from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useQuery } from '@template/ui/hooks';

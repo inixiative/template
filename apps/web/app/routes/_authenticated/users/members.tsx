@@ -11,7 +11,7 @@ function UsersMembersPage() {
   const context = useAppStore((state) => state.tenant.context);
 
   if (context.type === 'space' && context.space) {
-    return <div>Space Users - TODO</div>;
+    return <Unauthorized />;
   }
 
   if (context.type === 'organization' && context.organization) {

@@ -12,7 +12,7 @@ import {
 } from '@template/db/test';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';

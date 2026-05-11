@@ -3,7 +3,7 @@ import {
   meReadManyOrganizationsQueryKey,
   organizationReadManySpacesQueryKey,
   spaceProtectedQueryKey,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
 

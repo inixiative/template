@@ -48,8 +48,8 @@ class ResendEmailClient implements EmailClient {
   }
 
   async send(options: SendEmailOptions): Promise<SendEmailResult> {
-    if (process.env.NODE_ENV !== 'test') return this._send(options);
-    return this.vcr.capture('send', () => this._send(options));
+    if (process.env.NODE_ENV !== 'test') return this.__send(options);
+    return this.vcr.capture('send', () => this.__send(options));
   }
 
   async sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
@@ -58,15 +58,15 @@ class ResendEmailClient implements EmailClient {
     const results: SendEmailResult[] = [];
     for (const batchChunk of chunk(batch, MAX_BATCH_SIZE)) {
       if (process.env.NODE_ENV !== 'test') {
-        results.push(...(await this._sendBatch(batchChunk)));
+        results.push(...(await this.__sendBatch(batchChunk)));
       } else {
-        results.push(...(await this.vcr.capture('sendBatch', () => this._sendBatch(batchChunk))));
+        results.push(...(await this.vcr.capture('sendBatch', () => this.__sendBatch(batchChunk))));
       }
     }
     return results;
   }
 
-  private async _send(options: SendEmailOptions): Promise<SendEmailResult> {
+  private async __send(options: SendEmailOptions): Promise<SendEmailResult> {
     const { data, error } = await this.resend.emails.send(toResendPayload(options));
 
     if (error) {
@@ -79,7 +79,7 @@ class ResendEmailClient implements EmailClient {
     };
   }
 
-  private async _sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
+  private async __sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
     const { data, error } = await this.resend.batch.send(batch.map(toResendPayload));
 
     if (error) {

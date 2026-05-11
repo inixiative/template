@@ -5,11 +5,12 @@
 // Supports polymorphic ownership: default (all tenants), admin (platform), Organization (tenant-branded)
 
 model EmailTemplate {
-  id        String              @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  id        String                @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  deletedAt DateTime?
 
-  name     String               // "OTP Verification"
+  name     String                 // "OTP Verification"
   slug     String               // "otp"
   locale   String               @default("en")
   category CommunicationCategory

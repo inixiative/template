@@ -1,4 +1,4 @@
-import { organizationRead, spaceRead } from '@template/ui/apiClient';
+import { organizationRead, spaceRead } from '@template/sdk';
 import { useQuery } from '@template/ui/hooks/useQuery';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import { useAppStore } from '@template/ui/store';

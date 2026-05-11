@@ -4,5 +4,5 @@ export type BlueskyValue = { handle: string };
 
 // Bluesky: bsky.app/profile/<handle>
 export const parseBlueskyUrl = (url: string): BlueskyValue => ({
-  handle: parseSimpleHandleUrl('bsky.app', url, 'profile'),
+  handle: parseSimpleHandleUrl('bsky.app', url, { prefix: 'profile', caseInsensitive: true }),
 });

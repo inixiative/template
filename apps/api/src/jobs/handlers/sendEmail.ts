@@ -1,5 +1,6 @@
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import type { EmailTarget } from '@template/email/targeting';
+import { log } from '@template/shared/logger';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
@@ -19,24 +20,24 @@ const senderVars = (): Record<string, unknown> => ({
   address: process.env.PLATFORM_ADDRESS ?? '',
 });
 
-const verifyAddresses = async (addresses: string[], log: (msg: string) => void): Promise<string[]> => {
+const verifyAddresses = async (addresses: string[]): Promise<string[]> => {
   const verified: string[] = [];
 
   for (const address of addresses) {
     const result = await emailVerifier.verify(address);
 
     if (result.status === 'undeliverable') {
-      log(`Skipping undeliverable: ${address} (${result.reason})`);
+      log.info(`Skipping undeliverable: ${address} (${result.reason})`);
       continue;
     }
 
     if (result.isDisposable) {
-      log(`Skipping disposable: ${address}`);
+      log.info(`Skipping disposable: ${address}`);
       continue;
     }
 
     if (result.status === 'risky') {
-      log(`Sending to risky: ${address} (${result.reason})`);
+      log.info(`Sending to risky: ${address} (${result.reason})`);
     }
 
     verified.push(address);
@@ -45,9 +46,8 @@ const verifyAddresses = async (addresses: string[], log: (msg: string) => void):
   return verified;
 };
 
-export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
+export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const { to, cc, bcc, template, data, tags } = payload;
-  const { log } = ctx;
 
   const [recipients, ccAddresses, bccAddresses, from] = await Promise.all([
     resolveTargets(to),
@@ -58,17 +58,14 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   if (!recipients.length) return;
 
-  const verified = await verifyAddresses(
-    recipients.map((r) => r.to),
-    log,
-  );
+  const verified = await verifyAddresses(recipients.map((r) => r.to));
   const validRecipients = recipients.filter((r) => verified.includes(r.to));
 
   if (!validRecipients.length) return;
 
   const adapterName = emailRegistry.names()[0];
   if (!adapterName) {
-    log(`No email adapter registered — skipping send (template=${template})`);
+    log.info(`No email adapter registered — skipping send (template=${template})`);
     return;
   }
   // Stub: always uses first registered adapter. Future: resolve per-tenant via sender context.
@@ -94,5 +91,5 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
 
   await client.sendBatch(rendered);
 
-  log(`Email sent: template=${template} recipients=${rendered.length}`);
+  log.info(`Email sent: template=${template} recipients=${rendered.length}`);
 });

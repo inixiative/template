@@ -51,12 +51,12 @@ model Contact {
   source     String?
 
   // Communication-kind opt-ins for this specific contact channel.
-  // JSON array of CommunicationKind values. Default ['platform','activity']
-  // matches the kind-level policy: platform + activity are opt-out (on by
-  // default); marketing is opt-in (must be explicitly added). `system` kind
-  // bypasses this list entirely (always delivered).
+  // Native postgres enum array — value integrity enforced by the DB. Default
+  // [platform, activity] matches the kind-level policy: platform + activity
+  // are opt-out (on by default); marketing is opt-in (must be explicitly
+  // added). `system` kind bypasses this list entirely (always delivered).
   // See `apps/api/src/lib/messaging/canDeliver.ts`.
-  acceptedKinds Json @default("[\"platform\", \"activity\"]")
+  acceptedKinds CommunicationKind[] @default([platform, activity])
 
   // Per-owner uniqueness — partial uniques because Postgres treats NULLs as
   // distinct in composite uniques, so a single composite over the polymorphic

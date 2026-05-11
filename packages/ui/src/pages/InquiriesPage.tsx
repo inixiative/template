@@ -1,4 +1,4 @@
-import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClient';
+import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';

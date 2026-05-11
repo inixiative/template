@@ -2,7 +2,7 @@ import {
   type OrganizationReadManySpacesResponse,
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';

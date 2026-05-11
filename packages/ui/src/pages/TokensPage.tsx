@@ -4,7 +4,7 @@ import type {
   MeReadManyTokensResponse,
   OrganizationReadManyTokensResponse,
   SpaceReadManyTokensResponse,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';

@@ -11,6 +11,7 @@
     "./generated/client/models": "./src/generated/client/models.ts",
     "./generated/client/enums": "./src/generated/client/enums.ts",
     "./generated/zod/scalarSchemas.gen": "./src/generated/zod/scalarSchemas.gen.ts",
+    "./lib/auditActorContext": "./src/lib/auditActorContext.ts",
     "./lib/encryption/*": "./src/lib/encryption/*",
     "./test": "./src/test/index.ts",
     "./test/*": "./src/test/*",
@@ -29,7 +30,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "bun run prisma/seed.ts",
-    "db:truncate:webhooks": "bun run prisma/truncateWebhookSubscriptions.ts",
+    "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

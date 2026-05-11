@@ -8,6 +8,7 @@ model EmailComponent {
   id        String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
+  deletedAt DateTime?
 
   slug   String                // "default-header"
   mjml   String               @db.Text // MJML with {{component:slug}} and {{variable.*}} placeholders
@@ -40,6 +41,9 @@ model EmailComponent {
   @@unique([slug, locale, spaceId],        where: raw("\"ownerModel\" = 'Space'"),                map: "EmailComponent_slug_locale_space_key")
   @@index([ownerModel])
   @@index([organizationId])
+  // Reverse-lookup: "which components reference this slug?" — used by
+  // the save-side cycle validator and future editor "find usages".
+  @@index([componentRefs(ops: ArrayOps)], type: Gin)
 }
 
 enum EmailOwnerModel {

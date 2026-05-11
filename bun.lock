@@ -43,6 +43,7 @@
         "@iconify/react": "*",
         "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
+        "@template/sdk": "workspace:*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
         "lodash-es": "^4.18.1",
@@ -112,6 +113,7 @@
         "@iconify/react": "*",
         "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
+        "@template/sdk": "workspace:*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
         "lodash-es": "^4.18.1",
@@ -142,6 +144,7 @@
         "@iconify/react": "*",
         "@tanstack/react-query": "*",
         "@tanstack/react-router": "*",
+        "@template/sdk": "workspace:*",
         "@template/shared": "workspace:*",
         "@template/ui": "workspace:*",
         "lodash-es": "^4.18.1",
@@ -178,7 +181,7 @@
         "ioredis-mock": "^8.13.1",
         "lodash-es": "^4.18.1",
         "pg": "^8.20.0",
-        "uuid": "^14.0.0",
+        "uuidv7": "^1.1.0",
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
@@ -187,7 +190,6 @@
         "@types/ioredis-mock": "^8.2.7",
         "@types/lodash-es": "^4.17.12",
         "@types/pg": "^8.18.0",
-        "@types/uuid": "^11.0.0",
         "prisma": "^7.4.2",
         "prisma-zod-generator": "^2.1.4",
         "zod": "^4.3.6",
@@ -221,6 +223,21 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/sdk": {
+      "name": "@template/sdk",
+      "version": "0.0.0",
+      "dependencies": {
+        "@hey-api/client-fetch": "^0.13.1",
+      },
+      "devDependencies": {
+        "@hey-api/openapi-ts": "^0.94.0",
+        "@tanstack/react-query": "^5.90.21",
+        "typescript": "^5",
+      },
+      "peerDependencies": {
+        "@tanstack/react-query": "^5.0.0",
+      },
+    },
     "packages/shared": {
       "name": "@template/shared",
       "version": "0.0.1",
@@ -251,11 +268,11 @@
       "version": "0.0.0",
       "dependencies": {
         "@ariakit/react": "^0.4.22",
-        "@hey-api/client-fetch": "^0.13.1",
         "@iconify/react": "^6.0.2",
         "@tanstack/react-router": "^1.166.2",
         "@template/db": "workspace:*",
         "@template/permissions": "workspace:*",
+        "@template/sdk": "workspace:*",
         "@template/shared": "workspace:*",
         "better-auth": "^1.5.4",
         "class-variance-authority": "^0.7.1",
@@ -267,7 +284,6 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.8.9",
-        "@hey-api/openapi-ts": "^0.94.0",
         "@tailwindcss/vite": "^4.2.1",
         "@tanstack/react-query": "^5.90.21",
         "@testing-library/react": "^16.3.2",
@@ -976,6 +992,8 @@
 
     "@template/permissions": ["@template/permissions@workspace:packages/permissions"],
 
+    "@template/sdk": ["@template/sdk@workspace:packages/sdk"],
+
     "@template/shared": ["@template/shared@workspace:packages/shared"],
 
     "@template/ui": ["@template/ui@workspace:packages/ui"],
@@ -1073,8 +1091,6 @@
     "@types/stripe": ["@types/stripe@8.0.417", "", { "dependencies": { "stripe": "*" } }, "sha512-PTuqskh9YKNENnOHGVJBm4sM0zE8B1jZw1JIskuGAPkMB+OH236QeN8scclhYGPA4nG6zTtPXgwpXdp+HPDTVw=="],
 
     "@types/tedious": ["@types/tedious@4.0.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-KHPsfX/FoVbUGbyYvk1q9MMQHLPeRZhRJZdO45Q4YjvFkv4hMNghCWTvy7rdKessBsmtz4euWCWAB6/tVpI1Iw=="],
-
-    "@types/uuid": ["@types/uuid@11.0.0", "", { "dependencies": { "uuid": "*" } }, "sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA=="],
 
     "@types/whatwg-mimetype": ["@types/whatwg-mimetype@3.0.2", "", {}, "sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA=="],
 

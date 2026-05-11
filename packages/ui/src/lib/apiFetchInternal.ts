@@ -1,5 +1,5 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import { type Client, createClient } from '@template/ui/apiClient/client';
+import { type Client, createClient } from '@template/sdk/client';
 import { getToken } from '@template/ui/lib/auth/token';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 

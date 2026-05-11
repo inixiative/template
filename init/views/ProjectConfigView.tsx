@@ -56,13 +56,19 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
     setTimeout(() => loadConfig(), 100);
   }, []);
 
+  // Sanitize on entry so downstream consumers (docker container names like
+  // `${PROJECT_NAME}_postgres`, vercel URL slugs, etc.) never have to defend
+  // against whitespace. Trim outer spaces; collapse internal whitespace to
+  // a single `-`.
+  const sanitizeIdentifier = (value: string): string => value.trim().replace(/\s+/g, '-');
+
   const handleNameSubmit = (value: string) => {
-    setNewName(value || currentConfig.name);
+    setNewName(sanitizeIdentifier(value) || currentConfig.name);
     setViewState('prompt-org');
   };
 
   const handleOrgSubmit = (value: string) => {
-    setNewOrg(value || currentConfig.organization);
+    setNewOrg(sanitizeIdentifier(value) || currentConfig.organization);
     setViewState('confirm');
   };
 

@@ -1,4 +1,4 @@
-import type { OrganizationCreateAuthProviderData } from '@template/ui/apiClient';
+import type { OrganizationCreateAuthProviderData } from '@template/sdk';
 import { Button, Input, Label, Modal } from '@template/ui/components';
 import { memo, useState } from 'react';
 

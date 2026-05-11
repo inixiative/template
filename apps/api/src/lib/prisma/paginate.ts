@@ -77,14 +77,27 @@ export const paginate = async <
 
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere = buildWhereClause({
-    model,
-    search,
-    searchFields,
-    searchableFields,
-    skipFieldValidation,
-    orNullFields,
-  });
+  // Non-Prisma module routes don't register a searchable model. That's OK
+  // when there's no search input either — empty where, route runs. But if
+  // the request DID send search/searchFields, the route's misconfigured:
+  // without a model we can't validate operators or coerce values, and
+  // silently dropping the search would hide the bug. Throw loud.
+  if (!model && (search || searchFields)) {
+    throw new Error(
+      'paginate: search/searchFields requested but no searchableModel registered. ' +
+        'Routes that accept search must pass `model` (and optionally `searchableFields`) to the route template.',
+    );
+  }
+  const searchWhere = model
+    ? buildWhereClause({
+        model,
+        search,
+        searchFields,
+        searchableFields,
+        skipFieldValidation,
+        orNullFields,
+      })
+    : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
   const where = { ...baseWhere, ...searchWhere } as FindManyWhere<T>;

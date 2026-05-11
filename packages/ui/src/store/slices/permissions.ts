@@ -7,7 +7,7 @@ import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { isSuperadmin } from '@template/permissions/roles/shared';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { MeReadResponses } from '@template/sdk';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
 import type { StateCreator } from 'zustand';

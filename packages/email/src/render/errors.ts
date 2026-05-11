@@ -7,22 +7,26 @@ export type EmailErrorType = 'component_missing' | 'template_missing' | 'circula
 export class EmailRenderError extends Error {
   readonly slug: string;
   readonly type: EmailErrorType;
+  readonly path?: string[];
 
-  constructor(slug: string, type: EmailErrorType) {
-    super(EmailRenderError.getMessage(slug, type));
+  constructor(slug: string, type: EmailErrorType, path?: string[]) {
+    super(EmailRenderError.getMessage(slug, type, path));
     this.name = 'EmailRenderError';
     this.slug = slug;
     this.type = type;
+    this.path = path;
   }
 
-  private static getMessage(slug: string, type: EmailErrorType): string {
+  private static getMessage(slug: string, type: EmailErrorType, path?: string[]): string {
     switch (type) {
       case 'component_missing':
         return `Component not found: ${slug}`;
       case 'template_missing':
         return `Template not found: ${slug}`;
       case 'circular_ref':
-        return `Circular reference detected: ${slug}`;
+        return path && path.length > 0
+          ? `Circular reference detected: ${path.join(' → ')}`
+          : `Circular reference detected: ${slug}`;
     }
   }
 }

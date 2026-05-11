@@ -53,21 +53,21 @@ export class VCR {
    * - Real fn throws → saves { status: 500, body: message } and rethrows
    */
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
-    const fixturePath = this._popFixturePath(method);
+    const fixturePath = this.__popFixturePath(method);
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
-      if (saved.status >= 400) throw new Error(String(saved.body));
+      if (saved.status >= 400) throw new Error(JSON.stringify(saved.body));
       return saved.body as T;
     }
 
     try {
       const raw = await realFn();
-      const saved: Fixture<T> = { status: 200, body: this._sanitize(method, raw) };
-      this._save(fixturePath, saved);
+      const saved: Fixture<T> = { status: 200, body: this.__sanitize(method, raw) };
+      this.__save(fixturePath, saved);
       return saved.body as T;
     } catch (error) {
-      this._save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
+      this.__save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -77,7 +77,7 @@ export class VCR {
    * envelope (status, body, headers). Does NOT throw on error status.
    */
   async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
-    const fixturePath = this._popFixturePath(method);
+    const fixturePath = this.__popFixturePath(method);
 
     if (existsSync(fixturePath)) {
       return JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
@@ -87,42 +87,42 @@ export class VCR {
       const raw = await realFn();
       const saved: Fixture<T> = {
         status: raw.status,
-        body: this._sanitize(method, raw.body) as T | null,
+        body: this.__sanitize(method, raw.body) as T | null,
         ...(raw.headers && { headers: raw.headers }),
       };
-      this._save(fixturePath, saved);
+      this.__save(fixturePath, saved);
       return saved;
     } catch (error) {
-      this._save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
+      this.__save(fixturePath, { status: 500, body: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
 
-  private _sanitize<T>(method: string, data: T): T {
+  private __sanitize<T>(method: string, data: T): T {
     const rule = this.sanitizers[method];
     if (!rule) return data;
 
     if (rule.isArray && Array.isArray(data)) {
-      return data.map((item) => this._applyRule(rule, item)) as unknown as T;
+      return data.map((item) => this.__applyRule(rule, item)) as unknown as T;
     }
 
-    return this._applyRule(rule, data);
+    return this.__applyRule(rule, data);
   }
 
-  private _applyRule<T>(rule: Sanitizer, data: T): T {
+  private __applyRule<T>(rule: Sanitizer, data: T): T {
     if (rule.fn && typeof data === 'string') return rule.fn(data) as unknown as T;
     if (rule.keys?.length) return redactKeys(data, rule.keys);
     return data;
   }
 
-  private _popFixturePath(method: string): string {
+  private __popFixturePath(method: string): string {
     const q = this.queues.get(method);
     const fixtureName = q?.shift();
     if (!fixtureName) throw new Error(`VCR: no cassette queued for "${method}"`);
     return join(this.fixturesDir, `${method}.${fixtureName}.json`);
   }
 
-  private _save(fixturePath: string, data: unknown): void {
+  private __save(fixturePath: string, data: unknown): void {
     mkdirSync(dirname(fixturePath), { recursive: true });
     writeFileSync(fixturePath, `${JSON.stringify(data, null, 2)}\n`);
   }

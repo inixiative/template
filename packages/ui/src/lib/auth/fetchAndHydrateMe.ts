@@ -1,4 +1,4 @@
-import { type MeReadResponses, meRead } from '@template/ui/apiClient';
+import { type MeReadResponses, meRead } from '@template/sdk';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { AppStore } from '@template/ui/store/types';
 import { keyBy } from 'lodash-es';

@@ -9,7 +9,7 @@ import {
   spaceReadManyTokens,
   spaceReadManyTokensQueryKey,
   tokenDelete,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { makeContextQueries, mutation, query } from '@template/ui/lib/makeContextQueries';

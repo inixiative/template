@@ -1,4 +1,4 @@
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { MeReadResponses } from '@template/sdk';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
 

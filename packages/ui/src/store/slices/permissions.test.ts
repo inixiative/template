@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { MeReadResponses } from '@template/sdk';
 import { createTestStore } from '@template/ui/test';
 
 type UserWithRelations = MeReadResponses[200]['data'];

@@ -42,11 +42,10 @@ run_with_env_overrides() {
 
 if [ "$ENV" != "test" ]; then
     if command -v infisical &> /dev/null; then
-        CONFIG_FILE=$(bash "$SCRIPT_DIR/locate-config.sh")
-        PROJECT_ID=$(cd "$ROOT_DIR" && bun -e "import {projectConfig} from './$CONFIG_FILE'; console.log(projectConfig.infisical.projectId)" 2>/dev/null)
+        PROJECT_ID=$(bash "$SCRIPT_DIR/read-project-config.sh" infisical.projectId)
 
         if [ -n "$PROJECT_ID" ]; then
-            STAGING_ENABLED=$(cd "$ROOT_DIR" && bun -e "import {projectConfig} from './$CONFIG_FILE'; console.log(projectConfig.features?.staging?.enabled ? 'true' : 'false')" 2>/dev/null)
+            STAGING_ENABLED=$(bash "$SCRIPT_DIR/read-project-config.sh" features.staging.enabled)
 
             INFISICAL_ENV="$ENV"
             if [ "$ENV" = "local" ] || [ "$ENV" = "pr" ]; then

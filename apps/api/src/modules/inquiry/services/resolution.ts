@@ -2,7 +2,7 @@ import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
-import { auditActorContext } from '#/lib/auditActorContext';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -25,12 +25,14 @@ export const resolveInquiry = async (
 
   try {
     return await db.txn(async () => {
-      // Re-read fresh inside the txn so two concurrent resolves can't both pass
-      // a stale-status check. NOTE: Postgres default isolation is READ COMMITTED,
-      // so this still leaves a narrow window for two writers; full coverage
-      // requires a conditional update with a rowcount check or SERIALIZABLE.
-      const fresh = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
-      validateInquiryIsResolvable(fresh);
+      // Fetch + row-lock in one query. Under READ COMMITTED, two concurrent
+      // resolves could both pass `validateInquiryIsResolvable` on the same
+      // stale row and both run `handleApprove` (double-effect side effects).
+      // `SELECT … FOR UPDATE` makes the second caller wait here until the
+      // first commits; the second then re-reads the new status and the
+      // validator rejects. Single RTT vs SELECT-then-findUnique.
+      const [fresh] = await db.$queryRaw<Inquiry[]>`SELECT * FROM "Inquiry" WHERE id = ${inquiry.id} FOR UPDATE`;
+      validateInquiryIsResolvable(fresh!);
 
       let approvalOutput: Record<string, unknown> = {};
 

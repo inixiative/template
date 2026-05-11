@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
+import { log } from '@template/shared/logger';
 import type { JobHandler } from '#/jobs/types';
 
 export type SendWebhookPayload = {
@@ -11,11 +12,11 @@ export type SendWebhookPayload = {
 
 export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) => {
   const { subscriptionId, action, resourceId, data } = payload;
-  const { db, log } = ctx;
+  const { db } = ctx;
 
   const subscription = await db.webhookSubscription.findUnique({ where: { id: subscriptionId } });
   if (!subscription?.isActive) {
-    log(`Webhook subscription ${subscriptionId} not found or inactive - skipping`);
+    log.info(`Webhook subscription ${subscriptionId} not found or inactive - skipping`);
     return;
   }
 
@@ -53,11 +54,11 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   });
 
   if (status === 'success') {
-    log(`Webhook delivered to ${subscription.url}`);
+    log.info(`Webhook delivered to ${subscription.url}`);
     return;
   }
 
-  log(`Webhook delivery failed: ${error}`);
+  log.info(`Webhook delivery failed: ${error}`);
 
   // Circuit breaker: disable subscription if last N deliveries all failed
   const FAILURE_THRESHOLD = 5;
@@ -73,6 +74,6 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     recentEvents.every((e: Pick<WebhookEvent, 'status'>) => e.status !== 'success');
   if (allFailed) {
     await db.webhookSubscription.update({ where: { id: subscriptionId }, data: { isActive: false } });
-    log(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);
+    log.info(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);
   }
 };

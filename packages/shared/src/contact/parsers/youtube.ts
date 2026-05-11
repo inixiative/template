@@ -9,11 +9,12 @@ export const parseYoutubeUrl = (url: string): YoutubeValue => {
   if (parts[0]?.toLowerCase() !== 'youtube.com' || !parts[1]) {
     throw new Error(`Unrecognized YouTube URL: ${url}`);
   }
+  // YouTube @handles are case-insensitive — lowercase at every return path.
   const seg = parts[1]!;
-  if (seg.startsWith('@')) return { handle: seg.slice(1) };
-  if ((seg === 'c' || seg === 'user') && parts[2]) return { handle: parts[2]! };
+  if (seg.startsWith('@')) return { handle: seg.slice(1).toLowerCase() };
+  if ((seg === 'c' || seg === 'user') && parts[2]) return { handle: parts[2]!.toLowerCase() };
   if (seg === 'channel') {
     throw new Error('YouTube channel IDs are not supported; use the @handle URL');
   }
-  return { handle: seg };
+  return { handle: seg.toLowerCase() };
 };

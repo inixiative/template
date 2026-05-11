@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { buildOrganization } from '@template/db/test';
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { MeReadResponses } from '@template/sdk';
 import { createTestStore } from '@template/ui/test';
 
 type MeData = MeReadResponses[200]['data'];

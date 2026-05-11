@@ -7,7 +7,7 @@ import {
   type OrganizationDeleteData,
   organizationCreate,
   organizationDelete,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';

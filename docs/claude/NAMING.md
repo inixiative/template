@@ -58,6 +58,26 @@
 | Object constants (enums/registries) | PascalCase | `Modules`, `JobType`, `BatchStatus` |
 | Derived helpers (Zod enums, etc) | camelCase | `batchStatusEnum`, `moduleKeys` |
 
+### Underscore Prefix
+
+Two distinct meanings — **don't mix them**:
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `_name` | **Unused** variable/parameter | `(_input, key) => …`, `const { x: _drop, ...rest } = obj` |
+| `__name` | **Private / internal** — not for outside use | `private __body`, `__model` phantom-type brand, `__send()` |
+
+**Why both?** TypeScript's `private` keyword only works on class members. For module-level helpers, object literal keys, type brands, and other plain-data internals, there is no language-level private. The double-underscore convention covers those cases. Single underscore is reserved for the universal "ignored" meaning (matches `argsIgnorePattern: "^_"`).
+
+**Apply consistently:**
+- Class private methods/fields: `private __methodName()`, `private __field` (the keyword *and* the prefix reinforce intent).
+- Type brand keys on phantom types: `string & { readonly __model: Model }`.
+- Object-literal helpers a consumer shouldn't reach into: `{ __cache: …, lookup() { … } }`.
+- Unused destructured fields: `const { legacy: _legacy, ...rest }`.
+- Unused callback params: `(_event, payload) => …`.
+
+**Don't use `#name` (hard-private)** unless you need runtime privacy enforcement specifically — it's class-only and doesn't unify with the broader `__name` convention.
+
 ### Imports
 
 | Context | Alias | Example |

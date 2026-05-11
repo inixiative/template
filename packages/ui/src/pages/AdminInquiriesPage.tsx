@@ -4,7 +4,7 @@ import {
   adminInquiryReadManyQueryKey,
   type InquiryReceivedItem,
   type InquirySentItem,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';

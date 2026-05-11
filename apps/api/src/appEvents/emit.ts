@@ -2,7 +2,7 @@ import { db } from '@template/db';
 import type { AppEventPayloads } from '#/appEvents/handlers';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { AppEventPayload } from '#/appEvents/types';
-import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 
 export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   name: K,

@@ -14,14 +14,21 @@
     "generate:openapi": {
       "dependsOn": ["^db:generate"],
       "inputs": ["src/**/*.ts", "!src/**/*.test.ts", "scripts/generateOpenapiSpec.ts"],
-      "outputs": ["openapi.local.gen.json", "../../packages/ui/openapi.gen.json"],
+      "outputs": ["openapi.local.gen.json", "../../packages/sdk/openapi.gen.json"],
       "cache": true
     },
 
     "generate:sdk": {
       "dependsOn": ["^generate:openapi"],
-      "inputs": ["openapi.gen.json", "openapiTs.config.ts", "scripts/generateMswHandlers.ts"],
-      "outputs": ["src/apiClient/**/*.gen.ts", "src/test/mocks/handlers.gen.ts"],
+      "inputs": ["openapi.gen.json", "openapiTs.config.ts"],
+      "outputs": ["src/**/*.gen.ts"],
+      "cache": true
+    },
+
+    "generate:msw": {
+      "dependsOn": ["^generate:sdk"],
+      "inputs": ["scripts/generateMswHandlers.ts"],
+      "outputs": ["src/test/mocks/handlers.gen.ts"],
       "cache": true
     },
 

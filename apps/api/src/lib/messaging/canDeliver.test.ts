@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import type { CommunicationKind } from '@template/db/generated/client/enums';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 
-const contact = (acceptedKinds: string[]) => ({ acceptedKinds });
-const ref = (acceptedKinds: string[]) => ({ acceptedKinds });
+const contact = (acceptedKinds: CommunicationKind[]) => ({ acceptedKinds });
+const ref = (acceptedKinds: CommunicationKind[]) => ({ acceptedKinds });
 
 describe('canDeliver', () => {
   describe('system kind', () => {
@@ -27,10 +28,6 @@ describe('canDeliver', () => {
       expect(canDeliver('activity', contact([]))).toBe(false);
     });
 
-    it('refuses when acceptedKinds is malformed (non-array)', () => {
-      expect(canDeliver('platform', { acceptedKinds: null } as never)).toBe(false);
-      expect(canDeliver('platform', { acceptedKinds: 'platform' } as never)).toBe(false);
-    });
   });
 
   describe('customerRef gate', () => {

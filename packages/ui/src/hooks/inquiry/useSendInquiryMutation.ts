@@ -1,4 +1,4 @@
-import { inquirySend } from '@template/ui/apiClient';
+import { inquirySend } from '@template/sdk';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';

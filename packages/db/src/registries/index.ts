@@ -1,4 +1,5 @@
 export * from './auditEnabledModels';
+export * from './softDeleteModels';
 export {
   type FalsePolymorphismRef,
   type FlexibleRef,

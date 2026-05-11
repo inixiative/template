@@ -5,13 +5,16 @@ export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
   icon: 'lucide:settings',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
+  // Parent gate matches the loosest child (`Profile` is `read`) — without
+  // this, read-only users can't see the Settings menu and can't navigate
+  // to Profile. Each child still has its own per-action gate below.
+  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
   items: [
     {
       label: 'Profile',
       path: '/profile',
       icon: 'lucide:user',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'manage'),
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
     },
     {
       label: 'Tokens',

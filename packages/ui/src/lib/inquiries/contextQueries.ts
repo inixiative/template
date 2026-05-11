@@ -11,7 +11,7 @@ import {
   spaceReceivedManyInquiriesQueryKey,
   spaceSentManyInquiries,
   spaceSentManyInquiriesQueryKey,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { makeContextQueries, query } from '@template/ui/lib/makeContextQueries';
 

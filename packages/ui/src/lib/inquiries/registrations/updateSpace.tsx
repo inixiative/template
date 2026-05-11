@@ -1,4 +1,4 @@
-import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClient';
+import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {

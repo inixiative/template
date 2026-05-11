@@ -9,9 +9,10 @@ enum AuthProviderType {
 }
 
 model AuthProvider {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   type     AuthProviderType
   provider String // 'google', 'github', 'okta', 'azure-ad'

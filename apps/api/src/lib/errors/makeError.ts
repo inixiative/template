@@ -14,15 +14,15 @@ type MakeErrorOptions = {
 
 export class AppError extends HTTPException {
   requestId?: string;
-  private _body: Record<string, unknown>;
+  private __body: Record<string, unknown>;
 
   constructor(status: number, body: Record<string, unknown>) {
     super(status as HttpErrorCode, { message: body.message as string });
-    this._body = body;
+    this.__body = body;
   }
 
   getResponse(): Response {
-    return new Response(JSON.stringify({ ...this._body, requestId: this.requestId }), {
+    return new Response(JSON.stringify({ ...this.__body, requestId: this.requestId }), {
       status: this.status,
       headers: { 'Content-Type': 'application/json' },
     });

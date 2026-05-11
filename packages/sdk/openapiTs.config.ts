@@ -7,7 +7,7 @@ export default defineConfig({
   client: '@hey-api/client-fetch',
   input,
   output: {
-    path: './src/apiClient',
+    path: './src',
     format: 'biome',
     lint: 'biome',
   },

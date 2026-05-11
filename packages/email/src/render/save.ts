@@ -10,6 +10,7 @@ import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { SaveContext } from '@template/email/render/types';
+import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
@@ -51,6 +52,14 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
 
       const finalTemplate = { ...input, ...resolved.template, locale: ctx.locale } as EmailTemplate;
       const finalComponents = resolved.components as EmailComponent[];
+
+      // Cycle check before writes. mapRefs guarantees the intra-save graph
+      // is a tree (text-nested → can't self-reference); this defends against
+      // cross-save cycles where this save's new edge closes a loop with
+      // edges already in the DB.
+      for (const component of finalComponents) {
+        await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
+      }
 
       const [template, components] = await Promise.all([
         saveTemplate(finalTemplate, ctx),

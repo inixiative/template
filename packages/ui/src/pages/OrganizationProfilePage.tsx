@@ -3,7 +3,7 @@ import {
   organizationProtected,
   organizationProtectedQueryKey,
   organizationUpdate,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useOptimisticMutation, useQuery } from '@template/ui/hooks';

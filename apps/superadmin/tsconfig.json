@@ -11,7 +11,10 @@
       "@template/shared": ["../../packages/shared/src/index.ts"],
       "@template/shared/*": ["../../packages/shared/src/*"],
       "@template/ui": ["../../packages/ui/src/index.ts"],
-      "@template/ui/*": ["../../packages/ui/src/*"]
+      "@template/ui/*": ["../../packages/ui/src/*"],
+      "@template/sdk": ["../../packages/sdk/src/index.ts"],
+      "@template/sdk/openapi.gen.json": ["../../packages/sdk/openapi.gen.json"],
+      "@template/sdk/*": ["../../packages/sdk/src/*"]
     }
   },
   "include": ["app", "vite.config.ts"]

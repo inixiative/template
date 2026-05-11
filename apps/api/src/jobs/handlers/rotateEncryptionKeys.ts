@@ -4,12 +4,13 @@ import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/reg
 import type { EncryptedFieldConfig } from '@template/db/lib/encryption/types';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
 export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ctx) => {
-  const { db, log } = ctx;
+  const { db } = ctx;
 
   const rotations = await Promise.all(
     (Object.keys(ENCRYPTED_MODELS) as Array<keyof typeof ENCRYPTED_MODELS>).flatMap((modelName) => {
@@ -27,8 +28,8 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
         });
         if (!staleRecords.length) return [];
 
-        log(`Starting rotation: ${modelName}.${String(keyName)} ${fromVersion} → ${targetVersion}`);
-        log(`Found ${staleRecords.length} total records to rotate`);
+        log.info(`Starting rotation: ${modelName}.${String(keyName)} ${fromVersion} → ${targetVersion}`);
+        log.info(`Found ${staleRecords.length} total records to rotate`);
 
         return staleRecords.map((record: Record<string, unknown>) => async () => {
           try {
@@ -47,7 +48,7 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
 
             return updated.length > 0;
           } catch (error) {
-            log(
+            log.info(
               `Failed to rotate ${modelName} record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
             );
             return false;
@@ -62,7 +63,7 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
   const successCount = results.filter(Boolean).length;
   const failedCount = allRotations.length - successCount;
 
-  log(`Rotation complete: ${successCount}/${allRotations.length} records rotated successfully`);
+  log.info(`Rotation complete: ${successCount}/${allRotations.length} records rotated successfully`);
 
   if (failedCount > 0) {
     throw new Error(`Rotation incomplete: ${failedCount}/${allRotations.length} records failed to rotate`);

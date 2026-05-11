@@ -1,11 +1,11 @@
 import type { QueryKey } from '@tanstack/react-query';
-import type { InquiryItem } from '@template/ui/apiClient';
+import type { InquiryItem } from '@template/sdk';
 import {
   meReceivedManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
   organizationSentManyInquiriesQueryKey,
   spaceSentManyInquiriesQueryKey,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 
 export type InquiryType = InquiryItem['type'];
 export type InquiryStatus = InquiryItem['status'];

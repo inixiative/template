@@ -12,28 +12,54 @@ export const splitUrl = (url: string): string[] =>
     .split('/')
     .filter(Boolean);
 
+export type ParseSimpleHandleUrlOptions = {
+  /**
+   * Path segment(s) between host and handle. String → single prefix
+   * (`'profile'` matches `bsky.app/profile/<handle>`). Array → aliases that
+   * all map to the same handle position (`['u', 'user']` makes Reddit accept
+   * both `reddit.com/u/<handle>` and `reddit.com/user/<handle>`).
+   */
+  prefix?: string | readonly string[];
+  /**
+   * Whether the returned handle is lowercased. **Defaults to `true`** —
+   * virtually every social platform routed through here is case-insensitive,
+   * and lowercasing keeps the stored value aligned with `toValueKey`'s
+   * lowercased key (otherwise `JohnDoe` vs `johndoe` collapse to the same
+   * valueKey with different stored shapes — silent uniqueness bypass).
+   * Pass `false` only for genuinely case-sensitive platforms.
+   */
+  caseInsensitive?: boolean;
+};
+
 /**
  * Parse a `host/handle` or `host/<prefix>/handle` URL into its trailing handle.
  *
- * @param hosts  one or more accepted hosts (e.g. ['twitter.com', 'x.com'])
- * @param url    URL to parse
- * @param prefix optional path segment between host and handle (e.g. 'profile'
- *               for `bsky.app/profile/<handle>`). Pass undefined for direct.
+ * @param hosts   one or more accepted hosts (e.g. ['twitter.com', 'x.com'])
+ * @param url     URL to parse
+ * @param options see ParseSimpleHandleUrlOptions
  */
-export const parseSimpleHandleUrl = (hosts: string | readonly string[], url: string, prefix?: string): string => {
+export const parseSimpleHandleUrl = (
+  hosts: string | readonly string[],
+  url: string,
+  options: ParseSimpleHandleUrlOptions = {},
+): string => {
+  const { prefix, caseInsensitive = true } = options;
   const parts = splitUrl(url);
   const hostList = (typeof hosts === 'string' ? [hosts] : hosts).map((h) => h.toLowerCase());
   if (!parts[0] || !hostList.includes(parts[0].toLowerCase())) {
     throw new Error(`Unrecognized ${hostList[0]} URL: ${url}`);
   }
+  const normalize = (s: string) => (caseInsensitive ? s.toLowerCase() : s);
+
   if (prefix !== undefined) {
-    if (parts[1]?.toLowerCase() !== prefix.toLowerCase() || !parts[2]) {
-      throw new Error(`Expected ${hostList[0]}/${prefix}/<handle>: ${url}`);
+    const prefixList = (typeof prefix === 'string' ? [prefix] : prefix).map((p) => p.toLowerCase());
+    if (!parts[1] || !prefixList.includes(parts[1].toLowerCase()) || !parts[2]) {
+      throw new Error(`Expected ${hostList[0]}/(${prefixList.join('|')})/<handle>: ${url}`);
     }
-    return parts[2]!.replace(/^@/, '');
+    return normalize(parts[2]!.replace(/^@/, ''));
   }
   if (!parts[1]) throw new Error(`No handle in ${hostList[0]} URL: ${url}`);
-  return parts[1]!.replace(/^@/, '');
+  return normalize(parts[1]!.replace(/^@/, ''));
 };
 
 /**

@@ -1,11 +1,44 @@
 import { describe, expect, it } from 'bun:test';
 import {
   canonicalUrl,
+  parseBlueskyUrl,
+  parseFacebookUrl,
   parseGithubUrl,
+  parseInstagramUrl,
   parseLinkedinUrl,
+  parseMastodonUrl,
+  parseRedditUrl,
+  parseSimpleHandleUrl,
   parseTelegramUrl,
+  parseThreadsUrl,
+  parseTiktokUrl,
   parseTwitterUrl,
+  parseYoutubeUrl,
 } from '@template/shared/contact/parsers';
+
+describe('parseSimpleHandleUrl', () => {
+  it('lowercases handle by default', () => {
+    expect(parseSimpleHandleUrl('example.com', 'https://example.com/JohnDoe')).toBe('johndoe');
+  });
+
+  it('preserves case when caseInsensitive=false', () => {
+    expect(parseSimpleHandleUrl('example.com', 'https://example.com/JohnDoe', { caseInsensitive: false })).toBe(
+      'JohnDoe',
+    );
+  });
+
+  it('strips leading @', () => {
+    expect(parseSimpleHandleUrl('example.com', 'https://example.com/@JohnDoe')).toBe('johndoe');
+  });
+
+  it('rejects mismatched host', () => {
+    expect(() => parseSimpleHandleUrl('example.com', 'https://other.com/johndoe')).toThrow();
+  });
+
+  it('rejects unknown prefix when prefix supplied', () => {
+    expect(() => parseSimpleHandleUrl('example.com', 'https://example.com/wrong/x', { prefix: 'profile' })).toThrow();
+  });
+});
 
 describe('parseLinkedinUrl', () => {
   it('parses /in/ as personal', () => {
@@ -77,14 +110,112 @@ describe('parseTwitterUrl', () => {
     expect(parseTwitterUrl('https://twitter.com/jack')).toEqual({ handle: 'jack' });
   });
 
-  it('strips leading @', () => {
-    expect(parseTwitterUrl('https://x.com/@dril')).toEqual({ handle: 'dril' });
+  it('strips leading @ and lowercases together', () => {
+    expect(parseTwitterUrl('https://x.com/@Dril')).toEqual({ handle: 'dril' });
   });
 });
 
 describe('parseTelegramUrl', () => {
   it('extracts handle from t.me', () => {
     expect(parseTelegramUrl('https://t.me/durov')).toEqual({ handle: 'durov' });
+  });
+});
+
+describe('parseBlueskyUrl', () => {
+  it('extracts handle behind /profile/', () => {
+    expect(parseBlueskyUrl('https://bsky.app/profile/aron.bsky.social')).toEqual({
+      handle: 'aron.bsky.social',
+    });
+  });
+
+  it('rejects URLs without /profile/ prefix', () => {
+    expect(() => parseBlueskyUrl('https://bsky.app/aron.bsky.social')).toThrow();
+  });
+});
+
+describe('parseFacebookUrl', () => {
+  it('extracts handle', () => {
+    expect(parseFacebookUrl('https://facebook.com/zuck')).toEqual({ handle: 'zuck' });
+  });
+});
+
+describe('parseInstagramUrl', () => {
+  it('extracts handle', () => {
+    expect(parseInstagramUrl('https://instagram.com/cristiano')).toEqual({ handle: 'cristiano' });
+  });
+});
+
+describe('parseThreadsUrl', () => {
+  it('extracts handle and strips @', () => {
+    expect(parseThreadsUrl('https://threads.net/@zuck')).toEqual({ handle: 'zuck' });
+  });
+});
+
+describe('parseTiktokUrl', () => {
+  it('extracts handle and strips @', () => {
+    expect(parseTiktokUrl('https://tiktok.com/@charlidamelio')).toEqual({ handle: 'charlidamelio' });
+  });
+});
+
+describe('parseMastodonUrl', () => {
+  it('extracts instance and handle', () => {
+    expect(parseMastodonUrl('https://mastodon.social/@Gargron')).toEqual({
+      instance: 'mastodon.social',
+      handle: 'gargron',
+    });
+  });
+
+  it('works for arbitrary instance hosts', () => {
+    expect(parseMastodonUrl('https://hachyderm.io/@aron')).toEqual({
+      instance: 'hachyderm.io',
+      handle: 'aron',
+    });
+  });
+
+  it('rejects when handle segment lacks @', () => {
+    expect(() => parseMastodonUrl('https://mastodon.social/gargron')).toThrow();
+  });
+});
+
+describe('parseRedditUrl', () => {
+  it('accepts /u/ prefix', () => {
+    expect(parseRedditUrl('https://reddit.com/u/spez')).toEqual({ handle: 'spez' });
+  });
+
+  it('accepts /user/ prefix', () => {
+    expect(parseRedditUrl('https://reddit.com/user/spez')).toEqual({ handle: 'spez' });
+  });
+
+  it('rejects URLs without a recognized prefix', () => {
+    expect(() => parseRedditUrl('https://reddit.com/spez')).toThrow();
+  });
+});
+
+describe('parseYoutubeUrl', () => {
+  it('parses @handle URLs', () => {
+    expect(parseYoutubeUrl('https://youtube.com/@MrBeast')).toEqual({ handle: 'mrbeast' });
+  });
+
+  it('parses /c/<handle> URLs', () => {
+    expect(parseYoutubeUrl('https://youtube.com/c/MrBeast')).toEqual({ handle: 'mrbeast' });
+  });
+
+  it('parses /user/<handle> URLs', () => {
+    expect(parseYoutubeUrl('https://youtube.com/user/MrBeast')).toEqual({ handle: 'mrbeast' });
+  });
+
+  it('parses bare /<handle> URLs as a fallback', () => {
+    expect(parseYoutubeUrl('https://youtube.com/MrBeast')).toEqual({ handle: 'mrbeast' });
+  });
+
+  // Channel IDs (UCxxx) aren't human handles — surface as an error so callers
+  // can prompt for the canonical @handle URL.
+  it('rejects /channel/<id> URLs', () => {
+    expect(() => parseYoutubeUrl('https://youtube.com/channel/UCX6OQ3DkcsbYNE6H8uQQuVA')).toThrow();
+  });
+
+  it('rejects non-youtube hosts', () => {
+    expect(() => parseYoutubeUrl('https://vimeo.com/@mrbeast')).toThrow();
   });
 });
 

@@ -1,454 +1,367 @@
 import { describe, expect, it } from 'bun:test';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
+const onUser = (overrides: Parameters<typeof buildWhereClause>[0]) =>
+  buildWhereClause({ model: 'User', ...overrides });
+
 describe('buildWhereClause', () => {
-  describe('simple search', () => {
-    it('builds OR conditions for simple search', () => {
-      const result = buildWhereClause({
-        search: 'john',
-        searchableFields: ['name', 'email'],
-      });
-
+  describe('global search (single term, fan-out across fields)', () => {
+    it('emits a case-insensitive OR across String fields', () => {
+      const result = onUser({ search: 'aron', searchableFields: ['name', 'email'] });
       expect(result).toEqual({
         AND: [
           {
             OR: [
-              { name: { contains: 'john', mode: 'insensitive' } },
-              { email: { contains: 'john', mode: 'insensitive' } },
+              { name: { contains: 'aron', mode: 'insensitive' } },
+              { email: { contains: 'aron', mode: 'insensitive' } },
             ],
           },
         ],
       });
     });
 
-    it('supports nested paths in simple search', () => {
+    it('walks relation paths', () => {
       const result = buildWhereClause({
-        search: 'test',
-        searchableFields: ['name', 'user.email'],
+        model: 'Inquiry',
+        search: 'aron',
+        searchableFields: ['sourceUser.name', 'sourceUser.email'],
       });
-
       expect(result).toEqual({
         AND: [
           {
             OR: [
-              { name: { contains: 'test', mode: 'insensitive' } },
-              { user: { email: { contains: 'test', mode: 'insensitive' } } },
+              { sourceUser: { name: { contains: 'aron', mode: 'insensitive' } } },
+              { sourceUser: { email: { contains: 'aron', mode: 'insensitive' } } },
             ],
           },
         ],
       });
     });
-  });
 
-  describe('advanced search', () => {
-    it('builds AND conditions for field-specific search', () => {
-      const result = buildWhereClause({
-        searchFields: { name: 'john', email: 'example.com' },
-        searchableFields: ['name', 'email'],
+    it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', () => {
+      const result = onUser({
+        search: 'aron',
+        searchableFields: ['name', 'platformRole', 'createdAt', 'emailVerified'],
       });
-
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'john', mode: 'insensitive' } },
-          { email: { contains: 'example.com', mode: 'insensitive' } },
-        ],
+        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] }],
       });
     });
 
-    it('supports nested paths in advanced search', () => {
-      const result = buildWhereClause({
-        searchFields: { user: { email: 'test@example.com' } },
-        searchableFields: ['user.email'],
-      });
-
-      expect(result).toEqual({
-        AND: [{ user: { email: { contains: 'test@example.com', mode: 'insensitive' } } }],
-      });
+    it('emits no OR when every searchable field is non-String', () => {
+      const result = onUser({ search: 'foo', searchableFields: ['platformRole', 'createdAt'] });
+      expect(result).toEqual({});
     });
 
-    it('throws error for fields not in searchableFields', () => {
-      expect(() =>
-        buildWhereClause({
-          searchFields: { name: 'john', password: 'secret' },
-          searchableFields: ['name', 'email'],
-        }),
-      ).toThrow("Field 'password' is not searchable");
-    });
-  });
-
-  describe('combined search and filters', () => {
-    it('combines simple search with filters', () => {
-      const result = buildWhereClause({
-        search: 'john',
-        searchableFields: ['name'],
-        filters: { deletedAt: null },
-      });
-
-      expect(result).toEqual({
-        deletedAt: null,
-        AND: [
-          {
-            OR: [{ name: { contains: 'john', mode: 'insensitive' } }],
-          },
-        ],
-      });
-    });
-
-    it('combines advanced search with filters', () => {
-      const result = buildWhereClause({
-        searchFields: { name: 'john' },
-        searchableFields: ['name'],
-        filters: { status: 'active', deletedAt: null },
-      });
-
-      expect(result).toEqual({
-        status: 'active',
-        deletedAt: null,
-        AND: [{ name: { contains: 'john', mode: 'insensitive' } }],
-      });
-    });
-  });
-
-  describe('no search', () => {
-    it('returns only filters when no search', () => {
-      const result = buildWhereClause({
-        searchableFields: ['name'],
-        filters: { status: 'active' },
-      });
-
-      expect(result).toEqual({ status: 'active' });
-    });
-
-    it('returns empty object when no search and no filters', () => {
-      const result = buildWhereClause({
-        searchableFields: ['name'],
-      });
-
+    it('returns empty when there is no search term and no searchFields', () => {
+      const result = onUser({ searchableFields: ['name'] });
       expect(result).toEqual({});
     });
   });
 
-  describe('nested operator format', () => {
-    it('handles nested objects with Prisma operators', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          name: { contains: 'john' },
-          age: { gte: 18 },
-        },
-        searchableFields: ['name', 'age'],
-      });
-
+  describe('searchFields — bare value applies the kind default operator', () => {
+    it('String → contains + insensitive mode', () => {
+      const result = onUser({ searchFields: { name: 'aron' }, searchableFields: ['name'] });
       expect(result).toEqual({
-        AND: [{ name: { contains: 'john' } }, { age: { gte: 18 } }],
+        AND: [{ name: { contains: 'aron', mode: 'insensitive' } }],
       });
     });
 
-    it('handles deeply nested field paths with operators', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          user: {
-            profile: {
-              name: { contains: 'john' },
-            },
-          },
-        },
-        searchableFields: ['user.profile.name'],
+    it('enum → equals (no contains, no mode)', () => {
+      const result = onUser({
+        searchFields: { platformRole: 'superadmin' },
+        searchableFields: ['platformRole'],
       });
-
       expect(result).toEqual({
-        AND: [{ user: { profile: { name: { contains: 'john' } } } }],
+        AND: [{ platformRole: { equals: 'superadmin' } }],
       });
     });
 
-    it('handles relation filters with some', () => {
+    it('Int → equals, with string coercion to number', () => {
       const result = buildWhereClause({
-        searchFields: {
-          posts: {
-            some: {
-              status: 'published',
-            },
-          },
-        },
-        searchableFields: ['posts.status'],
+        model: 'CronJob',
+        searchFields: { maxAttempts: '3' },
+        searchableFields: ['maxAttempts'],
       });
-
-      expect(result).toEqual({
-        AND: [{ posts: { some: { status: 'published' } } }],
-      });
+      expect(result).toEqual({ AND: [{ maxAttempts: { equals: 3 } }] });
     });
 
-    it('handles relation filters with every', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          members: {
-            every: {
-              role: 'admin',
-            },
-          },
-        },
-        searchableFields: ['members.role'],
+    it('Boolean → equals, coercing "true" / "false" strings', () => {
+      const result = onUser({
+        searchFields: { emailVerified: 'true' },
+        searchableFields: ['emailVerified'],
       });
-
-      expect(result).toEqual({
-        AND: [{ members: { every: { role: 'admin' } } }],
-      });
+      expect(result).toEqual({ AND: [{ emailVerified: { equals: true } }] });
     });
 
-    it('handles relation filters with none', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          comments: {
-            none: {
-              flagged: true,
-            },
-          },
-        },
-        searchableFields: ['comments.flagged'],
+    it('DateTime → equals with Date coercion from ISO string', () => {
+      const result = onUser({
+        searchFields: { createdAt: '2026-05-10T12:00:00Z' },
+        searchableFields: ['createdAt'],
       });
-
-      expect(result).toEqual({
-        AND: [{ comments: { none: { flagged: true } } }],
-      });
+      const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
+      expect(inner.equals).toBeInstanceOf(Date);
+      expect(inner.equals.toISOString()).toBe('2026-05-10T12:00:00.000Z');
     });
 
-    it('mixes flat strings and nested operators', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          name: 'john',
-          age: { gte: 18 },
-          email: { endsWith: '@example.com' },
-        },
-        searchableFields: ['name', 'age', 'email'],
+    it('DateTime → equals with Date coercion from ms-timestamp string', () => {
+      const result = onUser({
+        searchFields: { createdAt: '1715353200000' },
+        searchableFields: ['createdAt'],
       });
-
-      expect(result).toEqual({
-        AND: [
-          { name: { contains: 'john', mode: 'insensitive' } },
-          { age: { gte: 18 } },
-          { email: { endsWith: '@example.com' } },
-        ],
-      });
+      const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
+      expect(inner.equals.getTime()).toBe(1715353200000);
     });
 
-    it('handles in and notIn arrays for field operators', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          type: { in: ['inviteOrganizationUser', 'transferSpace'] },
-          status: { notIn: ['denied', 'canceled'] },
-        },
-        searchableFields: ['type', 'status'],
-      });
-
-      expect(result).toEqual({
-        AND: [
-          { type: { in: ['inviteOrganizationUser', 'transferSpace'] } },
-          { status: { notIn: ['denied', 'canceled'] } },
-        ],
-      });
-    });
-
-    it('normalizes singleton in and notIn values to arrays', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          type: { in: 'inviteOrganizationUser' },
-          status: { notIn: 'denied' },
-        },
-        searchableFields: ['type', 'status'],
-      });
-
-      expect(result).toEqual({
-        AND: [{ type: { in: ['inviteOrganizationUser'] } }, { status: { notIn: ['denied'] } }],
-      });
-    });
-
-    it('widens configured fields to include null values', () => {
-      const now = '2026-03-20T12:00:00.000Z';
-
-      const result = buildWhereClause({
-        searchFields: {
-          expiresAt: { gte: now },
-        },
-        searchableFields: ['expiresAt'],
-        orNullFields: ['expiresAt'],
-      });
-
-      expect(result).toEqual({
-        AND: [
-          {
-            OR: [{ expiresAt: { gte: now } }, { expiresAt: null }],
-          },
-        ],
-      });
-    });
-
-    it('rejects array values for non-array field operators', () => {
+    it('Json fields throw — not searchable via this surface', () => {
+      // Inquiry.content is Json
       expect(() =>
         buildWhereClause({
-          searchFields: {
-            name: { contains: ['john', 'jane'] },
-          },
-          searchableFields: ['name'],
+          model: 'Inquiry',
+          searchFields: { content: 'anything' },
+          searchableFields: ['content'],
         }),
-      ).toThrow("Operator 'contains' on field 'name' does not support array values");
+      ).toThrow(/JSON fields aren't searchable/);
     });
+  });
 
-    it('rejects array values without an operator', () => {
-      expect(() =>
-        buildWhereClause({
-          searchFields: {
-            status: ['pending', 'approved'],
-          },
-          searchableFields: ['status'],
-        }),
-      ).toThrow("Field 'status' does not support array values without an operator");
-    });
-
-    it('rejects non-whitelisted relation fields', () => {
-      expect(() =>
-        buildWhereClause({
-          searchFields: {
-            posts: {
-              some: {
-                secretField: 'hacked',
-              },
-            },
-          },
-          searchableFields: ['posts.status'],
-        }),
-      ).toThrow("Field 'posts.secretField' is not searchable");
-    });
-
-    it('handles deeply nested relation paths', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          posts: {
-            some: {
-              author: {
-                name: 'John',
-              },
-            },
-          },
-        },
-        searchableFields: ['posts.author.name'],
+  describe('searchFields — explicit operators', () => {
+    it("auto-adds mode: 'insensitive' for String + mode-capable ops", () => {
+      const result = onUser({
+        searchFields: { name: { startsWith: 'A' } },
+        searchableFields: ['name'],
       });
-
       expect(result).toEqual({
-        AND: [{ posts: { some: { author: { name: 'John' } } } }],
+        AND: [{ name: { startsWith: 'A', mode: 'insensitive' } }],
+      });
+    });
+
+    it("doesn't add mode when caller explicitly passes mode", () => {
+      const result = onUser({
+        searchFields: { name: { contains: 'A', mode: 'default' } },
+        searchableFields: ['name'],
+      });
+      expect(result).toEqual({
+        AND: [{ name: { contains: 'A', mode: 'default' } }],
+      });
+    });
+
+    it("doesn't add mode for String in/notIn (Prisma doesn't support mode on those)", () => {
+      const result = onUser({
+        searchFields: { email: { in: ['a@x.com', 'b@x.com'] } },
+        searchableFields: ['email'],
+      });
+      expect(result).toEqual({
+        AND: [{ email: { in: ['a@x.com', 'b@x.com'] } }],
+      });
+    });
+
+    it("doesn't add mode for enum equals (mode is a String-only Prisma concept)", () => {
+      const result = onUser({
+        searchFields: { platformRole: { equals: 'superadmin' } },
+        searchableFields: ['platformRole'],
+      });
+      expect(result).toEqual({
+        AND: [{ platformRole: { equals: 'superadmin' } }],
+      });
+    });
+
+    it('coerces Int operator values', () => {
+      const result = buildWhereClause({
+        model: 'CronJob',
+        searchFields: { maxAttempts: { gte: '5', lt: '10' } },
+        searchableFields: ['maxAttempts'],
+      });
+      expect(result).toEqual({ AND: [{ maxAttempts: { gte: 5, lt: 10 } }] });
+    });
+
+    it('coerces DateTime operator values (ISO string and ms-timestamp)', () => {
+      const result = onUser({
+        searchFields: { createdAt: { gte: '2026-01-01T00:00:00Z', lt: '1735689600000' } },
+        searchableFields: ['createdAt'],
+      });
+      const clause = (result as { AND: Array<{ createdAt: { gte: Date; lt: Date } }> }).AND[0].createdAt;
+      expect(clause.gte).toBeInstanceOf(Date);
+      expect(clause.gte.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+      expect(clause.lt.getTime()).toBe(1735689600000);
+    });
+
+    it('normalises singleton in value to an array', () => {
+      const result = onUser({
+        searchFields: { platformRole: { in: 'superadmin' } },
+        searchableFields: ['platformRole'],
+      });
+      expect(result).toEqual({
+        AND: [{ platformRole: { in: ['superadmin'] } }],
       });
     });
   });
 
-  describe('skipFieldValidation (admin bypass)', () => {
-    it('allows any valid field at any depth when skipFieldValidation is true', () => {
-      const result = buildWhereClause({
-        searchFields: { user: { name: 'john' } },
-        searchableFields: ['status'],
-        skipFieldValidation: true,
-      });
-
-      expect(result).toEqual({
-        AND: [{ user: { name: { contains: 'john', mode: 'insensitive' } } }],
-      });
+  describe('searchFields — operator validation per kind', () => {
+    it("rejects 'contains' on enum field", () => {
+      expect(() =>
+        onUser({ searchFields: { platformRole: { contains: 'super' } }, searchableFields: ['platformRole'] }),
+      ).toThrow(/Operator 'contains' is not valid for field 'platformRole' \(enum\)/);
     });
 
-    it('blocks non-whitelisted fields when skipFieldValidation is false', () => {
+    it("rejects 'gt' on String field", () => {
+      expect(() => onUser({ searchFields: { name: { gt: 'a' } }, searchableFields: ['name'] })).toThrow(
+        /Operator 'gt' is not valid for field 'name' \(String\)/,
+      );
+    });
+
+    it("rejects 'in' on DateTime field", () => {
+      expect(() =>
+        onUser({ searchFields: { createdAt: { in: ['2026-01-01'] } }, searchableFields: ['createdAt'] }),
+      ).toThrow(/Operator 'in' is not valid for field 'createdAt' \(DateTime\)/);
+    });
+
+    it("rejects 'contains' on Boolean field", () => {
+      expect(() =>
+        onUser({ searchFields: { emailVerified: { contains: 'tr' } }, searchableFields: ['emailVerified'] }),
+      ).toThrow(/not valid for field 'emailVerified' \(Boolean\)/);
+    });
+  });
+
+  describe('searchFields — coercion errors', () => {
+    it('throws on non-numeric Int input', () => {
       expect(() =>
         buildWhereClause({
-          searchFields: { user: { name: 'john' } },
-          searchableFields: ['status'],
+          model: 'CronJob',
+          searchFields: { maxAttempts: 'abc' },
+          searchableFields: ['maxAttempts'],
         }),
-      ).toThrow("Field 'user.name' is not searchable");
+      ).toThrow(/Cannot coerce/);
     });
 
-    it('allows any relation with any operator when skipFieldValidation is true', () => {
-      const result = buildWhereClause({
-        searchFields: {
-          posts: {
-            some: {
-              author: {
-                is: {
-                  email: { contains: '@example.com' },
-                },
-              },
-            },
-          },
-        },
+    it("throws on Boolean inputs that aren't true/false strings", () => {
+      expect(() =>
+        onUser({ searchFields: { emailVerified: 'yes' }, searchableFields: ['emailVerified'] }),
+      ).toThrow(/Cannot coerce/);
+    });
+
+    it('throws on garbage DateTime input', () => {
+      expect(() =>
+        onUser({ searchFields: { createdAt: 'not-a-date' }, searchableFields: ['createdAt'] }),
+      ).toThrow(/Cannot coerce/);
+    });
+  });
+
+  describe('searchableFields whitelist', () => {
+    it('throws when a field is not in searchableFields', () => {
+      expect(() =>
+        onUser({ searchFields: { name: 'aron', password: 'secret' }, searchableFields: ['name'] }),
+      ).toThrow(/'password' is not searchable/);
+    });
+
+    it('throws on invalid path notation', () => {
+      expect(() => onUser({ searchFields: { 'bad path!': 'x' }, searchableFields: ['bad path!'] })).toThrow(
+        /Invalid search field/,
+      );
+    });
+  });
+
+  describe('relation operators (some / every / none / is / isNot)', () => {
+    it('threads through `some` filter into a to-many relation', () => {
+      const result = onUser({
+        searchFields: { tokens: { some: { name: 'tok-prod' } } },
+        searchableFields: ['tokens.name'],
+      });
+      expect(result).toEqual({
+        AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }],
+      });
+    });
+
+    it('threads through `every` with kind-aware coercion on the nested field', () => {
+      const result = onUser({
+        searchFields: { tokens: { every: { isActive: 'true' } } },
+        searchableFields: ['tokens.isActive'],
+      });
+      expect(result).toEqual({
+        AND: [{ tokens: { every: { isActive: { equals: true } } } }],
+      });
+    });
+
+    it('rejects non-whitelisted relation paths', () => {
+      expect(() =>
+        onUser({ searchFields: { tokens: { some: { name: 'x' } } }, searchableFields: ['email'] }),
+      ).toThrow(/'tokens' is not searchable/);
+    });
+  });
+
+  describe('skipFieldValidation (superadmin bypass)', () => {
+    it('allows fields not in searchableFields when bypass is on', () => {
+      const result = onUser({
+        searchFields: { name: 'aron', platformRole: 'user' },
         searchableFields: [],
         skipFieldValidation: true,
       });
-
       expect(result).toEqual({
-        AND: [{ posts: { some: { author: { is: { email: { contains: '@example.com' } } } } } }],
+        AND: [
+          { name: { contains: 'aron', mode: 'insensitive' } },
+          { platformRole: { equals: 'user' } },
+        ],
       });
     });
 
-    it('blocks relation operators on non-whitelisted relations when skipFieldValidation is false', () => {
+    it("still validates operators per kind — bypass doesn't loosen kind rules", () => {
       expect(() =>
-        buildWhereClause({
-          searchFields: {
-            posts: {
-              some: {
-                title: 'hello',
-              },
-            },
-          },
-          searchableFields: ['name'],
-        }),
-      ).toThrow("Relation 'posts' is not searchable");
-    });
-
-    it('still validates path notation even when skipFieldValidation is true', () => {
-      expect(() =>
-        buildWhereClause({
-          searchFields: { '../admin': 'test' },
+        onUser({
+          searchFields: { platformRole: { contains: 'super' } },
           searchableFields: [],
           skipFieldValidation: true,
         }),
-      ).toThrow('Invalid search field');
+      ).toThrow(/Operator 'contains' is not valid for field 'platformRole'/);
     });
 
-    it('works with empty searchableFields when skipFieldValidation is true', () => {
-      const result = buildWhereClause({
-        searchFields: { name: 'john', email: { endsWith: '@example.com' } },
+    it('passes through fields that do not resolve in the schema (synthetic / dynamic paths)', () => {
+      const result = onUser({
+        searchFields: { _customField: 'anything' },
         searchableFields: [],
         skipFieldValidation: true,
       });
+      expect(result).toEqual({ AND: [{ _customField: 'anything' }] });
+    });
+  });
 
+  describe('filters + orNullFields', () => {
+    it('combines pre-built filters with search', () => {
+      const result = onUser({
+        search: 'aron',
+        searchableFields: ['name'],
+        filters: { deletedAt: null },
+      });
       expect(result).toEqual({
-        AND: [{ name: { contains: 'john', mode: 'insensitive' } }, { email: { endsWith: '@example.com' } }],
+        deletedAt: null,
+        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] }],
       });
     });
 
-    it('simple search still uses only searchableFields even with skipFieldValidation', () => {
-      const result = buildWhereClause({
-        search: 'test',
+    it('widens orNullFields to OR null', () => {
+      const result = onUser({
+        searchFields: { name: 'aron' },
         searchableFields: ['name'],
-        skipFieldValidation: true,
+        orNullFields: ['name'],
       });
-
       expect(result).toEqual({
-        AND: [{ OR: [{ name: { contains: 'test', mode: 'insensitive' } }] }],
+        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { name: null }] }],
       });
     });
   });
 
-  describe('validation', () => {
-    it('throws error for invalid path notation in searchable fields', () => {
-      expect(() =>
-        buildWhereClause({
-          search: 'test',
-          searchableFields: ['user$email'],
-        }),
-      ).toThrow('Invalid searchable field');
+  describe('edge cases', () => {
+    it('rejects array values without an operator', () => {
+      expect(() => onUser({ searchFields: { name: ['a', 'b'] }, searchableFields: ['name'] })).toThrow(
+        /does not support array values without an operator/,
+      );
     });
 
-    it('throws error for invalid path notation in search fields', () => {
+    it('rejects nesting deeper than 10 levels', () => {
+      let nested: Record<string, unknown> = { value: 'leaf' };
+      for (let i = 0; i < 11; i += 1) nested = { wrap: nested };
       expect(() =>
-        buildWhereClause({
-          searchFields: { '../admin': 'test' },
-          searchableFields: ['../admin'],
-        }),
-      ).toThrow('Invalid search field');
+        onUser({ searchFields: nested as never, searchableFields: ['wrap'], skipFieldValidation: true }),
+      ).toThrow(/Search query nesting too deep/);
     });
   });
 });

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
-import { auditActorContext } from '#/lib/auditActorContext';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 
 describe('emitAppEvent', () => {
   const originalHandlers = { ...appEventHandlers };

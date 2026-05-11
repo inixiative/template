@@ -18,5 +18,7 @@ export const parseLinkedinUrl = (url: string): LinkedinValue => {
   const prefix = parts[1]!.toLowerCase();
   const classifier = PREFIX_TO_CLASSIFIER[prefix];
   if (!classifier) throw new Error(`Unknown LinkedIn URL prefix '${prefix}' in ${url}`);
-  return { classifier, handle: parts[2]! };
+  // LinkedIn handles are case-insensitive. Lowercase so stored value matches
+  // `toValueKey`'s lowercased key (no silent uniqueness bypass on case).
+  return { classifier, handle: parts[2]!.toLowerCase() };
 };

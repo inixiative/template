@@ -1,4 +1,4 @@
-import openApiSpec from '@template/ui/openapi.gen.json';
+import openApiSpec from '@template/sdk/openapi.gen.json';
 
 export type EnumFilter = {
   field: string;

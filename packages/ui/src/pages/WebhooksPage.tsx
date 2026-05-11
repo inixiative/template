@@ -4,7 +4,7 @@ import type {
   MeReadManyWebhookSubscriptionsResponse,
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';

@@ -1,4 +1,4 @@
-import type { MeReadResponses } from '@template/ui/apiClient';
+import type { MeReadResponses } from '@template/sdk';
 
 type MeData = MeReadResponses[200]['data'];
 type Organization = MeData['organizations'][number];

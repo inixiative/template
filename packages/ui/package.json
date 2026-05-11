@@ -5,9 +5,6 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./openapi.gen.json": "./openapi.gen.json",
-    "./apiClient": "./src/apiClient/index.ts",
-    "./apiClient/*": "./src/apiClient/*",
     "./components": "./src/components/index.ts",
     "./components/auth": "./src/components/auth/index.ts",
     "./components/auth/*": "./src/components/auth/*",
@@ -39,16 +36,15 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test src/",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureApiClientIndex.ts && bun run generate:msw",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.22",
-    "@hey-api/client-fetch": "^0.13.1",
     "@iconify/react": "^6.0.2",
     "@tanstack/react-router": "^1.166.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
+    "@template/sdk": "workspace:*",
     "@template/shared": "workspace:*",
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
@@ -60,7 +56,6 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.9",
-    "@hey-api/openapi-ts": "^0.94.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.90.21",
     "@testing-library/react": "^16.3.2",

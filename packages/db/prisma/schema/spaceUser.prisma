@@ -11,6 +11,7 @@ model SpaceUser {
     id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
     createdAt DateTime  @default(now())
     updatedAt DateTime  @updatedAt
+    deletedAt DateTime?
 
     role         Role @default(member)
     entitlements Json?

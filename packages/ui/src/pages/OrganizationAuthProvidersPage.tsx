@@ -9,7 +9,7 @@ import {
   organizationCreateAuthProvider,
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Badge, Button, Table } from '@template/ui/components';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';

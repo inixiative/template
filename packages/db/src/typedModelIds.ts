@@ -56,6 +56,14 @@ export const ModelIdType = {
 
   // Audit
   AuditLog: 'AuditLog',
+
+  // App Events
+  AppEvent: 'AppEvent',
+
+  // Tags
+  Tag: 'Tag',
+  TagCategory: 'TagCategory',
+  TagAttachment: 'TagAttachment',
 } as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -103,6 +111,14 @@ export type AuthProviderId = Id<typeof ModelIdType.AuthProvider>;
 // Audit
 export type AuditLogId = Id<typeof ModelIdType.AuditLog>;
 
+// App Events
+export type AppEventId = Id<typeof ModelIdType.AppEvent>;
+
+// Tags
+export type TagId = Id<typeof ModelIdType.Tag>;
+export type TagCategoryId = Id<typeof ModelIdType.TagCategory>;
+export type TagAttachmentId = Id<typeof ModelIdType.TagAttachment>;
+
 // ─────────────────────────────────────────────────────────────
 // Constructor functions (cast raw strings to typed IDs)
 // ─────────────────────────────────────────────────────────────
@@ -147,3 +163,11 @@ export const authProviderId = (id: string): AuthProviderId => id as AuthProvider
 
 // Audit
 export const auditLogId = (id: string): AuditLogId => id as AuditLogId;
+
+// App Events
+export const appEventId = (id: string): AppEventId => id as AppEventId;
+
+// Tags
+export const tagId = (id: string): TagId => id as TagId;
+export const tagCategoryId = (id: string): TagCategoryId => id as TagCategoryId;
+export const tagAttachmentId = (id: string): TagAttachmentId => id as TagAttachmentId;

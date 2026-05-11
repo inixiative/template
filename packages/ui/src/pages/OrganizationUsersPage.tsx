@@ -9,7 +9,7 @@ import {
   organizationReadManyUsers,
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
-} from '@template/ui/apiClient';
+} from '@template/sdk';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';

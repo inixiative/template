@@ -4,7 +4,7 @@ import type { Job } from 'bullmq';
 import { jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import type { WorkerContext } from '#/jobs/types';
-import { auditActorContext, nullAuditActor } from '#/lib/auditActorContext';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 
 export const createMockJob = (overrides?: Partial<Job>): Job =>
   ({
@@ -28,7 +28,7 @@ export const createTestWorker = (
   jobOverrides?: Partial<Job>,
 ): WorkerContext & { run: (payload?: unknown) => Promise<void> } => {
   const job = createMockJob(jobOverrides);
-  const ctx: WorkerContext = { db, queue, job, log: () => {} };
+  const ctx: WorkerContext = { db, queue, job };
 
   const run = (payload?: unknown): Promise<void> =>
     db.scope(

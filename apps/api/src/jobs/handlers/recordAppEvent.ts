@@ -1,3 +1,4 @@
+import { log } from '@template/shared/logger';
 import type { AppEventActor, ObserveData } from '#/appEvents/types';
 import { makeJob } from '#/jobs/makeJob';
 
@@ -9,7 +10,7 @@ export type RecordAppEventPayload = {
 
 export const recordAppEvent = makeJob<RecordAppEventPayload>(async (ctx, payload) => {
   const { name, actor, data } = payload;
-  const { db, log } = ctx;
+  const { db } = ctx;
 
   await db.appEvent.create({
     data: {
@@ -25,5 +26,5 @@ export const recordAppEvent = makeJob<RecordAppEventPayload>(async (ctx, payload
     },
   });
 
-  log(`Recorded event: ${name}`);
+  log.info(`Recorded event: ${name}`);
 });

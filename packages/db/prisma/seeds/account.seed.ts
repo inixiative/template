@@ -12,7 +12,7 @@ const HASHED_PASSWORD = hashSync(PASSWORD, 10);
  */
 export const accountSeeds: SeedFile<Account> = {
   model: 'account',
-  updateOmitFields: ['createdAt'],
+  updateOmitFields: ['createdAt', 'password'],
   records: [
     {
       id: '01936d42-8c4a-7000-8000-000000000011',

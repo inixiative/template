@@ -1,5 +1,5 @@
 import type { HydratedRecord } from '@template/db';
-import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/ui/apiClient';
+import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';

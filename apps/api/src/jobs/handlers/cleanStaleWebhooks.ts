@@ -1,3 +1,4 @@
+import { log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
@@ -8,7 +9,7 @@ import type { JobHandler } from '#/jobs/types';
  * Runs nightly to prevent unbounded growth of webhook history.
  */
 export const cleanStaleWebhooks: JobHandler<void> = makeSingletonJob(async (ctx) => {
-  const { db, log } = ctx;
+  const { db } = ctx;
 
   const cutoffDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // 90 days ago
 
@@ -20,5 +21,5 @@ export const cleanStaleWebhooks: JobHandler<void> = makeSingletonJob(async (ctx)
     },
   });
 
-  log(`Deleted ${result.count} webhook events older than 90 days`);
+  log.info(`Deleted ${result.count} webhook events older than 90 days`);
 });

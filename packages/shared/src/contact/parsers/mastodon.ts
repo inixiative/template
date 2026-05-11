@@ -8,5 +8,6 @@ export const parseMastodonUrl = (url: string): MastodonValue => {
   if (!parts[0] || !parts[1]?.startsWith('@')) {
     throw new Error(`Unrecognized Mastodon URL: ${url}`);
   }
-  return { instance: parts[0].toLowerCase(), handle: parts[1].slice(1) };
+  // Mastodon usernames are case-insensitive (server-side lookup normalises).
+  return { instance: parts[0].toLowerCase(), handle: parts[1].slice(1).toLowerCase() };
 };

@@ -1,6 +1,6 @@
 import type { HydratedRecord } from '@template/db';
 import type { ActionRule } from '@template/permissions/rebac/types';
-import type { InquiryReceivedItem, InquirySentItem } from '@template/ui/apiClient';
+import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { useAppStore } from '@template/ui/store';
 

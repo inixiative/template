@@ -32,11 +32,11 @@ class BouncerVerifierClient implements EmailVerifier {
   }
 
   async verify(email: string): Promise<VerificationResult> {
-    if (process.env.NODE_ENV !== 'test') return this._verify(email);
-    return this.vcr.capture('verify', () => this._verify(email));
+    if (process.env.NODE_ENV !== 'test') return this.__verify(email);
+    return this.vcr.capture('verify', () => this.__verify(email));
   }
 
-  private async _verify(email: string): Promise<VerificationResult> {
+  private async __verify(email: string): Promise<VerificationResult> {
     const url = `${BOUNCER_API}/v1.1/email/verify?email=${encodeURIComponent(email)}`;
 
     const response = await fetch(url, {

@@ -1,5 +1,5 @@
 import { Icon } from '@iconify/react';
-import type { MeCreateTokenData } from '@template/ui/apiClient';
+import type { MeCreateTokenData } from '@template/sdk';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
 import { checkPermission } from '@template/ui/hooks/usePermission';

@@ -4,13 +4,15 @@ import type { Redis } from 'ioredis';
 
 export type JobsQueue = Queue & { redis: Redis };
 
+// Handlers `import { log } from '@template/shared/logger'` directly. The
+// worker registers the BullBoard broadcast via async-local-storage before
+// invoking the handler, so log calls automatically also flow to job.log()
+// without needing a context wrapper.
 export type WorkerContext = {
   db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;
-  /** Log to stdout (automatically broadcast to BullBoard via logBroadcast) */
-  log: (message: string) => void;
 };
 
 export class SupersededError extends Error {

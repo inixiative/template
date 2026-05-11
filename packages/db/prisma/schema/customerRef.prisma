@@ -4,9 +4,10 @@
 // Links a customer (User, Org, or Space) to a provider (Space, etc.)
 
 model CustomerRef {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   // Customer (false polymorphism: User, Organization, or Space)
   customerModel        CustomerModel
@@ -27,9 +28,9 @@ model CustomerRef {
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.
-  // Default ['platform','activity'] matches the kind-level policy
+  // Default [platform, activity] matches the kind-level policy
   // (platform + activity opt-out, marketing opt-in); `system` bypasses.
-  acceptedKinds Json @default("[\"platform\", \"activity\"]")
+  acceptedKinds CommunicationKind[] @default([platform, activity])
 
   // (customer, provider) pair uniqueness — partial uniques across each
   // populated customer FK paired with each provider FK. Each partial doubles

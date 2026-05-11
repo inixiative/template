@@ -8,5 +8,5 @@ export type GithubValue = { classifier: GithubClassifier; handle: string };
 // when known (typical for OAuth flows); URL-only input defaults to 'user'.
 export const parseGithubUrl = (url: string, hint?: GithubClassifier): GithubValue => ({
   classifier: hint ?? 'user',
-  handle: parseSimpleHandleUrl('github.com', url),
+  handle: parseSimpleHandleUrl('github.com', url, { caseInsensitive: true }),
 });
