@@ -46,9 +46,18 @@ if [ "$ENV" != "test" ]; then
         PROJECT_ID=$(cd "$ROOT_DIR" && bun -e "import {projectConfig} from './$CONFIG_FILE'; console.log(projectConfig.infisical.projectId)" 2>/dev/null)
 
         if [ -n "$PROJECT_ID" ]; then
+            STAGING_ENABLED=$(cd "$ROOT_DIR" && bun -e "import {projectConfig} from './$CONFIG_FILE'; console.log(projectConfig.features?.staging?.enabled ? 'true' : 'false')" 2>/dev/null)
+
             INFISICAL_ENV="$ENV"
             if [ "$ENV" = "local" ] || [ "$ENV" = "pr" ]; then
-                INFISICAL_ENV="staging"
+                # When staging isn't configured, local/pr inherit from prod
+                # secrets (that's all there is). When staging IS configured,
+                # they pull from staging so devs don't accidentally read prod.
+                if [ "$STAGING_ENABLED" = "true" ]; then
+                    INFISICAL_ENV="staging"
+                else
+                    INFISICAL_ENV="prod"
+                fi
             fi
 
             # Infisical injects first, then run_with_env_overrides sources .env
