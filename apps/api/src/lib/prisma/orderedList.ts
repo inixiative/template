@@ -94,13 +94,16 @@ const insertAt = async <T extends AnyDelegate>(
   scope: Where,
   position: number,
   field: string,
-): Promise<void> => {
+): Promise<number> => {
+  const max = await nextSortOrder(delegate, scope, field);
+  const clamped = Math.max(1, Math.min(position, max));
   const d = delegate as WriteableDelegate<T>;
   const where = liveScope(scope, d);
   await d.updateManyAndReturn({
-    where: { ...where, [field]: { gte: position } },
+    where: { ...where, [field]: { gte: clamped } },
     data: { [field]: { increment: 1 } },
   } as Args<T, 'updateManyAndReturn'>);
+  return clamped;
 };
 
 export const applyOrderedListDefaults = async (
@@ -121,7 +124,7 @@ export const applyOrderedListDefaults = async (
     if (row[field] == null) {
       row[field] = await nextSortOrder(delegate, scope, field);
     } else {
-      await insertAt(delegate, scope, row[field] as number, field);
+      row[field] = await insertAt(delegate, scope, row[field] as number, field);
     }
   }
 };
