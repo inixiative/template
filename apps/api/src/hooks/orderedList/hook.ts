@@ -1,26 +1,13 @@
-import {
-  db,
-  DbAction,
-  type HookOptions,
-  HookTiming,
-  PolymorphismRegistry,
-  registerDbHook,
-  type SingleAction,
-} from '@template/db';
+import { db, DbAction, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
 import {
   applyOrderedListDefaults,
   applyOrderedListRestore,
   getOrderedListConfig,
-  registerOrderedList,
+  setOrderedListRegistry,
 } from '#/lib/prisma/orderedList';
+import { orderedListRegistry } from '#/hooks/orderedList/registry';
 
-// Derive Contact scope from PolymorphismRegistry — all owner FK fields + type.
-const contactOwnerFields = [
-  ...new Set(Object.values(PolymorphismRegistry.Contact?.axes[0]?.fkMap ?? {}).flat()),
-];
-registerOrderedList('Contact', {
-  sortOrder: [...contactOwnerFields, 'type'],
-});
+setOrderedListRegistry(orderedListRegistry);
 
 const extractRows = (args: unknown): Record<string, unknown>[] => {
   if (!args || typeof args !== 'object') return [];

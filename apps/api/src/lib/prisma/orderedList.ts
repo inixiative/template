@@ -9,16 +9,18 @@ type WriteableDelegate<T extends AnyDelegate> = T & {
   updateManyAndReturn: (args: Args<T, 'updateManyAndReturn'>) => Promise<unknown>;
 };
 
-// Registry: model → { orderField → scopeFields[] }
-type OrderedListConfig = Record<string, string[]>;
-const registry = new Map<string, OrderedListConfig>();
+// model → { orderField → scopeFields[] }
+export type OrderedListConfig = Record<string, string[]>;
+export type OrderedListRegistry = Record<string, OrderedListConfig>;
 
-export const registerOrderedList = (model: string, config: OrderedListConfig) => {
-  registry.set(model, config);
+let registry: OrderedListRegistry = {};
+
+export const setOrderedListRegistry = (r: OrderedListRegistry) => {
+  registry = r;
 };
 
 export const getOrderedListConfig = (model: string): OrderedListConfig | undefined =>
-  registry.get(model);
+  registry[model];
 
 const hasSoftDelete = (delegate: { $name?: string }): boolean => {
   const model = delegate.$name;
