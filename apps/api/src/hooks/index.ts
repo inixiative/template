@@ -9,6 +9,7 @@ import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
+import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
@@ -19,6 +20,7 @@ export const registerHooks = () => {
   registerClearCacheHook();
   registerContactRulesHook();
   registerImmutableFieldsHook();
+  registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRulesHook();
   registerTagOwnerCategoryHook();

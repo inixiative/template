@@ -9,6 +9,17 @@ type WriteableDelegate<T extends AnyDelegate> = T & {
   updateManyAndReturn: (args: Args<T, 'updateManyAndReturn'>) => Promise<unknown>;
 };
 
+// Registry: model → { orderField → scopeFields[] }
+type OrderedListConfig = Record<string, string[]>;
+const registry = new Map<string, OrderedListConfig>();
+
+export const registerOrderedList = (model: string, config: OrderedListConfig) => {
+  registry.set(model, config);
+};
+
+export const getOrderedListConfig = (model: string): OrderedListConfig | undefined =>
+  registry.get(model);
+
 const hasSoftDelete = (delegate: { $name?: string }): boolean => {
   const model = delegate.$name;
   return model ? lookupField(model, 'deletedAt') !== undefined : false;
@@ -16,6 +27,9 @@ const hasSoftDelete = (delegate: { $name?: string }): boolean => {
 
 const liveScope = (scope: Where, delegate: { $name?: string }): Where =>
   hasSoftDelete(delegate) ? { ...scope, deletedAt: null } : scope;
+
+const buildScope = (row: Record<string, unknown>, scopeFields: string[]): Where =>
+  Object.fromEntries(scopeFields.map((f) => [f, row[f]]));
 
 export const nextSortOrder = async <T extends AnyDelegate>(
   delegate: T,
@@ -73,4 +87,66 @@ export const restoreToEnd = async <T extends AnyDelegate>(
   const order = await nextSortOrder(delegate, scope, field);
   const d = delegate as WriteableDelegate<T>;
   await d.update({ where: { id: itemId }, data: { [field]: order } } as Args<T, 'update'>);
+};
+
+const insertAt = async <T extends AnyDelegate>(
+  delegate: T,
+  scope: Where,
+  position: number,
+  field: string,
+): Promise<void> => {
+  const d = delegate as WriteableDelegate<T>;
+  const where = liveScope(scope, d);
+  await d.updateManyAndReturn({
+    where: { ...where, [field]: { gte: position } },
+    data: { [field]: { increment: 1 } },
+  } as Args<T, 'updateManyAndReturn'>);
+};
+
+export const applyOrderedListDefaults = async (
+  delegate: { $name?: string } & AnyDelegate,
+  row: Record<string, unknown>,
+  isUpdate: boolean,
+): Promise<void> => {
+  if (isUpdate) return;
+  const model = delegate.$name;
+  if (!model) return;
+  const config = registry.get(model);
+  if (!config) return;
+
+  for (const [field, scopeFields] of Object.entries(config)) {
+    const scope = buildScope(row, scopeFields);
+    if (!scopeFields.every((f) => scope[f] != null)) continue;
+
+    if (row[field] == null) {
+      row[field] = await nextSortOrder(delegate, scope, field);
+    } else {
+      await insertAt(delegate, scope, row[field] as number, field);
+    }
+  }
+};
+
+export const applyOrderedListRestore = async (
+  delegate: { $name?: string } & AnyDelegate,
+  row: Record<string, unknown>,
+  previous: Record<string, unknown> | undefined,
+  itemId: string,
+): Promise<void> => {
+  if (!previous) return;
+  const wasDeleted = previous.deletedAt != null;
+  const isRestoring = row.deletedAt === null;
+  if (!wasDeleted || !isRestoring) return;
+
+  const model = delegate.$name;
+  if (!model) return;
+  const config = registry.get(model);
+  if (!config) return;
+
+  const merged = { ...previous, ...row };
+  for (const [field, scopeFields] of Object.entries(config)) {
+    const scope = buildScope(merged, scopeFields);
+    if (scopeFields.every((f) => scope[f] != null)) {
+      row[field] = await nextSortOrder(delegate, scope, field);
+    }
+  }
 };
