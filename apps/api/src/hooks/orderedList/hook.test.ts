@@ -1,10 +1,11 @@
-import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { reorderInList } from '#/lib/prisma/orderedList';
 
 registerRulesHook();
 registerContactRulesHook();
@@ -15,715 +16,570 @@ afterAll(async () => {
   clearHookRegistry();
 });
 
-const e164 = (local: string) => `+1555${local.padStart(7, '0').slice(-7)}`;
+// --- Helpers ---
 
-const createPhone = (userId: string, overrides: Record<string, unknown> = {}) =>
+const e164 = () => `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`;
+
+const phone = (userId: string, sortOrder?: number) =>
   db.contact.create({
     data: {
       ownerModel: ContactOwnerModel.User,
       userId,
       type: ContactType.phone,
-      value: { e164: e164(String(getNextSeq())), country: 'US' },
-      ...overrides,
+      value: { e164: e164(), country: 'US' },
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
     },
   });
 
-const createEmail = (userId: string, overrides: Record<string, unknown> = {}) =>
+const phoneRow = (userId: string, sortOrder?: number) => ({
+  ownerModel: ContactOwnerModel.User as const,
+  userId,
+  type: ContactType.phone as const,
+  value: { e164: e164(), country: 'US' },
+  ...(sortOrder !== undefined ? { sortOrder } : {}),
+});
+
+const email = (userId: string) =>
   db.contact.create({
     data: {
       ownerModel: ContactOwnerModel.User,
       userId,
       type: ContactType.email,
       value: { address: `test${getNextSeq()}@example.com` },
-      ...overrides,
     },
   });
 
-const getSortOrders = async (userId: string, type: ContactType) => {
-  const rows = await db.contact.findMany({
+const liveOrders = (userId: string, type = ContactType.phone) =>
+  db.contact.findMany({
     where: { userId, type, deletedAt: null },
     orderBy: { sortOrder: 'asc' },
     select: { id: true, sortOrder: true },
   });
-  return rows;
-};
 
-const getAllSortOrders = async (userId: string, type: ContactType) => {
-  const rows = await db.contact.findMany({
+const allOrders = (userId: string, type = ContactType.phone) =>
+  db.contact.findMany({
     where: { userId, type },
     orderBy: { sortOrder: 'asc' },
     select: { id: true, sortOrder: true, deletedAt: true },
   });
-  return rows;
-};
+
+const positions = (rows: { sortOrder: number }[]) => rows.map((r) => r.sortOrder);
+
+const posOf = (rows: { id: string; sortOrder: number }[], id: string) =>
+  rows.find((r) => r.id === id)?.sortOrder;
+
+const scope = (userId: string) => ({
+  ownerModel: ContactOwnerModel.User,
+  userId,
+  type: ContactType.phone,
+});
+
+const softDelete = (id: string) =>
+  db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
+
+const restore = (id: string) =>
+  db.contact.update({ where: { id }, data: { deletedAt: null } });
 
 // --- CREATE ---
 
-describe('orderedList — create', () => {
+describe('create', () => {
   it('appends to end when sortOrder omitted', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id);
-    const b = await createPhone(user.id);
-    const c = await createPhone(user.id);
-
-    expect(a.sortOrder).toBe(1);
-    expect(b.sortOrder).toBe(2);
-    expect(c.sortOrder).toBe(3);
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    expect([a.sortOrder, b.sortOrder, c.sortOrder]).toEqual([1, 2, 3]);
   });
 
-  it('inserts at specified position and shifts siblings', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-
-    // Insert at position 2 — b and c should shift to 3 and 4
-    const d = await createPhone(user.id, { sortOrder: 2 });
+  it('inserts at position and shifts siblings', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    const d = await phone(u.id, 2); // insert at 2
 
     expect(d.sortOrder).toBe(2);
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === d.id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(3);
-    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(4);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, d.id)).toBe(2);
+    expect(posOf(rows, b.id)).toBe(3);
+    expect(posOf(rows, c.id)).toBe(4);
   });
 
-  it('clamps out-of-bounds position to MAX+1', async () => {
-    const { entity: user } = await createUser();
-    await createPhone(user.id); // 1
-    await createPhone(user.id); // 2
-
-    const clamped = await createPhone(user.id, { sortOrder: 999 });
-    expect(clamped.sortOrder).toBe(3); // clamped to MAX+1
+  it('clamps position to [1, MAX+1]', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    expect((await phone(u.id, 999)).sortOrder).toBe(3);
+    expect((await phone(u.id, 0)).sortOrder).toBe(1);
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4]);
   });
 
-  it('clamps position < 1 to 1', async () => {
-    const { entity: user } = await createUser();
-    await createPhone(user.id); // 1
-    await createPhone(user.id); // 2
-
-    const clamped = await createPhone(user.id, { sortOrder: 0 });
-    expect(clamped.sortOrder).toBe(1);
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-  });
-
-  it('scopes by registry fields — different types are independent', async () => {
-    const { entity: user } = await createUser();
-    await createPhone(user.id); // phone: 1
-    await createPhone(user.id); // phone: 2
-
-    const email = await createEmail(user.id); // email: starts at 1
-    expect(email.sortOrder).toBe(1);
-  });
-
-  it('scopes by owner — different users are independent', async () => {
-    const { entity: user1 } = await createUser();
-    const { entity: user2 } = await createUser();
-    await createPhone(user1.id); // user1: 1
-    await createPhone(user1.id); // user1: 2
-
-    const first = await createPhone(user2.id); // user2: starts at 1
-    expect(first.sortOrder).toBe(1);
+  it('scopes by type and owner independently', async () => {
+    const { entity: u1 } = await createUser();
+    const { entity: u2 } = await createUser();
+    await phone(u1.id);
+    await phone(u1.id);
+    expect((await email(u1.id)).sortOrder).toBe(1); // different type
+    expect((await phone(u2.id)).sortOrder).toBe(1); // different owner
   });
 });
 
 // --- CREATE MANY ---
 
-const phoneData = (userId: string, overrides: Record<string, unknown> = {}) => ({
-  ownerModel: ContactOwnerModel.User,
-  userId,
-  type: ContactType.phone,
-  value: { e164: e164(String(getNextSeq())), country: 'US' },
-  ...overrides,
-});
-
-describe('orderedList — createManyAndReturn', () => {
-  it('assigns sequential positions when all omitted', async () => {
-    const { entity: user } = await createUser();
-    await createPhone(user.id); // 1 (existing)
-
-    const results = await db.contact.createManyAndReturn({
-      data: [phoneData(user.id), phoneData(user.id), phoneData(user.id)],
-    });
-
-    expect(results.map((r) => r.sortOrder).sort()).toEqual([2, 3, 4]);
+describe('createManyAndReturn', () => {
+  it('sequential append (all omitted)', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id); // existing: 1
+    const res = await db.contact.createManyAndReturn({ data: [phoneRow(u.id), phoneRow(u.id), phoneRow(u.id)] });
+    expect(res.map((r) => r.sortOrder).sort()).toEqual([2, 3, 4]);
   });
 
-  it('all with fixed positions — shifts accumulate left-to-right', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-
-    // Insert D at 1, E at 2, F at 3 — processed left-to-right:
-    //   before D: [a=1, b=2, c=3]
-    //   D at 1 → shift >=1 by +1: [a=2, b=3, c=4], D=1 → [D=1, a=2, b=3, c=4]
-    //   E at 2 → shift >=2 by +1: [a=3, b=4, c=5], D=1 → [D=1, E=2, a=3, b=4, c=5]
-    //   F at 3 → shift >=3 by +1: [a=4, b=5, c=6], D=1, E=2 → [D=1, E=2, F=3, a=4, b=5, c=6]
-    const results = await db.contact.createManyAndReturn({
-      data: [
-        phoneData(user.id, { sortOrder: 1 }),
-        phoneData(user.id, { sortOrder: 2 }),
-        phoneData(user.id, { sortOrder: 3 }),
-      ],
+  it('all fixed positions — shifts accumulate L→R', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    // D@1, E@2, F@3: each shifts everything before the next insert
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id, 1), phoneRow(u.id, 2), phoneRow(u.id, 3)],
     });
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4, 5, 6]);
-    // New items occupy 1, 2, 3; originals pushed to 4, 5, 6
-    const newIds = new Set(results.map((r) => r.id));
-    const newOrders = orders.filter((r) => newIds.has(r.id)).map((r) => r.sortOrder);
-    const oldOrders = orders.filter((r) => !newIds.has(r.id)).map((r) => r.sortOrder);
-    expect(newOrders.sort()).toEqual([1, 2, 3]);
-    expect(oldOrders.sort()).toEqual([4, 5, 6]);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6]);
+    const newIds = new Set(res.map((r) => r.id));
+    expect(rows.filter((r) => newIds.has(r.id)).map((r) => r.sortOrder).sort()).toEqual([1, 2, 3]);
+    expect(rows.filter((r) => !newIds.has(r.id)).map((r) => r.sortOrder).sort()).toEqual([4, 5, 6]);
   });
 
-  it('all at same position — each shifts the previous insert', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-
-    // Insert D at 1, E at 1, F at 1 — processed left-to-right:
-    //   D at 1 → shift >=1: [a=2, b=3], D=1 → [D=1, a=2, b=3]
-    //   E at 1 → shift >=1: [D=2, a=3, b=4], E=1 → [E=1, D=2, a=3, b=4]
-    //   F at 1 → shift >=1: [E=2, D=3, a=4, b=5], F=1 → [F=1, E=2, D=3, a=4, b=5]
-    const results = await db.contact.createManyAndReturn({
-      data: [
-        phoneData(user.id, { sortOrder: 1 }),
-        phoneData(user.id, { sortOrder: 1 }),
-        phoneData(user.id, { sortOrder: 1 }),
-      ],
+  it('all at same position — LIFO order', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id); // 1
+    await phone(u.id); // 2
+    // D@1, E@1, F@1: last insert ends up at 1
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id, 1), phoneRow(u.id, 1), phoneRow(u.id, 1)],
     });
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4, 5]);
-    // Last insert (F) ends up at 1, first insert (D) at 3
-    expect(orders.find((r) => r.id === results[2].id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === results[1].id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === results[0].id)?.sortOrder).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4, 5]);
+    expect(posOf(rows, res[2].id)).toBe(1);
+    expect(posOf(rows, res[1].id)).toBe(2);
+    expect(posOf(rows, res[0].id)).toBe(3);
   });
 
-  it('mixed specified and unspecified positions', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-
-    // D at pos 2, E no pos, F at pos 1 — processed left-to-right:
-    //   D at 2 → shift >=2: [a=1, b=3, c=4], D=2 → [a=1, D=2, b=3, c=4]
-    //   E append → MAX+1=5 → [a=1, D=2, b=3, c=4, E=5]
-    //   F at 1 → shift >=1: [a=2, D=3, b=4, c=5, E=6], F=1 → [F=1, a=2, D=3, b=4, c=5, E=6]
-    const results = await db.contact.createManyAndReturn({
-      data: [
-        phoneData(user.id, { sortOrder: 2 }),
-        phoneData(user.id),
-        phoneData(user.id, { sortOrder: 1 }),
-      ],
+  it('mixed fixed + append', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id); // 1
+    await phone(u.id); // 2
+    await phone(u.id); // 3
+    // D@2, E=append, F@1
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id, 2), phoneRow(u.id), phoneRow(u.id, 1)],
     });
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(orders.find((r) => r.id === results[2].id)?.sortOrder).toBe(1); // F
-    expect(orders.find((r) => r.id === results[0].id)?.sortOrder).toBe(3); // D (shifted by F's insert)
-    expect(orders.find((r) => r.id === results[1].id)?.sortOrder).toBe(6); // E (shifted by F's insert)
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
-  it('scattered fixed positions into existing list', async () => {
-    const { entity: user } = await createUser();
-    // Build a list of 5
-    const items = [];
-    for (let i = 0; i < 5; i++) items.push(await createPhone(user.id));
-    // [1, 2, 3, 4, 5]
-
-    // Insert at positions 2 and 4 — processed left-to-right:
-    //   D at 2 → shift >=2: items become [1, 3, 4, 5, 6], D=2 → 6 items, [1, 2, 3, 4, 5, 6]
-    //   E at 4 → shift >=4: items at 4,5,6 shift to 5,6,7, E=4 → 7 items, [1, 2, 3, 4, 5, 6, 7]
-    const results = await db.contact.createManyAndReturn({
-      data: [
-        phoneData(user.id, { sortOrder: 2 }),
-        phoneData(user.id, { sortOrder: 4 }),
-      ],
+  it('scattered fixed positions', async () => {
+    const { entity: u } = await createUser();
+    for (let i = 0; i < 5; i++) await phone(u.id); // [1..5]
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id, 2), phoneRow(u.id, 4)],
     });
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(orders.find((r) => r.id === results[0].id)?.sortOrder).toBe(2); // D
-    expect(orders.find((r) => r.id === results[1].id)?.sortOrder).toBe(4); // E
-  });
-
-  it('all append — no shifts needed', async () => {
-    const { entity: user } = await createUser();
-
-    const results = await db.contact.createManyAndReturn({
-      data: [phoneData(user.id), phoneData(user.id), phoneData(user.id)],
-    });
-
-    // Empty list → 1, 2, 3 — no shifts
-    expect(results.map((r) => r.sortOrder).sort()).toEqual([1, 2, 3]);
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-  });
-});
-
-// --- BULK SOFT DELETE (updateManyAndReturn) ---
-
-describe('orderedList — bulk soft delete', () => {
-  it('compacts after bulk soft-deleting multiple items', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-    const d = await createPhone(user.id); // 4
-    const e = await createPhone(user.id); // 5
-
-    // Bulk soft-delete b(2) and d(4)
-    // Each previous row is processed against the shared data.
-    // b at pos 2: → negative, compact >2 by -1 → [a=1, c=2, d=3, e=4]
-    // d was at pos 4 but after b's compact it's at 3: → negative, compact >3 by -1 → [a=1, c=2, e=3]
-    await db.contact.updateManyAndReturn({
-      where: { id: { in: [b.id, d.id] } },
-      data: { deletedAt: new Date() },
-    });
-
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(live.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(live.find((r) => r.id === c.id)?.sortOrder).toBe(2);
-    expect(live.find((r) => r.id === e.id)?.sortOrder).toBe(3);
-
-    const all = await getAllSortOrders(user.id, ContactType.phone);
-    const deleted = all.filter((r) => r.deletedAt != null);
-    expect(deleted.length).toBe(2);
-    expect(deleted.every((r) => r.sortOrder < 0)).toBe(true);
-    expect(new Set(deleted.map((r) => r.sortOrder)).size).toBe(2); // distinct negatives
-  });
-
-  it('bulk soft-delete all items leaves empty live list', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-
-    await db.contact.updateManyAndReturn({
-      where: { userId: user.id, type: ContactType.phone },
-      data: { deletedAt: new Date() },
-    });
-
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live).toEqual([]);
-
-    const all = await getAllSortOrders(user.id, ContactType.phone);
-    expect(all.every((r) => r.sortOrder < 0)).toBe(true);
-    expect(new Set(all.map((r) => r.sortOrder)).size).toBe(3); // all distinct
-  });
-});
-
-// --- BULK RESTORE (updateManyAndReturn) ---
-
-describe('orderedList — bulk restore', () => {
-  it('restores multiple items to sequential end positions', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-    const d = await createPhone(user.id); // 4
-
-    // Soft-delete b and c
-    await db.contact.update({ where: { id: b.id }, data: { deletedAt: new Date() } });
-    await db.contact.update({ where: { id: c.id }, data: { deletedAt: new Date() } });
-    // Live: [a=1, d=2]
-
-    // Bulk restore b and c
-    // b: → MAX+1=3, c: → MAX+1=4
-    await db.contact.updateManyAndReturn({
-      where: { id: { in: [b.id, c.id] } },
-      data: { deletedAt: null },
-    });
-
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
-    expect(live.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(live.find((r) => r.id === d.id)?.sortOrder).toBe(2);
-    // b and c at 3 and 4 (order may vary but both present and distinct)
-    const restored = live.filter((r) => r.id === b.id || r.id === c.id);
-    expect(restored.map((r) => r.sortOrder).sort()).toEqual([3, 4]);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(posOf(rows, res[0].id)).toBe(2);
+    expect(posOf(rows, res[1].id)).toBe(4);
   });
 });
 
 // --- SOFT DELETE ---
 
-describe('orderedList — soft delete', () => {
-  it('moves item to negative sortOrder and compacts siblings', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+describe('soft delete', () => {
+  it('negates sortOrder and compacts siblings', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    await softDelete(b.id);
 
-    // Soft-delete b (position 2)
-    await db.contact.update({
-      where: { id: b.id },
-      data: { deletedAt: new Date() },
-    });
-
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2]); // compacted
-    expect(live.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(live.find((r) => r.id === c.id)?.sortOrder).toBe(2); // shifted down
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
 
     const deleted = await db.contact.findUnique({ where: { id: b.id } });
-    expect(deleted?.sortOrder).toBeLessThan(0); // negative
+    expect(deleted!.sortOrder).toBeLessThan(0);
   });
 
-  it('stacks multiple soft-deletes as descending negatives', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+  it('stacks multiple deletes as descending negatives', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    await softDelete(a.id);
+    await softDelete(b.id);
 
-    await db.contact.update({
-      where: { id: a.id },
+    const all = await allOrders(u.id);
+    const live = all.filter((r) => !r.deletedAt);
+    const dead = all.filter((r) => r.deletedAt);
+    expect(positions(live)).toEqual([1]);
+    expect(dead.every((r) => r.sortOrder < 0)).toBe(true);
+    expect(new Set(dead.map((r) => r.sortOrder)).size).toBe(2);
+  });
+});
+
+// --- BULK SOFT DELETE ---
+
+describe('bulk soft delete', () => {
+  it('compacts after deleting multiple items', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    const d = await phone(u.id); // 4
+    const e = await phone(u.id); // 5
+
+    await db.contact.updateManyAndReturn({
+      where: { id: { in: [b.id, d.id] } },
       data: { deletedAt: new Date() },
     });
-    await db.contact.update({
-      where: { id: b.id },
+
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
+    expect(posOf(rows, e.id)).toBe(3);
+  });
+
+  it('bulk delete all leaves empty live list', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    await phone(u.id);
+
+    await db.contact.updateManyAndReturn({
+      where: { userId: u.id, type: ContactType.phone },
       data: { deletedAt: new Date() },
     });
 
-    const all = await getAllSortOrders(user.id, ContactType.phone);
-    const deleted = all.filter((r) => r.deletedAt != null);
-    const live = all.filter((r) => r.deletedAt == null);
-
-    // Live items stay dense
-    expect(live.map((r) => r.sortOrder)).toEqual([1]);
-    // Deleted items are both negative and distinct
-    expect(deleted.every((r) => r.sortOrder < 0)).toBe(true);
-    expect(new Set(deleted.map((r) => r.sortOrder)).size).toBe(2);
+    expect(await liveOrders(u.id)).toEqual([]);
+    const all = await allOrders(u.id);
+    expect(all.every((r) => r.sortOrder < 0)).toBe(true);
+    expect(new Set(all.map((r) => r.sortOrder)).size).toBe(3);
   });
 });
 
 // --- RESTORE ---
 
-describe('orderedList — restore (un-delete)', () => {
-  it('appends restored item to end of live list', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+describe('restore', () => {
+  it('appends to end of live list', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    await softDelete(b.id); // live: a=1, c=2
+    await restore(b.id);
 
-    // Soft-delete b
-    await db.contact.update({
-      where: { id: b.id },
-      data: { deletedAt: new Date() },
-    });
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, b.id)).toBe(3);
+  });
+});
 
-    // Live: a=1, c=2. Restore b.
-    await db.contact.update({
-      where: { id: b.id },
+// --- BULK RESTORE ---
+
+describe('bulk restore', () => {
+  it('assigns sequential end positions', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    const d = await phone(u.id); // 4
+    await softDelete(b.id);
+    await softDelete(c.id);
+    // live: a=1, d=2
+
+    await db.contact.updateManyAndReturn({
+      where: { id: { in: [b.id, c.id] } },
       data: { deletedAt: null },
     });
 
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(live.find((r) => r.id === b.id)?.sortOrder).toBe(3); // appended to end
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4]);
+    const restored = rows.filter((r) => r.id === b.id || r.id === c.id);
+    expect(restored.map((r) => r.sortOrder).sort()).toEqual([3, 4]);
   });
 });
 
 // --- HARD DELETE ---
 
-describe('orderedList — hard delete', () => {
-  it('compacts siblings after hard delete via Prisma', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-
-    // Hard-delete b (position 2) via Prisma — hook fires after delete
+describe('hard delete', () => {
+  it('compacts via Prisma delete', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
     await db.contact.delete({ where: { id: b.id } });
 
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2]);
-    expect(live.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(live.find((r) => r.id === c.id)?.sortOrder).toBe(2);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
   });
 
-  it('compacts after deleteMany', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-    const d = await createPhone(user.id); // 4
-    const e = await createPhone(user.id); // 5
+  it('deleteMany compacts in descending order', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
+    const d = await phone(u.id); // 4
+    const e = await phone(u.id); // 5
 
-    // Delete b(2) and d(4)
-    // After hook: compact >2 by -1 → [a=1, c=2, d=3, e=4]
-    //             compact >3 by -1 (d was at 4, now 3) → [a=1, c=2, e=3]
-    await db.contact.deleteMany({
-      where: { id: { in: [b.id, d.id] } },
-    });
+    await db.contact.deleteMany({ where: { id: { in: [b.id, d.id] } } });
 
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(live.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(live.find((r) => r.id === c.id)?.sortOrder).toBe(2);
-    expect(live.find((r) => r.id === e.id)?.sortOrder).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
   });
 });
 
 // --- REORDER ---
 
-describe('orderedList — reorder', () => {
-  it('moves item forward (3→1) and shifts affected range', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+describe('reorder', () => {
+  it('3→1: shifts [1,3) up', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    await reorderInList('Contact', scope(u.id), c.id, 3, 1);
 
-    const { reorderInList } = await import('#/lib/prisma/orderedList');
-    const scope = { ownerModel: ContactOwnerModel.User, userId: user.id, type: ContactType.phone };
-    await reorderInList('Contact', scope, c.id, 3, 1);
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, c.id)).toBe(1);
+    expect(posOf(rows, a.id)).toBe(2);
+    expect(posOf(rows, b.id)).toBe(3);
   });
 
-  it('moves item backward (1→3) and shifts affected range', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+  it('1→3: shifts (1,3] down', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    await reorderInList('Contact', scope(u.id), a.id, 1, 3);
 
-    const { reorderInList } = await import('#/lib/prisma/orderedList');
-    const scope = { ownerModel: ContactOwnerModel.User, userId: user.id, type: ContactType.phone };
-    await reorderInList('Contact', scope, a.id, 1, 3);
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, b.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
+    expect(posOf(rows, a.id)).toBe(3);
   });
 
   it('no-op when from === to', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    await reorderInList('Contact', scope(u.id), a.id, 1, 1);
 
-    const { reorderInList } = await import('#/lib/prisma/orderedList');
-    const scope = { ownerModel: ContactOwnerModel.User, userId: user.id, type: ContactType.phone };
-    await reorderInList('Contact', scope, a.id, 1, 1);
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2]);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(1);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2]);
+    expect(posOf(rows, a.id)).toBe(1);
   });
 
-  it('move middle item to end (2→4) in a 4-item list', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-    const d = await createPhone(user.id); // 4
+  it('2→4 in a 4-item list', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    const d = await phone(u.id);
+    await reorderInList('Contact', scope(u.id), b.id, 2, 4);
 
-    const { reorderInList } = await import('#/lib/prisma/orderedList');
-    const scope = { ownerModel: ContactOwnerModel.User, userId: user.id, type: ContactType.phone };
-    await reorderInList('Contact', scope, b.id, 2, 4);
-
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === d.id)?.sortOrder).toBe(3);
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(4);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3, 4]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
+    expect(posOf(rows, d.id)).toBe(3);
+    expect(posOf(rows, b.id)).toBe(4);
   });
 });
 
 // --- UPSERT ---
 
-describe('orderedList — upsert', () => {
-  it('assigns sortOrder on upsert-create path', async () => {
-    const { entity: user } = await createUser();
-    await createPhone(user.id); // 1
-
-    const upserted = await db.contact.upsert({
-      where: { id: 'nonexistent-id' },
-      create: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+describe('upsert', () => {
+  it('create path: appends to end', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id); // 1
+    const result = await db.contact.upsert({
+      where: { id: 'nonexistent' },
+      create: { ...phoneRow(u.id) },
       update: {},
     });
-
-    expect(upserted.sortOrder).toBe(2); // appended to end
+    expect(result.sortOrder).toBe(2);
   });
 
-  it('restores sortOrder on upsert-update that un-deletes', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
+  it('update path: restores un-deleted item to end', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    await softDelete(b.id);
 
-    // Soft-delete b
-    await db.contact.update({
-      where: { id: b.id },
-      data: { deletedAt: new Date() },
-    });
-
-    // Upsert that restores b
     await db.contact.upsert({
       where: { id: b.id },
-      create: {
-        ownerModel: ContactOwnerModel.User,
-        userId: user.id,
-        type: ContactType.phone,
-        value: { e164: e164(String(getNextSeq())), country: 'US' },
-      },
+      create: { ...phoneRow(u.id) },
       update: { deletedAt: null },
     });
 
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.find((r) => r.id === b.id)?.sortOrder).toBe(2); // restored to end
+    const rows = await liveOrders(u.id);
+    expect(posOf(rows, b.id)).toBe(2);
   });
 });
 
-// --- BULK INCREMENT / DECREMENT / COLLISION ---
+// --- BULK SORTORDER MANIPULATION ---
 
-describe('orderedList — bulk sortOrder manipulation', () => {
-  it('bulk increment creates a gap at the bottom — hook re-densifies', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+describe('bulk sortOrder manipulation', () => {
+  it('increment all — re-densifies to [1..N]', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
 
-    // Increment all by 1 → [2, 3, 4] — gap at 1
-    // Hook should re-densify to [1, 2, 3] preserving relative order
     await db.contact.updateManyAndReturn({
-      where: { userId: user.id, type: ContactType.phone },
+      where: { userId: u.id, type: ContactType.phone },
       data: { sortOrder: { increment: 1 } },
     });
 
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    // Relative order preserved: a < b < c
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBeLessThan(
-      orders.find((r) => r.id === b.id)?.sortOrder ?? 0,
-    );
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBeLessThan(
-      orders.find((r) => r.id === c.id)?.sortOrder ?? 0,
-    );
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    // Relative order preserved
+    expect(posOf(rows, a.id)!).toBeLessThan(posOf(rows, b.id)!);
+    expect(posOf(rows, b.id)!).toBeLessThan(posOf(rows, c.id)!);
   });
 
-  it('bulk decrement into zero/negative — hook clamps to positive dense', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+  it('decrement into zero/negative — re-densifies', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    await phone(u.id);
 
-    // Decrement all by 2 → [-1, 0, 1] — two items at or below zero
-    // Hook should re-densify to [1, 2, 3] preserving relative order
     await db.contact.updateManyAndReturn({
-      where: { userId: user.id, type: ContactType.phone },
+      where: { userId: u.id, type: ContactType.phone },
       data: { sortOrder: { decrement: 2 } },
     });
 
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3]);
   });
 
-  it('bulk set all to same position — resolves by id order', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+  it('set all to same value — resolves by id', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    await phone(u.id);
 
-    // Set all to position 1 → [1, 1, 1] — collision
-    // Hook should resolve: sort by id (deterministic), assign 1, 2, 3
     await db.contact.updateManyAndReturn({
-      where: { userId: user.id, type: ContactType.phone },
+      where: { userId: u.id, type: ContactType.phone },
       data: { sortOrder: 1 },
     });
 
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    // All distinct
-    expect(new Set(orders.map((r) => r.sortOrder)).size).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(new Set(rows.map((r) => r.sortOrder)).size).toBe(3);
   });
 
-  it('partial increment — some items shift, others stay', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
-    const d = await createPhone(user.id); // 4
+  it('partial increment causing overlap — re-densifies', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    const d = await phone(u.id);
 
-    // Increment only b and c by 2 → a=1, b=4, c=5, d=4
-    // Collision at 4 (b and d). Hook should re-densify to [1, 2, 3, 4]
-    // preserving intended relative order
     await db.contact.updateManyAndReturn({
       where: { id: { in: [b.id, c.id] } },
       data: { sortOrder: { increment: 2 } },
     });
 
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4]);
   });
 
-  it('set two items to swap positions', async () => {
-    const { entity: user } = await createUser();
-    const a = await createPhone(user.id); // 1
-    const b = await createPhone(user.id); // 2
-    const c = await createPhone(user.id); // 3
+  it('swap via sequential updates', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2
+    const c = await phone(u.id); // 3
 
-    // Set b to 3 and c to 2 via two updates — effective swap
     await db.contact.update({ where: { id: b.id }, data: { sortOrder: 3 } });
     await db.contact.update({ where: { id: c.id }, data: { sortOrder: 2 } });
 
-    // After each update the hook should resolve collisions
-    const orders = await getSortOrders(user.id, ContactType.phone);
-    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
-    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(1);
-    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(2);
-    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(3);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
+    expect(posOf(rows, b.id)).toBe(3);
+  });
+});
+
+// --- UNIQUE CONSTRAINT SAFETY ---
+
+describe('unique constraint safety', () => {
+  it('insert-at shifts before write (no collision)', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    await phone(u.id);
+    expect((await phone(u.id, 2)).sortOrder).toBe(2);
+  });
+
+  it('createMany at overlapping positions (no collision)', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    await phone(u.id);
+    await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id, 1), phoneRow(u.id, 1)],
+    });
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4]);
+  });
+
+  it('reorder parks at -1 first (no collision)', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    const c = await phone(u.id);
+    await reorderInList('Contact', scope(u.id), c.id, 3, 1);
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3]);
+  });
+
+  it('direct sortOrder update reorders (no collision)', async () => {
+    const { entity: u } = await createUser();
+    await phone(u.id);
+    const b = await phone(u.id);
+    await phone(u.id);
+    await db.contact.update({ where: { id: b.id }, data: { sortOrder: 1 } });
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3]);
+  });
+
+  it('soft-delete + create at same position (no collision)', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id);
+    const b = await phone(u.id);
+    await softDelete(a.id);
+    const c = await phone(u.id, 1);
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2]);
+    expect(posOf(rows, c.id)).toBe(1);
+    expect(posOf(rows, b.id)).toBe(2);
   });
 });
 
 // --- DENSITY INVARIANT ---
 
-describe('orderedList — density invariant', () => {
-  it('maintains dense [1..N] after mixed operations', async () => {
-    const { entity: user } = await createUser();
-
-    // Create 5
+describe('density invariant', () => {
+  it('mixed create/delete/insert/restore stays [1..N]', async () => {
+    const { entity: u } = await createUser();
     const items = [];
-    for (let i = 0; i < 5; i++) {
-      items.push(await createPhone(user.id));
-    }
-    // [1, 2, 3, 4, 5]
+    for (let i = 0; i < 5; i++) items.push(await phone(u.id)); // [1..5]
 
-    // Soft-delete #3
-    await db.contact.update({
-      where: { id: items[2].id },
-      data: { deletedAt: new Date() },
-    });
-    // Live: [1, 2, 3, 4]
+    await softDelete(items[2].id);    // live: [1,2,3,4]
+    await phone(u.id, 2);             // live: [1,2,3,4,5]
+    await restore(items[2].id);       // live: [1,2,3,4,5,6]
 
-    // Insert at position 2
-    await createPhone(user.id, { sortOrder: 2 });
-    // Live: [1, 2, 3, 4, 5]
-
-    // Restore #3 (appends to end)
-    await db.contact.update({
-      where: { id: items[2].id },
-      data: { deletedAt: null },
-    });
-    // Live: [1, 2, 3, 4, 5, 6]
-
-    const live = await getSortOrders(user.id, ContactType.phone);
-    expect(live.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4, 5, 6]);
   });
 });

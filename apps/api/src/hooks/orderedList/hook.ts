@@ -1,9 +1,9 @@
-import { DbAction, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
+import { DbAction, type HookOptions, HookTiming, type ManyAction, registerDbHook, type SingleAction } from '@template/db';
 import {
-  applyOrderedListDefaults,
+  applyOrderedListCreate,
   applyOrderedListHardDelete,
-  applyOrderedListRestore,
-  applyOrderedListSoftDelete,
+  applyOrderedListReDensify,
+  applyOrderedListUpdate,
   applyOrderedListUpsert,
 } from '#/lib/prisma/orderedList';
 import { orderedListRegistry } from '#/hooks/orderedList/registry';
@@ -15,22 +15,25 @@ const extractRows = (args: unknown): Record<string, unknown>[] => {
   return Array.isArray(a.data) ? (a.data as Record<string, unknown>[]) : [a.data as Record<string, unknown>];
 };
 
+const isRegistered = (model: string | undefined): boolean =>
+  !!model && !!orderedListRegistry[model];
+
 export const registerOrderedListHook = () => {
-  // Create / createManyAndReturn — assign sortOrder (append or insert-at)
+  // --- BEFORE: create / createManyAndReturn ---
   registerDbHook(
     'orderedList:create',
     '*',
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args, model }) => {
-      if (!model || !orderedListRegistry[model]) return;
+      if (!isRegistered(model)) return;
       for (const row of extractRows(args)) {
-        await applyOrderedListDefaults(model, row);
+        await applyOrderedListCreate(model!, row);
       }
     },
   );
 
-  // Update — soft delete (→ negative + compact) or restore (→ append to end)
+  // --- BEFORE: update (single) ---
   registerDbHook(
     'orderedList:update',
     '*',
@@ -38,40 +41,63 @@ export const registerOrderedListHook = () => {
     [DbAction.update],
     async (options) => {
       const { args, previous, model } = options as HookOptions & { action: SingleAction };
-      if (!model || !orderedListRegistry[model]) return;
-      if (!args || typeof args !== 'object' || !previous) return;
-      const data = (args as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      if (!isRegistered(model) || !previous) return;
+      const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data) return;
-      await applyOrderedListSoftDelete(model, data, previous as Record<string, unknown>);
-      await applyOrderedListRestore(model, data, previous as Record<string, unknown>);
+      await applyOrderedListUpdate(model!, data, previous as Record<string, unknown>);
     },
   );
 
-  // UpdateManyAndReturn — same as update but previous is an array
+  // --- BEFORE: updateManyAndReturn (soft-delete/restore per-row) ---
   registerDbHook(
-    'orderedList:updateMany',
+    'orderedList:updateMany:before',
     '*',
     HookTiming.before,
     [DbAction.updateManyAndReturn],
     async (options) => {
-      const { args, previous, model } = options as HookOptions & { action: 'updateManyAndReturn' };
-      if (!model || !orderedListRegistry[model]) return;
-      if (!args || typeof args !== 'object') return;
-      const data = (args as Record<string, unknown>).data as Record<string, unknown> | undefined;
+      const { args, previous, model } = options as HookOptions & { action: ManyAction };
+      if (!isRegistered(model)) return;
+      const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data || !previous || !Array.isArray(previous)) return;
 
-      // updateManyAndReturn applies the same data to all matched rows.
-      // Process each previous row against the shared data to detect
-      // soft-delete / restore transitions per-row.
-      for (const prev of previous) {
-        const rowData = { ...data };
-        await applyOrderedListSoftDelete(model, rowData, prev as Record<string, unknown>);
-        await applyOrderedListRestore(model, rowData, prev as Record<string, unknown>);
+      // Handle soft-delete/restore per-row (these need before-hook to avoid unique violations)
+      const touchesSortOrder = Object.keys(orderedListRegistry[model!] ?? {}).some((f) => data[f] !== undefined);
+      const touchesDeletedAt = data.deletedAt !== undefined;
+
+      if (touchesDeletedAt) {
+        for (const prev of previous) {
+          const rowData = { ...data };
+          await applyOrderedListUpdate(model!, rowData, prev as Record<string, unknown>);
+        }
       }
+
+      // If touching sortOrder directly (increment/decrement/set), let the write happen
+      // and re-densify in the after-hook
+      if (touchesSortOrder && !touchesDeletedAt) return;
     },
   );
 
-  // Upsert — create path or update path depending on whether previous exists
+  // --- AFTER: updateManyAndReturn (re-densify for bulk sortOrder manipulation) ---
+  registerDbHook(
+    'orderedList:updateMany:after',
+    '*',
+    HookTiming.after,
+    [DbAction.updateManyAndReturn],
+    async (options) => {
+      const { args, previous, model } = options as HookOptions & { action: ManyAction };
+      if (!isRegistered(model)) return;
+      const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      if (!data || !previous || !Array.isArray(previous)) return;
+
+      // Only re-densify if sortOrder was directly manipulated (not via soft-delete/restore)
+      const touchesDeletedAt = data.deletedAt !== undefined;
+      if (touchesDeletedAt) return;
+
+      await applyOrderedListReDensify(model!, data, previous as Record<string, unknown>[]);
+    },
+  );
+
+  // --- BEFORE: upsert ---
   registerDbHook(
     'orderedList:upsert',
     '*',
@@ -79,17 +105,16 @@ export const registerOrderedListHook = () => {
     [DbAction.upsert],
     async (options) => {
       const { args, previous, model } = options as HookOptions & { action: SingleAction };
-      if (!model || !orderedListRegistry[model]) return;
-      if (!args || typeof args !== 'object') return;
+      if (!isRegistered(model)) return;
       await applyOrderedListUpsert(
-        model,
+        model!,
         args as Record<string, unknown>,
         previous as Record<string, unknown> | undefined,
       );
     },
   );
 
-  // Delete — compact siblings after hard delete
+  // --- AFTER: delete / deleteMany (compact after row is gone) ---
   registerDbHook(
     'orderedList:delete',
     '*',
@@ -97,12 +122,23 @@ export const registerOrderedListHook = () => {
     [DbAction.delete, DbAction.deleteMany],
     async (options) => {
       const { previous, model } = options as HookOptions;
-      if (!model || !orderedListRegistry[model]) return;
-      if (!previous) return;
+      if (!isRegistered(model) || !previous) return;
 
       const rows = Array.isArray(previous) ? previous : [previous];
-      for (const row of rows) {
-        await applyOrderedListHardDelete(model, row as Record<string, unknown>);
+      const config = orderedListRegistry[model!];
+      const orderFields = config ? Object.keys(config) : [];
+
+      // Process in descending order (by first registered field) so each
+      // compaction doesn't shift positions of items we haven't processed yet
+      const sorted = [...rows].sort((a, b) => {
+        const field = orderFields[0] ?? 'sortOrder';
+        const aOrder = ((a as Record<string, unknown>)[field] as number) ?? 0;
+        const bOrder = ((b as Record<string, unknown>)[field] as number) ?? 0;
+        return bOrder - aOrder;
+      });
+
+      for (const row of sorted) {
+        await applyOrderedListHardDelete(model!, row as Record<string, unknown>);
       }
     },
   );

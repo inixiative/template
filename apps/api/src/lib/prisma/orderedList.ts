@@ -18,7 +18,13 @@ const tableName = (model: string): string => {
 const hasSoftDelete = (model: string): boolean =>
   lookupField(model, 'deletedAt') !== undefined;
 
-const scopeSql = (model: string, scope: Where, field: string): { text: string; values: unknown[] } => {
+const scopeSql = (
+  model: string,
+  scope: Where,
+  field: string,
+  opts: { liveOnly?: boolean } = {},
+): { text: string; values: unknown[] } => {
+  const { liveOnly = true } = opts;
   const parts: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -33,36 +39,15 @@ const scopeSql = (model: string, scope: Where, field: string): { text: string; v
     }
   }
 
-  if (hasSoftDelete(model)) {
-    parts.push(`"deletedAt" IS NULL`);
+  if (liveOnly) {
+    if (hasSoftDelete(model)) parts.push(`"deletedAt" IS NULL`);
+    parts.push(`"${field}" > 0`);
   }
 
-  parts.push(`"${field}" > 0`);
   return { text: parts.join(' AND '), values };
 };
 
-const shiftRaw = async (
-  model: string,
-  scope: Where,
-  field: string,
-  direction: 'increment' | 'decrement',
-  predicate: string,
-  predicateValues: unknown[],
-): Promise<void> => {
-  const table = tableName(model);
-  const op = direction === 'increment' ? '+' : '-';
-  const { text: scopeText, values: scopeValues } = scopeSql(model, scope, field);
-
-  const allValues = [...scopeValues, ...predicateValues];
-  const query = `UPDATE ${table} SET "${field}" = "${field}" ${op} 1 WHERE ${scopeText} AND ${predicate}`;
-
-  await db.$executeRawUnsafe(query, ...allValues);
-};
-
-// --- Public API ---
-
-const buildScope = (row: Record<string, unknown>, scopeFields: string[]): Where =>
-  Object.fromEntries(scopeFields.map((f) => [f, row[f]]));
+// --- Raw SQL operations ---
 
 export const nextSortOrderRaw = async (
   model: string,
@@ -70,9 +55,11 @@ export const nextSortOrderRaw = async (
   field: string,
 ): Promise<number> => {
   const table = tableName(model);
-  const { text: scopeText, values } = scopeSql(model, scope, field);
-  const query = `SELECT COALESCE(MAX("${field}"), 0) + 1 AS "next" FROM ${table} WHERE ${scopeText}`;
-  const result = await db.$queryRawUnsafe<{ next: number }[]>(query, ...values);
+  const { text, values } = scopeSql(model, scope, field);
+  const result = await db.$queryRawUnsafe<{ next: number }[]>(
+    `SELECT COALESCE(MAX("${field}"), 0) + 1 AS "next" FROM ${table} WHERE ${text}`,
+    ...values,
+  );
   return Number(result[0]?.next ?? 1);
 };
 
@@ -82,22 +69,42 @@ export const minSortOrderRaw = async (
   field: string,
 ): Promise<number> => {
   const table = tableName(model);
-  const parts: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
-  for (const [k, v] of Object.entries(scope)) {
-    if (v === null) {
-      parts.push(`"${k}" IS NULL`);
-    } else {
-      parts.push(`"${k}" = $${idx}`);
-      values.push(v);
-      idx++;
-    }
-  }
-  parts.push(`"${field}" < 0`);
-  const query = `SELECT COALESCE(MIN("${field}"), 0) - 1 AS "next" FROM ${table} WHERE ${parts.join(' AND ')}`;
-  const result = await db.$queryRawUnsafe<{ next: number }[]>(query, ...values);
+  const { text, values } = scopeSql(model, scope, field, { liveOnly: false });
+  const result = await db.$queryRawUnsafe<{ next: number }[]>(
+    `SELECT COALESCE(MIN("${field}"), 0) - 1 AS "next" FROM ${table} WHERE ${text} AND "${field}" < 0`,
+    ...values,
+  );
   return Number(result[0]?.next ?? -1);
+};
+
+const shiftRaw = async (
+  model: string,
+  scope: Where,
+  field: string,
+  direction: 'increment' | 'decrement',
+  comparator: string,
+  comparatorValues: unknown[],
+): Promise<void> => {
+  const table = tableName(model);
+  const op = direction === 'increment' ? '+' : '-';
+  const { text, values } = scopeSql(model, scope, field);
+  const offset = values.length + 1;
+  const predicate = comparator.replace(/\$NEXT/g, () => `$${offset + comparatorValues.indexOf(comparatorValues[comparatorValues.length - 1])}`);
+
+  // Build parameterized comparator
+  let paramComparator = comparator;
+  const allValues = [...values];
+  let pIdx = values.length + 1;
+  for (const v of comparatorValues) {
+    paramComparator = paramComparator.replace('$?', `$${pIdx}`);
+    allValues.push(v);
+    pIdx++;
+  }
+
+  await db.$executeRawUnsafe(
+    `UPDATE ${table} SET "${field}" = "${field}" ${op} 1 WHERE ${text} AND ${paramComparator}`,
+    ...allValues,
+  );
 };
 
 export const insertAtRaw = async (
@@ -108,9 +115,7 @@ export const insertAtRaw = async (
 ): Promise<number> => {
   const max = await nextSortOrderRaw(model, scope, field);
   const clamped = Math.max(1, Math.min(position, max));
-  const { values: scopeValues } = scopeSql(model, scope, field);
-  const paramIdx = scopeValues.length + 1;
-  await shiftRaw(model, scope, field, 'increment', `"${field}" >= $${paramIdx}`, [clamped]);
+  await shiftRaw(model, scope, field, 'increment', `"${field}" >= $?`, [clamped]);
   return clamped;
 };
 
@@ -120,9 +125,27 @@ export const compactAfterRemove = async (
   removedPosition: number,
   field: string,
 ): Promise<void> => {
-  const { values: scopeValues } = scopeSql(model, scope, field);
-  const paramIdx = scopeValues.length + 1;
-  await shiftRaw(model, scope, field, 'decrement', `"${field}" > $${paramIdx}`, [removedPosition]);
+  await shiftRaw(model, scope, field, 'decrement', `"${field}" > $?`, [removedPosition]);
+};
+
+export const reDensify = async (
+  model: string,
+  scope: Where,
+  field: string,
+): Promise<void> => {
+  const table = tableName(model);
+  const { text, values } = scopeSql(model, scope, field);
+
+  await db.$executeRawUnsafe(
+    `WITH numbered AS (
+      SELECT "id", ROW_NUMBER() OVER (ORDER BY "${field}" ASC, "id" ASC) AS new_order
+      FROM ${table}
+      WHERE ${text}
+    )
+    UPDATE ${table} SET "${field}" = numbered.new_order
+    FROM numbered WHERE ${table}."id" = numbered."id"`,
+    ...values,
+  );
 };
 
 export const reorderInList = async (
@@ -136,25 +159,14 @@ export const reorderInList = async (
   if (fromOrder === toOrder) return;
 
   const table = tableName(model);
-  const { text: scopeText, values: scopeValues } = scopeSql(model, scope, field);
 
-  // Park at -1
+  // Park at -1 (outside live range, won't collide with unique index)
   await db.$executeRawUnsafe(`UPDATE ${table} SET "${field}" = -1 WHERE "id" = $1`, itemId);
 
   if (fromOrder > toOrder) {
-    const paramIdx = scopeValues.length + 1;
-    await shiftRaw(
-      model, scope, field, 'increment',
-      `"${field}" >= $${paramIdx} AND "${field}" < $${paramIdx + 1}`,
-      [toOrder, fromOrder],
-    );
+    await shiftRaw(model, scope, field, 'increment', `"${field}" >= $? AND "${field}" < $?`, [toOrder, fromOrder]);
   } else {
-    const paramIdx = scopeValues.length + 1;
-    await shiftRaw(
-      model, scope, field, 'decrement',
-      `"${field}" > $${paramIdx} AND "${field}" <= $${paramIdx + 1}`,
-      [fromOrder, toOrder],
-    );
+    await shiftRaw(model, scope, field, 'decrement', `"${field}" > $? AND "${field}" <= $?`, [fromOrder, toOrder]);
   }
 
   await db.$executeRawUnsafe(`UPDATE ${table} SET "${field}" = $1 WHERE "id" = $2`, toOrder, itemId);
@@ -162,16 +174,25 @@ export const reorderInList = async (
 
 // --- Hook-callable functions ---
 
-export const applyOrderedListDefaults = async (
+const buildScope = (row: Record<string, unknown>, scopeFields: string[]): Where =>
+  Object.fromEntries(scopeFields.map((f) => [f, row[f]]));
+
+const configForModel = (model: string) => orderedListRegistry[model];
+
+const validScope = (scope: Where, scopeFields: string[]): boolean =>
+  scopeFields.every((f) => scope[f] != null);
+
+// Before create: assign MAX+1 if no sortOrder, or shift to make room at specified position
+export const applyOrderedListCreate = async (
   model: string,
   row: Record<string, unknown>,
 ): Promise<void> => {
-  const config = orderedListRegistry[model];
+  const config = configForModel(model);
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
     const scope = buildScope(row, scopeFields);
-    if (!scopeFields.every((f) => scope[f] != null)) continue;
+    if (!validScope(scope, scopeFields)) continue;
 
     if (row[field] == null) {
       row[field] = await nextSortOrderRaw(model, scope, field);
@@ -181,72 +202,101 @@ export const applyOrderedListDefaults = async (
   }
 };
 
-export const applyOrderedListSoftDelete = async (
+// Before update: handle soft-delete (negate + compact) and restore (append to end)
+export const applyOrderedListUpdate = async (
   model: string,
-  row: Record<string, unknown>,
+  data: Record<string, unknown>,
   previous: Record<string, unknown>,
 ): Promise<void> => {
-  const config = orderedListRegistry[model];
+  const config = configForModel(model);
   if (!config) return;
 
-  const wasLive = previous.deletedAt == null;
-  const isSoftDeleting = row.deletedAt != null && row.deletedAt !== undefined;
-  if (!wasLive || !isSoftDeleting) return;
+  const merged = { ...previous, ...data };
 
-  const merged = { ...previous, ...row };
   for (const [field, scopeFields] of Object.entries(config)) {
     const scope = buildScope(merged, scopeFields);
-    if (!scopeFields.every((f) => scope[f] != null)) continue;
+    if (!validScope(scope, scopeFields)) continue;
 
-    const oldPosition = previous[field] as number;
-    if (typeof oldPosition !== 'number' || oldPosition <= 0) continue;
+    // Soft delete: live → deleted
+    const wasLive = previous.deletedAt == null;
+    const isSoftDeleting = data.deletedAt != null && data.deletedAt !== undefined;
+    if (wasLive && isSoftDeleting) {
+      const oldPos = previous[field] as number;
+      if (typeof oldPos === 'number' && oldPos > 0) {
+        data[field] = await minSortOrderRaw(model, scope, field);
+        await compactAfterRemove(model, scope, oldPos, field);
+      }
+      continue;
+    }
 
-    // Move to negative register
-    row[field] = await minSortOrderRaw(model, scope, field);
-    // Compact the gap left behind
-    await compactAfterRemove(model, scope, oldPosition, field);
+    // Restore: deleted → live
+    const wasDeleted = previous.deletedAt != null;
+    const isRestoring = data.deletedAt === null;
+    if (wasDeleted && isRestoring) {
+      data[field] = await nextSortOrderRaw(model, scope, field);
+      continue;
+    }
+
+    // Direct sortOrder change: shift to make room at target
+    if (data[field] !== undefined && data[field] !== previous[field]) {
+      const newPos = data[field] as number;
+      const oldPos = previous[field] as number;
+      if (typeof newPos === 'number' && typeof oldPos === 'number' && newPos > 0 && oldPos > 0) {
+        // Use reorder logic: park, shift, place — but via raw SQL
+        await reorderInList(model, scope, (previous as Record<string, unknown>).id as string, oldPos, newPos, field);
+        // reorderInList already placed the item, so remove from data to avoid double-write
+        delete data[field];
+      }
+    }
   }
 };
 
-export const applyOrderedListRestore = async (
-  model: string,
-  row: Record<string, unknown>,
-  previous: Record<string, unknown>,
-): Promise<void> => {
-  const config = orderedListRegistry[model];
-  if (!config) return;
-
-  const wasDeleted = previous.deletedAt != null;
-  const isRestoring = row.deletedAt === null;
-  if (!wasDeleted || !isRestoring) return;
-
-  const merged = { ...previous, ...row };
-  for (const [field, scopeFields] of Object.entries(config)) {
-    const scope = buildScope(merged, scopeFields);
-    if (!scopeFields.every((f) => scope[f] != null)) continue;
-
-    row[field] = await nextSortOrderRaw(model, scope, field);
-  }
-};
-
+// After hard delete: compact the gap
 export const applyOrderedListHardDelete = async (
   model: string,
   previous: Record<string, unknown>,
 ): Promise<void> => {
-  const config = orderedListRegistry[model];
+  const config = configForModel(model);
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
     const scope = buildScope(previous, scopeFields);
-    if (!scopeFields.every((f) => scope[f] != null)) continue;
+    if (!validScope(scope, scopeFields)) continue;
 
-    const oldPosition = previous[field] as number;
-    if (typeof oldPosition !== 'number' || oldPosition <= 0) continue;
-
-    await compactAfterRemove(model, scope, oldPosition, field);
+    const oldPos = previous[field] as number;
+    if (typeof oldPos === 'number' && oldPos > 0) {
+      await compactAfterRemove(model, scope, oldPos, field);
+    }
   }
 };
 
+// After bulk sortOrder manipulation: re-densify to fix gaps/collisions/non-positive
+export const applyOrderedListReDensify = async (
+  model: string,
+  data: Record<string, unknown>,
+  previousRows: Record<string, unknown>[],
+): Promise<void> => {
+  const config = configForModel(model);
+  if (!config) return;
+
+  for (const [field, scopeFields] of Object.entries(config)) {
+    // Only re-densify if this update touched sortOrder
+    if (data[field] === undefined) continue;
+
+    // Collect all unique scopes from affected rows
+    const seen = new Set<string>();
+    for (const prev of previousRows) {
+      const scope = buildScope({ ...prev, ...data }, scopeFields);
+      if (!validScope(scope, scopeFields)) continue;
+      const key = JSON.stringify(scope);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      await reDensify(model, scope, field);
+    }
+  }
+};
+
+// Before upsert: route to create or update path
 export const applyOrderedListUpsert = async (
   model: string,
   args: Record<string, unknown>,
@@ -256,11 +306,10 @@ export const applyOrderedListUpsert = async (
   const update = args.update as Record<string, unknown> | undefined;
 
   if (!previous && create) {
-    await applyOrderedListDefaults(model, create);
+    await applyOrderedListCreate(model, create);
   }
 
   if (previous && update) {
-    await applyOrderedListSoftDelete(model, update, previous);
-    await applyOrderedListRestore(model, update, previous);
+    await applyOrderedListUpdate(model, update, previous);
   }
 };
