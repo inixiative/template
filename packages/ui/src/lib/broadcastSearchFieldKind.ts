@@ -10,7 +10,7 @@
  * not the full operator-validation surface the server uses.
  */
 
-import { prismaMap } from '@template/permissions/rebac/prismaMap.gen';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 type FieldDef = { kind: 'scalar' | 'enum' | 'object'; type: string };
 

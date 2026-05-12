@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { buildPrismaMapV7 } from '@inixiative/prisma-map';
 
 const generatedClientPath = join(import.meta.dir, '../src/generated/client');
-const outFile = join(import.meta.dir, '../../permissions/src/rebac/prismaMap.gen.ts');
+const outFile = join(import.meta.dir, '../src/generated/prismaMap.gen.ts');
 
 const rawPrismaMap = buildPrismaMapV7(generatedClientPath);
 

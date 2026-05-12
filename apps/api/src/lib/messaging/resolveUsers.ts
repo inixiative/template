@@ -1,7 +1,7 @@
 import { type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { Contact, User } from '@template/db/generated/client/client';
-import { prismaMap } from '@template/permissions/rebac/prismaMap.gen';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 export type ResolvedUser = User & { contacts: Contact[] };
 

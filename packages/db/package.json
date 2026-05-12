@@ -18,6 +18,7 @@
     "./zod": "./src/generated/zod/schemas/index.ts",
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
     "./zod/*": "./src/generated/zod/schemas/*.ts",
+    "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
     "./prisma/seed": "./prisma/seed.ts",
     "./prisma/seeds": "./prisma/seeds/index.ts"
   },
