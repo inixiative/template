@@ -1,4 +1,4 @@
-import { db } from '@template/db';
+import { db, Prisma } from '@template/db';
 import { lookupField } from '#/lib/prisma/fieldMetadata';
 import { orderedListRegistry } from '#/hooks/orderedList/registry';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -8,144 +8,90 @@ export type OrderedListRegistry = Record<string, OrderedListConfig>;
 
 type Where = Record<string, unknown>;
 
-// --- SQL helpers (bypass mutation lifecycle → no infinite loops) ---
+// --- SQL building via Prisma.sql (parameterized, no string interpolation for values) ---
 
-const tableName = (model: string): string => {
+const table = (model: string) => {
   const entry = (prismaMap as Record<string, { dbName: string | null }>)[model];
-  return `"${entry?.dbName ?? model}"`;
+  return Prisma.raw(`"${entry?.dbName ?? model}"`);
 };
+
+const col = (name: string) => Prisma.raw(`"${name}"`);
 
 const hasSoftDelete = (model: string): boolean =>
   lookupField(model, 'deletedAt') !== undefined;
 
-const scopeSql = (
-  model: string,
-  scope: Where,
-  field: string,
-  opts: { liveOnly?: boolean } = {},
-): { text: string; values: unknown[] } => {
-  const { liveOnly = true } = opts;
-  const parts: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
+const scopeWhere = (model: string, scope: Where, field: string, liveOnly = true): Prisma.Sql => {
+  const parts: Prisma.Sql[] = [];
 
   for (const [k, v] of Object.entries(scope)) {
-    if (v === null) {
-      parts.push(`"${k}" IS NULL`);
-    } else {
-      parts.push(`"${k}" = $${idx}`);
-      values.push(v);
-      idx++;
-    }
+    parts.push(v === null ? Prisma.sql`${col(k)} IS NULL` : Prisma.sql`${col(k)} = ${v}`);
   }
 
   if (liveOnly) {
-    if (hasSoftDelete(model)) parts.push(`"deletedAt" IS NULL`);
-    parts.push(`"${field}" > 0`);
+    if (hasSoftDelete(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
+    parts.push(Prisma.sql`${col(field)} > 0`);
   }
 
-  return { text: parts.join(' AND '), values };
+  return Prisma.join(parts, ' AND ');
 };
 
-// --- Raw SQL operations ---
+// --- Raw SQL operations (bypass mutation lifecycle) ---
 
-export const nextSortOrderRaw = async (
-  model: string,
-  scope: Where,
-  field: string,
-): Promise<number> => {
-  const table = tableName(model);
-  const { text, values } = scopeSql(model, scope, field);
-  const result = await db.$queryRawUnsafe<{ next: number }[]>(
-    `SELECT COALESCE(MAX("${field}"), 0) + 1 AS "next" FROM ${table} WHERE ${text}`,
-    ...values,
+export const nextSortOrderRaw = async (model: string, scope: Where, field: string): Promise<number> => {
+  const where = scopeWhere(model, scope, field);
+  const result = await db.$queryRaw<{ next: bigint }[]>(
+    Prisma.sql`SELECT COALESCE(MAX(${col(field)}), 0) + 1 AS "next" FROM ${table(model)} WHERE ${where}`,
   );
   return Number(result[0]?.next ?? 1);
 };
 
-export const minSortOrderRaw = async (
-  model: string,
-  scope: Where,
-  field: string,
-): Promise<number> => {
-  const table = tableName(model);
-  const { text, values } = scopeSql(model, scope, field, { liveOnly: false });
-  const result = await db.$queryRawUnsafe<{ next: number }[]>(
-    `SELECT COALESCE(MIN("${field}"), 0) - 1 AS "next" FROM ${table} WHERE ${text} AND "${field}" < 0`,
-    ...values,
+export const minSortOrderRaw = async (model: string, scope: Where, field: string): Promise<number> => {
+  const where = scopeWhere(model, scope, field, false);
+  const result = await db.$queryRaw<{ next: bigint }[]>(
+    Prisma.sql`SELECT COALESCE(MIN(${col(field)}), 0) - 1 AS "next" FROM ${table(model)} WHERE ${where} AND ${col(field)} < 0`,
   );
   return Number(result[0]?.next ?? -1);
 };
 
-const shiftRaw = async (
-  model: string,
-  scope: Where,
-  field: string,
-  direction: 'increment' | 'decrement',
-  comparator: string,
-  comparatorValues: unknown[],
-): Promise<void> => {
-  const table = tableName(model);
-  const op = direction === 'increment' ? '+' : '-';
-  const { text, values } = scopeSql(model, scope, field);
-  const offset = values.length + 1;
-  const predicate = comparator.replace(/\$NEXT/g, () => `$${offset + comparatorValues.indexOf(comparatorValues[comparatorValues.length - 1])}`);
-
-  // Build parameterized comparator
-  let paramComparator = comparator;
-  const allValues = [...values];
-  let pIdx = values.length + 1;
-  for (const v of comparatorValues) {
-    paramComparator = paramComparator.replace('$?', `$${pIdx}`);
-    allValues.push(v);
-    pIdx++;
-  }
-
-  await db.$executeRawUnsafe(
-    `UPDATE ${table} SET "${field}" = "${field}" ${op} 1 WHERE ${text} AND ${paramComparator}`,
-    ...allValues,
+const shiftUp = async (model: string, scope: Where, field: string, predicate: Prisma.Sql): Promise<void> => {
+  const where = scopeWhere(model, scope, field);
+  await db.$executeRaw(
+    Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${col(field)} + 1 WHERE ${where} AND ${predicate}`,
   );
 };
 
-export const insertAtRaw = async (
-  model: string,
-  scope: Where,
-  position: number,
-  field: string,
-): Promise<number> => {
+const shiftDown = async (model: string, scope: Where, field: string, predicate: Prisma.Sql): Promise<void> => {
+  const where = scopeWhere(model, scope, field);
+  await db.$executeRaw(
+    Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${col(field)} - 1 WHERE ${where} AND ${predicate}`,
+  );
+};
+
+export const insertAtRaw = async (model: string, scope: Where, position: number, field: string): Promise<number> => {
   const max = await nextSortOrderRaw(model, scope, field);
   const clamped = Math.max(1, Math.min(position, max));
-  await shiftRaw(model, scope, field, 'increment', `"${field}" >= $?`, [clamped]);
+  await shiftUp(model, scope, field, Prisma.sql`${col(field)} >= ${clamped}`);
   return clamped;
 };
 
-export const compactAfterRemove = async (
-  model: string,
-  scope: Where,
-  removedPosition: number,
-  field: string,
-): Promise<void> => {
-  await shiftRaw(model, scope, field, 'decrement', `"${field}" > $?`, [removedPosition]);
+export const compactAfterRemove = async (model: string, scope: Where, removedPosition: number, field: string): Promise<void> => {
+  await shiftDown(model, scope, field, Prisma.sql`${col(field)} > ${removedPosition}`);
 };
 
-export const reDensify = async (
-  model: string,
-  scope: Where,
-  field: string,
-): Promise<void> => {
-  const table = tableName(model);
-  const { text, values } = scopeSql(model, scope, field);
+export const reDensify = async (model: string, scope: Where, field: string): Promise<void> => {
+  const t = table(model);
+  const f = col(field);
+  const where = scopeWhere(model, scope, field);
 
-  await db.$executeRawUnsafe(
-    `WITH numbered AS (
-      SELECT "id", ROW_NUMBER() OVER (ORDER BY "${field}" ASC, "id" ASC) AS new_order
-      FROM ${table}
-      WHERE ${text}
+  await db.$executeRaw(Prisma.sql`
+    WITH numbered AS (
+      SELECT "id", ROW_NUMBER() OVER (ORDER BY ${f} ASC, "id" ASC) AS new_order
+      FROM ${t}
+      WHERE ${where}
     )
-    UPDATE ${table} SET "${field}" = numbered.new_order
-    FROM numbered WHERE ${table}."id" = numbered."id"`,
-    ...values,
-  );
+    UPDATE ${t} SET ${f} = numbered.new_order
+    FROM numbered WHERE ${t}."id" = numbered."id"
+  `);
 };
 
 export const reorderInList = async (
@@ -158,18 +104,18 @@ export const reorderInList = async (
 ): Promise<void> => {
   if (fromOrder === toOrder) return;
 
-  const table = tableName(model);
+  const t = table(model);
+  const f = col(field);
 
-  // Park at -1 (outside live range, won't collide with unique index)
-  await db.$executeRawUnsafe(`UPDATE ${table} SET "${field}" = -1 WHERE "id" = $1`, itemId);
+  await db.$executeRaw(Prisma.sql`UPDATE ${t} SET ${f} = -1 WHERE "id" = ${itemId}`);
 
   if (fromOrder > toOrder) {
-    await shiftRaw(model, scope, field, 'increment', `"${field}" >= $? AND "${field}" < $?`, [toOrder, fromOrder]);
+    await shiftUp(model, scope, field, Prisma.sql`${f} >= ${toOrder} AND ${f} < ${fromOrder}`);
   } else {
-    await shiftRaw(model, scope, field, 'decrement', `"${field}" > $? AND "${field}" <= $?`, [fromOrder, toOrder]);
+    await shiftDown(model, scope, field, Prisma.sql`${f} > ${fromOrder} AND ${f} <= ${toOrder}`);
   }
 
-  await db.$executeRawUnsafe(`UPDATE ${table} SET "${field}" = $1 WHERE "id" = $2`, toOrder, itemId);
+  await db.$executeRaw(Prisma.sql`UPDATE ${t} SET ${f} = ${toOrder} WHERE "id" = ${itemId}`);
 };
 
 // --- Hook-callable functions ---
@@ -182,11 +128,7 @@ const configForModel = (model: string) => orderedListRegistry[model];
 const validScope = (scope: Where, scopeFields: string[]): boolean =>
   scopeFields.every((f) => scope[f] != null);
 
-// Before create: assign MAX+1 if no sortOrder, or shift to make room at specified position
-export const applyOrderedListCreate = async (
-  model: string,
-  row: Record<string, unknown>,
-): Promise<void> => {
+export const applyOrderedListCreate = async (model: string, row: Record<string, unknown>): Promise<void> => {
   const config = configForModel(model);
   if (!config) return;
 
@@ -202,7 +144,6 @@ export const applyOrderedListCreate = async (
   }
 };
 
-// Before update: handle soft-delete (negate + compact) and restore (append to end)
 export const applyOrderedListUpdate = async (
   model: string,
   data: Record<string, unknown>,
@@ -217,7 +158,6 @@ export const applyOrderedListUpdate = async (
     const scope = buildScope(merged, scopeFields);
     if (!validScope(scope, scopeFields)) continue;
 
-    // Soft delete: live → deleted
     const wasLive = previous.deletedAt == null;
     const isSoftDeleting = data.deletedAt != null && data.deletedAt !== undefined;
     if (wasLive && isSoftDeleting) {
@@ -229,7 +169,6 @@ export const applyOrderedListUpdate = async (
       continue;
     }
 
-    // Restore: deleted → live
     const wasDeleted = previous.deletedAt != null;
     const isRestoring = data.deletedAt === null;
     if (wasDeleted && isRestoring) {
@@ -237,25 +176,18 @@ export const applyOrderedListUpdate = async (
       continue;
     }
 
-    // Direct sortOrder change: shift to make room at target
     if (data[field] !== undefined && data[field] !== previous[field]) {
       const newPos = data[field] as number;
       const oldPos = previous[field] as number;
       if (typeof newPos === 'number' && typeof oldPos === 'number' && newPos > 0 && oldPos > 0) {
-        // Use reorder logic: park, shift, place — but via raw SQL
         await reorderInList(model, scope, (previous as Record<string, unknown>).id as string, oldPos, newPos, field);
-        // reorderInList already placed the item, so remove from data to avoid double-write
         delete data[field];
       }
     }
   }
 };
 
-// After hard delete: compact the gap
-export const applyOrderedListHardDelete = async (
-  model: string,
-  previous: Record<string, unknown>,
-): Promise<void> => {
+export const applyOrderedListHardDelete = async (model: string, previous: Record<string, unknown>): Promise<void> => {
   const config = configForModel(model);
   if (!config) return;
 
@@ -270,7 +202,6 @@ export const applyOrderedListHardDelete = async (
   }
 };
 
-// After bulk sortOrder manipulation: re-densify to fix gaps/collisions/non-positive
 export const applyOrderedListReDensify = async (
   model: string,
   data: Record<string, unknown>,
@@ -280,10 +211,8 @@ export const applyOrderedListReDensify = async (
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
-    // Only re-densify if this update touched sortOrder
     if (data[field] === undefined) continue;
 
-    // Collect all unique scopes from affected rows
     const seen = new Set<string>();
     for (const prev of previousRows) {
       const scope = buildScope({ ...prev, ...data }, scopeFields);
@@ -296,7 +225,6 @@ export const applyOrderedListReDensify = async (
   }
 };
 
-// Before upsert: route to create or update path
 export const applyOrderedListUpsert = async (
   model: string,
   args: Record<string, unknown>,
