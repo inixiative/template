@@ -1,13 +1,6 @@
 import { db, DbAction, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
-import {
-  applyOrderedListDefaults,
-  applyOrderedListRestore,
-  getOrderedListConfig,
-  setOrderedListRegistry,
-} from '#/lib/prisma/orderedList';
+import { applyOrderedListDefaults, applyOrderedListRestore } from '#/lib/prisma/orderedList';
 import { orderedListRegistry } from '#/hooks/orderedList/registry';
-
-setOrderedListRegistry(orderedListRegistry);
 
 const extractRows = (args: unknown): Record<string, unknown>[] => {
   if (!args || typeof args !== 'object') return [];
@@ -23,7 +16,7 @@ export const registerOrderedListHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args, model }) => {
-      if (!model || !getOrderedListConfig(model)) return;
+      if (!model || !orderedListRegistry[model]) return;
       const delegate = (db as Record<string, unknown>)[model[0].toLowerCase() + model.slice(1)];
       if (!delegate) return;
       for (const row of extractRows(args)) {
@@ -39,7 +32,7 @@ export const registerOrderedListHook = () => {
     [DbAction.update, DbAction.updateManyAndReturn],
     async (options) => {
       const { args, previous, model } = options as HookOptions & { action: SingleAction };
-      if (!model || !getOrderedListConfig(model)) return;
+      if (!model || !orderedListRegistry[model]) return;
       if (!args || typeof args !== 'object') return;
       const data = (args as Record<string, unknown>).data as Record<string, unknown> | undefined;
       if (!data || !previous) return;

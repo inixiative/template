@@ -1,5 +1,6 @@
 import type { AnyDelegate, Args } from '@template/db';
 import { lookupField } from '#/lib/prisma/fieldMetadata';
+import { orderedListRegistry } from '#/hooks/orderedList/registry';
 
 type Where = Record<string, unknown>;
 
@@ -8,19 +9,6 @@ type WriteableDelegate<T extends AnyDelegate> = T & {
   update: (args: Args<T, 'update'>) => Promise<unknown>;
   updateManyAndReturn: (args: Args<T, 'updateManyAndReturn'>) => Promise<unknown>;
 };
-
-// model → { orderField → scopeFields[] }
-export type OrderedListConfig = Record<string, string[]>;
-export type OrderedListRegistry = Record<string, OrderedListConfig>;
-
-let registry: OrderedListRegistry = {};
-
-export const setOrderedListRegistry = (r: OrderedListRegistry) => {
-  registry = r;
-};
-
-export const getOrderedListConfig = (model: string): OrderedListConfig | undefined =>
-  registry[model];
 
 const hasSoftDelete = (delegate: { $name?: string }): boolean => {
   const model = delegate.$name;
@@ -116,7 +104,7 @@ export const applyOrderedListDefaults = async (
   if (isUpdate) return;
   const model = delegate.$name;
   if (!model) return;
-  const config = registry.get(model);
+  const config = orderedListRegistry[model];
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
@@ -144,7 +132,7 @@ export const applyOrderedListRestore = async (
 
   const model = delegate.$name;
   if (!model) return;
-  const config = registry.get(model);
+  const config = orderedListRegistry[model];
   if (!config) return;
 
   const merged = { ...previous, ...row };
