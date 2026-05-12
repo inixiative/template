@@ -63,7 +63,7 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean): Promise<vo
   if (!isUpdate && row.sortOrder == null) {
     const ownerWhere = ownerWhereFromRow(row);
     if (ownerKeyFields.some((k) => ownerWhere[k] !== null)) {
-      row.sortOrder = await nextSortOrder(db.contact, { ...ownerWhere, type: row.type });
+      row.sortOrder = await nextSortOrder(db.contact, { ...ownerWhere, type: row.type }, { model: 'Contact' });
     }
   }
 };
