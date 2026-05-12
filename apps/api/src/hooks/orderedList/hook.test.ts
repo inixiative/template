@@ -591,6 +591,107 @@ describe('orderedList — upsert', () => {
   });
 });
 
+// --- BULK INCREMENT / DECREMENT / COLLISION ---
+
+describe('orderedList — bulk sortOrder manipulation', () => {
+  it('bulk increment creates a gap at the bottom — hook re-densifies', async () => {
+    const { entity: user } = await createUser();
+    const a = await createPhone(user.id); // 1
+    const b = await createPhone(user.id); // 2
+    const c = await createPhone(user.id); // 3
+
+    // Increment all by 1 → [2, 3, 4] — gap at 1
+    // Hook should re-densify to [1, 2, 3] preserving relative order
+    await db.contact.updateManyAndReturn({
+      where: { userId: user.id, type: ContactType.phone },
+      data: { sortOrder: { increment: 1 } },
+    });
+
+    const orders = await getSortOrders(user.id, ContactType.phone);
+    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
+    // Relative order preserved: a < b < c
+    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBeLessThan(
+      orders.find((r) => r.id === b.id)?.sortOrder ?? 0,
+    );
+    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBeLessThan(
+      orders.find((r) => r.id === c.id)?.sortOrder ?? 0,
+    );
+  });
+
+  it('bulk decrement into zero/negative — hook clamps to positive dense', async () => {
+    const { entity: user } = await createUser();
+    const a = await createPhone(user.id); // 1
+    const b = await createPhone(user.id); // 2
+    const c = await createPhone(user.id); // 3
+
+    // Decrement all by 2 → [-1, 0, 1] — two items at or below zero
+    // Hook should re-densify to [1, 2, 3] preserving relative order
+    await db.contact.updateManyAndReturn({
+      where: { userId: user.id, type: ContactType.phone },
+      data: { sortOrder: { decrement: 2 } },
+    });
+
+    const orders = await getSortOrders(user.id, ContactType.phone);
+    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
+  });
+
+  it('bulk set all to same position — resolves by id order', async () => {
+    const { entity: user } = await createUser();
+    const a = await createPhone(user.id); // 1
+    const b = await createPhone(user.id); // 2
+    const c = await createPhone(user.id); // 3
+
+    // Set all to position 1 → [1, 1, 1] — collision
+    // Hook should resolve: sort by id (deterministic), assign 1, 2, 3
+    await db.contact.updateManyAndReturn({
+      where: { userId: user.id, type: ContactType.phone },
+      data: { sortOrder: 1 },
+    });
+
+    const orders = await getSortOrders(user.id, ContactType.phone);
+    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
+    // All distinct
+    expect(new Set(orders.map((r) => r.sortOrder)).size).toBe(3);
+  });
+
+  it('partial increment — some items shift, others stay', async () => {
+    const { entity: user } = await createUser();
+    const a = await createPhone(user.id); // 1
+    const b = await createPhone(user.id); // 2
+    const c = await createPhone(user.id); // 3
+    const d = await createPhone(user.id); // 4
+
+    // Increment only b and c by 2 → a=1, b=4, c=5, d=4
+    // Collision at 4 (b and d). Hook should re-densify to [1, 2, 3, 4]
+    // preserving intended relative order
+    await db.contact.updateManyAndReturn({
+      where: { id: { in: [b.id, c.id] } },
+      data: { sortOrder: { increment: 2 } },
+    });
+
+    const orders = await getSortOrders(user.id, ContactType.phone);
+    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('set two items to swap positions', async () => {
+    const { entity: user } = await createUser();
+    const a = await createPhone(user.id); // 1
+    const b = await createPhone(user.id); // 2
+    const c = await createPhone(user.id); // 3
+
+    // Set b to 3 and c to 2 via two updates — effective swap
+    await db.contact.update({ where: { id: b.id }, data: { sortOrder: 3 } });
+    await db.contact.update({ where: { id: c.id }, data: { sortOrder: 2 } });
+
+    // After each update the hook should resolve collisions
+    const orders = await getSortOrders(user.id, ContactType.phone);
+    expect(orders.map((r) => r.sortOrder)).toEqual([1, 2, 3]);
+    expect(orders.find((r) => r.id === a.id)?.sortOrder).toBe(1);
+    expect(orders.find((r) => r.id === c.id)?.sortOrder).toBe(2);
+    expect(orders.find((r) => r.id === b.id)?.sortOrder).toBe(3);
+  });
+});
+
 // --- DENSITY INVARIANT ---
 
 describe('orderedList — density invariant', () => {
