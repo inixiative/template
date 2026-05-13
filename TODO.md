@@ -15,53 +15,12 @@
 - [x] adminCacheClear route/controller body schema mismatch
 - [ ] packages/db circular type refs (pre-existing, low priority)
 
-## Low Priority
-
-- [ ] Inquiry module - needs fake polymorphism refactor (sourceId/targetId → sourceUserId/etc)
-
 ## Missing Deps (install when needed)
 
 - [ ] `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` - S3 file uploads
 - [ ] `stripe` - payments
 
 ## Future Work
-
-### Audit/Activity Logs
-
-Schema design for tracking all mutations:
-
-```prisma
-model AuditLog {
-  id          String   @id @default(dbgenerated("uuidv7()"))
-  createdAt   DateTime @default(now())
-
-  // Who
-  userId      String?
-  tokenId     String?
-  ipAddress   String?
-  userAgent   String?
-
-  // What
-  action      String   // 'create' | 'update' | 'delete'
-  model       String   // 'User', 'Organization', etc.
-  recordId    String
-
-  // Changes
-  before      Json?    // Previous state (for update/delete)
-  after       Json?    // New state (for create/update)
-  changes     Json?    // Diff of changed fields
-
-  @@index([userId])
-  @@index([model, recordId])
-  @@index([createdAt])
-}
-```
-
-Implementation:
-- Hook into mutation lifecycle (after hook)
-- Filter sensitive fields from logs
-- Consider async write to avoid latency
-- Retention policy (30/90 days?)
 
 ### Mutation Lifecycle
 
@@ -169,7 +128,6 @@ Implementation:
 
 ### Modules to Port
 
-- [ ] Inquiry system - needs polymorphism refactor
 - [ ] Notes system
 - [ ] Properly implement remaining inquiry features
 
