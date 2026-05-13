@@ -7,7 +7,7 @@ export const registerOrderedListUpdateManyHook = () => {
   // BEFORE: reject bulk writes to ordered fields. Bulk position arithmetic
   // (increment/decrement/set) can't be reconciled deterministically without
   // re-densifying away the caller's intent. Force callers to use a single
-  // update() per row or reorderInList() for atomic moves.
+  // update() per row — the update hook handles sibling shifts atomically.
   registerDbHook(
     'orderedList:updateMany:before',
     '*',
@@ -26,7 +26,7 @@ export const registerOrderedListUpdateManyHook = () => {
         if (data[field] !== undefined) {
           throw new Error(
             `Ordered field "${model}.${field}" cannot be written via updateManyAndReturn. ` +
-              `Use a single update() per row or reorderInList() for atomic moves.`,
+              `Use a single update() per row — the update hook will shift siblings atomically.`,
           );
         }
       }

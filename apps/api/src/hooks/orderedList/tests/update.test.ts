@@ -2,16 +2,15 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { reorderInList } from '#/lib/prisma/orderedList';
-import { liveOrders, mkEmail, phone, phoneRow, posOf, positions, scope, softDelete } from './setup';
+import { liveOrders, mkEmail, phone, phoneRow, posOf, positions, softDelete } from './setup';
 
-describe('reorder', () => {
+describe('reorder via direct position update', () => {
   it('3→1: shifts [1,3) up', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id);
     const b = await phone(u.id);
     const c = await phone(u.id);
-    await reorderInList('Contact', scope(u.id), c.id, 3, 1);
+    await db.contact.update({ where: { id: c.id }, data: { position: 1 } });
 
     const rows = await liveOrders(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
@@ -25,7 +24,7 @@ describe('reorder', () => {
     const a = await phone(u.id);
     const b = await phone(u.id);
     const c = await phone(u.id);
-    await reorderInList('Contact', scope(u.id), a.id, 1, 3);
+    await db.contact.update({ where: { id: a.id }, data: { position: 3 } });
 
     const rows = await liveOrders(u.id);
     expect(positions(rows)).toEqual([1, 2, 3]);
@@ -34,11 +33,11 @@ describe('reorder', () => {
     expect(posOf(rows, a.id)).toBe(3);
   });
 
-  it('no-op when from === to', async () => {
+  it('no-op when target position equals current', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id);
     await phone(u.id);
-    await reorderInList('Contact', scope(u.id), a.id, 1, 1);
+    await db.contact.update({ where: { id: a.id }, data: { position: 1 } });
 
     const rows = await liveOrders(u.id);
     expect(positions(rows)).toEqual([1, 2]);
@@ -51,7 +50,7 @@ describe('reorder', () => {
     const b = await phone(u.id);
     const c = await phone(u.id);
     const d = await phone(u.id);
-    await reorderInList('Contact', scope(u.id), b.id, 2, 4);
+    await db.contact.update({ where: { id: b.id }, data: { position: 4 } });
 
     const rows = await liveOrders(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4]);

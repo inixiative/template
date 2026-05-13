@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { createUser } from '@template/db/test';
-import { reorderInList } from '#/lib/prisma/orderedList';
-import { liveOrders, phone, phoneRow, posOf, positions, restore, scope, softDelete } from './setup';
+import { liveOrders, phone, phoneRow, posOf, positions, restore, softDelete } from './setup';
 
 describe('unique constraint safety', () => {
   it('insert-at shifts before write (no collision)', async () => {
@@ -21,15 +20,6 @@ describe('unique constraint safety', () => {
       data: [phoneRow(u.id, 1), phoneRow(u.id, 1)],
     });
     expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4]);
-  });
-
-  it('reorder parks at 0 first (no collision)', async () => {
-    const { entity: u } = await createUser();
-    await phone(u.id);
-    await phone(u.id);
-    const c = await phone(u.id);
-    await reorderInList('Contact', scope(u.id), c.id, 3, 1);
-    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3]);
   });
 
   it('direct position update reorders (no collision)', async () => {

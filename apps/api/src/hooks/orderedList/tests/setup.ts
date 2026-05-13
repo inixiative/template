@@ -80,12 +80,6 @@ export const positions = (rows: { position: number }[]) => rows.map((r) => r.pos
 export const posOf = (rows: { id: string; position: number }[], id: string) =>
   rows.find((r) => r.id === id)?.position;
 
-export const scope = (userId: string) => ({
-  ownerModel: ContactOwnerModel.User,
-  userId,
-  type: ContactType.phone,
-});
-
 export const softDelete = (id: string) =>
   db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
 

@@ -109,34 +109,6 @@ export const reDensifyLive = async (model: string, scope: Where, field: string):
   `);
 };
 
-// Direct reorder helper (call outside Prisma hook context — e.g. from service
-// layer or tests). Parks target at 0 (neutral sentinel: excluded from the live
-// scope by `position > 0`, doesn't collide with the negative soft-delete space)
-// so the shift predicates are clean, then sets the final position.
-export const reorderInList = async (
-  model: string,
-  scope: Where,
-  itemId: string,
-  fromOrder: number,
-  toOrder: number,
-  field = 'position',
-): Promise<void> => {
-  if (fromOrder === toOrder) return;
-
-  const t = table(model);
-  const f = col(field);
-
-  await db.$executeRaw(Prisma.sql`UPDATE ${t} SET ${f} = 0 WHERE "id" = ${itemId}`);
-
-  if (fromOrder > toOrder) {
-    await shiftUp(model, scope, field, Prisma.sql`${f} >= ${toOrder} AND ${f} < ${fromOrder}`);
-  } else {
-    await shiftDown(model, scope, field, Prisma.sql`${f} > ${fromOrder} AND ${f} <= ${toOrder}`);
-  }
-
-  await db.$executeRaw(Prisma.sql`UPDATE ${t} SET ${f} = ${toOrder} WHERE "id" = ${itemId}`);
-};
-
 // --- Hook-callable functions ---
 
 // Scope keys must be present on the row with explicit values. Distinguishing
