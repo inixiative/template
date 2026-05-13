@@ -215,8 +215,15 @@ const placeBatchInScope = async (
   const dbMax = (await nextSortOrderRaw(model, scope, field)) - 1;
 
   // 2. Simulate placement: track each virtual row's running position as
-  //    later fixed-position rows bump earlier ones up.
+  //    later fixed-position rows bump earlier ones up. The bump scan is
+  //    skipped when the new slot is above every previously-placed virtual
+  //    — covers the common case of pure-append batches and any batch whose
+  //    fixed positions are monotonically non-decreasing, dropping it from
+  //    O(N²) to O(N). Worst case (many low fixed positions, e.g. all @1)
+  //    remains O(N²); a Fenwick/segment-tree rewrite would bring it to
+  //    O(N log N) if that pattern ever shows up in practice.
   let currentMax = dbMax;
+  let maxVirtualPos = 0;
   const virtuals: { row: Record<string, unknown>; pos: number }[] = [];
 
   for (const row of batchRows) {
@@ -224,9 +231,15 @@ const placeBatchInScope = async (
       ? currentMax + 1
       : Math.max(1, Math.min(row[field] as number, currentMax + 1));
 
-    for (const v of virtuals) {
-      if (v.pos >= slot) v.pos += 1;
+    if (slot <= maxVirtualPos) {
+      for (const v of virtuals) {
+        if (v.pos >= slot) v.pos += 1;
+      }
+      maxVirtualPos += 1;
+    } else {
+      maxVirtualPos = slot;
     }
+
     virtuals.push({ row, pos: slot });
     currentMax += 1;
   }
