@@ -139,8 +139,37 @@ export const reorderInList = async (
 
 // --- Hook-callable functions ---
 
-const buildScope = (row: Record<string, unknown>, scopeFields: string[]): Where =>
-  Object.fromEntries(scopeFields.map((f) => [f, row[f] ?? null]));
+// Scope keys must be present on the row with explicit values. Distinguishing
+// "absent" from "explicitly null" matters: silently coalescing the two would
+// collapse semantically distinct scopes for any model where null is a
+// meaningful scope value. Use `normalizeInputScope` at the create boundary
+// to materialize undefined-as-null where Prisma's "absent = insert NULL"
+// semantics apply.
+const buildScope = (row: Record<string, unknown>, scopeFields: string[]): Where => {
+  const scope: Where = {};
+  for (const f of scopeFields) {
+    if (!(f in row)) {
+      throw new Error(
+        `Ordered list scope field "${f}" missing from row. Set it explicitly (use null to opt out of that scope axis).`,
+      );
+    }
+    const v = row[f];
+    if (v === undefined) {
+      throw new Error(`Ordered list scope field "${f}" is undefined. Pass null explicitly.`);
+    }
+    scope[f] = v;
+  }
+  return scope;
+};
+
+// Prisma treats an absent nullable field in args.data as "insert NULL".
+// Materialize that on the input row so buildScope can stay strict and the
+// scope used for shifts matches the row Prisma is about to write.
+const normalizeInputScope = (row: Record<string, unknown>, scopeFields: string[]): void => {
+  for (const f of scopeFields) {
+    if (row[f] === undefined) row[f] = null;
+  }
+};
 
 const configForModel = (model: string) => orderedListRegistry[model];
 
@@ -152,6 +181,7 @@ export const applyOrderedListCreate = async (
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
+    normalizeInputScope(row, scopeFields);
     const scope = buildScope(row, scopeFields);
     if (row[field] == null) {
       row[field] = await nextSortOrderRaw(model, scope, field);
@@ -178,6 +208,7 @@ export const applyOrderedListBatchCreate = async (
 
   for (const row of rows) {
     for (const [field, scopeFields] of Object.entries(config)) {
+      normalizeInputScope(row, scopeFields);
       const scope = buildScope(row, scopeFields);
       const key = JSON.stringify(scope);
       if (!virtualByScope.has(key)) virtualByScope.set(key, []);
@@ -232,7 +263,7 @@ export const applyOrderedListUpdate = async (
     const scope = buildScope(merged, scopeFields);
 
     const wasLive = previous.deletedAt == null;
-    const isSoftDeleting = data.deletedAt != null && data.deletedAt !== undefined;
+    const isSoftDeleting = data.deletedAt != null;
     if (wasLive && isSoftDeleting) {
       const oldPos = previous[field] as number;
       if (typeof oldPos === 'number' && oldPos > 0) {
@@ -287,13 +318,96 @@ export const applyOrderedListHardDelete = async (model: string, previous: Record
   }
 };
 
+// Groups ids by their (field-specific) scope key. JSON.stringify is stable
+// because buildScope iterates the registered scopeFields in declaration order.
+const groupIdsByScope = (
+  rows: Record<string, unknown>[],
+  scopeFields: string[],
+): Map<string, { scope: Where; ids: string[] }> => {
+  const grouped = new Map<string, { scope: Where; ids: string[] }>();
+  for (const r of rows) {
+    const scope = buildScope(r, scopeFields);
+    const key = JSON.stringify(scope);
+    let entry = grouped.get(key);
+    if (!entry) {
+      entry = { scope, ids: [] };
+      grouped.set(key, entry);
+    }
+    entry.ids.push(r.id as string);
+  }
+  return grouped;
+};
+
+// Bulk-assign distinct negatives in a single statement per scope. ROW_NUMBER
+// over the deleted-id set, anchored to current MIN(negatives) (0 if none),
+// produces a contiguous descending sequence below the lowest existing slot.
+const bulkAssignNegatives = async (
+  model: string,
+  scope: Where,
+  field: string,
+  ids: string[],
+): Promise<void> => {
+  if (ids.length === 0) return;
+  const t = table(model);
+  const f = col(field);
+  const scopeSQL = scopeWhere(model, scope, field, false);
+  const idsList = Prisma.join(ids.map((id) => Prisma.sql`${id}`), ', ');
+
+  await db.$executeRaw(Prisma.sql`
+    WITH base AS (
+      SELECT COALESCE(MIN(${f}), 0) AS min_val
+      FROM ${t}
+      WHERE ${scopeSQL} AND ${f} < 0
+    ),
+    numbered AS (
+      SELECT t."id", (base.min_val - ROW_NUMBER() OVER (ORDER BY t."id" ASC)) AS new_pos
+      FROM ${t} t, base
+      WHERE t."id" IN (${idsList})
+    )
+    UPDATE ${t} SET ${f} = numbered.new_pos
+    FROM numbered WHERE ${t}."id" = numbered."id"
+  `);
+};
+
+// Bulk-append restored rows to the end of the live list in one statement per
+// scope. Anchored to current MAX(live positives), then ROW_NUMBER assigns
+// MAX+1, MAX+2, … in id order.
+const bulkAssignAppend = async (
+  model: string,
+  scope: Where,
+  field: string,
+  ids: string[],
+): Promise<void> => {
+  if (ids.length === 0) return;
+  const t = table(model);
+  const f = col(field);
+  const liveScopeSQL = scopeWhere(model, scope, field, true);
+  const idsList = Prisma.join(ids.map((id) => Prisma.sql`${id}`), ', ');
+
+  await db.$executeRaw(Prisma.sql`
+    WITH base AS (
+      SELECT COALESCE(MAX(${f}), 0) AS max_val
+      FROM ${t}
+      WHERE ${liveScopeSQL}
+    ),
+    numbered AS (
+      SELECT t."id", (base.max_val + ROW_NUMBER() OVER (ORDER BY t."id" ASC)) AS new_pos
+      FROM ${t} t, base
+      WHERE t."id" IN (${idsList})
+    )
+    UPDATE ${t} SET ${f} = numbered.new_pos
+    FROM numbered WHERE ${t}."id" = numbered."id"
+  `);
+};
+
 // Called from the AFTER hook for updateManyAndReturn when deletedAt changed.
-// By this point query(args) has already committed, so the rows' deletedAt is
-// set correctly and we can read the current DB state.
+// By this point query(args) has already committed, so deletedAt is set and
+// we can read the current DB state.
 //
-// Soft-delete: re-densify the live rows, then assign distinct negatives to the
-//   rows that were just soft-deleted.
-// Restore: assign sequential positive positions (append to end) to restored rows.
+// Soft-delete: re-densify live rows (close gaps), then bulk-assign distinct
+//   negatives to the newly soft-deleted rows in a single statement per scope.
+// Restore: bulk-assign sequential positive positions (append to end of each
+//   scope's live list).
 export const applyOrderedListBulkDeletedAtChange = async (
   model: string,
   data: Record<string, unknown>,
@@ -302,71 +416,24 @@ export const applyOrderedListBulkDeletedAtChange = async (
   const config = configForModel(model);
   if (!config) return;
 
-  const isSoftDeleting = data.deletedAt != null && data.deletedAt !== undefined;
+  const isSoftDeleting = data.deletedAt != null;
   const isRestoring = data.deletedAt === null;
   if (!isSoftDeleting && !isRestoring) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
-    const seen = new Set<string>();
+    const grouped = groupIdsByScope(previousRows, scopeFields);
 
     if (isSoftDeleting) {
-      // Re-densify live items first (closes the gaps).
-      for (const prev of previousRows) {
-        const scope = buildScope(prev, scopeFields);
-        const key = JSON.stringify(scope);
-        if (seen.has(key)) continue;
-        seen.add(key);
+      for (const { scope } of grouped.values()) {
         await reDensifyLive(model, scope, field);
       }
-
-      // Assign distinct negatives to the newly soft-deleted rows.
-      for (const prev of previousRows) {
-        const scope = buildScope(prev, scopeFields);
-        const neg = await minSortOrderRaw(model, scope, field);
-        await db.$executeRaw(
-          Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${neg} WHERE "id" = ${prev.id as string}`,
-        );
+      for (const { scope, ids } of grouped.values()) {
+        await bulkAssignNegatives(model, scope, field, ids);
       }
     } else {
-      // Restore: append each restored row to the end of the live list.
-      const nextByScope = new Map<string, number>();
-      for (const prev of previousRows) {
-        const scope = buildScope(prev, scopeFields);
-        const key = JSON.stringify(scope);
-        if (!nextByScope.has(key)) {
-          nextByScope.set(key, await nextSortOrderRaw(model, scope, field));
-        }
-        const pos = nextByScope.get(key)!;
-        nextByScope.set(key, pos + 1);
-        await db.$executeRaw(
-          Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${pos} WHERE "id" = ${prev.id as string}`,
-        );
+      for (const { scope, ids } of grouped.values()) {
+        await bulkAssignAppend(model, scope, field, ids);
       }
-    }
-  }
-};
-
-// Called from the AFTER hook for updateManyAndReturn when position was
-// directly manipulated (increment / decrement / set). Re-densifies all live
-// rows including those that may have been pushed to ≤0.
-export const applyOrderedListReDensify = async (
-  model: string,
-  data: Record<string, unknown>,
-  previousRows: Record<string, unknown>[],
-): Promise<void> => {
-  const config = configForModel(model);
-  if (!config) return;
-
-  for (const [field, scopeFields] of Object.entries(config)) {
-    if (data[field] === undefined) continue;
-
-    const seen = new Set<string>();
-    for (const prev of previousRows) {
-      const scope = buildScope({ ...prev, ...data }, scopeFields);
-      const key = JSON.stringify(scope);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      await reDensifyLive(model, scope, field);
     }
   }
 };

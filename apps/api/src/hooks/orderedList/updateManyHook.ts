@@ -1,12 +1,40 @@
 import { DbAction, type HookOptions, HookTiming, type ManyAction, registerDbHook } from '@template/db';
-import { applyOrderedListBulkDeletedAtChange, applyOrderedListReDensify } from '#/lib/prisma/orderedList';
+import { applyOrderedListBulkDeletedAtChange } from '#/lib/prisma/orderedList';
+import { orderedListRegistry } from '#/hooks/orderedList/registry';
 import { isRegistered } from '#/hooks/orderedList/utils';
 
 export const registerOrderedListUpdateManyHook = () => {
-  // --- AFTER: updateManyAndReturn ---
-  // Handles two cases:
-  //   deletedAt changes  → re-densify live rows + assign negatives to deleted (or restore to end)
-  //   bulk position writes → re-densify so gaps/collisions left by increment/decrement are closed
+  // BEFORE: reject bulk writes to ordered fields. Bulk position arithmetic
+  // (increment/decrement/set) can't be reconciled deterministically without
+  // re-densifying away the caller's intent. Force callers to use a single
+  // update() per row or reorderInList() for atomic moves.
+  registerDbHook(
+    'orderedList:updateMany:before',
+    '*',
+    HookTiming.before,
+    [DbAction.updateManyAndReturn],
+    async (options) => {
+      const { args, model } = options as HookOptions & { action: ManyAction };
+      if (!isRegistered(model)) return;
+      const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      if (!data) return;
+
+      const config = orderedListRegistry[model!];
+      if (!config) return;
+
+      for (const field of Object.keys(config)) {
+        if (data[field] !== undefined) {
+          throw new Error(
+            `Ordered field "${model}.${field}" cannot be written via updateManyAndReturn. ` +
+              `Use a single update() per row or reorderInList() for atomic moves.`,
+          );
+        }
+      }
+    },
+  );
+
+  // AFTER: deletedAt-only changes need bulk compaction + sentinel assignment
+  // across all touched scopes. Position writes are blocked by the BEFORE hook.
   registerDbHook(
     'orderedList:updateMany:after',
     '*',
@@ -17,14 +45,9 @@ export const registerOrderedListUpdateManyHook = () => {
       if (!isRegistered(model)) return;
       const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data || !previous || !Array.isArray(previous)) return;
+      if (data.deletedAt === undefined) return;
 
-      const touchesDeletedAt = data.deletedAt !== undefined;
-
-      if (touchesDeletedAt) {
-        await applyOrderedListBulkDeletedAtChange(model!, data, previous as Record<string, unknown>[]);
-      } else {
-        await applyOrderedListReDensify(model!, data, previous as Record<string, unknown>[]);
-      }
+      await applyOrderedListBulkDeletedAtChange(model!, data, previous as Record<string, unknown>[]);
     },
   );
 };

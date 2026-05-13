@@ -456,70 +456,45 @@ describe('upsert', () => {
 // --- BULK SORTORDER MANIPULATION ---
 
 describe('bulk position manipulation', () => {
-  it('increment all — re-densifies to [1..N]', async () => {
-    const { entity: u } = await createUser();
-    const a = await phone(u.id);
-    const b = await phone(u.id);
-    const c = await phone(u.id);
-
-    await db.contact.updateManyAndReturn({
-      where: { userId: u.id, type: ContactType.phone },
-      data: { position: { increment: 1 } },
-    });
-
-    const rows = await liveOrders(u.id);
-    expect(positions(rows)).toEqual([1, 2, 3]);
-    // Relative order preserved
-    expect(posOf(rows, a.id)!).toBeLessThan(posOf(rows, b.id)!);
-    expect(posOf(rows, b.id)!).toBeLessThan(posOf(rows, c.id)!);
-  });
-
-  it('decrement into zero/negative — re-densifies', async () => {
+  it('throws on bulk increment', async () => {
     const { entity: u } = await createUser();
     await phone(u.id);
     await phone(u.id);
-    await phone(u.id);
 
-    await db.contact.updateManyAndReturn({
-      where: { userId: u.id, type: ContactType.phone },
-      data: { position: { decrement: 2 } },
-    });
-
-    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3]);
+    expect(
+      (async () => db.contact.updateManyAndReturn({
+        where: { userId: u.id, type: ContactType.phone },
+        data: { position: { increment: 1 } },
+      }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
-  it('set all to same value — resolves by id', async () => {
+  it('throws on bulk decrement', async () => {
     const { entity: u } = await createUser();
     await phone(u.id);
     await phone(u.id);
+
+    expect(
+      (async () => db.contact.updateManyAndReturn({
+        where: { userId: u.id, type: ContactType.phone },
+        data: { position: { decrement: 1 } },
+      }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
+  });
+
+  it('throws on bulk set', async () => {
+    const { entity: u } = await createUser();
     await phone(u.id);
 
-    await db.contact.updateManyAndReturn({
-      where: { userId: u.id, type: ContactType.phone },
-      data: { position: 1 },
-    });
-
-    const rows = await liveOrders(u.id);
-    expect(positions(rows)).toEqual([1, 2, 3]);
-    expect(new Set(rows.map((r) => r.position)).size).toBe(3);
+    expect(
+      (async () => db.contact.updateManyAndReturn({
+        where: { userId: u.id, type: ContactType.phone },
+        data: { position: 5 },
+      }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
-  it('partial increment causing overlap — re-densifies', async () => {
-    const { entity: u } = await createUser();
-    const a = await phone(u.id);
-    const b = await phone(u.id);
-    const c = await phone(u.id);
-    const d = await phone(u.id);
-
-    await db.contact.updateManyAndReturn({
-      where: { id: { in: [b.id, c.id] } },
-      data: { position: { increment: 2 } },
-    });
-
-    expect(positions(await liveOrders(u.id))).toEqual([1, 2, 3, 4]);
-  });
-
-  it('swap via sequential updates', async () => {
+  it('swap via sequential single updates', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id); // 1
     const b = await phone(u.id); // 2
@@ -699,34 +674,31 @@ describe('multi-scope isolation — bulk restore', () => {
   });
 });
 
-describe('multi-scope isolation — bulk position increment', () => {
-  it('incrementing across two owners re-densifies each list independently', async () => {
+describe('multi-scope isolation — bulk position write rejected', () => {
+  it('throws even when matched rows span multiple owners', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    await phone(u1.id); await phone(u1.id); await phone(u1.id); // u1: [1,2,3]
-    await phone(u2.id); await phone(u2.id); // u2: [1,2]
+    await phone(u1.id); await phone(u2.id);
 
-    await db.contact.updateManyAndReturn({
-      where: { userId: { in: [u1.id, u2.id] }, type: ContactType.phone },
-      data: { position: { increment: 5 } },
-    });
-
-    expect(positions(await liveOrders(u1.id))).toEqual([1, 2, 3]);
-    expect(positions(await liveOrders(u2.id))).toEqual([1, 2]);
+    expect(
+      (async () => db.contact.updateManyAndReturn({
+        where: { userId: { in: [u1.id, u2.id] }, type: ContactType.phone },
+        data: { position: { increment: 5 } },
+      }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
-  it('incrementing across two types (same owner) re-densifies each list independently', async () => {
+  it('throws even when matched rows span multiple types', async () => {
     const { entity: u } = await createUser();
-    await phone(u.id); await phone(u.id); // phone: [1,2]
-    await mkEmail(u.id); await mkEmail(u.id); await mkEmail(u.id); // email: [1,2,3]
+    await phone(u.id);
+    await mkEmail(u.id);
 
-    await db.contact.updateManyAndReturn({
-      where: { userId: u.id },
-      data: { position: { increment: 5 } },
-    });
-
-    expect(positions(await liveOrders(u.id, ContactType.phone))).toEqual([1, 2]);
-    expect(positions(await liveOrders(u.id, ContactType.email))).toEqual([1, 2, 3]);
+    expect(
+      (async () => db.contact.updateManyAndReturn({
+        where: { userId: u.id },
+        data: { position: { increment: 5 } },
+      }))(),
+    ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 });
 
