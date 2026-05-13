@@ -197,18 +197,18 @@ describe('Contact CRUD', () => {
   });
 
   describe('PATCH /contact/:id', () => {
-    it('updates own contact label + sortOrder', async () => {
+    it('updates own contact label + position', async () => {
       const { entity: contact } = await createContact({
         user,
         ownerModel: 'User',
         type: 'email',
         value: { address: `upd${getNextSeq()}@example.com` },
       });
-      const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Work', sortOrder: 5 }));
+      const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Work', position: 5 }));
       const { data } = await json<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.label).toBe('Work');
-      expect(data.sortOrder).toBe(5);
+      expect(data.position).toBe(5);
     });
 
     it('rejects updating another user contact (403)', async () => {

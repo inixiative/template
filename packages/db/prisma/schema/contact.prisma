@@ -8,7 +8,7 @@
 // used for indexing and uniqueness (e.g. E.164 for phones, jid for whatsapp,
 // `${classifier}:${handle}` for handle types).
 //
-// Per-owner uniqueness is enforced by the composite @@unique below.
+// Per-owner uniqueness on valueKey is enforced by the composite @@unique below.
 // All types use per-owner uniqueness — global-within-type is intentionally
 // omitted until handle ownership can be verified (OAuth / DNS proof). Without
 // verification, first-claim global locking is an abuse vector and blocks
@@ -33,11 +33,8 @@ model Contact {
   type    ContactType
   subtype String?    // semantics depend on type — see shared/contact/registry
 
-  label     String?
-  // Position within (owner, type) — Carde-style dense ordering. Hook
-  // auto-assigns MAX+1 on create when caller omits it; reorder via
-  // shift-and-renumber (see lib/prisma/orderedList.ts).
-  sortOrder Int @default(0)
+  label    String?
+  position Int     @default(0)
 
   value    Json
   valueKey String?
@@ -58,20 +55,16 @@ model Contact {
   // See `apps/api/src/lib/messaging/canDeliver.ts`.
   acceptedKinds CommunicationKind[] @default([platform, activity])
 
-  // Per-owner uniqueness — partial uniques because Postgres treats NULLs as
-  // distinct in composite uniques, so a single composite over the polymorphic
-  // FKs would let `(User, 'u1', null, null, …)` duplicate. Each partial covers
-  // one populated FK and doubles as a lookup index for that owner column.
+  // Per-owner uniqueness on valueKey — partial uniques because Postgres treats
+  // NULLs as distinct in composite uniques, so a single composite over the
+  // polymorphic FKs would let `(User, 'u1', null, null, …)` duplicate. Each
+  // partial covers one populated FK and doubles as a lookup index for that owner.
   @@unique([userId, type, valueKey],         where: { userId:         { not: null } })
   @@unique([organizationId, type, valueKey], where: { organizationId: { not: null } })
   @@unique([spaceId, type, valueKey],        where: { spaceId:        { not: null } })
-  // Sort order uniqueness per (owner, type) — ensures dense [1..N] for live
-  // items. Same partial-unique pattern as the valueKey constraints above.
-  // Negative sortOrders (soft-deleted items) can share values since they're
-  // outside the live range; the constraint only covers sortOrder > 0.
-  @@unique([userId, type, sortOrder],         where: { userId: { not: null }, sortOrder: { gt: 0 } })
-  @@unique([organizationId, type, sortOrder], where: { organizationId: { not: null }, sortOrder: { gt: 0 } })
-  @@unique([spaceId, type, sortOrder],        where: { spaceId: { not: null }, sortOrder: { gt: 0 } })
+  @@index([userId, type, position])
+  @@index([organizationId, type, position])
+  @@index([spaceId, type, position])
   @@index([ownerModel])
   @@index([type, valueKey])
 }
