@@ -36,26 +36,27 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
       );
     }
 
+    // Flatten each handoff into its own task so the outer Promise.allSettled
+    // isolates per-handoff failures — one bad email recipient doesn't fail the
+    // sibling emails for this event. A synchronous throw from the selector is
+    // captured as a single rejection so it can't bubble before sibling bridges
+    // enqueue.
     if (handler.email) {
-      tasks.push(
-        (async () => {
-          const handoffs = handler.email!(data);
-          if (handoffs?.length) {
-            await Promise.all(handoffs.map((h) => deliverEmailHandoffs(event, [h])));
-          }
-        })(),
-      );
+      try {
+        const handoffs = handler.email(data) ?? [];
+        for (const h of handoffs) tasks.push(deliverEmailHandoffs(event, [h]));
+      } catch (err) {
+        tasks.push(Promise.reject(err));
+      }
     }
 
     if (handler.websocket) {
-      tasks.push(
-        (async () => {
-          const handoffs = handler.websocket!(data);
-          if (handoffs?.length) {
-            await Promise.all(handoffs.map((h) => deliverWSHandoffs([h])));
-          }
-        })(),
-      );
+      try {
+        const handoffs = handler.websocket(data) ?? [];
+        for (const h of handoffs) tasks.push(deliverWSHandoffs([h]));
+      } catch (err) {
+        tasks.push(Promise.reject(err));
+      }
     }
 
     if (handler.cb) {

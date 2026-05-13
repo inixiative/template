@@ -34,9 +34,9 @@ export const phone = (userId: string, position?: number) =>
   });
 
 export const phoneRow = (userId: string, position?: number) => ({
-  ownerModel: ContactOwnerModel.User as const,
+  ownerModel: ContactOwnerModel.User,
   userId,
-  type: ContactType.phone as const,
+  type: ContactType.phone,
   value: { e164: e164(), country: 'US' },
   ...(position !== undefined ? { position } : {}),
 });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { cache, cacheKey, upsertCache } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
@@ -88,7 +89,9 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         where: { id: token.id },
         data: { lastUsedAt: new Date() },
       })
-      .catch(() => {});
+      .catch((err) => {
+        log.warn('token lastUsedAt update failed', { tokenId: token.id, err }, LogScope.auth);
+      });
 
     c.set('token', token);
 
@@ -120,8 +123,10 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
       // Org/Space token → just set up permissions (no user context)
       await setupOrgPermissions(c);
     }
-  } catch {
-    // Invalid token
+  } catch (err) {
+    // Invalid token, lookup failure, or cache miss. Log so failure modes like
+    // Redis-down or DB-down don't silently masquerade as "no token".
+    log.warn('token auth lookup failed', { err }, LogScope.auth);
   }
 
   await next();
