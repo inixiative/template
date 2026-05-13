@@ -58,7 +58,7 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean): Promise<vo
     row.valueKey = def.toValueKey(validated);
   }
 
-  // sortOrder is handled by the orderedList registry — applyOrderedListDefaults
+  // position is handled by the orderedList registry — applyOrderedListDefaults
   // fires automatically for registered models. Reorder is at the route layer.
 };
 

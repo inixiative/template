@@ -188,8 +188,8 @@ describe('contactRules hook — subtype enforcement', () => {
   });
 });
 
-describe('contactRules hook — sortOrder auto-assign', () => {
-  it('appends MAX+1 per (owner, type) when sortOrder omitted', async () => {
+describe('contactRules hook — position auto-assign', () => {
+  it('appends MAX+1 per (owner, type) when position omitted', async () => {
     const { entity: user } = await createUser();
     const first = await db.contact.create({
       data: {
@@ -199,7 +199,7 @@ describe('contactRules hook — sortOrder auto-assign', () => {
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    expect(first.sortOrder).toBe(1);
+    expect(first.position).toBe(1);
 
     const second = await db.contact.create({
       data: {
@@ -209,21 +209,21 @@ describe('contactRules hook — sortOrder auto-assign', () => {
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    expect(second.sortOrder).toBe(2);
+    expect(second.position).toBe(2);
   });
 
-  it('respects explicit sortOrder when caller supplies one', async () => {
+  it('respects explicit position when caller supplies one', async () => {
     const { entity: user } = await createUser();
     const explicit = await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
         type: ContactType.phone,
-        sortOrder: 42,
+        position: 42,
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    expect(explicit.sortOrder).toBe(42);
+    expect(explicit.position).toBe(42);
   });
 
   it('scopes ordering by (owner, type) — different types start fresh', async () => {
@@ -244,7 +244,7 @@ describe('contactRules hook — sortOrder auto-assign', () => {
         value: { address: `sort${getNextSeq()}@example.com` },
       },
     });
-    expect(phone.sortOrder).toBeGreaterThan(0);
-    expect(email.sortOrder).toBe(1); // first email for this user — not 2
+    expect(phone.position).toBeGreaterThan(0);
+    expect(email.position).toBe(1); // first email for this user — not 2
   });
 });
