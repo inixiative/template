@@ -94,13 +94,15 @@ export const registerWebhookHook = () => {
 
     let allCallbacks: (() => Promise<void>)[] = [];
 
-    // Prefetch all subscriptions for enabled models (prevents N+1 in batch operations)
+    // Prefetch all subscriptions for enabled models in one query, then group.
+    const allSubscriptions = await db.webhookSubscription.findMany({
+      where: { model: { in: enabledTargets as WebhookModel[] }, isActive: true },
+    });
     const subscriptionsByModel = new Map<string, WebhookSubscription[]>();
-    for (const webhookModel of enabledTargets) {
-      const subscriptions = await db.webhookSubscription.findMany({
-        where: { model: webhookModel as WebhookModel, isActive: true },
-      });
-      subscriptionsByModel.set(webhookModel, subscriptions);
+    for (const target of enabledTargets) subscriptionsByModel.set(target, []);
+    for (const sub of allSubscriptions) {
+      const bucket = subscriptionsByModel.get(sub.model);
+      if (bucket) bucket.push(sub);
     }
 
     // Process for each enabled target model
