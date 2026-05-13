@@ -1,12 +1,33 @@
 # Testing
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Running Tests](#running-tests)
+  - [Concurrency](#concurrency)
+  - [Environment Composition](#environment-composition)
 - [Test Structure](#test-structure)
+  - [Basic Test](#basic-test)
 - [Factories](#factories)
+  - [build vs create](#build-vs-create)
+  - [Serialization for API/UI-Shaped Assertions](#serialization-for-apiui-shaped-assertions)
+  - [Basic Usage](#basic-usage)
+  - [Triggering Optional Dependencies](#triggering-optional-dependencies)
+  - [Context Keys](#context-keys)
+  - [Reusing Entities](#reusing-entities)
+  - [Unique Data with getNextSeq](#unique-data-with-getnextseq)
+  - [TypedBuildResult (Type Safety)](#typedbuildresult-type-safety)
+  - [FK Auto-Inference](#fk-auto-inference)
+  - [Composite Foreign Keys](#composite-foreign-keys)
+  - [Cleanup](#cleanup)
+  - [Test Data Patterns](#test-data-patterns)
 - [Test App](#test-app)
 - [Request Helpers](#request-helpers)
+- [Frontend Testing (happy-dom)](#frontend-testing-happy-dom)
+
+<!-- toc:end -->
+
 
 ---
 

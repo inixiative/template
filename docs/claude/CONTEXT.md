@@ -1,15 +1,46 @@
 # Context
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Request Lifecycle](#request-lifecycle)
 - [AppEnv Types](#appenv-types)
 - [prepareRequest](#preparerequest)
+  - [What It Does](#what-it-does)
 - [Context Setters](#context-setters)
-- [Context Getters](#context-getters)
+  - [setUserContext](#setusercontext)
+  - [What It Does](#what-it-does)
+  - [Direct Setters](#direct-setters)
+- [Context Access](#context-access)
+  - [Direct Access for Simple Values](#direct-access-for-simple-values)
+    - [bracketQuery](#bracketquery)
+    - [searchableFields](#searchablefields)
+  - [Context Types](#context-types)
+    - [TokenWithRelations](#tokenwithrelations)
+  - [Complex Getters](#complex-getters)
+    - [getActor](#getactor)
+    - [getResource / getResourceType](#getresource--getresourcetype)
+    - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
+    - [isSuperadmin](#issuperadmin)
+- [Refreshing Context](#refreshing-context)
+  - [refreshUserContext](#refreshusercontext)
 - [Resource Context](#resource-context)
+  - [resourceContextMiddleware](#resourcecontextmiddleware)
+  - [Enforcement Rules](#enforcement-rules)
+  - [Lookup Parameter](#lookup-parameter)
+  - [Custom Inclusions](#custom-inclusions)
 - [Database Scope](#database-scope)
+  - [Scope Methods](#scope-methods)
+  - [Why Scoping Matters](#why-scoping-matters)
 - [Job Context](#job-context)
+  - [WorkerContext](#workercontext)
+  - [Job Scope](#job-scope)
+  - [Handler Usage](#handler-usage)
+  - [Key Differences from Request Context](#key-differences-from-request-context)
+
+<!-- toc:end -->
+
 
 ---
 

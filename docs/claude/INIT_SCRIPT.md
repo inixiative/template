@@ -1,5 +1,45 @@
 # Init Script Implementation (`bun run init`)
 
+<!-- toc:start -->
+
+## Contents
+
+- [Context](#context)
+- [Current State](#current-state)
+- [Resource Naming Conventions](#resource-naming-conventions)
+  - [Format](#format)
+  - [Components](#components)
+  - [Examples](#examples)
+  - [Benefits](#benefits)
+  - [Implementation](#implementation)
+- [Proposed Design](#proposed-design)
+  - [Commands](#commands)
+  - [Launch Script](#launch-script)
+  - [Full Implementation Scope](#full-implementation-scope)
+  - [File Structure](#file-structure)
+  - [Step-by-Step Flow](#step-by-step-flow)
+    - [1. Prerequisites (`01-prerequisites.ts`)](#1-prerequisites-01-prerequisitests)
+    - [2. Interactive Configuration (`02-configure.ts`)](#2-interactive-configuration-02-configurets)
+    - [3. Monorepo Rename (`03-rename.ts`) - SURGICAL APPROACH](#3-monorepo-rename-03-renamets---surgical-approach)
+    - [4. Infisical Setup (`04-infisical.ts`)](#4-infisical-setup-04-infisicalts)
+    - [5. Secret Generation (`05-secrets.ts`)](#5-secret-generation-05-secretsts)
+    - [6. Railway Provisioning (`06-render.ts`)](#6-railway-provisioning-06-renderts)
+    - [7. Sentry Setup (`07-sentry.ts`)](#7-sentry-setup-07-sentryts)
+    - [8. Email Provider Setup (`08-email.ts`)](#8-email-provider-setup-08-emailts)
+    - [9. OAuth Setup (`09-oauth.ts`) - OPTIONAL](#9-oauth-setup-09-oauthts---optional)
+    - [10. DNS Configuration (`10-dns.ts`)](#10-dns-configuration-10-dnsts)
+    - [11. PROJECT_NAME Setup (`11-project-name.ts`)](#11-project_name-setup-11-project-namets)
+    - [12. Environment Files (`12-environment.ts`)](#12-environment-files-12-environmentts)
+    - [13. Database Setup (`13-database.ts`)](#13-database-setup-13-databasets)
+    - [14. Validation (`14-validate.ts`)](#14-validation-14-validatets)
+    - [15. Finalize (`15-finalize.ts`)](#15-finalize-15-finalizets)
+  - [Progress & Resume Capability](#progress--resume-capability)
+- [Files to Modify](#files-to-modify)
+  - [New Files to Create](#new-files-to-create)
+  - [Existing Files to Modify](#existing-files-to-modify)
+
+<!-- toc:end -->
+
 > **📖 Architecture & Patterns:** See [INIT_SCRIPT_PATTERNS.md](./INIT_SCRIPT_PATTERNS.md) for implementation details, code patterns, and how to create new task views.
 
 ## Context

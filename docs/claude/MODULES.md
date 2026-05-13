@@ -1,5 +1,17 @@
 # Module Structure
 
+<!-- toc:start -->
+
+## Contents
+
+- [Core (most modules will have these)](#core-most-modules-will-have-these)
+- [Domain logic (richer modules)](#domain-logic-richer-modules)
+- [Shared internals (scoped to one module)](#shared-internals-scoped-to-one-module)
+- [Less common but legitimate](#less-common-but-legitimate)
+- [Rules of thumb](#rules-of-thumb)
+
+<!-- toc:end -->
+
 Allowlist of folder names a module under `apps/api/src/modules/<moduleName>/` may use. Not every module needs every folder — pick what fits. New folder names not on this list should be added here before the first PR that introduces them, so drift stays visible.
 
 ---

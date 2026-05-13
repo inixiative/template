@@ -1,21 +1,64 @@
 # Permissions
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
 - [Roles](#roles)
+  - [PlatformRole](#platformrole)
+  - [Role](#role)
+  - [Role Hierarchy](#role-hierarchy)
 - [Actions](#actions)
+  - [Role → Action Mapping](#role--action-mapping)
+  - [roleToStandardAction](#roletostandardaction)
 - [Permix](#permix)
+  - [API](#api)
+  - [How It Works](#how-it-works)
+  - [Superadmin Bypass](#superadmin-bypass)
 - [Permission Setup](#permission-setup)
+  - [setupOrgContext](#setuporgcontext)
+  - [setupUserContext](#setupusercontext)
+  - [setupSpacePermissions](#setupspacepermissions)
+  - [Token Permission Restriction](#token-permission-restriction)
+  - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
+  - [In Controllers](#in-controllers)
+  - [Via Validation Middleware](#via-validation-middleware)
 - [Entitlements](#entitlements)
+  - [How Entitlements Are Applied](#how-entitlements-are-applied)
+  - [Intersecting Entitlements](#intersecting-entitlements)
 - [REBAC](#rebac)
+  - [Schema](#schema)
+  - [ActionRule Types](#actionrule-types)
+  - [How It Works](#how-it-works)
+  - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
+  - [Example: Space Permission Check](#example-space-permission-check)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
 - [Row-Level Overrides](#row-level-overrides)
+  - [Schema](#schema)
+  - [How `check()` merges](#how-check-merges)
+  - [Boundary validation](#boundary-validation)
+  - [When to use it](#when-to-use-it)
 - [Space Permissions](#space-permissions)
+  - [Space Roles](#space-roles)
+  - [SpaceUser Model](#spaceuser-model)
+  - [Permission Flow](#permission-flow)
+  - [Key Points](#key-points)
 - [Validation Middleware](#validation-middleware)
+  - [validatePermission](#validatepermission)
+  - [validateOwnerPermission](#validateownerpermission)
+  - [validateNotToken](#validatenottoken)
 - [Role Assignment](#role-assignment)
+  - [Role Assignment Rules](#role-assignment-rules)
+- [Token Permissions](#token-permissions)
+  - [Token Creation](#token-creation)
+  - [Token Deletion](#token-deletion)
 - [Future Work](#future-work)
+  - [Groups](#groups)
+
+<!-- toc:end -->
+
 
 ---
 

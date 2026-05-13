@@ -1,5 +1,7 @@
 # Dependencies
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Core](#core)
@@ -8,10 +10,16 @@
 - [Auth & Permissions](#auth--permissions)
 - [Validation](#validation)
 - [Logging & Telemetry](#logging--telemetry)
+  - [Optional Integration Setup](#optional-integration-setup)
 - [Email](#email)
 - [Utilities](#utilities)
 - [Frontend](#frontend)
 - [Planned](#planned)
+  - [Adding date-fns](#adding-date-fns)
+- [Dev Dependencies](#dev-dependencies)
+
+<!-- toc:end -->
+
 
 ---
 

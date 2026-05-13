@@ -1,11 +1,30 @@
 # Naming Conventions
 
+<!-- toc:start -->
+
 ## Contents
 
+- [Terminology](#terminology)
 - [Backend](#backend)
+  - [Files](#files)
+  - [Functions](#functions)
+  - [Variables](#variables)
+  - [Underscore Prefix](#underscore-prefix)
+  - [Imports](#imports)
+  - [Constants Pattern: `keyof typeof`](#constants-pattern-keyof-typeof)
+  - [Zod Enum from Const Object](#zod-enum-from-const-object)
 - [Frontend](#frontend)
+  - [Components](#components)
+  - [Styles](#styles)
 - [Database](#database)
+  - [Prisma Schema](#prisma-schema)
+  - [IDs](#ids)
 - [Files & Directories](#files--directories)
+  - [Backend Structure](#backend-structure)
+  - [Frontend Structure](#frontend-structure)
+
+<!-- toc:end -->
+
 
 ---
 

@@ -1,5 +1,62 @@
 # Authentication
 
+<!-- toc:start -->
+
+## Contents
+
+- [Architecture](#architecture)
+- [Hooks](#hooks)
+  - [useAuthProviders](#useauthproviders)
+- [Login/Signup Pattern](#loginsignup-pattern)
+  - [Unified Auth System](#unified-auth-system)
+  - [LoginPage](#loginpage)
+  - [SignupPage](#signuppage)
+- [Components](#components)
+  - [LoginForm](#loginform)
+  - [SignupForm](#signupform)
+- [Types](#types)
+  - [AuthMethod (Unified Auth Interface)](#authmethod-unified-auth-interface)
+- [OAuth/SAML](#oauthsaml)
+  - [OAuth Flow (BetterAuth Client)](#oauth-flow-betterauth-client)
+  - [Provider Configuration](#provider-configuration)
+- [Navigation Patterns](#navigation-patterns)
+  - [Preserving Context](#preserving-context)
+  - [Preserving redirectTo](#preserving-redirectto)
+- [Guards](#guards)
+  - [requireAuth](#requireauth)
+  - [requirePublic](#requirepublic)
+- [Store Integration](#store-integration)
+  - [Auth Slice](#auth-slice)
+    - [initialize()](#initialize)
+    - [signIn(credentials)](#signincredentials)
+    - [signUp(credentials)](#signupcredentials)
+    - [logout()](#logout)
+- [Error Handling](#error-handling)
+  - [Pattern: Error Injection](#pattern-error-injection)
+  - [Error Messages](#error-messages)
+- [Testing](#testing)
+  - [Hook Tests](#hook-tests)
+  - [Page Tests](#page-tests)
+- [Security](#security)
+  - [Best Practices](#best-practices)
+  - [Environment Variables](#environment-variables)
+- [Common Patterns](#common-patterns)
+  - [Login with redirectTo](#login-with-redirectto)
+  - [Switching between Login/Signup](#switching-between-loginsignup)
+  - [OAuth Login](#oauth-login)
+  - [Logout](#logout)
+- [Key Files](#key-files)
+  - [Hooks](#hooks)
+  - [Pages](#pages)
+  - [Components](#components)
+  - [Utilities](#utilities)
+  - [Guards](#guards)
+  - [Store](#store)
+  - [Types](#types)
+  - [Backend](#backend)
+
+<!-- toc:end -->
+
 Comprehensive guide to authentication in the template using BetterAuth, JWT sessions, and OAuth providers.
 
 ## Architecture

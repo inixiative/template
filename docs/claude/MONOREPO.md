@@ -1,12 +1,31 @@
 # Monorepo Structure
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
 - [Workspaces](#workspaces)
+  - [Package Names](#package-names)
+  - [Package Descriptions](#package-descriptions)
+    - [@template/db](#templatedb)
+    - [@template/shared](#templateshared)
+    - [@template/ui](#templateui)
+    - [@template/permissions](#templatepermissions)
+    - [@template/email](#templateemail)
 - [Path Aliases](#path-aliases)
+  - [App Imports (`#/`)](#app-imports)
+  - [Package Imports (`@template/`)](#package-imports-template)
+  - [Barrel Files (Relative)](#barrel-files-relative)
+  - [TypeScript Configuration](#typescript-configuration)
 - [Dependencies](#dependencies)
+  - [Dependency Direction](#dependency-direction)
+  - [Adding Dependencies](#adding-dependencies)
 - [Where to Find Things](#where-to-find-things)
+  - [Avoid Barrel Files](#avoid-barrel-files)
+
+<!-- toc:end -->
+
 
 ---
 

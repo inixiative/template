@@ -1,16 +1,42 @@
 # Batch API
 
-Execute multiple API requests in a single HTTP call with transaction support, interpolation, and flexible failure handling.
+<!-- toc:start -->
 
 ## Contents
 
 - [Overview](#overview)
 - [Basic Usage](#basic-usage)
 - [Execution Strategies](#execution-strategies)
+  - [transactionAll](#transactionall)
+  - [transactionPerRound](#transactionperround)
+  - [allowFailures](#allowfailures)
+  - [failOnRound](#failonround)
 - [Request Interpolation](#request-interpolation)
+  - [Syntax](#syntax)
+  - [Examples](#examples)
+  - [Security Validations](#security-validations)
 - [Status Tracking](#status-tracking)
+  - [Status Values](#status-values)
+  - [Strategy-Specific Behavior](#strategy-specific-behavior)
+  - [Reading Status](#reading-status)
+  - [HTTP Status Code Semantics](#http-status-code-semantics)
 - [Security](#security)
+  - [Singleton Pattern](#singleton-pattern)
+  - [Absolute URL Protection](#absolute-url-protection)
+  - [Limits](#limits)
+  - [Timeout Calculation](#timeout-calculation)
 - [Implementation Patterns](#implementation-patterns)
+  - [Pattern: Type-Safe Constants](#pattern-type-safe-constants)
+  - [Pattern: Strategy Implementation](#pattern-strategy-implementation)
+  - [Pattern: Batch Context](#pattern-batch-context)
+- [Testing](#testing)
+- [Known Limitations](#known-limitations)
+- [See Also](#see-also)
+
+<!-- toc:end -->
+
+Execute multiple API requests in a single HTTP call with transaction support, interpolation, and flexible failure handling.
+
 
 ---
 

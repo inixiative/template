@@ -1,13 +1,32 @@
 # Documentation
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Workflow](#workflow)
 - [Before Starting Work](#before-starting-work)
 - [Writing Notes](#writing-notes)
+  - [RAW_NOTES.md](#raw_notesmd)
+  - [When to Sort](#when-to-sort)
+  - [Sorting Examples](#sorting-examples)
 - [Doc Structure](#doc-structure)
+  - [TOC Required](#toc-required)
+  - [Standard Sections](#standard-sections)
+  - [Stub Format](#stub-format)
+  - [Code Examples](#code-examples)
+  - [Diagrams with Mermaid](#diagrams-with-mermaid)
 - [Doc Maintenance](#doc-maintenance)
+  - [After Implementing Features](#after-implementing-features)
+  - [Keep Docs Honest](#keep-docs-honest)
 - [Doc Alignment Review](#doc-alignment-review)
+  - [Process](#process)
+  - [Example Review Findings](#example-review-findings)
+  - [Review Prompt Template](#review-prompt-template)
+  - [When to Run](#when-to-run)
+
+<!-- toc:end -->
+
 
 ---
 
@@ -91,9 +110,6 @@ Every doc must have a `## Contents` section at the top with links to all major s
 ```markdown
 # Topic
 
-## Contents
-- [Section 1](#section-1)
-- [Section 2](#section-2)
 
 ---
 
@@ -117,8 +133,6 @@ For incomplete docs:
 
 > Stub - to be expanded
 
-## Contents
-...
 
 ---
 

@@ -1,5 +1,31 @@
 # App Events
 
+<!-- toc:start -->
+
+## Contents
+
+- [Why This Exists](#why-this-exists)
+- [Architecture](#architecture)
+- [Usage](#usage)
+  - [Emitting Events](#emitting-events)
+  - [Defining a New Event](#defining-a-new-event)
+  - [Handler Definition](#handler-definition)
+- [Email Pipeline](#email-pipeline)
+  - [Email Targeting](#email-targeting)
+  - [Email Templates](#email-templates)
+- [Observe Pipeline](#observe-pipeline)
+- [Adapter Registries](#adapter-registries)
+- [Inquiry Events](#inquiry-events)
+- [File Layout](#file-layout)
+- [Stubs / Future Work](#stubs--future-work)
+- [WebSockets](#websockets)
+  - [Connection](#connection)
+  - [Client Messages](#client-messages)
+  - [Server Messages](#server-messages)
+  - [Frontend](#frontend)
+
+<!-- toc:end -->
+
 ## Why This Exists
 
 Every SaaS follows the same painful progression:

@@ -1,13 +1,35 @@
 # Environments
 
+<!-- toc:start -->
+
 ## Contents
 
-- [Overview](#overview)
+- [Environment Names](#environment-names)
+  - [Deployment Flow](#deployment-flow)
 - [Environment Detection](#environment-detection)
 - [File-Based Environments](#file-based-environments)
+  - [File Structure](#file-structure)
+  - [Inheritance Order](#inheritance-order)
+  - [Sync from Examples](#sync-from-examples)
 - [Infisical (Cloud Environments)](#infisical-cloud-environments)
+  - [Environment Structure](#environment-structure)
+  - [Setup](#setup)
+  - [Configuration File](#configuration-file)
+  - [Manual Usage](#manual-usage)
+  - [CLI Authentication](#cli-authentication)
 - [with-env Composition](#with-env-composition)
+  - [Usage](#usage)
+  - [How It Works](#how-it-works)
+  - [Loading Order](#loading-order)
+  - [Package.json Scripts](#packagejson-scripts)
 - [Adding Environment Variables](#adding-environment-variables)
+  - [Local Development](#local-development)
+  - [Cloud Environments](#cloud-environments)
+  - [In Code](#in-code)
+- [Common Variables](#common-variables)
+
+<!-- toc:end -->
+
 
 ---
 

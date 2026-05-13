@@ -1,17 +1,55 @@
 # Database
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Local Setup](#local-setup)
 - [Prisma](#prisma)
+  - [Version](#version)
+  - [Schema Location](#schema-location)
+  - [Generator Output](#generator-output)
 - [Scripts](#scripts)
+  - [Development Workflow](#development-workflow)
+  - [Production Workflow](#production-workflow)
+  - [Database Operations](#database-operations)
+- [Seeding](#seeding)
+  - [Prime Development Data](#prime-development-data)
+  - [Seed Architecture](#seed-architecture)
+  - [Adding Seed Data](#adding-seed-data)
+  - [Seed Order (FK Constraints)](#seed-order-fk-constraints)
+  - [Password Seeding](#password-seeding)
 - [Schema Conventions](#schema-conventions)
+  - [ID Fields (UUIDv7)](#id-fields-uuidv7)
+  - [Foreign Keys](#foreign-keys)
+  - [DateTime Fields](#datetime-fields)
+  - [Enum Naming](#enum-naming)
 - [Typed Model IDs](#typed-model-ids)
+  - [Usage](#usage)
+  - [Available Types](#available-types)
 - [Model Utilities](#model-utilities)
+  - [PascalCase (ModelName)](#pascalcase-modelname)
+  - [camelCase (AccessorName)](#camelcase-accessorname)
+  - [Delegate Access](#delegate-access)
+- [Delegate Typing](#delegate-typing)
+  - [The Problem](#the-problem)
+  - [Pass the Delegate (Type-Safe)](#pass-the-delegate-type-safe)
+  - [Mutation Lifecycle Pattern](#mutation-lifecycle-pattern)
 - [Client Methods](#client-methods)
 - [Transactions](#transactions)
+  - [Manual Transaction](#manual-transaction)
+  - [After Commit Callbacks](#after-commit-callbacks)
+- [Query Building Utilities](#query-building-utilities)
+  - [buildWhereClause](#buildwhereclause)
+  - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
-- [Additional Models](#additional-models)
+  - [Special Owner Values (No FK)](#special-owner-values-no-fk)
+- [Constraint Helpers](#constraint-helpers)
+- [Registries](#registries)
+- [Schema Reference](#schema-reference)
+
+<!-- toc:end -->
+
 
 ---
 

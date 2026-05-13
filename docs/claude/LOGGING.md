@@ -1,11 +1,33 @@
 # Logging & Telemetry
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Logger](#logger)
+  - [Usage](#usage)
+  - [Log Levels](#log-levels)
+  - [Environment Behavior](#environment-behavior)
 - [Log Scopes](#log-scopes)
+  - [LogScope Enum](#logscope-enum)
+  - [Usage](#usage)
+  - [Automatic Scopes with logScope()](#automatic-scopes-with-logscope)
+  - [Entry Points](#entry-points)
+  - [Log Broadcasting](#log-broadcasting)
+  - [Output](#output)
+  - [Frontend Apps](#frontend-apps)
 - [OpenTelemetry](#opentelemetry)
+  - [Environment Variables](#environment-variables)
+  - [Auto-Instrumentation](#auto-instrumentation)
+  - [Initialization](#initialization)
 - [Sentry](#sentry)
+  - [Environment Variables](#environment-variables)
+  - [Automatic Capture](#automatic-capture)
+  - [NOT Captured](#not-captured)
+  - [Manual Capture](#manual-capture)
+
+<!-- toc:end -->
+
 
 ---
 

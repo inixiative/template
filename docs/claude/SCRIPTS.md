@@ -1,16 +1,26 @@
 # Scripts & Commands
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Script Locations](#script-locations)
+  - [scripts/ Structure](#scripts-structure)
 - [Development](#development)
 - [Database](#database)
 - [Testing](#testing)
 - [Linting](#linting)
+  - [Lint Check Scripts](#lint-check-scripts)
+  - [CI Rule Scripts](#ci-rule-scripts)
 - [Setup Scripts](#setup-scripts)
 - [Deployment Scripts](#deployment-scripts)
 - [Docker](#docker)
+- [Writing New Scripts](#writing-new-scripts)
 - [AI Workspace](#ai-workspace)
+  - [Workflow](#workflow)
+
+<!-- toc:end -->
+
 
 ---
 

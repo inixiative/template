@@ -1,5 +1,17 @@
 # Template
 
+<!-- toc:start -->
+
+## Contents
+
+- [Read This First](#read-this-first)
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Documentation](#documentation)
+- [Script Maturity](#script-maturity)
+
+<!-- toc:end -->
+
 TypeScript monorepo with Bun, Hono, Prisma 7, React, and Tailwind.
 
 ## Read This First

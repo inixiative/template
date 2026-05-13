@@ -1,5 +1,42 @@
 # Init Script - Architecture & Patterns
 
+<!-- toc:start -->
+
+## Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Core Patterns](#core-patterns)
+  - [1. Root-Level Config State (Context Provider)](#1-root-level-config-state-context-provider)
+  - [2. Manual Sync Triggers (No Polling)](#2-manual-sync-triggers-no-polling)
+  - [3. Cache Busting on Imports](#3-cache-busting-on-imports)
+  - [4. Derived State with useMemo](#4-derived-state-with-usememo)
+  - [5. Composable Prompts (ALWAYS Use This!)](#5-composable-prompts-always-use-this)
+  - [6. Clean Status Lists](#6-clean-status-lists)
+  - [7. Suppress Console Logs in Tasks](#7-suppress-console-logs-in-tasks)
+  - [8. Always Fetch from Source, Never Trust Props](#8-always-fetch-from-source-never-trust-props)
+  - [9. Retry Logic for Async Initialization](#9-retry-logic-for-async-initialization)
+  - [10. Async Exec for Smooth Animations](#10-async-exec-for-smooth-animations)
+  - [11. Railway CLI vs GraphQL API](#11-railway-cli-vs-graphql-api)
+  - [12. Token Input Flow with Proper State Management](#12-token-input-flow-with-proper-state-management)
+  - [13. Atomic Progress Flags + Idempotent API Calls](#13-atomic-progress-flags--idempotent-api-calls)
+  - [14. OrgSelector Always Requires onCancel](#14-orgselector-always-requires-oncancel)
+  - [15. Interactive User Prompts for Required Input](#15-interactive-user-prompts-for-required-input)
+  - [16. State Management Standards](#16-state-management-standards)
+    - [ViewState - UI Navigation Only](#viewstate---ui-navigation-only)
+    - [SetupState - Business Logic State](#setupstate---business-logic-state)
+    - [Boolean Flags - Execution State](#boolean-flags---execution-state)
+    - [Complete Example](#complete-example)
+    - [Animation/Loading State Pattern](#animationloading-state-pattern)
+  - [16. Bun-Native Resume Tests with VCR Fixtures](#16-bun-native-resume-tests-with-vcr-fixtures)
+- [File Structure](#file-structure)
+- [Creating a New Task View](#creating-a-new-task-view)
+  - [1. Create View Component](#1-create-view-component)
+  - [2. Create Task Function](#2-create-task-function)
+  - [3. Wire Up in App](#3-wire-up-in-app)
+- [Key Takeaways](#key-takeaways)
+
+<!-- toc:end -->
+
 **Location:** `init/`
 
 Automated infrastructure provisioning via Terminal UI (Ink). Full implementation guide for INFRA-001 ticket.

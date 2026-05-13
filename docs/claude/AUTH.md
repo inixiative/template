@@ -1,16 +1,55 @@
 # Authentication
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
 - [BetterAuth (Session)](#betterauth-session)
+  - [Configuration](#configuration)
+  - [Session Storage Strategy](#session-storage-strategy)
+  - [Auth Routes](#auth-routes)
+  - [authMiddleware](#authmiddleware)
 - [OAuth + Bearer Tokens](#oauth--bearer-tokens)
+  - [OAuth Flow](#oauth-flow)
+  - [Bearer Token Pattern](#bearer-token-pattern)
 - [Multi-Provider Authentication (AuthProvider)](#multi-provider-authentication-authprovider)
+  - [Architecture](#architecture)
+  - [Database Schema](#database-schema)
+  - [Encryption](#encryption)
+  - [API Endpoints](#api-endpoints)
+  - [Example: Organization OAuth](#example-organization-oauth)
+  - [Provider Types](#provider-types)
+  - [SAML/SSO Status](#samlsso-status)
 - [Token Authentication](#token-authentication)
+  - [How It Works](#how-it-works)
+  - [tokenAuthMiddleware](#tokenauthmiddleware)
 - [Token Types](#token-types)
+  - [User Token](#user-token)
+  - [Organization Token](#organization-token)
+  - [OrganizationUser Token](#organizationuser-token)
+  - [Space Token](#space-token)
+  - [SpaceUser Token](#spaceuser-token)
+  - [Token Schema](#token-schema)
 - [Auth Middleware Chain](#auth-middleware-chain)
+  - [Flow](#flow)
 - [Spoof Middleware](#spoof-middleware)
+  - [Usage](#usage)
+  - [Requirements](#requirements)
+- [Validation Middleware](#validation-middleware)
+  - [validateUser](#validateuser)
+  - [validateActor](#validateactor)
+  - [validateNotToken](#validatenottoken)
+  - [validateSuperadmin](#validatesuperadmin)
+- [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
+  - [validateUser - Requires User Context](#validateuser---requires-user-context)
+  - [validateActor - More Permissive](#validateactor---more-permissive)
+  - [When to Use Each](#when-to-use-each)
+  - [Example](#example)
 - [Frontend Auth](#frontend-auth)
+
+<!-- toc:end -->
+
 
 ---
 

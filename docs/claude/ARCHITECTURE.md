@@ -1,11 +1,23 @@
 # Architecture
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
 - [Request Flow](#request-flow)
 - [Data Flow](#data-flow)
+  - [Write Path](#write-path)
+  - [Read Path](#read-path)
 - [Key Patterns](#key-patterns)
+  - [Why Hooks Instead of Triggers?](#why-hooks-instead-of-triggers)
+  - [Why False Polymorphism?](#why-false-polymorphism)
+  - [Why Mutation Lifecycle?](#why-mutation-lifecycle)
+  - [Why Scoped Context?](#why-scoped-context)
+- [See Also](#see-also)
+
+<!-- toc:end -->
+
 
 ---
 

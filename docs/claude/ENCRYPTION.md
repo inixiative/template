@@ -1,14 +1,41 @@
 # Encryption
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
+  - [Key Features](#key-features)
 - [Field-Scoped Encryption](#field-scoped-encryption)
+  - [Database Schema Pattern](#database-schema-pattern)
+  - [Registry Structure](#registry-structure)
 - [Adding Encrypted Fields](#adding-encrypted-fields)
+  - [1. Update Prisma Schema](#1-update-prisma-schema)
+  - [2. Add Environment Variables](#2-add-environment-variables)
+  - [3. Register in Encryption Registry](#3-register-in-encryption-registry)
+  - [4. Use in Controllers](#4-use-in-controllers)
 - [Key Rotation](#key-rotation)
+  - [Automatic Process](#automatic-process)
+  - [Manual Trigger](#manual-trigger)
+  - [Idempotent Protection](#idempotent-protection)
+  - [Version Constraints](#version-constraints)
 - [Environment Variables](#environment-variables)
+  - [Per Keyring (3 vars)](#per-keyring-3-vars)
+  - [Example: Auth Provider Secrets](#example-auth-provider-secrets)
+  - [Validation](#validation)
 - [CI Validation](#ci-validation)
+  - [Validation Rules](#validation-rules)
+  - [CI Integration](#ci-integration)
 - [Implementation Details](#implementation-details)
+  - [Type Safety](#type-safety)
+  - [Encryption Payload](#encryption-payload)
+  - [Singleton Locking](#singleton-locking)
+  - [Rotation Job Flow](#rotation-job-flow)
+- [Deployment Checklist](#deployment-checklist)
+- [FAQ](#faq)
+
+<!-- toc:end -->
+
 
 ---
 

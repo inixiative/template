@@ -1,5 +1,35 @@
 # Turborepo
 
+<!-- toc:start -->
+
+## Contents
+
+- [Task Naming Convention](#task-naming-convention)
+  - [How Task Resolution Works](#how-task-resolution-works)
+- [Watch Mode](#watch-mode)
+  - [Usage](#usage)
+  - [How it works](#how-it-works)
+- [Task Dependencies](#task-dependencies)
+- [Loop Prevention](#loop-prevention)
+- [Caching](#caching)
+- [Task Types](#task-types)
+  - [Generation Tasks (one-shot, cached)](#generation-tasks-one-shot-cached)
+  - [Development Tasks (persistent)](#development-tasks-persistent)
+  - [Build Tasks (production, cached)](#build-tasks-production-cached)
+- [Hot Reloading](#hot-reloading)
+  - [Backend (API/Worker)](#backend-apiworker)
+  - [Frontend (Web/Admin/Superadmin)](#frontend-webadminsuperadmin)
+- [Migration from Bash Watch Scripts](#migration-from-bash-watch-scripts)
+  - [Removed Scripts](#removed-scripts)
+- [Environment Composition with Turbo](#environment-composition-with-turbo)
+- [Filtering Tasks](#filtering-tasks)
+- [Debugging](#debugging)
+  - [View task graph](#view-task-graph)
+  - [View task logs](#view-task-logs)
+  - [Clear cache](#clear-cache)
+
+<!-- toc:end -->
+
 This project uses Turborepo for monorepo task orchestration, caching, and smart dependency-aware watching.
 
 ## Task Naming Convention

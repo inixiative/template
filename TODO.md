@@ -1,5 +1,27 @@
 # TODO
 
+<!-- toc:start -->
+
+## Contents
+
+- [In Progress](#in-progress)
+- [Type Errors](#type-errors)
+- [Missing Deps (install when needed)](#missing-deps-install-when-needed)
+- [Future Work](#future-work)
+  - [Mutation Lifecycle](#mutation-lifecycle)
+  - [Features](#features)
+  - [Frontend](#frontend)
+  - [Database](#database)
+  - [Developer Experience](#developer-experience)
+  - [Infrastructure](#infrastructure)
+  - [Modules to Port](#modules-to-port)
+- [Notes](#notes)
+  - [Auth Documentation](#auth-documentation)
+  - [Optimistic Updates](#optimistic-updates)
+  - [Feature Flag Design Concept](#feature-flag-design-concept)
+
+<!-- toc:end -->
+
 ## In Progress
 
 - [x] Token permission tests - comprehensive tests for OrganizationUser and SpaceUser tokens

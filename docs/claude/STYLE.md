@@ -1,13 +1,29 @@
 # Style
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Code Formatting](#code-formatting)
+  - [Single-Line Early Exits](#single-line-early-exits)
+  - [Atomic Files](#atomic-files)
+  - [Minimal Index Files](#minimal-index-files)
 - [Naming Conventions](#naming-conventions)
+  - [Variable Prefixes](#variable-prefixes)
 - [Imports](#imports)
+  - [Path Aliases](#path-aliases)
+  - [Never](#never)
 - [TypeScript](#typescript)
+  - [Prefer `type` Over `interface`](#prefer-type-over-interface)
+  - [No Enums](#no-enums)
+  - [Infer Types](#infer-types)
 - [Comments & Logging](#comments--logging)
+  - [No Comments](#no-comments)
+  - [Minimal Logging](#minimal-logging)
 - [Dependencies](#dependencies)
+
+<!-- toc:end -->
+
 
 ---
 

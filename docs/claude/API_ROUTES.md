@@ -1,17 +1,53 @@
 # API Routes
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Naming Conventions](#naming-conventions)
 - [Route Templates](#route-templates)
+  - [Template Args](#template-args)
+  - [Examples](#examples)
 - [Controllers](#controllers)
+  - [Respond Types](#respond-types)
 - [Module Examples](#module-examples)
+  - [AuthProvider Module](#authprovider-module)
+    - [Module Structure](#module-structure)
+    - [Endpoints](#endpoints)
+    - [Platform vs Organization Providers](#platform-vs-organization-providers)
+    - [Example: Read Platform Providers (Public)](#example-read-platform-providers-public)
+    - [Example: Create Organization Provider (Encrypted)](#example-create-organization-provider-encrypted)
+    - [Example: Read Organization Providers (Permission-Aware)](#example-read-organization-providers-permission-aware)
+    - [Request/Response Examples](#requestresponse-examples)
+    - [Integration with Frontend](#integration-with-frontend)
 - [Response Format](#response-format)
+  - [Pagination](#pagination)
+  - [paginate() Utility](#paginate-utility)
+  - [Search & Filtering](#search--filtering)
+  - [Bracket Notation Query Parsing](#bracket-notation-query-parsing)
+  - [Relation Field Security](#relation-field-security)
+  - [OrderBy](#orderby)
+- [Frontend Metadata](#frontend-metadata)
+  - [OpenAPI Extensions](#openapi-extensions)
+  - [Extracting Metadata](#extracting-metadata)
+  - [DataTable Configuration](#datatable-configuration)
 - [Error Responses](#error-responses)
+- [Complex Operations & HTTP Status](#complex-operations--http-status)
+  - [Batch Operations](#batch-operations)
 - [Middleware](#middleware)
 - [Schemas](#schemas)
+  - [Default: Use ScalarSchema](#default-use-scalarschema)
+  - [Inputs from Generated](#inputs-from-generated)
+  - [Colocation Rule](#colocation-rule)
+  - [Cross-Field Validations](#cross-field-validations)
 - [Router Exports](#router-exports)
 - [File Organization](#file-organization)
+  - [Core (always present)](#core-always-present)
+  - [Common Folders (as needed)](#common-folders-as-needed)
+  - [Also](#also)
+
+<!-- toc:end -->
+
 
 ---
 

@@ -1,16 +1,61 @@
 # Hooks
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Mutation Lifecycle](#mutation-lifecycle)
+  - [Hook Options](#hook-options)
+  - [Action Types](#action-types)
 - [Registering Hooks](#registering-hooks)
 - [Application Hooks](#application-hooks)
+- [Audit Log](#audit-log)
+  - [Enabling Audit for a Model](#enabling-audit-for-a-model)
+  - [Data Captured](#data-captured)
+  - [Field Processing Pipeline](#field-processing-pipeline)
+  - [Soft Delete Detection](#soft-delete-detection)
+  - [Registries](#registries)
+  - [Actor Context](#actor-context)
 - [Webhooks](#webhooks)
+  - [Enabling Webhooks for a Model](#enabling-webhooks-for-a-model)
+  - [How It Works](#how-it-works)
+  - [Webhook Payload](#webhook-payload)
+  - [Circuit Breaker](#circuit-breaker)
+  - [Ignored Fields](#ignored-fields)
+  - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
+  - [How It Works](#how-it-works)
+  - [Wildcard Keys](#wildcard-keys)
 - [False Polymorphism](#false-polymorphism)
+  - [Registry](#registry)
+  - [Auto-Generated Validation](#auto-generated-validation)
+  - [Validation Errors](#validation-errors)
 - [Contact Rules](#contact-rules)
+  - [Adding a Contact Type](#adding-a-contact-type)
 - [Rules Registry](#rules-registry)
+  - [shadowMerge for Updates](#shadowmerge-for-updates)
+  - [Recursive Validation](#recursive-validation)
+- [Ordered List](#ordered-list)
+  - [Registry](#registry)
+  - [What it covers](#what-it-covers)
+  - [Soft-deleted rows](#soft-deleted-rows)
+  - [Bulk-friendly by construction](#bulk-friendly-by-construction)
+  - [Scope strictness](#scope-strictness)
+  - [Adding a Model](#adding-a-model)
+  - [Limitations](#limitations)
 - [Immutable Fields](#immutable-fields)
+  - [**Global fields are always immutable**](#global-fields-are-always-immutable)
+  - [**FK fields are automatically immutable**](#fk-fields-are-automatically-immutable)
+  - [Why Strip Instead of Throw?](#why-strip-instead-of-throw)
+- [Supported Operations](#supported-operations)
+  - [Slow Mutation Logging](#slow-mutation-logging)
+- [Limitations](#limitations)
+  - [Rules: Nested Updates Skip Validation](#rules-nested-updates-skip-validation)
+  - [Rules: updateManyAndReturn Validates After](#rules-updatemanyandreturn-validates-after)
+  - [Immutable Fields: Only Strips, Never Throws](#immutable-fields-only-strips-never-throws)
+
+<!-- toc:end -->
+
 
 ---
 

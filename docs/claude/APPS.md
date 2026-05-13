@@ -1,5 +1,22 @@
 # App Structure
 
+<!-- toc:start -->
+
+## Contents
+
+- [The Three Apps](#the-three-apps)
+  - [Web - Consumer/End-User Interface](#web---consumerend-user-interface)
+  - [Admin - Provider/Operator Interface](#admin---provideroperator-interface)
+  - [Superadmin - Platform Operations](#superadmin---platform-operations)
+- [Key Insight](#key-insight)
+- [Frontend Architecture Overview](#frontend-architecture-overview)
+- [Context Switching](#context-switching)
+- [White-Label Mode](#white-label-mode)
+- [Real-World Example: TCG Platform](#real-world-example-tcg-platform)
+- [Implementation Notes](#implementation-notes)
+
+<!-- toc:end -->
+
 This template provides three frontend applications that work together as a multi-tenant SaaS platform.
 
 ## The Three Apps

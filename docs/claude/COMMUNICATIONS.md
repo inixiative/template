@@ -1,11 +1,37 @@
 # Communications
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Overview](#overview)
 - [Email](#email)
+  - [Implementation Status](#implementation-status)
+  - [Package Structure](#package-structure)
+  - [Email Clients](#email-clients)
+  - [Database Models](#database-models)
+    - [EmailTemplate](#emailtemplate)
+    - [EmailComponent](#emailcomponent)
+    - [Enums](#enums)
+  - [Component System](#component-system)
+    - [Syntax](#syntax)
+    - [Extraction (mapRefs)](#extraction-maprefs)
+  - [Variable Interpolation](#variable-interpolation)
+  - [Cascade Resolution](#cascade-resolution)
+  - [Render Pipeline](#render-pipeline)
+    - [Compose](#compose)
+    - [Interpolate (per recipient)](#interpolate-per-recipient)
+  - [Save Pipeline](#save-pipeline)
+  - [MJML Validation](#mjml-validation)
+  - [TODO: Send Pipeline](#todo-send-pipeline)
 - [Notifications](#notifications)
+  - [Planned: Novu](#planned-novu)
+- [SMS](#sms)
 - [Webhooks](#webhooks)
+- [Communication Preferences](#communication-preferences)
+
+<!-- toc:end -->
+
 
 ---
 

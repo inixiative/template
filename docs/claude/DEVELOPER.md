@@ -1,12 +1,24 @@
 # Developer Guide
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Development](#development)
 - [Common Commands](#common-commands)
+  - [Database](#database)
+  - [Code Quality](#code-quality)
+  - [Environment](#environment)
 - [Daily Workflow](#daily-workflow)
 - [Architectural Reviews](#architectural-reviews)
 - [Debugging](#debugging)
+  - [Logs](#logs)
+  - [Database](#database)
+  - [Redis](#redis)
+  - [Network](#network)
+
+<!-- toc:end -->
+
 
 ---
 

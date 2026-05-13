@@ -1,14 +1,23 @@
 # Setup
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Prerequisites](#prerequisites)
+  - [Required](#required)
+  - [CLI Tools](#cli-tools)
+  - [Authentication](#authentication)
+  - [Verification](#verification)
 - [Init vs Setup](#init-vs-setup)
 - [Quick Start](#quick-start)
 - [What Setup Does](#what-setup-does)
 - [Environment Variables](#environment-variables)
 - [Database Setup](#database-setup)
 - [Forking This Template](#forking-this-template)
+
+<!-- toc:end -->
+
 
 ---
 

@@ -1,13 +1,36 @@
 # Jobs
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Job System](#job-system)
+  - [Worker Configuration](#worker-configuration)
+  - [Job IDs](#job-ids)
+- [Built-in Handlers](#built-in-handlers)
+  - [sendWebhook](#sendwebhook)
+  - [rotateEncryptionKeys](#rotateencryptionkeys)
 - [Creating Handlers](#creating-handlers)
+  - [1. Define Handler](#1-define-handler)
+  - [2. Register in Index](#2-register-in-index)
 - [Handler Patterns](#handler-patterns)
+  - [ctx.log() - Dual-Write Logging](#ctxlog---dual-write-logging)
+  - [Singleton Job](#singleton-job)
+  - [Superseding Job](#superseding-job)
 - [Enqueuing Jobs](#enqueuing-jobs)
 - [Cron Jobs](#cron-jobs)
+  - [Cron Patterns (UTC)](#cron-patterns-utc)
+  - [CronJob Model](#cronjob-model)
+  - [Admin Routes](#admin-routes)
+  - [JobType Values](#jobtype-values)
 - [BullBoard](#bullboard)
+  - [Access](#access)
+  - [Configuration](#configuration)
+  - [Error Boundaries](#error-boundaries)
+  - [Features](#features)
+
+<!-- toc:end -->
+
 
 ---
 

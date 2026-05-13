@@ -1,5 +1,42 @@
 # Inquiries
 
+<!-- toc:start -->
+
+## Contents
+
+- [Overview](#overview)
+- [Data Model](#data-model)
+  - [Status Flow](#status-flow)
+- [API Endpoints](#api-endpoints)
+  - [Create — context-specific routes](#create--context-specific-routes)
+  - [Lifecycle — on the inquiry resource directly](#lifecycle--on-the-inquiry-resource-directly)
+  - [List — sent and received](#list--sent-and-received)
+  - [Admin](#admin)
+- [Source & Target Resolution](#source--target-resolution)
+  - [Source](#source)
+  - [Target](#target)
+- [Handler Architecture](#handler-architecture)
+  - [`unique` enforcement](#unique-enforcement)
+  - [`validate` — pre-create and pre-update checks](#validate--pre-create-and-pre-update-checks)
+  - [`resolvedContent` and the Override Pattern](#resolvedcontent-and-the-override-pattern)
+  - [Current Handlers](#current-handlers)
+- [Response Schemas](#response-schemas)
+  - [Standardized includes](#standardized-includes)
+- [Permissions (ReBAC)](#permissions-rebac)
+- [Adding a New Handler](#adding-a-new-handler)
+  - [Status utilities (`validations/validateInquiryStatus.ts`)](#status-utilities-validationsvalidateinquirystatusts)
+  - [Create route permission pattern](#create-route-permission-pattern)
+- [Frontend](#frontend)
+  - [Constants and utilities (`packages/ui/src/lib/inquiryQueryKeys.ts`)](#constants-and-utilities-packagesuisrclibinquiryquerykeysts)
+  - [Query key invalidation maps](#query-key-invalidation-maps)
+  - [`useInquiryPermission`](#useinquirypermission)
+  - [UI Components](#ui-components)
+    - [`InquirySourceControls`](#inquirysourcecontrols)
+    - [`InquiryTargetControls`](#inquirytargetcontrols)
+  - [Pages](#pages)
+
+<!-- toc:end -->
+
 The inquiry system is a generic, type-safe workflow engine for requests that require review and approval. It handles invitations, space management requests, and any asynchronous multi-party interaction.
 
 ## Overview

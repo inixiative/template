@@ -1,5 +1,59 @@
 # Template Features
 
+<!-- toc:start -->
+
+## Contents
+
+- [How to Read This](#how-to-read-this)
+- [Core Platform](#core-platform)
+- [API Architecture & Routing](#api-architecture--routing)
+- [Authentication & Sessions](#authentication--sessions)
+  - [Session Authentication (BetterAuth)](#session-authentication-betterauth)
+  - [Multi-Provider Auth (AuthProvider)](#multi-provider-auth-authprovider)
+  - [Token Authentication](#token-authentication)
+  - [User Impersonation](#user-impersonation)
+  - [Roadmap](#roadmap)
+- [Authorization & Permissions](#authorization--permissions)
+- [Multi-Tenancy](#multi-tenancy)
+- [Database & ORM](#database--orm)
+- [Admin Operations](#admin-operations)
+- [Background Jobs & Cron](#background-jobs--cron)
+- [Webhooks](#webhooks)
+- [Real-Time Communication](#real-time-communication)
+- [Email System](#email-system)
+- [Encryption & Security](#encryption--security)
+  - [Field-Level Encryption Engine](#field-level-encryption-engine)
+  - [General Security](#general-security)
+- [User Management](#user-management)
+- [Inquiry System](#inquiry-system)
+- [Contact System](#contact-system)
+- [Customer Management](#customer-management)
+- [Frontend Apps](#frontend-apps)
+- [Frontend Architecture](#frontend-architecture)
+- [UI Components](#ui-components)
+  - [Done (Primitives)](#done-primitives)
+  - [In Progress](#in-progress)
+- [Frontend Hooks](#frontend-hooks)
+- [Developer Experience](#developer-experience)
+  - [Development Workflow](#development-workflow)
+  - [Testing & Quality](#testing--quality)
+  - [Type Safety & Code Generation](#type-safety--code-generation)
+  - [Linting & Formatting](#linting--formatting)
+  - [Boilerplate Reduction](#boilerplate-reduction)
+- [Infrastructure & DevOps](#infrastructure--devops)
+  - [Logging & Observability](#logging--observability)
+  - [Environment & Secrets](#environment--secrets)
+  - [Caching & Performance](#caching--performance)
+  - [Database Operations](#database-operations)
+  - [Coming Soon](#coming-soon)
+- [Architectural Patterns](#architectural-patterns)
+- [Coming Soon (Ticketed Roadmap)](#coming-soon-ticketed-roadmap)
+- [Statistics](#statistics)
+- [Tech Stack](#tech-stack)
+- [🎯 Unique Selling Points](#unique-selling-points)
+
+<!-- toc:end -->
+
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
 **Last Updated:** 2026-05-09

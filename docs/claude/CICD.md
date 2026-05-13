@@ -1,6 +1,6 @@
 # CI/CD
 
-> Decision phase: deployment strategy intentionally deferred while platform patterns are validated.
+<!-- toc:start -->
 
 ## Contents
 
@@ -8,6 +8,11 @@
 - [GitHub Actions](#github-actions)
 - [Deployment Environments](#deployment-environments)
 - [Database Migrations](#database-migrations)
+
+<!-- toc:end -->
+
+> Decision phase: deployment strategy intentionally deferred while platform patterns are validated.
+
 
 ---
 

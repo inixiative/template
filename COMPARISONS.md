@@ -1,5 +1,101 @@
 # How This Template Compares
 
+<!-- toc:start -->
+
+## Contents
+
+- [The Cross-Cutting Advantage](#the-cross-cutting-advantage)
+- [1. Authentication & Sessions](#1-authentication--sessions)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [2. Authorization & Permissions](#2-authorization--permissions)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [3. Database & ORM](#3-database--orm)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [False polymorphism](#false-polymorphism)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Redis cache layer](#redis-cache-layer)
+  - [Mutation lifecycle hooks](#mutation-lifecycle-hooks)
+  - [Honest assessment](#honest-assessment)
+- [4. Background Jobs & Cron](#4-background-jobs--cron)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [5. Webhooks](#5-webhooks)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [6. Field-Level Encryption](#6-field-level-encryption)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [7. API Framework & Routing](#7-api-framework--routing)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The bracket query system](#the-bracket-query-system)
+  - [The batch API](#the-batch-api)
+  - [Honest assessment](#honest-assessment)
+- [8. Error Handling & Structured Errors](#8-error-handling--structured-errors)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [9. Event System](#9-event-system)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [The gap no one fills](#the-gap-no-one-fills)
+  - [Honest assessment](#honest-assessment)
+- [10. Email System](#10-email-system)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [11. WebSocket Infrastructure](#11-websocket-infrastructure)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [12. Multi-Tenancy](#12-multi-tenancy)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [13. Developer Experience](#13-developer-experience)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [14. Observability & Infrastructure](#14-observability--infrastructure)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [15. Middleware & Request Pipeline](#15-middleware--request-pipeline)
+  - [What the template provides](#what-the-template-provides)
+  - [Comparison](#comparison)
+  - [Honest assessment](#honest-assessment)
+- [16. Shared Utilities & Cross-Cutting Concerns](#16-shared-utilities--cross-cutting-concerns)
+  - [What the template provides](#what-the-template-provides)
+  - [Why this matters](#why-this-matters)
+  - [Honest assessment](#honest-assessment)
+- [17. Frontend Architecture](#17-frontend-architecture)
+  - [What the template provides](#what-the-template-provides)
+  - [In progress (not yet production-grade)](#in-progress-not-yet-production-grade)
+  - [Comparison](#comparison)
+  - [The six Zustand slices](#the-six-zustand-slices)
+  - [The 17+ custom hooks](#the-17-custom-hooks)
+  - [13 shared pages across 3 apps](#13-shared-pages-across-3-apps)
+  - [Honest assessment](#honest-assessment)
+- [Summary: Where the Template Stands](#summary-where-the-template-stands)
+  - [Features no alternative provides](#features-no-alternative-provides)
+  - [Where the template matches best-in-class](#where-the-template-matches-best-in-class)
+  - [Where the template has room to grow](#where-the-template-has-room-to-grow)
+
+<!-- toc:end -->
+
 > Every system in this template exists because nothing off-the-shelf solved the problem completely. This document compares each system against the alternatives — managed services, open-source libraries, and typical homegrown approaches at companies of different sizes.
 >
 > We're honest about where this template is ahead, where it's on par, and where it's a foundation rather than a finished product.
@@ -35,9 +131,9 @@ BetterAuth with email/password + OAuth, per-organization custom OAuth/SAML provi
 | Bearer tokens (SHA-256 hashed, Redis-cached) | Yes | No | No | No | Basic plugin | Usually plaintext in DB, no caching |
 | URL token fallback | Yes | No | No | No | No | No |
 | Hierarchical token scopes (User/Org/Space) | Yes | No | No | No | No | No — most startups have flat user-level tokens |
-| PATs with usage tracking | Yes | Limited | No | No | No | Rare — usually no `lastUsedAt` tracking |
+| PATs with usage tracking | Yes | Yes (machine tokens) | Yes (M2M tokens) | No | No | Rare — usually no `lastUsedAt` tracking |
 | Superadmin spoofing with audit headers | Yes | Actor JWT | Deprecated | Yes (dashboard only) | No | Direct DB access with no audit trail |
-| Per-token rate limiting | Yes | No | No | No | No | No — global rate limits at best |
+| Per-token rate limiting | Yes | Partial (org-level) | Partial (tenant-level) | No | No | No — global rate limits at best |
 | Self-hosted, open source | Yes | No | No | No | Yes | Yes |
 
 ### The gap no one fills
@@ -72,9 +168,11 @@ The Permify + json-rules combination is unique. No dedicated authorization servi
 
 More importantly: every other permission system requires you to **sync your data into their model**. User created? Push a relationship tuple to SpiceDB. Role changed? Sync it. Tenant switched? Update the graph. You now have two sources of truth and an eventual consistency problem between them.
 
-This template's rules evaluate against data that already exists in your database. No sync layer, no drift, no state where permissions say yes but the record doesn't exist. And because json-rules compiles to Prisma via `toPrisma()`, you can invert the question entirely: instead of "does user X have permission Y?", you can ask **"give me every user who has permission Y on resource Z"** — as a composable Prisma query, paginated, joined with anything, inside a single transaction. No other permission system can do this. SpiceDB, OpenFGA, and Permify can answer point lookups; they cannot generate the query set of entitled actors in a form you can compose with the rest of your data layer.
+This template's rules evaluate against data that already exists in your database. No sync layer, no drift, no state where permissions say yes but the record doesn't exist. And because json-rules compiles to Prisma via `toPrisma()`, you can invert the question entirely: instead of "does user X have permission Y?", you can ask **"give me every user who has permission Y on resource Z"** — as a composable Prisma query, paginated, joined with anything, inside a single transaction.
 
-Practical examples: notify every user entitled to see a space when it changes, bulk-migrate every actor with a given role, find all admins across orgs with a specific entitlement. With SpiceDB you'd fetch all subjects, then query your DB separately, then reconcile — two round trips, no transaction, pagination is a nightmare. Here it's one query.
+SpiceDB, OpenFGA, and Permify all expose reverse-lookup endpoints (`LookupSubjects`, `ListUsers`, `ListObjects`) that *can* answer "which subjects have permission X" — but they return a list of IDs from a separate RPC call that doesn't compose with your data layer. To paginate, sort, join with other tables, or wrap in a transaction with the side effects you're about to fire, you fetch the IDs, then run your own DB query against them, then reconcile. Here it's one query inside one transaction with everything else.
+
+Practical examples: notify every user entitled to see a space when it changes, bulk-migrate every actor with a given role, find all admins across orgs with a specific entitlement. With an external authorization service that's an RPC plus a DB query plus a reconciliation step. Here it's a single Prisma call you can paginate and join freely.
 
 ### Honest assessment
 The permission system is comprehensive. The Redis cache is event-driven via the db hook — a permission change triggers cache invalidation immediately, making the TTL a safety net rather than the primary expiry mechanism. The json-rules approach trades the power of a dedicated authorization DSL for compactness and composability with the rest of the stack. For most SaaS products, that's the right trade.
@@ -110,7 +208,7 @@ The template uses explicit FK columns per related type instead. This gives you: 
 It's not a workaround for a missing Prisma feature — it's a pattern that's strictly better than what Rails offers for the common case, filling a gap that Prisma doesn't address at all.
 
 ### The gap no one fills
-**No existing ORM provides transaction-aware hooks that execute inside the transaction, roll back on failure, AND defer side effects to post-commit.** This is the exact problem that causes webhooks to fire on rolled-back financial transactions. Every ORM either fires "after" hooks before commit (risking phantom side effects) or has no hook system at all. Only Sequelize has native `afterCommit`, but it doesn't have transaction-aware entity hooks.
+**No TypeScript ORM provides transaction-aware hooks that execute inside the transaction, roll back on failure, AND defer side effects to post-commit as a unified system.** This is the exact problem that causes webhooks to fire on rolled-back financial transactions. Every TypeScript ORM either fires "after" hooks before commit (risking phantom side effects) or has no hook system at all. Sequelize has native `afterCommit` but no transaction-aware entity hooks; Rails 8.2 + Sidekiq solves the post-commit half but lives in a different language stack. The template's mutation lifecycle + `db.onCommit()` brings both halves to the Prisma + Bun + Hono ecosystem.
 
 ### Redis cache layer
 
@@ -145,11 +243,11 @@ BullMQ with three job constructor patterns: `makeJob()` for standard concurrent 
 | DB-persisted cron schedules | **Yes** (CronJob model) | Redis only | Managed | Managed | PostgreSQL | Managed |
 | Manual cron trigger | **Yes** (admin API) | Manual job add | SDK/API/UI | Send event | `add_job()` | Start workflow |
 | Dashboard | BullBoard | BullBoard | Managed UI | Managed UI | None | Managed UI |
-| Transaction-aware enqueue | **Yes** (post-tx queue) | No | No | No | **Native** (SQL in tx) | No |
+| Transaction-aware enqueue | **Yes** (post-tx queue) | N/A (external service) | N/A (external service) | N/A (external service) | **Native** (SQL in tx) | No |
 | Graceful shutdown | Yes (30s timeout) | `worker.close()` | Managed | Managed | `runner.stop()` | Managed |
 
 ### The gap no one fills
-Transaction-aware job enqueueing is the most underappreciated feature. Most teams discover this need via intermittent "record not found" errors in job handlers — the job fires before the transaction commits. Only Graphile Worker (natively, via SQL) and Rails 8.2 + Sidekiq solve this elegantly. The template's `db.onCommit()` pattern brings this to the BullMQ ecosystem.
+Transaction-aware job enqueueing is the most underappreciated feature. Most teams discover this need via intermittent "record not found" errors in job handlers — the job fires before the transaction commits. Graphile Worker solves it natively because jobs live in the same Postgres; Rails 8.2 + Sidekiq solves it via `after_commit`. External services (Trigger.dev, Inngest, etc.) don't *try* to solve this — they're a separate system, and the cure is your own outbox pattern. The template's `db.onCommit()` brings the in-process version to the BullMQ + Prisma + Bun stack.
 
 ### Honest assessment
 The three job patterns are well-engineered. The superseding pattern (poll Redis every 500ms for abort signal) is pragmatic but not instant — there's up to 500ms latency before a superseded job notices. Graphile Worker would eliminate the need for Redis entirely but trades throughput (~10K/sec vs BullMQ's ~50K). The CronJob model with admin API for manual triggering is a genuine convenience that no managed service handles this cleanly.
@@ -203,7 +301,7 @@ AES-256-GCM encryption engine with registry pattern for auto-discovery, per-fiel
 Per-field version tracking combined with AAD binding doesn't exist in any off-the-shelf solution. Vault Transit versions keys globally — it can't tell you "field X on record Y is still on encryption version 2." The template can query for exactly those records and rotate them specifically. AAD binding prevents ciphertext transplant attacks (copying an encrypted value from one record to another).
 
 ### Honest assessment
-The encryption engine is production-grade and more sophisticated than what most Series B companies have. The AAD binding is a genuinely advanced security feature. The CI validation preventing version gaps is defensive engineering that catches deployment mistakes before they cause data loss. Currently used for auth provider secrets — the pattern is ready for any sensitive field.
+The encryption engine is production-grade. AAD binding (preventing ciphertext transplant between records) is a security feature most homegrown encryption layers skip. The CI validation preventing version gaps is defensive engineering that catches deployment mistakes before they cause data loss. Currently used for auth provider secrets — the pattern is ready for any sensitive field. The remaining gap is operational: key escrow, admin visibility into key ages, and rotation history UI (ticket FEAT-013).
 
 ---
 
@@ -475,6 +573,16 @@ These are the "invisible infrastructure" pieces that separate a maintained codeb
 
 ### What the template provides
 React 19 + Vite 7 + TanStack Router (file-based, type-safe) + TanStack Query v5 + Zustand (6 slices) + shadcn. Three frontend apps sharing components from `packages/ui`. Declarative navigation with permission-based rendering. Context-aware routing with URL sync. Route guards. 20+ custom hooks. 13 shared pages. Optimistic mutations with rollback. WebSocket-driven cache invalidation (`useEventRefetch`). Per-space CSS theming for white-labeling. Error guidance categories in global toast system. Auto-generated API SDK + MSW mock handlers.
+
+### In progress (not yet production-grade)
+- **Form components** — React Hook Form + Zod is wired, but the primitive set (Checkbox, Radio, Switch, DatePicker, FormField/FormError/FormLabel) is still being filled in
+- **Page-level composed pages** — the 13 shared pages exist as scaffolds; flesh-out is active work
+- **`useSpaceTheme`** — currently returns mock values; per-space CSS variables aren't yet wired to real space data
+- **Profile editing** — UI renders but save handler is a placeholder
+- **User settings** — notifications / preferences / appearance pages are route shells without content
+- **E2E tests** — Playwright not yet integrated
+
+Treat the comparison table below as covering the architectural shape, not feature parity with finished SaaS apps.
 
 ### Comparison
 

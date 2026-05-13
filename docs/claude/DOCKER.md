@@ -1,14 +1,32 @@
 # Docker
 
-Local development services via Docker Compose.
+<!-- toc:start -->
 
 ## Contents
 
 - [Quick Start](#quick-start)
 - [Services](#services)
+  - [docker-compose.yml](#docker-composeyml)
+  - [Connection Strings](#connection-strings)
 - [Commands](#commands)
+  - [Manual Docker Commands](#manual-docker-commands)
 - [Configuration](#configuration)
+  - [Postgres Initialization](#postgres-initialization)
+  - [Volume Persistence](#volume-persistence)
 - [Database Operations](#database-operations)
+  - [Clone Remote to Local](#clone-remote-to-local)
+  - [Dump Database](#dump-database)
+  - [Restore from Dump](#restore-from-dump)
+  - [Wait Scripts](#wait-scripts)
+- [Troubleshooting](#troubleshooting)
+  - [Port Already in Use](#port-already-in-use)
+  - [Container Won't Start](#container-wont-start)
+  - [Reset Everything](#reset-everything)
+
+<!-- toc:end -->
+
+Local development services via Docker Compose.
+
 
 ---
 

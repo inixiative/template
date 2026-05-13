@@ -1,12 +1,37 @@
 # Redis
 
+<!-- toc:start -->
+
 ## Contents
 
 - [Connection Management](#connection-management)
+  - [Connection Strategy](#connection-strategy)
+  - [Why Separate Connections?](#why-separate-connections)
 - [Namespaces](#namespaces)
+  - [Current Namespaces](#current-namespaces)
 - [Built-In Uses](#built-in-uses)
+  - [Cache (`cache:*`)](#cache-cache)
+  - [Sessions (`session:*`)](#sessions-session)
+  - [Rate Limiting (`limit:*`)](#rate-limiting-limit)
+  - [Job Coordination (`job:*`)](#job-coordination-job)
+  - [WebSocket Pub/Sub (`ws:*`)](#websocket-pubsub-ws)
+  - [BullMQ (`bull:*`)](#bullmq-bull)
 - [Cache Utilities](#cache-utilities)
+  - [cacheKey() Builder](#cachekey-builder)
+  - [cache() Get-or-Set](#cache-get-or-set)
+  - [clearKey()](#clearkey)
+  - [Automatic Invalidation](#automatic-invalidation)
 - [Testing](#testing)
+  - [In-Memory Mock](#in-memory-mock)
+  - [Test Isolation](#test-isolation)
+  - [Queue Mock](#queue-mock)
+- [Error Handling](#error-handling)
+  - [Connection Errors](#connection-errors)
+  - [Cache Fallback](#cache-fallback)
+  - [Key Validation](#key-validation)
+
+<!-- toc:end -->
+
 
 ---
 
