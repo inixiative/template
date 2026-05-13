@@ -333,7 +333,8 @@ The hook fires for `create`, `createManyAndReturn`, `upsert`, `update`, and `upd
 2. Enforces the subtype rule.
 3. Parses `value` through `inputSchema` → `parseInput` → `valueSchema`.
 4. Sets `valueKey = def.toValueKey(canonical)` so the per-owner unique constraint resolves.
-5. On create, auto-assigns `sortOrder = MAX+1` within `(owner, type)` if the caller omitted it (uses `nextSortOrder` from `apps/api/src/lib/prisma/orderedList.ts`).
+
+The `position` column is managed by the separate `orderedList` hook (see below) — Contact is registered against it, so position assignment, shifts, soft-delete sentinels, and bulk re-densification all happen automatically.
 
 Update paths shadow-merge the partial update with `previous` so type-aware validation runs against the merged record, then mirror hook-computed fields (`value`, `valueKey`) back into `args.data`.
 
@@ -410,6 +411,59 @@ await db.organization.create({
 ```
 
 Nested updates log a warning (can't fetch previous for each nested record without N+1 queries).
+
+---
+
+## Ordered List
+
+Registry-driven hook that maintains dense `[1..N]` position columns for any model that opts in. Lives at `apps/api/src/hooks/orderedList/`, with the SQL primitives in `apps/api/src/lib/prisma/orderedList.ts`.
+
+### Registry
+
+```typescript
+// hooks/orderedList/registry.ts
+export const orderedListRegistry: OrderedListRegistry = {
+  Contact: {
+    position: [...contactOwnerFields, 'type'],   // field → scope keys
+  },
+};
+```
+
+The key is the Prisma model name. The value maps each ordered field to its scope: an array of column names that partition rows into independent lists. For Contact, every `(userId|orgId|spaceId, type)` combination is its own list — `position` resets to 1 for each scope.
+
+### What it covers
+
+| Action | Behavior |
+|---|---|
+| `create` (single) | If `position` is null → append (MAX+1). If provided → clamp to `[1, MAX+1]` and shift siblings up |
+| `createManyAndReturn` | Per scope, one SELECT MAX + one CTE `UPDATE … FROM (VALUES …)` shifts existing rows; new rows are inserted at pre-computed positions |
+| `update` | Soft-delete → sets `position` to the next distinct negative, compacts siblings. Restore → appends to live tail. Explicit position change → shifts only siblings using a predicate that excludes the target row, then Prisma writes the new position |
+| `updateManyAndReturn` (BEFORE) | **Throws** if `data` writes any ordered field — bulk position arithmetic can't be reconciled with `[1..N]` semantics. Use single `update()` per row or chunk at the app layer |
+| `updateManyAndReturn` (AFTER) | If `deletedAt` changed, filters `previousRows` by actual state transition (only rows that were live get new negatives; only rows that were deleted get appended back). One `reDensifyLive` + one `bulkAssignNegatives` per scope on soft-delete; one `bulkAssignAppend` per scope on restore |
+| `upsert` | Routes to create or update branch based on `previous` |
+| `delete` / `deleteMany` | AFTER-hook re-densifies live survivors per scope via `ROW_NUMBER() OVER (ORDER BY position ASC, id ASC)` — single statement |
+
+### Soft-deleted rows
+
+Soft-deleted items keep a row but get a distinct **negative** position outside the live range, so the live `position > 0 AND deletedAt IS NULL` scope stays dense. Multiple deletes stack as `-1, -2, -3, …`. Restore takes the row back to `MAX(live) + 1`.
+
+### Bulk-friendly by construction
+
+Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts triggers two queries per (owner, type) scope regardless of batch size. Same for bulk soft-delete, bulk restore, and `deleteMany`.
+
+### Scope strictness
+
+`buildScope` throws if a registered scope key is missing or `undefined` on the row — no silent coalescing of "absent" and "explicitly null." Input rows on the create path are passed through `normalizeInputScope` at the boundary to materialize Prisma's "absent = insert NULL" semantics explicitly.
+
+### Adding a Model
+
+1. Register it in `orderedListRegistry` with `{ <fieldName>: [...scopeKeys] }`.
+2. That's it — every relevant action picks it up automatically.
+
+### Limitations
+
+- Concurrent inserts into the same scope from separate transactions can race on `SELECT MAX(position)` and produce duplicate positions. Sort still resolves deterministically via `(position, id)` and a later bulk op will heal it. Mitigation (advisory lock) is documented inline at the bottom of `apps/api/src/lib/prisma/orderedList.ts`.
+- `updateManyAndReturn` cannot write ordered fields directly. Use single updates.
 
 ---
 
