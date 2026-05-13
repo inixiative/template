@@ -57,19 +57,21 @@ registerDbHook(
 
 ## Application Hooks
 
-Located in `apps/api/src/hooks/`:
+Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API and worker entry points:
 
 | Hook | Purpose |
 |------|---------|
-| `auditLog` | Immutable audit trail of all mutations |
-| `cache` | Cache invalidation on mutations |
-| `webhooks` | Webhook delivery on mutations |
-| `immutableFields` | Prevents FK field updates |
-| `rules` | Declarative validation |
-| `falsePolymorphism` | Type enum + FK validation |
+| `auditLog` | Immutable audit trail of all mutations on enabled models |
+| `cache` | Cache invalidation on mutations (post-commit) |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
+| `immutableFields` | Strips immutable fields (FKs, `id`, `createdAt`) from updates |
+| `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
+| `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
+| `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
+| `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
+| `webhooks` | Webhook delivery on mutations (post-commit) |
 
-All registered via `registerHooks()` in entry points.
+`apps/api/src/hooks/falsePolymorphism/` lives under `hooks/` but is **not** a runtime hook — it's a pair of transformers (`toRules.ts`, `toImmutableFields.ts`) that inject polymorphism constraints into the rules and immutableFields registries at module load time.
 
 ---
 
