@@ -506,3 +506,30 @@ export const applyOrderedListUpsert = async (
     await applyOrderedListUpdate(model, update, previous);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Known limitation: concurrent-insert race
+// ---------------------------------------------------------------------------
+// Two transactions appending to the same scope at the same time can both
+// `SELECT MAX(position)` before either commits, then both write MAX+1.
+// Result: two rows at the same position. Sorting still works deterministically
+// (the secondary `ORDER BY id` tiebreaks), but the list is no longer a dense
+// [1..N]. The next bulk soft-delete or re-densify pass heals it.
+//
+// We intentionally don't guard against this. The cost of a guard hits every
+// happy-path mutation:
+//   - `SELECT … FOR UPDATE` on the pre-fetch would queue every writer behind
+//     the row-lock holder for the entire transaction (hooks included).
+//   - A `pg_advisory_xact_lock(hashtext(scope_key))` is lighter — one extra
+//     round trip, no B-tree write, only blocks on actual contention — but
+//     still pays the round trip on every ordered-list mutation.
+//   - A partial unique index `WHERE position > 0` would catch the dup at the
+//     DB and require rewriting every shift to handle transient violations
+//     (DEFERRABLE constraint or tail-first ordering).
+//
+// For the actual workloads here (per-owner Contact lists, low churn, usually
+// one user editing their own data), the race essentially never fires and the
+// failure mode is mild. If duplicate positions ever show up in prod, the
+// advisory-lock approach is the cheapest fix and lives entirely inside this
+// module — gate it on `orderedListRegistry[model]` so non-ordered models
+// don't pay.
