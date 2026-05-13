@@ -1,7 +1,6 @@
 import { DbAction, type HookOptions, HookTiming, type ManyAction, registerDbHook } from '@template/db';
 import { applyOrderedListBulkDeletedAtChange } from '#/lib/prisma/orderedList';
 import { orderedListRegistry } from '#/hooks/orderedList/registry';
-import { isRegistered } from '#/hooks/orderedList/utils';
 
 export const registerOrderedListUpdateManyHook = () => {
   // BEFORE: reject bulk writes to ordered fields. Bulk position arithmetic
@@ -15,12 +14,10 @@ export const registerOrderedListUpdateManyHook = () => {
     [DbAction.updateManyAndReturn],
     async (options) => {
       const { args, model } = options as HookOptions & { action: ManyAction };
-      if (!isRegistered(model)) return;
+      const config = orderedListRegistry[model];
+      if (!config) return;
       const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data) return;
-
-      const config = orderedListRegistry[model!];
-      if (!config) return;
 
       for (const field of Object.keys(config)) {
         if (data[field] !== undefined) {
@@ -42,12 +39,11 @@ export const registerOrderedListUpdateManyHook = () => {
     [DbAction.updateManyAndReturn],
     async (options) => {
       const { args, previous, model } = options as HookOptions & { action: ManyAction };
-      if (!isRegistered(model)) return;
       const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data || !previous || !Array.isArray(previous)) return;
       if (data.deletedAt === undefined) return;
 
-      await applyOrderedListBulkDeletedAtChange(model!, data, previous as Record<string, unknown>[]);
+      await applyOrderedListBulkDeletedAtChange(model, data, previous as Record<string, unknown>[]);
     },
   );
 };

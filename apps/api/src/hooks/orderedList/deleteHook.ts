@@ -1,6 +1,5 @@
 import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
 import { applyOrderedListHardDelete } from '#/lib/prisma/orderedList';
-import { isRegistered } from '#/hooks/orderedList/utils';
 
 export const registerOrderedListDeleteHook = () => {
   registerDbHook(
@@ -10,9 +9,9 @@ export const registerOrderedListDeleteHook = () => {
     [DbAction.delete, DbAction.deleteMany],
     async (options) => {
       const { previous, model } = options as HookOptions;
-      if (!isRegistered(model) || !previous) return;
+      if (!previous) return;
       const rows = Array.isArray(previous) ? previous : [previous];
-      await applyOrderedListHardDelete(model!, rows as Record<string, unknown>[]);
+      await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
     },
   );
 };
