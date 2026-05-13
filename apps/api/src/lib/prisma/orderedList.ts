@@ -163,12 +163,15 @@ export const applyOrderedListCreate = async (
   }
 };
 
-// Batch create: fixed-position rows are canonical — their position is what they
-// claim. When a fixed-position row arrives, any DB rows AND any previously-
-// assigned batch rows at >= that position are shifted up. Append rows fill the
-// next available slot after the current virtual + DB maximum.
-type VirtualRow = { row: Record<string, unknown>; pos: number };
-
+// Batch create. Per scope, computes final positions for the entire batch in
+// JS by mirroring the original iterative "fixed-position rows shift DB +
+// earlier batch rows up by 1, append rows take currentMax+1" semantics, then
+// emits ONE bulk UPDATE to shift existing rows into their final slots. The
+// caller writes the new rows at the pre-computed positions on insert.
+//
+// Cost per scope: 1 SELECT (MAX) + 1 UPDATE (VALUES list). Independent of
+// batch size. JS simulation is O(batch²) for the virtual-row shifts, fine
+// for any realistic batch.
 export const applyOrderedListBatchCreate = async (
   model: string,
   rows: Record<string, unknown>[],
@@ -176,41 +179,86 @@ export const applyOrderedListBatchCreate = async (
   const config = configForModel(model);
   if (!config) return;
 
-  const virtualByScope = new Map<string, VirtualRow[]>();
-
   for (const row of rows) {
-    for (const [field, scopeFields] of Object.entries(config)) {
+    for (const [, scopeFields] of Object.entries(config)) {
       normalizeInputScope(row, scopeFields);
-      const scope = buildScope(row, scopeFields);
-      const key = JSON.stringify(scope);
-      if (!virtualByScope.has(key)) virtualByScope.set(key, []);
-      const vp = virtualByScope.get(key)!;
-
-      if (row[field] == null) {
-        // Append: slot after max(DB max, virtual max).
-        const dbMax = (await nextSortOrderRaw(model, scope, field)) - 1;
-        const virtualMax = vp.length > 0 ? Math.max(...vp.map((v) => v.pos)) : 0;
-        const next = Math.max(dbMax, virtualMax) + 1;
-        vp.push({ row, pos: next });
-        row[field] = next;
-      } else {
-        // Fixed position: clamp to [1, max+1], shift DB rows AND previous batch rows.
-        const dbMax = await nextSortOrderRaw(model, scope, field);
-        const clamped = Math.max(1, Math.min(row[field] as number, dbMax));
-
-        await shiftUp(model, scope, field, Prisma.sql`${col(field)} >= ${clamped}`);
-
-        for (const vr of vp) {
-          if (vr.pos >= clamped) {
-            vr.pos += 1;
-            vr.row[field] = vr.pos;
-          }
-        }
-        vp.push({ row, pos: clamped });
-        row[field] = clamped;
-      }
     }
   }
+
+  for (const [field, scopeFields] of Object.entries(config)) {
+    // Group rows by scope, preserving input order within each scope.
+    const byScope = new Map<string, { scope: Where; rows: Record<string, unknown>[] }>();
+    for (const row of rows) {
+      const scope = buildScope(row, scopeFields);
+      const key = JSON.stringify(scope);
+      let entry = byScope.get(key);
+      if (!entry) {
+        entry = { scope, rows: [] };
+        byScope.set(key, entry);
+      }
+      entry.rows.push(row);
+    }
+
+    for (const { scope, rows: scopedRows } of byScope.values()) {
+      await placeBatchInScope(model, scope, field, scopedRows);
+    }
+  }
+};
+
+const placeBatchInScope = async (
+  model: string,
+  scope: Where,
+  field: string,
+  batchRows: Record<string, unknown>[],
+): Promise<void> => {
+  // 1. Read current DB max once.
+  const dbMax = (await nextSortOrderRaw(model, scope, field)) - 1;
+
+  // 2. Simulate placement: track each virtual row's running position as
+  //    later fixed-position rows bump earlier ones up.
+  let currentMax = dbMax;
+  const virtuals: { row: Record<string, unknown>; pos: number }[] = [];
+
+  for (const row of batchRows) {
+    const slot = row[field] == null
+      ? currentMax + 1
+      : Math.max(1, Math.min(row[field] as number, currentMax + 1));
+
+    for (const v of virtuals) {
+      if (v.pos >= slot) v.pos += 1;
+    }
+    virtuals.push({ row, pos: slot });
+    currentMax += 1;
+  }
+
+  // 3. Compute shift per existing row. With batch final positions sorted
+  //    ascending, walk original positions in order: each B[i] <= currentPos
+  //    bumps the running shift. Monotonic — single pass.
+  if (dbMax > 0) {
+    const sortedBatchPos = virtuals.map((v) => v.pos).sort((a, b) => a - b);
+    const updates: Prisma.Sql[] = [];
+    let shift = 0;
+    for (let p = 1; p <= dbMax; p++) {
+      while (shift < sortedBatchPos.length && sortedBatchPos[shift]! <= p + shift) {
+        shift += 1;
+      }
+      if (shift > 0) updates.push(Prisma.sql`(${p}::int, ${p + shift}::int)`);
+    }
+
+    if (updates.length > 0) {
+      const t = table(model);
+      const f = col(field);
+      const scopeSQL = scopeWhere(model, scope, field, true);
+      await db.$executeRaw(Prisma.sql`
+        UPDATE ${t} SET ${f} = c.new_pos
+        FROM (VALUES ${Prisma.join(updates, ', ')}) AS c(old_pos, new_pos)
+        WHERE ${scopeSQL} AND ${f} = c.old_pos
+      `);
+    }
+  }
+
+  // 4. Write the computed positions onto the input rows (Prisma will insert).
+  for (const v of virtuals) v.row[field] = v.pos;
 };
 
 // Called from the BEFORE hook for single `update`.
@@ -277,15 +325,25 @@ export const applyOrderedListUpdate = async (
   }
 };
 
-export const applyOrderedListHardDelete = async (model: string, previous: Record<string, unknown>): Promise<void> => {
+// AFTER-hook for delete / deleteMany. By the time this fires the deleted
+// rows are physically gone, so a single reDensifyLive per scope ROW_NUMBERs
+// the survivors into [1..N] — one query per scope regardless of how many
+// rows were deleted.
+export const applyOrderedListHardDelete = async (
+  model: string,
+  previousRows: Record<string, unknown>[],
+): Promise<void> => {
   const config = configForModel(model);
   if (!config) return;
 
   for (const [field, scopeFields] of Object.entries(config)) {
-    const scope = buildScope(previous, scopeFields);
-    const oldPos = previous[field] as number;
-    if (typeof oldPos === 'number' && oldPos > 0) {
-      await compactAfterRemove(model, scope, oldPos, field);
+    const seen = new Set<string>();
+    for (const prev of previousRows) {
+      const scope = buildScope(prev, scopeFields);
+      const key = JSON.stringify(scope);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      await reDensifyLive(model, scope, field);
     }
   }
 };
