@@ -1,6 +1,5 @@
 import {
   DbAction,
-  db,
   type HookOptions,
   HookTiming,
   PolymorphismRegistry,
@@ -10,7 +9,6 @@ import {
 } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
 import { makeError } from '#/lib/errors';
-import { registerOrderedList } from '#/lib/prisma/orderedList';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
@@ -58,8 +56,9 @@ const processContactRow = async (row: ContactRow, isUpdate: boolean): Promise<vo
     row.valueKey = def.toValueKey(validated);
   }
 
-  // position is handled by the orderedList registry — applyOrderedListDefaults
-  // fires automatically for registered models. Reorder is at the route layer.
+  // `position` is handled separately by the orderedList hook — Contact is
+  // registered there and position assignment / shifts / soft-delete sentinels
+  // all flow through that hook automatically. Nothing for us to do here.
 };
 
 // Returns a contact row from createMany / create args (data: T | T[] form).

@@ -131,7 +131,7 @@ describe('multi-scope isolation — createManyAndReturn', () => {
     await db.contact.createManyAndReturn({
       data: [
         phoneRow(u.id),
-        { ownerModel: ContactOwnerModel.User as const, userId: u.id, type: ContactType.email as const, value: { address: `a${getNextSeq()}@ex.com` } },
+        { ownerModel: ContactOwnerModel.User, userId: u.id, type: ContactType.email, value: { address: `a${getNextSeq()}@ex.com` } },
         phoneRow(u.id),
       ],
     });
