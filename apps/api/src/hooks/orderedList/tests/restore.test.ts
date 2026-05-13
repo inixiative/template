@@ -20,6 +20,25 @@ describe('restore', () => {
 });
 
 describe('bulk restore', () => {
+  it('ignores rows that were already live (no clobber)', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2 — will be soft-deleted then restored alongside live rows
+    const c = await phone(u.id); // 3
+    await softDelete(b.id); // live: a=1, c=2; deleted: b
+    // Bulk-set deletedAt=null over a where-clause that matches BOTH live and deleted rows.
+    // Only b should be re-slotted; a and c must keep their positions.
+    await db.contact.updateManyAndReturn({
+      where: { userId: u.id, type: ContactType.phone },
+      data: { deletedAt: null },
+    });
+    const rows = await liveOrders(u.id);
+    expect(positions(rows)).toEqual([1, 2, 3]);
+    expect(posOf(rows, a.id)).toBe(1);
+    expect(posOf(rows, c.id)).toBe(2);
+    expect(posOf(rows, b.id)).toBe(3); // restored to end, didn't clobber a/c
+  });
+
   it('assigns sequential end positions', async () => {
     const { entity: u } = await createUser();
     await phone(u.id); // 1

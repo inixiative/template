@@ -39,6 +39,30 @@ describe('soft delete', () => {
 });
 
 describe('bulk soft delete', () => {
+  it('ignores rows that were already deleted (no clobber)', async () => {
+    const { entity: u } = await createUser();
+    const a = await phone(u.id); // 1
+    const b = await phone(u.id); // 2 — already soft-deleted before the bulk op
+    const c = await phone(u.id); // 3
+    await softDelete(b.id); // live: a=1, c=2; b: negative
+    const bAfterFirstDelete = await db.contact.findUnique({ where: { id: b.id } });
+    const bOldNeg = bAfterFirstDelete!.position;
+    // Bulk-set deletedAt over a where-clause that matches BOTH live and the already-deleted row.
+    // Only a and c should transition; b must keep its existing negative.
+    await db.contact.updateManyAndReturn({
+      where: { userId: u.id, type: ContactType.phone },
+      data: { deletedAt: new Date() },
+    });
+    const all = await allOrders(u.id);
+    const bAfter = all.find((r) => r.id === b.id)!;
+    expect(bAfter.position).toBe(bOldNeg); // untouched
+    // a and c should both be negative now (newly soft-deleted)
+    const aAfter = all.find((r) => r.id === a.id)!;
+    const cAfter = all.find((r) => r.id === c.id)!;
+    expect(aAfter.position).toBeLessThan(0);
+    expect(cAfter.position).toBeLessThan(0);
+  });
+
   it('compacts after deleting multiple items', async () => {
     const { entity: u } = await createUser();
     const a = await phone(u.id); // 1

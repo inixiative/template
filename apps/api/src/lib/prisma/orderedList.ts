@@ -450,8 +450,17 @@ export const applyOrderedListBulkDeletedAtChange = async (
   const isRestoring = data.deletedAt === null;
   if (!isSoftDeleting && !isRestoring) return;
 
+  // Filter to rows actually transitioning state — a bulk
+  // `data.deletedAt = null` on a where-clause that matches both already-live
+  // and previously-deleted rows must only re-slot the deleted ones.
+  // Symmetrically for soft-delete.
+  const transitioning = isSoftDeleting
+    ? previousRows.filter((p) => p.deletedAt == null)
+    : previousRows.filter((p) => p.deletedAt != null);
+  if (transitioning.length === 0) return;
+
   for (const [field, scopeFields] of Object.entries(config)) {
-    const grouped = groupIdsByScope(previousRows, scopeFields);
+    const grouped = groupIdsByScope(transitioning, scopeFields);
 
     if (isSoftDeleting) {
       for (const { scope } of grouped.values()) {
