@@ -7,6 +7,6 @@ const contactOwnerFields = [
 
 export const orderedListRegistry: OrderedListRegistry = {
   Contact: {
-    sortOrder: [...contactOwnerFields, 'type'],
+    position: [...contactOwnerFields, 'type'],
   },
 };
