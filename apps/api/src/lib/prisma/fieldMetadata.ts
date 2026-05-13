@@ -8,7 +8,7 @@
  * parallel "kind" enum mediates between them.
  */
 
-import { prismaMap } from '@template/permissions/rebac/prismaMap.gen';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 export type FieldDef = {
   kind: 'scalar' | 'enum' | 'object';

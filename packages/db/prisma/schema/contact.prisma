@@ -65,6 +65,13 @@ model Contact {
   @@unique([userId, type, valueKey],         where: { userId:         { not: null } })
   @@unique([organizationId, type, valueKey], where: { organizationId: { not: null } })
   @@unique([spaceId, type, valueKey],        where: { spaceId:        { not: null } })
+  // Sort order uniqueness per (owner, type) — ensures dense [1..N] for live
+  // items. Same partial-unique pattern as the valueKey constraints above.
+  // Negative sortOrders (soft-deleted items) can share values since they're
+  // outside the live range; the constraint only covers sortOrder > 0.
+  @@unique([userId, type, sortOrder],         where: { userId: { not: null }, sortOrder: { gt: 0 } })
+  @@unique([organizationId, type, sortOrder], where: { organizationId: { not: null }, sortOrder: { gt: 0 } })
+  @@unique([spaceId, type, sortOrder],        where: { spaceId: { not: null }, sortOrder: { gt: 0 } })
   @@index([ownerModel])
   @@index([type, valueKey])
 }
