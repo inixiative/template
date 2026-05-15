@@ -40,7 +40,9 @@ export const resolveInquiry = async (
         const handler = inquiryHandlers[fresh.type];
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
+        const freshWithRelations = { ...inquiry, ...fresh };
+        if (handler.validate) await handler.validate(db, freshWithRelations, content);
+        approvalOutput = (await handler.handleApprove(db, freshWithRelations, merged)) ?? {};
       }
 
       const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
