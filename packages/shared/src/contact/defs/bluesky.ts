@@ -11,6 +11,7 @@ export const blueskyDef: ContactTypeDef<Input, BlueskyValue> = {
   parseInput: (i) => ('url' in i ? parseBlueskyUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://bsky.app/profile/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

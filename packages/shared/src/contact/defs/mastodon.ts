@@ -12,6 +12,7 @@ export const mastodonDef: ContactTypeDef<Input, MastodonValue> = {
   valueSchema: stored,
   // Mastodon is multi-instance — instance is part of identity.
   toValueKey: (v) => `${v.instance.toLowerCase()}/${v.handle.toLowerCase()}`,
+  redact: (id) => ({ instance: id, handle: id }),
   toUrl: (v) => `https://${v.instance}/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

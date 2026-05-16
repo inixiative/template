@@ -24,8 +24,7 @@ export type FieldDef = {
 // one cast, no `unknown` laundering.
 const MAP = prismaMap as Record<string, { fields: Record<string, FieldDef> }>;
 
-const getField = (modelName: string, fieldName: string): FieldDef | undefined =>
-  MAP[modelName]?.fields?.[fieldName];
+const getField = (modelName: string, fieldName: string): FieldDef | undefined => MAP[modelName]?.fields?.[fieldName];
 
 /**
  * Walk a dotted path through relation segments to its leaf field def.

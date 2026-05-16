@@ -1,7 +1,7 @@
 import { db, Prisma } from '@template/db';
-import { lookupField } from '#/lib/prisma/fieldMetadata';
-import { orderedListRegistry } from '#/hooks/orderedList/registry';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { orderedListRegistry } from '#/hooks/orderedList/registry';
+import { lookupField } from '#/lib/prisma/fieldMetadata';
 
 export type OrderedListConfig = Record<string, string[]>;
 export type OrderedListRegistry = Record<string, OrderedListConfig>;
@@ -17,8 +17,7 @@ const table = (model: string) => {
 
 const col = (name: string) => Prisma.raw(`"${name}"`);
 
-const hasSoftDelete = (model: string): boolean =>
-  lookupField(model, 'deletedAt') !== undefined;
+const hasSoftDelete = (model: string): boolean => lookupField(model, 'deletedAt') !== undefined;
 
 // liveOnly=true:  deletedAt IS NULL AND position > 0  (normal live scope)
 // liveOnly=false: scope columns only (no deletedAt / position filter)
@@ -87,7 +86,12 @@ export const insertAtRaw = async (model: string, scope: Where, position: number,
   return clamped;
 };
 
-export const compactAfterRemove = async (model: string, scope: Where, removedPosition: number, field: string): Promise<void> => {
+export const compactAfterRemove = async (
+  model: string,
+  scope: Where,
+  removedPosition: number,
+  field: string,
+): Promise<void> => {
   await shiftDown(model, scope, field, Prisma.sql`${col(field)} > ${removedPosition}`);
 };
 
@@ -145,10 +149,7 @@ const normalizeInputScope = (row: Record<string, unknown>, scopeFields: string[]
 
 const configForModel = (model: string) => orderedListRegistry[model];
 
-export const applyOrderedListCreate = async (
-  model: string,
-  row: Record<string, unknown>,
-): Promise<void> => {
+export const applyOrderedListCreate = async (model: string, row: Record<string, unknown>): Promise<void> => {
   const config = configForModel(model);
   if (!config) return;
 
@@ -172,10 +173,7 @@ export const applyOrderedListCreate = async (
 // Cost per scope: 1 SELECT (MAX) + 1 UPDATE (VALUES list). Independent of
 // batch size. JS simulation is O(batch²) for the virtual-row shifts, fine
 // for any realistic batch.
-export const applyOrderedListBatchCreate = async (
-  model: string,
-  rows: Record<string, unknown>[],
-): Promise<void> => {
+export const applyOrderedListBatchCreate = async (model: string, rows: Record<string, unknown>[]): Promise<void> => {
   const config = configForModel(model);
   if (!config) return;
 
@@ -227,9 +225,7 @@ const placeBatchInScope = async (
   const virtuals: { row: Record<string, unknown>; pos: number }[] = [];
 
   for (const row of batchRows) {
-    const slot = row[field] == null
-      ? currentMax + 1
-      : Math.max(1, Math.min(row[field] as number, currentMax + 1));
+    const slot = row[field] == null ? currentMax + 1 : Math.max(1, Math.min(row[field] as number, currentMax + 1));
 
     if (slot <= maxVirtualPos) {
       for (const v of virtuals) {
@@ -384,17 +380,15 @@ const groupIdsByScope = (
 // Bulk-assign distinct negatives in a single statement per scope. ROW_NUMBER
 // over the deleted-id set, anchored to current MIN(negatives) (0 if none),
 // produces a contiguous descending sequence below the lowest existing slot.
-const bulkAssignNegatives = async (
-  model: string,
-  scope: Where,
-  field: string,
-  ids: string[],
-): Promise<void> => {
+const bulkAssignNegatives = async (model: string, scope: Where, field: string, ids: string[]): Promise<void> => {
   if (ids.length === 0) return;
   const t = table(model);
   const f = col(field);
   const scopeSQL = scopeWhere(model, scope, field, false);
-  const idsList = Prisma.join(ids.map((id) => Prisma.sql`${id}`), ', ');
+  const idsList = Prisma.join(
+    ids.map((id) => Prisma.sql`${id}`),
+    ', ',
+  );
 
   await db.$executeRaw(Prisma.sql`
     WITH base AS (
@@ -415,17 +409,15 @@ const bulkAssignNegatives = async (
 // Bulk-append restored rows to the end of the live list in one statement per
 // scope. Anchored to current MAX(live positives), then ROW_NUMBER assigns
 // MAX+1, MAX+2, … in id order.
-const bulkAssignAppend = async (
-  model: string,
-  scope: Where,
-  field: string,
-  ids: string[],
-): Promise<void> => {
+const bulkAssignAppend = async (model: string, scope: Where, field: string, ids: string[]): Promise<void> => {
   if (ids.length === 0) return;
   const t = table(model);
   const f = col(field);
   const liveScopeSQL = scopeWhere(model, scope, field, true);
-  const idsList = Prisma.join(ids.map((id) => Prisma.sql`${id}`), ', ');
+  const idsList = Prisma.join(
+    ids.map((id) => Prisma.sql`${id}`),
+    ', ',
+  );
 
   await db.$executeRaw(Prisma.sql`
     WITH base AS (

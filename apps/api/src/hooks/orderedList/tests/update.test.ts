@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { liveOrders, mkEmail, phone, phoneRow, posOf, positions, softDelete } from './setup';
+import { liveOrders, mkEmail, phone, phoneRow, positions, posOf, softDelete } from './setup';
 
 describe('reorder via direct position update', () => {
   it('3→1: shifts [1,3) up', async () => {
@@ -113,10 +113,11 @@ describe('bulk position manipulation', () => {
     await phone(u.id);
 
     expect(
-      (async () => db.contact.updateManyAndReturn({
-        where: { userId: u.id, type: ContactType.phone },
-        data: { position: { increment: 1 } },
-      }))(),
+      (async () =>
+        db.contact.updateManyAndReturn({
+          where: { userId: u.id, type: ContactType.phone },
+          data: { position: { increment: 1 } },
+        }))(),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
@@ -126,10 +127,11 @@ describe('bulk position manipulation', () => {
     await phone(u.id);
 
     expect(
-      (async () => db.contact.updateManyAndReturn({
-        where: { userId: u.id, type: ContactType.phone },
-        data: { position: { decrement: 1 } },
-      }))(),
+      (async () =>
+        db.contact.updateManyAndReturn({
+          where: { userId: u.id, type: ContactType.phone },
+          data: { position: { decrement: 1 } },
+        }))(),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
@@ -138,10 +140,11 @@ describe('bulk position manipulation', () => {
     await phone(u.id);
 
     expect(
-      (async () => db.contact.updateManyAndReturn({
-        where: { userId: u.id, type: ContactType.phone },
-        data: { position: 5 },
-      }))(),
+      (async () =>
+        db.contact.updateManyAndReturn({
+          where: { userId: u.id, type: ContactType.phone },
+          data: { position: 5 },
+        }))(),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
@@ -166,13 +169,15 @@ describe('multi-scope isolation — bulk position write rejected', () => {
   it('throws even when matched rows span multiple owners', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    await phone(u1.id); await phone(u2.id);
+    await phone(u1.id);
+    await phone(u2.id);
 
     expect(
-      (async () => db.contact.updateManyAndReturn({
-        where: { userId: { in: [u1.id, u2.id] }, type: ContactType.phone },
-        data: { position: { increment: 5 } },
-      }))(),
+      (async () =>
+        db.contact.updateManyAndReturn({
+          where: { userId: { in: [u1.id, u2.id] }, type: ContactType.phone },
+          data: { position: { increment: 5 } },
+        }))(),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 
@@ -182,10 +187,11 @@ describe('multi-scope isolation — bulk position write rejected', () => {
     await mkEmail(u.id);
 
     expect(
-      (async () => db.contact.updateManyAndReturn({
-        where: { userId: u.id },
-        data: { position: { increment: 5 } },
-      }))(),
+      (async () =>
+        db.contact.updateManyAndReturn({
+          where: { userId: u.id },
+          data: { position: { increment: 5 } },
+        }))(),
     ).rejects.toThrow(/cannot be written via updateManyAndReturn/);
   });
 });

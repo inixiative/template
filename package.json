@@ -58,7 +58,7 @@
     "lint:generated": "./scripts/lint/check-generated-files.sh",
     "lint:fix": "biome check --write . && bun run lint:postBiome",
     "format": "biome format --write .",
-    "docs:toc": "bun run scripts/docs/regen-toc.ts"
+    "docs:toc": "bun run scripts/docs/regenToc.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",

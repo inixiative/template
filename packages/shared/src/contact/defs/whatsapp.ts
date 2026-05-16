@@ -14,6 +14,7 @@ export const whatsappDef: ContactTypeDef<WhatsappValue, WhatsappValue> = {
   parseInput: (v) => v,
   valueSchema: whatsappSchema,
   toValueKey: (v) => v.jid,
+  redact: (id) => ({ jid: id }),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'WhatsApp', icon: 'simple-icons:whatsapp' },

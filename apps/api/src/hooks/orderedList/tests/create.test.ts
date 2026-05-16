@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { createUser, getNextSeq } from '@template/db/test';
-import { email, liveOrders, phone, phoneRow, posOf, positions } from './setup';
+import { email, liveOrders, phone, phoneRow, positions, posOf } from './setup';
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {
@@ -67,8 +67,18 @@ describe('createManyAndReturn', () => {
     const rows = await liveOrders(u.id);
     expect(positions(rows)).toEqual([1, 2, 3, 4, 5, 6]);
     const newIds = new Set(res.map((r) => r.id));
-    expect(rows.filter((r) => newIds.has(r.id)).map((r) => r.position).sort()).toEqual([1, 2, 3]);
-    expect(rows.filter((r) => !newIds.has(r.id)).map((r) => r.position).sort()).toEqual([4, 5, 6]);
+    expect(
+      rows
+        .filter((r) => newIds.has(r.id))
+        .map((r) => r.position)
+        .sort(),
+    ).toEqual([1, 2, 3]);
+    expect(
+      rows
+        .filter((r) => !newIds.has(r.id))
+        .map((r) => r.position)
+        .sort(),
+    ).toEqual([4, 5, 6]);
   });
 
   it('all at same position — LIFO order', async () => {
@@ -131,7 +141,12 @@ describe('multi-scope isolation — createManyAndReturn', () => {
     await db.contact.createManyAndReturn({
       data: [
         phoneRow(u.id),
-        { ownerModel: ContactOwnerModel.User, userId: u.id, type: ContactType.email, value: { address: `a${getNextSeq()}@ex.com` } },
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: u.id,
+          type: ContactType.email,
+          value: { address: `a${getNextSeq()}@ex.com` },
+        },
         phoneRow(u.id),
       ],
     });

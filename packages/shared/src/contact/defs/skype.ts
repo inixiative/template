@@ -11,6 +11,7 @@ export const skypeDef: ContactTypeDef<SkypeValue, SkypeValue> = {
   parseInput: (v) => v,
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'Skype', icon: 'simple-icons:skype' },

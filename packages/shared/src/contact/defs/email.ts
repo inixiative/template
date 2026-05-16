@@ -11,6 +11,7 @@ export const emailDef: ContactTypeDef<EmailValue, EmailValue> = {
   parseInput: (v) => ({ address: v.address.toLowerCase() }),
   valueSchema: emailSchema,
   toValueKey: (v) => v.address,
+  redact: (id) => ({ address: `redacted-${id}@deleted.null` }),
   subtype: { mode: 'optional', values: EMAIL_SUBTYPES },
   uniqueness: 'per-owner',
   display: { label: 'Email', icon: 'lucide:mail' },

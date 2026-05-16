@@ -13,6 +13,7 @@ export const telegramDef: ContactTypeDef<TelegramInput, TelegramValue> = {
   parseInput: (input) => ('url' in input ? parseTelegramUrl(input.url) : input),
   valueSchema: telegramStored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://t.me/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

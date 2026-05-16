@@ -24,16 +24,8 @@ import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@temp
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, isStringPath, lookupField } from '#/lib/prisma/fieldMetadata';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
-import {
-  getDefaultOperator,
-  getValidOperators,
-  STRING_OPS_WITH_MODE,
-} from '#/lib/prisma/scalarOperators';
-import type {
-  BracketQueryPrimitive,
-  BracketQueryRecord,
-  BracketQueryValue,
-} from '#/lib/utils/parseBracketNotation';
+import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
+import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   model: ModelName;
@@ -136,9 +128,7 @@ const validateAndTransformSearchFields = (
         throw new Error(`Invalid search field: ${currentPath}`);
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
-        throw new Error(
-          `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
-        );
+        throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       const field = lookupField(model, stripRelationOperators(currentPath));
       if (!field) {
@@ -161,13 +151,8 @@ const validateAndTransformSearchFields = (
     const hasFieldOp = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
 
     if (hasRelationOp) {
-      if (
-        !skipFieldValidation &&
-        !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))
-      ) {
-        throw new Error(
-          `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
-        );
+      if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
+        throw new Error(`Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       const relationValue: BracketQueryRecord = {};
       for (const [opKey, opValue] of Object.entries(value)) {
@@ -191,9 +176,7 @@ const validateAndTransformSearchFields = (
         throw new Error(`Invalid search field: ${currentPath}`);
       }
       if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
-        throw new Error(
-          `Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
-        );
+        throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
       }
       const field = lookupField(model, stripRelationOperators(currentPath));
       if (!field) {

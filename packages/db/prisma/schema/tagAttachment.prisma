@@ -9,8 +9,9 @@
 // `apps/api/src/hooks/falsePolymorphism/registry.ts`.
 
 model TagAttachment {
-    id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-    createdAt DateTime @default(now())
+    id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+    createdAt DateTime  @default(now())
+    deletedAt DateTime?
 
     // Resource — false polymorphism. resourceModel restricts to PascalCase
     // entries of TagResource (the model names); camelCase entries

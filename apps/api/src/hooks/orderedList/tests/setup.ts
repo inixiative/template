@@ -77,11 +77,8 @@ export const allOrders = (userId: string, type = ContactType.phone) =>
 
 export const positions = (rows: { position: number }[]) => rows.map((r) => r.position);
 
-export const posOf = (rows: { id: string; position: number }[], id: string) =>
-  rows.find((r) => r.id === id)?.position;
+export const posOf = (rows: { id: string; position: number }[], id: string) => rows.find((r) => r.id === id)?.position;
 
-export const softDelete = (id: string) =>
-  db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
+export const softDelete = (id: string) => db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
 
-export const restore = (id: string) =>
-  db.contact.update({ where: { id }, data: { deletedAt: null } });
+export const restore = (id: string) => db.contact.update({ where: { id }, data: { deletedAt: null } });

@@ -168,7 +168,7 @@ describe('messageUser handler', () => {
   it('throws when a matched user has a contact type with no adapter', async () => {
     const { entity: user } = await createUser();
     await createContact(
-      { ownerModel: 'User', type: ContactType.signal, value: { phone: '+1555' }, acceptedKinds: ['platform'] },
+      { ownerModel: 'User', type: ContactType.signal, value: { handle: '+1555' }, acceptedKinds: ['platform'] },
       { user },
     );
 

@@ -1,5 +1,6 @@
 import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
@@ -9,7 +10,6 @@ import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)

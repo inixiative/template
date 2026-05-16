@@ -17,9 +17,7 @@ export const prepareMiddleware = (
   // need the model so buildWhereClause can type-check operators and
   // coerce values per field kind.
   const searchMiddleware =
-    model || searchableFields?.length
-      ? [searchableFieldsMiddleware({ fields: searchableFields ?? [], model })]
-      : [];
+    model || searchableFields?.length ? [searchableFieldsMiddleware({ fields: searchableFields ?? [], model })] : [];
   const result = [...resourceMiddleware, ...searchMiddleware, ...middlewareArray];
 
   return result.length ? result : undefined;

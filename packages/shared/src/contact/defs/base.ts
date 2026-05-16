@@ -1,3 +1,4 @@
+import type { ContactId } from '@template/db/typedModelIds';
 import type { z } from 'zod';
 
 export type ContactSubtypeRule =
@@ -27,4 +28,5 @@ export type ContactTypeDef<TInput, TStored> = {
   // (whatsapp / telegram / phone). Unset means resolveUserByContact will
   // refuse to stub a User of this type.
   toStubEmail?: (v: TStored) => string;
+  redact: (contactId: ContactId, value: TStored) => TStored;
 };

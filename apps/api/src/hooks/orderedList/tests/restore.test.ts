@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { liveOrders, mkEmail, phone, posOf, positions, restore, softDelete } from './setup';
+import { liveOrders, mkEmail, phone, positions, posOf, restore, softDelete } from './setup';
 
 describe('restore', () => {
   it('appends to end of live list', async () => {
@@ -64,8 +64,10 @@ describe('multi-scope isolation — bulk restore', () => {
   it('restoring across two owners appends to each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    const a1 = await phone(u1.id); await phone(u1.id); // u1: [1,2]
-    const a2 = await phone(u2.id); await phone(u2.id); // u2: [1,2]
+    const a1 = await phone(u1.id);
+    await phone(u1.id); // u1: [1,2]
+    const a2 = await phone(u2.id);
+    await phone(u2.id); // u2: [1,2]
     await softDelete(a1.id); // u1: [1]
     await softDelete(a2.id); // u2: [1]
 
@@ -80,8 +82,10 @@ describe('multi-scope isolation — bulk restore', () => {
 
   it('restoring across two types (same owner) appends to each list independently', async () => {
     const { entity: u } = await createUser();
-    const pa = await phone(u.id); await phone(u.id); // phone: [1,2]
-    const ea = await mkEmail(u.id); await mkEmail(u.id); // email: [1,2]
+    const pa = await phone(u.id);
+    await phone(u.id); // phone: [1,2]
+    const ea = await mkEmail(u.id);
+    await mkEmail(u.id); // email: [1,2]
     await softDelete(pa.id); // phone: [1]
     await softDelete(ea.id); // email: [1]
 

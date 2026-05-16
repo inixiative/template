@@ -64,9 +64,7 @@ const validateRowsBatch = async (rows: TagRow[]): Promise<void> => {
     where: { id: { in: ids } },
     select: { id: true, ownerModel: true, ...ownerSelect },
   });
-  const byId = new Map<string, CategoryOwner>(
-    categories.map((c) => [c.id as string, c as unknown as CategoryOwner]),
-  );
+  const byId = new Map<string, CategoryOwner>(categories.map((c) => [c.id as string, c as unknown as CategoryOwner]));
   for (const row of rows) {
     validateRowAgainstCategory(row, byId.get(row.tagCategoryId as string));
   }

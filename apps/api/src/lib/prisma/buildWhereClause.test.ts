@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
-const onUser = (overrides: Parameters<typeof buildWhereClause>[0]) =>
-  buildWhereClause({ model: 'User', ...overrides });
+const onUser = (overrides: Parameters<typeof buildWhereClause>[0]) => buildWhereClause({ model: 'User', ...overrides });
 
 describe('buildWhereClause', () => {
   describe('global search (single term, fan-out across fields)', () => {
@@ -235,23 +234,23 @@ describe('buildWhereClause', () => {
     });
 
     it("throws on Boolean inputs that aren't true/false strings", () => {
-      expect(() =>
-        onUser({ searchFields: { emailVerified: 'yes' }, searchableFields: ['emailVerified'] }),
-      ).toThrow(/Cannot coerce/);
+      expect(() => onUser({ searchFields: { emailVerified: 'yes' }, searchableFields: ['emailVerified'] })).toThrow(
+        /Cannot coerce/,
+      );
     });
 
     it('throws on garbage DateTime input', () => {
-      expect(() =>
-        onUser({ searchFields: { createdAt: 'not-a-date' }, searchableFields: ['createdAt'] }),
-      ).toThrow(/Cannot coerce/);
+      expect(() => onUser({ searchFields: { createdAt: 'not-a-date' }, searchableFields: ['createdAt'] })).toThrow(
+        /Cannot coerce/,
+      );
     });
   });
 
   describe('searchableFields whitelist', () => {
     it('throws when a field is not in searchableFields', () => {
-      expect(() =>
-        onUser({ searchFields: { name: 'aron', password: 'secret' }, searchableFields: ['name'] }),
-      ).toThrow(/'password' is not searchable/);
+      expect(() => onUser({ searchFields: { name: 'aron', password: 'secret' }, searchableFields: ['name'] })).toThrow(
+        /'password' is not searchable/,
+      );
     });
 
     it('throws on invalid path notation', () => {
@@ -283,9 +282,9 @@ describe('buildWhereClause', () => {
     });
 
     it('rejects non-whitelisted relation paths', () => {
-      expect(() =>
-        onUser({ searchFields: { tokens: { some: { name: 'x' } } }, searchableFields: ['email'] }),
-      ).toThrow(/'tokens' is not searchable/);
+      expect(() => onUser({ searchFields: { tokens: { some: { name: 'x' } } }, searchableFields: ['email'] })).toThrow(
+        /'tokens' is not searchable/,
+      );
     });
   });
 
@@ -297,10 +296,7 @@ describe('buildWhereClause', () => {
         skipFieldValidation: true,
       });
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'aron', mode: 'insensitive' } },
-          { platformRole: { equals: 'user' } },
-        ],
+        AND: [{ name: { contains: 'aron', mode: 'insensitive' } }, { platformRole: { equals: 'user' } }],
       });
     });
 

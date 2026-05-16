@@ -1,6 +1,6 @@
 import { DbAction, type HookOptions, HookTiming, type ManyAction, registerDbHook } from '@template/db';
-import { applyOrderedListBulkDeletedAtChange } from '#/lib/prisma/orderedList';
 import { orderedListRegistry } from '#/hooks/orderedList/registry';
+import { applyOrderedListBulkDeletedAtChange } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpdateManyHook = () => {
   // BEFORE: reject bulk writes to ordered fields. Bulk position arithmetic

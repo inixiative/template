@@ -2,11 +2,14 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
+import { uuidv7 } from 'uuidv7';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
+import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 
 registerRulesHook();
 registerContactRulesHook();
+registerOrderedListHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
@@ -212,9 +215,9 @@ describe('contactRules hook — position auto-assign', () => {
     expect(second.position).toBe(2);
   });
 
-  it('respects explicit position when caller supplies one', async () => {
+  it('clamps explicit position above MAX+1 on single create', async () => {
     const { entity: user } = await createUser();
-    const explicit = await db.contact.create({
+    const first = await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,
@@ -223,7 +226,124 @@ describe('contactRules hook — position auto-assign', () => {
         value: { e164: e164(String(getNextSeq())), country: 'US' },
       },
     });
-    expect(explicit.position).toBe(42);
+    expect(first.position).toBe(1);
+
+    const second = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        position: 99,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    expect(second.position).toBe(2);
+  });
+
+  it('honors explicit in-range position on single create and shifts siblings up', async () => {
+    const { entity: user } = await createUser();
+    const a = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    const b = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    const c = await db.contact.create({
+      data: {
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        position: 1,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+    });
+    expect(c.position).toBe(1);
+    const aAfter = await db.contact.findUniqueOrThrow({ where: { id: a.id } });
+    const bAfter = await db.contact.findUniqueOrThrow({ where: { id: b.id } });
+    expect(aAfter.position).toBe(2);
+    expect(bAfter.position).toBe(3);
+  });
+
+  it('clamps explicit position above MAX+1 on upsert.create', async () => {
+    const { entity: user } = await createUser();
+    const fakeId = uuidv7();
+    const upserted = await db.contact.upsert({
+      where: { id: fakeId },
+      create: {
+        id: fakeId,
+        ownerModel: ContactOwnerModel.User,
+        userId: user.id,
+        type: ContactType.phone,
+        position: 42,
+        value: { e164: e164(String(getNextSeq())), country: 'US' },
+      },
+      update: {},
+    });
+    expect(upserted.position).toBe(1);
+  });
+
+  it('createManyAndReturn appends no-position rows in input order around explicit positions', async () => {
+    const { entity: user } = await createUser();
+    const rows = await db.contact.createManyAndReturn({
+      data: [
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: user.id,
+          type: ContactType.phone,
+          value: { e164: e164(String(getNextSeq())), country: 'US' },
+        },
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: user.id,
+          type: ContactType.phone,
+          position: 1,
+          value: { e164: e164(String(getNextSeq())), country: 'US' },
+        },
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: user.id,
+          type: ContactType.phone,
+          value: { e164: e164(String(getNextSeq())), country: 'US' },
+        },
+      ],
+    });
+    expect(rows[0]!.position).toBe(2);
+    expect(rows[1]!.position).toBe(1);
+    expect(rows[2]!.position).toBe(3);
+  });
+
+  it('createManyAndReturn clamps out-of-bound explicit positions to the running tail', async () => {
+    const { entity: user } = await createUser();
+    const rows = await db.contact.createManyAndReturn({
+      data: [
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: user.id,
+          type: ContactType.phone,
+          position: 99,
+          value: { e164: e164(String(getNextSeq())), country: 'US' },
+        },
+        {
+          ownerModel: ContactOwnerModel.User,
+          userId: user.id,
+          type: ContactType.phone,
+          position: 50,
+          value: { e164: e164(String(getNextSeq())), country: 'US' },
+        },
+      ],
+    });
+    expect(rows[0]!.position).toBe(1);
+    expect(rows[1]!.position).toBe(2);
   });
 
   it('scopes ordering by (owner, type) — different types start fresh', async () => {

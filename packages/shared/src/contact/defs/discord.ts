@@ -13,6 +13,7 @@ export const discordDef: ContactTypeDef<DiscordValue, DiscordValue> = {
   parseInput: (v) => v,
   valueSchema: discordSchema,
   toValueKey: (v) => v.userId,
+  redact: (id) => ({ userId: id }),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'Discord', icon: 'simple-icons:discord' },

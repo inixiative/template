@@ -11,6 +11,7 @@ export const redditDef: ContactTypeDef<Input, RedditValue> = {
   parseInput: (i) => ('url' in i ? parseRedditUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://reddit.com/user/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

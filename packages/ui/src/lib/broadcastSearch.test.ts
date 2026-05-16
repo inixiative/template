@@ -14,10 +14,7 @@ describe('broadcastSearch', () => {
 
     it('builds an OR of case-insensitive contains across scalar paths', () => {
       expect(broadcastSearch('aron', ['name', 'email'])).toEqual({
-        OR: [
-          { name: { contains: 'aron', mode: 'insensitive' } },
-          { email: { contains: 'aron', mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { email: { contains: 'aron', mode: 'insensitive' } }],
       });
     });
 
@@ -36,10 +33,7 @@ describe('broadcastSearch', () => {
   describe('with model — filters to String paths only', () => {
     it('keeps String scalars', () => {
       expect(broadcastSearch('aron', ['name', 'email'], { model: 'User' })).toEqual({
-        OR: [
-          { name: { contains: 'aron', mode: 'insensitive' } },
-          { email: { contains: 'aron', mode: 'insensitive' } },
-        ],
+        OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { email: { contains: 'aron', mode: 'insensitive' } }],
       });
     });
 
@@ -51,11 +45,7 @@ describe('broadcastSearch', () => {
     });
 
     it('drops DateTime / Boolean / Int paths', () => {
-      const result = broadcastSearch(
-        'aron',
-        ['name', 'createdAt', 'emailVerified'],
-        { model: 'User' },
-      );
+      const result = broadcastSearch('aron', ['name', 'createdAt', 'emailVerified'], { model: 'User' });
       expect(result).toEqual({
         OR: [{ name: { contains: 'aron', mode: 'insensitive' } }],
       });

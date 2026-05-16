@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { allOrders, liveOrders, mkEmail, phone, posOf, positions, softDelete } from './setup';
+import { allOrders, liveOrders, mkEmail, phone, positions, posOf, softDelete } from './setup';
 
 describe('soft delete', () => {
   it('negates position and compacts siblings', async () => {
@@ -134,8 +134,11 @@ describe('multi-scope isolation — bulk soft-delete', () => {
   it('deleting across two owners compacts each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    const a1 = await phone(u1.id); await phone(u1.id); // u1: [1,2]
-    const b2 = await phone(u2.id); await phone(u2.id); await phone(u2.id); // u2: [1,2,3]
+    const a1 = await phone(u1.id);
+    await phone(u1.id); // u1: [1,2]
+    const b2 = await phone(u2.id);
+    await phone(u2.id);
+    await phone(u2.id); // u2: [1,2,3]
 
     await db.contact.updateManyAndReturn({
       where: { id: { in: [a1.id, b2.id] } },
@@ -148,8 +151,10 @@ describe('multi-scope isolation — bulk soft-delete', () => {
 
   it('deleting across two types (same owner) compacts each list independently', async () => {
     const { entity: u } = await createUser();
-    const pa = await phone(u.id); await phone(u.id); // phone: [1,2]
-    const ea = await mkEmail(u.id); await mkEmail(u.id); // email: [1,2]
+    const pa = await phone(u.id);
+    await phone(u.id); // phone: [1,2]
+    const ea = await mkEmail(u.id);
+    await mkEmail(u.id); // email: [1,2]
 
     await db.contact.updateManyAndReturn({
       where: { id: { in: [pa.id, ea.id] } },
@@ -165,8 +170,12 @@ describe('multi-scope isolation — deleteMany', () => {
   it('deleting across two owners compacts each list independently', async () => {
     const { entity: u1 } = await createUser();
     const { entity: u2 } = await createUser();
-    await phone(u1.id); const b1 = await phone(u1.id); await phone(u1.id);
-    await phone(u2.id); const b2 = await phone(u2.id); await phone(u2.id);
+    await phone(u1.id);
+    const b1 = await phone(u1.id);
+    await phone(u1.id);
+    await phone(u2.id);
+    const b2 = await phone(u2.id);
+    await phone(u2.id);
 
     await db.contact.deleteMany({ where: { id: { in: [b1.id, b2.id] } } });
 
@@ -176,8 +185,12 @@ describe('multi-scope isolation — deleteMany', () => {
 
   it('deleting across two types (same owner) compacts each list independently', async () => {
     const { entity: u } = await createUser();
-    await phone(u.id); const pb = await phone(u.id); await phone(u.id);
-    await mkEmail(u.id); const eb = await mkEmail(u.id); await mkEmail(u.id);
+    await phone(u.id);
+    const pb = await phone(u.id);
+    await phone(u.id);
+    await mkEmail(u.id);
+    const eb = await mkEmail(u.id);
+    await mkEmail(u.id);
 
     await db.contact.deleteMany({ where: { id: { in: [pb.id, eb.id] } } });
 

@@ -12,6 +12,7 @@ export const websiteDef: ContactTypeDef<WebsiteValue, WebsiteValue> = {
   parseInput: (v) => v,
   valueSchema: websiteSchema,
   toValueKey: (v) => canonicalUrl(v.url),
+  redact: (id) => ({ url: `https://deleted.null/${id}` }),
   subtype: { mode: 'optional', values: WEBSITE_SUBTYPES },
   uniqueness: 'per-owner',
   display: { label: 'Website', icon: 'lucide:globe' },

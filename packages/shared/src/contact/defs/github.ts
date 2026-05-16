@@ -19,6 +19,7 @@ export const githubDef: ContactTypeDef<GithubInput, GithubValue> = {
   parseInput: (input) => ('url' in input ? parseGithubUrl(input.url, input.classifier) : input),
   valueSchema: githubStored,
   toValueKey: (v) => `${v.classifier}:${v.handle.toLowerCase()}`,
+  redact: (id, v) => ({ classifier: v.classifier, handle: id }),
   toUrl: (v) => `https://github.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

@@ -12,6 +12,7 @@ export const twitterDef: ContactTypeDef<TwitterInput, TwitterValue> = {
   parseInput: (input) => ('url' in input ? parseTwitterUrl(input.url) : input),
   valueSchema: twitterStored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://x.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

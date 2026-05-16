@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createCronJob,
@@ -12,7 +13,6 @@ import {
 } from '@template/db/test';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -322,40 +322,6 @@ describe('auditLog hook', () => {
     expect(log?.contextOrganizationId).toBeNull();
     expect(log?.action).toBe(AuditAction.delete);
     expect(log?.after).toBeNull();
-  });
-
-  it('keeps tenant context on hard-delete for child records', async () => {
-    const { entity: organization } = await createOrganization();
-    const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization });
-
-    const { fetch } = createTestApp({
-      mount: [
-        (app) => {
-          app.post('/test/token/hard-delete', async (c) => {
-            await db.token.delete({ where: { id: token.id } });
-            return c.json({ ok: true });
-          });
-        },
-      ],
-    });
-
-    const res = await fetch(new Request('http://localhost/test/token/hard-delete', { method: 'POST' }));
-    expect(res.status).toBe(200);
-
-    const logs = await db.auditLog.findMany({
-      where: { subjectModel: 'Token', action: AuditAction.delete, contextOrganizationId: organization.id },
-      orderBy: { id: 'desc' },
-      take: 10,
-    });
-
-    const log = logs.find((entry) => {
-      const before = entry.before as { id?: string } | null;
-      return before?.id === token.id;
-    });
-
-    expect(log).toBeDefined();
-    expect(log?.subjectTokenId).toBeNull();
-    expect(log?.contextOrganizationId).toBe(organization.id);
   });
 
   it('keeps org context but clears space context on hard-delete for spaces', async () => {

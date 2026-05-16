@@ -111,7 +111,7 @@ describe('messageContact handler', () => {
   it('throws when no adapter is registered for contact.type', async () => {
     const { entity: user } = await createUser();
     const { entity: contact } = await createContact(
-      { ownerModel: 'User', type: ContactType.signal, value: { phone: '+1555' }, acceptedKinds: ['platform'] },
+      { ownerModel: 'User', type: ContactType.signal, value: { handle: '+1555' }, acceptedKinds: ['platform'] },
       { user },
     );
 

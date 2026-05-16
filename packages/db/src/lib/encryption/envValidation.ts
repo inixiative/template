@@ -1,5 +1,5 @@
+import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 import { z } from 'zod';
-import { ENCRYPTED_MODELS } from './registry';
 
 export const encryptionKeySchema = z.string().refine(
   (key) => {

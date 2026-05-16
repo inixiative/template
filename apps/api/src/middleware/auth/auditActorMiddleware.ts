@@ -1,5 +1,5 @@
-import type { Context, Next } from 'hono';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import type { Context, Next } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
 export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {

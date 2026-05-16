@@ -51,8 +51,6 @@ export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls =
       </aside>
 
       {isMobileMenuOpen && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, keyboard access via Escape handled by Sidebar focus trap
-        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay, keyboard access via Escape handled by Sidebar focus trap
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 

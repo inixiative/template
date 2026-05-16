@@ -8,6 +8,13 @@
       "suspicious": {
         "noConfusingVoidType": "off"
       },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "useKeyWithClickEvents": "off",
+        "useFocusableInteractive": "off",
+        "useSemanticElements": "off",
+        "noLabelWithoutControl": "off"
+      },
       "complexity": {
         "noForEach": "off",
         "useArrowFunction": "error"

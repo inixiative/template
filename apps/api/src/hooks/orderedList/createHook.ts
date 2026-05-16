@@ -1,6 +1,6 @@
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
-import { applyOrderedListBatchCreate, applyOrderedListCreate } from '#/lib/prisma/orderedList';
 import { extractRows } from '#/hooks/orderedList/utils';
+import { applyOrderedListBatchCreate, applyOrderedListCreate } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListCreateHook = () => {
   registerDbHook(

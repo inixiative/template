@@ -11,6 +11,7 @@ export const tiktokDef: ContactTypeDef<Input, TiktokValue> = {
   parseInput: (i) => ('url' in i ? parseTiktokUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://tiktok.com/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

@@ -11,6 +11,7 @@ export const youtubeDef: ContactTypeDef<Input, YoutubeValue> = {
   parseInput: (i) => ('url' in i ? parseYoutubeUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://youtube.com/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

@@ -1,8 +1,8 @@
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';

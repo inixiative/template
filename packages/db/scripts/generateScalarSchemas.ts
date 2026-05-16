@@ -42,11 +42,44 @@ const pureImports = pureModelNames
 const omit = (relations: string[]) =>
   relations.length === 0 ? '' : `.omit({ ${relations.map((r) => `${r}: true`).join(', ')} })`;
 
+// Detect default-having fields by diffing the two already-generated zod outputs:
+// `objects/<Model>CreateInput.schema.ts` marks defaulted fields `.optional()`
+// (Prisma create semantics), `variants/input/<Model>.input.ts` marks every
+// non-nullable field required. The delta — excluding relations — is exactly
+// the @id / @default / @updatedAt set. Used to chain `.partial({...})` on
+// ScalarInputSchema so callers don't have to send server-assigned fields.
+const optionalFieldsIn = (path: string): Set<string> => {
+  const out = new Set<string>();
+  for (const line of readFileSync(path, 'utf-8').split('\n')) {
+    const m = line.match(/^\s+(\w+):\s+.+\.optional\(\)/);
+    if (m) out.add(m[1]);
+  }
+  return out;
+};
+
+const objectsDir = join(import.meta.dir, '../src/generated/zod/schemas/objects');
+const defaultedFieldsByModel: Record<string, string[]> = {};
+for (const m of inputModelNames) {
+  try {
+    const createOpt = optionalFieldsIn(join(objectsDir, `${m}CreateInput.schema.ts`));
+    const inputOpt = optionalFieldsIn(join(inputDir, `${m}.input.ts`));
+    const relations = new Set(modelRelations[m]);
+    defaultedFieldsByModel[m] = [...createOpt].filter((f) => !inputOpt.has(f) && !relations.has(f)).sort();
+  } catch {
+    defaultedFieldsByModel[m] = [];
+  }
+}
+const partial = (defaulted: string[]) =>
+  defaulted.length === 0 ? '' : `.partial({ ${defaulted.map((f) => `${f}: true`).join(', ')} })`;
+
 const schemaBuilds = modelNames
   .map((m) => {
     const rel = modelRelations[m];
+    const defaulted = defaultedFieldsByModel[m] ?? [];
     const lines: string[] = [];
-    if (inputModelSet.has(m)) lines.push(`export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)};`);
+    if (inputModelSet.has(m)) {
+      lines.push(`export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)}${partial(defaulted)};`);
+    }
     if (pureModelSet.has(m)) lines.push(`export const ${m}ScalarSchema = ${m}ModelSchema${omit(rel)};`);
     return lines.join('\n');
   })

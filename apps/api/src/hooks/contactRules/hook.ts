@@ -1,26 +1,12 @@
-import {
-  DbAction,
-  type HookOptions,
-  HookTiming,
-  PolymorphismRegistry,
-  type Prisma,
-  registerDbHook,
-  type SingleAction,
-} from '@template/db';
+import { DbAction, type HookOptions, HookTiming, type Prisma, registerDbHook, type SingleAction } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
 import { makeError } from '#/lib/errors';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
-// Derived from the polymorphism registry — single source of truth.
-const ownerKeyFields = [...new Set(Object.values(PolymorphismRegistry.Contact?.axes[0]?.fkMap ?? {}).flat())];
-
-const ownerWhereFromRow = (row: ContactRow): Record<string, string | null> =>
-  Object.fromEntries(ownerKeyFields.map((k) => [k, (row[k] as string | null | undefined) ?? null]));
-
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.
-const processContactRow = async (row: ContactRow, isUpdate: boolean): Promise<void> => {
+const processContactRow = async (row: ContactRow): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
   const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
   if (!def) throw makeError({ status: 422, message: `Unknown Contact type: ${row.type}` });
@@ -82,7 +68,7 @@ export const registerContactRulesHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args }) => {
-      for (const row of extractCreateRows(args)) await processContactRow(row, false);
+      for (const row of extractCreateRows(args)) await processContactRow(row);
     },
   );
 
@@ -96,11 +82,11 @@ export const registerContactRulesHook = () => {
     const a = args as Record<string, unknown>;
     const create = a.create as ContactRow | undefined;
     const update = a.update as ContactRow | undefined;
-    if (create) await processContactRow(create, false);
+    if (create) await processContactRow(create);
     if (update) {
       const prev = previous as ContactRow | undefined;
       const merged: ContactRow = { ...(prev ?? {}), ...update };
-      await processContactRow(merged, true);
+      await processContactRow(merged);
       mirrorComputed(update, merged);
     }
   });
@@ -120,7 +106,7 @@ export const registerContactRulesHook = () => {
       if (!data) return;
       const prev = previous as ContactRow | undefined;
       const merged: ContactRow = { ...(prev ?? {}), ...data };
-      await processContactRow(merged, true);
+      await processContactRow(merged);
       mirrorComputed(data, merged);
     },
   );

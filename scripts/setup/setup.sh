@@ -15,13 +15,14 @@ if [ -f "$ROOT_DIR/.env" ]; then
   set +a
 fi
 
-# Check if project has been launched (config is committed, so grep is reliable)
-if [ "$USE_INTERNAL_CONFIG" = "true" ]; then
-  CONFIG_FILE="$ROOT_DIR/project.config.template-internal.ts"
-else
-  CONFIG_FILE="$ROOT_DIR/project.config.ts"
-fi
-if grep -q 'launched.*true\|"launched": true' "$CONFIG_FILE" 2>/dev/null; then
+# Check if project has been launched. Run the config through the actual
+# TypeScript module loader rather than grepping — comments / multi-line
+# shapes / regex alternation typos can all fool a grep pattern.
+LAUNCHED="$(bun run "$ROOT_DIR/scripts/checkLaunched.ts")" || {
+  echo "[setup] failed to evaluate project.config.ts; aborting" >&2
+  exit 1
+}
+if [ "$LAUNCHED" = "true" ]; then
   IS_LAUNCHED=1
 else
   IS_LAUNCHED=0

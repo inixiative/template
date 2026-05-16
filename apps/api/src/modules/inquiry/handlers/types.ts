@@ -41,4 +41,10 @@ export type InquiryHandler<
   unique?: 'targeted' | 'untargeted';
   defaultExpirationDays?: number;
   appEvents?: InquiryAppEvents;
+  // Optional: when redactUser scrubs a user's source/target on an inquiry,
+  // call this to scrub PII inside `content` for this inquiry type. Probably
+  // keyed off source/target model (different sources contain different
+  // shapes). Out of scope for now — wire when an inquiry actually carries
+  // PII that survives source-user redaction.
+  // redact?(inquiry: Inquiry, content: TContent): TContent;
 };

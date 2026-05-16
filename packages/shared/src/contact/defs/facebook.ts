@@ -11,6 +11,7 @@ export const facebookDef: ContactTypeDef<Input, FacebookValue> = {
   parseInput: (i) => ('url' in i ? parseFacebookUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://facebook.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

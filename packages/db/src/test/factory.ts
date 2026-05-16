@@ -26,7 +26,6 @@
  * Revisit if API feels awkward in practice.
  */
 
-import { faker } from '@faker-js/faker';
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';

@@ -1,10 +1,10 @@
 import { mock } from 'bun:test';
 import { db } from '@template/db';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { Job } from 'bullmq';
 import { jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
 import type { WorkerContext } from '#/jobs/types';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 
 export const createMockJob = (overrides?: Partial<Job>): Job =>
   ({

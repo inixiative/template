@@ -11,6 +11,7 @@ export const instagramDef: ContactTypeDef<Input, InstagramValue> = {
   parseInput: (i) => ('url' in i ? parseInstagramUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://instagram.com/${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

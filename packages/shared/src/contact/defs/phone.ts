@@ -16,6 +16,13 @@ export const phoneDef: ContactTypeDef<PhoneValue, PhoneValue> = {
   parseInput: (v) => v,
   valueSchema: phoneSchema,
   toValueKey: (v) => v.e164,
+  redact: (id, v) => ({
+    e164: `+${BigInt(`0x${id.replace(/-/g, '')}`)
+      .toString()
+      .slice(-13)
+      .padStart(13, '0')}`,
+    country: v.country,
+  }),
   subtype: { mode: 'optional', values: PHONE_SUBTYPES },
   uniqueness: 'per-owner',
   display: { label: 'Phone', icon: 'lucide:phone' },

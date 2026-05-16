@@ -11,6 +11,7 @@ export const threadsDef: ContactTypeDef<Input, ThreadsValue> = {
   parseInput: (i) => ('url' in i ? parseThreadsUrl(i.url) : i),
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   toUrl: (v) => `https://threads.net/@${v.handle}`,
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',

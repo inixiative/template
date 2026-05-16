@@ -1,7 +1,7 @@
 import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord } from '@template/db';
-import type { Action, Permix } from '@template/permissions/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import type { Action, Permix } from '@template/permissions/client';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 import { isNil, lowerFirst, upperFirst } from 'lodash-es';
 

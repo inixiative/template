@@ -27,7 +27,6 @@ describe('canDeliver', () => {
       expect(canDeliver('marketing', contact(['platform']))).toBe(false);
       expect(canDeliver('activity', contact([]))).toBe(false);
     });
-
   });
 
   describe('customerRef gate', () => {

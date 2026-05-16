@@ -11,6 +11,7 @@ export const lineDef: ContactTypeDef<LineValue, LineValue> = {
   parseInput: (v) => v,
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'LINE', icon: 'simple-icons:line' },

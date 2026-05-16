@@ -1,10 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { clearHookRegistry } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
-import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
+import { ContactOwnerModel, ContactType, PlatformRole } from '@template/db/generated/client/enums';
+import { cleanupTouchedTables, createContact, createOrganizationUser, createUser } from '@template/db/test';
+import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { adminUserRouter } from '#/modules/user';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
+
+// Redact runs `deleteMany` on a handful of user-owned models. The
+// preventHardDelete hook is the production gate — without registering it
+// here, tests would silently pass against a redactUser that throws in
+// prod the moment a soft-delete model is hit.
+registerPreventHardDeleteHook();
 
 describe('POST /api/admin/user/:id/redact', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -25,6 +33,7 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   afterAll(async () => {
     await cleanupTouchedTables(db);
+    clearHookRegistry();
   });
 
   it('redacts user data', async () => {
@@ -66,6 +75,36 @@ describe('POST /api/admin/user/:id/redact', () => {
 
     const deletedOrg = await db.organization.findUnique({ where: { id: org.id } });
     expect(deletedOrg?.deletedAt).not.toBeNull();
+  });
+
+  it('redacts contacts — soft-deletes + scrubs value via registry.redact', async () => {
+    const { entity: targetUser } = await createUser();
+    const { entity: emailContact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: targetUser.id,
+      type: ContactType.email,
+      value: { address: 'sensitive@example.com' },
+    });
+    const { entity: whatsappContact } = await createContact({
+      ownerModel: ContactOwnerModel.User,
+      userId: targetUser.id,
+      type: ContactType.whatsapp,
+      value: { jid: '15559999999@s.whatsapp.net' },
+    });
+
+    await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
+
+    const refreshed = await db.contact.findMany({
+      where: { id: { in: [emailContact.id, whatsappContact.id] } },
+    });
+    expect(refreshed).toHaveLength(2);
+    for (const c of refreshed) {
+      expect(c.deletedAt).not.toBeNull();
+      const serialized = JSON.stringify(c.value);
+      expect(serialized).toContain(c.id);
+      expect(serialized).not.toContain('sensitive@example.com');
+      expect(serialized).not.toContain('15559999999');
+    }
   });
 
   it('keeps org if other members exist', async () => {

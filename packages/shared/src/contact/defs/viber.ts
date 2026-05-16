@@ -11,6 +11,7 @@ export const viberDef: ContactTypeDef<ViberValue, ViberValue> = {
   parseInput: (v) => v,
   valueSchema: stored,
   toValueKey: (v) => v.handle.toLowerCase(),
+  redact: (id) => ({ handle: id }),
   subtype: { mode: 'forbidden' },
   uniqueness: 'per-owner',
   display: { label: 'Viber', icon: 'simple-icons:viber' },

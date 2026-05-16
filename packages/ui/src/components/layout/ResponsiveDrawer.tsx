@@ -27,8 +27,6 @@ export const ResponsiveDrawer = ({
   if (isDesktop) {
     return (
       <>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, keyboard access via close button */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay, keyboard access via close button */}
         <div className="fixed inset-0 bg-black/50 z-40 transition-opacity" onClick={onClose} />
         <div
           className={cn(

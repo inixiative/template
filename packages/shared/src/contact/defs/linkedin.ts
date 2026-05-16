@@ -16,6 +16,7 @@ export const linkedinDef: ContactTypeDef<LinkedinInput, LinkedinValue> = {
   parseInput: (input) => ('url' in input ? parseLinkedinUrl(input.url) : input),
   valueSchema: linkedinStored,
   toValueKey: (v) => `${v.classifier}:${v.handle.toLowerCase()}`,
+  redact: (id, v) => ({ classifier: v.classifier, handle: id }),
   toUrl: (v) => `https://linkedin.com/${v.classifier === 'personal' ? 'in' : v.classifier}/${v.handle}`,
   subtype: { mode: 'forbidden' }, // classifier lives in `value`
   uniqueness: 'per-owner',

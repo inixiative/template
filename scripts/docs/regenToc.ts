@@ -12,12 +12,12 @@
  * - Otherwise the marker block is inserted after the first `# ` heading.
  *
  * Usage:
- *   bun run scripts/docs/regen-toc.ts [paths...]
+ *   bun run scripts/docs/regenToc.ts [paths...]
  *
  * Defaults to operating on `docs/claude/`, `FEATURES.md`, `COMPARISONS.md`,
  * `TODO.md`, and `README.md`.
  */
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 const TOC_START = '<!-- toc:start -->';
@@ -68,9 +68,7 @@ const extractHeadings = (md: string): Heading[] => {
 const renderToc = (headings: Heading[]): string => {
   if (headings.length === 0) return '';
   const minLevel = Math.min(...headings.map((h) => h.level));
-  return headings
-    .map(({ level, text, slug }) => `${'  '.repeat(level - minLevel)}- [${text}](#${slug})`)
-    .join('\n');
+  return headings.map(({ level, text, slug }) => `${'  '.repeat(level - minLevel)}- [${text}](#${slug})`).join('\n');
 };
 
 // Remove a legacy `## Contents` section that doesn't use the markers. The
@@ -123,7 +121,7 @@ const updateToc = (md: string): { content: string; changed: boolean } => {
 };
 
 const walk = (path: string): string[] => {
-  let stat;
+  let stat: ReturnType<typeof statSync>;
   try {
     stat = statSync(path);
   } catch {
