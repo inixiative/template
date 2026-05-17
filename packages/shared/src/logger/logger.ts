@@ -20,6 +20,34 @@ const baseConsola = createConsola({
   },
 });
 
+// Reverse-lookup numeric consola level → string name. Lets us expose a string
+// `.level` for SDKs (Baileys' ILogger, pino-shaped consumers) while consola
+// internally keeps using numbers.
+const levelNumberToName: Record<number, string> = Object.fromEntries(
+  Object.entries(LogLevels)
+    .filter(([, v]) => typeof v === 'number')
+    .map(([k, v]) => [v as number, k]),
+);
+
+// Minimal logger contract SDKs expect when we hand them our log. Same shape
+// as Baileys' ILogger / pino's core API. Defined here so the logger package
+// doesn't depend on any SDK.
+type SdkLogger = {
+  level: string;
+  child(bindings?: unknown): SdkLogger;
+  trace(obj: unknown, msg?: string): void;
+  debug(obj: unknown, msg?: string): void;
+  info(obj: unknown, msg?: string): void;
+  warn(obj: unknown, msg?: string): void;
+  error(obj: unknown, msg?: string): void;
+  fatal(obj: unknown, msg?: string): void;
+};
+
+// Combined surface — our consola-backed methods (with scope/broadcast wiring)
+// AND the SDK contract. `level` is `string` (SDK shape wins over consola's
+// numeric type), backed at runtime by the proxy's getter.
+export type Logger = Omit<ConsolaInstance, 'level'> & SdkLogger;
+
 const timestamp = () => new Date().toISOString();
 const logScopeValues = new Set<string>(Object.values(LogScope));
 const logMethods = new Set(['fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']);
@@ -50,8 +78,17 @@ const fireBroadcasts = (level: string, args: unknown[]) => {
  *   log.info('sent to stdout AND job.log()');
  * });
  */
-export const log: ConsolaInstance = new Proxy(baseConsola, {
+const proxy = new Proxy(baseConsola, {
   get(target, prop) {
+    if (prop === 'child') {
+      return () => {
+        throw new Error('log.child() not supported — use logScope(id, fn) for ALS-bound scoping');
+      };
+    }
+
+    // SDKs expect `.level` as a string; consola stores it as a number.
+    if (prop === 'level') return levelNumberToName[target.level] ?? 'info';
+
     const value = Reflect.get(target, prop);
 
     // Wrap logging methods to check for LogScope as last arg
@@ -95,3 +132,8 @@ export const log: ConsolaInstance = new Proxy(baseConsola, {
     return value;
   },
 });
+
+// The proxy's runtime adds `child` + reshapes `level` to string. tsc can't
+// see through the Proxy intercept, so we annotate the export with the type
+// the runtime actually produces.
+export const log: Logger = proxy as never;
