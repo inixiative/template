@@ -9,6 +9,7 @@ export enum FrontendScope {
   web = 'web',
   admin = 'admin',
   superadmin = 'super',
+  ui = 'ui',
 }
 
 const getLogLevel = (): number => {

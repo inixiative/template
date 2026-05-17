@@ -15,14 +15,18 @@ type SdkOpts = {
 
 const headerMap = (h: Headers | Record<string, string> | undefined): Record<string, string> => {
   if (!h) return {};
-  if (h instanceof Headers) {
+  // Duck-type: happy-dom's GlobalRegistrator replaces the global Headers, but the
+  // SDK's internal Headers reference is the original — `instanceof Headers` fails.
+  // Lowercase keys explicitly: WHATWG spec returns lowercased, but happy-dom's
+  // forEach yields the original casing.
+  if (typeof (h as Headers).forEach === 'function') {
     const out: Record<string, string> = {};
-    h.forEach((v, k) => {
-      out[k] = v;
+    (h as Headers).forEach((v, k) => {
+      out[k.toLowerCase()] = v;
     });
     return out;
   }
-  return h;
+  return h as Record<string, string>;
 };
 
 describe('api transport wrappers', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { createUser } from '@template/db/test';
-import { liveOrders, phone, phoneRow, positions, posOf, restore, softDelete } from './setup';
+import { liveOrders, phone, phoneRow, positions, posOf, restore, softDelete } from '#/hooks/orderedList/tests/setup';
 
 describe('unique constraint safety', () => {
   it('insert-at shifts before write (no collision)', async () => {

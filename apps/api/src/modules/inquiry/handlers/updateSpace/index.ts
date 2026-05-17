@@ -22,6 +22,7 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceC
     db.space.findFirst({ where: { organizationId: space.organizationId, slug, id: { not: spaceId } } }),
     db.inquiry.findFirst({
       where: {
+        id: { not: inquiry.id },
         type: InquiryType.updateSpace,
         sourceSpaceId: spaceId,
         status: { notIn: inquiryTerminalStatuses },

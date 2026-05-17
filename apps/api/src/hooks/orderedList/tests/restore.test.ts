@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { liveOrders, mkEmail, phone, positions, posOf, restore, softDelete } from './setup';
+import { liveOrders, mkEmail, phone, positions, posOf, restore, softDelete } from '#/hooks/orderedList/tests/setup';
 
 describe('restore', () => {
   it('appends to end of live list', async () => {

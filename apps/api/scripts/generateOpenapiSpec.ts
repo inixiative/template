@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { app } from '#/app';
 
-const spec = app.getOpenAPIDocument({
+const spec = app.getOpenAPI31Document({
   openapi: '3.1.0',
   info: {
     title: 'Template API',

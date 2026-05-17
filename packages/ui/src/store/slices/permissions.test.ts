@@ -7,7 +7,7 @@ type UserWithRelations = MeReadResponses[200]['data'];
 
 describe('permissions slice', () => {
   let store: ReturnType<typeof createTestStore>;
-  const organizationRecord = { id: 'org-1' } as unknown as HydratedRecord;
+  const organizationRecord: HydratedRecord = { id: 'org-1' };
 
   beforeEach(() => {
     store = createTestStore();

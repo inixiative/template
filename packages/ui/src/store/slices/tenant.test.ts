@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { buildOrganization } from '@template/db/test';
+import { buildOrganization, buildSpace } from '@template/db/test';
 import type { MeReadResponses } from '@template/sdk';
 import { createTestStore } from '@template/ui/test';
 
@@ -89,8 +89,13 @@ describe('tenant slice', () => {
       expect(result).toBe(false);
     });
 
-    it('should set context to organization when it exists', () => {
-      const mockOrg = { id: 'org-1', name: 'Test Org' } as unknown as Organization;
+    it('should set context to organization when it exists', async () => {
+      const { entity } = await buildOrganization({
+        id: 'org-1',
+        name: 'Test Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const mockOrg = entity.__serialize() as Organization;
 
       store.setState({
         auth: {
@@ -130,8 +135,16 @@ describe('tenant slice', () => {
       expect(result).toBe(false);
     });
 
-    it('should return false when organization for space does not exist', () => {
-      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as unknown as Space;
+    it('should return false when organization for space does not exist', async () => {
+      const { entity } = await buildSpace({
+        id: 'space-1',
+        name: 'Test Space',
+        organizationId: 'org-1',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+        logoUrl: 'https://example.com/logo.png',
+        primaryColor: '#000000',
+      });
+      const mockSpace = entity.__serialize() as Space;
 
       store.setState({
         auth: {
@@ -146,9 +159,22 @@ describe('tenant slice', () => {
       expect(result).toBe(false);
     });
 
-    it('should set context to space when it and its organization exist', () => {
-      const mockOrg = { id: 'org-1', name: 'Test Org' } as unknown as Organization;
-      const mockSpace = { id: 'space-1', name: 'Test Space', organizationId: 'org-1' } as unknown as Space;
+    it('should set context to space when it and its organization exist', async () => {
+      const { entity: orgEntity } = await buildOrganization({
+        id: 'org-1',
+        name: 'Test Org',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+      const mockOrg = orgEntity.__serialize() as Organization;
+      const { entity: spaceEntity } = await buildSpace({
+        id: 'space-1',
+        name: 'Test Space',
+        organizationId: 'org-1',
+        deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+        logoUrl: 'https://example.com/logo.png',
+        primaryColor: '#000000',
+      });
+      const mockSpace = spaceEntity.__serialize() as Space;
 
       store.setState({
         auth: {

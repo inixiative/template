@@ -89,17 +89,17 @@ export const inquiryFiltersToSearchFields = (filters: InquiryFilters, now?: Date
 export type InquiryMeta = {
   id: string;
   type: InquiryType;
-  sourceOrganizationId: string;
-  sourceSpaceId: string;
-  targetOrganizationId: string;
+  sourceOrganizationId: string | null;
+  sourceSpaceId: string | null;
+  targetOrganizationId: string | null;
 };
 
 // Query keys affected when the SOURCE side mutates (cancel/delete)
 export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]> = {
-  inviteOrganizationUser: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })],
-  createSpace: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })],
-  updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })],
-  transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })],
+  inviteOrganizationUser: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } })],
+  createSpace: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } })],
+  updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
+  transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -107,5 +107,5 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   inviteOrganizationUser: (_inq) => [meReceivedManyInquiriesQueryKey()],
   createSpace: (_inq) => [],
   updateSpace: (_inq) => [],
-  transferSpace: (inq) => [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })],
+  transferSpace: (inq) => [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } })],
 };

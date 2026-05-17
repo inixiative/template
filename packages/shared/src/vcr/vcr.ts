@@ -78,7 +78,9 @@ export class VCR {
         if (saved.bodyFile) return readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T;
         return saved.body as T;
       }
-      log.warn(`VCR: refreshing cassette "${basename(fixturePath)}" (was ${saved.version ?? '<none>'}, now ${current})`);
+      log.warn(
+        `VCR: refreshing cassette "${basename(fixturePath)}" (was ${saved.version ?? '<none>'}, now ${current})`,
+      );
     }
 
     try {
@@ -106,7 +108,9 @@ export class VCR {
         }
         return saved;
       }
-      log.warn(`VCR: refreshing cassette "${basename(fixturePath)}" (was ${saved.version ?? '<none>'}, now ${current})`);
+      log.warn(
+        `VCR: refreshing cassette "${basename(fixturePath)}" (was ${saved.version ?? '<none>'}, now ${current})`,
+      );
     }
 
     try {

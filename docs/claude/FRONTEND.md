@@ -433,7 +433,7 @@ const org = data;  // Already unwrapped
 
 ## Authentication
 
-**See:** [AUTHENTICATION.md](./AUTHENTICATION.md) for complete authentication documentation.
+**See:** [AUTH.md](./AUTH.md) for complete authentication documentation (backend + frontend).
 
 **Quick Reference:**
 
@@ -1075,7 +1075,7 @@ const { data } = useQuery({
 });
 ```
 
-See AUTHENTICATION.md for complete API integration patterns.
+See AUTH.md for complete API integration patterns.
 
 ### Settings Components
 

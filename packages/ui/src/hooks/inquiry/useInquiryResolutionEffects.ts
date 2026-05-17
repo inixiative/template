@@ -21,17 +21,17 @@ export const useInquiryResolutionEffects = () => {
         break;
       case 'createSpace':
         await queryClient.invalidateQueries({
-          queryKey: organizationReadManySpacesQueryKey({ path: { id: inquiry.sourceOrganizationId } }),
+          queryKey: organizationReadManySpacesQueryKey({ path: { id: inquiry.sourceOrganizationId! } }),
         });
         break;
       case 'updateSpace':
         await queryClient.invalidateQueries({
-          queryKey: spaceProtectedQueryKey({ path: { id: inquiry.sourceSpaceId } }),
+          queryKey: spaceProtectedQueryKey({ path: { id: inquiry.sourceSpaceId! } }),
         });
         break;
       case 'transferSpace':
         await queryClient.invalidateQueries({
-          queryKey: organizationReadManySpacesQueryKey({ path: { id: inquiry.targetOrganizationId } }),
+          queryKey: organizationReadManySpacesQueryKey({ path: { id: inquiry.targetOrganizationId! } }),
         });
         break;
     }

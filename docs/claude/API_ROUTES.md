@@ -401,7 +401,7 @@ export const useAuthProviders = () => {
 };
 ```
 
-See `docs/claude/AUTHENTICATION.md` for complete frontend integration patterns.
+See `docs/claude/AUTH.md` for complete frontend integration patterns.
 
 ---
 

@@ -1,3 +1,4 @@
+import { log } from '@template/ui/lib/logger';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AppEventPayload = {
@@ -112,7 +113,7 @@ export const useAppEvents = (options: UseAppEventsOptions = {}): UseAppEventsRet
 
         // Handle server-initiated reconnect (graceful shutdown)
         if (event.type === 'reconnect') {
-          console.log('[WS] Server requested reconnect:', event.reason);
+          log.info('[WS] Server requested reconnect:', event.reason);
           ws.close();
           // Reconnect immediately (not waiting for delay) - but respect explicit disconnect
           if (shouldReconnectRef.current) {
@@ -123,7 +124,7 @@ export const useAppEvents = (options: UseAppEventsOptions = {}): UseAppEventsRet
 
         // Handle explicit disconnect confirmation
         if (event.type === 'disconnected') {
-          console.log('[WS] Disconnected:', event.connectionId);
+          log.info('[WS] Disconnected:', event.connectionId);
           return;
         }
 

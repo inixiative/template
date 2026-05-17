@@ -1,8 +1,8 @@
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { type Fixture, VCR } from './vcr';
+import { type Fixture, VCR } from '@template/shared/vcr';
 
 describe('VCR', () => {
   let dir: string;

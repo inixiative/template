@@ -9,7 +9,7 @@ Canonical instructions for all coding agents in this repository.
 
 - **Naming matters.** If a name doesn't clearly describe what the thing does, rename it. Do not leave misleading or generic names for convenience.
 - **One file, one concern.** Each file should have a single clear purpose. If a file has multiple exported functions that serve different consumers, split them. The cost of an extra file is near zero; the cost of hunting through a multi-purpose file is real.
-- **No premature features.** Do not build things nobody is using yet unless they are foundational patterns that every app page will need. When in doubt, ask.
+- **YAGNI applies to scope invention, not to completion.** See section 0.2 for the precise rule.
 - **No continuous support debt.** Build things that are self-explanatory and do not require hand-holding. If a consumer needs to read the source code to understand the API, the API is wrong.
 - **Adversarial reviews should run regularly.** After any significant implementation, run an adversarial review in the background against the full scope of changes. Do not wait for the user to ask. Flag issues proactively.
 
@@ -21,6 +21,9 @@ Canonical instructions for all coding agents in this repository.
 - Only change CI rules/fixtures when the user explicitly requests it.
 - Prefer minimal, targeted changes over redesigns.
 - Do not run git commands unless the user explicitly asks.
+- **NEVER run `git stash` — for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
+- **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
+- **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
 
 ## 0.1. Decomposition by Default
 
@@ -40,6 +43,31 @@ Before undertaking any task or planning any approach, decompose first. Do not ju
 - "Just put it all in one table/function/component" — stop. Convenience now is coupling later.
 
 Never merge distinct concerns into one place for convenience — the convenience is temporary, the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
+
+## 0.2. YAGNI — Scope Invention vs. Completion
+
+YAGNI is about **what was asked**, not **how complete the asked-for thing is**. Two distinct rules, often conflated.
+
+**YAGNI applies to: scope invention.** Adding things adjacent to the task that nobody asked for. Symptoms:
+
+- Extra fields on a model "in case we need them later"
+- Wrapper functions around single-call sites
+- Defensive try/catch around code that can't throw meaningfully
+- Backwards-compat shims for unused old paths
+- A second helper file for one current caller + "future" callers
+- Re-exports / barrels that nothing imports
+- Comments explaining what well-named code already says
+
+**YAGNI does NOT apply to: completing the asked-for thing.** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* applying YAGNI here:
+
+- Shipping a v1 that forces a v2 in a week (binary support, version-awareness, config flexibility)
+- Hardcoding what should be parameterized (CLI flag, regex)
+- Stuffing a thing in one consumer when it belongs as a shared primitive
+- Skipping the API that makes the thing testable / setup-able (static cache, global setup)
+
+**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build. Adjacent = skip.
+
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Build it complete. Is it feature code? Trim hard.
 
 ## 1. Mandatory Task Intake (Always)
 
@@ -200,7 +228,7 @@ Read docs based on task type:
 
 - API/routes/controllers: `docs/claude/API_ROUTES.md`
 - DB/schema/hooks: `docs/claude/DATABASE.md`, `docs/claude/HOOKS.md`
-- Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`, `docs/claude/AUTHENTICATION.md`
+- Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`
 - Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
 - Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - App events/email/notifications: `docs/claude/APP_EVENTS.md`

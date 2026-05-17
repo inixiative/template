@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { createUser, getNextSeq } from '@template/db/test';
-import { email, liveOrders, phone, phoneRow, positions, posOf } from './setup';
+import { email, liveOrders, phone, phoneRow, positions, posOf } from '#/hooks/orderedList/tests/setup';
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {

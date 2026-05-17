@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactType } from '@template/db/generated/client/enums';
 import { createUser } from '@template/db/test';
-import { allOrders, liveOrders, mkEmail, phone, positions, posOf, softDelete } from './setup';
+import { allOrders, liveOrders, mkEmail, phone, positions, posOf, softDelete } from '#/hooks/orderedList/tests/setup';
 
 describe('soft delete', () => {
   it('negates position and compacts siblings', async () => {

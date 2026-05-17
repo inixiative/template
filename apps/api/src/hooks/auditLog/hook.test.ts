@@ -175,11 +175,19 @@ describe('auditLog hook', () => {
   it('records actorTokenId when authenticated via token', async () => {
     const { entity: tokenOwner } = await createUser();
     const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const mockToken: TokenWithRelations = {
+      ...token,
+      user: tokenOwner,
+      organization: null,
+      organizationUser: null,
+      space: null,
+      spaceUser: null,
+    };
     const ts = Date.now();
 
     const { fetch } = createTestApp({
       mockUser: tokenOwner,
-      mockToken: token as unknown as TokenWithRelations,
+      mockToken,
       mount: [
         (app) => {
           app.use('*', auditActorMiddleware);

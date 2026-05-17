@@ -12,7 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureSdkIndex.ts"
+    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureSdkIndex.ts && bunx biome check --write --only=assist/source/organizeImports src/index.ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1"

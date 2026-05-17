@@ -1,6 +1,7 @@
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import { log } from '@template/shared/logger';
 import type { AppEnv } from '#/types/appEnv';
 
 export const autoRegisterRoutes = async (
@@ -30,7 +31,7 @@ export const autoRegisterRoutes = async (
     const controller = controllerModule.default || controllerModule[`${baseName}Controller`];
 
     if (!route || !controller) {
-      console.warn(`Skipping ${baseName}: route or controller not found`);
+      log.warn(`Skipping ${baseName}: route or controller not found`);
       continue;
     }
 
