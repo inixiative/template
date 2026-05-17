@@ -3,6 +3,11 @@ import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/e
 import { VCR } from '@template/shared/vcr';
 import { Resend } from 'resend';
 
+// Bun resolves the installed resend/package.json at runtime — version comes
+// from the lockfile-pinned install. tsc can't resolve into node_modules JSON,
+// so we bypass module resolution via Bun's require.
+const resendPkg = import.meta.require('resend/package.json') as { version: string };
+
 const FIXTURES_DIR = join(import.meta.dir, '../../tests/fixtures/resend');
 const SANITIZE_KEYS = ['id'];
 const MAX_BATCH_SIZE = 100;
@@ -40,7 +45,11 @@ const toResendPayload = (options: SendEmailOptions) => ({
 });
 
 class ResendEmailClient implements EmailClient {
-  readonly vcr = new VCR(FIXTURES_DIR, { send: { keys: SANITIZE_KEYS } });
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    service: 'resend',
+    version: () => resendPkg.version,
+    sanitizers: { send: { keys: SANITIZE_KEYS } },
+  });
   private readonly resend: Resend;
 
   constructor(apiKey: string) {

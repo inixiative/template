@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/vercel');
@@ -17,7 +17,7 @@ export type VercelProject = {
 };
 
 class VercelApi {
-  readonly vcr = new VCR(FIXTURES_DIR);
+  readonly vcr = new VCR(FIXTURES_DIR, { service: 'vercel', version: () => cliVersion('vercel') });
 
   /**
    * Get Vercel API token from CLI config

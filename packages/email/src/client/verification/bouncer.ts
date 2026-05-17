@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { EmailVerifier, VerificationResult, VerificationStatus } from '@template/email/client/verification/types';
-import { VCR } from '@template/shared/vcr';
+import { fetchVersion, VCR } from '@template/shared/vcr';
 
 type BouncerResponse = {
   email: string;
@@ -24,7 +24,14 @@ const toResult = (data: BouncerResponse): VerificationResult => ({
 });
 
 class BouncerVerifierClient implements EmailVerifier {
-  readonly vcr = new VCR(FIXTURES_DIR, { verify: { keys: SANITIZE_KEYS } });
+  // No SDK + no CLI — derive version from the docs page for this specific
+  // endpoint. When their contract changes, the doc updates, the body hash
+  // shifts, cassettes auto-refresh.
+  readonly vcr = new VCR(FIXTURES_DIR, {
+    service: 'bouncer',
+    version: () => fetchVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
+    sanitizers: { verify: { keys: SANITIZE_KEYS } },
+  });
   private readonly apiKey: string;
 
   constructor(apiKey: string) {

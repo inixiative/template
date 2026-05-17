@@ -30,7 +30,8 @@
     "./contact/*": "./src/contact/*.ts",
     "./reference": "./src/reference/index.ts",
     "./reference/*": "./src/reference/*.ts",
-    "./vcr": "./src/vcr.ts",
+    "./vcr": "./src/vcr/index.ts",
+    "./vcr/*": "./src/vcr/*.ts",
     "./styles/theme.css": "./styles/theme.css"
   },
   "dependencies": {

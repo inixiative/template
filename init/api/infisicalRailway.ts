@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { getInfisicalToken } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalRailway');
@@ -39,7 +39,13 @@ type EnsureRailwaySyncInput = {
 
 class InfisicalRailwayApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    createRailwayConnection: { fn: () => 'REDACTED' },
+    service: 'infisical|railway',
+    // Composite: either CLI bumping should invalidate cassettes since
+    // both shape the Infisical-Railway connection payload.
+    version: async () => (await Promise.all([cliVersion('infisical'), cliVersion('railway')])).join('|'),
+    sanitizers: {
+      createRailwayConnection: { fn: () => 'REDACTED' },
+    },
   });
 
   /**

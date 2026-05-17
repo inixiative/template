@@ -1,7 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { getSecretAsync, setSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
@@ -54,10 +54,14 @@ export type RailwayDeployment = {
 
 class RailwayApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    getRedisUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
-    getPostgresUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
-    getRailwayUserToken: { fn: () => 'REDACTED' },
-    getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
+    service: 'railway',
+    version: () => cliVersion('railway'),
+    sanitizers: {
+      getRedisUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
+      getPostgresUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
+      getRailwayUserToken: { fn: () => 'REDACTED' },
+      getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
+    },
   });
 
   private async _railwayGraphQLWithToken<T>(

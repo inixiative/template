@@ -1,6 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
 const INFISICAL_API = 'https://app.infisical.com/api';
@@ -68,8 +68,12 @@ const redactSecrets = (s: string) =>
 
 class InfisicalApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    getSecret: { fn: redactSecrets },
-    setSecret: { fn: redactSecrets },
+    service: 'infisical',
+    version: () => cliVersion('infisical'),
+    sanitizers: {
+      getSecret: { fn: redactSecrets },
+      setSecret: { fn: redactSecrets },
+    },
   });
 
   private async _fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

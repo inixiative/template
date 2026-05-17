@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { getInfisicalToken } from './infisical';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisicalVercel');
@@ -36,7 +36,13 @@ type EnsureVercelSyncInput = {
 
 class InfisicalVercelApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    createVercelConnection: { fn: () => 'REDACTED' },
+    service: 'infisical|vercel',
+    // Composite: either CLI bumping should invalidate cassettes since
+    // both shape the Infisical-Vercel connection payload.
+    version: async () => (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
+    sanitizers: {
+      createVercelConnection: { fn: () => 'REDACTED' },
+    },
   });
 
   async listVercelConnections(infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> {

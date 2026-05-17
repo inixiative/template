@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { getSecretAsync } from '../tasks/infisicalSetup';
 import { execAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
@@ -67,9 +67,13 @@ type ServiceToken = {
 
 class PlanetScaleApi {
   readonly vcr = new VCR(FIXTURES_DIR, {
-    createPassword: { keys: SANITIZE_KEYS },
-    createRole: { keys: SANITIZE_KEYS },
-    listPasswords: { keys: SANITIZE_KEYS, isArray: true },
+    service: 'planetscale',
+    version: () => cliVersion('pscale'),
+    sanitizers: {
+      createPassword: { keys: SANITIZE_KEYS },
+      createRole: { keys: SANITIZE_KEYS },
+      listPasswords: { keys: SANITIZE_KEYS, isArray: true },
+    },
   });
 
   private async _fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

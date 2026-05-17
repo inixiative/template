@@ -1,11 +1,11 @@
 import { join } from 'path';
-import { VCR } from '../../packages/shared/src/vcr';
+import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/github');
 
 class GitHubApi {
-  readonly vcr = new VCR(FIXTURES_DIR);
+  readonly vcr = new VCR(FIXTURES_DIR, { service: 'github', version: () => cliVersion('gh') });
 
   /**
    * Check if a GitHub App is installed on an organization
