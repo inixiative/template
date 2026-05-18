@@ -27,18 +27,6 @@ const withOpenApiRef = actionRuleBase as z.ZodType & {
 };
 const actionRuleSchema: z.ZodType = withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
 
-/**
- * Build a Zod schema for a `permissionRules: Json?` column on a model.
- * Valid action keys are derived from the model's rebac schema entry — no
- * second source of truth to maintain. Pass `pick` to narrow further.
- *
- * @example
- *   // All actions defined for `contact` in rebacSchema
- *   permissionRules: buildPermissionRulesSchema('contact'),
- *
- *   // Only `read` is row-overridable (sharing); manage/delete owner-only
- *   permissionRules: buildPermissionRulesSchema('contact', ['read']),
- */
 export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly string[]) => {
   const schemaActions = Object.keys(rebacSchema[model]?.actions ?? {});
   const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;

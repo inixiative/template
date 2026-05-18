@@ -1,3 +1,7 @@
+// @wip — WS auth layer not finalized; part of the ws/ rewrite (see pubsub.ts / handler.ts).
+// Known TODOs: the try/catch swallows token validation failures silently and returns
+// `userId: null` (downgrades to anonymous). Decide whether that's right behavior vs. rejecting.
+
 import { auth } from '#/lib/auth';
 
 export type WSAuthResult = {
@@ -5,15 +9,6 @@ export type WSAuthResult = {
   userId: string | null;
 };
 
-/**
- * Authenticate WebSocket upgrade request.
- * Uses bearer token passed as query param (WS can't set headers from browser).
- *
- * Client connects with: ws://host?token=<bearer_token>
- * Anonymous connections allowed (userId will be null).
- *
- * Returns unique connectionId for tracking (supports multiple tabs per user).
- */
 export const authenticateWS = async (req: Request): Promise<WSAuthResult> => {
   const connectionId = crypto.randomUUID();
 

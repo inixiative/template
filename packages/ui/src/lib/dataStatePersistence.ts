@@ -1,8 +1,3 @@
-/**
- * Pure functions for persisting and restoring paginated data state
- * to/from history.state and URL search params.
- */
-
 export type PersistedState = {
   page?: number;
   pageSize?: number;
@@ -10,7 +5,6 @@ export type PersistedState = {
   orderBy?: string[];
 };
 
-/** URL param names for each state field. */
 const URL_PARAMS: Record<keyof PersistedState, string> = {
   page: 'page',
   pageSize: 'pageSize',
@@ -18,7 +12,6 @@ const URL_PARAMS: Record<keyof PersistedState, string> = {
   orderBy: 'orderBy',
 };
 
-/** Sync a PersistedState to URL search params. Falsy/default values are removed. */
 export function syncStateToUrl(state: PersistedState): string {
   const url = new URL(window.location.href);
 
@@ -40,7 +33,6 @@ export function syncStateToUrl(state: PersistedState): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-/** Read PersistedState from URL search params. Pass searchString for testing. */
 export function readStateFromUrl(searchString?: string): PersistedState {
   const params = new URLSearchParams(searchString ?? window.location.search);
   const state: PersistedState = {};
@@ -60,7 +52,6 @@ export function readStateFromUrl(searchString?: string): PersistedState {
   return state;
 }
 
-/** Read initial state from history.state, falling back to URL params. */
 export function readInitialState(stateKey: string | undefined, checkUrl: boolean): PersistedState {
   if (typeof window === 'undefined') return {};
 
@@ -83,7 +74,6 @@ export function readInitialState(stateKey: string | undefined, checkUrl: boolean
   return {};
 }
 
-/** Write state to history.state under the given key. */
 export function writeToHistoryState(key: string, state: PersistedState): void {
   try {
     const historyState = { ...window.history.state, [key]: state };
@@ -93,7 +83,6 @@ export function writeToHistoryState(key: string, state: PersistedState): void {
   }
 }
 
-/** Write state to both history.state and URL search params in one replaceState call. */
 export function writeToHistoryStateAndUrl(key: string | undefined, state: PersistedState): void {
   try {
     const url = syncStateToUrl(state);
@@ -104,7 +93,6 @@ export function writeToHistoryStateAndUrl(key: string | undefined, state: Persis
   }
 }
 
-/** Parse "field:direction" strings back to orderBy objects. */
 export function parseOrderByStrings(strings: string[]): Array<{ field: string; direction: 'asc' | 'desc' }> {
   return strings.map((s) => {
     const [field, direction] = s.split(':');

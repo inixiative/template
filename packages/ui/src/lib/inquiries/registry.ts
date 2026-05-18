@@ -3,20 +3,14 @@ import type { InquiryType } from '@template/ui/lib/inquiries/queryKeys';
 import type { ComponentType } from 'react';
 
 export type InquirySourceInterface = {
-  /** Powers the row summary cell in inquiry lists */
   summary: ComponentType<{ inquiry: InquirySentItem }>;
-  /** Full detail view (drawer/page body) */
   detail?: ComponentType<{ inquiry: InquirySentItem; onClose: () => void }>;
-  /** Create or edit the inquiry — same interface, different save target */
   compose?: ComponentType<{ inquiry?: InquirySentItem; onClose: () => void }>;
 };
 
 export type InquiryTargetInterface = {
-  /** Powers the row summary cell in inquiry lists */
   summary: ComponentType<{ inquiry: InquiryReceivedItem }>;
-  /** Full detail view (drawer/page body) */
   detail?: ComponentType<{ inquiry: InquiryReceivedItem; onClose: () => void }>;
-  /** Target-side decision UI — context the approver needs before acting */
   review?: ComponentType<{ inquiry: InquiryReceivedItem; onClose: () => void }>;
 };
 

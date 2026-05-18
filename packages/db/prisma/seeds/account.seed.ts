@@ -6,10 +6,6 @@ import type { SeedFile } from '../seed';
 const PASSWORD = 'asd123!';
 const HASHED_PASSWORD = hashSync(PASSWORD, 10);
 
-/**
- * Prime development accounts with passwords.
- * All use password: "asd123!"
- */
 export const accountSeeds: SeedFile<Account> = {
   model: 'account',
   updateOmitFields: ['createdAt', 'password'],

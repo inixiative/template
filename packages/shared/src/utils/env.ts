@@ -1,6 +1,3 @@
-/**
- * Canonical environment names: local | test | pr | staging | prod
- */
 export type Environment = 'local' | 'test' | 'pr' | 'staging' | 'prod';
 
 export const isTest = process.env.ENVIRONMENT === 'test';

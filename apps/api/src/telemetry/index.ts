@@ -1,11 +1,3 @@
-/**
- * OpenTelemetry SDK setup for traces + metrics, exported via OTLP HTTP.
- *
- * DISABLED: the `@opentelemetry/*` packages are listed in apps/api/package.json
- * but not currently installed (bun.lock is missing them). To enable, run
- *   `bun install`
- * to pick up the listed deps, then uncomment the block below.
- */
 
 export {};
 

@@ -10,11 +10,6 @@ type BaseSanitizeKey = (typeof BASE_SANITIZE_KEYS)[number];
 // Type that represents a sanitized schema with base keys removed
 type SanitizedSchema<T extends ZodSchema> = z.ZodObject<Omit<T['shape'], BaseSanitizeKey>>;
 
-/**
- * Sanitizes a Zod object schema by:
- * 1. Removing system-managed fields (id, createdAt, updatedAt, etc.)
- * 2. Transforming z.unknown() JSON fields to Prisma-compatible InputJsonValue
- */
 export const sanitizeRequestSchema = <T extends ZodSchema>(
   schema: T,
   additionalSanitizeKeys: readonly string[] = [],

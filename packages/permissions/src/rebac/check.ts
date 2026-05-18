@@ -16,19 +16,6 @@ const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: s
   return lowerFirst(field.type) as AccessorName;
 };
 
-/**
- * Check if permix grants access via ReBAC schema traversal.
- *
- * Flow:
- * 1. Superadmin bypass (if permix.isSuperadmin)
- * 2. Direct permission check (permix.check)
- * 3. Row-level extension: `record.permissionRules?.[action]` is OR'd with the
- *    schema rule for that action — additive only (the schema default is the
- *    floor; row rules can grant additional paths but never restrict).
- * 4. Schema delegation (action inherits from another action)
- * 5. Relation traversal (space.own → organization.own)
- * 6. JSON rule evaluation (attribute-based checks)
- */
 export const check = (
   permix: Permix,
   schema: RebacSchema,

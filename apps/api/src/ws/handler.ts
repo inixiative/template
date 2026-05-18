@@ -1,3 +1,13 @@
+// @wip — WebSocket message handling not yet finalized; part of the same
+// rewrite as ws/pubsub.ts.
+// Known TODOs for the next pass:
+//   - 4-case switch on `data.action` → `Record<action, handler>` once the
+//     client/server message contract is locked.
+//   - Stale-cleanup setInterval at module top is a side-effect on import;
+//     move into an explicit init hook called from server startup.
+//   - Swallowed JSON.parse catch sends a generic 'Invalid message format'
+//     reply — fine, but worth confirming we don't want structured details.
+
 import { log } from '@template/shared/logger';
 import type { Server } from 'bun';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
@@ -22,10 +32,6 @@ setInterval(() => {
   }
 }, 60_000);
 
-/**
- * Handle WebSocket upgrade requests.
- * Allows anonymous connections (userId will be null).
- */
 export const handleUpgrade = async (req: Request, server: WSServer): Promise<Response | undefined> => {
   const { connectionId, userId } = await authenticateWS(req);
 
@@ -43,9 +49,6 @@ export const handleUpgrade = async (req: Request, server: WSServer): Promise<Res
   return success ? undefined : new Response('Upgrade failed', { status: 500 });
 };
 
-/**
- * WebSocket event handlers for Bun.serve().
- */
 export const websocketHandler = {
   open(ws: WSSocket) {
     addConnection(ws);

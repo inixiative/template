@@ -11,7 +11,7 @@ function SpacesApplicationsPage() {
   const context = useAppStore((state) => state.tenant.context);
 
   if (context.type === 'organization' && context.organization) {
-    return <OrganizationSpaceApplicationsPage organizationId={context.organization.id} />;
+    return <OrganizationSpaceApplicationsPage />;
   }
 
   return <Unauthorized />;

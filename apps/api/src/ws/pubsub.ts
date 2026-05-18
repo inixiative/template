@@ -1,14 +1,11 @@
-import { LogScope, log } from '@template/shared/logger';
-/**
- * WebSocket Pub/Sub Layer
- *
- * Enables cross-server WebSocket broadcasting via Redis.
- * When Redis is available, messages are published to Redis channels
- * and all servers subscribe to receive and forward to their local connections.
- *
- * Falls back to local-only when Redis is unavailable (dev mode).
- */
+// @wip — cross-server WebSocket pub/sub layer not yet finalized.
+// Known TODOs for the next pass:
+//   - Three duplicate switches on `type` (init handler, fallback in publish,
+//     redis-error fallback in publish) should collapse into one `Record<type, fn>`
+//     once the message contract is stable.
+//   - Redis-unavailable fallback is duplicated with the redis-error fallback.
 
+import { LogScope, log } from '@template/shared/logger';
 import { getRedisPub, getRedisSub } from '@template/db';
 import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/connections';
 import type { AppEventPayload } from '#/ws/types';
@@ -17,25 +14,19 @@ const WS_CHANNEL = 'ws:broadcast';
 
 type PubSubMessage = {
   type: 'user' | 'channel' | 'broadcast';
-  target?: string; // userId or channel name
+  target?: string;
   event: AppEventPayload;
 };
 
 let initialized = false;
 let pubsubEnabled = false;
 
-/**
- * Initialize Redis pub/sub for WebSocket broadcasting.
- * Call this once at server startup.
- */
 export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
   initialized = true;
 
   try {
     const sub = getRedisSub();
-
-    // Subscribe to WebSocket broadcast channel
     await sub.subscribe(WS_CHANNEL);
 
     sub.on('message', (channel, message) => {
@@ -44,7 +35,6 @@ export const initWebSocketPubSub = async (): Promise<void> => {
       try {
         const { type, target, event } = JSON.parse(message) as PubSubMessage;
 
-        // Forward to local connections
         switch (type) {
           case 'user':
             if (target) sendToUserLocal(target, event);
@@ -69,12 +59,8 @@ export const initWebSocketPubSub = async (): Promise<void> => {
   }
 };
 
-/**
- * Publish a message to all servers via Redis.
- */
 const publish = async (message: PubSubMessage): Promise<void> => {
   if (!pubsubEnabled) {
-    // Fallback to local-only
     switch (message.type) {
       case 'user':
         if (message.target) sendToUserLocal(message.target, message.event);
@@ -94,7 +80,6 @@ const publish = async (message: PubSubMessage): Promise<void> => {
     await pub.publish(WS_CHANNEL, JSON.stringify(message));
   } catch (err) {
     log.error('Failed to publish to Redis:', err);
-    // Fallback to local
     switch (message.type) {
       case 'user':
         if (message.target) sendToUserLocal(message.target, message.event);
@@ -109,30 +94,18 @@ const publish = async (message: PubSubMessage): Promise<void> => {
   }
 };
 
-/**
- * Send an event to a specific user across all servers.
- */
 export const sendToUser = (userId: string, event: AppEventPayload): void => {
   publish({ type: 'user', target: userId, event });
 };
 
-/**
- * Send an event to all subscribers of a channel across all servers.
- */
 export const sendToChannel = (channel: string, event: AppEventPayload): void => {
   publish({ type: 'channel', target: channel, event });
 };
 
-/**
- * Broadcast an event to all connected users across all servers.
- */
 export const broadcast = (event: AppEventPayload): void => {
   publish({ type: 'broadcast', event });
 };
 
-/**
- * Check if pub/sub is enabled (Redis connected).
- */
 export const isPubSubEnabled = (): boolean => {
   return pubsubEnabled;
 };

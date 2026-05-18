@@ -1,9 +1,6 @@
 import type { Organization } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
-/**
- * Prime development organization.
- */
 export const organizationSeeds: SeedFile<Organization> = {
   model: 'organization',
   updateOmitFields: ['createdAt'],

@@ -11,7 +11,7 @@ function SpacesIncomingTransfersPage() {
   const context = useAppStore((state) => state.tenant.context);
 
   if (context.type === 'organization' && context.organization) {
-    return <OrganizationIncomingTransfersPage organizationId={context.organization.id} />;
+    return <OrganizationIncomingTransfersPage />;
   }
 
   return <Unauthorized />;

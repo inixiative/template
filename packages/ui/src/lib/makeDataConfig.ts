@@ -5,8 +5,6 @@ export type SearchMode = 'combined' | 'field';
 export type DataConfig = {
   searchableFields: string[];
   searchMode: SearchMode;
-  /** Admin mode: filters serialize under filters[...] (direct Prisma, no validation).
-   *  Non-admin: serializes under searchFields[...] (validated against searchableFields). */
   adminMode: boolean;
   orderableFields: string[];
   defaultOrderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
@@ -23,18 +21,6 @@ export type DataConfigOptions = {
   canOrder?: boolean;
 };
 
-/**
- * Create data configuration from API metadata.
- *
- * Reads the OpenAPI spec for the given operation and extracts:
- * - Searchable fields from x-searchable-fields
- * - Orderable fields (auto-detected, recursive, no arrays)
- * - Enum filters (auto-detected with in/notIn ops)
- * - Permission toggles (canSearch, canOrder)
- *
- * Works with usePaginatedData, useInfiniteData, or any consumer
- * that needs to know what an API endpoint supports for filtering.
- */
 export const makeDataConfig = (operationId: string, options?: DataConfigOptions): DataConfig => {
   const metadata = getQueryMetadataByOperation(operationId);
   const adminMode = options?.adminMode ?? false;

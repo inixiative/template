@@ -10,22 +10,6 @@ export type ResolveUserByContactArgs = {
   displayName?: string | null;
 };
 
-/**
- * Look up the User who owns a given Contact (type + valueKey), creating a
- * stub User + Contact pair when no match exists. Used by listener-style
- * paths where an external observer (e.g. a chat-platform bot) sees a
- * message from someone with no app account yet.
- *
- * Stub-User email is derived via the type's `toStubEmail` registry method
- * (e.g. whatsappDef → `${digits}@whatsapp.${PROJECT_NAME}`). Types without
- * that method cannot be stub-created — the function throws.
- *
- * Check-and-create runs inside a single transaction so a sibling request's
- * insert is visible by the time we re-check (READ COMMITTED). True
- * concurrent first-observation by two requests can still race past the
- * check; in that rare case the second insert errors out and the caller
- * retries.
- */
 export const resolveUserByContact = async (args: ResolveUserByContactArgs): Promise<string> => {
   return db.$transaction(async (tx) => {
     const existing = await tx.contact.findFirst({

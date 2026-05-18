@@ -1,8 +1,3 @@
-/**
- * App Theme - Platform baseline colors
- * These are the default theme colors used across the platform
- * Shades: 1 (lightest) → 4 (darkest) in light mode, inverted in dark mode
- */
 export type AppTheme = {
   // Brand colors with shades
   primary: string;

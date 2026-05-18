@@ -1,31 +1,15 @@
 import { LogScope, log } from '@template/shared/logger';
 
-/**
- * Graceful Shutdown Handler
- *
- * Handles SIGTERM/SIGINT signals to gracefully shut down:
- * 1. WebSocket - notify clients to reconnect elsewhere
- * 2. BullMQ Worker - stop accepting jobs, finish current ones
- * 3. Redis - close connections cleanly
- */
 
 type ShutdownHandler = () => Promise<void> | void;
 
 const handlers: ShutdownHandler[] = [];
 let isShuttingDown = false;
 
-/**
- * Register a shutdown handler.
- * Handlers run in order of registration.
- */
 export const onShutdown = (handler: ShutdownHandler): void => {
   handlers.push(handler);
 };
 
-/**
- * Initialize graceful shutdown listeners.
- * Call once at server startup.
- */
 export const initGracefulShutdown = (
   options: { timeout?: number; onStart?: () => void; onComplete?: () => void } = {},
 ): void => {

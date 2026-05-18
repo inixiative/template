@@ -1,13 +1,6 @@
-/**
- * PACKAGE INDEX FILE - Cross-package exports use relative imports.
- * All other files in this package should use absolute #/ imports.
- */
-
 // Database client with scope/transaction methods
 export { db } from './client';
 export type { Db } from './clientTypes';
-// Constraint helpers (CHECK, partial unique indexes)
-export { addCheckConstraint, addGistIndex, addUniqueWhereNotNull } from './constraints';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,

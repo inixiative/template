@@ -1,16 +1,3 @@
-/**
- * Typed Model IDs
- *
- * Provides compile-time safety for model IDs using phantom types.
- * This prevents accidentally passing a UserId where a SessionId is expected.
- *
- * Usage:
- *   const user = await db.user.findUnique({ where: { id: userId('abc-123') } });
- *
- *   // This would be a compile-time error:
- *   // await db.session.findUnique({ where: { id: userId('abc-123') } });
- */
-
 // Phantom type brand for model IDs
 export type Id<Model> = string & { readonly __model: Model };
 

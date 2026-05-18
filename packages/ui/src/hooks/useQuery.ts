@@ -8,10 +8,6 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-/**
- * Re-export TanStack Query hooks with app-specific types.
- * QueryClient comes from QueryClientProvider in main.tsx.
- */
 export const useQuery = <
   TQueryFnData = unknown,
   TError = Error,

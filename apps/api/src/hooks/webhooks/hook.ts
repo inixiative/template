@@ -1,8 +1,17 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, db, filterIgnoredFields, HookTiming, isFalsePolymorphismRef, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  filterIgnoredFields,
+  HookTiming,
+  isFalsePolymorphismRef,
+  registerDbHook,
+  webhookEnabledModels,
+  webhookRelatedModels,
+} from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
-import { getRelatedWebhookRefs, isNoOpUpdate, isWebhookEnabled } from '#/hooks/webhooks/utils';
+import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -82,14 +91,12 @@ export const registerWebhookHook = () => {
   registerDbHook('webhookDelivery', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action: dbAction } = options;
 
-    // Get webhook targets: either related refs (via false polymorphism) or the model itself
-    const relatedRefs = getRelatedWebhookRefs(model);
-    const webhookTargets: string[] = relatedRefs
+    const relatedRefs = webhookRelatedModels[model];
+    const webhookTargets: string[] = relatedRefs?.length
       ? relatedRefs.map((ref) => (isFalsePolymorphismRef(ref) ? ref.model : ref))
       : [model];
 
-    // Filter to enabled targets
-    const enabledTargets = webhookTargets.filter(isWebhookEnabled);
+    const enabledTargets = webhookTargets.filter((m) => (webhookEnabledModels as readonly string[]).includes(m));
     if (enabledTargets.length === 0) return;
 
     let allCallbacks: (() => Promise<void>)[] = [];

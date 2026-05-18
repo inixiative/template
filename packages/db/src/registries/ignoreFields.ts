@@ -1,13 +1,6 @@
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import { omit } from 'lodash-es';
 
-/**
- * Fields to ignore when determining if a mutation is meaningful.
- * Used by: Cache, Webhooks, Audit logs.
- *
- * Encrypted-column triplets are auto-injected from the encryption registry —
- * ciphertext changes don't carry diffable signal for hook subscribers.
- */
 const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
   _global: ['updatedAt'],
   User: ['lastLoginAt'],

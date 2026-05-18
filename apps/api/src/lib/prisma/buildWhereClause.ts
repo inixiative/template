@@ -1,24 +1,3 @@
-/**
- * Build a Prisma where clause from a global `search` term + a structured
- * `searchFields` filter (the bracket-query shape parsed off the URL).
- *
- * Three guarantees per leaf:
- *   1. Operators match the field's type — `contains` on enum, `gt` on
- *      string, etc. all 400 with a clear "Operator X not valid for field Y"
- *      message. Tables live in `scalarOperators.ts`.
- *   2. Values get coerced — bracket-query values arrive as strings; we turn
- *      `'42'` into `42` for Int fields, `'2026-05-10'` into a Date for
- *      DateTime fields, etc. Coercion failures 400 with a clear message.
- *      Logic lives in `coerceValue.ts`.
- *   3. Bare values get a per-kind default operator — `{ name: 'foo' }`
- *      becomes `{ name: { contains: 'foo', mode: 'insensitive' } }` for a
- *      String field, `{ status: { equals: 'approved' } }` for an enum,
- *      etc.
- *
- * `model` is required — every caller in this codebase passes it. There is
- * no legacy fallback.
- */
-
 import type { ModelName } from '@template/db';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';

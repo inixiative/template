@@ -4,7 +4,6 @@ import { cleanupTouchedTables, createEmailComponent, createOrganization, createS
 import { saveEmailTemplate } from '@template/email/render/save';
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 
-/** Wrap content in valid MJML structure */
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 

@@ -1,6 +1,3 @@
-/**
- * Validate MJML syntax. Throws MjmlValidationError if invalid.
- */
 
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 import mjml2html from 'mjml';

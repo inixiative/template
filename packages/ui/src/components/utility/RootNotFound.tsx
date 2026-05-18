@@ -10,10 +10,10 @@ export const RootNotFound = ({
   title = 'Page not found',
   description = 'This route does not exist.',
 }: RootNotFoundProps = {}) => {
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
 
   const handleGoToDashboard = () => {
-    navigatePreservingContext('/dashboard');
+    navigatePreserving('/dashboard', 'context');
   };
 
   return (

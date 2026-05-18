@@ -1,11 +1,3 @@
-/**
- * Space Theme - Tenant-specific overrides
- * Keys match CSS variable names exactly (e.g., primary → --space-primary)
- * All fields are optional - undefined values fall back to app theme
- *
- * Shades (1-4) are auto-computed via CSS color-mix() if base color is set
- * You can override individual shades if needed
- */
 export type SpaceTheme = {
   // Brand colors (HSL format: "H S% L%")
   primary?: string;

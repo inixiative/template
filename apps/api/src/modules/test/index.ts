@@ -1,7 +1,3 @@
-/**
- * Test module - mock webhook receiver for testing webhook delivery
- * Only mounted in test environment (check is in routes/index.ts)
- */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppEnv } from '#/types/appEnv';
 

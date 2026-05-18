@@ -17,10 +17,8 @@ export type MutationSlot<TVars = unknown, TData = unknown> = {
 
 export type Slot = QuerySlot | MutationSlot;
 
-/** Normalizes a query slot — widens queryKey so T unifies across scopes */
 export const query = <TData>(slot: QuerySlot<TData>): QuerySlot<TData> => slot;
 
-/** Normalizes a mutation slot */
 export const mutation = <TVars, TData>(slot: MutationSlot<TVars, TData>): MutationSlot<TVars, TData> => slot;
 
 type ContextScopeMap<T, P> = {
@@ -30,12 +28,6 @@ type ContextScopeMap<T, P> = {
   space?: (args: { organization: Organization; space: Space }, params?: P) => T;
 };
 
-/**
- * Context-aware query/mutation factory. Dispatches to the correct scope
- * (user/org/space) at runtime. All scopes must return the same shape T.
- *
- * Curried: `makeContextQueries<ParamsType>()({...})` or `makeContextQueries()({...})`
- */
 export const makeContextQueries =
   <P = undefined>() =>
   <T>(scopeMap: ContextScopeMap<T, P>) =>

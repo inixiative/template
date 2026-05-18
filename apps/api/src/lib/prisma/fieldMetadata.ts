@@ -1,13 +1,3 @@
-/**
- * Field-type metadata derived from the generated `prismaMap`. Resolves a
- * dotted field path (`'contacts.valueKey'`) on a model to its leaf `FieldDef`,
- * walking through `object`-kind relations along the way.
- *
- * Pure metadata. Operator validation lives in `scalarOperators.ts`; value
- * coercion in `coerceValue.ts`. Both work on `FieldDef` directly — no
- * parallel "kind" enum mediates between them.
- */
-
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 export type FieldDef = {
@@ -26,11 +16,6 @@ const MAP = prismaMap as Record<string, { fields: Record<string, FieldDef> }>;
 
 const getField = (modelName: string, fieldName: string): FieldDef | undefined => MAP[modelName]?.fields?.[fieldName];
 
-/**
- * Walk a dotted path through relation segments to its leaf field def.
- * Returns `undefined` if any segment is missing or a non-relation
- * intermediate appears before the leaf.
- */
 export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;

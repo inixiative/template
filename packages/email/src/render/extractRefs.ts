@@ -1,9 +1,3 @@
-/**
- * Component syntax: {{#component:slug}}content{{/component:slug}}
- * Output tags variants: {{#component:slug:0}}content{{/component:slug:0}}
- * Slugs: lowercase, numbers, hyphens only.
- */
-
 const OPEN_TAG = /\{\{#component:([a-z0-9-]+)\}\}/g;
 
 export type MappedComponent = {
@@ -19,9 +13,6 @@ export type MapResult = {
   refs: string[]; // Top-level refs
 };
 
-/**
- * Parse MJML, extract component map, return tagged output.
- */
 export const mapRefs = (input: string): MapResult => {
   const map: RefMap = {};
   const { mjml, refs } = processLevel(input, map);
@@ -106,9 +97,6 @@ const findClose = (input: string, slug: string, from: number): number => {
   return -1;
 };
 
-/**
- * {{#component:slug:N}}...{{/component:slug:N}} → {{#component:slug:N}}{{/component:slug:N}}
- */
 const cleanRefs = (content: string): string =>
   content.replace(
     /\{\{#component:([a-z0-9-]+:\d+)\}\}[\s\S]*?\{\{\/component:\1\}\}/g,

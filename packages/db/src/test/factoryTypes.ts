@@ -60,11 +60,6 @@ export type TypedBuildResult<
 
 import type { Identifier } from '@template/db/utils/runtimeDataModel';
 
-/**
- * FK format: { targetField: sourceField }
- * - string: source = target (e.g., "organizationId")
- * - Record: mapped (e.g., { id: "userId" } means set sourceField from targetField)
- */
 export type DependencyConfig = {
   modelName: ModelName;
   foreignKey: Identifier;

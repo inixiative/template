@@ -7,11 +7,6 @@ import { getAccessorRelations, type Identifier } from '@template/db/utils/runtim
 
 type PendingMap = Map<string, Promise<HydratedRecord | null>>;
 
-/**
- * Resolve FK mapping to actual values from the record.
- * FK mapping is { targetField: sourceField } - we read sourceField from record
- * and build { targetField: value } for querying.
- */
 const resolveIdentifier = (record: HydratedRecord, fk: Identifier): Identifier | null => {
   if (typeof fk === 'string') {
     // Simple: source field name equals target field name

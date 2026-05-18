@@ -1,23 +1,5 @@
-import type { RoutingContextResolutionInput } from '@template/ui/hooks/useAuthenticatedRouting/types';
-import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import type { AppStore } from '@template/ui/store/types';
 import type { TenantContext } from '@template/ui/store/types/tenant';
-
-export type ApplyAuthorizedContextInput = {
-  tenant: AppStore['tenant'];
-  context: TenantContext;
-};
-
-export const resolveAuthorizedContext = (input: RoutingContextResolutionInput): TenantContext | null => {
-  return checkContextPermission({
-    path: input.path,
-    navConfig: input.navConfig,
-    permissions: input.permissions,
-    context: input.context,
-    page: input.page,
-    organizations: input.organizations,
-  });
-};
 
 export const hasContextChanged = (context: TenantContext, nextContext: TenantContext): boolean => {
   return (
@@ -27,7 +9,10 @@ export const hasContextChanged = (context: TenantContext, nextContext: TenantCon
   );
 };
 
-export const applyAuthorizedContext = ({ tenant, context }: ApplyAuthorizedContextInput): void => {
+export const applyAuthorizedContext = ({
+  tenant,
+  context,
+}: { tenant: AppStore['tenant']; context: TenantContext }): void => {
   if (context.type === 'organization' && context.organization) {
     tenant.setOrganization(context.organization.id);
     return;

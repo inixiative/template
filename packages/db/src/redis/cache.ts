@@ -18,17 +18,6 @@ const dateReviver = (_key: string, value: unknown): unknown => {
   return value;
 };
 
-/**
- * Build a cache key. Composite keys are sorted alphabetically for consistency.
- *
- * @example
- * cacheKey('user', 'abc-123')                                        // cache:user:id:abc-123
- * cacheKey('user', { email: 'foo@example.com' })                     // cache:user:email:foo@example.com
- * cacheKey('organizationUser', { userId: 'u1', organizationId: 'o1' })
- *   // → cache:organizationUser:organizationId:o1:userId:u1 (sorted)
- * cacheKey('user', 'abc-123', ['organizationUsers'])                 // cache:user:id:abc-123:organizationUsers
- * cacheKey('session', { userId: 'abc-123' }, [], true)               // cache:session:userId:abc-123:*
- */
 export const cacheKey = (accessor: string, identifier: Identifier, tags: string[] = [], wildcard = false): string => {
   const idParts: string[] = [];
 
@@ -51,25 +40,6 @@ const validateKey = (key: string): void => {
   }
 };
 
-/**
- * Get value from cache, or compute and store it.
- * Always sets with TTL (default 24 hours) to ensure expiry.
- *
- * - Returns cached value if exists (including cached null/undefined)
- * - Computes via fn() on cache miss
- * - Caches null/undefined with short TTL (1 min) to prevent thundering herd
- * - Caches real values with provided TTL (default 24 hours)
- *
- * @example
- * ```ts
- * const user = await cache(cacheKey('user', id), async () => {
- *   return db.user.findUnique({ where: { id } });
- * });
- *
- * // With custom TTL (1 hour)
- * const stats = await cache(cacheKey('stats', 'daily'), fetchStats, 60 * 60);
- * ```
- */
 export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> => {
   validateKey(key);
 
@@ -115,16 +85,6 @@ export const upsertCache = async <T>(
   }
 };
 
-/**
- * Clear cache entries matching a pattern.
- * Supports wildcards (*) for pattern matching.
- * Uses SCAN instead of KEYS to avoid blocking Redis.
- *
- * @example
- * await clearKey('cache:User:id:123');        // Exact key
- * await clearKey('cache:User:*');             // Pattern with wildcard
- * await clearKey('cache:*');                  // All cache entries
- */
 export const clearKey = async (pattern: string): Promise<number> => {
   validateKey(pattern);
 

@@ -1,16 +1,6 @@
-// Handler for Bun.serve()
+// @wip — barrel for the in-flight ws/ rewrite (see pubsub.ts / handler.ts).
 
-// Local connection management
 export { drainConnections, getConnectionStats } from '#/ws/connections';
 export { handleUpgrade, websocketHandler } from '#/ws/handler';
-// Broadcasting utilities (cross-server via Redis pub/sub)
-export {
-  broadcast,
-  initWebSocketPubSub,
-  isPubSubEnabled,
-  sendToChannel,
-  sendToUser,
-} from '#/ws/pubsub';
-
-// Types
+export { broadcast, initWebSocketPubSub, isPubSubEnabled, sendToChannel, sendToUser } from '#/ws/pubsub';
 export type { WSData, WSMessage, WSSocket } from '#/ws/types';

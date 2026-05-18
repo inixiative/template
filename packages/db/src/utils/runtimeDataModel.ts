@@ -1,14 +1,3 @@
-/**
- * Extracts runtimeDataModel and relation metadata from Prisma 7 generated client.
- *
- * Prisma 7 embeds two things in the generated client:
- * 1. runtimeDataModel - minimal field info (name, kind, type, relationName)
- * 2. inlineSchema - the full Prisma schema text
- *
- * The runtimeDataModel lacks FK field mappings, so we parse the inlineSchema
- * to extract @relation(fields: [...], references: [...]) for composite FKs.
- */
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,21 +25,6 @@ export type RuntimeDataModel = {
   types: Record<string, unknown>;
 };
 
-/**
- * Identifier for records - used in two contexts:
- *
- * 1. FK mapping (in RelationInfo.foreignKey): { [targetField]: sourceField }
- *    - Describes how to resolve a relation
- *    - { id: "userId" } → query target WHERE id = record.userId
- *    - { organizationId: "organizationId", id: "spaceId" } → composite FK
- *
- * 2. Query/cache key (resolved values): { [field]: value }
- *    - Actual field names and values for lookup
- *    - { id: "abc-123" } → WHERE id = "abc-123"
- *    - { organizationId: "org1", userId: "user1" } → composite key
- *
- * String shorthand: "userId" or "abc-123" (simple id field)
- */
 export type Identifier = string | Record<string, string>;
 
 export type RelationInfo = {
@@ -106,10 +80,6 @@ const getInlineSchema = (): string => {
   return cachedInlineSchema;
 };
 
-/**
- * Parse @relation(fields: [...], references: [...]) from schema text.
- * Returns Map<ModelName, Map<RelationFieldName, { fields, references }>>
- */
 const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
   if (cachedRelationFks) return cachedRelationFks;
 
@@ -148,10 +118,6 @@ const parseRelationFks = (): Map<string, Map<string, RelationFkMapping>> => {
   return cachedRelationFks;
 };
 
-/**
- * Build FK identifier for a relation.
- * Maps source fields to target reference fields for proper querying.
- */
 const getRelationForeignKey = (modelName: string, relationField: string): Identifier | null => {
   const relationFks = parseRelationFks();
   const modelFks = relationFks.get(modelName);
@@ -176,9 +142,6 @@ const getRelationForeignKey = (modelName: string, relationField: string): Identi
   return composite;
 };
 
-/**
- * Get all relations for a model with their FK fields.
- */
 export const getModelRelations = (modelName: ModelName): RelationInfo[] => {
   const dataModel = getRuntimeDataModel();
   const model = dataModel.models[modelName];
@@ -197,7 +160,6 @@ export const getModelRelations = (modelName: ModelName): RelationInfo[] => {
     }));
 };
 
-/** Accessor version - converts accessor to model name internally */
 export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => {
   const modelName = toModelName(accessor);
   if (!modelName) {
@@ -206,7 +168,6 @@ export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => 
   return getModelRelations(modelName);
 };
 
-/** Clear caches - useful for testing */
 export const clearRuntimeCaches = (): void => {
   cachedDataModel = null;
   cachedInlineSchema = null;

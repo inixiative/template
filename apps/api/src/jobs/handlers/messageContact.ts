@@ -11,16 +11,6 @@ export type MessageContactPayload = {
   replyTo?: MessageDispatchOptions['replyTo'];
 };
 
-/**
- * Direct send to a single Contact (and therefore single provider).
- * Used when replying to an inbound conversation that arrived on a known
- * channel. For broadcasts across all of a user's accepted contacts use
- * messageUser instead.
- *
- * Hard-fails on missing contact and missing provider adapter — both are
- * configuration errors. canDeliver is a policy decision (contact opted
- * out of this kind) and silently skips.
- */
 export const messageContact = makeJob<MessageContactPayload>(async (_ctx, payload) => {
   const { contactId, kind, content, replyTo } = payload;
 

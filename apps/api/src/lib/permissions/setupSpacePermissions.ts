@@ -4,10 +4,6 @@ import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
-/**
- * Set up permissions for user's spaces at auth time.
- * Applies token restrictions (lesserRole, intersectEntitlements) if present.
- */
 export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const token = c.get('token');

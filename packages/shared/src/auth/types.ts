@@ -1,8 +1,3 @@
-/**
- * Auth types for frontend state management.
- * These mirror the API response structures.
- */
-
 export type AuthUser = {
   id: string;
   email: string;

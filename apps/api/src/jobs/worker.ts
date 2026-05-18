@@ -49,23 +49,18 @@ export const initializeWorker = async (): Promise<void> => {
 
               log.info(`Processing job ${job.name} (${job.id})`);
 
-              try {
-                const payload = (job.data as { payload?: unknown }).payload;
-                await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-                  if (payload === undefined) {
-                    await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                  } else {
-                    await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
-                      ctx,
-                      payload,
-                    );
-                  }
-                });
-                log.info(`Completed job ${job.name} (${job.id})`);
-              } catch (error) {
-                log.error(`Failed job ${job.name} (${job.id}):`, error);
-                throw error;
-              }
+              const payload = (job.data as { payload?: unknown }).payload;
+              await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
+                if (payload === undefined) {
+                  await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+                } else {
+                  await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
+                    ctx,
+                    payload,
+                  );
+                }
+              });
+              log.info(`Completed job ${job.name} (${job.id})`);
             },
             'worker',
           ),
@@ -78,6 +73,11 @@ export const initializeWorker = async (): Promise<void> => {
       lockDuration: 5 * 60 * 1000,
     },
   );
+
+  jobsWorker.on('failed', (job, error) => {
+    if (!job) return;
+    log.error(`Failed job ${job.name} (${job.id}):`, error, LogScope.worker);
+  });
 
   log.info('Job worker initialized', LogScope.worker);
 

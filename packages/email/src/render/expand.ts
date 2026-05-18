@@ -1,14 +1,7 @@
-/**
- * Expand component refs in MJML - replaces {{#component:slug}}...{{/component:slug}} with content.
- */
-
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { SaveContext } from '@template/email/render/types';
 
-/**
- * Recursively expand all component refs in MJML.
- */
 export const expand = async (mjml: string, componentRefs: string[], ctx: SaveContext): Promise<string> => {
   if (!componentRefs.length) return mjml;
 

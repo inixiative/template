@@ -1,11 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
 
-/**
- * Tests for useInfiniteScrollTrigger's guard logic.
- * The actual IntersectionObserver behavior requires a DOM environment,
- * so we test the callback guards as pure functions.
- */
-
 describe('useInfiniteScrollTrigger — callback guards', () => {
   it('calls onLoadMore when intersecting, hasMore, and not loading', () => {
     const onLoadMore = mock(() => {});

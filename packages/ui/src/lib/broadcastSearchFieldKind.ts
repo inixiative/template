@@ -1,14 +1,3 @@
-/**
- * Tiny browser-side helper that mirrors `apps/api`'s server-side
- * `isStringPath` — answers "does this dotted path resolve to a String
- * field on this model?" — by reading the generated `prismaMap`.
- *
- * Used only by `broadcastSearch` to filter caller-provided paths down to
- * string scalars before fanning out a `contains` OR. We could reuse the
- * server's `fieldMetadata` helpers, but `apps/api` can't be imported from
- * `packages/ui`, and the broadcast filter only needs one yes/no answer —
- * not the full operator-validation surface the server uses.
- */
 
 import { prismaMap } from '@template/db/generated/prismaMap';
 

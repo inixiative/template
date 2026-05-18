@@ -17,7 +17,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
   // Read from Zustand
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
 
   const context = tenant.context; // TenantContext with full objects
@@ -77,7 +77,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => fullPath && navigatePreservingContext(fullPath)}
+            onClick={() => fullPath && navigatePreserving(fullPath, 'context')}
             className={cn(
               'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               DEPTH_PADDING[depth],

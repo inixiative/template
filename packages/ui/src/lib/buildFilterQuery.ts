@@ -3,15 +3,10 @@ import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 export type FilterState = {
-  /** Array operators (in/notIn) take all values; scalar operators (contains/equals/startsWith/endsWith) use values[0] */
   operator: ArrayFieldOperator | 'equals' | 'contains' | 'startsWith' | 'endsWith';
   values: string[];
 };
 
-/**
- * Recursively set a value at a dot-notation path in a nested object.
- * 'sourceUser.email' → { sourceUser: { email: value } }
- */
 const setPath = (obj: Record<string, unknown>, path: string[], value: unknown): void => {
   if (path.length === 1) {
     obj[path[0]] = value;
@@ -24,10 +19,6 @@ const setPath = (obj: Record<string, unknown>, path: string[], value: unknown): 
   setPath(obj[head] as Record<string, unknown>, rest, value);
 };
 
-/**
- * Serialize filter/sort state into the flat query object the SDK expects.
- * No page/pageSize — those are added by the paginated controller.
- */
 export const buildFilterQuery = (
   search: string,
   searchMode: SearchMode,

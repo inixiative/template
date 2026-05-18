@@ -1,27 +1,13 @@
-import type { UseNavigateResult } from '@tanstack/react-router';
-import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
-import type { RouteMatch } from '@template/ui/lib/findRoute';
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
+import type { NavigationSlice } from '@template/ui/store/types/navigation';
 import type { AppStore } from '@template/ui/store/types';
 import type { StateCreator } from 'zustand';
 
-export type NavigationSlice = {
-  navigation: {
-    navigate: ((options: { to: string; search?: Record<string, string> }) => void) | null;
-    navConfig: NavConfig | null;
-    currentRouteMatch: RouteMatch | null;
-    setNavigate: (fn: UseNavigateResult<string>) => void;
-    setNavConfig: (config: NavConfig) => void;
-    setCurrentRouteMatch: (match: RouteMatch | null) => void;
-    navigatePreservingContext: (to: string) => void;
-    navigatePreservingSpoof: (to: string) => void;
-    navigatePreservingAll: (to: string) => void;
-  };
-};
+type Policy = 'context' | 'spoof' | 'all';
 
 const resolveSearchForPolicy = (
   currentSearch: string,
-  policy: 'context' | 'spoof' | 'all',
+  policy: Policy,
   spoofUserEmail: string | null,
 ): Record<string, string> | undefined => {
   if (policy === 'all') {
@@ -36,15 +22,10 @@ const resolveSearchForPolicy = (
   const preservedContext = policy === 'context' ? pickSearchParams(currentSearch, ['org', 'space']) : undefined;
   const spoof = spoofUserEmail ?? readSearchParam(currentSearch, 'spoof');
 
-  if (!preservedContext && !spoof) {
-    return undefined;
-  }
+  if (!preservedContext && !spoof) return undefined;
 
   const search = { ...(preservedContext || {}) };
-  if (spoof) {
-    search.spoof = spoof;
-  }
-
+  if (spoof) search.spoof = spoof;
   return search;
 };
 
@@ -97,43 +78,16 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
         navigation: { ...state.navigation, currentRouteMatch: match },
       })),
 
-    navigatePreservingContext: (to) => {
+    navigatePreserving: (to, policy) => {
       const navigate = get().navigation.navigate;
       if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
       const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
       const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
-      const preservedSearch = resolveSearchForPolicy(currentSearch, 'context', spoofUserEmail);
+      const preservedSearch = resolveSearchForPolicy(currentSearch, policy, spoofUserEmail);
       const target = parseNavigateTarget(to);
       const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
-      const search = mergeSearch(target.search, preservedSearch);
-      navigate({ to: finalPath, search });
-    },
-
-    navigatePreservingSpoof: (to) => {
-      const navigate = get().navigation.navigate;
-      if (!navigate) return;
-      const spoofUserEmail = get().auth.spoofUserEmail;
-      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
-      const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
-      const preservedSearch = resolveSearchForPolicy(currentSearch, 'spoof', spoofUserEmail);
-      const target = parseNavigateTarget(to);
-      const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
-      const search = mergeSearch(target.search, preservedSearch);
-      navigate({ to: finalPath, search });
-    },
-
-    navigatePreservingAll: (to) => {
-      const navigate = get().navigation.navigate;
-      if (!navigate) return;
-      const spoofUserEmail = get().auth.spoofUserEmail;
-      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
-      const currentHash = typeof window === 'undefined' ? '' : (window.location?.hash ?? '');
-      const preservedSearch = resolveSearchForPolicy(currentSearch, 'all', spoofUserEmail);
-      const target = parseNavigateTarget(to);
-      const finalPath = target.path.includes('#') ? target.path : `${target.path}${currentHash}`;
-      const search = mergeSearch(target.search, preservedSearch);
-      navigate({ to: finalPath, search });
+      navigate({ to: finalPath, search: mergeSearch(target.search, preservedSearch) });
     },
   },
 });

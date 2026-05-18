@@ -34,7 +34,6 @@ const getEntityLabel = (inq: Row, direction: 'sent' | 'received'): string => {
 
 type InquiriesPageProps = {
   direction: 'sent' | 'received';
-  /** External hard constraints — sent to the server as searchFields filters */
   filters?: InquiryFilters;
   title?: string;
   emptyMessage?: string;

@@ -2,14 +2,6 @@ import { createHash } from 'node:crypto';
 import type { Token } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
-/**
- * Prime development API tokens.
- *
- * Predictable tokens for local development:
- * - User token:  local_user_owner_personal
- * - Org token:   local_orgUser_acme_main
- * - Space token: local_spaceUser_acme_main
- */
 
 // Helper to generate keyHash and keyPrefix from raw token
 const generateTokenFields = (rawToken: string) => {

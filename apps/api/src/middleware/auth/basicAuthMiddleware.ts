@@ -1,11 +1,5 @@
 import type { Context, Next } from 'hono';
 
-/**
- * Basic HTTP authentication middleware.
- * Used to protect admin routes like BullBoard.
- *
- * Note: For production, consider placing behind VPN/firewall.
- */
 export const basicAuthMiddleware = (username: string, password: string, realm = 'Secure Area') => {
   const unauthorized = () =>
     new Response('Unauthorized', {

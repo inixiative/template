@@ -1,17 +1,6 @@
 import type { User } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
-/**
- * Prime development users - the foundation of the dev environment.
- * All marked with prime: true (only seed with --prime flag).
- *
- * Credentials (all use password: "asd123!"):
- * - super@inixiative.com (Platform Superadmin)
- * - owner@inixiative.com (Org/Space Owner)
- * - customer@inixiative.com (End User/Customer)
- *
- * Passwords are automatically seeded via account.seed.ts
- */
 export const userSeeds: SeedFile<User> = {
   model: 'user',
   updateOmitFields: ['createdAt'],

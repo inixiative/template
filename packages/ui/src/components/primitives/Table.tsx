@@ -11,13 +11,9 @@ export type Column<T> = {
 };
 
 export type InfiniteScrollProps = {
-  /** Called when the sentinel element enters the viewport. */
   onLoadMore: () => void;
-  /** Whether more data is available. */
   hasMore: boolean;
-  /** Whether a fetch is in flight. */
   isLoading: boolean;
-  /** IntersectionObserver rootMargin. Defaults to '200px'. */
   rootMargin?: string;
 };
 
@@ -30,22 +26,10 @@ export type TableProps<T> = {
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
   show?: boolean | (() => boolean);
-  /** Fixed-page pagination (page numbers, prev/next, per-page selector). */
   pagination?: PaginationProps;
-  /** Infinite scroll (load more as user scrolls). Mutually exclusive with pagination. */
   infiniteScroll?: InfiniteScrollProps;
-  /**
-   * Max height of the table container. When set, the table scrolls
-   * internally with a sticky header. When omitted, the table expands
-   * to fit all rows and scrolls with the page.
-   */
   maxHeight?: number;
-  /**
-   * Ref to the scroll container (the overflow div when maxHeight is set).
-   * Pass this to useScrollState to enable scroll position restoration.
-   */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
-  /** Stamps data-section on the outer container for useSectionHash auto-discovery. */
   sectionId?: string;
   className?: string;
 };

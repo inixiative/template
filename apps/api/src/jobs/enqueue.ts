@@ -13,7 +13,7 @@ type EnqueueOptions = JobOptions & {
   id?: string;
 };
 
-const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
+export const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
   const redis = queue.redis;
   const jobs = await queue.getJobs(['active', 'waiting', 'delayed', 'paused']);
 
@@ -57,11 +57,8 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   if (dedupeKey) await signalSupersededJobs(dedupeKey);
 
-  const job = await queue.add(
-    handlerName,
-    { type, id, payload, dedupeKey },
-    { ...jobOptions, jobId: dedupeKey || undefined },
-  );
+  // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
+  const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
 
   log.info(`Enqueued job ${handlerName} (${job.id})`);
 

@@ -1,17 +1,6 @@
 import { LogScope, log } from '@template/shared/logger';
 import { isLocal, isTest } from '@template/shared/utils';
 
-/**
- * Initialize OpenTelemetry for BetterStack (or any OTLP-compatible backend).
- *
- * This must be called BEFORE any other imports that you want to trace.
- * Typically import this at the very top of your entry point.
- *
- * Required environment variables:
- * - OTEL_EXPORTER_OTLP_ENDPOINT: The OTLP endpoint (e.g., https://in-otel.logs.betterstack.com)
- * - OTEL_EXPORTER_OTLP_HEADERS: Auth headers (e.g., Authorization=Bearer <token>)
- * - OTEL_SERVICE_NAME: Service name for traces (defaults to 'inixiative-api')
- */
 export const initializeOpenTelemetry = async () => {
   // Skip in local/test environments
   if (isLocal || isTest) {

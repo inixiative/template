@@ -1,7 +1,3 @@
-/**
- * Resolve variants: match existing or suffix, rewrite MJML.
- */
-
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import type { RefMap } from '@template/email/render/extractRefs';
 import type { SaveContext } from '@template/email/render/types';

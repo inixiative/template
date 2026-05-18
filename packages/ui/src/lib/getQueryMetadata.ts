@@ -12,10 +12,6 @@ export type QueryMetadata = {
   enumFilters?: EnumFilter[];
 };
 
-/**
- * Extract orderable fields from schema recursively.
- * Excludes arrays, includes nested objects with dot notation.
- */
 // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<any> = new Set()): string[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
@@ -46,9 +42,6 @@ const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<a
   return fields;
 };
 
-/**
- * Extract enum filters from schema recursively.
- */
 // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> = new Set()): EnumFilter[] => {
   if (!schema || typeof schema !== 'object' || visited.has(schema)) {
@@ -81,9 +74,6 @@ const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> 
   return filters;
 };
 
-/**
- * Get response schema for an operation.
- */
 // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 const getResponseSchema = (operation: any): any => {
   const response200 = operation.responses?.['200'];
@@ -119,17 +109,6 @@ const getResponseSchema = (operation: any): any => {
   return schema;
 };
 
-/**
- * Extract query metadata from OpenAPI spec for a given endpoint.
- *
- * @example
- * const meta = getQueryMetadata('/api/admin/organization', 'get');
- * // => {
- * //   searchableFields: ['name', 'slug'],
- * //   orderableFields: ['id', 'name', 'slug', 'createdAt', ...],
- * //   enumFilters: [{ field: 'status', values: [...], operators: [...] }]
- * // }
- */
 export const getQueryMetadata = (path: string, method: string = 'get'): QueryMetadata => {
   // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
   const spec = openApiSpec as any;
@@ -148,13 +127,6 @@ export const getQueryMetadata = (path: string, method: string = 'get'): QueryMet
   };
 };
 
-/**
- * Get query metadata by operation ID.
- *
- * @example
- * const meta = getQueryMetadataByOperation('adminOrganizationReadMany');
- * // => { searchableFields: ['name', 'slug'], orderableFields: [...], ... }
- */
 export const getQueryMetadataByOperation = (operationId: string): QueryMetadata => {
   // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
   const spec = openApiSpec as any;
@@ -173,22 +145,6 @@ export const getQueryMetadataByOperation = (operationId: string): QueryMetadata 
   return {};
 };
 
-/**
- * Hook to get query metadata for a given operation.
- *
- * @example
- * function OrganizationTable() {
- *   const meta = useQueryMetadata('adminOrganizationReadMany');
- *
- *   return (
- *     <DataTable
- *       searchableFields={meta.searchableFields}
- *       orderableFields={meta.orderableFields}
- *       enumFilters={meta.enumFilters}
- *     />
- *   );
- * }
- */
 export const useQueryMetadata = (operationId: string): QueryMetadata => {
   return getQueryMetadataByOperation(operationId);
 };

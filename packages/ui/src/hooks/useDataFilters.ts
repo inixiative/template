@@ -15,22 +15,9 @@ export type DataFilters = {
   setFilter: (field: string, state: FilterState | null) => void;
   toggleOrderBy: (field: string) => void;
   reset: () => void;
-  /**
-   * The filter/sort portion of the query object (no page/pageSize).
-   * Paginated controllers add page params; infinite controllers pass
-   * this to their queryFn for server-side filtering.
-   */
   filterQuery: Record<string, unknown>;
 };
 
-/**
- * Shared search, filter, and sort state for data views.
- * Used by both usePaginatedData and useInfiniteData.
- *
- * `onFiltersChange` is called whenever search, filter, or sort state changes.
- * Paginated controllers use this to reset to page 1. Infinite controllers
- * use this to reset/invalidate the query.
- */
 export const useDataFilters = (
   config: DataConfig,
   onFiltersChange?: () => void,

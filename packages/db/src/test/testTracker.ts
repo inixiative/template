@@ -3,12 +3,6 @@ import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mu
 
 const touchedTables = new Set<string>();
 
-/**
- * Register test tracker hook to track all mutated tables.
- * Only registers if NODE_ENV === 'test' or ENVIRONMENT === 'test'.
- *
- * Call this once at test setup (e.g., in a global setup file or createTestApp).
- */
 export const registerTestTracker = () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
 
@@ -27,28 +21,8 @@ export const registerTestTracker = () => {
   });
 };
 
-/**
- * Get the set of tables that were touched during tests.
- * Useful for debugging which tables need cleanup.
- */
 export const getTouchedTables = (): ReadonlySet<string> => touchedTables;
 
-/**
- * Cleanup all tables that were touched during tests.
- * Only runs if NODE_ENV === 'test' or ENVIRONMENT === 'test'.
- *
- * Uses PostgreSQL TRUNCATE with CASCADE for efficient cleanup.
- * Temporarily disables foreign key constraints via session_replication_role.
- *
- * @param db - The Prisma client instance
- *
- * @example
- * ```typescript
- * afterAll(async () => {
- *   await cleanupTouchedTables(db);
- * });
- * ```
- */
 export const cleanupTouchedTables = async (db: Db) => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
   if (touchedTables.size === 0) return;
@@ -75,10 +49,6 @@ export const cleanupTouchedTables = async (db: Db) => {
   }
 };
 
-/**
- * Reset the touched tables set without truncating.
- * Useful if you want to track tables fresh for a specific test.
- */
 export const resetTouchedTables = () => {
   touchedTables.clear();
 };

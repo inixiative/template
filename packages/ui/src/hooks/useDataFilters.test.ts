@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 
-/** Wrapper that adds page/pageSize to buildFilterQuery for test compatibility. */
 const buildQuery = (
   search: string,
   searchMode: 'combined' | 'field',

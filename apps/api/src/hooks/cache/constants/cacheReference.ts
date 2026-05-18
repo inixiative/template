@@ -1,20 +1,6 @@
 import type { ModelTypeMap, Prisma } from '@template/db';
 import { cacheKey } from '@template/db';
 
-/**
- * Cache Key Pattern (use cacheKey helper)
- *
- * Format: cache:<accessor>:<field>:<value>[:<field>:<value>...][:<tags>][:*]
- * Composite keys are sorted alphabetically for consistency.
- *
- * Examples:
- *   cacheKey('user', id)                                              → cache:user:id:abc-123
- *   cacheKey('user', { email })                                       → cache:user:email:foo@example.com
- *   cacheKey('user', id, ['organizationUsers'])                       → cache:user:id:abc-123:organizationUsers
- *   cacheKey('session', { userId }, [], true)                         → cache:session:userId:abc-123:*
- *   cacheKey('organizationUser', { userId, organizationId })          → cache:organizationUser:organizationId:o1:userId:u1
- */
-
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
 export const cacheReference: CacheReference = {

@@ -1,45 +1,12 @@
 import * as React from 'react';
 
 export type UseInfiniteScrollTriggerOptions = {
-  /** Called when the sentinel element enters the viewport. */
   onLoadMore: () => void;
-  /** Whether more data is available. When false, the observer disconnects. */
   hasMore: boolean;
-  /** Whether a fetch is already in flight. Prevents duplicate triggers. */
   isLoading: boolean;
-  /**
-   * IntersectionObserver rootMargin. Controls how far before the sentinel
-   * becomes visible the trigger fires. Defaults to '200px' (fires 200px
-   * before the sentinel scrolls into view).
-   */
   rootMargin?: string;
 };
 
-/**
- * Returns a ref callback to attach to a sentinel element (e.g. a div
- * at the bottom of a list). When the sentinel enters the viewport
- * (or comes within rootMargin), onLoadMore is called.
- *
- * Works with both viewport-contained scroll (overflow div) and
- * window-level scroll (items expand the page). IntersectionObserver
- * handles both cases natively.
- *
- * Usage:
- * ```tsx
- * const sentinelRef = useInfiniteScrollTrigger({
- *   onLoadMore: query.fetchNextPage,
- *   hasMore: query.hasNextPage,
- *   isLoading: query.isFetchingNextPage,
- * });
- *
- * return (
- *   <div>
- *     {items.map(item => <Row key={item.id} />)}
- *     <div ref={sentinelRef} />
- *   </div>
- * );
- * ```
- */
 export function useInfiniteScrollTrigger(options: UseInfiniteScrollTriggerOptions): React.RefCallback<HTMLElement> {
   const { onLoadMore, hasMore, isLoading, rootMargin = '200px' } = options;
 

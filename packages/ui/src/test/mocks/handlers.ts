@@ -2,10 +2,6 @@ import { buildOrganizationUser, buildSpaceUser, buildUser } from '@template/db/t
 import { handlers as generatedHandlers } from '@template/ui/test/mocks/handlers.gen';
 import { HttpResponse, http } from 'msw';
 
-/**
- * Custom MSW handlers that override generated defaults.
- * Generated handlers are in handlers.gen.ts (auto-generated from SDK).
- */
 const customHandlers = [
   // Auth endpoints (BetterAuth, not in OpenAPI spec)
   http.post('*/auth/sign-out', () => {
@@ -64,8 +60,4 @@ const customHandlers = [
   }),
 ];
 
-/**
- * Export custom handlers first, then generated ones.
- * MSW uses the first matching handler, so custom overrides take precedence.
- */
 export const handlers = [...customHandlers, ...generatedHandlers];

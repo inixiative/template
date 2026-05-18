@@ -28,7 +28,7 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
 
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signIn = useAppStore((state) => state.auth.signIn);
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
 
     try {
       await signIn({ type: 'email', email, password });
-      navigatePreservingContext(search.redirectTo || '/dashboard');
+      navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Log in failed. Please try again.';
       setError(message);

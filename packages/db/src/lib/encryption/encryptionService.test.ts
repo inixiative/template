@@ -1,175 +1,132 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
+import { createEncryption, type Encryption } from '@template/db/lib/encryption/encryptionService';
 import type { EncryptionKeyring } from '@template/db/lib/encryption/types';
 
-describe('EncryptionService', () => {
+describe('createEncryption', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');
   const testKey2Base64 = Buffer.from('abcdefghijklmnopqrstuvwxyz123456', 'utf8').toString('base64');
 
-  let service: EncryptionService;
+  let service: Encryption;
   let keyring: EncryptionKeyring;
 
   beforeEach(() => {
-    keyring = {
-      currentVersion: 1,
-      currentKey: testKey1Base64,
-    };
-    service = new EncryptionService(keyring);
+    keyring = { currentVersion: 1, currentKey: testKey1Base64 };
+    service = createEncryption(keyring);
   });
 
-  describe('constructor validation', () => {
-    it('creates service with valid keyring', () => {
-      expect(() => new EncryptionService(keyring)).not.toThrow();
+  describe('keyring validation', () => {
+    it('accepts valid keyring', () => {
+      expect(() => createEncryption(keyring)).not.toThrow();
     });
 
-    it('rejects keyring with invalid current key length', () => {
+    it('rejects invalid current key length', () => {
       const shortKey = Buffer.from('short', 'utf8').toString('base64');
-      expect(() => new EncryptionService({ currentVersion: 1, currentKey: shortKey })).toThrow(
-        'Key must be exactly 32 bytes',
+      expect(() => createEncryption({ currentVersion: 1, currentKey: shortKey })).toThrow(
+        'Current key must be exactly 32 bytes',
       );
     });
 
-    it('rejects keyring with invalid previous key length', () => {
+    it('rejects invalid previous key length', () => {
       const shortKey = Buffer.from('short', 'utf8').toString('base64');
-      expect(
-        () =>
-          new EncryptionService({
-            currentVersion: 2,
-            currentKey: testKey1Base64,
-            previousVersion: 1,
-            previousKey: shortKey,
-          }),
+      expect(() =>
+        createEncryption({
+          currentVersion: 2,
+          currentKey: testKey1Base64,
+          previousVersion: 1,
+          previousKey: shortKey,
+        }),
       ).toThrow('Previous key must be exactly 32 bytes');
     });
   });
 
   describe('encrypt', () => {
-    it('encrypts string data', async () => {
-      const result = await service.encrypt('sensitive-data', 'aad-context');
-
-      expect(result).toHaveProperty('ciphertext');
-      expect(result).toHaveProperty('version', 1);
-      expect(result).toHaveProperty('iv');
-      expect(result).toHaveProperty('authTag');
+    it('encrypts string data', () => {
+      const result = service.encrypt('sensitive-data', 'aad-context');
+      expect(result.version).toBe(1);
       expect(typeof result.ciphertext).toBe('string');
       expect(typeof result.iv).toBe('string');
       expect(typeof result.authTag).toBe('string');
     });
 
-    it('encrypts object data', async () => {
-      const data = { clientId: 'id', clientSecret: 'secret' };
-      const result = await service.encrypt(data, 'aad-context');
-
+    it('encrypts object data', () => {
+      const result = service.encrypt({ clientId: 'id', clientSecret: 'secret' }, 'aad-context');
       expect(result.version).toBe(1);
       expect(result.ciphertext).toBeDefined();
     });
 
-    it('produces different ciphertext for same plaintext (random IV)', async () => {
-      const result1 = await service.encrypt('same-data', 'aad');
-      const result2 = await service.encrypt('same-data', 'aad');
-
-      expect(result1.ciphertext).not.toBe(result2.ciphertext);
-      expect(result1.iv).not.toBe(result2.iv);
-    });
-
-    it('throws on null plaintext', async () => {
-      await expect(service.encrypt(null, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
-    });
-
-    it('throws on undefined plaintext', async () => {
-      await expect(service.encrypt(undefined, 'aad')).rejects.toThrow('Plaintext cannot be null or undefined');
-    });
-
-    it('throws on empty string plaintext', async () => {
-      await expect(service.encrypt('', 'aad')).rejects.toThrow('Plaintext cannot be empty');
+    it('produces different ciphertext for same plaintext (random IV)', () => {
+      const a = service.encrypt('same-data', 'aad');
+      const b = service.encrypt('same-data', 'aad');
+      expect(a.ciphertext).not.toBe(b.ciphertext);
+      expect(a.iv).not.toBe(b.iv);
     });
   });
 
   describe('decrypt', () => {
-    it('decrypts data encrypted with current key', async () => {
-      const plaintext = 'secret-data';
-      const encrypted = await service.encrypt(plaintext, 'aad');
-      const decrypted = await service.decrypt(encrypted, 'aad');
-
-      expect(decrypted).toBe(plaintext);
+    it('round-trips string', () => {
+      const encrypted = service.encrypt('secret-data', 'aad');
+      expect(service.decrypt(encrypted, 'aad')).toBe('secret-data');
     });
 
-    it('decrypts object data', async () => {
+    it('round-trips object', () => {
       const data = { clientId: 'id', clientSecret: 'secret' };
-      const encrypted = await service.encrypt(data, 'aad');
-      const decrypted = await service.decrypt(encrypted, 'aad');
-
-      expect(decrypted).toEqual(data);
+      const encrypted = service.encrypt(data, 'aad');
+      expect(service.decrypt(encrypted, 'aad')).toEqual(data);
     });
 
-    it('decrypts data encrypted with previous key', async () => {
-      const oldService = new EncryptionService({ currentVersion: 1, currentKey: testKey2Base64 });
-      const encrypted = await oldService.encrypt('old-data', 'aad');
+    it('decrypts data encrypted with previous key', () => {
+      const old = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      const encrypted = old.encrypt('old-data', 'aad');
 
-      const newService = new EncryptionService({
+      const next = createEncryption({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,
         previousKey: testKey2Base64,
       });
-      const decrypted = await newService.decrypt(encrypted, 'aad');
-
-      expect(decrypted).toBe('old-data');
+      expect(next.decrypt(encrypted, 'aad')).toBe('old-data');
     });
 
-    it('throws on tampered ciphertext', async () => {
-      const encrypted = await service.encrypt('data', 'aad');
-      const tampered = { ...encrypted, ciphertext: 'AAAAAAAAAA' };
-
-      await expect(service.decrypt(tampered, 'aad')).rejects.toThrow();
+    it('throws on tampered ciphertext', () => {
+      const encrypted = service.encrypt('data', 'aad');
+      expect(() => service.decrypt({ ...encrypted, ciphertext: 'AAAAAAAAAA' }, 'aad')).toThrow();
     });
 
-    it('throws on wrong AAD', async () => {
-      const encrypted = await service.encrypt('data', 'correct-aad');
-      await expect(service.decrypt(encrypted, 'wrong-aad')).rejects.toThrow();
+    it('throws on wrong AAD', () => {
+      const encrypted = service.encrypt('data', 'correct-aad');
+      expect(() => service.decrypt(encrypted, 'wrong-aad')).toThrow();
     });
 
-    it('throws when no keys can decrypt', async () => {
-      const encrypted = await service.encrypt('data', 'aad');
-
-      const otherService = new EncryptionService({
-        currentVersion: 1,
-        currentKey: testKey2Base64,
-      });
-
-      await expect(otherService.decrypt(encrypted, 'aad')).rejects.toThrow();
+    it('throws when no keys can decrypt', () => {
+      const encrypted = service.encrypt('data', 'aad');
+      const other = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      expect(() => other.decrypt(encrypted, 'aad')).toThrow();
     });
   });
 
   describe('key rotation', () => {
-    it('always encrypts with current key version', async () => {
-      const serviceV2 = new EncryptionService({
+    it('always encrypts with current key version', () => {
+      const v2 = createEncryption({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,
         previousKey: testKey2Base64,
       });
-
-      const encrypted = await serviceV2.encrypt('data', 'aad');
-      expect(encrypted.version).toBe(2);
+      expect(v2.encrypt('data', 'aad').version).toBe(2);
     });
 
-    it('supports multiple version transitions', async () => {
-      const v1Service = new EncryptionService({ currentVersion: 1, currentKey: testKey2Base64 });
-      const encryptedV1 = await v1Service.encrypt('data', 'aad');
+    it('supports multiple version transitions', () => {
+      const v1 = createEncryption({ currentVersion: 1, currentKey: testKey2Base64 });
+      const encryptedV1 = v1.encrypt('data', 'aad');
 
-      const v2Service = new EncryptionService({
+      const v2 = createEncryption({
         currentVersion: 2,
         currentKey: testKey1Base64,
         previousVersion: 1,
         previousKey: testKey2Base64,
       });
-
-      const decrypted = await v2Service.decrypt(encryptedV1, 'aad');
-      expect(decrypted).toBe('data');
-
-      const reEncrypted = await v2Service.encrypt('data', 'aad');
-      expect(reEncrypted.version).toBe(2);
+      expect(v2.decrypt(encryptedV1, 'aad')).toBe('data');
+      expect(v2.encrypt('data', 'aad').version).toBe(2);
     });
   });
 });

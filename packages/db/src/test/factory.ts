@@ -1,31 +1,3 @@
-/**
- * Test Factory System
- *
- * Creates test entities with automatic dependency resolution.
- *
- * ## Triggering Optional Dependencies
- *
- * For optional dependencies (required: false), pass an empty object in overrides
- * to trigger creation:
- *
- *   tokenFactory.build({ organizationUser: {} })
- *
- * This follows Prisma's nested create pattern. Alternative API designs considered:
- *   - Boolean trigger: `{ organizationUser: true }`
- *   - Explicit array: `{ $create: ['organizationUser'] }`
- *   - Symbol marker: `{ organizationUser: CREATE }`
- *
- * ## Future: Reference Existing Entities
- *
- * Could support passing existing entity or unique field to link instead of create:
- *   - Pass entity: `{ user: existingUser }`
- *   - Pass unique field: `{ organization: { ref: { slug: 'acme' } } }`
- *   - Explicit create vs ref: `{ user: { create: {} } }` vs `{ user: { ref: { id } } }`
- *
- * Current approach chosen for familiarity with Prisma's `{ relation: { create: {} } }`.
- * Revisit if API feels awkward in practice.
- */
-
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
@@ -45,10 +17,6 @@ import { toAccessor } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 import { uuidv7 } from 'uuidv7';
 
-/**
- * Converts Date fields to ISO strings for API compatibility
- * Recursively handles nested objects and arrays
- */
 const serializeEntity = <T>(obj: T): Serialized<T> => {
   if (obj === null || obj === undefined) {
     return obj as Serialized<T>;

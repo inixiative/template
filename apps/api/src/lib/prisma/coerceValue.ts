@@ -1,22 +1,3 @@
-/**
- * Coerce a raw input value (typically a URL-string from bracket-query
- * parsing) into the runtime type Prisma expects for a given field.
- *
- * Throws on inputs that can't be coerced — `buildWhereClause` lets those
- * bubble up to a 400 at the controller boundary.
- *
- *   String/enum: pass through (Prisma validates enum values at query time)
- *   Int        : Number(v); throws on NaN
- *   Boolean    : true | false | 'true' | 'false'; throws otherwise
- *   DateTime   : Date | ISO string | ms-timestamp (string or number);
- *                throws on Invalid Date
- *   Json       : ALWAYS throws — JSON fields aren't searchable via this
- *                surface. Postgres JSON equality is structural and silently
- *                mismatches across compact/pretty/key-order variations. Use
- *                Prisma's typed JSON operators (`path`, `string_contains`,
- *                etc.) directly when needed.
- */
-
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 type Coercer = (value: unknown) => unknown;

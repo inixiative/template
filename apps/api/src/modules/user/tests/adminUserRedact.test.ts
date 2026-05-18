@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { ContactOwnerModel, ContactType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createOrganizationUser, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createContact, createOrganizationUser, createToken, createUser } from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { adminUserRouter } from '#/modules/user';
 import { createTestApp } from '#tests/createTestApp';
@@ -49,16 +49,8 @@ describe('POST /api/admin/user/:id/redact', () => {
   });
 
   it('deletes user tokens', async () => {
-    const { entity: targetUser } = await createUser();
-    await db.token.create({
-      data: {
-        name: 'test-token',
-        keyHash: 'hash123',
-        keyPrefix: 'test_',
-        ownerModel: 'User',
-        userId: targetUser.id,
-      },
-    });
+    const { entity: targetUser, context } = await createUser();
+    await createToken({}, context);
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 
@@ -112,11 +104,8 @@ describe('POST /api/admin/user/:id/redact', () => {
     const org = context.organization;
     const targetUser = context.user;
 
-    // Add another member
     const { entity: otherUser } = await createUser();
-    await db.organizationUser.create({
-      data: { organizationId: org.id, userId: otherUser.id, role: 'member' },
-    });
+    await createOrganizationUser({ role: 'member' }, { user: otherUser, organization: org });
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 

@@ -21,10 +21,18 @@ type Organization = NonNullable<MeReadManyOrganizationsResponse>['data'][number]
 
 export const OrganizationsPage = () => {
   const permissions = useAppStore((state) => state.permissions);
-  const _queryClient = useAppStore((state) => state.client);
-  const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const refreshMe = useAppStore((state) => state.auth.refreshMe);
+  const spaces = useAppStore((state) => state.auth.spaces);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const spaceCountByOrg = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const space of Object.values(spaces ?? {})) {
+      counts[space.organizationId] = (counts[space.organizationId] ?? 0) + 1;
+    }
+    return counts;
+  }, [spaces]);
 
   const { data, isLoading } = useQuery({
     queryKey: meReadManyOrganizationsQueryKey(),
@@ -76,7 +84,7 @@ export const OrganizationsPage = () => {
       {
         key: 'spacesCount',
         label: 'Spaces',
-        render: () => '—',
+        render: (org: Organization) => spaceCountByOrg[org.id] ?? 0,
       },
       {
         key: 'createdAt',
@@ -105,7 +113,7 @@ export const OrganizationsPage = () => {
         },
       },
     ],
-    [permissions, deleteMutation.mutate],
+    [permissions, deleteMutation.mutate, spaceCountByOrg],
   );
 
   const handleCreate = (name: string, slug: string) => {
@@ -136,7 +144,7 @@ export const OrganizationsPage = () => {
               columns={columns}
               data={organizations}
               keyExtractor={(org) => org.id}
-              onRowClick={(org: Organization) => navigatePreservingSpoof(`/dashboard?org=${org.id}`)}
+              onRowClick={(org: Organization) => navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')}
               emptyMessage="You don't belong to any organizations yet"
             />
           </CardContent>

@@ -2,9 +2,6 @@ import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
 
-/**
- * Frontend app scopes
- */
 export enum FrontendScope {
   web = 'web',
   admin = 'admin',
@@ -23,19 +20,6 @@ const getLogLevel = (): number => {
   return LogLevels.info;
 };
 
-/**
- * Create a frontend logger with a fixed base scope.
- * Use this in web/admin/superadmin apps.
- *
- * @example
- * // In apps/web
- * export const log = createFrontendLogger(FrontendScope.web);
- * log.info('page loaded');  // [web] page loaded
- *
- * // In apps/admin
- * export const log = createFrontendLogger(FrontendScope.admin);
- * log.error('failed');  // [admin] failed
- */
 export const createFrontendLogger = (scope: FrontendScope | string): ConsolaInstance => {
   const base = createConsola({
     level: getLogLevel(),

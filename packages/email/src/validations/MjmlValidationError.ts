@@ -1,6 +1,3 @@
-/**
- * Error thrown when MJML validation fails.
- */
 
 export type MjmlIssue = {
   line: number;

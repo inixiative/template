@@ -8,18 +8,6 @@ const zodSchemas = zodSchemasNs as unknown as Record<string, ZodObject<Record<st
 const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
   zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;
 
-/**
- * Infer dependencies from Prisma runtimeDataModel.
- *
- * Uses:
- * - `runtimeDataModel` for relation metadata (kind: "object" fields)
- * - Zod CreateInput schema for optionality detection
- *
- * Only creates required dependencies (optional relations are skipped).
- *
- * Edge cases requiring manual config:
- * - Composite foreign keys (e.g., Token -> OrganizationUser uses [orgId, userId])
- */
 export const inferDependencies = (modelName: ModelName): Record<string, DependencyConfig> => {
   const relations = getModelRelations(modelName);
   const zodSchema = getCreateInputSchema(modelName);
@@ -43,15 +31,6 @@ export const inferDependencies = (modelName: ModelName): Record<string, Dependen
   return deps;
 };
 
-/**
- * Merge inferred dependencies with manual overrides.
- *
- * @param modelName - The model to get dependencies for
- * @param manualDeps - Manual overrides:
- *   - `null` removes an inferred dependency
- *   - Partial config merges with inferred
- *   - Full config adds new dependency
- */
 export const mergeDependencies = (
   modelName: ModelName,
   manualDeps: Record<string, Partial<DependencyConfig> | null> = {},

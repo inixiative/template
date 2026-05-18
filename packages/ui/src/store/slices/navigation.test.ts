@@ -26,8 +26,7 @@ describe('navigation slice', () => {
       expect(typeof navigation.setNavigate).toBe('function');
       expect(typeof navigation.setNavConfig).toBe('function');
       expect(typeof navigation.setCurrentRouteMatch).toBe('function');
-      expect(typeof navigation.navigatePreservingContext).toBe('function');
-      expect(typeof navigation.navigatePreservingSpoof).toBe('function');
+      expect(typeof navigation.navigatePreserving).toBe('function');
     });
   });
 
@@ -72,11 +71,10 @@ describe('navigation slice', () => {
     });
   });
 
-  describe('navigatePreservingContext', () => {
+  describe('navigatePreserving', () => {
     it('should do nothing when navigate is not set', () => {
-      // Should not throw even without navigate function
       expect(() => {
-        store.getState().navigation.navigatePreservingContext('/dashboard');
+        store.getState().navigation.navigatePreserving('/dashboard', 'context');
       }).not.toThrow();
     });
 
@@ -84,7 +82,7 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreservingContext('/dashboard');
+      store.getState().navigation.navigatePreserving('/dashboard', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
     });
@@ -93,7 +91,7 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreservingContext('/dashboard');
+      store.getState().navigation.navigatePreserving('/dashboard', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
@@ -105,32 +103,14 @@ describe('navigation slice', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
-      store.getState().navigation.navigatePreservingContext('/dashboard#section');
+      store.getState().navigation.navigatePreserving('/dashboard#section', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
       expect(arg.to).toContain('/dashboard#section');
     });
-  });
 
-  describe('navigatePreservingSpoof', () => {
-    it('should do nothing when navigate is not set', () => {
-      // Should not throw even without navigate function
-      expect(() => {
-        store.getState().navigation.navigatePreservingSpoof('/dashboard');
-      }).not.toThrow();
-    });
-
-    it('should call navigate when set', () => {
-      const mockNavigate = mock(() => {});
-      store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
-
-      store.getState().navigation.navigatePreservingSpoof('/dashboard');
-
-      expect(mockNavigate).toHaveBeenCalled();
-    });
-
-    it('should preserve spoof from auth state', () => {
+    it('should preserve spoof from auth state under spoof policy', () => {
       const mockNavigate = mock(() => {});
       store.getState().navigation.setNavigate(mockNavigate as unknown as UseNavigateResult<string>);
 
@@ -141,7 +121,7 @@ describe('navigation slice', () => {
         },
       });
 
-      store.getState().navigation.navigatePreservingSpoof('/dashboard');
+      store.getState().navigation.navigatePreserving('/dashboard', 'spoof');
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];

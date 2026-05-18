@@ -1,20 +1,6 @@
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 
-/**
- * Generates aliased column expressions for raw SQL queries.
- *
- * Useful when JOINing tables to avoid column name conflicts and
- * to map results back to typed model objects.
- *
- * @example
- * const sql = `
- *   SELECT ${aliasColumns('User')}, ${aliasColumns('Organization', 'org')}
- *   FROM "User"
- *   JOIN "Organization" org ON org.id = "User"."organizationId"
- * `;
- * // Produces: User.id AS "User.id", User.email AS "User.email", org.id AS "org.id", ...
- */
 export const aliasColumns = (model: ModelName, alias?: string, fields?: string[]): string => {
   const dataModel = getRuntimeDataModel();
   const modelData = dataModel.models[model];

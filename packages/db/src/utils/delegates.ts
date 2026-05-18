@@ -1,6 +1,5 @@
 import type { Prisma } from '@template/db/generated/client/client';
 
-/** Operation type for Prisma delegates */
 export type Operation =
   | 'findUnique'
   | 'findUniqueOrThrow'
@@ -51,10 +50,8 @@ type HasDelete = { delete: (args: any) => Promise<any> };
 // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate constraints require any for structural compatibility
 type HasCount = { count: (args?: any) => Promise<any> };
 
-/** Any Prisma delegate that supports standard read operations */
 export type AnyDelegate = HasFindFirst & HasFindUnique & HasFindMany & HasCount;
 
-/** Any Prisma delegate that supports all CRUD operations */
 export type AnyCrudDelegate = AnyDelegate & HasCreate & HasUpdate & HasDelete;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,7 +119,6 @@ type CountArgs = {
   orderBy?: OrderByInput;
 };
 
-/** Full delegate interface for runtime access (hooks, hydration, factories, etc.) */
 export type RuntimeDelegate = {
   findFirst: (args?: FindArgs) => Promise<Record_ | null>;
   findFirstOrThrow: (args?: FindArgs) => Promise<Record_>;
@@ -139,24 +135,6 @@ export type RuntimeDelegate = {
   count: (args?: CountArgs) => Promise<number>;
 };
 
-/**
- * Type-safe query helpers that infer types from the delegate passed.
- *
- * @example
- * ```typescript
- * import { query } from '@template/db';
- *
- * // Full type inference - no generics needed
- * const user = await query.findFirst(db.user, { where: { email: 'test@example.com' } });
- * //    ^? User | null
- *
- * const users = await query.findMany(db.user, { where: { role: 'admin' } });
- * //    ^? User[]
- *
- * const org = await query.create(db.organization, { data: { name: 'Acme' } });
- * //    ^? Organization
- * ```
- */
 export const query = {
   findFirst: <T extends HasFindFirst>(
     delegate: T,

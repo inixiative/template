@@ -6,19 +6,10 @@ import { Role } from '@template/db/generated/client/enums';
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
 const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
-/**
- * Find user by email (cached)
- */
 export const findUserByEmail = async (db: Db, email: string): Promise<User | null> => {
   return cache<User | null>(cacheKey('User', { email }), () => db.user.findFirst({ where: { email } }), USER_CACHE_TTL);
 };
 
-/**
- * Find user with all relations (cached)
- * Includes: flat organizationUsers, organizations, spaceUsers, and spaces arrays
- * Only includes orgs/spaces that aren't soft-deleted
- * Spaces include both explicit memberships and all spaces from owned orgs
- */
 export const findUserWithRelations = async (db: Db, userId: string): Promise<UserWithRelations | null> => {
   return cache<UserWithRelations | null>(
     cacheKey('User', userId, ['Relations']),

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser, createSpace, createSpaceUser } from '@template/db/test';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { createTestApp } from '#tests/createTestApp';
 import { del } from '#tests/utils/request';
@@ -24,14 +24,8 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'owner',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    const { entity: su } = await createSpaceUser({ role: 'owner' }, { ...context, space });
+    spaceUser = su;
 
     const harness = createTestApp({
       mockUser: user,
@@ -48,18 +42,8 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
   });
 
   it('deletes the spaceUser', async () => {
-    const { entity: _memberOrgUser, context: memberCtx } = await createOrganizationUser(
-      { role: 'member' },
-      { organization: org },
-    );
-    const memberSpaceUser = await db.spaceUser.create({
-      data: {
-        role: 'member',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: memberCtx.user.id,
-      },
-    });
+    const { context: memberCtx } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: memberSpaceUser } = await createSpaceUser({ role: 'member' }, { ...memberCtx, space });
 
     const response = await fetch(del(`/api/v1/spaceUser/${memberSpaceUser.id}`));
     expect(response.status).toBe(204);
@@ -73,14 +57,7 @@ describe('DELETE /api/v1/spaceUser/:id', () => {
       { role: 'viewer' },
       { organization: org },
     );
-    const viewerSpaceUser = await db.spaceUser.create({
-      data: {
-        role: 'viewer',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: viewerCtx.user.id,
-      },
-    });
+    const { entity: viewerSpaceUser } = await createSpaceUser({ role: 'viewer' }, { ...viewerCtx, space });
 
     const viewerHarness = createTestApp({
       mockUser: viewerCtx.user,

@@ -1,9 +1,3 @@
-/**
- * Converts a nested filter object to URLSearchParams with repeated keys for arrays.
- *
- * Input:  { searchFields: { type: { in: ['foo', 'bar'] }, status: { notIn: ['baz'] } } }
- * Output: searchFields[type][in]=foo&searchFields[type][in]=bar&searchFields[status][notIn]=baz
- */
 export const serializeBracketQuery = (obj: Record<string, unknown>, prefix = ''): URLSearchParams => {
   const params = new URLSearchParams();
   const append = (key: string, val: unknown) => {

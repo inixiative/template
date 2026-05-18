@@ -12,21 +12,6 @@ type BuildOperationIdArgs = {
 
 const pascalCase = (str: string) => upperFirst(camelCase(str));
 
-/**
- * Builds operationId to match controller naming pattern exactly.
- * Pattern: {admin|internal?}{model}{Action}{Many?}{Submodel}
- *
- * Rules:
- * - many: true with submodel → plural submodel (meReadManyOrganizations)
- * - many: false with submodel → singular submodel (organizationCreateToken)
- * - many: true without submodel → no submodel (cronJobReadMany)
- *
- * Examples:
- *   - meReadManyOrganizations (many + submodel)
- *   - organizationCreateToken (singular submodel)
- *   - adminCronJobReadMany (no submodel)
- *   - internalChatGroupCreateChatMessage (internal submodel)
- */
 export const buildOperationId = ({
   action,
   model,

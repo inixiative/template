@@ -2,7 +2,7 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import { clearKey, DbAction, db, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
-import { isNoOpUpdate } from '#/hooks/webhooks/utils';
+import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
 
 const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
@@ -39,10 +39,7 @@ export const registerClearCacheHook = () => {
       for (const resultData of results) {
         const previousData = previousById.get(resultData.id as string);
 
-        // Skip cache clear if only tracking fields changed
-        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData)) {
-          continue;
-        }
+        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData)) continue;
 
         const keys = fetchCacheKeys(model as Prisma.ModelName, resultData);
         allKeys = allKeys.concat(keys);

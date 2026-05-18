@@ -2,10 +2,6 @@ import { useAppStore } from '@template/ui/store';
 import type { PageContext } from '@template/ui/store/types/tenant';
 import { useEffect, useMemo } from 'react';
 
-/**
- * Sets page title and meta description from cached route match.
- * Automatically updates document.title and meta description tag.
- */
 export const usePageMeta = (): { title: string; description: string } => {
   const appName = useAppStore((state) => state.ui.appName);
   const appDescription = useAppStore((state) => state.ui.description);

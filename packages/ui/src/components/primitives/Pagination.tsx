@@ -6,24 +6,15 @@ export type PaginationProps = {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  /** Total number of records across all pages. */
   totalRecords?: number;
-  /** Current page size. Required when pageSizeOptions is provided. */
   pageSize?: number;
-  /** Available page size choices. Pass an empty array to hide the selector. */
   pageSizeOptions?: number[];
-  /** Called when the user selects a different page size. */
   onPageSizeChange?: (pageSize: number) => void;
   className?: string;
 };
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-/**
- * Build the page number buttons to display.
- * Shows first, last, current ± siblings, with ellipses for gaps.
- * e.g. [1, '...', 4, 5, 6, '...', 20]
- */
 export function buildPageRange(currentPage: number, totalPages: number, siblings = 1): (number | '...')[] {
   if (totalPages <= 1) return [];
 

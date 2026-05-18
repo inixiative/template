@@ -3,10 +3,6 @@ import { buildFilterQuery } from '@template/ui/lib/buildFilterQuery';
 import { parseOrderByStrings, readStateFromUrl, syncStateToUrl } from '@template/ui/lib/dataStatePersistence';
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 
-/**
- * All imports from source — no local copies of logic.
- */
-
 // --- syncStateToUrl ---
 
 describe('syncStateToUrl', () => {

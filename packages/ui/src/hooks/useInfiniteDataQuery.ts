@@ -4,17 +4,13 @@ import * as React from 'react';
 
 export type InfiniteDataPage<TItem> = {
   data: TItem[];
-  /** Total number of records across all pages, if known. */
   total?: number;
-  /** Next page cursor/number, or undefined if no more pages. */
   nextPage?: number;
 };
 
 export type UseInfiniteDataQueryOptions<TItem> = {
   queryKey: QueryKey;
-  /** Fetch function for a single page. Receives the page param (starts at 0). */
   queryFn: (pageParam: number) => Promise<InfiniteDataPage<TItem>>;
-  /** Whether the query is enabled. Defaults to true. */
   enabled?: boolean;
 };
 
@@ -24,34 +20,17 @@ export type InfiniteDataPageLocation = {
 };
 
 export type UseInfiniteDataQueryResult<TItem> = {
-  /** Flattened array of all items across loaded pages. */
   data: TItem[];
-  /** Number of pages currently in cache. */
   pageCount: number;
-  /** Whether the initial load is in progress. */
   isLoading: boolean;
-  /** Whether a subsequent page is being fetched. */
   isFetchingNextPage: boolean;
-  /** Whether there are more pages available. */
   hasNextPage: boolean;
-  /** Call to fetch the next page. Wire to useInfiniteScrollTrigger's onLoadMore. */
   fetchNextPage: () => void;
-  /** Total record count from the server, if available. */
   total: number | undefined;
-  /**
-   * Given a flat index, returns which page it belongs to and
-   * its index within that page. Useful for optimistic mutations.
-   */
   locateItem: (flatIndex: number) => InfiniteDataPageLocation | null;
-  /** The query key, for use with cache mutation APIs. */
   queryKey: QueryKey;
 };
 
-/**
- * Wraps TanStack Query's useInfiniteQuery for paginated table data.
- * Returns a flat data array and pagination state. No virtualization —
- * all loaded items exist in the DOM.
- */
 export function useInfiniteDataQuery<TItem>(
   options: UseInfiniteDataQueryOptions<TItem>,
 ): UseInfiniteDataQueryResult<TItem> {
@@ -102,10 +81,6 @@ export function useInfiniteDataQuery<TItem>(
   };
 }
 
-/**
- * Given an array of pages and a flat index, returns which page it
- * belongs to and its index within that page. Exported for testing.
- */
 export function locateItemInPages<TItem>(
   pages: InfiniteDataPage<TItem>[],
   flatIndex: number,

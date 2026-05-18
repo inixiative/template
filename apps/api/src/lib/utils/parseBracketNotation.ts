@@ -4,14 +4,6 @@ export type BracketQueryRecord = {
   [key: string]: BracketQueryValue | undefined;
 };
 
-/**
- * Parses bracket notation query parameters into nested objects.
- * Supports arbitrary nesting levels.
- *
- * Examples:
- * - ?filters[status]=active → { filters: { status: 'active' } }
- * - ?searchFields[user][name][contains]=dragon → { searchFields: { user: { name: { contains: 'dragon' } } } }
- */
 export const parseBracketNotation = (url: string): BracketQueryRecord => {
   const params = new URLSearchParams(url.split('?')[1] || '');
   const result: BracketQueryRecord = {};

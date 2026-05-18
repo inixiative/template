@@ -38,28 +38,6 @@ export type UsePaginatedDataOptions = {
 const DEFAULT_PAGE_SIZE = 20;
 const DEBOUNCE_MS = 300;
 
-/**
- * Search, filter, sort, and page-number pagination for server-side data.
- *
- * Works with any renderer — Table, card grids, lists.
- *
- * Usage:
- * ```tsx
- * const data = usePaginatedData({
- *   config: makeDataConfig('adminOrganizationReadMany'),
- *   sectionId: 'orgs',
- * });
- * const { data: response } = useQuery(queries.orgs.list(data.query));
- *
- * <Table
- *   columns={columns}
- *   data={response.items}
- *   keyExtractor={(o) => o.id}
- *   pagination={data.paginationProps(response.total)}
- *   {...data.layoutProps}
- * />
- * ```
- */
 export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedData => {
   const { config, sectionId, shareableUrl = false, scrollRestore, defaultPageSize: defaultPageSizeOption } = options;
 

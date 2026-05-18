@@ -7,13 +7,6 @@ import { clearRulesCache, setRulesCache } from '#/hooks/rules/registry';
 
 registerRulesHook();
 
-/**
- * NOTE: Rules hook limitations:
- * 1. updateManyAndReturn: Logs warning, allows operation (can't fetch previous for each record)
- * 2. Nested updates: Logs warning (can't merge with previous for nested records)
- * 3. For complex validations requiring previous state, use explicit transactions
- */
-
 afterAll(async () => {
   await cleanupTouchedTables(db);
 });

@@ -1,14 +1,3 @@
-/**
- * Partial-unique sanity checks across all polymorphic-FK models.
- *
- * These verify the partial @@unique([...], where: ...) constraints actually
- * land in Postgres and block duplicates within a scope while permitting
- * the same key across different scopes. They also catch any drift in the
- * raw() syntax used for enum-discriminator partials.
- *
- * Convention: factories only — no `db.x.create` in tests.
- */
-
 import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactType, TagResource, WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';

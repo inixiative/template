@@ -6,14 +6,6 @@ import { clearImmutableFieldsCache, setImmutableFieldsCache } from '#/hooks/immu
 
 registerImmutableFieldsHook();
 
-/**
- * NOTE: immutableFields only strips FK fields from UPDATE operations.
- * Nested creates (create/createMany inside update) are NOT processed because:
- * 1. FKs must be set on initial creation - that's the whole point
- * 2. For nested creates via relations, Prisma auto-fills the parent FK anyway
- * 3. falsePolymorphism hook handles FK validation on creates
- */
-
 afterAll(async () => {
   await cleanupTouchedTables(db);
 });

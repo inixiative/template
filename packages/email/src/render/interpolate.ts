@@ -2,13 +2,6 @@ import { evaluateConditions } from '@template/email/render/evaluateConditions';
 // biome-ignore lint/suspicious/noShadowRestrictedNames: lodash escape is the intended import
 import { escape, isNil } from 'lodash-es';
 
-/**
- * Variable prefixes for email templates.
- * - sender.* - Auto-resolved from sender (platform or org)
- * - recipient.* - Auto-resolved from recipient user
- * - data.* - Explicit values from send call
- * - component:slug - Component inclusion (handled separately)
- */
 export enum VariablePrefix {
   sender = 'sender',
   recipient = 'recipient',
@@ -23,11 +16,6 @@ export type Variables = {
   data?: Record<string, unknown>;
 };
 
-/**
- * Interpolate variables in template string.
- * 1. Evaluates {{#if rule={...}}}...{{/if}} conditionals
- * 2. Substitutes {{sender.*}}, {{recipient.*}}, {{variable.*}}
- */
 export const interpolate = (template: string, variables: Variables): string => {
   // 1. Evaluate conditionals
   const evaluated = evaluateConditions(template, variables);

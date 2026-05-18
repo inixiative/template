@@ -10,8 +10,6 @@ export type NavigationSlice = {
     setNavigate: (fn: UseNavigateResult<string>) => void;
     setNavConfig: (config: NavConfig) => void;
     setCurrentRouteMatch: (match: RouteMatch | null) => void;
-    navigatePreservingContext: (to: string) => void;
-    navigatePreservingSpoof: (to: string) => void;
-    navigatePreservingAll: (to: string) => void;
+    navigatePreserving: (to: string, policy: 'context' | 'spoof' | 'all') => void;
   };
 };

@@ -31,30 +31,9 @@ const resolveTargets = <TVariables>(
   return typeof targets === 'function' ? targets(variables) : targets;
 };
 
-/**
- * Optimistic mutation wrapper for TanStack Query.
- *
- * Pattern:
- * 1. onMutate: Cache current state, optimistically update
- * 2. onError: Rollback to cached state
- * 3. onSettled: Invalidate to refetch real data
- *
- * @example
- * ```tsx
- * const updateTodo = useOptimisticMutation({
- *   mutationFn: (todo) => api.updateTodo(todo),
- *   queryKey: ['todos'],
- *   optimisticUpdate: (old, newTodo) =>
- *     old.map(t => t.id === newTodo.id ? { ...t, ...newTodo } : t),
- * });
- * ```
- */
 export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(options: {
-  /** The mutation function */
   mutationFn: (variables: TVariables) => Promise<TData>;
-  /** Cache targets to optimistically patch and invalidate */
   targets: OptimisticTargets<TVariables>;
-  /** Additional mutation options */
   mutationOptions?: Omit<
     UseMutationOptions<TData, TError, TVariables, OptimisticContext<TVariables>>,
     'mutationFn' | 'onMutate' | 'onError' | 'onSettled'
@@ -101,10 +80,6 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   });
 };
 
-/**
- * Pure helper for building a single optimistic target for list create/update/delete operations.
- * Supports OpenAPI-style variables: { path: { id }, body?: {...} }.
- */
 export const createOptimisticListTarget = <TItem extends { id: string }, TVariables = unknown>(options: {
   queryKey: QueryKey;
   operation: OptimisticListOperation;

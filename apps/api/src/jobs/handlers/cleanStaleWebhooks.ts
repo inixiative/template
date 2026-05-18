@@ -2,12 +2,6 @@ import { log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
-/**
- * Clean Stale Webhook Events
- *
- * Removes webhook event records older than 90 days.
- * Runs nightly to prevent unbounded growth of webhook history.
- */
 export const cleanStaleWebhooks: JobHandler<void> = makeSingletonJob(async (ctx) => {
   const { db } = ctx;
 

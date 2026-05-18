@@ -1,9 +1,3 @@
-/**
- * HTTP Error Map
- *
- * Canonical mapping from HTTP status codes to stable labels, names, and default guidance.
- * All types are derived from this map to prevent drift.
- */
 export const HTTP_ERROR_MAP = {
   // 4xx Client Errors
   400: { label: 'BAD_REQUEST', name: 'Bad Request', guidance: 'fixInput' },
@@ -25,40 +19,16 @@ export const HTTP_ERROR_MAP = {
   504: { label: 'GATEWAY_TIMEOUT', name: 'Gateway Timeout', guidance: 'tryAgain' },
 } as const;
 
-/**
- * Supported HTTP error codes
- */
 export type HttpErrorCode = keyof typeof HTTP_ERROR_MAP;
 
-/**
- * Stable machine labels for error identification (analytics, contracts)
- */
 export type ErrorLabel = (typeof HTTP_ERROR_MAP)[HttpErrorCode]['label'];
 
-/**
- * Guidance values for error handling behavior
- *
- * - fixInput: User needs to correct their input
- * - tryAgain: Temporary issue, retry may succeed
- * - reauthenticate: Session expired, re-login required
- * - requestPermission: User lacks necessary permissions
- * - refreshAndRetry: Refresh page and try again
- * - contactSupport: System issue requiring support intervention
- */
 export type Guidance = (typeof HTTP_ERROR_MAP)[HttpErrorCode]['guidance'];
 
-/**
- * Standard API error response body shape
- */
 export type ApiErrorBody = {
-  /** Stable machine label for analytics/logging */
   error: ErrorLabel;
-  /** User-safe error message */
   message: string;
-  /** Guidance for error handling behavior */
   guidance: Guidance;
-  /** Field-level validation errors (for forms) */
   fieldErrors?: Record<string, string[]>;
-  /** Request ID for support/debugging */
   requestId: string;
 };

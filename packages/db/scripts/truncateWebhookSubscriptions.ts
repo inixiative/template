@@ -1,17 +1,5 @@
 #!/usr/bin/env bun
 
-/**
- * Truncate Webhook Subscriptions
- *
- * Clears all webhook subscriptions from the local database.
- * Used after cloning production data to prevent webhooks firing to prod URLs.
- *
- * Safety: Only runs in local/test environments.
- *
- * Usage:
- *   bun run db:truncate:webhooks
- */
-
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 
@@ -26,23 +14,16 @@ const truncateWebhookSubscriptions = async () => {
 
   log.info('Truncating webhook subscriptions...', LogScope.db);
 
-  try {
-    const result = await db.$executeRaw`
-      TRUNCATE "WebhookSubscription" CASCADE;
-    `;
+  const result = await db.$executeRaw`
+    TRUNCATE "WebhookSubscription" CASCADE;
+  `;
 
-    log.success(`Truncated webhook subscriptions (${result} affected)`, LogScope.db);
-  } catch (error) {
-    log.error('Failed to truncate webhook subscriptions:', LogScope.db);
-    console.error(error);
-    throw error;
-  }
+  log.success(`Truncated webhook subscriptions (${result} affected)`, LogScope.db);
 };
 
 truncateWebhookSubscriptions()
   .then(() => process.exit(0))
   .catch((error) => {
-    log.error('Truncate failed:', LogScope.db);
-    console.error(error);
+    log.error('Truncate failed:', error, LogScope.db);
     process.exit(1);
   });

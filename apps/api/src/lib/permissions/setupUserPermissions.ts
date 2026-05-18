@@ -4,12 +4,6 @@ import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
-/**
- * Set up permissions for user's own resources at auth time.
- * - Session auth → owner (full permissions)
- * - User token → restricted by token role
- * - Org/OrgUser tokens → no user permissions (org-scoped)
- */
 export const setupUserPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const user = c.get('user');

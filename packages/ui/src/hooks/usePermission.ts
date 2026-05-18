@@ -1,6 +1,6 @@
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { ActionRule } from '@template/permissions/rebac/types';
-import type { PermissionsSlice } from '@template/ui/store';
+import type { PermissionsSlice } from '@template/ui/store/types';
 
 export type PermissionCheck = {
   show: boolean;

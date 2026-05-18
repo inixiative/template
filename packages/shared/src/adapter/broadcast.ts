@@ -3,12 +3,6 @@ export type BroadcastRegistry<A> = {
   unregister: (name: string) => void;
   get: (name: string) => A;
   getOrDefault: (name: string | undefined, fallback: string) => A;
-  /**
-   * Run `fn` against every registered adapter. Each adapter runs in isolation
-   * (one rejection does NOT short-circuit siblings). After all settle, if any
-   * rejected, throw an `AggregateError` (or the lone error) so the caller can
-   * surface the failure — silent swallowing was the previous bug.
-   */
   broadcast: <R>(fn: (adapter: A) => Promise<R>) => Promise<R[]>;
   has: (name: string) => boolean;
   names: () => string[];

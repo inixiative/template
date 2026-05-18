@@ -1,6 +1,3 @@
-/**
- * Save coordinator - resolves variants, rewrites MJML, saves.
- */
 
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
@@ -27,9 +24,6 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-/**
- * Save a template - validates MJML, parses components, saves all.
- */
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
 

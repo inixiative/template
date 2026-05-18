@@ -1,4 +1,5 @@
 export * from './AdminInquiriesPage';
+export * from './AuthCallbackPage';
 export * from './HomePage';
 export * from './InquiriesPage';
 export * from './LoginPage';

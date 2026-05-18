@@ -28,7 +28,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
 
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signUp = useAppStore((state) => state.auth.signUp);
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const { providers, isLoading: _isLoadingProviders, error: providerError } = useAuthProviders();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
 
     try {
       await signUp({ type: 'email', email, password, name });
-      navigatePreservingContext(search.redirectTo || '/dashboard');
+      navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed. Please try again.';
       setError(message);

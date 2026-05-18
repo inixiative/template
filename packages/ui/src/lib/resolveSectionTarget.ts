@@ -1,15 +1,5 @@
 const SECTION_ATTR = 'data-section';
 
-/**
- * Resolves a section target from a potentially dot-notated ID.
- *
- * - `"users"` → finds `[data-section="users"]`
- * - `"usersTable.usr_abc123"` → finds `[data-section="usersTable"]`,
- *   then finds child `[data-key="usr_abc123"]` within it
- * - `"usersTable.3"` → finds `[data-section="usersTable"]`,
- *   then finds child `[data-key="3"]`, falling back to the
- *   4th `[data-key]` child (0-indexed) if no key match
- */
 export function resolveSectionTarget(sectionId: string): Element | null {
   const dotIndex = sectionId.indexOf('.');
   if (dotIndex === -1) {

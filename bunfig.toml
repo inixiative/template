@@ -1,0 +1,6 @@
+# Root bunfig — only used when `bun test` runs from the repo root, which is
+# the wrong invocation. See scripts/testRedirect.ts.
+# `bun run test` cd's into each workspace and uses that workspace's bunfig.
+
+[test]
+preload = ["./scripts/testRedirect.ts"]

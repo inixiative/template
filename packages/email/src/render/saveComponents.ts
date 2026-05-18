@@ -1,7 +1,3 @@
-/**
- * Save components - find + create/update at context level.
- * Uses findFirst to handle nullable FKs in compound unique (Prisma 7 quirk).
- */
 
 import { db } from '@template/db';
 import type { EmailComponent } from '@template/db/generated/client/client';

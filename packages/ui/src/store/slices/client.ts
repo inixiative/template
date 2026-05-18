@@ -12,70 +12,35 @@ const shouldSkipToast = (meta: unknown) => {
 };
 
 const handleApiError = (error: unknown, getStore: () => AppStore) => {
-  // Default values
   let message = 'An error occurred';
   let guidance: ApiErrorBody['guidance'] | undefined;
 
-  // Parse API error response
   if (error && typeof error === 'object') {
-    if ('message' in error && typeof error.message === 'string') {
-      message = error.message;
-    }
-    if ('guidance' in error && typeof error.guidance === 'string') {
+    if ('message' in error && typeof error.message === 'string') message = error.message;
+    if ('guidance' in error && typeof error.guidance === 'string')
       guidance = error.guidance as ApiErrorBody['guidance'];
-    }
   }
 
-  // Handle based on guidance
-  switch (guidance) {
-    case 'fixInput':
-      // Show toast, inline errors will provide details
-      toast.error(`${message}. Please double check your data.`);
-      break;
-
-    case 'tryAgain':
-      // Show toast with retry hint
-      toast.error(`${message}. Please try again.`);
-      break;
-
-    case 'reauthenticate':
-      // Show toast with login link
+  const handlers = {
+    fixInput: () => toast.error(`${message}. Please double check your data.`),
+    tryAgain: () => toast.error(`${message}. Please try again.`),
+    reauthenticate: () =>
       toast.error('Session expired. Please log in again.', {
-        action: {
-          label: 'Login',
-          onClick: () => navigateToLogin(getStore),
-        },
-      });
-      break;
-
-    case 'requestPermission':
-      // Show persistent error with admin CTA
-      toast.error(`${message}. Contact an administrator to request access.`);
-      break;
-
-    case 'refreshAndRetry':
-      // Show toast with refresh button
+        action: { label: 'Login', onClick: () => navigateToLogin(getStore) },
+      }),
+    requestPermission: () => toast.error(`${message}. Contact an administrator to request access.`),
+    refreshAndRetry: () =>
       toast.error(message, {
-        action: {
-          label: 'Refresh',
-          onClick: () => {
-            window.location.reload();
-          },
-        },
-      });
-      break;
-    default:
-      // Persistent error toast with support link
-      toast.error(message, {
-        action: {
-          label: 'Contact Support',
-          onClick: () => {
-            getStore().navigation.navigatePreservingContext('/support');
-          },
-        },
-      });
-      break;
-  }
+        action: { label: 'Refresh', onClick: () => window.location.reload() },
+      }),
+  } satisfies Partial<Record<NonNullable<ApiErrorBody['guidance']>, () => void>>;
+
+  const handler = guidance && handlers[guidance as keyof typeof handlers];
+  if (handler) handler();
+  else
+    toast.error(message, {
+      action: { label: 'Contact Support', onClick: () => getStore().navigation.navigatePreserving('/support', 'context') },
+    });
 };
 
 export const createClientSlice: StateCreator<AppStore, [], [], ClientSlice> = (_set, get) => {

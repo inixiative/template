@@ -3,11 +3,6 @@ import { type Client, createClient } from '@template/sdk/client';
 import { getToken } from '@template/ui/lib/auth/token';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
-/**
- * Extracts the success type from SDK union types
- * When throwOnError is true, the error case never happens (it throws instead)
- * So we extract only the success variant from: { data: X } | { error: Y }
- */
 export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
   ? T
   : // biome-ignore lint/suspicious/noExplicitAny: conditional type discriminant — any is required for union narrowing
@@ -16,10 +11,6 @@ export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
       Extract<T, { data: any }>
     : T;
 
-/**
- * Unwraps nested API response types at compile time
- * { data: { data: X, pagination: Y } } -> { data: X, pagination: Y }
- */
 type UnwrapResponse<T> =
   ExtractSuccess<T> extends { data: infer DataObj }
     ? DataObj extends { data: infer InnerData }
@@ -29,9 +20,6 @@ type UnwrapResponse<T> =
       : ExtractSuccess<T>
     : ExtractSuccess<T>;
 
-/**
- * Overloaded return type for apiFetch that works with both queries and mutations
- */
 interface ApiFetchFunction<T, TVariables> {
   // For React Query queries
   (context: QueryFunctionContext): Promise<UnwrapResponse<T>>;
@@ -50,14 +38,6 @@ export type RequestOptionsFor<TVariables extends Record<string, unknown> | undef
   ? ClientInjectedOptions
   : TVariables & ClientInjectedOptions;
 
-/**
- * Internal API fetch function that doesn't depend on the store.
- * Use this directly when you need to avoid circular dependencies.
- *
- * Handles both React Query context and direct variables:
- * - QueryFunctionContext: Extracts variables from queryKey[0]
- * - Direct vars: Uses them as-is
- */
 export const apiFetchInternal = <T, TVariables extends Record<string, unknown> | undefined | void = void>(
   fn: (requestOptions: RequestOptionsFor<TVariables>) => Promise<T>,
   options?: {

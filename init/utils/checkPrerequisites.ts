@@ -181,3 +181,54 @@ export const checkDockerRunningAsync = async (): Promise<InfisicalSession> => {
     };
   }
 };
+
+const INSTALL_COMMANDS: Record<string, string> = {
+  gh: 'brew install gh',
+  infisical: 'brew install infisical/get-cli/infisical',
+  pscale: 'brew install planetscale/tap/pscale',
+  vercel: 'npm i -g vercel',
+  railway: 'brew install railway',
+  wrangler: 'npm i -g wrangler',
+  docker: 'brew install --cask docker',
+};
+
+export const getInstallCommand = (cli: string): string => INSTALL_COMMANDS[cli] ?? `# install ${cli} manually`;
+
+const SESSION_CHECKS: Record<string, () => Promise<InfisicalSession>> = {
+  pscale: checkPlanetScaleSessionAsync,
+  vercel: checkVercelSessionAsync,
+  railway: checkRailwaySessionAsync,
+  infisical: checkInfisicalSessionAsync,
+  gh: checkGitHubSessionAsync,
+  docker: checkDockerRunningAsync,
+};
+
+const LOGIN_COMMANDS: Record<string, string> = {
+  pscale: 'pscale auth login',
+  vercel: 'vercel login',
+  railway: 'railway login',
+  infisical: 'infisical login',
+  gh: 'gh auth login',
+  docker: 'open -a Docker  # then wait for the daemon to start',
+};
+
+export const checkProviderPrereq = async (
+  cli: string,
+): Promise<{ ok: true } | { ok: false; reason: string; fixCommand: string }> => {
+  const status = await checkCLIAsync(cli, cli);
+  if (!status.installed) {
+    return { ok: false, reason: `${cli} CLI not installed`, fixCommand: getInstallCommand(cli) };
+  }
+  const sessionCheck = SESSION_CHECKS[cli];
+  if (sessionCheck) {
+    const session = await sessionCheck();
+    if (!session.loggedIn) {
+      return {
+        ok: false,
+        reason: `${cli} not authenticated (${session.error ?? 'no session'})`,
+        fixCommand: LOGIN_COMMANDS[cli] ?? `${cli} login`,
+      };
+    }
+  }
+  return { ok: true };
+};

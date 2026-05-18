@@ -1,23 +1,3 @@
-/**
- * Save-side cycle detection. Before persisting a component's new outgoing
- * `componentRefs`, walk them through the DB state (via `lookupCascade` so
- * scope resolution matches `expand`'s render-time behavior) and refuse the
- * save if we ever reach `savingSlug`.
- *
- * Catches cross-save cycles like:
- *   1. Save A.componentRefs = ['B']
- *   2. Save B.componentRefs = ['A']  ← this attempt fails here
- *
- * Intra-save cycles can't happen because `mapRefs` walks MJML text top-down
- * and produces a tree by construction.
- *
- * Direct DB writes (migrations, admin tools) bypass this check — `expand`
- * has no runtime guard, so any cycle introduced outside `saveEmailTemplate`
- * will blow the stack at render time. Render-side belt-and-suspenders is
- * intentionally NOT added here — the save-side fence is the only writer
- * boundary we control, and a render-time guard would mask data bugs
- * silently rather than failing loudly at the source.
- */
 
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';

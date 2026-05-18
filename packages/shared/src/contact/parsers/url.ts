@@ -13,31 +13,10 @@ export const splitUrl = (url: string): string[] =>
     .filter(Boolean);
 
 export type ParseSimpleHandleUrlOptions = {
-  /**
-   * Path segment(s) between host and handle. String → single prefix
-   * (`'profile'` matches `bsky.app/profile/<handle>`). Array → aliases that
-   * all map to the same handle position (`['u', 'user']` makes Reddit accept
-   * both `reddit.com/u/<handle>` and `reddit.com/user/<handle>`).
-   */
   prefix?: string | readonly string[];
-  /**
-   * Whether the returned handle is lowercased. **Defaults to `true`** —
-   * virtually every social platform routed through here is case-insensitive,
-   * and lowercasing keeps the stored value aligned with `toValueKey`'s
-   * lowercased key (otherwise `JohnDoe` vs `johndoe` collapse to the same
-   * valueKey with different stored shapes — silent uniqueness bypass).
-   * Pass `false` only for genuinely case-sensitive platforms.
-   */
   caseInsensitive?: boolean;
 };
 
-/**
- * Parse a `host/handle` or `host/<prefix>/handle` URL into its trailing handle.
- *
- * @param hosts   one or more accepted hosts (e.g. ['twitter.com', 'x.com'])
- * @param url     URL to parse
- * @param options see ParseSimpleHandleUrlOptions
- */
 export const parseSimpleHandleUrl = (
   hosts: string | readonly string[],
   url: string,
@@ -62,10 +41,6 @@ export const parseSimpleHandleUrl = (
   return normalize(parts[1]!.replace(/^@/, ''));
 };
 
-/**
- * Best-effort URL canonicalization for `website` valueKey. Lowercases host,
- * strips protocol + `www.` + trailing slash + fragment. Keeps path + query.
- */
 export const canonicalUrl = (url: string): string => {
   const trimmed = stripQueryAndFragment(url).replace(/#.*$/, '');
   const noProtocol = stripWwwAndProtocol(trimmed);

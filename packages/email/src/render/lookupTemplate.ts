@@ -1,6 +1,3 @@
-/**
- * Cascade lookup for template or component: Space → Org → default
- */
 
 import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';

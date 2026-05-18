@@ -1,4 +1,4 @@
-import { EncryptionService } from '@template/db/lib/encryption/encryptionService';
+import { createEncryption } from '@template/db/lib/encryption/encryptionService';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
 import type { EncryptedFieldConfig, EncryptionKeyring } from '@template/db/lib/encryption/types';
 import type { ModelNameFromAccessor, ModelName as PrismaModelName } from '@template/db/utils/modelNames';
@@ -43,10 +43,10 @@ export const encryptField = async <M extends ModelName, K extends KeyName<M>>(
 
   const data = record[keyName];
   const keyring = getKeyringFromEnv(keyConfig.envPrefix);
-  const service = new EncryptionService(keyring);
+  const { encrypt } = createEncryption(keyring);
   const aad = keyConfig.buildAAD(record as unknown as Parameters<typeof keyConfig.buildAAD>[0]);
 
-  const encrypted = await service.encrypt(data, aad);
+  const encrypted = encrypt(data, aad);
 
   return {
     [fields.encryptedField]: encrypted.ciphertext,
@@ -67,20 +67,15 @@ export const decryptField = async <M extends ModelName, K extends KeyName<M>>(
   const fields = getFieldNames(String(keyName));
 
   const keyring = getKeyringFromEnv(keyConfig.envPrefix);
-  const service = new EncryptionService(keyring);
+  const { decrypt } = createEncryption(keyring);
   const aad = keyConfig.buildAAD(record as unknown as Parameters<typeof keyConfig.buildAAD>[0]);
 
   const ciphertext = record[fields.encryptedField] as string;
   const version = record[fields.versionField] as number;
   const metadata = record[fields.metadataField] as { iv: string; authTag: string };
 
-  return service.decrypt(
-    {
-      ciphertext,
-      version,
-      iv: metadata.iv,
-      authTag: metadata.authTag,
-    },
+  return decrypt(
+    { ciphertext, version, iv: metadata.iv, authTag: metadata.authTag },
     aad,
   );
 };

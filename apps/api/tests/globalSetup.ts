@@ -1,11 +1,6 @@
 import '#/config/env';
 import { db } from '@template/db';
 
-/**
- * Runs before each test file worker.
- * Truncates all public tables to clean up any state left by a crashed previous run.
- * In normal flow (afterAll cleanup working) this is a near-instant no-op on empty tables.
- */
 const truncateAll = async () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
 

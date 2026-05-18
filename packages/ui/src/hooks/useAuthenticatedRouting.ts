@@ -2,34 +2,21 @@ import { useLocation } from '@tanstack/react-router';
 import {
   applyAuthorizedContext,
   hasContextChanged,
-  resolveAuthorizedContext,
 } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
 import {
   parseRoutingSearchParams,
   syncStoreFromSearchParams,
 } from '@template/ui/hooks/useAuthenticatedRouting/querySync';
 import { buildSearchParamUpdates, replaceUrlSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
+import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import { findRoute } from '@template/ui/lib/findRoute';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Handles all routing logic for authenticated layouts:
- * - Reads context from query params (?org=123, ?space=456)
- * - Syncs context changes back to URL
- * - Checks permissions and falls back to valid contexts
- * - Auto-navigates to dashboard when context changes
- *
- * Future embed mode:
- * - Parent injects context via query params: ?org=123&token=abc
- * - skipAutoNavigation keeps user on embedded page
- * - onContextChange notifies parent for deep linking
- * - Use with useAuthStrategy for token auth from parent window
- */
 export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const { pathname, search } = useLocation();
-  const navigatePreservingContext = useAppStore((state) => state.navigation.navigatePreservingContext);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const navConfig = useAppStore((state) => state.navigation.navConfig);
   const setCurrentRouteMatch = useAppStore((state) => state.navigation.setCurrentRouteMatch);
   const tenant = useAppStore((state) => state.tenant);
@@ -71,7 +58,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   useEffect(() => {
     if (!navConfig) return;
 
-    const authorizedContext = resolveAuthorizedContext({
+    const authorizedContext = checkContextPermission({
       path: pathname,
       navConfig,
       permissions,
@@ -106,9 +93,9 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
     // Skip redirect when context is being initialized from URL params (public → org/space)
     if (prevContextType === 'public' || prevContextType === '') return;
 
-    if (pathname === previousPathname.current) navigatePreservingContext('/dashboard');
+    if (pathname === previousPathname.current) navigatePreserving('/dashboard', 'context');
     previousPathname.current = pathname;
-  }, [tenant.context.type, navigatePreservingContext, pathname]);
+  }, [tenant.context.type, navigatePreserving, pathname]);
 
   return { isAuthorized };
 };

@@ -6,62 +6,15 @@ const SECTION_ATTR = 'data-section';
 const SECTION_SELECTOR = `[${SECTION_ATTR}]`;
 
 export type UseSectionHashOptions = {
-  /**
-   * Whether hash tracking is enabled. Defaults to true.
-   * Set to false to temporarily disable without unmounting.
-   */
   enabled?: boolean;
-  /**
-   * IntersectionObserver threshold. The section with the highest
-   * intersection ratio becomes the active hash. Defaults to 0.5.
-   */
   threshold?: number;
 };
 
 export type UseSectionHashResult = {
-  /** The currently active section ID (from the URL hash or scroll). */
   activeSection: string | null;
-  /** Scroll to a section and update the hash. */
   scrollToSection: (sectionId: string) => void;
 };
 
-/**
- * Auto-discovers sections in the DOM and syncs the URL hash with the
- * most visible one. Mount once at the app root — no per-page wiring needed.
- *
- * Sections opt in by adding `data-section` to any element. Use camelCase
- * for section IDs (they become URL hash fragments):
- *
- *   <div data-section="users">...</div>
- *   <div data-section="activityLog">...</div>
- *
- * The hook uses a MutationObserver to detect sections as they mount/unmount,
- * and an IntersectionObserver to track which section is most visible.
- *
- * On mount: if the URL has a #hash matching a section, scrolls to it.
- * On scroll: updates the URL hash to the most visible section (debounced).
- * On navigation: new page's sections are auto-discovered as they mount.
- *
- * Dot notation for deep linking into rows/children:
- *   scrollToSection('usersTable.usr_abc123')  → #usersTable.usr_abc123
- *   scrollToSection('usersTable.3')           → 4th [data-key] child
- *
- * Usage (app root):
- * ```tsx
- * function App() {
- *   const { activeSection, scrollToSection } = useSectionHash();
- *   return <RouterProvider ... />;
- * }
- * ```
- *
- * Usage (any component):
- * ```tsx
- * <section data-section="teamMembers">
- *   <h2>Team Members</h2>
- *   <Table ... />
- * </section>
- * ```
- */
 export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionHashResult {
   const { enabled = true, threshold = 0.5 } = options;
 

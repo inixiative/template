@@ -1,18 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { log } from '@template/shared/logger';
+import { isTest } from '@template/shared/utils/env';
 
 export type Fixture<T = unknown> = {
-  version: string;
+  version?: string;
   status: number;
   body?: T | null;
   bodyFile?: string;
   headers?: Record<string, string>;
 };
-
-// What realFn returns into captureResponse. Same as Fixture but version is
-// VCR's concern — caller can't know it at call time.
-export type ResponseFixture<T = unknown> = Omit<Fixture<T>, 'version'>;
 
 type Sanitizer = {
   fn?: (s: string) => string;
@@ -66,6 +63,7 @@ export class VCR {
   }
 
   async capture<T>(method: string, realFn: () => Promise<T>): Promise<T> {
+    if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
     const current = await this.getVersion();
 
@@ -95,18 +93,18 @@ export class VCR {
     }
   }
 
-  async captureResponse<T>(method: string, realFn: () => Promise<ResponseFixture<T>>): Promise<Fixture<T>> {
+  async captureResponse<T>(method: string, realFn: () => Promise<Fixture<T>>): Promise<Fixture<T>> {
+    if (!isTest) return realFn();
     const fixturePath = this.__popFixturePath(method);
     const current = await this.getVersion();
 
     if (existsSync(fixturePath)) {
       const saved = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Fixture<T>;
       if (saved.version === current) {
-        if (saved.bodyFile) {
-          const bytes = readFileSync(join(dirname(fixturePath), saved.bodyFile));
-          return { ...saved, body: bytes as unknown as T, bodyFile: undefined };
-        }
-        return saved;
+        const body = saved.bodyFile
+          ? (readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T)
+          : (saved.body as T);
+        return { status: saved.status, body, ...(saved.headers && { headers: saved.headers }) };
       }
       log.warn(
         `VCR: refreshing cassette "${basename(fixturePath)}" (was ${saved.version ?? '<none>'}, now ${current})`,
@@ -115,8 +113,7 @@ export class VCR {
 
     try {
       const raw = await realFn();
-      const sanitized = this.__sanitize(method, raw.body);
-      return this.__saveFixture<T>(fixturePath, method, sanitized as T, current, raw.status, raw.headers);
+      return this.__saveFixture<T>(fixturePath, method, this.__sanitize(method, raw.body) as T, current, raw.status, raw.headers);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.__save(fixturePath, { version: current, status: 500, body: message });
@@ -150,13 +147,11 @@ export class VCR {
       const sidecarPath = join(dirname(fixturePath), sidecarName);
       mkdirSync(dirname(sidecarPath), { recursive: true });
       writeFileSync(sidecarPath, body as Uint8Array);
-      const fixture: Fixture<T> = { version, status, bodyFile: sidecarName, ...(headers && { headers }) };
-      this.__save(fixturePath, fixture);
-      return { ...fixture, body: body as T };
+      this.__save(fixturePath, { version, status, bodyFile: sidecarName, ...(headers && { headers }) });
+      return { status, body: body as T, ...(headers && { headers }) };
     }
-    const fixture: Fixture<T> = { version, status, body, ...(headers && { headers }) };
-    this.__save(fixturePath, fixture);
-    return fixture;
+    this.__save(fixturePath, { version, status, body, ...(headers && { headers }) });
+    return { status, body, ...(headers && { headers }) };
   }
 
   private __sanitize<T>(method: string, data: T): T {

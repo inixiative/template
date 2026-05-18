@@ -1,17 +1,3 @@
-/**
- * Stripe Client
- *
- * Used for fiat payment processing (investment deposits, payouts).
- *
- * Required environment variables:
- * - STRIPE_SECRET_KEY
- * - STRIPE_WEBHOOK_SECRET (for webhook verification)
- *
- * DISABLED: `stripe` is not installed. To enable, run
- *   `bun add --cwd apps/api stripe`
- * then uncomment the block below.
- */
-
 export {};
 
 /*

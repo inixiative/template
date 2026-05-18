@@ -1,15 +1,8 @@
-/**
- * Evaluate {{#if rule={...}}}...{{/if}} conditional blocks in MJML.
- */
 
 import { type Condition, check } from '@inixiative/json-rules';
 import type { Variables } from '@template/email/render/interpolate';
 import { isLocal, isTest } from '@template/shared/utils';
 
-/**
- * Flatten variables into dot-notation accessible object for json-rules.
- * { sender: { name: 'Acme' } } → { 'sender.name': 'Acme' }
- */
 const flattenVariables = (variables: Variables): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
 
@@ -23,9 +16,6 @@ const flattenVariables = (variables: Variables): Record<string, unknown> => {
   return result;
 };
 
-/**
- * Find matching close brace, handling nested braces and strings.
- */
 const findJsonEnd = (str: string, start: number): number => {
   let depth = 0;
   let inString = false;
@@ -64,12 +54,6 @@ const findJsonEnd = (str: string, start: number): number => {
   return -1;
 };
 
-/**
- * Parse and evaluate all conditional blocks.
- * {{#if rule={...}}}content{{/if}}
- *
- * NOTE: Nested conditionals are NOT supported - use compound rules (all/any) instead.
- */
 export const evaluateConditions = (content: string, variables: Variables): string => {
   const data = flattenVariables(variables);
   const OPEN = '{{#if rule=';

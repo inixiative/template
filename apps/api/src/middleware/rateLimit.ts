@@ -6,13 +6,6 @@ import type { AppEnv } from '#/types/appEnv';
 
 const DEFAULT_RATE_LIMIT = 10; // requests per second
 
-/**
- * Rate limiting middleware.
- *
- * Runs AFTER auth middleware so it can check for tokens.
- * - If token exists: uses token's rateLimitPerSecond (or default), keyed by token ID
- * - If no token: uses default limit, keyed by IP
- */
 export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
   const redis = getRedisClient();
   const token = c.get('token');
@@ -31,9 +24,6 @@ export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
   await next();
 };
 
-/**
- * Create a custom rate limiter for specific endpoints.
- */
 type RateLimitConfig = {
   windowMs: number;
   max: number;

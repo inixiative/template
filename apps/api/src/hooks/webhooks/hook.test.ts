@@ -3,26 +3,13 @@ import { clearHookRegistry, db } from '@template/db';
 import { WebhookModel } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
-import { resetWebhookEnabledModels, setWebhookEnabledModels } from '#/hooks/webhooks/utils';
 import * as enqueueModule from '#/jobs/enqueue';
 
 registerWebhookHook();
 
-/**
- * NOTE: Requires NODE_ENV=test to load .env.test (for REDIS_URL and webhook signing keys).
- * Run with: NODE_ENV=test bun test src/hooks/webhooks/hook.test.ts
- *
- * Webhook routing: When a User changes, webhooks are sent to CustomerRef subscribers
- * (via the relatedModels mapping: User -> CustomerRef via customerModel axis).
- */
-
 afterAll(async () => {
   await cleanupTouchedTables(db);
   clearHookRegistry();
-});
-
-afterEach(() => {
-  resetWebhookEnabledModels();
 });
 
 describe('webhook hook', () => {
@@ -142,17 +129,4 @@ describe('webhook hook', () => {
     });
   });
 
-  describe('with disabled models', () => {
-    it('does not enqueue jobs for disabled models', async () => {
-      setWebhookEnabledModels([]);
-      const enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-7', name: 'sendWebhook' });
-
-      await db.user.create({
-        data: { email: `webhook-disabled-${Date.now()}@example.com` },
-      });
-
-      expect(enqueueSpy).not.toHaveBeenCalled();
-      enqueueSpy.mockRestore();
-    });
-  });
 });

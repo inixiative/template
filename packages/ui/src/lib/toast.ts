@@ -10,24 +10,6 @@ type ToastPromiseOptions<TData> = {
 };
 type ToastPromiseResult<TData> = { unwrap: () => Promise<TData> };
 
-/**
- * Toast notification utility with automatic duration settings
- *
- * Durations:
- * - success: 3000ms (auto-dismiss)
- * - error: Infinity (persist until closed)
- * - warning: 6000ms (double time)
- * - info: 3000ms (auto-dismiss)
- *
- * @example
- * ```tsx
- * import { toast } from '@template/ui/lib/toast';
- *
- * toast.success('Organization created');
- * toast.error('Failed to save changes');
- * toast.warning('Session expiring soon');
- * ```
- */
 export const toast = {
   success: (message: string, options?: Parameters<typeof sonnerToast.success>[1]) => {
     return sonnerToast.success(message, { duration: 3000, ...options });

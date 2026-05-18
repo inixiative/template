@@ -6,20 +6,14 @@ import { useEffect, useRef } from 'react';
 type EventMatcher = string | RegExp | ((event: AppEventPayload) => boolean);
 
 type RefetchRule = {
-  /** Event type(s) to match - string, regex, or function */
   match: EventMatcher | EventMatcher[];
-  /** Query keys to invalidate when matched */
   queryKeys: QueryKey[];
 };
 
 type UseEventRefetchOptions = {
-  /** WebSocket URL (defaults to same origin) */
   url?: string;
-  /** Channels to subscribe to */
   channels?: string[];
-  /** Rules for when to refetch queries */
   rules: RefetchRule[];
-  /** Called when any event is received (before refetch) */
   onEvent?: (event: AppEventPayload) => void;
 };
 
@@ -45,28 +39,6 @@ const matchesAny = (event: AppEventPayload, matchers: EventMatcher | EventMatche
   return matcherArray.some((m) => matchEvent(event, m));
 };
 
-/**
- * Hook that refetches TanStack Query queries when specific WebSocket events are received.
- *
- * @example
- * ```tsx
- * useEventRefetch({
- *   rules: [
- *     // When any user event occurs, refetch the current user
- *     { match: 'user.*', queryKeys: [['user', 'current']] },
- *
- *     // When an inixiative is updated, refetch its data
- *     {
- *       match: (e) => e.type === 'inixiative.updated' && e.resourceId === inixiativeId,
- *       queryKeys: [['inixiative', inixiativeId]],
- *     },
- *
- *     // When any participant joins, refetch the participants list
- *     { match: 'participant.joined', queryKeys: [['inixiative', inixiativeId, 'participants']] },
- *   ],
- * });
- * ```
- */
 export const useEventRefetch = (options: UseEventRefetchOptions): void => {
   const { url, channels, rules, onEvent } = options;
   const queryClient = useAppStore((state) => state.client);

@@ -12,18 +12,6 @@ export type MessageUserPayload = {
   content: MessageContent;
 };
 
-/**
- * Broadcast a message to every user matching the rule, fanned across each
- * user's accepted contacts (per-Contact `acceptedKinds`). Each contact is
- * dispatched via its provider adapter. Missing provider adapter is a hard
- * error — the system has a contact of a type it doesn't know how to send to.
- *
- * `content.text` / `content.html` are interpolated per-recipient with
- * `{{recipient.*}}` and `{{data.*}}` (same engine as email templates).
- *
- * No replyTo: a broadcast doesn't have a single conversation to thread into.
- * For in-conversation replies use messageContact.
- */
 export const messageUser = makeJob<MessageUserPayload>(async (_ctx, payload) => {
   const { rule, kind, content } = payload;
 

@@ -1,7 +1,3 @@
-/**
- * Errors for email rendering pipeline.
- */
-
 export type EmailErrorType = 'component_missing' | 'template_missing' | 'circular_ref';
 
 export class EmailRenderError extends Error {

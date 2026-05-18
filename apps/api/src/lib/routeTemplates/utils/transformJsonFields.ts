@@ -21,10 +21,6 @@ const InputJsonValueSchema: z.ZodType<unknown> = z
     example: { key: 'value' },
   });
 
-/**
- * Transforms z.unknown() fields to InputJsonValueSchema for Prisma JSON compatibility.
- * Handles nullable and optional variants.
- */
 export const transformJsonFields = (shape: Record<string, z.ZodTypeAny>): Record<string, z.ZodTypeAny> => {
   const replaceUnknown = (field: z.ZodTypeAny): z.ZodTypeAny => {
     if (field instanceof z.ZodUnknown) return InputJsonValueSchema;

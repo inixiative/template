@@ -1,11 +1,3 @@
-/**
- * Which Prisma operators are valid for a given field, and which one to
- * default to when a caller passes a bare value (`{ field: 'foo' }`).
- *
- * Keyed on `FieldDef` directly — `field.kind === 'enum'` is the one branch
- * that doesn't live in the type-keyed map; everything else is a plain lookup.
- */
-
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma supports `mode: 'insensitive'` on these string ops. We always emit

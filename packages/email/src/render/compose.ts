@@ -1,6 +1,3 @@
-/**
- * Compose - fetch template/component and expand all refs into full MJML.
- */
 
 import type { CommunicationCategory } from '@template/db';
 import { EmailRenderError } from '@template/email/render/errors';
@@ -8,7 +5,6 @@ import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
 import type { SaveContext } from '@template/email/render/types';
 
-/** Reuse SaveContext - same shape needed for compose */
 export type ComposeContext = SaveContext;
 
 export type ComposeTemplateResult = {
@@ -21,9 +17,6 @@ export type ComposeComponentResult = {
   mjml: string;
 };
 
-/**
- * Compose a template - fetch and expand all component refs.
- */
 export const composeTemplate = async (slug: string, ctx: ComposeContext): Promise<ComposeTemplateResult> => {
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
@@ -33,9 +26,6 @@ export const composeTemplate = async (slug: string, ctx: ComposeContext): Promis
   return { mjml, subject: template.subject, category: template.category };
 };
 
-/**
- * Compose a component - fetch and expand nested refs (for component editor preview).
- */
 export const composeComponent = async (slug: string, ctx: ComposeContext): Promise<ComposeComponentResult> => {
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');

@@ -11,38 +11,23 @@ export type AppEventPayload = {
 };
 
 type UseAppEventsOptions = {
-  /** WebSocket URL (defaults to same origin with ws:// protocol) */
   url?: string;
-  /** Bearer token for authentication (optional - anonymous if not provided) */
   token?: string;
-  /** Channels to subscribe to on connect */
   channels?: string[];
-  /** Called when an event is received */
   onEvent?: (event: AppEventPayload) => void;
-  /** Called when connection opens */
   onOpen?: (connectionId: string) => void;
-  /** Called when connection closes */
   onClose?: () => void;
-  /** Reconnect automatically on disconnect */
   reconnect?: boolean;
-  /** Reconnect delay in ms */
   reconnectDelay?: number;
 };
 
 type UseAppEventsReturn = {
-  /** Whether WebSocket is connected */
   connected: boolean;
-  /** Unique connection ID (for managing this specific connection) */
   connectionId: string | null;
-  /** Recent events (newest first, max 50) */
   events: AppEventPayload[];
-  /** Subscribe to a channel */
   subscribe: (channel: string) => void;
-  /** Unsubscribe from a channel */
   unsubscribe: (channel: string) => void;
-  /** Send a ping to keep connection alive */
   ping: () => void;
-  /** Explicitly disconnect (clean shutdown, no auto-reconnect) */
   disconnect: () => void;
 };
 

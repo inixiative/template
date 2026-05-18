@@ -3,61 +3,25 @@ import * as React from 'react';
 const DEBOUNCE_MS = 150;
 
 export type ScrollStateEntry = {
-  /** Scroll offset in pixels at time of navigation. */
   scrollTop: number;
 };
 
 export type UseScrollStateOptions = {
-  /**
-   * Unique identifier for this scroll container. Multiple containers
-   * on the same page each get their own key in history.state.
-   */
   id: string;
-  /**
-   * The scroll container element ref. For viewport mode (overflow div),
-   * pass the div ref. For window mode, pass undefined or null —
-   * the hook will use document.documentElement automatically.
-   */
+  // Pass for viewport mode (overflow div); omit/null for window scroll.
   scrollRef?: React.RefObject<HTMLElement | null>;
-  /**
-   * Whether enough data has loaded to make scroll restoration meaningful.
-   * When false, restoration is deferred. Defaults to true.
-   */
+  // Defer restore until data has loaded — set false while paginated list / filters resolve from URL.
   ready?: boolean;
-  /**
-   * Whether scroll state tracking is enabled. When false, the hook
-   * does nothing (no restore, no persist). Defaults to true.
-   */
   enabled?: boolean;
 };
 
 export type UseScrollStateResult = {
-  /** Whether saved state was found but couldn't be restored (e.g. not ready). */
   hasSavedPosition: boolean;
 };
 
-/**
- * Persists and restores scroll position via history.state for a single
- * scroll container. On back/forward navigation, restores the pixel
- * offset. On fresh navigation (link click), history.state has no entry
- * so the container starts at the top.
- *
- * Works for both viewport containers (overflow div) and window scroll
- * (pass no scrollRef to use the window).
- *
- * Multiple instances on the same page each track their own key in
- * history.state, independent of each other.
- *
- * Usage:
- * ```tsx
- * // Viewport container
- * const scrollRef = useRef<HTMLDivElement>(null);
- * useScrollState({ id: 'users-table', scrollRef });
- *
- * // Window scroll
- * useScrollState({ id: 'main-feed' });
- * ```
- */
+// Per-container scroll offset persisted in history.state. Pairs with router
+// scroll-restoration: router handles top-of-page nav, this handles offsets
+// inside specific containers across back/forward and page reload.
 export function useScrollState(options: UseScrollStateOptions): UseScrollStateResult {
   const { id, scrollRef, ready = true, enabled = true } = options;
 
@@ -74,13 +38,12 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
         savedRef.current = (raw as ScrollStateEntry).scrollTop;
       }
     } catch {
-      // SSR or sandboxed iframe
+      // history.state read fails in SSR / sandboxed iframes — accept no restore
     }
   }
 
   const hasSavedPosition = savedRef.current !== null;
 
-  // Resolve the scroll element: explicit ref (if attached) or window.
   // A ref with .current === null (e.g. no maxHeight on Table) falls through
   // to window scroll, same as no ref at all.
   const getScrollElement = React.useCallback((): HTMLElement | null => {
@@ -116,13 +79,6 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
     });
   }, [enabled, ready, getScrollElement, scrollRef]);
 
-  // Clear stale entry if we couldn't restore (not ready after mount).
-  React.useEffect(() => {
-    if (restoredRef.current || savedRef.current === null) return;
-    // If ready never becomes true and component unmounts, the entry persists.
-    // That's acceptable — next navigation will try again.
-  }, []);
-
   // Persist scroll position on scroll (debounced).
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastTopRef = React.useRef<number | null>(null);
@@ -146,7 +102,7 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
           const state = { ...window.history.state, [stateKey]: entry };
           window.history.replaceState(state, '');
         } catch {
-          // skip
+          // replaceState fails in SSR / sandboxed iframes / quota — accept partial state loss
         }
       }, DEBOUNCE_MS);
     };

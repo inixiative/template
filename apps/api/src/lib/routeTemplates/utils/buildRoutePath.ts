@@ -8,19 +8,6 @@ type BuildRoutePathArgs = {
   operation?: 'create' | 'read' | 'update' | 'delete';
 };
 
-/**
- * Builds a route path based on submodel, action, and resource flags.
- * Model paths are singular (match Prisma). Submodel paths are plural for collections.
- *
- * Examples:
- * - buildRoutePath({ operation: 'create' }) → '/'
- * - buildRoutePath({ operation: 'read' }) → '/:id'
- * - buildRoutePath({ many: true }) → '/'
- * - buildRoutePath({ submodel: 'token', operation: 'create' }) → '/:id/tokens'
- * - buildRoutePath({ submodel: 'token', many: true }) → '/:id/tokens'
- * - buildRoutePath({ submodel: 'profile' }) → '/:id/profile' (1-1)
- * - buildRoutePath({ action: 'trigger' }) → '/:id/trigger'
- */
 export const buildRoutePath = (args: BuildRoutePathArgs): string => {
   const { submodel, action, skipId = false, many = false, operation } = args;
 

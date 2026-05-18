@@ -66,18 +66,6 @@ const fireBroadcasts = (level: string, args: unknown[]) => {
   }
 };
 
-/**
- * Logger with automatic scope support and broadcasting.
- *
- * @example
- * log.info('message');                    // uses logScope context
- * log.info('message', LogScope.worker);   // manual scope (overrides logScope)
- *
- * // Broadcasting: register targets that receive all log calls in scope
- * logBroadcast((level, msg) => job.log(msg), () => {
- *   log.info('sent to stdout AND job.log()');
- * });
- */
 const proxy = new Proxy(baseConsola, {
   get(target, prop) {
     if (prop === 'child') {

@@ -1,3 +1,5 @@
+// @wip — part of the ws/ rewrite (see pubsub.ts / handler.ts).
+
 import type { ServerWebSocket } from 'bun';
 
 export type WSData = {

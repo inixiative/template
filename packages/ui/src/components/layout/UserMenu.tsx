@@ -33,7 +33,7 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
   const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
   const setSpoof = useAppStore((state) => state.auth.setSpoof);
   const logout = useAppStore((state) => state.auth.logout);
-  const navigatePreservingSpoof = useAppStore((state) => state.navigation.navigatePreservingSpoof);
+  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
 
   const handleSpoofSubmit = async () => {
     if (spoofEmail.trim()) {
@@ -70,7 +70,7 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onClick={() => navigatePreservingSpoof('/settings')}>
+        <DropdownMenuItem onClick={() => navigatePreserving('/settings', 'spoof')}>
           <Icon icon="lucide:settings" className="h-4 w-4 mr-2" />
           <span>Settings</span>
         </DropdownMenuItem>
