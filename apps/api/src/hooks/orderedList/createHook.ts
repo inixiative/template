@@ -1,5 +1,5 @@
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
-import { extractRows } from '#/hooks/orderedList/utils';
+import { extractRows, queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
 import { applyOrderedListBatchCreate, applyOrderedListCreate } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListCreateHook = () => {
@@ -10,11 +10,13 @@ export const registerOrderedListCreateHook = () => {
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ args, model }) => {
       const rows = extractRows(args);
-      if (rows.length > 1) {
-        await applyOrderedListBatchCreate(model, rows);
-      } else if (rows.length === 1) {
-        await applyOrderedListCreate(model, rows[0]!);
-      }
+      const affected =
+        rows.length > 1
+          ? await applyOrderedListBatchCreate(model, rows)
+          : rows.length === 1
+            ? await applyOrderedListCreate(model, rows[0]!)
+            : [];
+      queueOrderedListCacheInvalidation(model, affected);
     },
   );
 };

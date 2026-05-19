@@ -32,6 +32,11 @@ describe('ignoreFields', () => {
       expect(fields).toContain('encryptedSecretsMetadata');
       expect(fields).toContain('encryptedSecretsKeyVersion');
     });
+
+    it('auto-injects ordered-list position field for Contact from orderedList registry', () => {
+      const fields = getIgnoreFields('Contact');
+      expect(fields).toContain('position');
+    });
   });
 
   describe('filterIgnoredFields', () => {

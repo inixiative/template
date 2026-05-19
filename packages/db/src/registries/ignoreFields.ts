@@ -1,4 +1,5 @@
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
+import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { omit } from 'lodash-es';
 
 const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
@@ -7,15 +8,18 @@ const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
   Token: ['lastUsedAt'],
 };
 
-const mergeEncryptedFields = (base: Record<string, string[]>): Record<string, string[]> => {
-  const merged: Record<string, string[]> = { ...base };
-  for (const [model, fields] of Object.entries(getEncryptedFieldsByModel())) {
-    merged[model] = [...(merged[model] ?? []), ...fields];
+const buildHookIgnoreFields = (): Record<string, string[]> => {
+  const merged: Record<string, string[]> = { ...HOOK_IGNORE_FIELDS_BASE };
+  const composed = [getEncryptedFieldsByModel(), getOrderedListFieldsByModel()];
+  for (const source of composed) {
+    for (const [model, fields] of Object.entries(source)) {
+      merged[model] = [...(merged[model] ?? []), ...fields];
+    }
   }
   return merged;
 };
 
-export const HOOK_IGNORE_FIELDS: Record<string, string[]> = mergeEncryptedFields(HOOK_IGNORE_FIELDS_BASE);
+export const HOOK_IGNORE_FIELDS: Record<string, string[]> = buildHookIgnoreFields();
 
 export const getIgnoreFields = (model: string): string[] => [
   ...(HOOK_IGNORE_FIELDS._global ?? []),

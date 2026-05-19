@@ -1,4 +1,5 @@
 import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
+import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
 import { applyOrderedListHardDelete } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListDeleteHook = () => {
@@ -11,7 +12,8 @@ export const registerOrderedListDeleteHook = () => {
       const { previous, model } = options as HookOptions;
       if (!previous) return;
       const rows = Array.isArray(previous) ? previous : [previous];
-      await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
+      const affected = await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
+      queueOrderedListCacheInvalidation(model, affected);
     },
   );
 };
