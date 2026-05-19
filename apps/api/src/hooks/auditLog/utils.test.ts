@@ -31,6 +31,14 @@ describe('auditLog/utils', () => {
       expect(result.keyHash).toBe('[REDACTED]');
       expect(result.name).toBe('tok');
     });
+
+    it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
+      const before = processAuditData('Contact', { id: '1', value: { e164: '+15551234567' }, position: 3 });
+      const after = processAuditData('Contact', { id: '1', value: { e164: '+15551234567' }, position: 1 });
+      expect(before).not.toHaveProperty('position');
+      expect(after).not.toHaveProperty('position');
+      expect(computeDiff(before, after)).toEqual({});
+    });
   });
 
   describe('buildSubjectFkFields', () => {
