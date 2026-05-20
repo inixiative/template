@@ -239,25 +239,30 @@ const FAILURE_THRESHOLD = 5;
 
 ### Ignored Fields
 
-Fields in this registry are:
+`HOOK_IGNORE_FIELDS` is the **shared** ignore registry — used by audit, cache, webhooks, and the generic `isNoOpUpdate`. Any field listed here is:
+
 1. **Excluded from payload** - never sent to webhook subscribers
-2. **Ignored for no-op detection** - changes don't trigger webhooks
+2. **Stripped before audit diff** - changes don't produce AuditLog entries
+3. **Treated as a no-op** - updates that only touch ignored fields skip the cache/webhook/audit hooks
 
 ```typescript
-// hooks/webhooks/constants/ignoredFields.ts
-export const webhookIgnoredFields: Record<string, string[]> = {
+// packages/db/src/registries/ignoreFields.ts
+const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
   _global: ['updatedAt'],      // Always ignored for all models
-  Token: ['lastUsedAt'],       // Token usage doesn't trigger webhook
-  User: ['lastLoginAt'],       // Login timestamp changes ignored
+  User: ['lastLoginAt'],       // Login timestamp not meaningful
+  Token: ['lastUsedAt'],       // Token usage timestamp not meaningful
 };
+
+// Auto-composes from encryption + orderedList registries so encrypted column
+// triplets (encryptedX / encryptedXMetadata / encryptedXKeyVersion) and
+// ordered-list position fields don't need to be re-listed per model.
+export const HOOK_IGNORE_FIELDS = buildHookIgnoreFields();
 ```
 
 Use cases:
 - **Timestamps** (`updatedAt`, `lastUsedAt`) - noisy, not meaningful
-- **Sensitive data** (`passwordHash`, `apiKey`) - security
-- **Transient state** (`cartItems`, `tempData`) - not relevant to subscribers
-
-**No-op detection**: If only ignored fields changed, webhook is skipped entirely.
+- **Sensitive data** (encrypted blobs) - auto-composed from encryption registry
+- **Presentation-only state** (ordered-list `position`) - auto-composed from orderedList registry; the `orderedList` hook owns cache invalidation for ordering cascades (see [Ordered List](#ordered-list))
 
 ### Related Models
 
@@ -468,13 +473,17 @@ Registry-driven hook that maintains dense `[1..N]` position columns for any mode
 ### Registry
 
 ```typescript
-// hooks/orderedList/registry.ts
+// packages/db/src/registries/orderedList.ts
+import { orderedListRegistry } from '@template/db';
+
 export const orderedListRegistry: OrderedListRegistry = {
   Contact: {
     position: [...contactOwnerFields, 'type'],   // field → scope keys
   },
 };
 ```
+
+Lives in `packages/db/src/registries/` alongside the encryption and false-polymorphism registries so it can be composed into other db-level registries (notably `HOOK_IGNORE_FIELDS` — see [Ignored Fields](#ignored-fields)). The hook implementations and SQL primitives still live in `apps/api/src/hooks/orderedList/` and `apps/api/src/lib/prisma/orderedList.ts`.
 
 The key is the Prisma model name. The value maps each ordered field to its scope: an array of column names that partition rows into independent lists. For Contact, every `(userId|orgId|spaceId, type)` combination is its own list — `position` resets to 1 for each scope.
 
@@ -497,6 +506,10 @@ Soft-deleted items keep a row but get a distinct **negative** position outside t
 ### Bulk-friendly by construction
 
 Every bulk hook is O(scopes), not O(rows). Importing a 1000-row CSV of Contacts triggers two queries per (owner, type) scope regardless of batch size. Same for bulk soft-delete, bulk restore, and `deleteMany`.
+
+### Cache invalidation
+
+Cascade shifts run as raw SQL (`UPDATE … RETURNING *`), which bypasses the mutation lifecycle extension entirely — so the `cache` hook never fires for them. And because `position` is in `HOOK_IGNORE_FIELDS` (auto-composed from this registry), the cache hook also skips ordering-only updates of the originating row as no-ops. To cover both paths, every cascade helper returns the affected rows; the `orderedList` hook queues per-row cache invalidation on commit using the same `fetchCacheKeys` + `clearKey` primitives the cache hook uses. Audit and webhooks naturally no-op on ordering-only diffs via the shared ignore registry.
 
 ### Scope strictness
 
