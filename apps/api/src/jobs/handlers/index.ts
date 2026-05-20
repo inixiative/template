@@ -1,5 +1,4 @@
-import { cleanStaleAuditLogs } from '#/jobs/handlers/cleanStaleAuditLogs';
-import { cleanStaleWebhooks } from '#/jobs/handlers/cleanStaleWebhooks';
+import { type CleanStaleDataPayload, cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import { type RecordAppEventPayload, recordAppEvent } from '#/jobs/handlers/recordAppEvent';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
 import { type SendEmailPayload, sendEmail } from '#/jobs/handlers/sendEmail';
@@ -11,8 +10,7 @@ export const JobHandlerName = {
   sendEmail: 'sendEmail',
   sendWebhook: 'sendWebhook',
   rotateEncryptionKeys: 'rotateEncryptionKeys',
-  cleanStaleWebhooks: 'cleanStaleWebhooks',
-  cleanStaleAuditLogs: 'cleanStaleAuditLogs',
+  cleanStaleData: 'cleanStaleData',
 } as const;
 
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
@@ -22,8 +20,7 @@ export type JobPayloads = {
   sendEmail: SendEmailPayload;
   sendWebhook: SendWebhookPayload;
   rotateEncryptionKeys: undefined;
-  cleanStaleWebhooks: undefined;
-  cleanStaleAuditLogs: undefined;
+  cleanStaleData: CleanStaleDataPayload;
 };
 
 export type JobHandlers = {
@@ -35,8 +32,7 @@ export const jobHandlers: JobHandlers = {
   sendEmail,
   sendWebhook,
   rotateEncryptionKeys,
-  cleanStaleWebhooks,
-  cleanStaleAuditLogs,
+  cleanStaleData,
 };
 
 export const isValidHandlerName = (name: string): name is JobHandlerName => name in jobHandlers;

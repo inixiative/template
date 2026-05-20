@@ -1,5 +1,6 @@
 import type { SeedFile } from '../seed';
 import { accountSeeds } from './account.seed';
+import { cronJobSeeds } from './cronJob.seed';
 import { emailComponentSeeds } from './emailComponent.seed';
 import { emailTemplateSeeds } from './emailTemplate.seed';
 import { organizationSeeds } from './organization.seed';
@@ -20,6 +21,7 @@ const seeds: SeedFile[] = [
   tokenSeeds, // 7. Tokens (depends on users, orgs, spaces)
   emailComponentSeeds, // 8. Email components (no dependencies)
   emailTemplateSeeds, // 9. Email templates (references components by slug, not FK)
+  cronJobSeeds, // 10. Cron jobs (registerCronJobs reads from DB on startup)
 ];
 
 export { seeds };

@@ -1,6 +1,7 @@
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
+import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
@@ -12,6 +13,7 @@ export const registerHooks = () => {
   registerAuditLogHook();
   registerClearCacheHook();
   registerContactRulesHook();
+  registerCronJobSyncHook();
   registerImmutableFieldsHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
