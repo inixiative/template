@@ -231,6 +231,7 @@ Read docs based on task type:
 - Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`
 - Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
 - Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
+- Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
 - App events/email/notifications: `docs/claude/APP_EVENTS.md`
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
