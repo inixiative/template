@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency } from '@template/shared/utils/concurrency';
@@ -80,9 +79,7 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
       const { prime, ...data } = record;
       const id = data.id as string;
 
-      const updateData = seedFile.createOnly
-        ? {}
-        : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
+      const updateData = seedFile.createOnly ? {} : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
 
       await delegate.upsert({ where: { id }, create: data, update: updateData });
       log.success(`  - Upserted: ${id}`, LogScope.seed);

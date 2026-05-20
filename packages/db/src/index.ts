@@ -22,6 +22,8 @@ export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
+// Distributed lock
+export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities
 export {
   cache,

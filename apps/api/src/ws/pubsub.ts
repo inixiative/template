@@ -5,8 +5,8 @@
 //     once the message contract is stable.
 //   - Redis-unavailable fallback is duplicated with the redis-error fallback.
 
-import { LogScope, log } from '@template/shared/logger';
 import { getRedisPub, getRedisSub } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/connections';
 import type { AppEventPayload } from '#/ws/types';
 

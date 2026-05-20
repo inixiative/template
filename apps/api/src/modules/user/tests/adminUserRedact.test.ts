@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { ContactOwnerModel, ContactType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createOrganizationUser, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createOrganizationUser,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { adminUserRouter } from '#/modules/user';
 import { createTestApp } from '#tests/createTestApp';

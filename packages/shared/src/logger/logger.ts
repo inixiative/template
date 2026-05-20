@@ -1,127 +1,51 @@
+import { consolaAdapter } from '@template/shared/logger/consolaAdapter';
+import { pinoAdapter } from '@template/shared/logger/pinoAdapter';
 import { getLogBroadcasts, getLogScopes, LogScope } from '@template/shared/logger/scope';
+import type { LoggerAdapter, LogLevel } from '@template/shared/logger/types';
 import { isLocal, isTest } from '@template/shared/utils/env';
-import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
-type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
+const adapters: LoggerAdapter[] = [isLocal || isTest ? consolaAdapter : pinoAdapter];
 
-const getLogLevel = (): number => {
-  const level = process.env.LOG_LEVEL as LogLevel | undefined;
-  if (level && level in LogLevels) return LogLevels[level];
-  return LogLevels.info;
-};
-
-const baseConsola = createConsola({
-  level: getLogLevel(),
-  formatOptions: {
-    date: false,
-    colors: isLocal || isTest,
-    compact: true,
-    columns: 0,
-  },
-});
-
-// Reverse-lookup numeric consola level → string name. Lets us expose a string
-// `.level` for SDKs (Baileys' ILogger, pino-shaped consumers) while consola
-// internally keeps using numbers.
-const levelNumberToName: Record<number, string> = Object.fromEntries(
-  Object.entries(LogLevels)
-    .filter(([, v]) => typeof v === 'number')
-    .map(([k, v]) => [v as number, k]),
-);
-
-// Minimal logger contract SDKs expect when we hand them our log. Same shape
-// as Baileys' ILogger / pino's core API. Defined here so the logger package
-// doesn't depend on any SDK.
-type SdkLogger = {
-  level: string;
-  child(bindings?: unknown): SdkLogger;
-  trace(obj: unknown, msg?: string): void;
-  debug(obj: unknown, msg?: string): void;
-  info(obj: unknown, msg?: string): void;
-  warn(obj: unknown, msg?: string): void;
-  error(obj: unknown, msg?: string): void;
-  fatal(obj: unknown, msg?: string): void;
-};
-
-// Combined surface — our consola-backed methods (with scope/broadcast wiring)
-// AND the SDK contract. `level` is `string` (SDK shape wins over consola's
-// numeric type), backed at runtime by the proxy's getter.
-export type Logger = Omit<ConsolaInstance, 'level'> & SdkLogger;
-
-const timestamp = () => new Date().toISOString();
 const logScopeValues = new Set<string>(Object.values(LogScope));
-const logMethods = new Set(['fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']);
 
-const fireBroadcasts = (level: string, args: unknown[]) => {
-  const broadcasts = getLogBroadcasts();
-  if (broadcasts.length === 0) return;
-
-  const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  for (const fn of broadcasts) {
-    try {
-      fn(level, message);
-    } catch {
-      // Fire-and-forget — broadcast errors never affect the log call
-    }
-  }
+const formatArg = (a: unknown): string => {
+  if (a === null || a === undefined) return String(a);
+  if (typeof a === 'string') return a;
+  if (a instanceof Error) return a.stack ?? a.message;
+  return JSON.stringify(a);
 };
 
-const proxy = new Proxy(baseConsola, {
-  get(target, prop) {
-    if (prop === 'child') {
-      return () => {
-        throw new Error('log.child() not supported — use logScope(id, fn) for ALS-bound scoping');
-      };
-    }
+const compose = (rawArgs: unknown[]): string => {
+  const time = new Date().toISOString();
+  const lastArg = rawArgs[rawArgs.length - 1];
+  const hasManualScope = typeof lastArg === 'string' && logScopeValues.has(lastArg);
+  const args = hasManualScope ? rawArgs.slice(0, -1) : rawArgs;
+  const scopes = hasManualScope ? [...getLogScopes(), lastArg as string] : getLogScopes();
+  const scopeStr = scopes.length ? ` ${scopes.map((s) => `[${s}]`).join(' ')}` : '';
+  return `[${time}]${scopeStr} ${args.map(formatArg).join(' ')}`;
+};
 
-    // SDKs expect `.level` as a string; consola stores it as a number.
-    if (prop === 'level') return levelNumberToName[target.level] ?? 'info';
+const fireBroadcasts = (level: LogLevel, msg: string) => {
+  for (const fn of getLogBroadcasts()) fn(level, msg);
+};
 
-    const value = Reflect.get(target, prop);
+const emit = (level: LogLevel, args: unknown[]) => {
+  const msg = compose(args);
+  for (const a of adapters) a[level](msg);
+  fireBroadcasts(level, msg);
+};
 
-    // Wrap logging methods to check for LogScope as last arg
-    if (typeof value === 'function') {
-      return (...args: unknown[]) => {
-        const lastArg = args[args.length - 1];
-        const hasManualScope = typeof lastArg === 'string' && logScopeValues.has(lastArg);
-        const level = typeof prop === 'string' ? prop : '';
-        const isBroadcastable = logMethods.has(level);
-
-        const time = timestamp();
-        const logger = target;
-
-        if (hasManualScope) {
-          // Prepend both timestamp and scope to message
-          const scope = lastArg as string;
-          const msgArgs = args.slice(0, -1);
-          if (isBroadcastable) fireBroadcasts(level, [`[${time}] [${scope}]`, ...msgArgs]);
-          return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(
-            `[${time}] [${scope}]`,
-            ...msgArgs,
-          );
-        }
-
-        // Prepend timestamp and automatic scopes to message
-        const scopes = getLogScopes();
-        if (scopes.length > 0) {
-          const scopeStr = scopes.map((s) => `[${s}]`).join(' ');
-          if (isBroadcastable) fireBroadcasts(level, [`[${time}] ${scopeStr}`, ...args]);
-          return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(
-            `[${time}] ${scopeStr}`,
-            ...args,
-          );
-        }
-
-        if (isBroadcastable) fireBroadcasts(level, [`[${time}]`, ...args]);
-        return (logger[prop as keyof ConsolaInstance] as (...args: unknown[]) => unknown)(`[${time}]`, ...args);
-      };
-    }
-
-    return value;
+export const log: LoggerAdapter = {
+  level: process.env.LOG_LEVEL ?? 'info',
+  info: (...args) => emit('info', args),
+  warn: (...args) => emit('warn', args),
+  error: (...args) => emit('error', args),
+  debug: (...args) => emit('debug', args),
+  fatal: (...args) => emit('fatal', args),
+  trace: (...args) => emit('trace', args),
+  success: (...args) => emit('success', args),
+  box: (...args) => emit('box', args),
+  child: () => {
+    throw new Error('log.child() not supported — use logScope(id, fn) for ALS-bound scoping');
   },
-});
-
-// The proxy's runtime adds `child` + reshapes `level` to string. tsc can't
-// see through the Proxy intercept, so we annotate the export with the type
-// the runtime actually produces.
-export const log: Logger = proxy as never;
+};

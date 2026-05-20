@@ -1,6 +1,6 @@
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
-import type { NavigationSlice } from '@template/ui/store/types/navigation';
 import type { AppStore } from '@template/ui/store/types';
+import type { NavigationSlice } from '@template/ui/store/types/navigation';
 import type { StateCreator } from 'zustand';
 
 type Policy = 'context' | 'spoof' | 'all';

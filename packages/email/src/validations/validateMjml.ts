@@ -1,4 +1,3 @@
-
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 import mjml2html from 'mjml';
 

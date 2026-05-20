@@ -1,8 +1,5 @@
 import { useLocation } from '@tanstack/react-router';
-import {
-  applyAuthorizedContext,
-  hasContextChanged,
-} from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
+import { applyAuthorizedContext, hasContextChanged } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
 import {
   parseRoutingSearchParams,
   syncStoreFromSearchParams,

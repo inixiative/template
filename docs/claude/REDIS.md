@@ -97,6 +97,7 @@ const key = `cache:User:${id}`;  // Don't do this
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
+| `lock` | `lock:*` | Distributed locks via `createLock` |
 
 ---
 

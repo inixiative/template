@@ -6,6 +6,7 @@ export const redisNamespace = {
   otp: 'otp',
   session: 'session',
   limit: 'limit',
+  lock: 'lock',
   // flag: 'flag',
 } as const;
 

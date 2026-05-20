@@ -29,7 +29,11 @@ export const createEncryption = (keyring: EncryptionKeyring) => {
 
   const decrypt = (encrypted: EncryptedFieldData, aad: string): unknown => {
     const key = encrypted.version === keyring.currentVersion ? keyring.currentKey : keyring.previousKey;
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(key!, 'base64'), Buffer.from(encrypted.iv, 'base64'));
+    const decipher = crypto.createDecipheriv(
+      ALGORITHM,
+      Buffer.from(key!, 'base64'),
+      Buffer.from(encrypted.iv, 'base64'),
+    );
     decipher.setAAD(Buffer.from(aad, 'utf8'));
     decipher.setAuthTag(Buffer.from(encrypted.authTag, 'base64'));
     const plaintext = Buffer.concat([

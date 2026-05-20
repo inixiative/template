@@ -1,4 +1,3 @@
-
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { mapRefs } from '@template/email/render/extractRefs';

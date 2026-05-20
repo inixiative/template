@@ -186,15 +186,11 @@ class VercelApi {
     trackedBranch: string,
   ): Promise<string> {
     return this.vcr.capture('createCustomEnvironment', async () => {
-      const result = await this.vercelAPI(
-        `/v9/projects/${projectId}/custom-environments?teamId=${teamId}`,
-        'POST',
-        {
-          slug: environmentName.toLowerCase(),
-          description: `${environmentName} environment`,
-          branchMatcher: { type: 'equals', pattern: trackedBranch },
-        },
-      );
+      const result = await this.vercelAPI(`/v9/projects/${projectId}/custom-environments?teamId=${teamId}`, 'POST', {
+        slug: environmentName.toLowerCase(),
+        description: `${environmentName} environment`,
+        branchMatcher: { type: 'equals', pattern: trackedBranch },
+      });
       if (result.error) {
         const err = result.error as Record<string, unknown>;
         const msg = err.message ?? err.code ?? JSON.stringify(result.error);

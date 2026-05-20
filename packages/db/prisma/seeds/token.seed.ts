@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import type { Token } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
-
 // Helper to generate keyHash and keyPrefix from raw token
 const generateTokenFields = (rawToken: string) => {
   const keyHash = createHash('sha256').update(rawToken).digest('hex');

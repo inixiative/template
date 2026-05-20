@@ -113,7 +113,14 @@ export class VCR {
 
     try {
       const raw = await realFn();
-      return this.__saveFixture<T>(fixturePath, method, this.__sanitize(method, raw.body) as T, current, raw.status, raw.headers);
+      return this.__saveFixture<T>(
+        fixturePath,
+        method,
+        this.__sanitize(method, raw.body) as T,
+        current,
+        raw.status,
+        raw.headers,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.__save(fixturePath, { version: current, status: 500, body: message });

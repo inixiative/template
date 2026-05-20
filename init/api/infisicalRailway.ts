@@ -95,7 +95,9 @@ class InfisicalRailwayApi {
       if (!response.ok) {
         const errorText = await response.text();
         if (errorText.includes('already exists')) {
-          const existing = (await this.listRailwayConnections(infisicalProjectId)).find((c) => c.name === connectionName);
+          const existing = (await this.listRailwayConnections(infisicalProjectId)).find(
+            (c) => c.name === connectionName,
+          );
           if (existing) return existing.id;
         }
         throw new Error(`Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`);
@@ -132,7 +134,9 @@ class InfisicalRailwayApi {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create Railway sync "${input.syncName}": ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to create Railway sync "${input.syncName}": ${response.statusText}\n${await response.text()}`,
+        );
       }
     });
   }

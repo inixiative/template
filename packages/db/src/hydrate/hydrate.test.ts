@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import { hydrate } from '@template/db/hydrate/hydrate';
 import {
@@ -21,7 +22,10 @@ describe('hydrate', () => {
   });
 
   it('hydrates single relation', async () => {
-    const { entity: token, context } = await createToken({ organizationUser: {} });
+    const { entity: token, context } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
 
     const result = await hydrate(db, 'token', {
       id: token.id,
@@ -36,7 +40,10 @@ describe('hydrate', () => {
   });
 
   it('hydrates nested relations - token -> orgUser -> org', async () => {
-    const { entity: token, context } = await createToken({ organizationUser: {} });
+    const { entity: token, context } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
 
     const result = await hydrate(db, 'token', {
       id: token.id,
@@ -52,7 +59,10 @@ describe('hydrate', () => {
   });
 
   it('deduplicates fetches for same record', async () => {
-    const { entity: token } = await createToken({ organizationUser: {} });
+    const { entity: token } = await createToken({
+      organizationUser: {},
+      ownerModel: TokenOwnerModel.OrganizationUser,
+    });
 
     const pending = new Map();
     await hydrate(

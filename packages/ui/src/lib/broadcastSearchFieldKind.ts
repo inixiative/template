@@ -1,4 +1,3 @@
-
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 type FieldDef = { kind: 'scalar' | 'enum' | 'object'; type: string };

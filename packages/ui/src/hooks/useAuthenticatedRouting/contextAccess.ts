@@ -12,7 +12,10 @@ export const hasContextChanged = (context: TenantContext, nextContext: TenantCon
 export const applyAuthorizedContext = ({
   tenant,
   context,
-}: { tenant: AppStore['tenant']; context: TenantContext }): void => {
+}: {
+  tenant: AppStore['tenant'];
+  context: TenantContext;
+}): void => {
   if (context.type === 'organization' && context.organization) {
     tenant.setOrganization(context.organization.id);
     return;

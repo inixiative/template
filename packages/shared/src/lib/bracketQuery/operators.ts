@@ -1,4 +1,3 @@
-
 export const RELATION_OPERATORS = ['some', 'every', 'none', 'is', 'isNot'] as const;
 
 export const ARRAY_FIELD_OPERATORS = ['in', 'notIn'] as const;

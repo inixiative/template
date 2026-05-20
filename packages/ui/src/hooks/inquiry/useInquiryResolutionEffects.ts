@@ -1,3 +1,4 @@
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import {
   meReadManyOrganizationsQueryKey,
   organizationReadManySpacesQueryKey,
@@ -5,7 +6,6 @@ import {
 } from '@template/sdk';
 import type { InquiryMeta, InquiryType } from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 
 type EffectContext = {
   refreshMe: () => Promise<void>;

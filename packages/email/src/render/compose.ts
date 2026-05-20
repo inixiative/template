@@ -1,4 +1,3 @@
-
 import type { CommunicationCategory } from '@template/db';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';

@@ -1,4 +1,3 @@
-
 export type MjmlIssue = {
   line: number;
   message: string;

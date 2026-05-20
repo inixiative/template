@@ -74,10 +74,7 @@ export const decryptField = async <M extends ModelName, K extends KeyName<M>>(
   const version = record[fields.versionField] as number;
   const metadata = record[fields.metadataField] as { iv: string; authTag: string };
 
-  return decrypt(
-    { ciphertext, version, iv: metadata.iv, authTag: metadata.authTag },
-    aad,
-  );
+  return decrypt({ ciphertext, version, iv: metadata.iv, authTag: metadata.authTag }, aad);
 };
 
 export type DecryptFieldInput<

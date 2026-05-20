@@ -1,4 +1,3 @@
-
 import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db/generated/client/client';
 import type { SaveContext } from '@template/email/render/types';
 

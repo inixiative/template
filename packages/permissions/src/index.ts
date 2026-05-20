@@ -1,4 +1,3 @@
-
 export { Role } from '@template/db/generated/client/enums';
 // Client
 export {

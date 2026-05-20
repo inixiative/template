@@ -39,7 +39,10 @@ const handleApiError = (error: unknown, getStore: () => AppStore) => {
   if (handler) handler();
   else
     toast.error(message, {
-      action: { label: 'Contact Support', onClick: () => getStore().navigation.navigatePreserving('/support', 'context') },
+      action: {
+        label: 'Contact Support',
+        onClick: () => getStore().navigation.navigatePreserving('/support', 'context'),
+      },
     });
 };
 
