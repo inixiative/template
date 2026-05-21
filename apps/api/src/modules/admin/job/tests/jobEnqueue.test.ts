@@ -31,22 +31,22 @@ describe('admin/job', () => {
     it('enqueues a job with valid handler', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleWebhooks',
-          payload: {},
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
         }),
       );
       const { data } = await json<JobEnqueueResponse>(response);
 
       expect(response.status).toBe(201);
-      expect(data.name).toBe('cleanStaleWebhooks');
+      expect(data.name).toBe('cleanStaleData');
       expect(data.enqueuedAt).toBeDefined();
     });
 
     it('enqueues a job with options', async () => {
       const response = await fetch(
         post('/api/admin/job', {
-          handler: 'cleanStaleWebhooks',
-          payload: {},
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
           options: {
             priority: 5,
             delay: 1000,
@@ -57,7 +57,7 @@ describe('admin/job', () => {
       const { data } = await json<JobEnqueueResponse>(response);
 
       expect(response.status).toBe(201);
-      expect(data.name).toBe('cleanStaleWebhooks');
+      expect(data.name).toBe('cleanStaleData');
     });
 
     it('rejects invalid handler name', async () => {

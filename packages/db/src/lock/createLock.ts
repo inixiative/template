@@ -90,8 +90,12 @@ export const createLock = (opts: LockOptions): Lock => {
   };
 
   const release = async (): Promise<void> => {
+    if (declared) {
+      stopHeartbeat();
+      return;
+    }
+    declared = true;
     stopHeartbeat();
-    if (declared) return;
     await compareAndDelete();
   };
 
