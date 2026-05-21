@@ -100,7 +100,11 @@ export const paginate = async <
     : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
-  const where = { ...baseWhere, ...searchWhere } as FindManyWhere<T>;
+  // Wrap both in AND so caller-supplied AND/OR clauses aren't overwritten by
+  // search's AND. Prisma flattens nested AND, so `{ AND: [a, b] }` is exactly
+  // `a` and `b` both holding — no semantic change vs the old spread when
+  // neither side had AND/OR keys.
+  const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
 
   const parsedOrderBy: Record<string, Prisma.SortOrder>[] = rawOrderBy
     ? (parseOrderBy(rawOrderBy) as Record<string, Prisma.SortOrder>[])
