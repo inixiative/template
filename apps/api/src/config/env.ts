@@ -24,7 +24,7 @@ const baseEnvSchema = z
 
     // URLs
     API_URL: z.string(),
-    WEB_URL: z.string(),
+    WEB_URL: z.string().optional(),
     ADMIN_URL: z.string().optional(),
     SUPERADMIN_URL: z.string().optional(),
 
