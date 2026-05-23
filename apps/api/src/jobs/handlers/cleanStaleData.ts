@@ -1,6 +1,6 @@
 import { type ModelName, toAccessor } from '@template/db';
 import { log } from '@template/shared/logger';
-import { archiveStaleRecords, type ArchiveConfig } from '#/jobs/handlers/archiveStaleRecords';
+import { type ArchiveConfig, archiveStaleRecords } from '#/jobs/handlers/archiveStaleRecords';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler, WorkerContext } from '#/jobs/types';
 

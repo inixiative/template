@@ -22,7 +22,10 @@ export const createSerializedQueue = (): SerializedQueue => {
       // Run fn whether tail succeeded or failed — the chain doesn't poison.
       // tail keeps the rejection state; the next call's onReject branch
       // consumes it, or Node's unhandledRejection surfaces if no one handles.
-      const next = tail.then(() => fn(), () => fn());
+      const next = tail.then(
+        () => fn(),
+        () => fn(),
+      );
       tail = next;
       return next;
     },
