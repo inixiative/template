@@ -390,6 +390,19 @@ router.patch('/:id',
 );
 ```
 
+#### Resource Lookup Runs Before Authorization
+
+`resourceContextMiddleware` throws **404** (not found) or **409** (multiple matches)
+*before* `validatePermission` runs. This is intentional. An unauthenticated or
+unauthorized caller probing a URL cannot distinguish "this resource doesn't exist"
+from "this resource exists but you can't see it" — both surface as 404.
+
+The template treats resource existence as non-secret (IDs frequently appear in
+share links, emails, audit logs, and references from peers). Privacy is enforced
+on **field visibility and queries**, not on the discoverability of a resource ID.
+If a future resource type genuinely needs to hide its existence from non-members,
+write a custom middleware that returns 404 when the permission check fails.
+
 ---
 
 ## Entitlements

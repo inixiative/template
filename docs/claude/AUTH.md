@@ -548,10 +548,14 @@ Order matters. Applied in `apps/api/src/routes/api.ts`:
 ```typescript
 apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);      // 1. Initialize context
-apiRouter.use('*', authMiddleware);      // 2. Check session auth
-apiRouter.use('*', spoofMiddleware);     // 3. Allow superadmin spoofing
-apiRouter.use('*', tokenAuthMiddleware); // 4. Check token auth (if no session)
+apiRouter.use('*', tokenAuthMiddleware); // 2. Check token auth (Authorization header wins)
+apiRouter.use('*', authMiddleware);      // 3. Check session auth (fallback to cookie)
+apiRouter.use('*', spoofMiddleware);     // 4. Allow superadmin spoofing (after user is resolved)
 ```
+
+Token auth runs first so an `Authorization: Bearer <key>` header always wins
+over a session cookie when both are present (typical SDK xhr from a browser).
+Spoof runs last so a superadmin can spoof via either auth path.
 
 ##### Flow
 
@@ -561,17 +565,18 @@ Request
 prepareRequest
   - user: null, token: null, permix: empty
   ↓
+tokenAuthMiddleware
+  - If valid Bearer/URL token matches a Token row → set token, setUserContext()
+  - Otherwise pass through unchanged
+  ↓
 authMiddleware
-  - If valid session → setUserContext() → user: User, permix: configured
+  - If already has user (token won) → skip
+  - If valid better-auth session → setUserContext()
   - If no session → pass through unchanged
   ↓
 spoofMiddleware
   - If superadmin + spoof header → replace user context
   - Sets spoofedBy to original admin
-  ↓
-tokenAuthMiddleware
-  - If already has user → skip (session/spoof takes precedence)
-  - If valid Bearer token → set token, maybe setUserContext()
 ```
 
 ---

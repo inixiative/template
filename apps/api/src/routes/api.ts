@@ -35,9 +35,12 @@ apiRouter.route('/internal', internalRouter);
 // Auth routes (better-auth handles its own auth, returns early)
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
+// Token first so an Authorization header always wins over a session cookie when
+// both are present (e.g. SDK xhr from a browser). Spoof runs last so it applies
+// regardless of which auth path resolved the user.
+apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
-apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', auditActorMiddleware);
 
 // Admin Routes (superadmin only - see routes/admin.ts)
