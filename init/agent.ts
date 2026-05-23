@@ -1,9 +1,14 @@
 #!/usr/bin/env bun
 
-/**
- * Agent-accessible init script
- * Non-interactive version for programmatic project initialization
- */
+// Headless init agent. Runs whole sections of the setup flow without the TUI.
+//
+//   bun run init:agent                          # runs every section in order
+//   bun run init:agent -- --section=infisical   # runs only that section
+//
+// Each section validates its own env vars, so a `--section=infisical` invocation
+// doesn't demand `PLANETSCALE_*` / `RAILWAY_*` to be set. Sections downstream of
+// Infisical (planetscale, railway) read the prior projectId from the persisted
+// config file, so they can run standalone after a one-time full init.
 
 import { setupInfisical } from './tasks/infisicalSetup';
 import { setupPlanetScale } from './tasks/planetscaleSetup';
@@ -13,222 +18,120 @@ import { updateConfigField } from './utils/configHelpers';
 import { getProjectConfig } from './utils/getProjectConfig';
 import { isComplete, markComplete } from './utils/progressTracking';
 
-export type InitConfig = {
-  // Project details
-  projectName: string;
-  organizationName: string;
+const SECTIONS = ['project', 'infisical', 'planetscale', 'railway'] as const;
+type Section = (typeof SECTIONS)[number];
 
-  // Infisical
-  infisicalOrgId: string;
-
-  // PlanetScale
-  planetscaleOrg: string;
-  planetscaleRegion: string;
-  planetscaleTokenId?: string;
-  planetscaleToken?: string;
-
-  // Railway
-  railwayWorkspaceId: string;
-  railwayApiToken?: string;
-
-  // Optional: Callback for progress updates
-  onProgress?: (step: string, message: string) => void;
+const parseSection = (): Section | null => {
+  const arg = process.argv.find((a) => a.startsWith('--section='));
+  if (!arg) return null;
+  const value = arg.slice('--section='.length);
+  if (!(SECTIONS as readonly string[]).includes(value)) {
+    console.error(`Unknown section "${value}". Valid: ${SECTIONS.join(', ')}`);
+    process.exit(1);
+  }
+  return value as Section;
 };
 
-export type InitResult = {
-  success: boolean;
-  message: string;
-  details?: {
-    infisical?: {
-      projectId: string;
-      organizationId: string;
-    };
-    planetscale?: {
-      database: string;
-      organization: string;
-    };
-    railway?: {
-      projectId: string;
-      apiServiceId: string;
-      workerServiceId: string;
-      redisServiceId: string;
-    };
-  };
-  error?: string;
+const requireEnv = (key: string): string => {
+  const value = process.env[key];
+  if (!value) {
+    console.error(`Missing required env: ${key}`);
+    process.exit(1);
+  }
+  return value;
 };
 
-/**
- * Initialize project infrastructure programmatically
- * This is the main entry point for agents and automation
- */
-export async function initializeProject(config: InitConfig): Promise<InitResult> {
-  try {
-    const { onProgress } = config;
+const log = (step: string, message: string) => console.log(`[${step}] ${message}`);
 
-    // Step 1: Project Configuration
-    onProgress?.('project-config', 'Configuring project name and organization');
+const runProject = async (): Promise<void> => {
+  const projectName = requireEnv('PROJECT_NAME');
+  const organizationName = requireEnv('ORGANIZATION_NAME');
+  log('project', 'Configuring project name and organization');
 
-    const projectConfig = await getProjectConfig();
+  const projectConfig = await getProjectConfig();
+  // Persist name + org before rename so downstream steps read correct values.
+  await updateProjectConfig({ name: projectName, organization: organizationName });
 
-    // Persist name + org to config before rename so downstream steps read correct values
-    await updateProjectConfig({ name: config.projectName, organization: config.organizationName });
-
-    // Rename project files if needed
-    if (!(await isComplete('project', 'cleanInstall'))) {
-      await renameProject(projectConfig.project.name, config.projectName);
-    }
-
-    // Mark org step complete
-    if (!(await isComplete('project', 'renameOrg'))) {
-      await markComplete('project', 'renameOrg');
-    }
-
-    // Agent mode provisions remote services only. It does not run `bun run setup`,
-    // so the local shell setup flag must remain owned by the interactive flow.
-
-    // Step 2: Infisical Setup
-    onProgress?.('infisical', 'Setting up Infisical secrets management');
-
-    const infisicalResult = await setupInfisical(config.infisicalOrgId, async () => {
-      onProgress?.('infisical', 'Infisical setup progress...');
-    });
-
-    // Step 3: PlanetScale Setup
-    onProgress?.('planetscale', 'Setting up PlanetScale database');
-
-    // Store PlanetScale tokens if provided
-    if (config.planetscaleTokenId && config.planetscaleToken) {
-      const { setSecretAsync } = await import('./tasks/infisicalSetup');
-      await setSecretAsync(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN_ID', config.planetscaleTokenId);
-      await setSecretAsync(infisicalResult.projectId, 'root', 'PLANETSCALE_TOKEN', config.planetscaleToken);
-
-      // Mark token/bootstrap storage steps as complete
-      await updateConfigField('planetscale', 'tokenId', config.planetscaleTokenId);
-      await markComplete('planetscale', 'recordTokenId');
-      await markComplete('planetscale', 'storeOrganizationSecret');
-      await markComplete('planetscale', 'storeRegionSecret');
-      await markComplete('planetscale', 'storeTokenIdSecret');
-      await markComplete('planetscale', 'storeTokenSecret');
-
-      // Store region
-      await updateConfigField('planetscale', 'region', config.planetscaleRegion);
-      await markComplete('planetscale', 'selectRegion');
-    }
-
-    const planetscaleResult = await setupPlanetScale(config.planetscaleOrg, async () => {
-      onProgress?.('planetscale', 'PlanetScale setup progress...');
-    });
-
-    // Step 4: Railway Setup
-    onProgress?.('railway', 'Setting up Railway hosting');
-
-    // Store Railway token if provided
-    if (config.railwayApiToken) {
-      const { setSecretAsync } = await import('./tasks/infisicalSetup');
-      await setSecretAsync(infisicalResult.projectId, 'root', 'RAILWAY_API_TOKEN', config.railwayApiToken);
-    }
-
-    const railwayResult = await setupRailway(config.railwayWorkspaceId, async () => {
-      onProgress?.('railway', 'Railway setup progress...');
-    });
-
-    // Success!
-    onProgress?.('complete', 'Project initialization complete');
-
-    return {
-      success: true,
-      message: 'Project initialized successfully',
-      details: {
-        infisical: {
-          projectId: infisicalResult.projectId,
-          organizationId: infisicalResult.organizationId,
-        },
-        planetscale: {
-          database: planetscaleResult.databaseName,
-          organization: config.planetscaleOrg,
-        },
-        railway: {
-          projectId: railwayResult.projectId,
-          apiServiceId: railwayResult.prodApiServiceId,
-          workerServiceId: railwayResult.prodWorkerServiceId,
-          redisServiceId: railwayResult.prodRedisServiceId,
-        },
-      },
-    };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    return {
-      success: false,
-      message: 'Project initialization failed',
-      error: errorMsg,
-    };
+  if (!(await isComplete('project', 'cleanInstall'))) {
+    await renameProject(projectConfig.project.name, projectName);
   }
-}
+  if (!(await isComplete('project', 'renameOrg'))) {
+    await markComplete('project', 'renameOrg');
+  }
+  // Agent mode provisions remote services only — it does not run `bun run setup`,
+  // so the local shell setup flag stays owned by the interactive flow.
+};
 
-/**
- * Initialize from environment variables
- * Useful for CI/CD and automated setups
- */
-export async function initializeFromEnv(): Promise<InitResult> {
-  const config: InitConfig = {
-    projectName: process.env.PROJECT_NAME || '',
-    organizationName: process.env.ORGANIZATION_NAME || '',
-    infisicalOrgId: process.env.INFISICAL_ORG_ID || '',
-    planetscaleOrg: process.env.PLANETSCALE_ORG || '',
-    planetscaleRegion: process.env.PLANETSCALE_REGION || '',
-    planetscaleTokenId: process.env.PLANETSCALE_TOKEN_ID,
-    planetscaleToken: process.env.PLANETSCALE_TOKEN,
-    railwayWorkspaceId: process.env.RAILWAY_WORKSPACE_ID || '',
-    railwayApiToken: process.env.RAILWAY_API_TOKEN,
-    onProgress: (step, message) => {
-      console.log(`[${step}] ${message}`);
-    },
-  };
+const runInfisical = async (): Promise<void> => {
+  const orgId = requireEnv('INFISICAL_ORG_ID');
+  log('infisical', 'Setting up Infisical secrets management');
+  const result = await setupInfisical(orgId, async () => log('infisical', 'step complete'));
+  log('infisical', `projectId=${result.projectId} organizationId=${result.organizationId}`);
+};
 
-  // Validate required fields
-  const required = [
-    'projectName',
-    'organizationName',
-    'infisicalOrgId',
-    'planetscaleOrg',
-    'planetscaleRegion',
-    'railwayWorkspaceId',
-  ] as const;
+const runPlanetscale = async (): Promise<void> => {
+  const org = requireEnv('PLANETSCALE_ORG');
+  const region = requireEnv('PLANETSCALE_REGION');
+  const tokenId = process.env.PLANETSCALE_TOKEN_ID;
+  const token = process.env.PLANETSCALE_TOKEN;
 
-  const missing = required.filter((field) => !config[field]);
-  if (missing.length > 0) {
-    return {
-      success: false,
-      message: `Missing required environment variables: ${missing.map((f) => f.toUpperCase()).join(', ')}`,
-    };
+  log('planetscale', 'Setting up PlanetScale database');
+
+  // Token bootstrap is optional — when supplied, push it into Infisical + mark
+  // the corresponding planetscale progress flags so the setup function skips
+  // the manual-prompt steps.
+  if (tokenId && token) {
+    const config = await getProjectConfig();
+    if (!config.infisical.projectId) {
+      throw new Error('Infisical projectId missing from config — run --section=infisical first.');
+    }
+    const { setSecretAsync } = await import('./tasks/infisicalSetup');
+    await setSecretAsync(config.infisical.projectId, 'root', 'PLANETSCALE_TOKEN_ID', tokenId);
+    await setSecretAsync(config.infisical.projectId, 'root', 'PLANETSCALE_TOKEN', token);
+    await updateConfigField('planetscale', 'tokenId', tokenId);
+    await markComplete('planetscale', 'recordTokenId');
+    await markComplete('planetscale', 'storeOrganizationSecret');
+    await markComplete('planetscale', 'storeRegionSecret');
+    await markComplete('planetscale', 'storeTokenIdSecret');
+    await markComplete('planetscale', 'storeTokenSecret');
+    await updateConfigField('planetscale', 'region', region);
+    await markComplete('planetscale', 'selectRegion');
   }
 
-  return initializeProject(config);
-}
+  const result = await setupPlanetScale(org, async () => log('planetscale', 'step complete'));
+  log('planetscale', `database=${result.databaseName}`);
+};
 
-// If run directly, use environment variables
+const runRailway = async (): Promise<void> => {
+  const workspaceId = requireEnv('RAILWAY_WORKSPACE_ID');
+  const apiToken = process.env.RAILWAY_API_TOKEN;
+
+  log('railway', 'Setting up Railway hosting');
+
+  if (apiToken) {
+    const config = await getProjectConfig();
+    if (!config.infisical.projectId) {
+      throw new Error('Infisical projectId missing from config — run --section=infisical first.');
+    }
+    const { setSecretAsync } = await import('./tasks/infisicalSetup');
+    await setSecretAsync(config.infisical.projectId, 'root', 'RAILWAY_API_TOKEN', apiToken);
+  }
+
+  const result = await setupRailway(workspaceId, async () => log('railway', 'step complete'));
+  log(
+    'railway',
+    `projectId=${result.projectId} prodApiServiceId=${result.prodApiServiceId} prodWorkerServiceId=${result.prodWorkerServiceId}`,
+  );
+};
+
 if (import.meta.main) {
-  console.log('🤖 Agent Init - Starting project initialization...\n');
+  const section = parseSection();
+  console.log(section ? `🤖 Agent init — section: ${section}\n` : '🤖 Agent init — full flow\n');
 
-  initializeFromEnv()
-    .then((result) => {
-      if (result.success) {
-        console.log('\n✅', result.message);
-        if (result.details) {
-          console.log('\nDetails:');
-          console.log(JSON.stringify(result.details, null, 2));
-        }
-        process.exit(0);
-      } else {
-        console.error('\n❌', result.message);
-        if (result.error) {
-          console.error('Error:', result.error);
-        }
-        process.exit(1);
-      }
-    })
-    .catch((error) => {
-      console.error('\n💥 Unexpected error:', error);
-      process.exit(1);
-    });
+  if (!section || section === 'project') await runProject();
+  if (!section || section === 'infisical') await runInfisical();
+  if (!section || section === 'planetscale') await runPlanetscale();
+  if (!section || section === 'railway') await runRailway();
+
+  console.log('\n✅ Done');
 }
