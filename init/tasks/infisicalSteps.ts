@@ -236,6 +236,18 @@ export const infisicalApiAuthSecretSteps = [
   { action: 'ensureStagingApiAuthSecret', environment: 'staging' },
 ] as const;
 
+export const infisicalWebhookSigningSteps = [
+  { action: 'ensureProdWebhookSigningKeys', environment: 'prod' },
+  { action: 'ensureStagingWebhookSigningKeys', environment: 'staging' },
+] as const;
+
+// One step per env; the per-prefix iteration over ENCRYPTED_MODELS happens
+// inside the setup loop so adding a new encrypted model picks up automatically.
+export const infisicalEncryptionKeySteps = [
+  { action: 'ensureProdEncryptionKeys', environment: 'prod' },
+  { action: 'ensureStagingEncryptionKeys', environment: 'staging' },
+] as const;
+
 const infisicalProgressGroups: readonly InfisicalProgressGroup[] = [
   {
     actions: ['selectOrg'],
@@ -292,6 +304,22 @@ const infisicalProgressGroups: readonly InfisicalProgressGroup[] = [
   {
     actions: ['ensureStagingApiAuthSecret'],
     getLabel: () => 'Staging API auth secret initialized',
+  },
+  {
+    actions: ['ensureProdWebhookSigningKeys'],
+    getLabel: () => 'Production webhook signing keypair initialized',
+  },
+  {
+    actions: ['ensureStagingWebhookSigningKeys'],
+    getLabel: () => 'Staging webhook signing keypair initialized',
+  },
+  {
+    actions: ['ensureProdEncryptionKeys'],
+    getLabel: () => 'Production encryption keys initialized',
+  },
+  {
+    actions: ['ensureStagingEncryptionKeys'],
+    getLabel: () => 'Staging encryption keys initialized',
   },
 ] as const;
 

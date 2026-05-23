@@ -87,6 +87,8 @@ describe('Infisical Resume Scenario', () => {
       'storeSuperadminAppNameSecret',
       'ensureProdApiAuthSecret',
       'ensureStagingApiAuthSecret',
+      'ensureProdWebhookSigningKeys',
+      'ensureStagingWebhookSigningKeys',
     ]);
 
     // renameEnv not complete → getProject (dev already renamed to root in recorded fixture)
@@ -97,6 +99,11 @@ describe('Infisical Resume Scenario', () => {
     infisicalApi.vcr.queue('setSecret', 'nodeEnv');
     infisicalApi.vcr.queue('setSecret', 'envProd');
     infisicalApi.vcr.queue('setSecret', 'envStaging');
+    // Encryption-keys step always iterates (no isComplete guard) so we can
+    // detect newly-added ENCRYPTED_MODELS prefixes. Template has 1 prefix
+    // (AUTH_PROVIDER_SECRETS) × 2 envs × 2 keys (VERSION, KEY_CURRENT) = 4
+    // getSecret probes; existing values short-circuit the writes.
+    for (let i = 0; i < 4; i++) infisicalApi.vcr.queue('getSecret', 'prodApiUrl');
   });
 
   afterEach(() => {
@@ -115,6 +122,9 @@ describe('Infisical Resume Scenario', () => {
     expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'createStagingAdminEnvImport');
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureProdApiAuthSecret');
     expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureStagingApiAuthSecret');
+    // Encryption-keys step re-runs and re-marks complete (idempotent) — existing keys detected, no writes.
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'ensureProdEncryptionKeys');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'ensureStagingEncryptionKeys');
 
     // All VCR cassettes consumed — no extra setSecret/getSecret calls happened
     expect(infisicalApi.vcr.isEmpty()).toBe(true);

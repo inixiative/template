@@ -1,4 +1,5 @@
-import { randomBytes } from 'crypto';
+import { generateKeyPairSync, randomBytes } from 'crypto';
+import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
 import { execAsync } from '../utils/exec';
@@ -7,9 +8,11 @@ import { clearError, clearProgress, isComplete, markComplete, setError } from '.
 import {
   infisicalApiAuthSecretSteps,
   infisicalAppNameSecretSteps,
+  infisicalEncryptionKeySteps,
   infisicalFolderSteps,
   infisicalIdentitySecretSteps,
   infisicalInheritanceSteps,
+  infisicalWebhookSigningSteps,
 } from './infisicalSteps';
 
 /**
@@ -213,6 +216,93 @@ export const setupInfisical = async (
       if (!hasValidSecret) {
         const secret = await generateSecretAsync();
         await setSecretAsync(projectId, step.environment, 'BETTER_AUTH_SECRET', secret, '/api');
+      }
+
+      await markComplete('infisical', step.action);
+      await onStepComplete?.();
+    }
+
+    // Step 7: Ensure webhook signing keypair (RSA-SHA256 per sendWebhook.ts)
+    for (const step of infisicalWebhookSigningSteps) {
+      if (!stagingEnabled && step.environment === 'staging') continue;
+      if (await isComplete('infisical', step.action)) continue;
+
+      let hasKeypair = false;
+      try {
+        const existing = await getSecretAsync('WEBHOOK_SIGNING_PRIVATE_KEY', {
+          projectId,
+          environment: step.environment,
+          path: '/api',
+        });
+        hasKeypair = Boolean(existing && existing.includes('PRIVATE KEY'));
+      } catch {
+        // Missing secret expected on first run.
+      }
+
+      if (!hasKeypair) {
+        const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+        const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+        const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
+        await setSecretAsync(projectId, step.environment, 'WEBHOOK_SIGNING_PRIVATE_KEY', privatePem, '/api');
+        await setSecretAsync(projectId, step.environment, 'WEBHOOK_SIGNING_PUBLIC_KEY', publicPem, '/api');
+      }
+
+      await markComplete('infisical', step.action);
+      await onStepComplete?.();
+    }
+
+    // Step 8: Ensure encryption keys for every ENCRYPTED_MODELS prefix.
+    // Adding a new encrypted model (template-side or downstream) is auto-handled.
+    //
+    // CREATE-ONLY: if either VERSION or KEY_CURRENT already exists for a prefix,
+    // we never overwrite — silently skip. Overwriting an encryption key orphans
+    // every existing encrypted row in the DB (decryption fails irrecoverably).
+    // Partial state (one set, the other missing) is treated as a hard error so
+    // someone notices instead of the script "fixing" it by generating a key
+    // that doesn't match the stored ciphertexts.
+    //
+    // Intentionally no outer `isComplete` short-circuit: ENCRYPTED_MODELS is
+    // dynamic, so a previously-complete run wouldn't notice a newly-added
+    // prefix. The per-prefix existence check keeps re-runs idempotent and the
+    // extra Infisical roundtrips are cheap.
+    for (const step of infisicalEncryptionKeySteps) {
+      if (!stagingEnabled && step.environment === 'staging') continue;
+
+      const prefixes = new Set<string>();
+      for (const modelConfig of Object.values(ENCRYPTED_MODELS)) {
+        for (const keyConfig of Object.values(modelConfig.keys)) prefixes.add(keyConfig.envPrefix);
+      }
+
+      const fetchOne = async (key: string): Promise<string | null> => {
+        try {
+          const value = await getSecretAsync(key, {
+            projectId,
+            environment: step.environment,
+            path: '/api',
+          });
+          return value && value.trim().length > 0 ? value : null;
+        } catch {
+          return null;
+        }
+      };
+
+      for (const prefix of prefixes) {
+        const versionKey = `${prefix}_ENCRYPTION_VERSION`;
+        const currentKey = `${prefix}_ENCRYPTION_KEY_CURRENT`;
+        const [existingVersion, existingCurrent] = await Promise.all([fetchOne(versionKey), fetchOne(currentKey)]);
+
+        if (existingVersion && existingCurrent) continue;
+        if (existingVersion || existingCurrent) {
+          throw new Error(
+            `Refusing to overwrite encryption keys for ${prefix} in ${step.environment}: ` +
+              `partial state detected (${existingVersion ? versionKey : currentKey} set, other missing). ` +
+              `Fix manually before re-running init.`,
+          );
+        }
+
+        const key = randomBytes(32).toString('base64');
+        await setSecretAsync(projectId, step.environment, versionKey, '1', '/api');
+        await setSecretAsync(projectId, step.environment, currentKey, key, '/api');
       }
 
       await markComplete('infisical', step.action);

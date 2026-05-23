@@ -86,7 +86,11 @@ export type InfisicalAction =
   | 'storeAdminAppNameSecret'
   | 'storeSuperadminAppNameSecret'
   | 'ensureProdApiAuthSecret'
-  | 'ensureStagingApiAuthSecret';
+  | 'ensureStagingApiAuthSecret'
+  | 'ensureProdWebhookSigningKeys'
+  | 'ensureStagingWebhookSigningKeys'
+  | 'ensureProdEncryptionKeys'
+  | 'ensureStagingEncryptionKeys';
 export type ProjectAction =
   | 'renameOrg'
   | 'updatePackages'
