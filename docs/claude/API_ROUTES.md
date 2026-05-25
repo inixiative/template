@@ -97,7 +97,7 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
 | `sanitizeKeys` | string[] | Keys to strip from body before Prisma |
-| `searchableFields` | string[] | Fields that can be searched (auto-injects search schemas) |
+| `narrowing` | LensNarrowing | Lens narrowing — controls **filter surface** (which fields are searchable, enum value subsets, server-enforced where). NOT response shape — that's `responseSchema`. |
 
 ### Examples
 
@@ -475,7 +475,7 @@ If you need relation data, pass `include` in the options first. In many cases th
 **What paginate() handles automatically:**
 - Reads `page`, `pageSize` from query params
 - Reads `search`, `searchFields` from bracket notation (parsed in prepareRequest)
-- Reads `searchableFields` from route context (set by middleware)
+- Reads `narrowing` from route context (set by middleware) — used for picks-based whitelist + server-side where
 - Reads `orderBy` from query and parses it
 - Appends `{ id: desc }` as stable pagination tiebreaker
 - Calls `buildWhereClause` to combine search + filters
@@ -484,27 +484,29 @@ If you need relation data, pass `include` in the options first. In many cases th
 
 ### Search & Filtering
 
-List endpoints support search via query parameters. Define `searchableFields` in the route, and search schemas are auto-injected.
+> **Critical distinction — `narrowing` controls FILTER SHAPE, not response shape.**
+> `narrowing.root.picks` is the list of fields the consumer can pass in `searchFields[...]`. It does NOT determine what fields the API returns — that's `responseSchema`. The two are independent. A field can be in the response but not searchable, or vice versa.
 
-**Simple search** - searches across all searchable fields:
+List endpoints support search via query parameters. Define a `narrowing` on the route and search schemas are auto-injected for the SDK / OpenAPI surface.
+
+**Simple search** — searches across all searchable String fields:
 ```
 GET /api/v1/organizations?search=acme
 ```
 
-**Advanced search** - search specific fields using bracket notation:
+**Advanced search** — bracket notation per field:
 ```
 GET /api/v1/organizations?searchFields[name]=acme&searchFields[slug]=corp
 ```
 
-**Prisma operators** - use nested brackets for advanced filtering:
+**Prisma operators** — nested brackets:
 ```
 # Text operators
 GET /api/v1/users?searchFields[email][contains]=@example.com
 GET /api/v1/users?searchFields[name][startsWith]=John
 
-# Comparison operators
+# Comparison
 GET /api/v1/products?searchFields[price][gte]=100&searchFields[price][lte]=500
-GET /api/v1/users?searchFields[age][gt]=18
 
 # Relation filters
 GET /api/v1/users?searchFields[posts][some][status]=published
@@ -512,105 +514,157 @@ GET /api/v1/orgs?searchFields[members][every][role]=admin
 GET /api/v1/items?searchFields[comments][none][flagged]=true
 ```
 
-**Supported operators:**
-- `contains`, `startsWith`, `endsWith` - String matching
-- `equals` - Exact match
-- `gt`, `gte`, `lt`, `lte` - Comparison
-- `in`, `notIn` - Array membership
-- `some`, `every`, `none` - Relation filters
-- `is`, `isNot` - Relation equality
+**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`.
 
-**Route definition** (new way):
+### Route declaration (lens narrowing)
+
+The `narrowing` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (2.2.0+). Shape:
+
 ```typescript
-import { searchable } from '#/lib/prisma/searchable';
+import { lensFor } from '@template/db/lens';
 
 readRoute({
   model: Modules.organization,
   many: true,
   paginate: true,
   responseSchema: OrganizationSchema,
-  searchableFields: searchable({
-    organization: [
-      'name', 'slug', 'description',
-      { organizationUsers: ['role', { user: ['name', 'email'] }] },
-    ],
-  }),
-  // Expands to: ['name', 'slug', 'description', 'organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
-});
-```
-
-**`searchable()` helper** - validates fields against Prisma schema and generates dot-notation paths:
-```typescript
-import { searchable } from '#/lib/prisma/searchable';
-
-// Takes { model: fields[] } — model key is validated against Prisma schema
-searchable({ organization: ['name', 'slug'] })
-// → ['name', 'slug']
-
-// Objects expand relation fields (validated as relations in Prisma)
-searchable({ organization: [{ organizationUsers: ['role'] }] })
-// → ['organizationUsers.role']
-
-// Single string value
-searchable({ organization: [{ organizationUsers: 'role' }] })
-// → ['organizationUsers.role']
-
-// Nested relations
-searchable({ organization: [{ organizationUsers: ['role', { user: ['name', 'email'] }] }] })
-// → ['organizationUsers.role', 'organizationUsers.user.name', 'organizationUsers.user.email']
-
-// Object value (shorthand for single nested relation)
-searchable({ organization: [{ organizationUsers: { user: ['name', 'email'] } }] })
-// → ['organizationUsers.user.name', 'organizationUsers.user.email']
-```
-
-**Note:** Admin routes do not define `searchableFields` — superadmins bypass the whitelist via `skipFieldValidation` and can search any valid Prisma field.
-
-**Controller** (simplified):
-```typescript
-export const organizationReadManyController = makeController(route, async (c, respond) => {
-  const db = c.get('db');
-
-  // paginate() handles search automatically!
-  const { data, pagination } = await paginate(c, db.organization);
-
-  return respond.ok(data, { pagination });
-});
-```
-
-**With additional filters:**
-```typescript
-const { deleted } = c.req.valid('query');
-
-const { data, pagination } = await paginate(c, db.organization, {
-  where: {
-    deletedAt: deleted === 'true' ? { not: null } : null,
+  narrowing: {
+    parent: lensFor('Organization'),         // anchors the lens
+    root: {
+      picks: ['name', 'slug', 'description'],  // filterable fields (dot-paths for relations)
+      // omits: [...],                       // alternatively: exclude specific fields
+      // enumOmits: { Status: ['draft'] },   // hide enum values from the SDK type surface
+      // where: { ... },                     // server-enforced row filter (Condition AST)
+      // relations: { author: { picks: [...], where: ... } },  // descent scoping
+    },
   },
 });
 ```
 
-**How it works:**
-1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into objects
-2. `searchableFieldsMiddleware` sets searchableFields on context
-3. `paginate()` reads searchFields from bracket query + searchableFields from context
-4. `buildWhereClause()` combines search + filters with validation
+**Picks dot-paths** for relations:
+```typescript
+root: {
+  picks: ['name', 'slug', 'organizationUsers.role', 'organizationUsers.user.name'],
+}
+```
 
-**Bracket notation parsing:**
-- **Automatic**: All bracket notation is parsed into nested objects (arbitrary depth)
-- **Generic**: Works for any query param, not just searchFields
-- **Validated**: `buildWhereClause` only allows fields in the `searchableFields` whitelist
-- **Values trimmed**: All values automatically trimmed of whitespace
-- **Depth limited**: Maximum 10 levels of nesting to prevent stack overflow
+**Server-enforced filtering — `root.where`:**
 
-**Security:**
-- Only fields in `searchableFields` can be searched (whitelist validation with full paths)
-- **Superadmin bypass**: Users with `platformRole: 'superadmin'` skip the whitelist and can search any valid field at any depth. Path notation validation still applies.
-- Path notation is validated to prevent injection (camelCase enforced, rejects snake_case)
+For static (route-wide) filters use `root.where`. For per-request / context-dependent filters use the `scopeNarrowing` middleware (see below). Both go through `toPrisma` and AND-merge into the final Prisma where.
+
+```typescript
+narrowing: {
+  parent: lensFor('Inquiry'),
+  root: {
+    picks: inquiryPicks,
+    enumOmits: { InquiryStatus: ['draft', 'canceled'] },  // SDK type surface
+    where: {
+      all: [
+        { field: 'targetModel', operator: 'equals', value: 'Organization' },
+        { field: 'status', operator: 'notIn', value: ['draft', 'canceled'] },  // server enforcement
+      ],
+    },
+  },
+},
+```
+
+**Defense in depth — `enumOmits` + `where`:** `enumOmits` hides values from the SDK type surface (consumer types can't even express the omitted enum value). `where` enforces the same filter server-side. **Both are needed**: type narrowing prevents accidental misuse, server `where` enforces under raw API calls.
+
+### Dynamic per-request scope — `scopeNarrowing` middleware
+
+For ctx-aware where conditions (tenant scope, user ownership, etc.), use the `scopeNarrowing` middleware. It merges into the narrowing already on context. Supports both sync and async callbacks:
+
+```typescript
+import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
+
+readRoute({
+  model: Modules.organization,
+  submodel: Modules.inquiry,
+  action: 'received',
+  many: true,
+  paginate: true,
+  narrowing: inquiryReceivedNarrowing,  // static part
+  responseSchema,
+  middleware: [
+    validatePermission('manage'),
+    scopeNarrowing((c) => ({
+      root: {
+        where: { field: 'targetOrganizationId', operator: 'equals', value: getResource<'organization'>(c).id },
+      },
+    })),
+  ],
+});
+```
+
+Async (e.g., integration-source lookup):
+```typescript
+scopeNarrowing(async (c) => {
+  const tenantId = await resolveTenant(c);
+  return { root: { where: { field: 'tenantId', operator: 'equals', value: tenantId } } };
+}),
+```
+
+`WhereScope` mirrors the narrowing shape:
+```typescript
+type WhereScope = {
+  root?: { where?: Condition; relations?: Record<string, /* recursive */> };
+  mapDefaults?: Record<string, { models?: Record<string, { where?: Condition }> }>;
+};
+```
+
+### Admin routes
+
+Admin routes typically don't restrict picks — superadmin's `skipFieldValidation` bypasses the whitelist at runtime. But `paginate()` still needs a narrowing on context to enter `buildWhereClause`. Declare a bare lens:
+
+```typescript
+readRoute({
+  model: Modules.organization,
+  many: true,
+  paginate: true,
+  admin: true,
+  narrowing: { parent: lensFor('Organization') },  // bare lens, no narrowing applied
+  responseSchema,
+});
+```
+
+No `picks` / `omits` / `where` — the lens just anchors the model so `paginate()` knows what kind it's filtering. With `skipFieldValidation: true` (superadmin), all bracket-query fields pass through.
+
+### Controller — `paginate()` integration
+
+```typescript
+export const organizationReadManyController = makeController(route, async (c, respond) => {
+  const db = c.get('db');
+  const { data, pagination } = await paginate(c, db.organization);
+  return respond.ok(data, { pagination });
+});
+```
+
+With additional ad-hoc filters (raw Prisma escape hatch — not type-safe against the lens):
+```typescript
+const { deleted } = c.req.valid('query');
+const { data, pagination } = await paginate(c, db.organization, {
+  where: { deletedAt: deleted === 'true' ? { not: null } : null },  // AND-merged with narrowing
+});
+```
+
+### How it works
+
+1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
+2. `searchableFieldsMiddleware` sets `narrowing` on context (from the route's static narrowing)
+3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
+4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
+5. `buildWhereClause` validates fields against `narrowing.root.picks`, translates `narrowing.root.where` via `toPrisma`, AND-merges everything
+
+### Security
+
+- Only fields in `narrowing.root.picks` can be searched (whitelist with full dot-paths)
+- **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
+- Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
-- Supports nested relation fields (e.g., `posts.status`, `posts.author.name`)
-- Relation fields must be explicitly whitelisted to prevent unauthorized access (non-superadmin)
-- Depth limit (10 levels) prevents stack overflow from deeply nested queries
-- Routes without `searchableFields` gracefully ignore search parameters (no crash)
+- Relation fields must be explicitly whitelisted (non-superadmin)
+- Max 10 levels of nesting in the bracket query
+- Routes without a `narrowing` skip search entirely (`paginate` no-ops the search path)
+- `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
 
 ### Bracket Notation Query Parsing
 
@@ -662,38 +716,56 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields. Use `searchable()` for compact notation:
+When using relation filters, explicitly whitelist nested fields in `narrowing.root.picks` as dot-paths:
 
 ```typescript
-import { searchable } from '#/lib/prisma/searchable';
-
-// Route definition
-searchableFields: searchable({
-  organization: [
-    'name',                                    // Direct field
-    'slug',                                    // Direct field
-    { organizationUsers: ['role', { user: ['name'] }] },  // Relation fields
-  ],
-})
-// Expands to: ['name', 'slug', 'posts.status', 'posts.title', 'posts.author.name', 'members.role']
+narrowing: {
+  parent: lensFor('Organization'),
+  root: {
+    picks: [
+      'name',
+      'slug',
+      'organizationUsers.role',
+      'organizationUsers.user.name',
+    ],
+  },
+}
 
 // Allowed queries:
-?searchFields[posts][some][status]=published        // ✓ posts.status whitelisted
-?searchFields[posts][some][title]=test              // ✓ posts.title whitelisted
-?searchFields[posts][some][author][name]=John       // ✓ posts.author.name whitelisted
+?searchFields[organizationUsers][some][role]=admin              // ✓ organizationUsers.role whitelisted
+?searchFields[organizationUsers][some][user][name]=John         // ✓ organizationUsers.user.name whitelisted
 
 // Rejected queries (non-superadmin):
-?searchFields[posts][some][secretField]=hack        // ✗ posts.secretField not whitelisted
-?searchFields[posts][some][author][email]=test      // ✗ posts.author.email not whitelisted
+?searchFields[organizationUsers][some][secretField]=hack        // ✗ not in picks
+?searchFields[organizationUsers][some][user][email]=test        // ✗ not in picks
 
-// Superadmin: all valid fields allowed regardless of whitelist
+// Superadmin: all valid fields allowed regardless of picks (skipFieldValidation bypass)
+```
+
+For deeper structural narrowing of related models, use `root.relations`:
+
+```typescript
+narrowing: {
+  parent: lensFor('Organization'),
+  root: {
+    picks: ['name'],
+    relations: {
+      organizationUsers: {
+        picks: ['role'],
+        where: { field: 'role', operator: 'notEquals', value: 'pending' },  // descent scope
+        relations: {
+          user: { picks: ['name', 'email'] },
+        },
+      },
+    },
+  },
+}
 ```
 
 **Validation:**
-- Full path must be in `searchableFields` array (non-superadmin users)
-- Superadmin (`platformRole: 'superadmin'`) bypasses the whitelist entirely
-- Use `searchable()` helper for compact relation field definitions
-- Relation operators (`some`, `every`, `none`) are automatically supported
+- Full dot-path must be in `picks` (non-superadmin users)
+- Superadmin (`platformRole: 'superadmin'`) bypasses picks validation entirely
+- Relation operators (`some`, `every`, `none`) automatically supported
 - Error thrown for non-whitelisted fields (not silently ignored)
 
 ### OrderBy
@@ -745,14 +817,16 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ## Frontend Metadata
 
-Route metadata (searchableFields) is exposed via OpenAPI extensions and can be consumed by frontend DataTables. Only tenant routes define `searchableFields` — admin routes omit them since superadmins bypass the whitelist.
+Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `narrowing` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and frontend `useQueryMetadata` extract it from there.
 
-### OpenAPI Extensions
+> **Filter shape vs response shape (recap):** narrowing controls what consumers can **filter** on. The response payload shape comes from `responseSchema`, totally separate. A field can be in the response but not searchable, or searchable but stripped from the response.
 
-Routes with `searchableFields` automatically include OpenAPI extensions:
+### OpenAPI surface (Phase 4 work-in-progress)
+
+Routes with a `narrowing` automatically expose a typed `searchFields` query parameter in the OpenAPI spec. SDK consumers get autocomplete on field names and (where declared) enum-narrowed values:
 
 ```typescript
-// Route definition (tenant route)
+// Route declaration
 readRoute({
   model: Modules.me,
   submodel: Modules.inquiry,
@@ -760,11 +834,14 @@ readRoute({
   many: true,
   paginate: true,
   responseSchema: inquirySentResponseSchema,
-  searchableFields: inquirySearchableFields,
+  narrowing: {
+    parent: lensFor('Inquiry'),
+    root: { picks: inquiryPicks },
+  },
 });
 
-// Generated OpenAPI spec includes:
-// "x-searchable-fields": ["type", "status", ...]
+// SDK-generated typed call:
+// client.meReadManyInquiriesSent({ searchFields: { type: { equals: 'intro' } } })
 ```
 
 ### Extracting Metadata

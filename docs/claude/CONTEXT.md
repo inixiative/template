@@ -15,7 +15,7 @@
 - [Context Access](#context-access)
   - [Direct Access for Simple Values](#direct-access-for-simple-values)
     - [bracketQuery](#bracketquery)
-    - [searchableFields](#searchablefields)
+    - [narrowing](#narrowing)
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
@@ -112,7 +112,7 @@ type AppVars = {
   resource: unknown;
   resourceType: string | null;
   bracketQuery: Record<string, any>;
-  searchableFields: string[] | null;
+  narrowing: LensNarrowing | null;
 };
 
 type AppEnv = { Variables: AppVars };
@@ -132,7 +132,7 @@ type AppEnv = { Variables: AppVars };
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
-| `searchableFields` | `string[] \| null` | Fields for full-text search (set by route) |
+| `narrowing` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set by route's static narrowing + scopeNarrowing middleware. NOT response shape. |
 | `permix` | `Permix` | Permission checker instance |
 | `requestId` | `string` | UUID for request tracing |
 | `resource` | `unknown` | Loaded resource from `:id` param |
@@ -185,7 +185,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('searchableFields', null);  // Set by route templates
+  c.set('narrowing', null);  // Set by searchableFieldsMiddleware + scopeNarrowing
 
   // Wrap in database scope for logging/tracing
   await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
@@ -264,7 +264,7 @@ const spaces = c.get('spaces');                // Space[] | null
 const requestId = c.get('requestId');          // string
 const db = c.get('db');                        // Db
 const bracketQuery = c.get('bracketQuery');    // Record<string, any>
-const searchableFields = c.get('searchableFields');  // string[] | null
+const narrowing = c.get('narrowing');          // LensNarrowing | null
 ```
 
 **Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
@@ -292,33 +292,39 @@ const users = await db.user.findMany({
 - `?sort[field]=asc` → `{ sort: { field: 'asc' } }`
 - `?include[relation]=true` → `{ include: { relation: true } }`
 
-#### searchableFields
+#### narrowing
 
-**Purpose:** Fields to search when `?search=query` parameter is provided.
+**Purpose:** Lens narrowing that drives the filter surface — `picks` (whitelisted searchable fields), `enumOmits` (hidden enum values), and `where` (server-enforced row scope). **Does NOT shape the response** — that's `responseSchema`.
 
-**Set by:** Route templates via `buildRequest()` in route definition
+**Set by:**
+- `searchableFieldsMiddleware` — reads route's static `narrowing` and sets it on context
+- `scopeNarrowing` middleware — merges per-request ctx-aware where conditions into the narrowing
 
 **Example:**
 ```typescript
-// Route definition
+// Route declaration (static)
 export const usersReadMany = readRoute({
-  path: '/users',
-  tags: ['users'],
-  searchableFields: ['name', 'email'],  // ← Set here
+  model: Modules.user,
+  many: true,
+  paginate: true,
+  responseSchema,
+  narrowing: {
+    parent: lensFor('User'),
+    root: { picks: ['name', 'email'] },
+  },
+  middleware: [
+    // Optional: per-request scope
+    scopeNarrowing((c) => ({
+      root: { where: { field: 'organizationId', operator: 'equals', value: c.get('user')!.organizationId } },
+    })),
+  ],
 });
 
-// Controller
-const search = c.req.query('search');
-const searchableFields = c.get('searchableFields');
-
-if (search && searchableFields) {
-  where.OR = searchableFields.map(field => ({
-    [field]: { contains: search, mode: 'insensitive' },
-  }));
-}
+// Controller — typically nothing to read; paginate() handles it
+const { data, pagination } = await paginate(c, db.user);
 ```
 
-**Used in:** `readManyTemplate` controllers automatically apply this pattern for list endpoints.
+**Used by:** `paginate()` → `buildWhereClause()` — applies picks-based whitelist + AND-merges `narrowing.root.where` into the final Prisma where. Superadmin's `skipFieldValidation` bypasses picks but still translates the where.
 
 ### Context Types
 
