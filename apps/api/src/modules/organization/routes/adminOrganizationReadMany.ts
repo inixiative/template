@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { OrganizationScalarSchema } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
@@ -11,5 +12,6 @@ export const adminOrganizationReadManyRoute = readRoute({
   query: z.object({
     deleted: z.enum(['true', 'false', 'all']).default('false'),
   }),
+  narrowing: { parent: lensFor('Organization') },
   responseSchema: OrganizationScalarSchema,
 });
