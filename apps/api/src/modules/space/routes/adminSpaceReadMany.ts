@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { SpaceScalarSchema } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
@@ -12,5 +13,6 @@ export const adminSpaceReadManyRoute = readRoute({
     deleted: z.enum(['true', 'false', 'all']).default('false'),
     organizationId: z.string().optional(),
   }),
+  narrowing: { parent: lensFor('Space') },
   responseSchema: SpaceScalarSchema,
 });

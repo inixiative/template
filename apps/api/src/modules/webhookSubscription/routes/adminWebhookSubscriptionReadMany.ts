@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { advancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
 import { Modules } from '#/modules/modules';
@@ -22,5 +23,6 @@ export const adminWebhookSubscriptionReadManyRoute = readRoute({
   skipId: true,
   admin: true,
   query: querySchema,
+  narrowing: { parent: lensFor('WebhookSubscription') },
   responseSchema: WebhookSubscriptionScalarSchema,
 });

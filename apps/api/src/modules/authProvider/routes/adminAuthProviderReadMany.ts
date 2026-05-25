@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { AuthProviderScalarSchema } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
@@ -11,6 +12,7 @@ export const adminAuthProviderReadManyRoute = readRoute({
   query: z.object({
     organizationId: z.string().optional(),
   }),
+  narrowing: { parent: lensFor('AuthProvider') },
   responseSchema: AuthProviderScalarSchema.omit({
     encryptedSecrets: true,
     encryptedSecretsMetadata: true,
