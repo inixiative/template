@@ -5,7 +5,7 @@ import { mergeNarrowingWheres } from '#/middleware/resources/mergeNarrowingWhere
 
 const baseNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  maps: { default: { models: { Inquiry: { picks: ['type', 'status'] } } } },
+  maps: { prisma: { models: { Inquiry: { picks: ['type', 'status'] } } } },
 });
 
 const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };

@@ -24,7 +24,7 @@ export const spaceReadManyContactsRoute = readRoute({
   ],
   narrowing: {
     parent: lensFor('Contact'),
-    maps: { default: { models: { Contact: { picks: ['type', 'subtype', 'label', 'valueKey'] } } } },
+    maps: { prisma: { models: { Contact: { picks: ['type', 'subtype', 'label', 'valueKey'] } } } },
   },
   responseSchema: ContactScalarSchema,
 });

@@ -8,7 +8,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name', 'email'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name', 'email'] } } } },
         },
         search: 'aron',
       });
@@ -28,7 +28,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('Inquiry'),
-          maps: { default: { models: { Inquiry: { picks: ['sourceUser.name', 'sourceUser.email'] } } } },
+          maps: { prisma: { models: { Inquiry: { picks: ['sourceUser.name', 'sourceUser.email'] } } } },
         },
         search: 'aron',
       });
@@ -48,7 +48,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name', 'platformRole', 'createdAt', 'emailVerified'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name', 'platformRole', 'createdAt', 'emailVerified'] } } } },
         },
         search: 'aron',
       });
@@ -61,7 +61,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['platformRole', 'createdAt'] } } } },
+          maps: { prisma: { models: { User: { picks: ['platformRole', 'createdAt'] } } } },
         },
         search: 'foo',
       });
@@ -72,7 +72,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
       });
       expect(result).toEqual({});
@@ -84,7 +84,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
         searchFields: { name: 'aron' },
       });
@@ -97,7 +97,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+          maps: { prisma: { models: { User: { picks: ['platformRole'] } } } },
         },
         searchFields: { platformRole: 'superadmin' },
       });
@@ -110,7 +110,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('CronJob'),
-          maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+          maps: { prisma: { models: { CronJob: { picks: ['maxAttempts'] } } } },
         },
         searchFields: { maxAttempts: '3' },
       });
@@ -121,7 +121,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+          maps: { prisma: { models: { User: { picks: ['emailVerified'] } } } },
         },
         searchFields: { emailVerified: 'true' },
       });
@@ -132,7 +132,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+          maps: { prisma: { models: { User: { picks: ['createdAt'] } } } },
         },
         searchFields: { createdAt: '2026-05-10T12:00:00Z' },
       });
@@ -145,7 +145,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+          maps: { prisma: { models: { User: { picks: ['createdAt'] } } } },
         },
         searchFields: { createdAt: '1715353200000' },
       });
@@ -158,7 +158,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('Inquiry'),
-            maps: { default: { models: { Inquiry: { picks: ['content'] } } } },
+            maps: { prisma: { models: { Inquiry: { picks: ['content'] } } } },
           },
           searchFields: { content: 'anything' },
         }),
@@ -171,7 +171,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
         searchFields: { name: { startsWith: 'A' } },
       });
@@ -184,7 +184,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
         searchFields: { name: { contains: 'A', mode: 'default' } },
       });
@@ -197,7 +197,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['email'] } } } },
+          maps: { prisma: { models: { User: { picks: ['email'] } } } },
         },
         searchFields: { email: { in: ['a@x.com', 'b@x.com'] } },
       });
@@ -210,7 +210,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+          maps: { prisma: { models: { User: { picks: ['platformRole'] } } } },
         },
         searchFields: { platformRole: { equals: 'superadmin' } },
       });
@@ -223,7 +223,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('CronJob'),
-          maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+          maps: { prisma: { models: { CronJob: { picks: ['maxAttempts'] } } } },
         },
         searchFields: { maxAttempts: { gte: '5', lt: '10' } },
       });
@@ -234,7 +234,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+          maps: { prisma: { models: { User: { picks: ['createdAt'] } } } },
         },
         searchFields: { createdAt: { gte: '2026-01-01T00:00:00Z', lt: '1735689600000' } },
       });
@@ -248,7 +248,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+          maps: { prisma: { models: { User: { picks: ['platformRole'] } } } },
         },
         searchFields: { platformRole: { in: 'superadmin' } },
       });
@@ -264,7 +264,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+            maps: { prisma: { models: { User: { picks: ['platformRole'] } } } },
           },
           searchFields: { platformRole: { contains: 'super' } },
         }),
@@ -276,7 +276,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['name'] } } } },
+            maps: { prisma: { models: { User: { picks: ['name'] } } } },
           },
           searchFields: { name: { gt: 'a' } },
         }),
@@ -288,7 +288,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+            maps: { prisma: { models: { User: { picks: ['createdAt'] } } } },
           },
           searchFields: { createdAt: { in: ['2026-01-01'] } },
         }),
@@ -300,7 +300,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+            maps: { prisma: { models: { User: { picks: ['emailVerified'] } } } },
           },
           searchFields: { emailVerified: { contains: 'tr' } },
         }),
@@ -314,7 +314,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('CronJob'),
-            maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+            maps: { prisma: { models: { CronJob: { picks: ['maxAttempts'] } } } },
           },
           searchFields: { maxAttempts: 'abc' },
         }),
@@ -326,7 +326,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+            maps: { prisma: { models: { User: { picks: ['emailVerified'] } } } },
           },
           searchFields: { emailVerified: 'yes' },
         }),
@@ -338,7 +338,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+            maps: { prisma: { models: { User: { picks: ['createdAt'] } } } },
           },
           searchFields: { createdAt: 'not-a-date' },
         }),
@@ -352,7 +352,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['name'] } } } },
+            maps: { prisma: { models: { User: { picks: ['name'] } } } },
           },
           searchFields: { name: 'aron', password: 'secret' },
         }),
@@ -364,7 +364,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['bad path!'] } } } },
+            maps: { prisma: { models: { User: { picks: ['bad path!'] } } } },
           },
           searchFields: { 'bad path!': 'x' },
         }),
@@ -377,7 +377,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['tokens.name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['tokens.name'] } } } },
         },
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
@@ -390,7 +390,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['tokens.isActive'] } } } },
+          maps: { prisma: { models: { User: { picks: ['tokens.isActive'] } } } },
         },
         searchFields: { tokens: { every: { isActive: 'true' } } },
       });
@@ -404,7 +404,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['email'] } } } },
+            maps: { prisma: { models: { User: { picks: ['email'] } } } },
           },
           searchFields: { tokens: { some: { name: 'x' } } },
         }),
@@ -417,7 +417,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: [] } } } },
+          maps: { prisma: { models: { User: { picks: [] } } } },
         },
         searchFields: { name: 'aron', platformRole: 'user' },
         skipFieldValidation: true,
@@ -432,7 +432,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: [] } } } },
+            maps: { prisma: { models: { User: { picks: [] } } } },
           },
           searchFields: { platformRole: { contains: 'super' } },
           skipFieldValidation: true,
@@ -444,7 +444,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: [] } } } },
+          maps: { prisma: { models: { User: { picks: [] } } } },
         },
         searchFields: { _customField: 'anything' },
         skipFieldValidation: true,
@@ -458,7 +458,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
         search: 'aron',
         filters: { deletedAt: null },
@@ -473,7 +473,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         narrowing: {
           parent: lensFor('User'),
-          maps: { default: { models: { User: { picks: ['name'] } } } },
+          maps: { prisma: { models: { User: { picks: ['name'] } } } },
         },
         searchFields: { name: 'aron' },
         orNullFields: ['name'],
@@ -490,7 +490,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['name'] } } } },
+            maps: { prisma: { models: { User: { picks: ['name'] } } } },
           },
           searchFields: { name: ['a', 'b'] },
         }),
@@ -504,7 +504,7 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           narrowing: {
             parent: lensFor('User'),
-            maps: { default: { models: { User: { picks: ['wrap'] } } } },
+            maps: { prisma: { models: { User: { picks: ['wrap'] } } } },
           },
           searchFields: nested as never,
           skipFieldValidation: true,

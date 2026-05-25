@@ -7,7 +7,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 const inquiryNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  maps: { default: { models: { Inquiry: { picks: ['type'] } } } },
+  maps: { prisma: { models: { Inquiry: { picks: ['type'] } } } },
 });
 
 const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };
