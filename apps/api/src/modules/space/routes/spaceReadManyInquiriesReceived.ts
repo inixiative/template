@@ -14,7 +14,7 @@ export const spaceReadManyInquiriesReceivedRoute = readRoute({
   action: 'received',
   many: true,
   paginate: true,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Inquiry'),
     root: {
       picks: inquiryPicks,

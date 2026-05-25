@@ -31,7 +31,7 @@ export type AppVars = {
   resource: unknown;
   resourceType: AccessorName | null;
   routeConfig: RouteConfig | null;
-  narrowing: LensNarrowing | null;
+  filterLens: LensNarrowing | null;
   bracketQuery: BracketQueryRecord;
 };
 

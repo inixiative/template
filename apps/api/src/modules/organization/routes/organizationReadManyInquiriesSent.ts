@@ -14,7 +14,7 @@ export const organizationReadManyInquiriesSentRoute = readRoute({
   action: 'sent',
   many: true,
   paginate: true,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Inquiry'),
     root: {
       picks: inquiryPicks,

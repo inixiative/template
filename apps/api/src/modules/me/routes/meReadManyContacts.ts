@@ -12,7 +12,7 @@ export const meReadManyContactsRoute = readRoute({
   many: true,
   paginate: true,
   skipId: true,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Contact'),
     root: {
       picks: contactPicks,

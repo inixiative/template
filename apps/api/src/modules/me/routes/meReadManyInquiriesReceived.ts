@@ -13,7 +13,7 @@ export const meReadManyInquiriesReceivedRoute = readRoute({
   many: true,
   skipId: true,
   paginate: true,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Inquiry'),
     root: {
       picks: inquiryPicks,

@@ -15,7 +15,7 @@
 - [Context Access](#context-access)
   - [Direct Access for Simple Values](#direct-access-for-simple-values)
     - [bracketQuery](#bracketquery)
-    - [narrowing](#narrowing)
+    - [filterLens](#filterlens)
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
@@ -112,7 +112,7 @@ type AppVars = {
   resource: unknown;
   resourceType: string | null;
   bracketQuery: Record<string, any>;
-  narrowing: LensNarrowing | null;
+  filterLens: LensNarrowing | null;
 };
 
 type AppEnv = { Variables: AppVars };
@@ -132,7 +132,7 @@ type AppEnv = { Variables: AppVars };
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
-| `narrowing` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set by route's static narrowing + scopeNarrowing middleware. NOT response shape. |
+| `filterLens` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set by route's static narrowing + scopeNarrowing middleware. NOT response shape. |
 | `permix` | `Permix` | Permission checker instance |
 | `requestId` | `string` | UUID for request tracing |
 | `resource` | `unknown` | Loaded resource from `:id` param |
@@ -185,7 +185,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('narrowing', null);  // Set by searchableFieldsMiddleware + scopeNarrowing
+  c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens) + scopeNarrowing
 
   // Wrap in database scope for logging/tracing
   await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
@@ -264,7 +264,7 @@ const spaces = c.get('spaces');                // Space[] | null
 const requestId = c.get('requestId');          // string
 const db = c.get('db');                        // Db
 const bracketQuery = c.get('bracketQuery');    // Record<string, any>
-const narrowing = c.get('narrowing');          // LensNarrowing | null
+const filterLens = c.get('filterLens');        // LensNarrowing | null
 ```
 
 **Pattern change:** Previous versions had `getUser()`, `getToken()`, `getRequestId()` helper functions. These were removed in favor of direct `c.get()` access.
@@ -292,12 +292,12 @@ const users = await db.user.findMany({
 - `?sort[field]=asc` → `{ sort: { field: 'asc' } }`
 - `?include[relation]=true` → `{ include: { relation: true } }`
 
-#### narrowing
+#### filterLens
 
 **Purpose:** Lens narrowing that drives the filter surface — `picks` (whitelisted searchable fields), `enumOmits` (hidden enum values), and `where` (server-enforced row scope). **Does NOT shape the response** — that's `responseSchema`.
 
 **Set by:**
-- `searchableFieldsMiddleware` — reads route's static `narrowing` and sets it on context
+- `searchableFieldsMiddleware` — reads route's static `filterLens` and sets it on context
 - `scopeNarrowing` middleware — merges per-request ctx-aware where conditions into the narrowing
 
 **Example:**
@@ -308,7 +308,7 @@ export const usersReadMany = readRoute({
   many: true,
   paginate: true,
   responseSchema,
-  narrowing: {
+  filterLens: {
     parent: lensFor('User'),
     root: { picks: ['name', 'email'] },
   },
@@ -324,7 +324,7 @@ export const usersReadMany = readRoute({
 const { data, pagination } = await paginate(c, db.user);
 ```
 
-**Used by:** `paginate()` → `buildWhereClause()` — applies picks-based whitelist + AND-merges `narrowing.root.where` into the final Prisma where. Superadmin's `skipFieldValidation` bypasses picks but still translates the where.
+**Used by:** `paginate()` → `buildWhereClause()` — applies picks-based whitelist + AND-merges `filterLens.root.where` into the final Prisma where. Superadmin's `skipFieldValidation` bypasses picks but still translates the where.
 
 ### Context Types
 

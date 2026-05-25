@@ -63,11 +63,11 @@ export const paginate = async <
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
-  const narrowing = c.get('narrowing');
+  const filterLens = c.get('filterLens');
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere = narrowing
-    ? buildWhereClause({ narrowing, search, searchFields, skipFieldValidation, orNullFields })
+  const searchWhere = filterLens
+    ? buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields })
     : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

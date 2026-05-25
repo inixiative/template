@@ -97,7 +97,7 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
 | `sanitizeKeys` | string[] | Keys to strip from body before Prisma |
-| `narrowing` | LensNarrowing | Lens narrowing — controls **filter surface** (which fields are searchable, enum value subsets, server-enforced where). NOT response shape — that's `responseSchema`. |
+| `filterLens` | LensNarrowing | Lens narrowing — controls **filter surface** (which fields are searchable, enum value subsets, server-enforced where). NOT response shape — that's `responseSchema`. |
 
 ### Examples
 
@@ -475,7 +475,7 @@ If you need relation data, pass `include` in the options first. In many cases th
 **What paginate() handles automatically:**
 - Reads `page`, `pageSize` from query params
 - Reads `search`, `searchFields` from bracket notation (parsed in prepareRequest)
-- Reads `narrowing` from route context (set by middleware) — used for picks-based whitelist + server-side where
+- Reads `filterLens` from route context (set by middleware) — used for picks-based whitelist + server-side where
 - Reads `orderBy` from query and parses it
 - Appends `{ id: desc }` as stable pagination tiebreaker
 - Calls `buildWhereClause` to combine search + filters
@@ -484,10 +484,10 @@ If you need relation data, pass `include` in the options first. In many cases th
 
 ### Search & Filtering
 
-> **Critical distinction — `narrowing` controls FILTER SHAPE, not response shape.**
-> `narrowing.root.picks` is the list of fields the consumer can pass in `searchFields[...]`. It does NOT determine what fields the API returns — that's `responseSchema`. The two are independent. A field can be in the response but not searchable, or vice versa.
+> **Critical distinction — `filterLens` controls FILTER SHAPE, not response shape.**
+> `filterLens.root.picks` is the list of fields the consumer can pass in `searchFields[...]`. It does NOT determine what fields the API returns — that's `responseSchema`. The two are independent. A field can be in the response but not searchable, or vice versa.
 
-List endpoints support search via query parameters. Define a `narrowing` on the route and search schemas are auto-injected for the SDK / OpenAPI surface.
+List endpoints support search via query parameters. Define a `filterLens` on the route and search schemas are auto-injected for the SDK / OpenAPI surface.
 
 **Simple search** — searches across all searchable String fields:
 ```
@@ -518,7 +518,7 @@ GET /api/v1/items?searchFields[comments][none][flagged]=true
 
 ### Route declaration (lens narrowing)
 
-The `narrowing` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (2.2.0+). Shape:
+The `filterLens` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (2.2.0+). Shape:
 
 ```typescript
 import { lensFor } from '@template/db/lens';
@@ -528,7 +528,7 @@ readRoute({
   many: true,
   paginate: true,
   responseSchema: OrganizationSchema,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Organization'),         // anchors the lens
     root: {
       picks: ['name', 'slug', 'description'],  // filterable fields (dot-paths for relations)
@@ -553,7 +553,7 @@ root: {
 For static (route-wide) filters use `root.where`. For per-request / context-dependent filters use the `scopeNarrowing` middleware (see below). Both go through `toPrisma` and AND-merge into the final Prisma where.
 
 ```typescript
-narrowing: {
+filterLens: {
   parent: lensFor('Inquiry'),
   root: {
     picks: inquiryPicks,
@@ -583,7 +583,7 @@ readRoute({
   action: 'received',
   many: true,
   paginate: true,
-  narrowing: inquiryReceivedNarrowing,  // static part
+  filterLens: inquiryReceivedNarrowing,  // static part
   responseSchema,
   middleware: [
     validatePermission('manage'),
@@ -622,7 +622,7 @@ readRoute({
   many: true,
   paginate: true,
   admin: true,
-  narrowing: { parent: lensFor('Organization') },  // bare lens, no narrowing applied
+  filterLens: { parent: lensFor('Organization') },  // bare lens, no narrowing applied
   responseSchema,
 });
 ```
@@ -650,20 +650,20 @@ const { data, pagination } = await paginate(c, db.organization, {
 ### How it works
 
 1. `prepareRequest` middleware parses bracket notation (`?searchFields[name]=value`) into nested objects
-2. `searchableFieldsMiddleware` sets `narrowing` on context (from the route's static narrowing)
+2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
 4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
-5. `buildWhereClause` validates fields against `narrowing.root.picks`, translates `narrowing.root.where` via `toPrisma`, AND-merges everything
+5. `buildWhereClause` validates fields against `filterLens.root.picks`, translates `filterLens.root.where` via `toPrisma`, AND-merges everything
 
 ### Security
 
-- Only fields in `narrowing.root.picks` can be searched (whitelist with full dot-paths)
+- Only fields in `filterLens.root.picks` can be searched (whitelist with full dot-paths)
 - **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
 - Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
 - Relation fields must be explicitly whitelisted (non-superadmin)
 - Max 10 levels of nesting in the bracket query
-- Routes without a `narrowing` skip search entirely (`paginate` no-ops the search path)
+- Routes without a `filterLens` skip search entirely (`paginate` no-ops the search path)
 - `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
 
 ### Bracket Notation Query Parsing
@@ -716,10 +716,10 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields in `narrowing.root.picks` as dot-paths:
+When using relation filters, explicitly whitelist nested fields in `filterLens.root.picks` as dot-paths:
 
 ```typescript
-narrowing: {
+filterLens: {
   parent: lensFor('Organization'),
   root: {
     picks: [
@@ -745,7 +745,7 @@ narrowing: {
 For deeper structural narrowing of related models, use `root.relations`:
 
 ```typescript
-narrowing: {
+filterLens: {
   parent: lensFor('Organization'),
   root: {
     picks: ['name'],
@@ -817,13 +817,13 @@ const { data, pagination } = await paginate(c, db.organization, {
 
 ## Frontend Metadata
 
-Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `narrowing` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and frontend `useQueryMetadata` extract it from there.
+Filter surface metadata (picks, enum subsets, server-side scope) is encoded in the route's `filterLens` and flows into the OpenAPI spec via the per-route `searchFields` query schema. The SDK and frontend `useQueryMetadata` extract it from there.
 
 > **Filter shape vs response shape (recap):** narrowing controls what consumers can **filter** on. The response payload shape comes from `responseSchema`, totally separate. A field can be in the response but not searchable, or searchable but stripped from the response.
 
 ### OpenAPI surface (Phase 4 work-in-progress)
 
-Routes with a `narrowing` automatically expose a typed `searchFields` query parameter in the OpenAPI spec. SDK consumers get autocomplete on field names and (where declared) enum-narrowed values:
+Routes with a `filterLens` automatically expose a typed `searchFields` query parameter in the OpenAPI spec. SDK consumers get autocomplete on field names and (where declared) enum-narrowed values:
 
 ```typescript
 // Route declaration
@@ -834,7 +834,7 @@ readRoute({
   many: true,
   paginate: true,
   responseSchema: inquirySentResponseSchema,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Inquiry'),
     root: { picks: inquiryPicks },
   },

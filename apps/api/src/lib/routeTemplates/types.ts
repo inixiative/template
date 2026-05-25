@@ -22,5 +22,5 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   paginate?: boolean;
   admin?: boolean;
   internal?: boolean;
-  narrowing?: LensNarrowing;
+  filterLens?: LensNarrowing;
 };

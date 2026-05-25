@@ -8,6 +8,6 @@ export const adminInquiryReadManyRoute = readRoute({
   many: true,
   paginate: true,
   admin: true,
-  narrowing: { parent: lensFor('Inquiry') },
+  filterLens: { parent: lensFor('Inquiry') },
   responseSchema: inquiryResponseSchema,
 });

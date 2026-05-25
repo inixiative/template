@@ -23,6 +23,6 @@ export const adminWebhookSubscriptionReadManyRoute = readRoute({
   skipId: true,
   admin: true,
   query: querySchema,
-  narrowing: { parent: lensFor('WebhookSubscription') },
+  filterLens: { parent: lensFor('WebhookSubscription') },
   responseSchema: WebhookSubscriptionScalarSchema,
 });

@@ -9,7 +9,7 @@ import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/l
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
-  narrowing: LensNarrowing;
+  filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
   // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
@@ -181,10 +181,10 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { narrowing, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
-  const lens = rootLens(narrowing);
+  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
+  const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
-  const searchableFields = narrowing.root?.picks ?? [];
+  const searchableFields = filterLens.root?.picks ?? [];
   const conditions: Record<string, unknown>[] = [];
 
   // Global search — `contains` only makes sense for text, drop everything else.
@@ -211,8 +211,8 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   }
 
   // Per-request scoping: root-anchored where → Prisma where via toPrisma.
-  if (narrowing.root?.where !== undefined) {
-    const step = toPrisma(narrowing.root.where, { map: lens, mapName: lens.mapName, model }).steps[0];
+  if (filterLens.root?.where !== undefined) {
+    const step = toPrisma(filterLens.root.where, { map: lens, mapName: lens.mapName, model }).steps[0];
     if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
   }
 

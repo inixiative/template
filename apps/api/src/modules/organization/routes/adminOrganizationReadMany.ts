@@ -12,6 +12,6 @@ export const adminOrganizationReadManyRoute = readRoute({
   query: z.object({
     deleted: z.enum(['true', 'false', 'all']).default('false'),
   }),
-  narrowing: { parent: lensFor('Organization') },
+  filterLens: { parent: lensFor('Organization') },
   responseSchema: OrganizationScalarSchema,
 });

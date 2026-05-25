@@ -9,6 +9,6 @@ export const adminContactReadManyRoute = readRoute({
   paginate: true,
   skipId: true,
   admin: true,
-  narrowing: { parent: lensFor('Contact') },
+  filterLens: { parent: lensFor('Contact') },
   responseSchema: ContactScalarSchema,
 });

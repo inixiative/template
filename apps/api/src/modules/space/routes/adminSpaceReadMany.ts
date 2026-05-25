@@ -13,6 +13,6 @@ export const adminSpaceReadManyRoute = readRoute({
     deleted: z.enum(['true', 'false', 'all']).default('false'),
     organizationId: z.string().optional(),
   }),
-  narrowing: { parent: lensFor('Space') },
+  filterLens: { parent: lensFor('Space') },
   responseSchema: SpaceScalarSchema,
 });

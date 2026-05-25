@@ -6,7 +6,7 @@ describe('buildWhereClause', () => {
   describe('global search (single term, fan-out across fields)', () => {
     it('emits a case-insensitive OR across String fields', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name', 'email'] },
         },
@@ -26,7 +26,7 @@ describe('buildWhereClause', () => {
 
     it('walks relation paths', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('Inquiry'),
           root: { picks: ['sourceUser.name', 'sourceUser.email'] },
         },
@@ -46,7 +46,7 @@ describe('buildWhereClause', () => {
 
     it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name', 'platformRole', 'createdAt', 'emailVerified'] },
         },
@@ -59,7 +59,7 @@ describe('buildWhereClause', () => {
 
     it('emits no OR when every searchable field is non-String', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole', 'createdAt'] },
         },
@@ -70,7 +70,7 @@ describe('buildWhereClause', () => {
 
     it('returns empty when there is no search term and no searchFields', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -82,7 +82,7 @@ describe('buildWhereClause', () => {
   describe('searchFields — bare value applies the kind default operator', () => {
     it('String → contains + insensitive mode', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -95,7 +95,7 @@ describe('buildWhereClause', () => {
 
     it('enum → equals (no contains, no mode)', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
         },
@@ -108,7 +108,7 @@ describe('buildWhereClause', () => {
 
     it('Int → equals, with string coercion to number', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('CronJob'),
           root: { picks: ['maxAttempts'] },
         },
@@ -119,7 +119,7 @@ describe('buildWhereClause', () => {
 
     it('Boolean → equals, coercing "true" / "false" strings', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['emailVerified'] },
         },
@@ -130,7 +130,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ISO string', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
         },
@@ -143,7 +143,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ms-timestamp string', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
         },
@@ -156,7 +156,7 @@ describe('buildWhereClause', () => {
     it('Json fields throw — not searchable via this surface', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('Inquiry'),
             root: { picks: ['content'] },
           },
@@ -169,7 +169,7 @@ describe('buildWhereClause', () => {
   describe('searchFields — explicit operators', () => {
     it("auto-adds mode: 'insensitive' for String + mode-capable ops", () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -182,7 +182,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode when caller explicitly passes mode", () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -195,7 +195,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for String in/notIn (Prisma doesn't support mode on those)", () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['email'] },
         },
@@ -208,7 +208,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for enum equals (mode is a String-only Prisma concept)", () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
         },
@@ -221,7 +221,7 @@ describe('buildWhereClause', () => {
 
     it('coerces Int operator values', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('CronJob'),
           root: { picks: ['maxAttempts'] },
         },
@@ -232,7 +232,7 @@ describe('buildWhereClause', () => {
 
     it('coerces DateTime operator values (ISO string and ms-timestamp)', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
         },
@@ -246,7 +246,7 @@ describe('buildWhereClause', () => {
 
     it('normalises singleton in value to an array', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
         },
@@ -262,7 +262,7 @@ describe('buildWhereClause', () => {
     it("rejects 'contains' on enum field", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['platformRole'] },
           },
@@ -274,7 +274,7 @@ describe('buildWhereClause', () => {
     it("rejects 'gt' on String field", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['name'] },
           },
@@ -286,7 +286,7 @@ describe('buildWhereClause', () => {
     it("rejects 'in' on DateTime field", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['createdAt'] },
           },
@@ -298,7 +298,7 @@ describe('buildWhereClause', () => {
     it("rejects 'contains' on Boolean field", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['emailVerified'] },
           },
@@ -312,7 +312,7 @@ describe('buildWhereClause', () => {
     it('throws on non-numeric Int input', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('CronJob'),
             root: { picks: ['maxAttempts'] },
           },
@@ -324,7 +324,7 @@ describe('buildWhereClause', () => {
     it("throws on Boolean inputs that aren't true/false strings", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['emailVerified'] },
           },
@@ -336,7 +336,7 @@ describe('buildWhereClause', () => {
     it('throws on garbage DateTime input', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['createdAt'] },
           },
@@ -350,7 +350,7 @@ describe('buildWhereClause', () => {
     it('throws when a field is not in picks', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['name'] },
           },
@@ -362,7 +362,7 @@ describe('buildWhereClause', () => {
     it('throws on invalid path notation', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['bad path!'] },
           },
@@ -375,7 +375,7 @@ describe('buildWhereClause', () => {
   describe('relation operators (some / every / none / is / isNot)', () => {
     it('threads through `some` filter into a to-many relation', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['tokens.name'] },
         },
@@ -388,7 +388,7 @@ describe('buildWhereClause', () => {
 
     it('threads through `every` with kind-aware coercion on the nested field', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['tokens.isActive'] },
         },
@@ -402,7 +402,7 @@ describe('buildWhereClause', () => {
     it('rejects non-whitelisted relation paths', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['email'] },
           },
@@ -415,7 +415,7 @@ describe('buildWhereClause', () => {
   describe('skipFieldValidation (superadmin bypass)', () => {
     it('allows fields not in picks when bypass is on', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: [] },
         },
@@ -430,7 +430,7 @@ describe('buildWhereClause', () => {
     it("still validates operators per kind — bypass doesn't loosen kind rules", () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: [] },
           },
@@ -442,7 +442,7 @@ describe('buildWhereClause', () => {
 
     it('passes through fields that do not resolve in the schema (synthetic / dynamic paths)', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: [] },
         },
@@ -456,7 +456,7 @@ describe('buildWhereClause', () => {
   describe('filters + orNullFields', () => {
     it('combines pre-built filters with search', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -471,7 +471,7 @@ describe('buildWhereClause', () => {
 
     it('widens orNullFields to OR null', () => {
       const result = buildWhereClause({
-        narrowing: {
+        filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
         },
@@ -488,7 +488,7 @@ describe('buildWhereClause', () => {
     it('rejects array values without an operator', () => {
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['name'] },
           },
@@ -502,7 +502,7 @@ describe('buildWhereClause', () => {
       for (let i = 0; i < 11; i += 1) nested = { wrap: nested };
       expect(() =>
         buildWhereClause({
-          narrowing: {
+          filterLens: {
             parent: lensFor('User'),
             root: { picks: ['wrap'] },
           },

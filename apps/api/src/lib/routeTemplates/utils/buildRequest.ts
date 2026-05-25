@@ -83,10 +83,10 @@ export const buildRequest = <const T extends RouteArgs>(
     paginate = false,
     many = false,
     admin = false,
-    narrowing,
+    filterLens,
   } = args;
 
-  const searchableFields = narrowing ? (narrowing.root?.picks ?? []) : undefined;
+  const searchableFields = filterLens ? (filterLens.root?.picks ?? []) : undefined;
 
   // Need ID when: not skipId AND (has submodel OR not many)
   // With submodel + many: getting all submodels for a parent, so need parent ID

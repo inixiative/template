@@ -69,7 +69,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('narrowing', null);
+  c.set('filterLens', null);
 
   const bracketQuery = parseBracketNotation(c.req.url);
   c.set('bracketQuery', bracketQuery);

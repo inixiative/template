@@ -24,7 +24,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
     admin = false,
     internal = false,
     tags,
-    narrowing,
+    filterLens,
   } = args;
 
   if (!responseSchema) throw new Error('responseSchema is required for read routes');
@@ -46,7 +46,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, narrowing),
+    middleware: prepareMiddleware(middleware, skipResource, filterLens),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

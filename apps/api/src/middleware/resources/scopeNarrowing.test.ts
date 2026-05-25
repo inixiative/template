@@ -17,13 +17,13 @@ describe('scopeNarrowing', () => {
   it('AND-merges scope.root.where into narrowing on ctx', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
-      c.set('narrowing', inquiryNarrowing());
+      c.set('filterLens', inquiryNarrowing());
       await next();
     });
     app.get(
       '/check',
       scopeNarrowing(() => ({ root: { where: ruleA } })),
-      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
+      (c) => c.json({ where: c.get('filterLens')?.root?.where ?? null }),
     );
     const res = await app.fetch(new Request('http://test/check'));
     expect(res.status).toBe(200);
@@ -34,7 +34,7 @@ describe('scopeNarrowing', () => {
     let capturedPath: string | undefined;
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
-      c.set('narrowing', inquiryNarrowing());
+      c.set('filterLens', inquiryNarrowing());
       await next();
     });
     app.get(
@@ -52,14 +52,14 @@ describe('scopeNarrowing', () => {
   it('multiple scopeNarrowing middlewares compose AND-merge in order', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
-      c.set('narrowing', inquiryNarrowing());
+      c.set('filterLens', inquiryNarrowing());
       await next();
     });
     app.get(
       '/check',
       scopeNarrowing(() => ({ root: { where: ruleA } })),
       scopeNarrowing(() => ({ root: { where: ruleB } })),
-      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
+      (c) => c.json({ where: c.get('filterLens')?.root?.where ?? null }),
     );
     const res = await app.fetch(new Request('http://test/check'));
     expect(await res.json()).toEqual({ where: { all: [ruleA, ruleB] } });
@@ -68,7 +68,7 @@ describe('scopeNarrowing', () => {
   it('merges root.relations and mapDefaults slots through to ctx narrowing', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
-      c.set('narrowing', inquiryNarrowing());
+      c.set('filterLens', inquiryNarrowing());
       await next();
     });
     app.get(
@@ -78,7 +78,7 @@ describe('scopeNarrowing', () => {
         mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
       })),
       (c) => {
-        const n = c.get('narrowing')!;
+        const n = c.get('filterLens')!;
         return c.json({
           rel: n.root?.relations?.sourceUser.where ?? null,
           def: n.mapDefaults?.prisma?.models?.User.where ?? null,
@@ -92,7 +92,7 @@ describe('scopeNarrowing', () => {
   it('awaits async scope callbacks (for integration-source lookups)', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
-      c.set('narrowing', inquiryNarrowing());
+      c.set('filterLens', inquiryNarrowing());
       await next();
     });
     app.get(
@@ -101,7 +101,7 @@ describe('scopeNarrowing', () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
         return { root: { where: ruleA } };
       }),
-      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
+      (c) => c.json({ where: c.get('filterLens')?.root?.where ?? null }),
     );
     const res = await app.fetch(new Request('http://test/check'));
     expect(await res.json()).toEqual({ where: ruleA });

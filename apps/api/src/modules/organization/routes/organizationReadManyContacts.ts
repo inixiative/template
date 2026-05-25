@@ -12,7 +12,7 @@ export const organizationReadManyContactsRoute = readRoute({
   submodel: Modules.contact,
   many: true,
   paginate: true,
-  narrowing: {
+  filterLens: {
     parent: lensFor('Contact'),
     root: {
       picks: contactPicks,

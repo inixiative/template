@@ -12,7 +12,7 @@ export const adminAuthProviderReadManyRoute = readRoute({
   query: z.object({
     organizationId: z.string().optional(),
   }),
-  narrowing: { parent: lensFor('AuthProvider') },
+  filterLens: { parent: lensFor('AuthProvider') },
   responseSchema: AuthProviderScalarSchema.omit({
     encryptedSecrets: true,
     encryptedSecretsMetadata: true,
