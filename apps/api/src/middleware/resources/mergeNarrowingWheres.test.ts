@@ -5,7 +5,7 @@ import { mergeNarrowingWheres } from '#/middleware/resources/mergeNarrowingWhere
 
 const baseNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  maps: { prisma: { models: { Inquiry: { picks: ['type', 'status'] } } } },
+  root: { picks: ['type', 'status'] },
 });
 
 const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };
@@ -17,74 +17,94 @@ describe('mergeNarrowingWheres', () => {
     it('returns narrowing unchanged when scope is empty', () => {
       const before = baseNarrowing();
       const after = mergeNarrowingWheres(before, {});
-      expect(after.where).toBeUndefined();
-      expect(after.maps).toEqual(before.maps);
+      expect(after.root?.where).toBeUndefined();
+      expect(after).toEqual(before);
     });
   });
 
-  describe('root where', () => {
-    it('sets root where when narrowing has none', () => {
-      const after = mergeNarrowingWheres(baseNarrowing(), { where: ruleA });
-      expect(after.where).toEqual(ruleA);
+  describe('root.where', () => {
+    it('sets root.where when narrowing.root has none', () => {
+      const after = mergeNarrowingWheres(baseNarrowing(), { root: { where: ruleA } });
+      expect(after.root?.where).toEqual(ruleA);
     });
 
-    it('AND-merges when both narrowing and scope have a root where', () => {
+    it('AND-merges when both narrowing.root and scope have a where', () => {
       const initial = baseNarrowing();
-      initial.where = ruleA;
-      const after = mergeNarrowingWheres(initial, { where: ruleB });
-      expect(after.where).toEqual({ all: [ruleA, ruleB] });
+      initial.root!.where = ruleA;
+      const after = mergeNarrowingWheres(initial, { root: { where: ruleB } });
+      expect(after.root?.where).toEqual({ all: [ruleA, ruleB] });
+    });
+
+    it('preserves picks on root when adding where', () => {
+      const after = mergeNarrowingWheres(baseNarrowing(), { root: { where: ruleA } });
+      expect(after.root?.picks).toEqual(['type', 'status']);
     });
   });
 
-  describe('relations where (descent scoping under root model)', () => {
+  describe('root.relations[R].where (descent scoping)', () => {
     it('adds relation entry with where when none existed', () => {
-      const after = mergeNarrowingWheres(baseNarrowing(), { relations: { sourceUser: ruleA } });
-      expect(after.maps.default.models.Inquiry.relations?.sourceUser.where).toEqual(ruleA);
+      const after = mergeNarrowingWheres(baseNarrowing(), {
+        root: { relations: { sourceUser: { where: ruleA } } },
+      });
+      expect(after.root?.relations?.sourceUser.where).toEqual(ruleA);
     });
 
     it('AND-merges relation where when one already exists', () => {
       const initial = baseNarrowing();
-      initial.maps.default.models.Inquiry.relations = { sourceUser: { where: ruleA } };
-      const after = mergeNarrowingWheres(initial, { relations: { sourceUser: ruleB } });
-      expect(after.maps.default.models.Inquiry.relations?.sourceUser.where).toEqual({ all: [ruleA, ruleB] });
+      initial.root!.relations = { sourceUser: { where: ruleA } };
+      const after = mergeNarrowingWheres(initial, { root: { relations: { sourceUser: { where: ruleB } } } });
+      expect(after.root?.relations?.sourceUser.where).toEqual({ all: [ruleA, ruleB] });
     });
 
-    it('preserves existing picks/omits on the relation when adding where', () => {
+    it('preserves existing picks on the relation when adding where', () => {
       const initial = baseNarrowing();
-      initial.maps.default.models.Inquiry.relations = { sourceUser: { picks: ['id', 'name'] } };
-      const after = mergeNarrowingWheres(initial, { relations: { sourceUser: ruleA } });
-      expect(after.maps.default.models.Inquiry.relations?.sourceUser).toEqual({
-        picks: ['id', 'name'],
-        where: ruleA,
-      });
+      initial.root!.relations = { sourceUser: { picks: ['id', 'name'] } };
+      const after = mergeNarrowingWheres(initial, { root: { relations: { sourceUser: { where: ruleA } } } });
+      expect(after.root?.relations?.sourceUser).toEqual({ picks: ['id', 'name'], where: ruleA });
     });
 
-    it('preserves picks/omits on the root model when adding relations', () => {
-      const after = mergeNarrowingWheres(baseNarrowing(), { relations: { sourceUser: ruleA } });
-      expect(after.maps.default.models.Inquiry.picks).toEqual(['type', 'status']);
+    it('recurses on deeper relation paths', () => {
+      const after = mergeNarrowingWheres(baseNarrowing(), {
+        root: {
+          relations: {
+            sourceUser: {
+              where: ruleA,
+              relations: { account: { where: ruleB } },
+            },
+          },
+        },
+      });
+      expect(after.root?.relations?.sourceUser.where).toEqual(ruleA);
+      expect(after.root?.relations?.sourceUser.relations?.account.where).toEqual(ruleB);
     });
   });
 
-  describe('defaults where (everywhere-X scoping)', () => {
-    it('adds defaults.models[X] with where when none existed', () => {
-      const after = mergeNarrowingWheres(baseNarrowing(), { defaults: { User: ruleA } });
-      expect(after.maps.default.defaults?.models?.User.where).toEqual(ruleA);
+  describe('mapDefaults.<map>.models[X].where (everywhere-X scoping)', () => {
+    it('adds mapDefaults entry when none existed', () => {
+      const after = mergeNarrowingWheres(baseNarrowing(), {
+        mapDefaults: { prisma: { models: { User: { where: ruleA } } } },
+      });
+      expect(after.mapDefaults?.prisma?.models?.User.where).toEqual(ruleA);
     });
 
-    it('AND-merges defaults.models[X].where when one already exists', () => {
+    it('AND-merges when one already exists', () => {
       const initial = baseNarrowing();
-      initial.maps.default.defaults = { models: { User: { where: ruleA } } };
-      const after = mergeNarrowingWheres(initial, { defaults: { User: ruleB } });
-      expect(after.maps.default.defaults?.models?.User.where).toEqual({ all: [ruleA, ruleB] });
+      initial.mapDefaults = { prisma: { models: { User: { where: ruleA } } } };
+      const after = mergeNarrowingWheres(initial, {
+        mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
+      });
+      expect(after.mapDefaults?.prisma?.models?.User.where).toEqual({ all: [ruleA, ruleB] });
     });
 
-    it('preserves picks/enumPicks on defaults.models[X] when adding where', () => {
+    it('preserves picks/enumPicks on existing mapDefaults model when adding where', () => {
       const initial = baseNarrowing();
-      initial.maps.default.defaults = {
-        models: { User: { picks: ['id', 'name'], enumPicks: { PlatformRole: ['user'] } } },
+      initial.mapDefaults = {
+        prisma: { models: { User: { picks: ['id', 'name'], enumPicks: { PlatformRole: ['user'] } } } },
       };
-      const after = mergeNarrowingWheres(initial, { defaults: { User: ruleA } });
-      expect(after.maps.default.defaults?.models?.User).toEqual({
+      const after = mergeNarrowingWheres(initial, {
+        mapDefaults: { prisma: { models: { User: { where: ruleA } } } },
+      });
+      expect(after.mapDefaults?.prisma?.models?.User).toEqual({
         picks: ['id', 'name'],
         enumPicks: { PlatformRole: ['user'] },
         where: ruleA,
@@ -93,47 +113,27 @@ describe('mergeNarrowingWheres', () => {
   });
 
   describe('cross-slot composition', () => {
-    it('applies all three slots in one merge', () => {
+    it('applies root and mapDefaults in one merge', () => {
       const after = mergeNarrowingWheres(baseNarrowing(), {
-        where: ruleA,
-        relations: { sourceUser: ruleB },
-        defaults: { User: ruleC },
+        root: { where: ruleA, relations: { sourceUser: { where: ruleB } } },
+        mapDefaults: { prisma: { models: { User: { where: ruleC } } } },
       });
-      expect(after.where).toEqual(ruleA);
-      expect(after.maps.default.models.Inquiry.relations?.sourceUser.where).toEqual(ruleB);
-      expect(after.maps.default.defaults?.models?.User.where).toEqual(ruleC);
-    });
-
-    it('fans out across multiple maps (relations + defaults apply to every map)', () => {
-      const initial: LensNarrowing = {
-        parent: lensFor('Inquiry'),
-        maps: {
-          default: { models: { Inquiry: { picks: ['type'] } } },
-          admin: { models: { Inquiry: { picks: ['type', 'status'] } } },
-        },
-      };
-      const after = mergeNarrowingWheres(initial, {
-        relations: { sourceUser: ruleA },
-        defaults: { User: ruleB },
-      });
-      expect(after.maps.default.models.Inquiry.relations?.sourceUser.where).toEqual(ruleA);
-      expect(after.maps.admin.models.Inquiry.relations?.sourceUser.where).toEqual(ruleA);
-      expect(after.maps.default.defaults?.models?.User.where).toEqual(ruleB);
-      expect(after.maps.admin.defaults?.models?.User.where).toEqual(ruleB);
+      expect(after.root?.where).toEqual(ruleA);
+      expect(after.root?.relations?.sourceUser.where).toEqual(ruleB);
+      expect(after.mapDefaults?.prisma?.models?.User.where).toEqual(ruleC);
     });
   });
 
   describe('immutability', () => {
     it('does not mutate the input narrowing', () => {
       const initial = baseNarrowing();
-      initial.where = ruleA;
-      initial.maps.default.models.Inquiry.relations = { sourceUser: { where: ruleA } };
-      initial.maps.default.defaults = { models: { User: { where: ruleA } } };
+      initial.root!.where = ruleA;
+      initial.root!.relations = { sourceUser: { where: ruleA } };
+      initial.mapDefaults = { prisma: { models: { User: { where: ruleA } } } };
       const snapshot = structuredClone(initial);
       mergeNarrowingWheres(initial, {
-        where: ruleB,
-        relations: { sourceUser: ruleB },
-        defaults: { User: ruleB },
+        root: { where: ruleB, relations: { sourceUser: { where: ruleB } } },
+        mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
       });
       expect(initial).toEqual(snapshot);
     });

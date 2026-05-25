@@ -1,1 +1,1 @@
-export const contactPicks: readonly string[] = ['type', 'subtype', 'label', 'valueKey'];
+export const contactPicks: string[] = ['type', 'subtype', 'label', 'valueKey'];

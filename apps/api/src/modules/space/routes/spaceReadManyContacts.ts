@@ -4,6 +4,7 @@ import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
 import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { contactPicks } from '#/modules/contact/schemas/contactPicks';
 import { Modules } from '#/modules/modules';
 
 export const spaceReadManyContactsRoute = readRoute({
@@ -11,20 +12,18 @@ export const spaceReadManyContactsRoute = readRoute({
   submodel: Modules.contact,
   many: true,
   paginate: true,
+  narrowing: {
+    parent: lensFor('Contact'),
+    root: {
+      picks: contactPicks,
+      where: { field: 'deletedAt', operator: 'equals', value: null },
+    },
+  },
+  responseSchema: ContactScalarSchema,
   middleware: [
     validatePermission('read'),
     scopeNarrowing((c) => ({
-      where: {
-        all: [
-          { field: 'spaceId', operator: 'equals', value: getResource<'space'>(c).id },
-          { field: 'deletedAt', operator: 'equals', value: null },
-        ],
-      },
+      root: { where: { field: 'spaceId', operator: 'equals', value: getResource<'space'>(c).id } },
     })),
   ],
-  narrowing: {
-    parent: lensFor('Contact'),
-    maps: { prisma: { models: { Contact: { picks: ['type', 'subtype', 'label', 'valueKey'] } } } },
-  },
-  responseSchema: ContactScalarSchema,
 });

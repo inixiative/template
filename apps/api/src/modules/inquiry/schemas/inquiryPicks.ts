@@ -1,4 +1,4 @@
-export const inquiryPicks: readonly string[] = [
+export const inquiryPicks: string[] = [
   'type',
   'status',
   'sourceModel',

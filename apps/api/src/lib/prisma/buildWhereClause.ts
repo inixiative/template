@@ -184,7 +184,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const { narrowing, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(narrowing);
   const model = lens.model as ModelName;
-  const searchableFields = narrowing.maps[lens.mapName]?.models?.[model]?.picks ?? [];
+  const searchableFields = narrowing.root?.picks ?? [];
   const conditions: Record<string, unknown>[] = [];
 
   // Global search — `contains` only makes sense for text, drop everything else.
@@ -210,9 +210,9 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     }
   }
 
-  // Per-request scoping: root-level narrowing.where → Prisma where via toPrisma.
-  if (narrowing.where !== undefined) {
-    const step = toPrisma(narrowing.where, { map: lens, mapName: lens.mapName, model }).steps[0];
+  // Per-request scoping: root-anchored where → Prisma where via toPrisma.
+  if (narrowing.root?.where !== undefined) {
+    const step = toPrisma(narrowing.root.where, { map: lens, mapName: lens.mapName, model }).steps[0];
     if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
   }
 

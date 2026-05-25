@@ -7,14 +7,14 @@ import type { AppEnv } from '#/types/appEnv';
 
 const inquiryNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  maps: { prisma: { models: { Inquiry: { picks: ['type'] } } } },
+  root: { picks: ['type'] },
 });
 
 const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };
 const ruleB: Condition = { field: 'b', operator: 'equals', value: 2 };
 
 describe('scopeNarrowing', () => {
-  it('AND-merges scope.where into narrowing on ctx', async () => {
+  it('AND-merges scope.root.where into narrowing on ctx', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
       c.set('narrowing', inquiryNarrowing());
@@ -22,8 +22,8 @@ describe('scopeNarrowing', () => {
     });
     app.get(
       '/check',
-      scopeNarrowing(() => ({ where: ruleA })),
-      (c) => c.json({ where: c.get('narrowing')?.where ?? null }),
+      scopeNarrowing(() => ({ root: { where: ruleA } })),
+      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
     );
     const res = await app.fetch(new Request('http://test/check'));
     expect(res.status).toBe(200);
@@ -57,15 +57,15 @@ describe('scopeNarrowing', () => {
     });
     app.get(
       '/check',
-      scopeNarrowing(() => ({ where: ruleA })),
-      scopeNarrowing(() => ({ where: ruleB })),
-      (c) => c.json({ where: c.get('narrowing')?.where ?? null }),
+      scopeNarrowing(() => ({ root: { where: ruleA } })),
+      scopeNarrowing(() => ({ root: { where: ruleB } })),
+      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
     );
     const res = await app.fetch(new Request('http://test/check'));
     expect(await res.json()).toEqual({ where: { all: [ruleA, ruleB] } });
   });
 
-  it('merges relations and defaults slots through to ctx narrowing', async () => {
+  it('merges root.relations and mapDefaults slots through to ctx narrowing', async () => {
     const app = new OpenAPIHono<AppEnv>();
     app.use('*', async (c, next) => {
       c.set('narrowing', inquiryNarrowing());
@@ -73,12 +73,15 @@ describe('scopeNarrowing', () => {
     });
     app.get(
       '/check',
-      scopeNarrowing(() => ({ relations: { sourceUser: ruleA }, defaults: { User: ruleB } })),
+      scopeNarrowing(() => ({
+        root: { relations: { sourceUser: { where: ruleA } } },
+        mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
+      })),
       (c) => {
         const n = c.get('narrowing')!;
         return c.json({
-          rel: n.maps.default.models.Inquiry.relations?.sourceUser.where ?? null,
-          def: n.maps.default.defaults?.models?.User.where ?? null,
+          rel: n.root?.relations?.sourceUser.where ?? null,
+          def: n.mapDefaults?.prisma?.models?.User.where ?? null,
         });
       },
     );

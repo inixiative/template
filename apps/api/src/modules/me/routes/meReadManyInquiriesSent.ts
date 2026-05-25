@@ -1,7 +1,8 @@
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
-import { inquiryNarrowing } from '#/modules/inquiry/schemas/inquiryNarrowing';
+import { inquiryPicks } from '#/modules/inquiry/schemas/inquiryPicks';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -12,16 +13,17 @@ export const meReadManyInquiriesSentRoute = readRoute({
   many: true,
   skipId: true,
   paginate: true,
-  narrowing: inquiryNarrowing,
+  narrowing: {
+    parent: lensFor('Inquiry'),
+    root: {
+      picks: inquiryPicks,
+      where: { field: 'sourceModel', operator: 'equals', value: InquiryResourceModel.User },
+    },
+  },
   responseSchema: inquirySentResponseSchema,
   middleware: [
     scopeNarrowing((c) => ({
-      where: {
-        all: [
-          { field: 'sourceModel', operator: 'equals', value: InquiryResourceModel.User },
-          { field: 'sourceUserId', operator: 'equals', value: c.get('user')!.id },
-        ],
-      },
+      root: { where: { field: 'sourceUserId', operator: 'equals', value: c.get('user')!.id } },
     })),
   ],
 });
