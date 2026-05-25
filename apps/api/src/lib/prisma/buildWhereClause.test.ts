@@ -1,12 +1,17 @@
+import { lensFor } from '@template/db/lens';
 import { describe, expect, it } from 'bun:test';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-
-const onUser = (overrides: Parameters<typeof buildWhereClause>[0]) => buildWhereClause({ model: 'User', ...overrides });
 
 describe('buildWhereClause', () => {
   describe('global search (single term, fan-out across fields)', () => {
     it('emits a case-insensitive OR across String fields', () => {
-      const result = onUser({ search: 'aron', searchableFields: ['name', 'email'] });
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name', 'email'] } } } },
+        },
+        search: 'aron',
+      });
       expect(result).toEqual({
         AND: [
           {
@@ -21,9 +26,11 @@ describe('buildWhereClause', () => {
 
     it('walks relation paths', () => {
       const result = buildWhereClause({
-        model: 'Inquiry',
+        narrowing: {
+          parent: lensFor('Inquiry'),
+          maps: { default: { models: { Inquiry: { picks: ['sourceUser.name', 'sourceUser.email'] } } } },
+        },
         search: 'aron',
-        searchableFields: ['sourceUser.name', 'sourceUser.email'],
       });
       expect(result).toEqual({
         AND: [
@@ -38,9 +45,12 @@ describe('buildWhereClause', () => {
     });
 
     it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name', 'platformRole', 'createdAt', 'emailVerified'] } } } },
+        },
         search: 'aron',
-        searchableFields: ['name', 'platformRole', 'createdAt', 'emailVerified'],
       });
       expect(result).toEqual({
         AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] }],
@@ -48,28 +58,48 @@ describe('buildWhereClause', () => {
     });
 
     it('emits no OR when every searchable field is non-String', () => {
-      const result = onUser({ search: 'foo', searchableFields: ['platformRole', 'createdAt'] });
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['platformRole', 'createdAt'] } } } },
+        },
+        search: 'foo',
+      });
       expect(result).toEqual({});
     });
 
     it('returns empty when there is no search term and no searchFields', () => {
-      const result = onUser({ searchableFields: ['name'] });
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
+      });
       expect(result).toEqual({});
     });
   });
 
   describe('searchFields — bare value applies the kind default operator', () => {
     it('String → contains + insensitive mode', () => {
-      const result = onUser({ searchFields: { name: 'aron' }, searchableFields: ['name'] });
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
+        searchFields: { name: 'aron' },
+      });
       expect(result).toEqual({
         AND: [{ name: { contains: 'aron', mode: 'insensitive' } }],
       });
     });
 
     it('enum → equals (no contains, no mode)', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+        },
         searchFields: { platformRole: 'superadmin' },
-        searchableFields: ['platformRole'],
       });
       expect(result).toEqual({
         AND: [{ platformRole: { equals: 'superadmin' } }],
@@ -78,25 +108,33 @@ describe('buildWhereClause', () => {
 
     it('Int → equals, with string coercion to number', () => {
       const result = buildWhereClause({
-        model: 'CronJob',
+        narrowing: {
+          parent: lensFor('CronJob'),
+          maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+        },
         searchFields: { maxAttempts: '3' },
-        searchableFields: ['maxAttempts'],
       });
       expect(result).toEqual({ AND: [{ maxAttempts: { equals: 3 } }] });
     });
 
     it('Boolean → equals, coercing "true" / "false" strings', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+        },
         searchFields: { emailVerified: 'true' },
-        searchableFields: ['emailVerified'],
       });
       expect(result).toEqual({ AND: [{ emailVerified: { equals: true } }] });
     });
 
     it('DateTime → equals with Date coercion from ISO string', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+        },
         searchFields: { createdAt: '2026-05-10T12:00:00Z' },
-        searchableFields: ['createdAt'],
       });
       const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
       expect(inner.equals).toBeInstanceOf(Date);
@@ -104,21 +142,25 @@ describe('buildWhereClause', () => {
     });
 
     it('DateTime → equals with Date coercion from ms-timestamp string', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+        },
         searchFields: { createdAt: '1715353200000' },
-        searchableFields: ['createdAt'],
       });
       const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
       expect(inner.equals.getTime()).toBe(1715353200000);
     });
 
     it('Json fields throw — not searchable via this surface', () => {
-      // Inquiry.content is Json
       expect(() =>
         buildWhereClause({
-          model: 'Inquiry',
+          narrowing: {
+            parent: lensFor('Inquiry'),
+            maps: { default: { models: { Inquiry: { picks: ['content'] } } } },
+          },
           searchFields: { content: 'anything' },
-          searchableFields: ['content'],
         }),
       ).toThrow(/JSON fields aren't searchable/);
     });
@@ -126,9 +168,12 @@ describe('buildWhereClause', () => {
 
   describe('searchFields — explicit operators', () => {
     it("auto-adds mode: 'insensitive' for String + mode-capable ops", () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
         searchFields: { name: { startsWith: 'A' } },
-        searchableFields: ['name'],
       });
       expect(result).toEqual({
         AND: [{ name: { startsWith: 'A', mode: 'insensitive' } }],
@@ -136,9 +181,12 @@ describe('buildWhereClause', () => {
     });
 
     it("doesn't add mode when caller explicitly passes mode", () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
         searchFields: { name: { contains: 'A', mode: 'default' } },
-        searchableFields: ['name'],
       });
       expect(result).toEqual({
         AND: [{ name: { contains: 'A', mode: 'default' } }],
@@ -146,9 +194,12 @@ describe('buildWhereClause', () => {
     });
 
     it("doesn't add mode for String in/notIn (Prisma doesn't support mode on those)", () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['email'] } } } },
+        },
         searchFields: { email: { in: ['a@x.com', 'b@x.com'] } },
-        searchableFields: ['email'],
       });
       expect(result).toEqual({
         AND: [{ email: { in: ['a@x.com', 'b@x.com'] } }],
@@ -156,9 +207,12 @@ describe('buildWhereClause', () => {
     });
 
     it("doesn't add mode for enum equals (mode is a String-only Prisma concept)", () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+        },
         searchFields: { platformRole: { equals: 'superadmin' } },
-        searchableFields: ['platformRole'],
       });
       expect(result).toEqual({
         AND: [{ platformRole: { equals: 'superadmin' } }],
@@ -167,17 +221,22 @@ describe('buildWhereClause', () => {
 
     it('coerces Int operator values', () => {
       const result = buildWhereClause({
-        model: 'CronJob',
+        narrowing: {
+          parent: lensFor('CronJob'),
+          maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+        },
         searchFields: { maxAttempts: { gte: '5', lt: '10' } },
-        searchableFields: ['maxAttempts'],
       });
       expect(result).toEqual({ AND: [{ maxAttempts: { gte: 5, lt: 10 } }] });
     });
 
     it('coerces DateTime operator values (ISO string and ms-timestamp)', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+        },
         searchFields: { createdAt: { gte: '2026-01-01T00:00:00Z', lt: '1735689600000' } },
-        searchableFields: ['createdAt'],
       });
       const clause = (result as { AND: Array<{ createdAt: { gte: Date; lt: Date } }> }).AND[0].createdAt;
       expect(clause.gte).toBeInstanceOf(Date);
@@ -186,9 +245,12 @@ describe('buildWhereClause', () => {
     });
 
     it('normalises singleton in value to an array', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+        },
         searchFields: { platformRole: { in: 'superadmin' } },
-        searchableFields: ['platformRole'],
       });
       expect(result).toEqual({
         AND: [{ platformRole: { in: ['superadmin'] } }],
@@ -199,25 +261,49 @@ describe('buildWhereClause', () => {
   describe('searchFields — operator validation per kind', () => {
     it("rejects 'contains' on enum field", () => {
       expect(() =>
-        onUser({ searchFields: { platformRole: { contains: 'super' } }, searchableFields: ['platformRole'] }),
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['platformRole'] } } } },
+          },
+          searchFields: { platformRole: { contains: 'super' } },
+        }),
       ).toThrow(/Operator 'contains' is not valid for field 'platformRole' \(enum\)/);
     });
 
     it("rejects 'gt' on String field", () => {
-      expect(() => onUser({ searchFields: { name: { gt: 'a' } }, searchableFields: ['name'] })).toThrow(
-        /Operator 'gt' is not valid for field 'name' \(String\)/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['name'] } } } },
+          },
+          searchFields: { name: { gt: 'a' } },
+        }),
+      ).toThrow(/Operator 'gt' is not valid for field 'name' \(String\)/);
     });
 
     it("rejects 'in' on DateTime field", () => {
       expect(() =>
-        onUser({ searchFields: { createdAt: { in: ['2026-01-01'] } }, searchableFields: ['createdAt'] }),
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+          },
+          searchFields: { createdAt: { in: ['2026-01-01'] } },
+        }),
       ).toThrow(/Operator 'in' is not valid for field 'createdAt' \(DateTime\)/);
     });
 
     it("rejects 'contains' on Boolean field", () => {
       expect(() =>
-        onUser({ searchFields: { emailVerified: { contains: 'tr' } }, searchableFields: ['emailVerified'] }),
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+          },
+          searchFields: { emailVerified: { contains: 'tr' } },
+        }),
       ).toThrow(/not valid for field 'emailVerified' \(Boolean\)/);
     });
   });
@@ -226,45 +312,74 @@ describe('buildWhereClause', () => {
     it('throws on non-numeric Int input', () => {
       expect(() =>
         buildWhereClause({
-          model: 'CronJob',
+          narrowing: {
+            parent: lensFor('CronJob'),
+            maps: { default: { models: { CronJob: { picks: ['maxAttempts'] } } } },
+          },
           searchFields: { maxAttempts: 'abc' },
-          searchableFields: ['maxAttempts'],
         }),
       ).toThrow(/Cannot coerce/);
     });
 
     it("throws on Boolean inputs that aren't true/false strings", () => {
-      expect(() => onUser({ searchFields: { emailVerified: 'yes' }, searchableFields: ['emailVerified'] })).toThrow(
-        /Cannot coerce/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['emailVerified'] } } } },
+          },
+          searchFields: { emailVerified: 'yes' },
+        }),
+      ).toThrow(/Cannot coerce/);
     });
 
     it('throws on garbage DateTime input', () => {
-      expect(() => onUser({ searchFields: { createdAt: 'not-a-date' }, searchableFields: ['createdAt'] })).toThrow(
-        /Cannot coerce/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['createdAt'] } } } },
+          },
+          searchFields: { createdAt: 'not-a-date' },
+        }),
+      ).toThrow(/Cannot coerce/);
     });
   });
 
-  describe('searchableFields whitelist', () => {
-    it('throws when a field is not in searchableFields', () => {
-      expect(() => onUser({ searchFields: { name: 'aron', password: 'secret' }, searchableFields: ['name'] })).toThrow(
-        /'password' is not searchable/,
-      );
+  describe('picks whitelist', () => {
+    it('throws when a field is not in picks', () => {
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['name'] } } } },
+          },
+          searchFields: { name: 'aron', password: 'secret' },
+        }),
+      ).toThrow(/'password' is not searchable/);
     });
 
     it('throws on invalid path notation', () => {
-      expect(() => onUser({ searchFields: { 'bad path!': 'x' }, searchableFields: ['bad path!'] })).toThrow(
-        /Invalid search field/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['bad path!'] } } } },
+          },
+          searchFields: { 'bad path!': 'x' },
+        }),
+      ).toThrow(/Invalid search field/);
     });
   });
 
   describe('relation operators (some / every / none / is / isNot)', () => {
     it('threads through `some` filter into a to-many relation', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['tokens.name'] } } } },
+        },
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
-        searchableFields: ['tokens.name'],
       });
       expect(result).toEqual({
         AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }],
@@ -272,9 +387,12 @@ describe('buildWhereClause', () => {
     });
 
     it('threads through `every` with kind-aware coercion on the nested field', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['tokens.isActive'] } } } },
+        },
         searchFields: { tokens: { every: { isActive: 'true' } } },
-        searchableFields: ['tokens.isActive'],
       });
       expect(result).toEqual({
         AND: [{ tokens: { every: { isActive: { equals: true } } } }],
@@ -282,17 +400,26 @@ describe('buildWhereClause', () => {
     });
 
     it('rejects non-whitelisted relation paths', () => {
-      expect(() => onUser({ searchFields: { tokens: { some: { name: 'x' } } }, searchableFields: ['email'] })).toThrow(
-        /'tokens' is not searchable/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['email'] } } } },
+          },
+          searchFields: { tokens: { some: { name: 'x' } } },
+        }),
+      ).toThrow(/'tokens' is not searchable/);
     });
   });
 
   describe('skipFieldValidation (superadmin bypass)', () => {
-    it('allows fields not in searchableFields when bypass is on', () => {
-      const result = onUser({
+    it('allows fields not in picks when bypass is on', () => {
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: [] } } } },
+        },
         searchFields: { name: 'aron', platformRole: 'user' },
-        searchableFields: [],
         skipFieldValidation: true,
       });
       expect(result).toEqual({
@@ -302,18 +429,24 @@ describe('buildWhereClause', () => {
 
     it("still validates operators per kind — bypass doesn't loosen kind rules", () => {
       expect(() =>
-        onUser({
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: [] } } } },
+          },
           searchFields: { platformRole: { contains: 'super' } },
-          searchableFields: [],
           skipFieldValidation: true,
         }),
       ).toThrow(/Operator 'contains' is not valid for field 'platformRole'/);
     });
 
     it('passes through fields that do not resolve in the schema (synthetic / dynamic paths)', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: [] } } } },
+        },
         searchFields: { _customField: 'anything' },
-        searchableFields: [],
         skipFieldValidation: true,
       });
       expect(result).toEqual({ AND: [{ _customField: 'anything' }] });
@@ -322,9 +455,12 @@ describe('buildWhereClause', () => {
 
   describe('filters + orNullFields', () => {
     it('combines pre-built filters with search', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
         search: 'aron',
-        searchableFields: ['name'],
         filters: { deletedAt: null },
       });
       expect(result).toEqual({
@@ -334,9 +470,12 @@ describe('buildWhereClause', () => {
     });
 
     it('widens orNullFields to OR null', () => {
-      const result = onUser({
+      const result = buildWhereClause({
+        narrowing: {
+          parent: lensFor('User'),
+          maps: { default: { models: { User: { picks: ['name'] } } } },
+        },
         searchFields: { name: 'aron' },
-        searchableFields: ['name'],
         orNullFields: ['name'],
       });
       expect(result).toEqual({
@@ -347,16 +486,29 @@ describe('buildWhereClause', () => {
 
   describe('edge cases', () => {
     it('rejects array values without an operator', () => {
-      expect(() => onUser({ searchFields: { name: ['a', 'b'] }, searchableFields: ['name'] })).toThrow(
-        /does not support array values without an operator/,
-      );
+      expect(() =>
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['name'] } } } },
+          },
+          searchFields: { name: ['a', 'b'] },
+        }),
+      ).toThrow(/does not support array values without an operator/);
     });
 
     it('rejects nesting deeper than 10 levels', () => {
       let nested: Record<string, unknown> = { value: 'leaf' };
       for (let i = 0; i < 11; i += 1) nested = { wrap: nested };
       expect(() =>
-        onUser({ searchFields: nested as never, searchableFields: ['wrap'], skipFieldValidation: true }),
+        buildWhereClause({
+          narrowing: {
+            parent: lensFor('User'),
+            maps: { default: { models: { User: { picks: ['wrap'] } } } },
+          },
+          searchFields: nested as never,
+          skipFieldValidation: true,
+        }),
       ).toThrow(/Search query nesting too deep/);
     });
   });

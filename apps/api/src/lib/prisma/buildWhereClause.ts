@@ -1,4 +1,6 @@
+import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
+import { rootLens } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, isStringPath, lookupField } from '#/lib/prisma/fieldMetadata';
@@ -7,13 +9,10 @@ import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/l
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
-  model: ModelName;
+  narrowing: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
-  searchableFields?: readonly string[];
-  // Superadmin path bypasses the searchableFields whitelist. Still type-
-  // checks operators + coerces values — strictness applies even with the
-  // bypass.
+  // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
@@ -182,15 +181,10 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const {
-    model,
-    search,
-    searchFields,
-    searchableFields = [],
-    skipFieldValidation = false,
-    filters = {},
-    orNullFields = [],
-  } = options;
+  const { narrowing, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
+  const lens = rootLens(narrowing);
+  const model = lens.model as ModelName;
+  const searchableFields = narrowing.maps[lens.mapName]?.models?.[model]?.picks ?? [];
   const conditions: Record<string, unknown>[] = [];
 
   // Global search — `contains` only makes sense for text, drop everything else.
@@ -214,6 +208,12 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
         conditions.push({ [key]: value });
       }
     }
+  }
+
+  // Per-request scoping: root-level narrowing.where → Prisma where via toPrisma.
+  if (narrowing.where !== undefined) {
+    const step = toPrisma(narrowing.where, { map: lens, mapName: lens.mapName, model }).steps[0];
+    if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
   }
 
   return {

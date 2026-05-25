@@ -22,7 +22,6 @@ type FindManySelect<T extends AnyDelegate> = FindManyArgs<T> extends { select?: 
 type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: infer C } ? C : never;
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
-  searchableFields?: readonly string[];
   orNullFields?: string[];
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
@@ -59,44 +58,16 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const {
-    searchableFields: explicitSearchableFields,
-    orNullFields,
-    ...findManyOptions
-  } = (options ?? {}) as PaginateOptions<T>;
+  const { orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
-  const contextSearchableFields = c.get('searchableFields');
-  const searchableFields = contextSearchableFields ?? explicitSearchableFields;
-  // searchableModel is the search-target model (Inquiry on a /:id/inquiry
-  // submodel route, even though resourceType=Organization). Routes register
-  // it via searchableFieldsMiddleware; non-Prisma module routes pass null.
-  const model = c.get('searchableModel') ?? undefined;
-
+  const narrowing = c.get('narrowing');
   const skipFieldValidation = isSuperadmin(c);
 
-  // Non-Prisma module routes don't register a searchable model. That's OK
-  // when there's no search input either — empty where, route runs. But if
-  // the request DID send search/searchFields, the route's misconfigured:
-  // without a model we can't validate operators or coerce values, and
-  // silently dropping the search would hide the bug. Throw loud.
-  if (!model && (search || searchFields)) {
-    throw new Error(
-      'paginate: search/searchFields requested but no searchableModel registered. ' +
-        'Routes that accept search must pass `model` (and optionally `searchableFields`) to the route template.',
-    );
-  }
-  const searchWhere = model
-    ? buildWhereClause({
-        model,
-        search,
-        searchFields,
-        searchableFields,
-        skipFieldValidation,
-        orNullFields,
-      })
+  const searchWhere = narrowing
+    ? buildWhereClause({ narrowing, search, searchFields, skipFieldValidation, orNullFields })
     : {};
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;

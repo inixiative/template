@@ -1,5 +1,3 @@
-import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
-import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -9,19 +7,11 @@ export const spaceReadManyInquiriesReceivedController = makeController(
   spaceReadManyInquiriesReceivedRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const space = getResource<'space'>(c);
-
     const { data, pagination } = await paginate(c, db.inquiry, {
       orNullFields: ['expiresAt'],
-      where: {
-        targetModel: InquiryResourceModel.Space,
-        targetSpaceId: space.id,
-        status: { not: InquiryStatus.draft },
-      },
       orderBy: { createdAt: 'desc' },
       include: includeInquiryReceived,
     });
-
     return respond.ok(data, { pagination });
   },
 );

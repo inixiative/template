@@ -4,7 +4,7 @@ type FieldDef = { kind: 'scalar' | 'enum' | 'object'; type: string };
 
 // One cast at module boundary — see apps/api/src/lib/prisma/fieldMetadata.ts
 // for rationale.
-const MAP = prismaMap as Record<string, { fields: Record<string, FieldDef> }>;
+const MAP = prismaMap.models as Record<string, { fields: Record<string, FieldDef> }>;
 
 const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');

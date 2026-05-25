@@ -1,5 +1,6 @@
 import type { RouteConfig } from '@hono/zod-openapi';
-import type { AccessorName, Db, ModelName, Prisma } from '@template/db';
+import type { LensNarrowing } from '@inixiative/json-rules';
+import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -30,8 +31,7 @@ export type AppVars = {
   resource: unknown;
   resourceType: AccessorName | null;
   routeConfig: RouteConfig | null;
-  searchableFields: readonly string[] | null;
-  searchableModel: ModelName | null;
+  narrowing: LensNarrowing | null;
   bracketQuery: BracketQueryRecord;
 };
 

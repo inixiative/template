@@ -8,7 +8,7 @@ type Row = Record<string, unknown>;
 // --- SQL building via Prisma.sql (parameterized, no string interpolation for values) ---
 
 const table = (model: string) => {
-  const entry = (prismaMap as Record<string, { dbName: string | null }>)[model];
+  const entry = (prismaMap.models as Record<string, { dbName: string | null }>)[model];
   return Prisma.raw(`"${entry?.dbName ?? model}"`);
 };
 

@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import type { Prisma } from '@template/db';
+import { rootLens } from '@template/db/lens';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
@@ -83,8 +84,12 @@ export const buildRequest = <const T extends RouteArgs>(
     paginate = false,
     many = false,
     admin = false,
-    searchableFields,
+    narrowing,
   } = args;
+
+  const searchableFields = narrowing
+    ? (narrowing.maps[rootLens(narrowing).mapName]?.models?.[rootLens(narrowing).model]?.picks ?? [])
+    : undefined;
 
   // Need ID when: not skipId AND (has submodel OR not many)
   // With submodel + many: getting all submodels for a parent, so need parent ID

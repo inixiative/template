@@ -69,8 +69,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('searchableFields', null);
-  c.set('searchableModel', null);
+  c.set('narrowing', null);
 
   const bracketQuery = parseBracketNotation(c.req.url);
   c.set('bracketQuery', bracketQuery);

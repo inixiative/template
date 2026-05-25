@@ -6,7 +6,7 @@ import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types'
 import { isNil, lowerFirst, upperFirst } from 'lodash-es';
 
 const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: string): AccessorName | null => {
-  const modelEntry = prismaMap[upperFirst(sourceAccessor) as keyof typeof prismaMap];
+  const modelEntry = prismaMap.models[upperFirst(sourceAccessor) as keyof typeof prismaMap.models];
   if (!modelEntry) return null;
 
   const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[relationName];

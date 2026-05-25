@@ -12,7 +12,7 @@ export type FieldDef = {
 // `prismaMap` is exported `as const`, so its type is the full literal shape.
 // For string-keyed runtime lookups we reshape it once at module boundary —
 // one cast, no `unknown` laundering.
-const MAP = prismaMap as Record<string, { fields: Record<string, FieldDef> }>;
+const MAP = prismaMap.models as Record<string, { fields: Record<string, FieldDef> }>;
 
 const getField = (modelName: string, fieldName: string): FieldDef | undefined => MAP[modelName]?.fields?.[fieldName];
 

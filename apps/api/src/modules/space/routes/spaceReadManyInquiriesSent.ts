@@ -1,7 +1,10 @@
+import { InquiryResourceModel } from '@template/db/generated/client/enums';
+import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
+import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { inquiryNarrowing } from '#/modules/inquiry/schemas/inquiryNarrowing';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
-import { inquirySearchableFields } from '#/modules/inquiry/schemas/inquirySearchableFields';
 import { Modules } from '#/modules/modules';
 
 export const spaceReadManyInquiriesSentRoute = readRoute({
@@ -10,7 +13,17 @@ export const spaceReadManyInquiriesSentRoute = readRoute({
   action: 'sent',
   many: true,
   paginate: true,
-  searchableFields: inquirySearchableFields,
+  narrowing: inquiryNarrowing,
   responseSchema: inquirySentResponseSchema,
-  middleware: [validatePermission('manage')],
+  middleware: [
+    validatePermission('manage'),
+    scopeNarrowing((c) => ({
+      where: {
+        all: [
+          { field: 'sourceModel', operator: 'equals', value: InquiryResourceModel.Space },
+          { field: 'sourceSpaceId', operator: 'equals', value: getResource<'space'>(c).id },
+        ],
+      },
+    })),
+  ],
 });
