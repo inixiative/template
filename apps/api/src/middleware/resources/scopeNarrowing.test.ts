@@ -88,4 +88,22 @@ describe('scopeNarrowing', () => {
     const res = await app.fetch(new Request('http://test/check'));
     expect(await res.json()).toEqual({ rel: ruleA, def: ruleB });
   });
+
+  it('awaits async scope callbacks (for integration-source lookups)', async () => {
+    const app = new OpenAPIHono<AppEnv>();
+    app.use('*', async (c, next) => {
+      c.set('narrowing', inquiryNarrowing());
+      await next();
+    });
+    app.get(
+      '/check',
+      scopeNarrowing(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return { root: { where: ruleA } };
+      }),
+      (c) => c.json({ where: c.get('narrowing')?.root?.where ?? null }),
+    );
+    const res = await app.fetch(new Request('http://test/check'));
+    expect(await res.json()).toEqual({ where: ruleA });
+  });
 });
