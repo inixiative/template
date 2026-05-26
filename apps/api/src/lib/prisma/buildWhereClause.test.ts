@@ -16,8 +16,8 @@ describe('buildWhereClause', () => {
         AND: [
           {
             OR: [
-              { name: { contains: 'aron', mode: 'insensitive' } },
               { email: { contains: 'aron', mode: 'insensitive' } },
+              { name: { contains: 'aron', mode: 'insensitive' } },
             ],
           },
         ],
@@ -28,7 +28,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('Inquiry'),
-          root: { picks: ['sourceUser.name', 'sourceUser.email'] },
+          root: { picks: [], relations: { sourceUser: { picks: ['name', 'email'] } } },
         },
         search: 'aron',
       });
@@ -36,8 +36,8 @@ describe('buildWhereClause', () => {
         AND: [
           {
             OR: [
-              { sourceUser: { name: { contains: 'aron', mode: 'insensitive' } } },
               { sourceUser: { email: { contains: 'aron', mode: 'insensitive' } } },
+              { sourceUser: { name: { contains: 'aron', mode: 'insensitive' } } },
             ],
           },
         ],
@@ -364,11 +364,12 @@ describe('buildWhereClause', () => {
         buildWhereClause({
           filterLens: {
             parent: lensFor('User'),
-            root: { picks: ['bad path!'] },
+            // Picks accepts only valid field names — invalid notation rejected via incoming searchFields path
+            root: { picks: ['name'] },
           },
           searchFields: { 'bad path!': 'x' },
         }),
-      ).toThrow(/Invalid search field/);
+      ).toThrow(/Invalid search field|not searchable/);
     });
   });
 
@@ -377,7 +378,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
-          root: { picks: ['tokens.name'] },
+          root: { relations: { tokens: { picks: ['name'] } } },
         },
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
@@ -390,7 +391,7 @@ describe('buildWhereClause', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
-          root: { picks: ['tokens.isActive'] },
+          root: { relations: { tokens: { picks: ['isActive'] } } },
         },
         searchFields: { tokens: { every: { isActive: 'true' } } },
       });

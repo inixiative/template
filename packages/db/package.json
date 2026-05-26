@@ -19,7 +19,8 @@
     "./zod/models": "./src/generated/zod/schemas/variants/pure/index.ts",
     "./zod/*": "./src/generated/zod/schemas/*.ts",
     "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
-    "./lens": "./src/lens.ts",
+    "./lens": "./src/lens/index.ts",
+    "./lens/*": "./src/lens/*.ts",
     "./prisma/seed": "./prisma/seed.ts",
     "./prisma/seeds": "./prisma/seeds/index.ts"
   },
@@ -36,6 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@inixiative/json-rules": "^2.4.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@supercharge/promise-pool": "^3.3.0",

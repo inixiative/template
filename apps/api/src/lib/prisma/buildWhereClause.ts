@@ -1,6 +1,6 @@
 import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
-import { rootLens } from '@template/db/lens';
+import { rootLens, searchablePaths } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, isStringPath, lookupField } from '#/lib/prisma/fieldMetadata';
@@ -184,7 +184,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
-  const searchableFields = filterLens.root?.picks ?? [];
+  const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
   // Global search — `contains` only makes sense for text, drop everything else.
