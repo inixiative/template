@@ -70,6 +70,23 @@ services:
     ports: ["6379:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+
+  minio:
+    image: minio/minio:latest
+    container_name: template-minio
+    ports: ["9000:9000", "9001:9001"]   # 9000=S3 API, 9001=console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live"]
+
+  mc-init:
+    image: minio/mc:latest
+    depends_on:
+      minio: { condition: service_healthy }
+    # Creates the 4 slot-0 buckets on every `docker compose up` (idempotent via --ignore-existing)
 ```
 
 ### Connection Strings
@@ -78,6 +95,23 @@ services:
 |---------|-----|
 | Postgres | `postgres://postgres:postgres@localhost:5432/template` |
 | Redis | `redis://localhost:6379` |
+| MinIO S3 | `http://localhost:9000` (login: minioadmin / minioadmin) |
+| MinIO console | `http://localhost:9001` |
+
+### Storage buckets (slot 0 / main checkout)
+
+The `mc-init` service auto-creates 4 buckets on every `docker compose up`:
+
+| Bucket | Purpose |
+|---|---|
+| `template-system` | Platform assets (default avatars, email templates, branding) |
+| `template-user` | Tenant-uploaded content |
+| `template-system-test` | Test isolation — system bucket |
+| `template-user-test` | Test isolation — user bucket |
+
+Storage is **ephemeral** (no persistent volume on MinIO). `docker compose down && up` wipes all uploads and re-creates empty buckets. By design — file persistence in dev is rarely useful, and the reset story matters more than carrying state across restarts.
+
+See `tickets/INFRA-011-railway-buckets.md` for the full adapter design and `docs/claude/ADAPTERS.md` for the adapter pattern.
 
 ---
 

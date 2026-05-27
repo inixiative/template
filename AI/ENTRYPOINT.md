@@ -233,6 +233,7 @@ Read docs based on task type:
 - Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
 - App events/email/notifications: `docs/claude/APP_EVENTS.md`
+- Adapter modules (storage, errorReporter, email client, etc.): `docs/claude/ADAPTERS.md`
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`

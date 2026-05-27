@@ -10,6 +10,8 @@ kanban
   Todo
     INFRA-001-init-script
     INFRA-002-rules-builder
+    INFRA-011-railway-buckets
+    INFRA-012-typed-prisma-results
     FEAT-002-notes-system
     FEAT-003-feature-flags
     FEAT-004-ai-providers
@@ -33,6 +35,8 @@ kanban
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (separate repo)
+- [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - S3 adapter + MinIO local + bucket provisioning (blocks FEAT-009)
+- [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
 
 **Features:**
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
@@ -64,8 +68,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 12
-- **Todo**: 9
+- **Total Tickets**: 14
+- **Todo**: 11
 - **In Progress**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 2
@@ -78,8 +82,10 @@ INFRA-002 (Rules Builder)
 └─> FEAT-008 (Permissions Builder)
 
 INFRA-001 (Init Script)
-└─> INFRA-003 (CI/CD)
-    └─> FEAT-007 (White Labeling - DNS)
+├─> INFRA-003 (CI/CD)
+│   └─> FEAT-007 (White Labeling - DNS)
+└─> INFRA-011 (Railway Buckets — Phase 2 provisioning)
+    └─> FEAT-009 (File Management)
 
 INFRA-004 (WebSockets)
 └─> FEAT-003 (Feature Flags - real-time updates)
@@ -87,4 +93,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-03-31_
+_Last Updated: 2026-05-26_
