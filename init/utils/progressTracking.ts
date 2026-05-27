@@ -6,6 +6,7 @@ export type ProgressSection =
   | 'planetscale'
   | 'railway'
   | 'railwayPostgres'
+  | 'railwayBuckets'
   | 'cloudflarePages'
   | 'resend'
   | 'bouncer'
@@ -38,6 +39,14 @@ export type RailwayPostgresAction =
   | 'renameStagingPostgresService'
   | 'renameStagingPostgresVolume'
   | 'storeStagingPostgresUrl';
+
+export type RailwayBucketsAction =
+  | 'ensureProdSystemBucket'
+  | 'ensureProdUserBucket'
+  | 'storeProdCredentials'
+  | 'ensureStagingSystemBucket'
+  | 'ensureStagingUserBucket'
+  | 'storeStagingCredentials';
 
 export type InfisicalAction =
   | 'selectOrg'
@@ -216,6 +225,7 @@ export type ProgressActions = {
   planetscale: PlanetScaleAction;
   railway: RailwayAction;
   railwayPostgres: RailwayPostgresAction;
+  railwayBuckets: RailwayBucketsAction;
   cloudflarePages: CloudflarePagesAction;
   resend: ResendAction;
   bouncer: BouncerAction;

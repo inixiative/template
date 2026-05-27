@@ -6,6 +6,7 @@ import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
 import { getCloudflarePagesLiveActions, getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
+import { getRailwayBucketsProgressSummaries } from '../tasks/railwayBucketsSteps';
 import { getRailwayPostgresProgressSummaries } from '../tasks/railwayPostgresSteps';
 import { getRailwayProgressSummaries } from '../tasks/railwaySteps';
 import { getResendProgressSummaries } from '../tasks/resendSteps';
@@ -99,6 +100,22 @@ const getRailwayPostgresStatus = (config: ProjectConfig): { status: MenuItem['st
   return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayPostgres.error);
 };
 
+const getRailwayBucketsStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+  const summaries = getRailwayBucketsProgressSummaries(config);
+  const stagingEnabled = config.features.staging.enabled;
+  const filteredProgress: Record<string, boolean> = {};
+  filteredProgress.ensureProdSystemBucket = config.railwayBuckets.progress.ensureProdSystemBucket;
+  filteredProgress.ensureProdUserBucket = config.railwayBuckets.progress.ensureProdUserBucket;
+  filteredProgress.storeProdCredentials = config.railwayBuckets.progress.storeProdCredentials;
+  if (stagingEnabled) {
+    filteredProgress.ensureStagingSystemBucket = config.railwayBuckets.progress.ensureStagingSystemBucket;
+    filteredProgress.ensureStagingUserBucket = config.railwayBuckets.progress.ensureStagingUserBucket;
+    filteredProgress.storeStagingCredentials = config.railwayBuckets.progress.storeStagingCredentials;
+  }
+  const liveSummaries = summaries.filter((s) => !s.skipped);
+  return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayBuckets.error);
+};
+
 const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
   return getStatusFromSummaries(config.vercel.progress, getVercelProgressSummaries(config), config.vercel.error);
 };
@@ -169,6 +186,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
       const useResend = cfg.providers.email === 'resend';
 
       const railwayPostgresStatus = getRailwayPostgresStatus(cfg);
+      const railwayBucketsStatus = getRailwayBucketsStatus(cfg);
 
       const cloudflarePagesSummaries = getCloudflarePagesProgressSummaries(cfg);
       const cloudflarePagesLive = cloudflarePagesSummaries.filter((s) => !s.skipped);
@@ -226,6 +244,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
               progressDetails: railwayPostgresStatus.details,
             }
           : null,
+        {
+          label: 'Railway Buckets Setup',
+          value: 'railway-buckets',
+          status: railwayBucketsStatus.status,
+          progressDetails: railwayBucketsStatus.details,
+        },
         useVercel
           ? {
               label: 'Vercel Setup',

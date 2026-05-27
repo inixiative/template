@@ -277,6 +277,22 @@ const defaultConfig: ProjectConfig = {
     },
     error: '',
   },
+  railwayBuckets: {
+    prodSystemServiceId: '',
+    prodUserServiceId: '',
+    stagingSystemServiceId: '',
+    stagingUserServiceId: '',
+    configProjectName: '',
+    progress: {
+      ensureProdSystemBucket: false,
+      ensureProdUserBucket: false,
+      storeProdCredentials: false,
+      ensureStagingSystemBucket: false,
+      ensureStagingUserBucket: false,
+      storeStagingCredentials: false,
+    },
+    error: '',
+  },
   cloudflarePages: {
     accountId: '',
     accountName: '',

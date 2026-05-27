@@ -631,6 +631,104 @@ class RailwayApi {
       return data.integrationCreate;
     });
   }
+
+  async getProjectBuckets(projectId: string): Promise<Array<{ id: string; name: string }>> {
+    return this.vcr.capture('getProjectBuckets', async () => {
+      const data = await this.railwayGraphQLUser<{
+        project: { buckets: Array<{ id: string; name: string }> };
+      }>(
+        `
+          query ProjectBuckets($id: String!) {
+            project(id: $id) {
+              buckets { id name }
+            }
+          }
+        `,
+        { id: projectId },
+      );
+      return data.project.buckets ?? [];
+    });
+  }
+
+  async createBucket(projectId: string, name: string): Promise<{ id: string; name: string }> {
+    return this.vcr.capture('createBucket', async () => {
+      const data = await this.railwayGraphQLUser<{
+        bucketCreate: { id: string; name: string; projectId: string };
+      }>(
+        `
+          mutation BucketCreate($input: BucketCreateInput!) {
+            bucketCreate(input: $input) {
+              id
+              name
+              projectId
+            }
+          }
+        `,
+        { input: { projectId, name } },
+      );
+      return { id: data.bucketCreate.id, name: data.bucketCreate.name };
+    });
+  }
+
+  async ensureBucket(projectId: string, name: string): Promise<{ id: string; name: string }> {
+    return this.vcr.capture('ensureBucket', async () => {
+      const existing = (await this.getProjectBuckets(projectId)).find((b) => b.name === name);
+      if (existing) return existing;
+      return this.createBucket(projectId, name);
+    });
+  }
+
+  async getBucketCredentials(
+    bucketId: string,
+    environmentId: string,
+    projectId: string,
+  ): Promise<{
+    bucket: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    region: string;
+    endpoint: string;
+    urlStyle: string;
+  }> {
+    return this.vcr.capture('getBucketCredentials', async () => {
+      const data = await this.railwayGraphQLUser<{
+        bucketS3Credentials: {
+          accessKeyId: string;
+          bucketName: string;
+          endpoint: string;
+          region: string;
+          secretAccessKey: string;
+          urlStyle: string;
+        };
+      }>(
+        `
+          query BucketS3Credentials($bucketId: String!, $environmentId: String!, $projectId: String!) {
+            bucketS3Credentials(bucketId: $bucketId, environmentId: $environmentId, projectId: $projectId) {
+              accessKeyId
+              bucketName
+              endpoint
+              region
+              secretAccessKey
+              urlStyle
+            }
+          }
+        `,
+        { bucketId, environmentId, projectId },
+      );
+      const creds = data.bucketS3Credentials;
+      if (!creds?.bucketName || !creds?.accessKeyId) {
+        throw new Error('Bucket credentials not ready');
+      }
+      return {
+        bucket: creds.bucketName,
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+        region: creds.region,
+        endpoint: creds.endpoint,
+        urlStyle: creds.urlStyle,
+      };
+    });
+  }
 }
 
 export const railwayApi = new RailwayApi();

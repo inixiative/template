@@ -281,6 +281,22 @@ export type ProjectConfig = {
     };
     error: string;
   };
+  railwayBuckets: {
+    prodSystemServiceId: string;
+    prodUserServiceId: string;
+    stagingSystemServiceId: string;
+    stagingUserServiceId: string;
+    configProjectName: string;
+    progress: {
+      ensureProdSystemBucket: boolean;
+      ensureProdUserBucket: boolean;
+      storeProdCredentials: boolean;
+      ensureStagingSystemBucket: boolean;
+      ensureStagingUserBucket: boolean;
+      storeStagingCredentials: boolean;
+    };
+    error: string;
+  };
   cloudflarePages: {
     accountId: string;
     accountName: string;
@@ -355,6 +371,25 @@ const defaultRailwayPostgres: ProjectConfig['railwayPostgres'] = {
   stagingVolumeId: '',
   configProjectName: '',
   progress: defaultRailwayPostgresProgress,
+  error: '',
+};
+
+const defaultRailwayBucketsProgress: ProjectConfig['railwayBuckets']['progress'] = {
+  ensureProdSystemBucket: false,
+  ensureProdUserBucket: false,
+  storeProdCredentials: false,
+  ensureStagingSystemBucket: false,
+  ensureStagingUserBucket: false,
+  storeStagingCredentials: false,
+};
+
+const defaultRailwayBuckets: ProjectConfig['railwayBuckets'] = {
+  prodSystemServiceId: '',
+  prodUserServiceId: '',
+  stagingSystemServiceId: '',
+  stagingUserServiceId: '',
+  configProjectName: '',
+  progress: defaultRailwayBucketsProgress,
   error: '',
 };
 
@@ -954,6 +989,18 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         },
         error: config.railwayPostgres?.error ?? '',
       },
+      railwayBuckets: {
+        prodSystemServiceId: config.railwayBuckets?.prodSystemServiceId ?? '',
+        prodUserServiceId: config.railwayBuckets?.prodUserServiceId ?? '',
+        stagingSystemServiceId: config.railwayBuckets?.stagingSystemServiceId ?? '',
+        stagingUserServiceId: config.railwayBuckets?.stagingUserServiceId ?? '',
+        configProjectName: config.railwayBuckets?.configProjectName ?? '',
+        progress: {
+          ...defaultRailwayBucketsProgress,
+          ...(config.railwayBuckets?.progress ?? {}),
+        },
+        error: config.railwayBuckets?.error ?? '',
+      },
       cloudflarePages: {
         accountId: config.cloudflarePages?.accountId ?? '',
         accountName: config.cloudflarePages?.accountName ?? '',
@@ -1075,6 +1122,14 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       progress: {
         ...defaultRailwayPostgresProgress,
         ...(config.railwayPostgres?.progress ?? {}),
+      },
+    },
+    railwayBuckets: {
+      ...defaultRailwayBuckets,
+      ...(config.railwayBuckets ?? {}),
+      progress: {
+        ...defaultRailwayBucketsProgress,
+        ...(config.railwayBuckets?.progress ?? {}),
       },
     },
     cloudflarePages: {
