@@ -125,6 +125,10 @@ API_PORT="8${SLOT}00"
 DB_LOCAL="${PROJECT_NAME}_wt_${SLOT}"
 DB_TEST="${PROJECT_NAME}_test_wt_${SLOT}"
 REDIS_DB="$SLOT"
+STORAGE_BUCKET_SYSTEM="${PROJECT_NAME}-system-wt-${SLOT}"
+STORAGE_BUCKET_USER="${PROJECT_NAME}-user-wt-${SLOT}"
+STORAGE_BUCKET_SYSTEM_TEST="${PROJECT_NAME}-system-test-wt-${SLOT}"
+STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${SLOT}"
 
 # ---------------------------------------------------------------------------
 # 3. Create git worktree
@@ -165,6 +169,10 @@ sedi "s|/[A-Za-z0-9_]\+\(?\\|$\\)|/${DB_LOCAL}\\1|" "$WT_ENV" || true
 DB_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
 sedi "s|^DATABASE_URL=.*|DATABASE_URL=${DB_HOST_USER}/${DB_LOCAL}|" "$WT_ENV"
 
+# Storage buckets — slot-isolated
+sedi "s|^STORAGE_BUCKET_SYSTEM=.*|STORAGE_BUCKET_SYSTEM=${STORAGE_BUCKET_SYSTEM}|" "$WT_ENV"
+sedi "s|^STORAGE_BUCKET_USER=.*|STORAGE_BUCKET_USER=${STORAGE_BUCKET_USER}|" "$WT_ENV"
+
 # Redis — append /N to logical DB if a REDIS_URL is present
 if grep -q '^REDIS_URL=' "$WT_ENV"; then
   REDIS_BASE="$(grep -m1 '^REDIS_URL=' "$WT_ENV" | sed -E 's|^REDIS_URL=(redis://[^/]+)(/[0-9]+)?|\1|')"
@@ -182,6 +190,10 @@ if [ -f "$MAIN_TEST_ENV" ]; then
 
   TEST_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_TEST_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
   sedi "s|^DATABASE_URL=.*|DATABASE_URL=${TEST_HOST_USER}/${DB_TEST}|" "$WT_TEST_ENV"
+
+  # Storage buckets — slot-isolated test variants
+  sedi "s|^STORAGE_BUCKET_SYSTEM=.*|STORAGE_BUCKET_SYSTEM=${STORAGE_BUCKET_SYSTEM_TEST}|" "$WT_TEST_ENV"
+  sedi "s|^STORAGE_BUCKET_USER=.*|STORAGE_BUCKET_USER=${STORAGE_BUCKET_USER_TEST}|" "$WT_TEST_ENV"
 else
   echo -e "${YELLOW}Warning: $MAIN_TEST_ENV not found, skipping .env.test generation${NC}"
 fi
@@ -199,6 +211,23 @@ if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
   echo -e "${GREEN}Created: $DB_LOCAL, $DB_TEST${NC}"
 else
   echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB creation. Start with 'bun run start:db' then re-run this script's DB step manually.${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 6b. Create MinIO buckets for this slot
+# ---------------------------------------------------------------------------
+MINIO_CONTAINER="${PROJECT_NAME}_minio"
+echo -e "${BLUE}Creating MinIO buckets on $MINIO_CONTAINER...${NC}"
+if docker ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
+  for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+                 "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
+    docker run --rm --network "${PROJECT_NAME}_default" \
+      -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
+      minio/mc:latest mb --ignore-existing "local/${BUCKET}" >/dev/null 2>&1 || true
+  done
+  echo -e "${GREEN}Created: 4 buckets for slot ${SLOT}${NC}"
+else
+  echo -e "${YELLOW}Warning: $MINIO_CONTAINER not running — skipping bucket creation.${NC}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -226,6 +255,8 @@ ${GREEN}======================================${NC}
   DB (local):  ${DB_LOCAL}
   DB (test):   ${DB_TEST}
   Redis DB:    ${REDIS_DB}
+  Buckets:     ${STORAGE_BUCKET_SYSTEM}, ${STORAGE_BUCKET_USER}
+               ${STORAGE_BUCKET_SYSTEM_TEST}, ${STORAGE_BUCKET_USER_TEST}
 
   ${BLUE}cd .worktrees/$WT_NAME && bun run local${NC}
 EOF

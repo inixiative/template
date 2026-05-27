@@ -69,6 +69,24 @@ else
     echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB drop.${NC}"
   fi
 
+  # --- 2b. Remove MinIO buckets ---------------------------------------------
+  MINIO_CONTAINER="${PROJECT_NAME}_minio"
+  if docker ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
+    STORAGE_BUCKET_SYSTEM="${PROJECT_NAME}-system-wt-${SLOT}"
+    STORAGE_BUCKET_USER="${PROJECT_NAME}-user-wt-${SLOT}"
+    STORAGE_BUCKET_SYSTEM_TEST="${PROJECT_NAME}-system-test-wt-${SLOT}"
+    STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${SLOT}"
+
+    echo -e "${BLUE}Removing MinIO buckets for slot ${SLOT}...${NC}"
+    for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+                   "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
+      docker run --rm --network "${PROJECT_NAME}_default" \
+        -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
+        minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
+    done
+    echo -e "${GREEN}MinIO buckets removed${NC}"
+  fi
+
   # --- 3. Flush Redis logical DB --------------------------------------------
   if docker ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
     echo -e "${BLUE}Flushing Redis DB ${SLOT}...${NC}"

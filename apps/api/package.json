@@ -17,6 +17,9 @@
     "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.gen.json bun run ./scripts/generateOpenapiSpec.ts && cp ./openapi.local.gen.json ../../packages/sdk/openapi.gen.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1054.0",
+    "@aws-sdk/s3-presigned-post": "^3.1054.0",
+    "@aws-sdk/s3-request-presigner": "^3.1054.0",
     "@bull-board/api": "^6.20.3",
     "@bull-board/hono": "^6.20.3",
     "@hono/zod-openapi": "^1.2.2",
