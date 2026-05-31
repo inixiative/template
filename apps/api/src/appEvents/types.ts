@@ -1,4 +1,5 @@
 import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
+import type { WSEvent } from '@template/shared/ws';
 
 export type { EmailTarget, ResolvedRecipient };
 
@@ -36,11 +37,6 @@ export type EmailHandoff = {
   tags?: string[];
 };
 
-export type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
-  message: { data: Record<string, unknown> };
-};
-
 export type ObserveData = Record<string, unknown>;
 
 export type ObserveAdapter = {
@@ -49,7 +45,7 @@ export type ObserveAdapter = {
 
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
-  websocket?: (data: T) => WSHandoff[] | null;
+  websocket?: (data: T) => WSEvent[] | null;
   observe?: (data: T) => ObserveData | null;
 
   cb?: Array<(data: T) => Promise<void> | void>;

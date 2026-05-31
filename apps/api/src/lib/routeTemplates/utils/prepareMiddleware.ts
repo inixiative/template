@@ -2,10 +2,12 @@ import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
 
-const filterLensSetter = (filterLens: LensNarrowing): MiddlewareHandler => async (c, next) => {
-  c.set('filterLens', filterLens);
-  await next();
-};
+const filterLensSetter =
+  (filterLens: LensNarrowing): MiddlewareHandler =>
+  async (c, next) => {
+    c.set('filterLens', filterLens);
+    await next();
+  };
 
 export const prepareMiddleware = (
   middleware: MiddlewareHandler | MiddlewareHandler[] | undefined,

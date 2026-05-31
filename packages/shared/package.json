@@ -32,6 +32,7 @@
     "./reference/*": "./src/reference/*.ts",
     "./vcr": "./src/vcr/index.ts",
     "./vcr/*": "./src/vcr/*.ts",
+    "./ws": "./src/ws/index.ts",
     "./styles/theme.css": "./styles/theme.css"
   },
   "dependencies": {

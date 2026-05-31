@@ -1,34 +1,28 @@
-// @wip — WS auth layer not finalized; part of the ws/ rewrite (see pubsub.ts / handler.ts).
-// Known TODOs: the try/catch swallows token validation failures silently and returns
-// `userId: null` (downgrades to anonymous). Decide whether that's right behavior vs. rejecting.
-
+import { db } from '@template/db';
 import { auth } from '#/lib/auth';
+import { findUserByEmail, findUserWithRelations } from '#/modules/user/services/find';
+import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 
-export type WSAuthResult = {
-  connectionId: string;
-  userId: string | null;
+// Resolve the real user behind a session token (better-auth), mirroring authMiddleware.
+const userFromToken = async (token: string) => {
+  const headers = new Headers({ authorization: `Bearer ${token}` });
+  const session = await auth.api.getSession({ headers });
+  if (!session?.user?.id) return null;
+  return findUserWithRelations(db, session.user.id);
 };
 
-export const authenticateWS = async (req: Request): Promise<WSAuthResult> => {
-  const connectionId = crypto.randomUUID();
+// authenticate / unspoof: token → real userId, or null when the token is invalid.
+export const authenticateToken = async (token: string): Promise<string | null> => {
+  const user = await userFromToken(token);
+  return user?.id ?? null;
+};
 
-  try {
-    const url = new URL(req.url);
-    const token = url.searchParams.get('token');
-
-    if (!token) {
-      return { connectionId, userId: null };
-    }
-
-    // Validate bearer token via better-auth
-    const headers = new Headers({ authorization: `Bearer ${token}` });
-    const session = await auth.api.getSession({ headers });
-
-    return {
-      connectionId,
-      userId: session?.user?.id ?? null,
-    };
-  } catch {
-    return { connectionId, userId: null };
-  }
+// spoof: only a superadmin may spoof; the target is resolved by email (mirrors
+// spoofMiddleware). Returns the spoofed userId, or null if the requester isn't a
+// superadmin or the email is unknown.
+export const resolveSpoofTarget = async (token: string, email: string): Promise<string | null> => {
+  const actor = await userFromToken(token);
+  if (actor?.platformRole !== 'superadmin') return null;
+  const target = await findUserByEmail(db, normalizeEmail(email));
+  return target?.id ?? null;
 };

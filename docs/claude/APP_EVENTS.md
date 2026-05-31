@@ -55,11 +55,13 @@ appEventHandlers[name](event)  ← centralized map, like jobHandlers
 makeAppEvent handler (Promise.allSettled across bridges)
   ├─ observe  → enqueueJob('recordAppEvent')  → AppEvent table
   ├─ email    → enqueueJob('sendEmail')        → Resend/Console
-  ├─ websocket → sendToChannel/sendToUser       → Redis pub/sub → frontend
+  ├─ websocket → sendToChannel(channelKey(key))  → Redis pub/sub → FE invalidateQueries
   └─ cb       → raw callbacks
 ```
 
 Nothing synchronous hits external services in the request path. Observe and email go through BullMQ jobs. WebSocket is Redis pub/sub (milliseconds). The API response is unblocked.
+
+The `websocket` reach returns `WSEvent[]` — a refetch-only contract: it names the **query** to invalidate (`{ category:'query', action:'refetch', key:{ _id, path } }`), never raw data. The FE refetches through the real authorized route, so there's no data leak. See **[WEBSOCKETS.md](./WEBSOCKETS.md)** for the full realtime layer (channelKey, the FE pipe, heartbeat/reconnect, horizontal scaling).
 
 ---
 
@@ -90,7 +92,7 @@ export type MyEventPayload = { userId: string; action: string };
 
 export const myEvent = makeAppEvent<MyEventPayload>({
   email: (data) => [{ to: [{ userIds: [data.userId] }], template: 'my-template', data }],
-  websocket: (data) => [{ target: { userIds: [data.userId] }, message: { data } }],
+  websocket: (data) => [{ category: 'query', action: 'refetch', key: { _id: 'someRead', path: { id: data.id } } }],
   observe: (data) => ({ userId: data.userId, action: data.action }),
 });
 ```
@@ -126,7 +128,7 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
 ```typescript
 type AppEventHandlerDefinition<T> = {
   email?: (data: T) => EmailHandoff[] | null;     // enqueues sendEmail job
-  websocket?: (data: T) => WSHandoff[] | null;     // pushes to channels/users
+  websocket?: (data: T) => WSEvent[] | null;       // refetch a query (channel = channelKey(key))
   observe?: (data: T) => ObserveData | null;        // enqueues recordAppEvent job
   cb?: Array<(data: T) => Promise<void> | void>;    // raw callbacks
 };
@@ -236,7 +238,7 @@ Inquiry events route by inquiry type. Each `InquiryHandler` has an `appEvents` k
 export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
   sent: {
     email: (inquiry) => [{ to: [...], template: 'org-invitation', data: {...} }],
-    websocket: (inquiry) => [{ target: {...}, message: {...} }],
+    websocket: (inquiry) => [{ category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: inquiry.id } } }],
   },
   approved: { ... },
   denied: { ... },
@@ -255,8 +257,7 @@ The `inquiry.sent` and `inquiry.resolved` handlers in `appEvents/handlers/inquir
 apps/api/src/
 ├── appEvents/
 │   ├── bridges/
-│   │   ├── email.ts           handoff → enqueueJob (glue)
-│   │   └── websocket.ts       handoff → sendToChannel/User
+│   │   └── email.ts           handoff → enqueueJob (glue)   [websocket is inlined in makeAppEvent]
 │   ├── handlers/
 │   │   ├── index.ts           AppEventPayloads + AppEventName + appEventHandlers
 │   │   ├── inquiry/
@@ -267,7 +268,7 @@ apps/api/src/
 │   │       └── userVerificationRequested.ts
 │   ├── emit.ts                emitAppEvent<K>(name, data, options?)
 │   ├── makeAppEvent.ts        returns AppEventHandlerFn
-│   ├── types.ts               EmailHandoff, WSHandoff, ObserveData, etc.
+│   ├── types.ts               EmailHandoff, WSEvent, ObserveData, etc.
 │   └── index.ts               re-exports emitAppEvent + types
 ├── lib/
 │   ├── email.ts               emailRegistry + emailVerifier + resolveFromAddress

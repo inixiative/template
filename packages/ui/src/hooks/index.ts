@@ -7,7 +7,7 @@ export {
   useSendInquiryMutation,
   useUpdateInquiryMutation,
 } from './inquiry';
-export { type AppEventPayload, useAppEvents } from './useAppEvents';
+export { useApiWebsocket } from './useApiWebsocket';
 export { useAuthenticatedRouting } from './useAuthenticatedRouting';
 export { type AuthProvider, useAuthProviders } from './useAuthProviders';
 export {
@@ -24,7 +24,6 @@ export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { type DataFilters, useDataFilters } from './useDataFilters';
 export { useDebounce, useDebouncedCallback } from './useDebounce';
-export { useEventRefetch } from './useEventRefetch';
 export { type InfiniteDataResult, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
 export {
   type InfiniteDataPage,

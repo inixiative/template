@@ -7,15 +7,15 @@
 
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/connections';
-import type { AppEventPayload } from '#/ws/types';
+import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/delivery';
+import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
 
 type PubSubMessage = {
   type: 'user' | 'channel' | 'broadcast';
   target?: string;
-  event: AppEventPayload;
+  event: WSOutbound;
 };
 
 let initialized = false;
@@ -94,15 +94,15 @@ const publish = async (message: PubSubMessage): Promise<void> => {
   }
 };
 
-export const sendToUser = (userId: string, event: AppEventPayload): void => {
+export const sendToUser = (userId: string, event: WSOutbound): void => {
   publish({ type: 'user', target: userId, event });
 };
 
-export const sendToChannel = (channel: string, event: AppEventPayload): void => {
+export const sendToChannel = (channel: string, event: WSOutbound): void => {
   publish({ type: 'channel', target: channel, event });
 };
 
-export const broadcast = (event: AppEventPayload): void => {
+export const broadcast = (event: WSOutbound): void => {
   publish({ type: 'broadcast', event });
 };
 

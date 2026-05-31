@@ -1,24 +1,28 @@
-// @wip — part of the ws/ rewrite (see pubsub.ts / handler.ts).
-
+import type { SerializedQueue } from '@template/shared/utils';
 import type { ServerWebSocket } from 'bun';
 
 export type WSData = {
-  connectionId: string; // Unique per connection (multiple tabs = multiple IDs)
-  userId: string | null; // Null for anonymous connections
-  channels: Set<string>;
+  connectionId: string; // unique per connection (multiple tabs = multiple ids)
+  userId: string | null; // effective identity: real, or spoofed-as; null = anonymous
+  channels: Set<string>; // subscribed channels (normalized query keys)
   connectedAt: number;
-  lastPing: number; // For staleness detection
+  lastPing: number; // staleness detection
+  queue: SerializedQueue; // serializes this connection's async message handling
 };
 
+// Inbound: FE → BE, one per frame. Identity actions carry the session token and
+// are validated server-side; only logout is token-free (clears to anonymous).
 export type WSMessage =
+  | { action: 'authenticate'; token: string }
+  | { action: 'spoof'; token: string; email: string }
+  | { action: 'unspoof'; token: string }
+  | { action: 'logout' }
   | { action: 'subscribe'; channel: string }
   | { action: 'unsubscribe'; channel: string }
-  | { action: 'ping' }
-  | { action: 'disconnect' }; // Explicit cleanup from FE
+  | { action: 'ping' };
 
 export type WSSocket = ServerWebSocket<WSData>;
 
-// Wire format for outbound websocket messages. The shape is opaque to the
-// transport layer — handlers in #/appEvents/handlers decide what fields the
-// frontend will see (typically `event` + handler-specific data).
-export type AppEventPayload = Record<string, unknown>;
+// Wire format for outbound websocket messages. Opaque to the transport — the
+// producer (appEvent ws bridge, etc.) decides the fields the frontend sees.
+export type WSOutbound = Record<string, unknown>;

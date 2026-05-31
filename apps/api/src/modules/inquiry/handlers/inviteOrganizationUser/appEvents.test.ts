@@ -65,37 +65,20 @@ describe('inviteOrganizationUserAppEvents', () => {
   });
 
   describe('sent.websocket', () => {
-    it('returns WS handoff targeting the invited user', () => {
-      const inquiry = makeInquiry();
-      const handoffs = inviteOrganizationUserAppEvents.sent!.websocket!(inquiry as never);
-
-      expect(handoffs).toHaveLength(1);
-      expect(handoffs![0].target).toEqual({ userIds: ['user-target'] });
-      expect(handoffs![0].message.data.event).toBe('inquiry.sent');
-      expect(handoffs![0].message.data.inquiryId).toBe('inq-1');
-    });
-
-    it('returns null when no targetUserId', () => {
-      const inquiry = makeInquiry({ targetUserId: null });
-      const handoffs = inviteOrganizationUserAppEvents.sent!.websocket!(inquiry as never);
-      expect(handoffs).toBeNull();
+    it('refetches the inquiry the send touched', () => {
+      const events = inviteOrganizationUserAppEvents.sent!.websocket!(makeInquiry() as never);
+      expect(events).toEqual([
+        { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: 'inq-1' } } },
+      ]);
     });
   });
 
   describe('resolved.websocket', () => {
-    it('targets both source and target users', () => {
-      const inquiry = makeInquiry();
-      const handoffs = inviteOrganizationUserAppEvents.resolved!.websocket!(inquiry as never);
-
-      expect(handoffs).toHaveLength(1);
-      expect(handoffs![0].target).toEqual({ userIds: ['user-source', 'user-target'] });
-      expect(handoffs![0].message.data.event).toBe('inquiry.resolved');
-    });
-
-    it('returns null when no source or target user', () => {
-      const inquiry = makeInquiry({ sourceUserId: null, targetUserId: null });
-      const handoffs = inviteOrganizationUserAppEvents.resolved!.websocket!(inquiry as never);
-      expect(handoffs).toBeNull();
+    it('refetches the inquiry the resolution touched', () => {
+      const events = inviteOrganizationUserAppEvents.resolved!.websocket!(makeInquiry() as never);
+      expect(events).toEqual([
+        { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: 'inq-1' } } },
+      ]);
     });
   });
 });

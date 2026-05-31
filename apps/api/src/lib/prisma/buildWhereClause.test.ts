@@ -1,5 +1,5 @@
-import { lensFor } from '@template/db/lens';
 import { describe, expect, it } from 'bun:test';
+import { lensFor } from '@template/db/lens';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
 describe('buildWhereClause', () => {

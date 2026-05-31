@@ -12,6 +12,13 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const client = createAuthClient({ baseURL });
 
+  // After any auth change, sync the websocket identity. The server re-validates
+  // the token; the socket queues the send if it isn't open yet.
+  const syncWsAuth = () => {
+    const token = getToken();
+    if (token) get().websocket.authenticate(token);
+  };
+
   return {
     auth: {
       client,
@@ -30,7 +37,10 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         if (get().auth.isInitialized) return;
 
         try {
-          if (getToken()) await fetchAndHydrateMe(set, get);
+          if (getToken()) {
+            await fetchAndHydrateMe(set, get);
+            syncWsAuth();
+          }
         } catch (error) {
           await get().auth.logout();
           throw error;
@@ -41,12 +51,14 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
 
       refreshMe: async () => {
         await fetchAndHydrateMe(set, get);
+        syncWsAuth();
       },
 
       signIn: async (method: AuthMethod) => {
         await signInFn(method);
         if (method.type !== 'oauth') {
           await fetchAndHydrateMe(set, get);
+          syncWsAuth();
         }
       },
 
@@ -54,6 +66,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
         await signUpFn(method);
         if (method.type !== 'oauth') {
           await fetchAndHydrateMe(set, get);
+          syncWsAuth();
         }
       },
 
@@ -69,12 +82,18 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       setSpoof: async (email: string | null) => {
         set((state: AppStore) => ({ auth: { ...state.auth, spoofUserEmail: email } }));
         await fetchAndHydrateMe(set, get);
+        const token = getToken();
+        if (token) {
+          if (email) get().websocket.spoof(token, email);
+          else get().websocket.unspoof(token);
+        }
       },
 
       logout: async () => {
         try {
           await client.signOut();
         } finally {
+          get().websocket.logout();
           clearToken();
           set((state: AppStore) => ({
             auth: {

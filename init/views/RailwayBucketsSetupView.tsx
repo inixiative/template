@@ -94,12 +94,12 @@ export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = (
 
       <Box marginBottom={1} flexDirection="column">
         <Text bold>Buckets to provision:</Text>
-        <Text>  • {projectName}-prod-system</Text>
-        <Text>  • {projectName}-prod-user</Text>
+        <Text> • {projectName}-prod-system</Text>
+        <Text> • {projectName}-prod-user</Text>
         {stagingEnabled && (
           <>
-            <Text>  • {projectName}-staging-system</Text>
-            <Text>  • {projectName}-staging-user</Text>
+            <Text> • {projectName}-staging-system</Text>
+            <Text> • {projectName}-staging-user</Text>
           </>
         )}
       </Box>

@@ -1,7 +1,8 @@
+import { channelKey } from '@template/shared/ws';
 import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
-import { deliverWSHandoffs } from '#/appEvents/bridges/websocket';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
+import { sendToChannel } from '#/ws/pubsub';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 
@@ -51,12 +52,8 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     }
 
     if (handler.websocket) {
-      try {
-        const handoffs = handler.websocket(data) ?? [];
-        for (const h of handoffs) tasks.push(deliverWSHandoffs([h]));
-      } catch (err) {
-        tasks.push(Promise.reject(err));
-      }
+      const events = handler.websocket(data) ?? [];
+      for (const e of events) sendToChannel(channelKey(e.key), e);
     }
 
     if (handler.cb) {

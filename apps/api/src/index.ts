@@ -5,7 +5,7 @@ import { app } from '#/app';
 import { initializeOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
-import { drainConnections, handleUpgrade, initWebSocketPubSub, websocketHandler } from '#/ws';
+import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
 
 // Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
 await initializeOpenTelemetry();
@@ -19,12 +19,15 @@ initGracefulShutdown({ timeout: 30_000 });
 // Initialize WebSocket pub/sub for cross-server broadcasting
 initWebSocketPubSub();
 
+// Start the periodic stale-connection sweep
+startStaleSweep();
+
 const server = Bun.serve({
   port: process.env.PORT,
   fetch(req, server) {
     // Handle WebSocket upgrade requests
     if (req.headers.get('upgrade') === 'websocket') {
-      return handleUpgrade(req, server);
+      return acceptWebSocket(req, server);
     }
     return app.fetch(req);
   },

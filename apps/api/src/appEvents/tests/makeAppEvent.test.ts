@@ -62,7 +62,7 @@ describe('makeAppEvent', () => {
 
   describe('websocket', () => {
     it('calls websocket callback with event data', async () => {
-      const wsFn = mock(() => [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }]);
+      const wsFn = mock(() => [{ category: 'query' as const, action: 'refetch' as const, key: { _id: 'userRead' } }]);
 
       const handler = makeAppEvent({ websocket: wsFn });
       await handler(createEvent('test', { key: 'val' }));

@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import type { Permix } from '@template/permissions/client';
 import { createAuthSlice } from '@template/ui/store/slices/auth';
+import { createClientSlice } from '@template/ui/store/slices/client';
 import { createNavigationSlice } from '@template/ui/store/slices/navigation';
 import { createTenantSlice } from '@template/ui/store/slices/tenant';
 import { createUISlice } from '@template/ui/store/slices/ui';
@@ -41,7 +42,8 @@ const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlic
 
 export const createTestStore = (initialState?: Partial<AppStore>) => {
   const store = createStore<AppStore>()((set, get) => ({
-    // Client slice
+    // Client slice (real implementation; override the client with a retry-free test QueryClient)
+    ...createClientSlice(set, get, {} as StoreApi<AppStore>),
     client: new QueryClient({
       defaultOptions: {
         queries: { retry: false },

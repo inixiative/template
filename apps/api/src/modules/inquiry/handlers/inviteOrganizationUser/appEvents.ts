@@ -25,30 +25,13 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
         },
       ];
     },
-    websocket: (inquiry) => {
-      if (!inquiry.targetUserId) return null;
-      return [
-        {
-          target: { userIds: [inquiry.targetUserId] },
-          message: { data: { event: 'inquiry.sent', inquiryId: inquiry.id, type: inquiry.type } },
-        },
-      ];
-    },
+    websocket: (inquiry) => [
+      { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: inquiry.id } } },
+    ],
   },
   resolved: {
-    websocket: (inquiry) => {
-      const targets: string[] = [];
-      if (inquiry.sourceUserId) targets.push(inquiry.sourceUserId);
-      if (inquiry.targetUserId) targets.push(inquiry.targetUserId);
-      if (!targets.length) return null;
-      return [
-        {
-          target: { userIds: targets },
-          message: {
-            data: { event: 'inquiry.resolved', inquiryId: inquiry.id, type: inquiry.type, status: inquiry.status },
-          },
-        },
-      ];
-    },
+    websocket: (inquiry) => [
+      { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: inquiry.id } } },
+    ],
   },
 };

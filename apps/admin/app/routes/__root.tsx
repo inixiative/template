@@ -1,6 +1,13 @@
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
-import { useDarkMode, useLanguage, usePageMeta, useSpaceTheme, useThemePersistence } from '@template/ui/hooks';
+import {
+  useApiWebsocket,
+  useDarkMode,
+  useLanguage,
+  usePageMeta,
+  useSpaceTheme,
+  useThemePersistence,
+} from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
 import { useLayoutEffect } from 'react';
 import { navConfig } from '#/config/nav';
@@ -23,6 +30,7 @@ const RootComponent = () => {
   usePageMeta();
   useLanguage();
   useThemePersistence();
+  useApiWebsocket();
 
   // TODO: Remove mock theme once database schema is ready
   const mockSpaceTheme = {

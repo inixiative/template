@@ -9,10 +9,7 @@ type RailwayBucketsProgressGroup = {
   requiresStaging?: boolean;
 };
 
-const countCompletedActions = (
-  progress: RailwayBucketsProgress,
-  actions: readonly RailwayBucketsAction[],
-): number => {
+const countCompletedActions = (progress: RailwayBucketsProgress, actions: readonly RailwayBucketsAction[]): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
