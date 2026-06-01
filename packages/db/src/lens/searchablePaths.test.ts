@@ -4,8 +4,26 @@ import { searchablePaths } from '@template/db/lens/searchablePaths';
 
 const inquiryLens = lensFor('Inquiry');
 const userLens = lensFor('User');
+const accountLens = lensFor('Account');
 
 describe('searchablePaths', () => {
+  describe('redaction (registry-driven)', () => {
+    it('omits redacted fields from the root model', () => {
+      const paths = searchablePaths({ parent: accountLens });
+      expect(paths).not.toContain('password');
+      expect(paths).toContain('accountId');
+    });
+
+    it('omits redacted fields wherever the model appears via relations', () => {
+      const paths = searchablePaths({
+        parent: userLens,
+        root: { relations: { accounts: {} } },
+      });
+      expect(paths.some((p) => p.startsWith('accounts.'))).toBe(true);
+      expect(paths).not.toContain('accounts.password');
+    });
+  });
+
   describe('picks at root', () => {
     it('returns picked scalar/enum fields', () => {
       const paths = searchablePaths({
