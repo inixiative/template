@@ -1,4 +1,5 @@
 import { OrganizationUserScalarSchema, UserScalarSchema } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
@@ -13,6 +14,7 @@ export const organizationReadManyUsersRoute = readRoute({
   submodel: Modules.user,
   many: true,
   paginate: true,
+  filterLens: { parent: lensFor('User') },
   responseSchema,
   middleware: [validatePermission('read')],
   tags: [Tags.user, Tags.organizationUser],

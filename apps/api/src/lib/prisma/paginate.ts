@@ -1,4 +1,5 @@
 import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
+import { orderablePaths } from '@template/db/lens/orderablePaths';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
@@ -24,6 +25,9 @@ type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinc
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
   where?: FindManyWhere<T>;
+  // Caller-supplied order keys, applied at the FRONT (priority) — e.g. server-set
+  // scope ordering. Merged ahead of the client's orderBy, then deduped by top-level
+  // key, so caller keys always win over a client sort on the same key.
   orderBy?: FindManyOrderBy<T>;
   include?: FindManyInclude<T>;
   omit?: FindManyOmit<T>;
@@ -58,17 +62,21 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const { orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
+  const { orderBy: callerOrderByOption, orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
+  // paginate is lens-only: every paginated route declares a filterLens, so
+  // searchable + orderable validation always applies — there's no unvalidated
+  // escape hatch where a client `orderBy`/`searchFields` reaches Prisma raw.
   const filterLens = c.get('filterLens');
+  if (!filterLens) {
+    throw new Error('paginate: route must declare a filterLens (readRoute({ filterLens: … })).');
+  }
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere = filterLens
-    ? buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields })
-    : {};
+  const searchWhere = buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
   // Wrap both in AND so caller-supplied AND/OR clauses aren't overwritten by
@@ -77,14 +85,31 @@ export const paginate = async <
   // neither side had AND/OR keys.
   const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
 
-  const parsedOrderBy: Record<string, Prisma.SortOrder>[] = rawOrderBy
-    ? (parseOrderBy(rawOrderBy) as Record<string, Prisma.SortOrder>[])
-    : findManyOptions.orderBy
-      ? Array.isArray(findManyOptions.orderBy)
-        ? ([...findManyOptions.orderBy] as Record<string, Prisma.SortOrder>[])
-        : [findManyOptions.orderBy as Record<string, Prisma.SortOrder>]
-      : [];
-  if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
+  // Compose orderBy = caller front-keys + client orderBy + default tiebreaker,
+  // then dedupe by top-level key left-to-right (first occurrence wins) so a
+  // client sort never doubles a caller/default key. Client orderBy is validated
+  // against the lens' orderable allowlist unless the caller is a superadmin.
+  const callerOrderBy = callerOrderByOption
+    ? ((Array.isArray(callerOrderByOption) ? callerOrderByOption : [callerOrderByOption]) as Record<
+        string,
+        Prisma.SortOrder
+      >[])
+    : [];
+  const clientOrderBy = rawOrderBy
+    ? (parseOrderBy(rawOrderBy, skipFieldValidation ? undefined : orderablePaths(filterLens)) as Record<
+        string,
+        Prisma.SortOrder
+      >[])
+    : [];
+  const tiebreaker: Record<string, Prisma.SortOrder>[] = [{ id: Prisma.SortOrder.desc }];
+
+  const seenKeys = new Set<string>();
+  const parsedOrderBy = [...callerOrderBy, ...clientOrderBy, ...tiebreaker].filter((entry) => {
+    const key = Object.keys(entry)[0];
+    if (!key || seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
 
   const paginatedArgs = {
     ...findManyOptions,

@@ -1,3 +1,4 @@
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { customerRefAsProviderSchema, customerRefTags } from '#/modules/customerRef/schemas/customerRefSchemas';
@@ -9,6 +10,7 @@ export const spaceReadManyCustomersRoute = readRoute({
   submodel: Modules.customer,
   many: true,
   paginate: true,
+  filterLens: { parent: lensFor('CustomerRef') },
   responseSchema: customerRefAsProviderSchema,
   middleware: [validatePermission('read')],
   tags: [...customerRefTags],

@@ -1,3 +1,4 @@
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { providerFilterSchema } from '#/modules/customerRef/schemas/customerRefQuerySchemas';
 import { customerRefAsCustomerSchema, customerRefTags } from '#/modules/customerRef/schemas/customerRefSchemas';
@@ -10,6 +11,7 @@ export const meReadManyProvidersRoute = readRoute({
   many: true,
   skipId: true,
   paginate: true,
+  filterLens: { parent: lensFor('CustomerRef') },
   query: providerFilterSchema,
   responseSchema: customerRefAsCustomerSchema,
   tags: [Tags.me, Tags.provider, ...customerRefTags],
