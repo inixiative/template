@@ -107,6 +107,50 @@ describe('buildQuery — enum filters', () => {
   });
 });
 
+describe('buildQuery — scalar comparison filters', () => {
+  it('gte operator: emits single value', () => {
+    const result = q('', 'combined', [], { pointsAmount: { operator: 'gte', values: ['100'] } });
+    expect(result['searchFields[pointsAmount][gte]']).toBe('100');
+  });
+
+  it('lte operator: emits single value', () => {
+    const result = q('', 'combined', [], { pointsAmount: { operator: 'lte', values: ['900'] } });
+    expect(result['searchFields[pointsAmount][lte]']).toBe('900');
+  });
+
+  it('gt / lt / not operators flow through as single values', () => {
+    const result = q('', 'combined', [], {
+      a: { operator: 'gt', values: ['1'] },
+      b: { operator: 'lt', values: ['2'] },
+      c: { operator: 'not', values: ['3'] },
+    });
+    expect(result['searchFields[a][gt]']).toBe('1');
+    expect(result['searchFields[b][lt]']).toBe('2');
+    expect(result['searchFields[c][not]']).toBe('3');
+  });
+
+  it('two-sided range: merges gte and lte clauses for one field', () => {
+    const result = q('', 'combined', [], {
+      pointsAmount: [
+        { operator: 'gte', values: ['100'] },
+        { operator: 'lte', values: ['900'] },
+      ],
+    });
+    expect(result['searchFields[pointsAmount][gte]']).toBe('100');
+    expect(result['searchFields[pointsAmount][lte]']).toBe('900');
+  });
+
+  it('array in operator still works alongside the merge path', () => {
+    const result = q('', 'combined', [], { status: { operator: 'in', values: ['sent', 'approved'] } });
+    expect(result['searchFields[status][in]']).toEqual(['sent', 'approved']);
+  });
+
+  it('clause array with a single entry behaves like the single-clause form', () => {
+    const result = q('', 'combined', [], { pointsAmount: [{ operator: 'gte', values: ['100'] }] });
+    expect(result['searchFields[pointsAmount][gte]']).toBe('100');
+  });
+});
+
 describe('buildQuery — relation field filters', () => {
   it('one level: sourceUser.email', () => {
     const result = q('', 'combined', [], {
