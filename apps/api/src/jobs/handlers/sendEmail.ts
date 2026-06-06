@@ -75,19 +75,21 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
   const senderData = senderVars();
 
-  const rendered = validRecipients.map((recipient) => {
-    const variables: Variables = {
-      sender: senderData,
-      recipient: { name: recipient.name, email: recipient.to },
-      data,
-    };
+  const rendered = await Promise.all(
+    validRecipients.map(async (recipient) => {
+      const variables: Variables = {
+        sender: senderData,
+        recipient: { name: recipient.name, email: recipient.to },
+        data,
+      };
 
-    const mjml = interpolate(composed.mjml, variables);
-    const subject = interpolate(composed.subject, variables);
-    const { html } = mjml2html(mjml, { validationLevel: 'skip' });
+      const mjml = interpolate(composed.mjml, variables);
+      const subject = interpolate(composed.subject, variables);
+      const { html } = await mjml2html(mjml, { validationLevel: 'skip' });
 
-    return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
-  });
+      return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
+    }),
+  );
 
   await client.sendBatch(rendered);
 
