@@ -1,4 +1,5 @@
 import type { AccessorName, UserId } from '@template/db';
+import { castArray } from 'lodash-es';
 import { createPermix } from 'permix';
 
 // Base actions - most resources use these
@@ -60,7 +61,7 @@ export const createPermissions = (): Permix => {
     setup: async (perms, options) => {
       if (options?.replace) accumulated = {};
 
-      const entries = Array.isArray(perms) ? perms : [perms];
+      const entries = castArray(perms);
       for (const { resource, id, actions } of entries) {
         const key = id ? `${resource}:${id}` : resource;
         accumulated[key] = { ...actions };

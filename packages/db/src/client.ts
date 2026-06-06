@@ -5,6 +5,7 @@ import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLife
 import { PrismaClient } from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { castArray } from 'lodash-es';
 
 type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -123,8 +124,8 @@ const dbMethods = {
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
     const s = store.getStore();
     if (!s?.txn) throw new Error('db.onCommit() requires db.txn()');
-    const fns = Array.isArray(callbacks) ? callbacks : [callbacks];
-    const typeArray = types ? (Array.isArray(types) ? types : [types]) : undefined;
+    const fns = castArray(callbacks);
+    const typeArray = types ? castArray(types) : undefined;
     s.afterCommitBatches.push({ fns, concurrency: getConcurrency(typeArray), types: typeArray });
   },
 

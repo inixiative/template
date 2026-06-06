@@ -1,11 +1,11 @@
-import { ARRAY_FIELD_OPERATORS, type FieldOperator } from '@template/shared/bracketQuery';
+import type { ArrayFieldOperator, ScalarFieldOperator } from '@template/shared/bracketQuery';
 import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
+import { castArray } from 'lodash-es';
 
-export type FilterState = {
-  operator: FieldOperator;
-  values: string[];
-};
+export type FilterState =
+  | { operator: ArrayFieldOperator; values: string[] }
+  | { operator: ScalarFieldOperator; value: string };
 
 const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
   const [head, ...rest] = path;
@@ -43,13 +43,11 @@ export const buildFilterQuery = (
   }
 
   for (const [field, state] of Object.entries(filters)) {
-    const clauses = Array.isArray(state) ? state : [state];
-    for (const { operator, values } of clauses) {
-      if (values.length > 0) {
-        const filterValue = (ARRAY_FIELD_OPERATORS as readonly string[]).includes(operator)
-          ? { [operator]: values }
-          : { [operator]: values[0] };
-        mergePath(nested, field.split('.'), filterValue);
+    for (const clause of castArray(state)) {
+      if ('values' in clause) {
+        if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
+      } else if (clause.value) {
+        mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
       }
     }
   }

@@ -1,5 +1,6 @@
 import { DbAction, type HookOptions, HookTiming, type Prisma, registerDbHook, type SingleAction } from '@template/db';
 import { ContactRegistry } from '@template/shared/contact';
+import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
@@ -52,7 +53,7 @@ const extractCreateRows = (args: unknown): ContactRow[] => {
   if (!args || typeof args !== 'object') return [];
   const a = args as Record<string, unknown>;
   if (a.data === undefined) return [];
-  return Array.isArray(a.data) ? (a.data as ContactRow[]) : [a.data as ContactRow];
+  return castArray(a.data) as ContactRow[];
 };
 
 const mirrorComputed = (target: ContactRow, source: ContactRow): void => {

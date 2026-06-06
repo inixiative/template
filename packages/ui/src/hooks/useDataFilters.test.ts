@@ -83,12 +83,12 @@ describe('buildQuery — enum filters', () => {
   });
 
   it('equals operator: emits single value', () => {
-    const result = q('', 'combined', [], { type: { operator: 'equals', values: ['transferSpace'] } });
+    const result = q('', 'combined', [], { type: { operator: 'equals', value: 'transferSpace' } });
     expect(result['searchFields[type][equals]']).toBe('transferSpace');
   });
 
   it('contains operator: emits single value', () => {
-    const result = q('', 'combined', [], { name: { operator: 'contains', values: ['acme'] } });
+    const result = q('', 'combined', [], { name: { operator: 'contains', value: 'acme' } });
     expect(result['searchFields[name][contains]']).toBe('acme');
   });
 
@@ -109,20 +109,20 @@ describe('buildQuery — enum filters', () => {
 
 describe('buildQuery — scalar comparison filters', () => {
   it('gte operator: emits single value', () => {
-    const result = q('', 'combined', [], { pointsAmount: { operator: 'gte', values: ['100'] } });
+    const result = q('', 'combined', [], { pointsAmount: { operator: 'gte', value: '100' } });
     expect(result['searchFields[pointsAmount][gte]']).toBe('100');
   });
 
   it('lte operator: emits single value', () => {
-    const result = q('', 'combined', [], { pointsAmount: { operator: 'lte', values: ['900'] } });
+    const result = q('', 'combined', [], { pointsAmount: { operator: 'lte', value: '900' } });
     expect(result['searchFields[pointsAmount][lte]']).toBe('900');
   });
 
   it('gt / lt / not operators flow through as single values', () => {
     const result = q('', 'combined', [], {
-      a: { operator: 'gt', values: ['1'] },
-      b: { operator: 'lt', values: ['2'] },
-      c: { operator: 'not', values: ['3'] },
+      a: { operator: 'gt', value: '1' },
+      b: { operator: 'lt', value: '2' },
+      c: { operator: 'not', value: '3' },
     });
     expect(result['searchFields[a][gt]']).toBe('1');
     expect(result['searchFields[b][lt]']).toBe('2');
@@ -132,8 +132,8 @@ describe('buildQuery — scalar comparison filters', () => {
   it('two-sided range: merges gte and lte clauses for one field', () => {
     const result = q('', 'combined', [], {
       pointsAmount: [
-        { operator: 'gte', values: ['100'] },
-        { operator: 'lte', values: ['900'] },
+        { operator: 'gte', value: '100' },
+        { operator: 'lte', value: '900' },
       ],
     });
     expect(result['searchFields[pointsAmount][gte]']).toBe('100');
@@ -146,7 +146,7 @@ describe('buildQuery — scalar comparison filters', () => {
   });
 
   it('clause array with a single entry behaves like the single-clause form', () => {
-    const result = q('', 'combined', [], { pointsAmount: [{ operator: 'gte', values: ['100'] }] });
+    const result = q('', 'combined', [], { pointsAmount: [{ operator: 'gte', value: '100' }] });
     expect(result['searchFields[pointsAmount][gte]']).toBe('100');
   });
 });
@@ -154,14 +154,14 @@ describe('buildQuery — scalar comparison filters', () => {
 describe('buildQuery — relation field filters', () => {
   it('one level: sourceUser.email', () => {
     const result = q('', 'combined', [], {
-      'sourceUser.email': { operator: 'contains', values: ['@hotmail.com'] },
+      'sourceUser.email': { operator: 'contains', value: '@hotmail.com' },
     });
     expect(result['searchFields[sourceUser][email][contains]']).toBe('@hotmail.com');
   });
 
   it('two levels with relation op: tokens.some.name', () => {
     const result = q('', 'combined', [], {
-      'tokens.some.name': { operator: 'contains', values: ['mytoken'] },
+      'tokens.some.name': { operator: 'contains', value: 'mytoken' },
     });
     expect(result['searchFields[tokens][some][name][contains]']).toBe('mytoken');
   });
@@ -175,8 +175,8 @@ describe('buildQuery — relation field filters', () => {
 
   it('sibling relation fields share prefix without collision', () => {
     const result = q('', 'combined', [], {
-      'sourceUser.name': { operator: 'contains', values: ['john'] },
-      'sourceUser.email': { operator: 'contains', values: ['@example.com'] },
+      'sourceUser.name': { operator: 'contains', value: 'john' },
+      'sourceUser.email': { operator: 'contains', value: '@example.com' },
     });
     expect(result['searchFields[sourceUser][name][contains]']).toBe('john');
     expect(result['searchFields[sourceUser][email][contains]']).toBe('@example.com');
@@ -249,7 +249,7 @@ describe('buildQuery — adminMode', () => {
       '',
       'combined',
       [],
-      { 'organizationUser.role': { operator: 'equals', values: ['admin'] } },
+      { 'organizationUser.role': { operator: 'equals', value: 'admin' } },
       [],
       1,
       20,

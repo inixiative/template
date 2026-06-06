@@ -1,8 +1,6 @@
 import { FieldKind, getOperatorsForKind, type Operator } from '@inixiative/json-rules';
 import type { FieldOperator } from '@template/shared/lib/bracketQuery/operators';
 
-// Maps json-rules Operator names to the bracket/Prisma operator names the filter system uses.
-// json-rules operators without a bracket equivalent (matches, between, isEmpty, etc.) are dropped.
 const JSON_RULES_TO_BRACKET: Partial<Record<Operator, FieldOperator>> = {
   greaterThanEquals: 'gte',
   lessThanEquals: 'lte',
@@ -17,8 +15,8 @@ const JSON_RULES_TO_BRACKET: Partial<Record<Operator, FieldOperator>> = {
   endsWith: 'endsWith',
 };
 
-export { FieldKind };
 export type { Operator };
+export { FieldKind };
 
 export const operatorsForFieldKind = (kind: FieldKind): FieldOperator[] => {
   const { field } = getOperatorsForKind(kind);
