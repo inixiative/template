@@ -10,7 +10,7 @@ export const ConcurrencyType = {
 export type ConcurrencyType = (typeof ConcurrencyType)[keyof typeof ConcurrencyType];
 
 export const concurrencyLimits: Record<ConcurrencyType, number> = {
-  [ConcurrencyType.db]: 10,
+  [ConcurrencyType.db]: 4,
   [ConcurrencyType.redis]: 50,
   [ConcurrencyType.queue]: 100,
   [ConcurrencyType.socket]: 100,

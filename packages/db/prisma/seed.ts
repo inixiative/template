@@ -2,9 +2,7 @@
 
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { ConcurrencyType, getConcurrency } from '@template/shared/utils/concurrency';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
-import { resolveAll } from '@template/shared/utils/resolveAll';
 import { omit } from 'lodash-es';
 import { seeds } from './seeds';
 
@@ -72,20 +70,16 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
 
   log.info(`Seeding ${seedFile.model} (${eligibleRecords.length} records)...`, LogScope.seed);
 
-  const concurrency = getConcurrency([ConcurrencyType.db]) || 10;
+  // Sequential: each mutation holds 2 pool connections (lifecycle txn + the write); parallelizing past pool/2 deadlocks.
+  for (const record of eligibleRecords) {
+    const { prime, ...data } = record;
+    const id = data.id as string;
 
-  await resolveAll(
-    eligibleRecords.map((record) => async () => {
-      const { prime, ...data } = record;
-      const id = data.id as string;
+    const updateData = seedFile.createOnly ? {} : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
 
-      const updateData = seedFile.createOnly ? {} : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
-
-      await delegate.upsert({ where: { id }, create: data, update: updateData });
-      log.success(`  - Upserted: ${id}`, LogScope.seed);
-    }),
-    concurrency,
-  );
+    await delegate.upsert({ where: { id }, create: data, update: updateData });
+    log.success(`  - Upserted: ${id}`, LogScope.seed);
+  }
 };
 
 const seed = async () => {
