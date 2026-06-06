@@ -4,6 +4,7 @@ import {
   SpaceScalarSchema,
   SpaceUserScalarSchema,
 } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
@@ -22,6 +23,7 @@ export const meReadManyTokensRoute = readRoute({
   many: true,
   skipId: true,
   paginate: true,
+  filterLens: { parent: lensFor('Token') },
   responseSchema,
   tags: [Tags.me, Tags.token],
 });

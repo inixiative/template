@@ -1,12 +1,13 @@
 import { clearKey, db, type Prisma } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
+import { castArray } from 'lodash-es';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 
 export const extractRows = (args: unknown): Record<string, unknown>[] => {
   if (!args || typeof args !== 'object') return [];
   const a = args as Record<string, unknown>;
   if (a.data === undefined) return [];
-  return Array.isArray(a.data) ? (a.data as Record<string, unknown>[]) : [a.data as Record<string, unknown>];
+  return castArray(a.data) as Record<string, unknown>[];
 };
 
 // orderedList cascades shift sibling rows via raw SQL, which bypasses the

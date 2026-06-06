@@ -1,29 +1,30 @@
-import { ARRAY_FIELD_OPERATORS, type ArrayFieldOperator } from '@template/shared/bracketQuery';
+import type { ArrayFieldOperator, ScalarFieldOperator } from '@template/shared/bracketQuery';
 import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
+import { castArray } from 'lodash-es';
 
-export type FilterState = {
-  operator: ArrayFieldOperator | 'equals' | 'contains' | 'startsWith' | 'endsWith';
-  values: string[];
-};
+export type FilterState =
+  | { operator: ArrayFieldOperator; values: string[] }
+  | { operator: ScalarFieldOperator; value: string };
 
-const setPath = (obj: Record<string, unknown>, path: string[], value: unknown): void => {
-  if (path.length === 1) {
-    obj[path[0]] = value;
-    return;
-  }
+const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
   const [head, ...rest] = path;
   if (!obj[head] || typeof obj[head] !== 'object' || Array.isArray(obj[head])) {
     obj[head] = {};
   }
-  setPath(obj[head] as Record<string, unknown>, rest, value);
+  const next = obj[head] as Record<string, unknown>;
+  if (rest.length === 0) {
+    Object.assign(next, value);
+    return;
+  }
+  mergePath(next, rest, value);
 };
 
 export const buildFilterQuery = (
   search: string,
   searchMode: SearchMode,
   searchableFields: string[],
-  filters: Record<string, FilterState>,
+  filters: Record<string, FilterState | FilterState[]>,
   orderBy: Array<{ field: string; direction: 'asc' | 'desc' }>,
   adminMode = false,
 ): Record<string, unknown> => {
@@ -41,12 +42,13 @@ export const buildFilterQuery = (
     }
   }
 
-  for (const [field, { operator, values }] of Object.entries(filters)) {
-    if (values.length > 0) {
-      const filterValue = (ARRAY_FIELD_OPERATORS as readonly string[]).includes(operator)
-        ? { [operator]: values }
-        : { [operator]: values[0] };
-      setPath(nested, field.split('.'), filterValue);
+  for (const [field, state] of Object.entries(filters)) {
+    for (const clause of castArray(state)) {
+      if ('values' in clause) {
+        if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
+      } else if (clause.value) {
+        mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
+      }
     }
   }
 

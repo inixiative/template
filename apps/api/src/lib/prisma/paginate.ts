@@ -1,8 +1,9 @@
-import { type AnyDelegate, type Args, Prisma, type Result } from '@template/db';
+import type { AnyDelegate, Args, Result } from '@template/db';
+import { orderablePaths } from '@template/db/lens/orderablePaths';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
@@ -58,38 +59,32 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const { orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
+  const { orderBy: callerOrderByOption, orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
   const filterLens = c.get('filterLens');
+  if (!filterLens) {
+    throw new Error('paginate: route must declare a filterLens (readRoute({ filterLens: … })).');
+  }
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere = filterLens
-    ? buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields })
-    : {};
+  const searchWhere = buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
-  // Wrap both in AND so caller-supplied AND/OR clauses aren't overwritten by
-  // search's AND. Prisma flattens nested AND, so `{ AND: [a, b] }` is exactly
-  // `a` and `b` both holding — no semantic change vs the old spread when
-  // neither side had AND/OR keys.
   const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
 
-  const parsedOrderBy: Record<string, Prisma.SortOrder>[] = rawOrderBy
-    ? (parseOrderBy(rawOrderBy) as Record<string, Prisma.SortOrder>[])
-    : findManyOptions.orderBy
-      ? Array.isArray(findManyOptions.orderBy)
-        ? ([...findManyOptions.orderBy] as Record<string, Prisma.SortOrder>[])
-        : [findManyOptions.orderBy as Record<string, Prisma.SortOrder>]
-      : [];
-  if (!parsedOrderBy.some((o) => 'id' in o)) parsedOrderBy.push({ id: Prisma.SortOrder.desc });
+  const orderBy = buildOrderBy({
+    callerOrderBy: callerOrderByOption,
+    clientOrderBy: rawOrderBy,
+    orderableFields: skipFieldValidation ? undefined : orderablePaths(filterLens),
+  });
 
   const paginatedArgs = {
     ...findManyOptions,
     where,
-    orderBy: parsedOrderBy,
+    orderBy,
     take: pageSize,
     skip: (page - 1) * pageSize,
   } as unknown as FindManyArgs<T>;

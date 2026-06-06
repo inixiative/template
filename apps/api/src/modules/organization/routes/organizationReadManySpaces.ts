@@ -1,4 +1,5 @@
 import { SpaceScalarSchema } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
@@ -9,6 +10,7 @@ export const organizationReadManySpacesRoute = readRoute({
   submodel: Modules.space,
   many: true,
   paginate: true,
+  filterLens: { parent: lensFor('Space') },
   responseSchema: SpaceScalarSchema,
   middleware: [validatePermission('read')],
   tags: [Tags.space, Tags.organization],

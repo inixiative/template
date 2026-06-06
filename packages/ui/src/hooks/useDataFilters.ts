@@ -36,7 +36,7 @@ export const useDataFilters = (
 
   const setFilter = (field: string, state: FilterState | null) => {
     setFilters((prev) => {
-      if (!state || state.values.length === 0) {
+      if (!state || ('values' in state ? state.values.length === 0 : !state.value)) {
         const { [field]: _removed, ...rest } = prev;
         return rest;
       }
