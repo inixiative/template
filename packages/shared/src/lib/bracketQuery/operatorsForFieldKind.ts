@@ -15,9 +15,6 @@ const JSON_RULES_TO_BRACKET: Partial<Record<Operator, FieldOperator>> = {
   endsWith: 'endsWith',
 };
 
-export type { Operator };
-export { FieldKind };
-
 export const operatorsForFieldKind = (kind: FieldKind): FieldOperator[] => {
   const { field } = getOperatorsForKind(kind);
   const mapped: FieldOperator[] = [];

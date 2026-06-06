@@ -15,6 +15,16 @@ describe('orderablePaths', () => {
     });
   });
 
+  describe('to-one edges', () => {
+    it('includes leaves reachable through a to-one relation', () => {
+      const paths = orderablePaths({
+        parent: inquiryLens,
+        root: { relations: { sourceUser: { picks: ['name'] } } },
+      });
+      expect(paths).toContain('sourceUser.name');
+    });
+  });
+
   describe('orderable leaves', () => {
     it('includes scalar and enum leaves, excludes Json', () => {
       // content + resolution are Json (not orderable); type/status are enums; createdAt is a scalar.
@@ -76,16 +86,12 @@ describe('orderablePaths', () => {
   });
 
   describe('to-many edges', () => {
-    // NOTE: the template's @inixiative/prisma-map (v0.0.2) does not emit `isList`
-    // on relation fields, so `crossesToMany` can't yet distinguish to-one from
-    // to-many — leaves behind a to-many relation are NOT excluded today. The guard
-    // matches the Zealot reference and activates once the generator emits `isList`.
-    it('currently includes leaves behind a to-many relation (isList unavailable)', () => {
+    it('excludes leaves reachable through a to-many relation (Prisma orderBy cannot sort by a to-many)', () => {
       const paths = orderablePaths({
         parent: userLens,
         root: { picks: ['name'], relations: { accounts: { picks: ['accountId'] } } },
       });
-      expect(paths.sort()).toEqual(['accounts.accountId', 'name']);
+      expect(paths.sort()).toEqual(['name']);
     });
   });
 

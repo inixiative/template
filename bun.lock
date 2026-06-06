@@ -189,7 +189,7 @@
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
-        "@inixiative/prisma-map": "^0.0.2",
+        "@inixiative/prisma-map": "^0.0.4",
         "@types/bcryptjs": "^3.0.0",
         "@types/ioredis-mock": "^8.2.7",
         "@types/lodash-es": "^4.17.12",
@@ -619,7 +619,7 @@
 
     "@inixiative/json-rules": ["@inixiative/json-rules@2.5.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-fmHPhIsreGjJqu6KPGf/g2DtM1a0mx9SNOVfpCAtjSNrdtFi5reek3lWSFRKKsY8CSXIdJ9IXSsdq/UGUx+5Zg=="],
 
-    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.0.2", "", {}, "sha512-QVEuPHKDEYccSd/EFlJY7Q3jjyPkcHEoDHWTwUlw+fPAd8oqemciAR/1vy1FvU2jSge80winVv08DMPaYg2qgQ=="],
+    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.0.4", "", {}, "sha512-Wdvr/ST3sCX+ZTfZwFNLiq1o3gW/sLcetOFngaKhblF+1kABkm14TQeNv9qqBJqdXbRVB//uRcKiDuQoaOIDSg=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 

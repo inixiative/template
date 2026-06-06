@@ -23,6 +23,19 @@ describe('buildOrderBy', () => {
     expect(() => buildOrderBy({ clientOrderBy: ['secret:asc'], orderableFields: ['name'] })).toThrow();
   });
 
+  it('builds nested orderBy for deep relation dot-paths', () => {
+    expect(
+      buildOrderBy({
+        clientOrderBy: ['user.organization.name:asc'],
+        orderableFields: ['user.organization.name'],
+      }),
+    ).toEqual([{ user: { organization: { name: 'asc' } } }, { id: 'desc' }]);
+  });
+
+  it('throws on a path outside the allowlist (e.g. a to-many bridge orderablePaths excludes)', () => {
+    expect(() => buildOrderBy({ clientOrderBy: ['organizationUsers.role:asc'], orderableFields: ['name'] })).toThrow();
+  });
+
   it('skips validation when orderableFields is undefined', () => {
     expect(buildOrderBy({ clientOrderBy: ['anything:asc'] })).toEqual([{ anything: 'asc' }, { id: 'desc' }]);
   });

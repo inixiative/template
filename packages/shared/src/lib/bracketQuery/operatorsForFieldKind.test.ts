@@ -1,4 +1,5 @@
-import { FieldKind, operatorsForFieldKind } from '@template/shared/bracketQuery';
+import { FieldKind } from '@inixiative/json-rules';
+import { operatorsForFieldKind } from '@template/shared/bracketQuery';
 import { describe, expect, it } from 'bun:test';
 
 describe('operatorsForFieldKind', () => {

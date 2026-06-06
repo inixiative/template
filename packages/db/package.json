@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
-    "@inixiative/prisma-map": "^0.0.2",
+    "@inixiative/prisma-map": "^0.0.4",
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",
