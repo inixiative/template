@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { clearImmutableFieldsCache, setImmutableFieldsCache } from '#/hooks/immutableFields/registry';
 
@@ -14,19 +14,16 @@ describe('immutableFields hook', () => {
   let userId: string;
   let orgId: string;
   let orgUserId: string;
-  let tokenId: string;
 
   afterEach(() => {
     clearImmutableFieldsCache();
   });
 
   beforeAll(async () => {
-    const { entity: orgUser, context } = await createOrganizationUser();
-    const { entity: token } = await createToken({ ownerModel: 'OrganizationUser' }, context);
+    const { entity: orgUser } = await createOrganizationUser();
     userId = orgUser.userId;
     orgId = orgUser.organizationId;
     orgUserId = orgUser.id;
-    tokenId = token.id;
   });
 
   it('strips immutable FK fields from update', async () => {
@@ -67,52 +64,6 @@ describe('immutableFields hook', () => {
 
     expect(result.userId).toBe(userId);
     expect(result.role).toBe('member');
-  });
-
-  it('strips immutable FK fields 3 levels deep (User -> OrganizationUser -> Token)', async () => {
-    const result = await db.user.update({
-      where: { id: userId },
-      data: {
-        name: 'Updated Name',
-        organizationUsers: {
-          update: {
-            where: { id: orgUserId },
-            data: {
-              userId: 'should-strip-level-2',
-              organizationId: 'should-strip-level-2',
-              role: 'admin',
-              tokens: {
-                update: {
-                  where: { id: tokenId },
-                  data: {
-                    userId: 'should-strip-level-3',
-                    organizationId: 'should-strip-level-3',
-                    name: 'Updated Token',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      include: {
-        organizationUsers: {
-          include: { tokens: true },
-        },
-      },
-    });
-
-    expect(result.name).toBe('Updated Name');
-
-    const orgUser = result.organizationUsers[0];
-    expect(orgUser.userId).toBe(userId);
-    expect(orgUser.organizationId).toBe(orgId);
-    expect(orgUser.role).toBe('admin');
-
-    const token = orgUser.tokens[0];
-    expect(token.userId).toBe(userId);
-    expect(token.organizationId).toBe(orgId);
-    expect(token.name).toBe('Updated Token');
   });
 
   describe('overrides', () => {

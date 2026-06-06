@@ -1,4 +1,5 @@
 import type { Db } from '@template/db/clientTypes';
+import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
@@ -21,6 +22,12 @@ const getDb = (): Db => require('@template/db/client').db;
 
 const runtimeDelegate = (db: Db, model: Prisma.ModelName): RuntimeDelegate =>
   db[toAccessor(model)] as unknown as RuntimeDelegate;
+
+// Re-issue through db.txn so the write + hooks share the txn's connection atomically.
+const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown): Promise<unknown> =>
+  getDb().txn(() =>
+    (runtimeDelegate(getDb(), model) as unknown as Record<string, (a: unknown) => Promise<unknown>>)[operation](args),
+  );
 
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = (model: Prisma.ModelName, where: Record<string, unknown>) =>
@@ -46,16 +53,16 @@ export const mutationLifeCycleExtension = () => {
     query: {
       $allModels: {
         async create({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
-          return getDb().txn(() =>
-            timed(model, operation, async () => {
-              await executeHooks(HookTiming.before, hookOptions);
-              const result = await query(args);
-              hookOptions.result = result;
-              await executeHooks(HookTiming.after, hookOptions);
-              return result;
-            }),
-          );
+          return timed(model, operation, async () => {
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async createMany({ model }) {
@@ -66,31 +73,31 @@ export const mutationLifeCycleExtension = () => {
         },
 
         async createManyAndReturn({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
-          return getDb().txn(() =>
-            timed(model, operation, async () => {
-              await executeHooks(HookTiming.before, hookOptions);
-              const result = await query(args);
-              hookOptions.result = result;
-              await executeHooks(HookTiming.after, hookOptions);
-              return result;
-            }),
-          );
+          return timed(model, operation, async () => {
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async update({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
-          return getDb().txn(() =>
-            timed(model, operation, async () => {
-              hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
-              await executeHooks(HookTiming.before, hookOptions);
-              const result = await query(args);
-              hookOptions.result = result;
-              await executeHooks(HookTiming.after, hookOptions);
-              return result;
-            }),
-          );
+          return timed(model, operation, async () => {
+            hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async updateMany({ model }) {
@@ -101,69 +108,64 @@ export const mutationLifeCycleExtension = () => {
         },
 
         async updateManyAndReturn({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
-          return getDb().txn(
-            () =>
-              timed(model, operation, async () => {
-                const previous = await fetchExistingRecords(model, where);
-                hookOptions.previous = previous;
-                await executeHooks(HookTiming.before, hookOptions);
-                const result = await query(args);
-                hookOptions.result = result;
-                await executeHooks(HookTiming.after, hookOptions);
-                return result;
-              }),
-            { timeout: 30_000 },
-          );
+          return timed(model, operation, async () => {
+            hookOptions.previous = await fetchExistingRecords(model, where);
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async upsert({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
-          return getDb().txn(() =>
-            timed(model, operation, async () => {
-              hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
-              await executeHooks(HookTiming.before, hookOptions);
-              const result = await query(args);
-              hookOptions.result = result;
-              await executeHooks(HookTiming.after, hookOptions);
-              return result;
-            }),
-          );
+          return timed(model, operation, async () => {
+            hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async delete({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
-          return getDb().txn(() =>
-            timed(model, operation, async () => {
-              hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
-              await executeHooks(HookTiming.before, hookOptions);
-              const result = await query(args);
-              hookOptions.result = result;
-              await executeHooks(HookTiming.after, hookOptions);
-              return result;
-            }),
-          );
+          return timed(model, operation, async () => {
+            hookOptions.previous = (await fetchExistingRecord(model, where)) ?? undefined;
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = result;
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
 
         async deleteMany({ model, operation, args, query }) {
+          if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
+          assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.deleteMany, args };
-          return getDb().txn(
-            () =>
-              timed(model, operation, async () => {
-                const previous = await fetchExistingRecords(model, where);
-                hookOptions.previous = previous;
-                await executeHooks(HookTiming.before, hookOptions);
-                const result = await query(args);
-                hookOptions.result = previous; // deleteMany returns count, so use previous as result for hooks
-                await executeHooks(HookTiming.after, hookOptions);
-                return result;
-              }),
-            { timeout: 30_000 },
-          );
+          return timed(model, operation, async () => {
+            const previous = await fetchExistingRecords(model, where);
+            hookOptions.previous = previous;
+            await executeHooks(HookTiming.before, hookOptions);
+            const result = await query(args);
+            hookOptions.result = previous; // deleteMany returns count, so use previous as result for hooks
+            await executeHooks(HookTiming.after, hookOptions);
+            return result;
+          });
         },
       },
     },

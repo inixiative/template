@@ -1,4 +1,4 @@
-import { DbAction, getModelRelations, HookTiming, type ModelName, registerDbHook } from '@template/db';
+import { DbAction, HookTiming, type ModelName, registerDbHook } from '@template/db';
 import { unset } from 'lodash-es';
 import { getImmutableFields } from '#/hooks/immutableFields/registry';
 
@@ -9,37 +9,12 @@ const stripFromObject = (obj: Record<string, unknown>, model: ModelName): void =
 };
 
 const processArgs = (args: unknown, model: ModelName): void => {
-  if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) {
-    args.forEach((item) => {
-      processArgs(item, model);
-    });
-    return;
-  }
-
-  const record = args as Record<string, unknown>;
-
-  // Strip from data/update at this level (for the current model)
-  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+  const record = args as Record<string, unknown> | null;
+  if (record?.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
     stripFromObject(record.data as Record<string, unknown>, model);
   }
-  if (record.update && typeof record.update === 'object' && !Array.isArray(record.update)) {
+  if (record?.update && typeof record.update === 'object' && !Array.isArray(record.update)) {
     stripFromObject(record.update as Record<string, unknown>, model);
-  }
-
-  // Recurse into relation fields (check both at record level and inside data)
-  const relations = getModelRelations(model);
-  const dataRecord = (record.data as Record<string, unknown>) ?? {};
-
-  for (const rel of relations) {
-    const targetModel = rel.targetModel as ModelName;
-    const nested = dataRecord[rel.relationName] ?? record[rel.relationName];
-    if (!nested || typeof nested !== 'object') continue;
-
-    const nestedRecord = nested as Record<string, unknown>;
-    for (const op of ['update', 'updateMany', 'upsert'] as const) {
-      if (nestedRecord[op]) processArgs(nestedRecord[op], targetModel);
-    }
   }
 };
 

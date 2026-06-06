@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@template/db/generated/client/client';
+import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
 
 export type AfterCommitFn = () => Promise<void> | void;
@@ -13,6 +14,7 @@ export type DbMethods = {
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
+  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>) => Promise<T[]>;
 };
 
 export type Db = PrismaClient & DbMethods;

@@ -6,26 +6,16 @@ export const organizationCreateController = makeController(organizationCreateRou
   const user = c.get('user')!;
   const body = c.req.valid('json');
 
-  const organization = await db.organization.create({
-    data: {
-      ...body,
-      organizationUsers: {
-        create: {
-          userId: user!.id,
-          role: 'owner',
-        },
-      },
-    },
-    include: {
-      organizationUsers: true,
-    },
+  const { organization, organizationUser } = await db.txn(async () => {
+    const organization = await db.organization.create({ data: body });
+    const organizationUser = await db.organizationUser.create({
+      data: { organizationId: organization.id, userId: user!.id, role: 'owner' },
+    });
+    return { organization, organizationUser };
   });
 
-  const organizationUser = organization.organizationUsers[0];
-  const { organizationUsers: _organizationUsers, ...organizationData } = organization;
-
   return respond.created({
-    ...organizationData,
+    ...organization,
     organizationUser,
   });
 });

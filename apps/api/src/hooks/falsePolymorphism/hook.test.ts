@@ -110,55 +110,7 @@ describe('falsePolymorphism hook', () => {
     await expect(promise).toThrow('Invalid ownerModel value on Token');
   });
 
-  describe('recursive nested validation', () => {
-    it('pass: nested create with valid polymorphism', async () => {
-      const { entity: user } = await createUser();
-      const seq = getNextSeq();
-
-      const result = await db.user.update({
-        where: { id: user.id },
-        data: {
-          tokens: {
-            create: {
-              name: 'nested',
-              keyHash: `h${seq}`,
-              keyPrefix: `p${seq}`,
-              ownerModel: 'User',
-            },
-          },
-        },
-        include: { tokens: true },
-      });
-
-      expect(result.tokens[0].ownerModel).toBe('User');
-      expect(result.tokens[0].userId).toBe(user.id);
-    });
-
-    it('fail: nested create with extra FK via relation', async () => {
-      const { entity: org } = await createOrganization();
-      const { entity: user } = await createUser();
-      const seq = getNextSeq();
-
-      const promise = async () =>
-        db.organization.update({
-          where: { id: org.id },
-          data: {
-            tokens: {
-              create: {
-                name: 'nested',
-                keyHash: `h${seq}`,
-                keyPrefix: `p${seq}`,
-                ownerModel: 'Organization',
-                userId: user.id, // Invalid - Organization owner can't have userId
-              },
-            },
-          },
-        });
-
-      // Prisma FK constraint catches this before our validation
-      await expect(promise).toThrow('Foreign key constraint violated');
-    });
-
+  describe('create path polymorphism validation', () => {
     it('pass: upsert create path with valid polymorphism', async () => {
       const { entity: user } = await createUser();
       const seq = getNextSeq();
@@ -198,39 +150,6 @@ describe('falsePolymorphism hook', () => {
         });
 
       await expect(promise).toThrow('Invalid ownerModel value on Token');
-    });
-
-    it('fail: nested createMany with invalid item inside update', async () => {
-      const { entity: user } = await createUser();
-      const { entity: org } = await createOrganization();
-      const seq1 = getNextSeq();
-      const seq2 = getNextSeq();
-
-      // Note: Prisma auto-infers userId from the user.tokens relation, so we don't pass it
-      // The invalid item has organizationId which violates the compound FK constraint
-      const promise = async () =>
-        db.user.update({
-          where: { id: user.id },
-          data: {
-            tokens: {
-              createMany: {
-                data: [
-                  { name: 'valid', keyHash: `h${seq1}`, keyPrefix: `p${seq1}`, ownerModel: 'User' },
-                  {
-                    name: 'invalid',
-                    keyHash: `h${seq2}`,
-                    keyPrefix: `p${seq2}`,
-                    ownerModel: 'User',
-                    organizationId: org.id,
-                  },
-                ],
-              },
-            },
-          },
-        });
-
-      // Prisma FK constraint catches this before our validation
-      await expect(promise).toThrow('Foreign key constraint violated');
     });
 
     it('pass: regular update without nested creates', async () => {

@@ -11,8 +11,8 @@ export type ResolveUserByContactArgs = {
 };
 
 export const resolveUserByContact = async (args: ResolveUserByContactArgs): Promise<string> => {
-  return db.$transaction(async (tx) => {
-    const existing = await tx.contact.findFirst({
+  return db.txn(async () => {
+    const existing = await db.contact.findFirst({
       where: { ownerModel: ContactOwnerModel.User, type: args.type, valueKey: args.valueKey },
       select: { userId: true },
     });
@@ -27,7 +27,7 @@ export const resolveUserByContact = async (args: ResolveUserByContactArgs): Prom
     }
     const pseudoEmail = def.toStubEmail(args.value as never);
 
-    const user = await tx.user.create({
+    const user = await db.user.create({
       data: {
         email: pseudoEmail,
         name: args.displayName || null,
@@ -35,7 +35,7 @@ export const resolveUserByContact = async (args: ResolveUserByContactArgs): Prom
         emailVerified: false,
       },
     });
-    await tx.contact.create({
+    await db.contact.create({
       data: {
         ownerModel: ContactOwnerModel.User,
         userId: user.id,

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { clearRulesCache, setRulesCache } from '#/hooks/rules/registry';
 
@@ -143,58 +143,6 @@ describe('rules hook', () => {
       });
 
       expect(result.name).toBe('Existing');
-    });
-  });
-
-  describe('recursive nested validation', () => {
-    it('validates nested create on relation', async () => {
-      setRulesCache('OrganizationUser', {
-        field: 'role',
-        operator: Operator.in,
-        value: ['member', 'admin', 'owner'],
-        error: 'invalid role',
-      });
-
-      const { entity: user } = await createUser();
-      const seq = getNextSeq();
-
-      const org = await db.organization.create({
-        data: {
-          name: `Org${seq}`,
-          slug: `org${seq}`,
-          organizationUsers: {
-            create: { userId: user.id, role: 'member' },
-          },
-        },
-        include: { organizationUsers: true },
-      });
-
-      expect(org.organizationUsers[0].role).toBe('member');
-    });
-
-    it('validates nested update on relation', async () => {
-      const { entity: orgUser } = await createOrganizationUser({ role: 'member' });
-      setRulesCache('OrganizationUser', {
-        field: 'role',
-        operator: Operator.in,
-        value: ['member', 'admin', 'owner'],
-        error: 'invalid role',
-      });
-
-      const result = await db.user.update({
-        where: { id: orgUser.userId },
-        data: {
-          organizationUsers: {
-            update: {
-              where: { id: orgUser.id },
-              data: { role: 'admin' },
-            },
-          },
-        },
-        include: { organizationUsers: true },
-      });
-
-      expect(result.organizationUsers[0].role).toBe('admin');
     });
   });
 

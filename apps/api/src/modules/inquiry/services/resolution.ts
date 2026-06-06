@@ -25,13 +25,8 @@ export const resolveInquiry = async (
 
   try {
     return await db.txn(async () => {
-      // Fetch + row-lock in one query. Under READ COMMITTED, two concurrent
-      // resolves could both pass `validateInquiryIsResolvable` on the same
-      // stale row and both run `handleApprove` (double-effect side effects).
-      // `SELECT … FOR UPDATE` makes the second caller wait here until the
-      // first commits; the second then re-reads the new status and the
-      // validator rejects. Single RTT vs SELECT-then-findUnique.
-      const [fresh] = await db.$queryRaw<Inquiry[]>`SELECT * FROM "Inquiry" WHERE id = ${inquiry.id} FOR UPDATE`;
+      // Row-lock first: serializes concurrent resolves so the second re-reads the committed status and the validator rejects.
+      const [fresh] = await db.findForUpdate<Inquiry>('Inquiry', { id: inquiry.id });
       validateInquiryIsResolvable(fresh!);
 
       let approvalOutput: Record<string, unknown> = {};
@@ -40,9 +35,7 @@ export const resolveInquiry = async (
         const handler = inquiryHandlers[fresh.type];
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
-        const freshWithRelations = { ...inquiry, ...fresh };
-        if (handler.validate) await handler.validate(db, freshWithRelations, content);
-        approvalOutput = (await handler.handleApprove(db, freshWithRelations, merged)) ?? {};
+        approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
       }
 
       const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;

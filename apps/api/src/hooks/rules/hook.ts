@@ -1,15 +1,12 @@
 import { check } from '@inixiative/json-rules';
 import {
   DbAction,
-  getModelRelations,
   type HookOptions,
   HookTiming,
   type ModelName,
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import { log } from '@template/shared/logger';
-import { isEmpty } from 'lodash-es';
 import { getRule } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 
@@ -19,95 +16,17 @@ const validateData = (data: Record<string, unknown>, model: ModelName): void => 
 };
 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
-  if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) {
-    args.forEach((item) => {
-      processCreateArgs(item, model);
-    });
-    return;
-  }
-
-  const record = args as Record<string, unknown>;
-
-  // Validate data at this level
-  if (record.data && typeof record.data === 'object') {
-    if (Array.isArray(record.data)) {
-      record.data.forEach((d) => {
-        validateData(d as Record<string, unknown>, model);
-      });
-    } else {
-      validateData(record.data as Record<string, unknown>, model);
-    }
-  }
-
-  // Validate create path in upsert
-  if (record.create && typeof record.create === 'object' && !Array.isArray(record.create)) {
-    validateData(record.create as Record<string, unknown>, model);
-  }
-
-  // Validate raw data (nested create items passed directly without wrapper)
-  if (!record.data && !record.create && !record.where) {
-    validateData(record, model);
-  }
-
-  // Recurse into nested relations
-  const relations = getModelRelations(model);
-  const dataRecord = (record.data as Record<string, unknown>) ?? {};
-  const createRecord = (record.create as Record<string, unknown>) ?? {};
-
-  for (const rel of relations) {
-    const targetModel = rel.targetModel as ModelName;
-    const nested = dataRecord[rel.relationName] ?? createRecord[rel.relationName] ?? record[rel.relationName];
-    if (!nested || typeof nested !== 'object') continue;
-
-    const nestedRecord = nested as Record<string, unknown>;
-    for (const op of ['create', 'createMany', 'upsert'] as const) {
-      if (nestedRecord[op]) processCreateArgs(nestedRecord[op], targetModel);
-    }
-  }
+  const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data)) for (const d of data) validateData(d as Record<string, unknown>, model);
+  else validateData(data as Record<string, unknown>, model);
 };
 
 const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<string, unknown>): void => {
-  if (!args || typeof args !== 'object') return;
-  if (Array.isArray(args)) {
-    args.forEach((item) => {
-      processUpdateArgs(item, model);
-    });
-    return;
-  }
-
-  const record = args as Record<string, unknown>;
-  const data = record.data as Record<string, unknown> | undefined;
-
-  // Merge previous with update data and validate
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const merged = shadowMerge(previous, data);
-    validateData(merged, model);
-  }
-
-  // For upsert, also validate the update path
-  if (record.update && typeof record.update === 'object' && !Array.isArray(record.update)) {
-    const merged = shadowMerge(previous, record.update as Record<string, unknown>);
-    validateData(merged, model);
-  }
-
-  // Warn if nested updates detected - can't merge without fetching previous for each nested record
-  const relations = getModelRelations(model);
-  const dataRecord = data ?? {};
-  const updateRecord = (record.update as Record<string, unknown>) ?? {};
-
-  for (const rel of relations) {
-    const nested = dataRecord[rel.relationName] ?? updateRecord[rel.relationName];
-    if (!nested || typeof nested !== 'object') continue;
-
-    const nestedRecord = nested as Record<string, unknown>;
-    const upsertUpdate = (nestedRecord.upsert as Record<string, unknown>)?.update;
-    const hasUpdate = nestedRecord.update || nestedRecord.updateMany || (nestedRecord.upsert && !isEmpty(upsertUpdate));
-
-    if (hasUpdate) {
-      log.warn(`Nested update on ${model}.${rel.relationName} skips rule validation - use explicit transaction`);
-    }
-  }
+  const data = ((args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.update) as
+    | Record<string, unknown>
+    | undefined;
+  if (data && typeof data === 'object' && !Array.isArray(data)) validateData(shadowMerge(previous, data), model);
 };
 
 export const registerRulesHook = () => {

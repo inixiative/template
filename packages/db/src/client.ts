@@ -2,7 +2,9 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
-import { PrismaClient } from '@template/db/generated/client/client';
+import { Prisma, PrismaClient } from '@template/db/generated/client/client';
+import { prismaMap } from '@template/db/generated/prismaMap';
+import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
@@ -134,6 +136,18 @@ const dbMethods = {
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
   isInTxn: (): boolean => !!store.getStore()?.txn,
+
+  // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
+  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>): Promise<T[]> => {
+    if (!dbMethods.isInTxn()) throw new Error('db.findForUpdate() requires db.txn()');
+    const keys = Object.keys(where);
+    if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
+    const table = prismaMap.models[model]?.dbName ?? model;
+    const conds = keys.map((key) => Prisma.sql`${Prisma.raw(`"${key}"`)} = ${where[key]}`);
+    return db.$queryRaw<T[]>(
+      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
+    );
+  },
 };
 
 export const db: Db = new Proxy({} as Db, {
