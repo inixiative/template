@@ -1,4 +1,5 @@
 import { type FieldMapEntry, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import { redactLens } from '@template/db/lens/redactLens';
 
 type Visit = { fields: Record<string, FieldMapEntry> };
 
@@ -18,7 +19,7 @@ const crossesToMany = (dottedPath: string, rootKey: string, byPath: Map<string, 
 };
 
 export const orderablePaths = (filterLens: LensNarrowing): string[] => {
-  const byPath = projectByPath(filterLens) as Map<string, Visit>;
+  const byPath = projectByPath(redactLens(filterLens)) as Map<string, Visit>;
   const rootKey = byPath.keys().next().value;
   if (!rootKey) return [];
 

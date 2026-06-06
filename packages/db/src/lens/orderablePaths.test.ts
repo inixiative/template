@@ -4,8 +4,17 @@ import { orderablePaths } from '@template/db/lens/orderablePaths';
 
 const inquiryLens = lensFor('Inquiry');
 const userLens = lensFor('User');
+const accountLens = lensFor('Account');
 
 describe('orderablePaths', () => {
+  describe('redaction (registry-driven)', () => {
+    it('omits redacted fields from the sortable surface', () => {
+      const paths = orderablePaths({ parent: accountLens });
+      expect(paths).not.toContain('password');
+      expect(paths).toContain('accountId');
+    });
+  });
+
   describe('orderable leaves', () => {
     it('includes scalar and enum leaves, excludes Json', () => {
       // content + resolution are Json (not orderable); type/status are enums; createdAt is a scalar.
