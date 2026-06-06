@@ -56,3 +56,19 @@ describe('buildSearchFieldsSchema (json)', () => {
     expect(schema?.safeParse({ permissionRules: { path: ['a', 'b'], equals: 'x' } }).success).toBe(true);
   });
 });
+
+describe('buildSearchFieldsSchema — null + boolean values', () => {
+  const lens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name', 'emailVerified'] } };
+  const schema = buildSearchFieldsSchema(lens);
+  if (!schema) throw new Error('expected a schema');
+
+  it('allows null on equals/not (is-null / is-set)', () => {
+    expect(schema.safeParse({ name: { equals: null } }).success).toBe(true);
+    expect(schema.safeParse({ name: { not: null } }).success).toBe(true);
+  });
+
+  it('Boolean field takes a boolean value, rejects the string form', () => {
+    expect(schema.safeParse({ emailVerified: { equals: true } }).success).toBe(true);
+    expect(schema.safeParse({ emailVerified: { equals: 'true' } }).success).toBe(false);
+  });
+});

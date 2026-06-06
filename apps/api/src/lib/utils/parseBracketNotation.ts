@@ -1,3 +1,5 @@
+import { BRACKET_SYMBOL_SEGMENT, castBracketSymbol } from '@template/shared/bracketQuery';
+
 export type BracketQueryPrimitive = string | number | boolean | null;
 export type BracketQueryValue = BracketQueryPrimitive | BracketQueryPrimitive[] | BracketQueryRecord;
 export type BracketQueryRecord = {
@@ -12,8 +14,14 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     const bracketMatch = key.match(/^([^[]+)(\[[^\]]+\])+$/);
     if (!bracketMatch) continue;
 
-    const keys = key.match(/[^[\]]+/g);
-    if (!keys || keys.length < 2) continue;
+    const rawKeys = key.match(/[^[\]]+/g);
+    if (!rawKeys || rawKeys.length < 2) continue;
+
+    // A trailing `[:]` marks the leaf value as a symbol (null/true/false) rather
+    // than a literal string; drop the marker and cast the value.
+    const isSymbol = rawKeys[rawKeys.length - 1] === BRACKET_SYMBOL_SEGMENT;
+    const keys = isSymbol ? rawKeys.slice(0, -1) : rawKeys;
+    if (keys.length < 1) continue;
 
     let current: BracketQueryRecord = result;
     for (let i = 0; i < keys.length - 1; i++) {
@@ -24,7 +32,11 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
       current = current[keys[i]] as BracketQueryRecord;
     }
 
-    const decodedValue = decodeURIComponent(value.replace(/\+/g, ' ')).trim();
+    const decoded = decodeURIComponent(value.replace(/\+/g, ' ')).trim();
+    // Cast `[:]`-marked tokens to symbols; unknown tokens fall back to the literal
+    // string (allowlist, no eval). `=== undefined` so the valid null symbol survives.
+    const symbol = isSymbol ? castBracketSymbol(decoded) : undefined;
+    const decodedValue: BracketQueryPrimitive = symbol !== undefined ? symbol : decoded;
     const leafKey = keys[keys.length - 1];
     const existingValue = current[leafKey];
 

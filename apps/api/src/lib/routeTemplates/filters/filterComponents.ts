@@ -5,12 +5,22 @@ import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 import { getValidOperators } from '#/lib/prisma/scalarOperators';
 
 const ARRAY_OPS = new Set(['in', 'notIn']);
+// Operators that accept a null symbol value (is-null / is-set). On the wire null
+// arrives via the `[:]` marker; here the value is simply nullable.
+const NULLABLE_OPS = new Set(['equals', 'not']);
 
 // `{ contains?: …, in?: […], … }` for a set of operators over a value schema.
 // strict so an unsupported operator is rejected (→ additionalProperties:false in the spec).
 const operatorObject = (operators: readonly string[], value: z.ZodTypeAny): z.ZodObject<z.ZodRawShape> =>
   z
-    .object(Object.fromEntries(operators.map((op) => [op, (ARRAY_OPS.has(op) ? z.array(value) : value).optional()])))
+    .object(
+      Object.fromEntries(
+        operators.map((op) => {
+          const opValue = ARRAY_OPS.has(op) ? z.array(value) : NULLABLE_OPS.has(op) ? value.nullable() : value;
+          return [op, opValue.optional()];
+        }),
+      ),
+    )
     .strict();
 
 // Open-ended JSON filter — its own shared $ref. `path` is string|string[] to cover
@@ -30,7 +40,9 @@ const SCALAR_TYPES = ['String', 'Int', 'BigInt', 'Float', 'Decimal', 'DateTime',
 const SCALAR_FILTERS = new Map<string, z.ZodObject<z.ZodRawShape>>(
   SCALAR_TYPES.flatMap((type) => {
     const operators = getValidOperators({ kind: 'scalar', type } as FieldDef);
-    return operators.length ? [[type, operatorObject(operators, z.string()).openapi(`${type}Filter`)]] : [];
+    if (!operators.length) return [];
+    const value = type === 'Boolean' ? z.boolean() : z.string();
+    return [[type, operatorObject(operators, value).openapi(`${type}Filter`)]];
   }),
 );
 

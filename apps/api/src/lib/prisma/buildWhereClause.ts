@@ -38,6 +38,7 @@ const stripRelationOperators = (path: string): string =>
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
+  if (value === null) return { equals: null }; // bare null → is-null
   const op = getDefaultOperator(field);
   const coerced = coerceValueForField(field, value);
   if (field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {

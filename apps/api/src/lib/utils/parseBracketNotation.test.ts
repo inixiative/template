@@ -136,3 +136,24 @@ describe('parseBracketNotation', () => {
     });
   });
 });
+
+describe('parseBracketNotation — symbol values ([:] marker)', () => {
+  it('casts [:]-marked null/true/false to symbols', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][:]=null').searchFields).toEqual({ a: { equals: null } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=true').searchFields).toEqual({ a: { equals: true } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=false').searchFields).toEqual({ a: { equals: false } });
+  });
+
+  it('keeps plain (un-marked) values as strings', () => {
+    expect(parseBracketNotation('?searchFields[a][equals]=null').searchFields).toEqual({ a: { equals: 'null' } });
+    expect(parseBracketNotation('?searchFields[a][equals]=true').searchFields).toEqual({ a: { equals: 'true' } });
+  });
+
+  it('falls back to the literal string for non-allowlisted [:] tokens (no eval)', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][:]=bogus').searchFields).toEqual({ a: { equals: 'bogus' } });
+  });
+
+  it('supports a bare [:] symbol value', () => {
+    expect(parseBracketNotation('?searchFields[a][:]=null').searchFields).toEqual({ a: null });
+  });
+});

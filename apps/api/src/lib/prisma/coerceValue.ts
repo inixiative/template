@@ -43,6 +43,7 @@ const COERCERS: Record<string, Coercer> = {
 };
 
 export const coerceValueForField = (field: FieldDef, value: unknown): unknown => {
+  if (value === null || typeof value === 'boolean') return value; // symbol values pass through
   if (Array.isArray(value)) return value.map((item) => coerceValueForField(field, item));
   if (field.kind !== 'scalar') return value; // enums + relations pass through
   return COERCERS[field.type]?.(value) ?? value;
