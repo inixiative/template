@@ -6,3 +6,4 @@ export { buildTags } from '#/lib/routeTemplates/utils/buildTags';
 export { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
 export { prepareMiddleware } from '#/lib/routeTemplates/utils/prepareMiddleware';
 export { sanitizeRequestSchema } from '#/lib/routeTemplates/utils/sanitizeRequestSchema';
+export { toOpenApi } from '#/lib/routeTemplates/utils/toOpenApi';

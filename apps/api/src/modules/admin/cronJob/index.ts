@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { toOpenApi } from '#/lib/routeTemplates/utils';
 import { cronJobCreateController } from '#/modules/admin/cronJob/controllers/cronJobCreate';
 import { cronJobDeleteController } from '#/modules/admin/cronJob/controllers/cronJobDelete';
 import { cronJobReadController } from '#/modules/admin/cronJob/controllers/cronJobRead';
@@ -15,9 +16,9 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const adminCronJobRouter = new OpenAPIHono<AppEnv>();
 
-adminCronJobRouter.openapi(cronJobReadManyRoute, cronJobReadManyController);
-adminCronJobRouter.openapi(cronJobCreateRoute, cronJobCreateController);
-adminCronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
-adminCronJobRouter.openapi(cronJobUpdateRoute, cronJobUpdateController);
-adminCronJobRouter.openapi(cronJobDeleteRoute, cronJobDeleteController);
-adminCronJobRouter.openapi(cronJobTriggerRoute, cronJobTriggerController);
+adminCronJobRouter.openapi(toOpenApi(cronJobReadManyRoute), cronJobReadManyController);
+adminCronJobRouter.openapi(toOpenApi(cronJobCreateRoute), cronJobCreateController);
+adminCronJobRouter.openapi(toOpenApi(cronJobReadRoute), cronJobReadController);
+adminCronJobRouter.openapi(toOpenApi(cronJobUpdateRoute), cronJobUpdateController);
+adminCronJobRouter.openapi(toOpenApi(cronJobDeleteRoute), cronJobDeleteController);
+adminCronJobRouter.openapi(toOpenApi(cronJobTriggerRoute), cronJobTriggerController);

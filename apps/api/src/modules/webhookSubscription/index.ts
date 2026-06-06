@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { toOpenApi } from '#/lib/routeTemplates/utils';
 import { autoRegisterAdminRoutes, autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
 import { validateActor } from '#/middleware/validations/validateActor';
 import { webhookSubscriptionInfoController } from '#/modules/webhookSubscription/controllers/webhookSubscriptionInfo';
@@ -8,7 +9,7 @@ import type { AppEnv } from '#/types/appEnv';
 export const webhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
 
 // Public route (no auth)
-webhookSubscriptionRouter.openapi(webhookSubscriptionInfoRoute, webhookSubscriptionInfoController);
+webhookSubscriptionRouter.openapi(toOpenApi(webhookSubscriptionInfoRoute), webhookSubscriptionInfoController);
 
 // Protected routes (create via /me or /organization submodels)
 webhookSubscriptionRouter.use('*', validateActor);
