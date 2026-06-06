@@ -33,7 +33,7 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
 
 const createClient = (): Db => {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter, log: ['error'] });
+  const prisma = new PrismaClient({ adapter, log: ['error'], transactionOptions: { timeout: 30_000 } });
   // You would add read replicas here via additional $extends
   return prisma.$extends(mutationLifeCycleExtension()) as unknown as Db;
 };
