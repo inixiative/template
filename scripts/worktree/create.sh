@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # create.sh — Create an isolated git worktree with its own ports + per-slot
-# Postgres DBs (local + test) + Redis DB number.
+# Postgres DBs (local + test) + Redis DB number + MinIO buckets.
 #
 # Usage:
 #   bun run worktree:create <base-branch> <new-branch>
+#     Fork <new-branch> from <base-branch> and check it out in a new worktree.
+#   bun run worktree:create <existing-branch>
+#     Attach an existing branch (local or origin/<branch>) to a new worktree.
+#     Useful for PR review without disturbing the main checkout.
 #
 # A "slot" (1-9) is allocated to each worktree. The slot drives:
 #   - Ports:   WEB  3${SLOT}00   ADMIN 3${SLOT}01   SUPERADMIN 3${SLOT}02
@@ -11,6 +15,7 @@
 #   - DBs:     ${PROJECT_NAME}_wt_${SLOT}            (local)
 #              ${PROJECT_NAME}_test_wt_${SLOT}       (test)
 #   - Redis:   logical DB number ${SLOT}
+#   - Buckets: ${PROJECT_NAME}-{system,user}{,-test}-wt-${SLOT}
 #
 # Slot 0 is reserved for the main checkout.
 
@@ -30,13 +35,28 @@ sedi() {
   if sed --version >/dev/null 2>&1; then sed -i "$@"; else sed -i '' "$@"; fi
 }
 
-BASE_BRANCH="${1:-}"
-NEW_BRANCH="${2:-}"
+ARG1="${1:-}"
+ARG2="${2:-}"
 
-if [ -z "$BASE_BRANCH" ] || [ -z "$NEW_BRANCH" ]; then
-  echo -e "${RED}Usage: $0 <base-branch> <new-branch>${NC}"
-  echo "  Example: bun run worktree:create main feature/my-feature"
+if [ -z "$ARG1" ]; then
+  echo -e "${RED}Usage:${NC}"
+  echo "  $0 <base-branch> <new-branch>   Fork <new-branch> from <base-branch>"
+  echo "  $0 <existing-branch>            Attach an existing branch to a new worktree"
+  echo
+  echo "Examples:"
+  echo "  bun run worktree:create main feature/my-feature"
+  echo "  bun run worktree:create feature/their-pr"
   exit 1
+fi
+
+if [ -n "$ARG2" ]; then
+  BASE_BRANCH="$ARG1"
+  NEW_BRANCH="$ARG2"
+  ATTACH_ONLY=0
+else
+  BASE_BRANCH=""
+  NEW_BRANCH="$ARG1"
+  ATTACH_ONLY=1
 fi
 
 # Resolve PROJECT_NAME (drives container + DB naming) — falls back to repo dir.
@@ -60,11 +80,20 @@ if [ -d "$WORKTREE_DIR" ]; then
   exit 1
 fi
 
-# Verify base branch exists (local or remote)
-if ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$BASE_BRANCH" 2>/dev/null && \
-   ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH" 2>/dev/null; then
-  echo -e "${RED}Error: Base branch '$BASE_BRANCH' not found (local or remote)${NC}"
-  exit 1
+# Verify branch existence for the chosen mode
+if [ "$ATTACH_ONLY" -eq 1 ]; then
+  if ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$NEW_BRANCH" 2>/dev/null && \
+     ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/remotes/origin/$NEW_BRANCH" 2>/dev/null; then
+    echo -e "${RED}Error: Branch '$NEW_BRANCH' not found (local or remote).${NC}"
+    echo -e "${RED}To create a new branch, pass a base too: $0 <base-branch> $NEW_BRANCH${NC}"
+    exit 1
+  fi
+else
+  if ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$BASE_BRANCH" 2>/dev/null && \
+     ! git -C "$ROOT_DIR" show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH" 2>/dev/null; then
+    echo -e "${RED}Error: Base branch '$BASE_BRANCH' not found (local or remote)${NC}"
+    exit 1
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -133,11 +162,18 @@ STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${SLOT}"
 # ---------------------------------------------------------------------------
 # 3. Create git worktree
 # ---------------------------------------------------------------------------
-echo -e "${BLUE}Creating git worktree on '$NEW_BRANCH' from '$BASE_BRANCH'...${NC}"
+if [ "$ATTACH_ONLY" -eq 1 ]; then
+  echo -e "${BLUE}Attaching existing branch '$NEW_BRANCH' to a new worktree...${NC}"
+else
+  echo -e "${BLUE}Creating git worktree on '$NEW_BRANCH' from '$BASE_BRANCH'...${NC}"
+fi
 mkdir -p "$ROOT_DIR/.worktrees"
 
 if git -C "$ROOT_DIR" show-ref --verify --quiet "refs/heads/$NEW_BRANCH" 2>/dev/null; then
   git -C "$ROOT_DIR" worktree add "$WORKTREE_DIR" "$NEW_BRANCH"
+elif [ "$ATTACH_ONLY" -eq 1 ]; then
+  # Origin-only branch — create local tracking branch
+  git -C "$ROOT_DIR" worktree add -b "$NEW_BRANCH" "$WORKTREE_DIR" "origin/$NEW_BRANCH"
 else
   git -C "$ROOT_DIR" worktree add -b "$NEW_BRANCH" "$WORKTREE_DIR" "$BASE_BRANCH"
 fi
@@ -156,27 +192,38 @@ cp "$MAIN_ENV" "$WORKTREE_DIR/.env.local"
 WT_ENV="$WORKTREE_DIR/.env.local"
 sedi "1s/^/WORKTREE_SLOT=${SLOT}\n/" "$WT_ENV"
 
-# Ports + URLs
-sedi "s|^PORT=.*|PORT=${API_PORT}|"                                "$WT_ENV"
-sedi "s|^API_URL=.*|API_URL=http://localhost:${API_PORT}|"          "$WT_ENV"
-sedi "s|^WEB_URL=.*|WEB_URL=http://localhost:${WEB_PORT}|"          "$WT_ENV"
-sedi "s|^ADMIN_URL=.*|ADMIN_URL=http://localhost:${ADMIN_PORT}|"    "$WT_ENV"
-sedi "s|^SUPERADMIN_URL=.*|SUPERADMIN_URL=http://localhost:${SUPERADMIN_PORT}|" "$WT_ENV"
+# Set a key in $WT_ENV: replace if present, append if absent. Bare `sedi` silently
+# no-ops on missing keys — which once left worktrees pointing FE URLs at the main
+# checkout's ports. Use this for every slot-critical key.
+ensure_env_var() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^${key}=" "$WT_ENV"; then
+    sedi "s|^${key}=.*|${key}=${value}|" "$WT_ENV"
+  else
+    echo "${key}=${value}" >> "$WT_ENV"
+  fi
+}
 
-# Database (assumes localhost:5432 postgres:postgres — same as main)
-sedi "s|/[A-Za-z0-9_]\+\(?\\|$\\)|/${DB_LOCAL}\\1|" "$WT_ENV" || true
-# Safer explicit replacement on the DATABASE_URL line:
+# Ports + URLs
+ensure_env_var "PORT"           "$API_PORT"
+ensure_env_var "API_URL"        "http://localhost:${API_PORT}"
+ensure_env_var "WEB_URL"        "http://localhost:${WEB_PORT}"
+ensure_env_var "ADMIN_URL"      "http://localhost:${ADMIN_PORT}"
+ensure_env_var "SUPERADMIN_URL" "http://localhost:${SUPERADMIN_PORT}"
+
+# Database (preserves protocol + auth + host from main, swaps the DB name)
 DB_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
-sedi "s|^DATABASE_URL=.*|DATABASE_URL=${DB_HOST_USER}/${DB_LOCAL}|" "$WT_ENV"
+ensure_env_var "DATABASE_URL" "${DB_HOST_USER}/${DB_LOCAL}"
 
 # Storage buckets — slot-isolated
-sedi "s|^STORAGE_BUCKET_SYSTEM=.*|STORAGE_BUCKET_SYSTEM=${STORAGE_BUCKET_SYSTEM}|" "$WT_ENV"
-sedi "s|^STORAGE_BUCKET_USER=.*|STORAGE_BUCKET_USER=${STORAGE_BUCKET_USER}|" "$WT_ENV"
+ensure_env_var "STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_SYSTEM"
+ensure_env_var "STORAGE_BUCKET_USER"   "$STORAGE_BUCKET_USER"
 
 # Redis — append /N to logical DB if a REDIS_URL is present
 if grep -q '^REDIS_URL=' "$WT_ENV"; then
   REDIS_BASE="$(grep -m1 '^REDIS_URL=' "$WT_ENV" | sed -E 's|^REDIS_URL=(redis://[^/]+)(/[0-9]+)?|\1|')"
-  sedi "s|^REDIS_URL=.*|REDIS_URL=${REDIS_BASE}/${REDIS_DB}|" "$WT_ENV"
+  ensure_env_var "REDIS_URL" "${REDIS_BASE}/${REDIS_DB}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -188,12 +235,21 @@ if [ -f "$MAIN_TEST_ENV" ]; then
   WT_TEST_ENV="$WORKTREE_DIR/.env.test"
   sedi "1s/^/WORKTREE_SLOT=${SLOT}\n/" "$WT_TEST_ENV"
 
-  TEST_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_TEST_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
-  sedi "s|^DATABASE_URL=.*|DATABASE_URL=${TEST_HOST_USER}/${DB_TEST}|" "$WT_TEST_ENV"
+  # Local helper bound to the test env file (same semantics as the one above)
+  ensure_test_env_var() {
+    local key="$1"
+    local value="$2"
+    if grep -q "^${key}=" "$WT_TEST_ENV"; then
+      sedi "s|^${key}=.*|${key}=${value}|" "$WT_TEST_ENV"
+    else
+      echo "${key}=${value}" >> "$WT_TEST_ENV"
+    fi
+  }
 
-  # Storage buckets — slot-isolated test variants
-  sedi "s|^STORAGE_BUCKET_SYSTEM=.*|STORAGE_BUCKET_SYSTEM=${STORAGE_BUCKET_SYSTEM_TEST}|" "$WT_TEST_ENV"
-  sedi "s|^STORAGE_BUCKET_USER=.*|STORAGE_BUCKET_USER=${STORAGE_BUCKET_USER_TEST}|" "$WT_TEST_ENV"
+  TEST_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_TEST_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
+  ensure_test_env_var "DATABASE_URL"          "${TEST_HOST_USER}/${DB_TEST}"
+  ensure_test_env_var "STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_SYSTEM_TEST"
+  ensure_test_env_var "STORAGE_BUCKET_USER"   "$STORAGE_BUCKET_USER_TEST"
 else
   echo -e "${YELLOW}Warning: $MAIN_TEST_ENV not found, skipping .env.test generation${NC}"
 fi
@@ -247,7 +303,7 @@ ${GREEN} Worktree '$WT_NAME' ready (slot $SLOT)${NC}
 ${GREEN}======================================${NC}
 
   Path:        $WORKTREE_DIR
-  Branch:      $NEW_BRANCH (from $BASE_BRANCH)
+  Branch:      $NEW_BRANCH $( [ "$ATTACH_ONLY" -eq 1 ] && echo "(attached)" || echo "(from $BASE_BRANCH)" )
   Web:         http://localhost:${WEB_PORT}
   Admin:       http://localhost:${ADMIN_PORT}
   Superadmin:  http://localhost:${SUPERADMIN_PORT}

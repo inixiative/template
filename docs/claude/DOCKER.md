@@ -50,44 +50,38 @@ bun run stop:db
 ### docker-compose.yml
 
 ```yaml
+# Pinned project name — every worktree's `docker-compose up` reuses the SAME
+# shared containers + network instead of forking its own under a dir-derived
+# project name (which would collide on `container_name:` and leak resources).
+name: ${PROJECT_NAME:-template}
+
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: template-postgres
-    ports: ["5432:5432"]
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: template
+    container_name: ${PROJECT_NAME:-template}_postgres
     volumes:
       - ./scripts/db/pg-init.sh:/docker-entrypoint-initdb.d/pg-init.sh:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+    # ... ports, env, healthcheck
 
   redis:
     image: redis:7-alpine
-    container_name: template-redis
-    ports: ["6379:6379"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+    container_name: ${PROJECT_NAME:-template}_redis
+    # ... ports, healthcheck
 
   minio:
     image: minio/minio:latest
-    container_name: template-minio
-    ports: ["9000:9000", "9001:9001"]   # 9000=S3 API, 9001=console
+    container_name: ${PROJECT_NAME:-template}_minio
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live"]
-
-  mc-init:
-    image: minio/mc:latest
-    depends_on:
-      minio: { condition: service_healthy }
-    # Creates the 4 slot-0 buckets on every `docker compose up` (idempotent via --ignore-existing)
+      PROJECT: ${PROJECT_NAME:-template}
+    volumes:
+      - ./scripts/db/minio-init.sh:/usr/local/bin/minio-init.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/minio-init.sh"]
+    # ... ports, env, healthcheck
 ```
+
+Bucket bootstrap mirrors the pg-init pattern: `scripts/db/minio-init.sh` lives beside the postgres init script and is mounted into the minio container. Minio doesn't have a built-in init dir (unlike postgres's `/docker-entrypoint-initdb.d/`), so we override the entrypoint to call our script, which `mkdir`s the four bucket subdirs and then `exec`s `minio server`. In MinIO filesystem mode, subdirs of `/data` ARE buckets — so `mkdir -p` is idempotent and the equivalent of `CREATE DATABASE IF NOT EXISTS`.
+
+> **Why pin the compose project name?** Without `name: …` at the top of docker-compose.yml, Compose derives the project from the working directory. A worktree at `.worktrees/feature-x/` would try to bring up its own `feature-x_default` network and collide with the main checkout's `container_name:`-pinned containers. Pinning lets `docker-compose up` from any worktree connect to the shared stack; isolation comes from per-slot DB names + bucket prefixes, not separate containers.
 
 ### Connection Strings
 
@@ -100,7 +94,7 @@ services:
 
 ### Storage buckets (slot 0 / main checkout)
 
-The `mc-init` service auto-creates 4 buckets on every `docker compose up`:
+`scripts/db/minio-init.sh` (run inside the minio container as the entrypoint) creates 4 buckets on every boot:
 
 | Bucket | Purpose |
 |---|---|
@@ -109,7 +103,9 @@ The `mc-init` service auto-creates 4 buckets on every `docker compose up`:
 | `template-system-test` | Test isolation — system bucket |
 | `template-user-test` | Test isolation — user bucket |
 
-Storage is **ephemeral** (no persistent volume on MinIO). `docker compose down && up` wipes all uploads and re-creates empty buckets. By design — file persistence in dev is rarely useful, and the reset story matters more than carrying state across restarts.
+Worktree slots add their own buckets (`template-system-wt-<slot>`, etc.) via `scripts/worktree/create.sh`, which `mc mb`s them against the shared minio container after the worktree is provisioned.
+
+Storage is **ephemeral** (no persistent volume on MinIO). `docker compose down && up` wipes all uploads and the entrypoint re-creates empty buckets on next boot. By design — file persistence in dev is rarely useful, and the reset story matters more than carrying state across restarts.
 
 See `tickets/INFRA-011-railway-buckets.md` for the full adapter design and `docs/claude/ADAPTERS.md` for the adapter pattern.
 

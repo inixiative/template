@@ -1,3 +1,10 @@
+# Pin the Compose project name so every git worktree reuses the SAME shared
+# containers (postgres / redis / minio) instead of each worktree spinning up
+# its own under a dir-derived project name. Worktrees stay isolated via their
+# namespaced DBs (${project}_wt_<slot>), redis index, and bucket prefixes —
+# not separate container instances.
+name: ${PROJECT_NAME:-template}
+
 services:
   postgres:
     image: postgres:18-alpine
@@ -36,31 +43,15 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      PROJECT: ${PROJECT_NAME:-template}
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web console
-    command: server /data --console-address ":9001"
+    volumes:
+      - ./scripts/db/minio-init.sh:/usr/local/bin/minio-init.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/minio-init.sh"]
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  mc-init:
-    image: minio/mc:latest
-    container_name: ${PROJECT_NAME:-template}_mc_init
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      PROJECT: ${PROJECT_NAME:-template}
-    entrypoint: >
-      sh -c "
-        mc alias set local http://minio:9000 minioadmin minioadmin &&
-        mc mb --ignore-existing local/$$PROJECT-system &&
-        mc mb --ignore-existing local/$$PROJECT-user &&
-        mc mb --ignore-existing local/$$PROJECT-system-test &&
-        mc mb --ignore-existing local/$$PROJECT-user-test &&
-        echo 'Buckets ready: '$$PROJECT-{system,user,system-test,user-test}
-      "
-    restart: "no"
