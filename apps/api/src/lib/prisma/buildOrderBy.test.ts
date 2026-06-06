@@ -23,6 +23,15 @@ describe('buildOrderBy', () => {
     expect(() => buildOrderBy({ clientOrderBy: ['secret:asc'], orderableFields: ['name'] })).toThrow();
   });
 
+  it('keeps distinct fields of the same relation (dedupe by full path, not top-level key)', () => {
+    expect(
+      buildOrderBy({
+        clientOrderBy: ['user.name:asc', 'user.email:desc'],
+        orderableFields: ['user.name', 'user.email'],
+      }),
+    ).toEqual([{ user: { name: 'asc' } }, { user: { email: 'desc' } }, { id: 'desc' }]);
+  });
+
   it('builds nested orderBy for deep relation dot-paths', () => {
     expect(
       buildOrderBy({
