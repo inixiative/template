@@ -15,8 +15,6 @@ if [[ "${#scan_roots[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-# Spreading a lens/narrowing flattens the parent chain and silently drops narrowing
-# layers (redaction omits, scope-where). Compose by NESTING instead: { parent: prev, ... }.
 pattern='\.\.\.[A-Za-z_][A-Za-z0-9_]*([Ll]ens|[Nn]arrowing)'
 
 if grep -rnE --include='*.ts' --include='*.tsx' "$pattern" "${scan_roots[@]}" >/dev/null 2>&1; then

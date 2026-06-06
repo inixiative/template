@@ -5,16 +5,11 @@ import { HOOK_REDACT_FIELDS } from '@template/db/registries/redactFields';
 // `fields` is keyed by field name; entries carry the same shape as a FieldMap field.
 type Visit = { fields: Record<string, FieldMapEntry> };
 
-// Redacted fields are omitted wherever their model appears, so the searchable surface
-// never advertises secrets (Account.password, Bot.encryptedAuth, …). Same registry the
-// audit/response redaction uses — single source of truth.
 const redactionDefaults: NarrowingDefaults = {
   models: Object.fromEntries(Object.entries(HOOK_REDACT_FIELDS).map(([model, omits]) => [model, { omits }])),
 };
 
 export const searchablePaths = (filterLens: LensNarrowing): string[] => {
-  // Compose redaction as a new outer narrowing layer — never spread filterLens (that
-  // would flatten the parent chain and drop the route's own root/where).
   const narrowed: LensNarrowing = { parent: filterLens, mapDefaults: { prisma: redactionDefaults } };
   const byPath = projectByPath(narrowed) as Map<string, Visit>;
   const paths: string[] = [];
