@@ -38,11 +38,8 @@ const COERCERS: Record<string, Coercer> = {
     throw new Error(`Cannot coerce ${JSON.stringify(value)} to DateTime`);
   },
 
-  Json: (value) => {
-    throw new Error(
-      `JSON fields aren't searchable via this filter surface (got ${JSON.stringify(value)}). Use Prisma's typed JSON operators directly.`,
-    );
-  },
+  // Json filters carry their own values (path / string_contains / …) and are
+  // handled by buildJsonWhere, not coercion — pass through unchanged.
 };
 
 export const coerceValueForField = (field: FieldDef, value: unknown): unknown => {

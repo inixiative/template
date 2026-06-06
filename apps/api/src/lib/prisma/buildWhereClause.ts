@@ -2,8 +2,10 @@ import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
+import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
-import { type FieldDef, isStringPath, lookupField } from '#/lib/prisma/fieldMetadata';
+import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
 import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
@@ -124,6 +126,17 @@ const validateAndTransformSearchFields = (
     }
     if (!isRecord(value)) continue;
 
+    // Json fields use their own operator set (path/string_contains/…), translated
+    // to a Prisma JSON where rather than the scalar operator pipeline.
+    const jsonField = lookupField(model, stripRelationOperators(currentPath));
+    if (jsonField?.kind === 'scalar' && jsonField.type === 'Json') {
+      if (!skipFieldValidation && !searchableFields.includes(currentPath)) {
+        throw new Error(`Field '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`);
+      }
+      result[key] = buildJsonWhere(value, currentPath) as unknown as BracketQueryValue;
+      continue;
+    }
+
     const keys = Object.keys(value);
     const hasRelationOp = keys.some(isRelationOperator);
     const hasFieldOp = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
@@ -187,16 +200,17 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  // Global search — `contains` only makes sense for text, drop everything else.
+  // Global search — broad: each searchable field contributes a clause based on its
+  // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
   if (search && searchableFields.length) {
-    const stringFields = searchableFields.filter((f) => isStringPath(model, stripRelationOperators(f)));
-    if (stringFields.length) {
-      const searchConditions = stringFields.map((field) => {
-        if (!validatePathNotation(field)) throw new Error(`Invalid searchable field: ${field}`);
-        return buildNestedPath(field, { contains: search, mode: 'insensitive' as const });
-      });
-      conditions.push({ OR: searchConditions });
-    }
+    const searchConditions = searchableFields.flatMap((field) => {
+      const def = lookupField(model, stripRelationOperators(field));
+      const clause = def && buildSearchClause(def, search);
+      if (!clause) return [];
+      if (!validatePathNotation(field)) throw new Error(`Invalid searchable field: ${field}`);
+      return [buildNestedPath(field, clause)];
+    });
+    if (searchConditions.length) conditions.push({ OR: searchConditions });
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {

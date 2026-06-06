@@ -3,6 +3,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 export type FieldDef = {
   kind: 'scalar' | 'enum' | 'object';
   type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Json' | <ModelName> | <EnumName>
+  isList?: boolean;
   values?: readonly string[];
   relationName?: string;
   fromFields?: readonly string[];

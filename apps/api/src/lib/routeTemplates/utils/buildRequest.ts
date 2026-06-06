@@ -1,6 +1,8 @@
 import { z } from '@hono/zod-openapi';
 import type { Prisma } from '@template/db';
 import { searchablePaths } from '@template/db/lens';
+import { buildOrderBySchema } from '#/lib/routeTemplates/filters/buildOrderBySchema';
+import { buildSearchFieldsSchema } from '#/lib/routeTemplates/filters/buildSearchFieldsSchema';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
 import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
@@ -102,17 +104,21 @@ export const buildRequest = <const T extends RouteArgs>(
   }
 
   if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
+
+  // Lens-constrained orderBy (enum of orderable fields) overrides the generic one.
+  if (filterLens) {
+    const orderBy = buildOrderBySchema(filterLens);
+    if (orderBy) querySchema = querySchema.merge(z.object({ orderBy }));
+  }
+
   // Admin routes have unlocked search at runtime (paginate.ts skips field
   // validation when isSuperadmin), so always expose the searchFields schema
-  // for them — without it the SDK doesn't generate a bracket-style
-  // querySerializer and the client errors on nested filter objects.
-  // Non-admin routes still gate searchFields on an explicit allowlist.
+  // for them. With a filterLens we emit the typed, prisma-where-shaped schema;
+  // otherwise (admin without a lens) fall back to the loose record schema.
   if (admin || searchableFields?.length) {
-    const searchSchema = z.object({
-      search: simpleSearchSchema,
-      searchFields: createAdvancedSearchSchema(searchableFields ?? []),
-    });
-    querySchema = querySchema.merge(searchSchema);
+    const searchFields =
+      (filterLens && buildSearchFieldsSchema(filterLens)) || createAdvancedSearchSchema(searchableFields ?? []);
+    querySchema = querySchema.merge(z.object({ search: simpleSearchSchema, searchFields }));
   }
 
   const sanitizedBodySchema = bodySchema ? sanitizeRequestSchema(bodySchema, sanitizeKeys) : undefined;
