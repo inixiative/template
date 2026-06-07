@@ -164,20 +164,27 @@ Used in `worker.ts` to pipe all job logs to BullBoard automatically.
 
 ### Frontend Apps
 
-The main `log` uses `AsyncLocalStorage` (Node-only). For frontend apps, use `createFrontendLogger`:
+`@template/shared/logger` is **server-only** — `log` pulls in pino and `AsyncLocalStorage`
+(`node:async_hooks`), so importing it from browser code breaks the Vite bundle. The
+browser-safe logger lives in `@template/ui` and must be imported directly (it is **not**
+re-exported through the shared barrel):
 
 ```typescript
-import { createFrontendLogger, FrontendScope } from '@template/shared/logger';
+import { createFrontendLogger, FrontendScope } from '@template/ui/lib/frontendLogger';
 
 // Create once per app (e.g., in lib/logger.ts)
-export const log = createFrontendLogger(FrontendScope.web);     // 'web'
-export const log = createFrontendLogger(FrontendScope.admin);   // 'admin'
+export const log = createFrontendLogger(FrontendScope.web);        // 'web'
+export const log = createFrontendLogger(FrontendScope.admin);      // 'admin'
 export const log = createFrontendLogger(FrontendScope.superadmin); // 'super'
 
 // Usage
 log.info('Page loaded');   // [web] Page loaded
 log.error('API failed');   // [web] API failed
 ```
+
+> Rule: browser code imports the logger from `@template/ui/lib/frontendLogger`; server code
+> imports `log`/`LogScope` from `@template/shared/logger`. The two never cross — that's why
+> `shared/logger` can stay server-only and the FE bundle stays clean.
 
 ---
 

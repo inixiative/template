@@ -489,7 +489,7 @@ If you need relation data, pass `include` in the options first. In many cases th
 
 List endpoints support search via query parameters. Define a `filterLens` on the route and search schemas are auto-injected for the SDK / OpenAPI surface.
 
-**Simple search** — searches across all searchable String fields:
+**Simple search** — broad term fanned across the lens's searchable fields by kind: String → `contains`, String[] → `has` (Postgres only), Json → `string_contains`. Non-text fields are skipped.
 ```
 GET /api/v1/organizations?search=acme
 ```
@@ -515,6 +515,21 @@ GET /api/v1/items?searchFields[comments][none][flagged]=true
 ```
 
 **Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`.
+
+**Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
+
+**JSON fields** filter (not order) via their own operators: `path` (dotted string or array), `string_contains`, `string_starts_with`, `string_ends_with`, `equals`, `not`. The `path` shape is provider-specific (Postgres key array / MySQL JSONPath) — handled by `dialect` (`apps/api/src/lib/prisma/dialect.ts`).
+```
+GET /api/v1/events?searchFields[meta][path]=user.id&searchFields[meta][string_contains]=abc
+```
+
+**`null` / `true` / `false` via the `[:]` symbol marker** — query strings are all strings, so to pass an actual JS `null`/boolean (e.g. an is-null check) use the `[:]` segment. Only those three tokens are allowlisted (no eval).
+```
+GET /api/v1/orgs?searchFields[deletedAt][equals][:]=null   # is-null
+GET /api/v1/users?searchFields[emailVerified][:]=true
+```
+
+**Typed SDK surface:** the `searchFields` schema is generated from the route's `filterLens` — shared `<Type>Filter` components (`StringFilter`/`IntFilter`/`DateTimeFilter`/`BooleanFilter`) plus a `JsonFilter`, with operators sourced from the server's own `getValidOperators` so the schema can never advertise an operator the server rejects. Enum fields inline their lens-narrowed value set. The FE reads this back via `getQueryMetadata` (no `x-*` vendor extensions).
 
 ### Route declaration (lens narrowing)
 
@@ -781,7 +796,9 @@ GET /api/v1/users?orderBy[]=createdAt:desc&orderBy[]=name:asc
 GET /api/v1/users?orderBy[]=organization.name:asc  // Nested fields supported
 ```
 
-**In route definition**:
+**Lens-constrained (default):** when a route declares a `filterLens`, `orderBy` is **auto-injected** as an enum of `<field>:asc|desc` over the lens's orderable paths (`orderablePaths` — excludes to-many crossings + Json/Bytes). You don't add it manually; the SDK/OpenAPI surface only offers sortable fields, and an unlisted field is a 400.
+
+**Manual fallback (no lens):** routes without a `filterLens` can take the generic schema:
 ```typescript
 import { orderByRequestSchema } from '#/lib/routeTemplates/orderBySchema';
 
@@ -849,7 +866,7 @@ readRoute({
 Use `getQueryMetadata()` or `useQueryMetadata()` to extract metadata from the OpenAPI spec:
 
 ```typescript
-import { getQueryMetadata, useQueryMetadata } from '@template/ui/lib';
+import { getQueryMetadataByOperation, useQueryMetadata } from '@template/ui/lib';
 
 // By operation ID (recommended)
 const meta = getQueryMetadataByOperation('meReadManyOrganizations');
@@ -861,35 +878,26 @@ function OrganizationsTable() {
 }
 ```
 
-### DataTable Configuration
+### Data Config + Filters
 
-Use `makeDataTableConfig()` to create table configurations:
+`makeDataConfig(operationId, options?)` builds a `DataConfig` from the operation's metadata
+(`searchableFields`, `orderableFields`, `enumFilters`, `searchMode`, `canSearch`, `canOrder`);
+`useDataFilters(config)` drives the live filter/search/order state. See FRONTEND.md for the full
+wiring (debounce, URL/history state, `buildFilterQuery`).
 
 ```typescript
-import { makeDataTableConfig, useDataTableConfig } from '@template/ui/lib';
+import { makeDataConfig } from '@template/ui/lib';
+import { useDataFilters } from '@template/ui/hooks';
 
-// Standalone
-const config = makeDataTableConfig('meReadManyOrganizations', {
+const config = makeDataConfig('meReadManyOrganizations', {
   defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],
 });
-
-// In React component
-function OrganizationsTable() {
-  const config = useDataTableConfig('meReadManyOrganizations');
-
-  return (
-    <DataTable
-      searchableFields={config.searchableFields}
-      defaultOrderBy={config.defaultOrderBy}
-    />
-  );
-}
+const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(config);
 ```
 
 **Benefits:**
-- Single source of truth for searchable fields
-- Frontend automatically stays in sync with API changes
-- OrderBy works generically with any response field
+- Single source of truth — searchable/orderable fields + enum values come from the OpenAPI spec (generated from the `filterLens`), no hand-maintained field lists
+- Frontend stays in sync with the API automatically; `getQueryMetadata` reads the typed schema (no `x-*` extensions)
 
 ---
 
