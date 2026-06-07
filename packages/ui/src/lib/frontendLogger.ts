@@ -10,7 +10,6 @@ export enum FrontendScope {
 }
 
 const getLogLevel = (): number => {
-  // Check for browser environment and window.LOG_LEVEL
   const level = (
     typeof globalThis !== 'undefined' && 'window' in globalThis
       ? (globalThis as { LOG_LEVEL?: unknown }).LOG_LEVEL

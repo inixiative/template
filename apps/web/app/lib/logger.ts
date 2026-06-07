@@ -1,3 +1,3 @@
-import { createFrontendLogger, FrontendScope } from '@template/shared/logger/frontend';
+import { createFrontendLogger, FrontendScope } from '@template/ui/lib/frontendLogger';
 
 export const log = createFrontendLogger(FrontendScope.web);

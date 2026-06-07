@@ -42,6 +42,7 @@
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
     "@tanstack/react-router": "^1.166.2",
+    "consola": "^3.4.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
     "@template/sdk": "workspace:*",
