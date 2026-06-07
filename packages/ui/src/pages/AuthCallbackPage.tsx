@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
-import { log } from '@template/shared/logger';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { setToken } from '@template/ui/lib/auth/token';
+import { log } from '@template/ui/lib/logger';
 import { useAppStore } from '@template/ui/store';
 import { useEffect } from 'react';
 
