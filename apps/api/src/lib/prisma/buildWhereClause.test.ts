@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { Prisma } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
@@ -153,16 +154,30 @@ describe('buildWhereClause', () => {
       expect(inner.equals.getTime()).toBe(1715353200000);
     });
 
-    it('Json fields throw — not searchable via this surface', () => {
+    it('Json bare value throws — requires an operator', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('Inquiry'),
-            root: { picks: ['content'] },
-          },
+          filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
           searchFields: { content: 'anything' },
         }),
-      ).toThrow(/JSON fields aren't searchable/);
+      ).toThrow(/requires an operator/);
+    });
+
+    it('Json filter builds a Prisma json where (string_contains + path)', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: { path: 'a.b', string_contains: 'x' } },
+      });
+      expect(JSON.stringify(where)).toContain('"content":{"path":["a","b"],"string_contains":"x"}');
+    });
+
+    it('Json bare null → equals AnyNull (db-NULL or json-null)', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: null },
+      });
+      const inner = (where as { AND: Array<{ content: { equals: unknown } }> }).AND[0].content;
+      expect(inner.equals).toBe(Prisma.AnyNull);
     });
   });
 

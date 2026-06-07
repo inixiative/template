@@ -3,6 +3,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 export type FieldDef = {
   kind: 'scalar' | 'enum' | 'object';
   type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Json' | <ModelName> | <EnumName>
+  isList?: boolean;
   values?: readonly string[];
   relationName?: string;
   fromFields?: readonly string[];
@@ -28,16 +29,4 @@ export const lookupField = (modelName: string, path: string): FieldDef | undefin
     currentModel = field.type;
   }
   return undefined;
-};
-
-export const isStringPath = (modelName: string, path: string): boolean => {
-  const field = lookupField(modelName, path);
-  return field?.kind === 'scalar' && field.type === 'String';
-};
-
-export const isEnumPath = (modelName: string, path: string): boolean => lookupField(modelName, path)?.kind === 'enum';
-
-export const isDatePath = (modelName: string, path: string): boolean => {
-  const field = lookupField(modelName, path);
-  return field?.kind === 'scalar' && field.type === 'DateTime';
 };

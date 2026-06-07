@@ -67,3 +67,17 @@ describe('serializeBracketQuery', () => {
     expect(params.get('searchFields[tokens][some][name][contains]')).toBe('api');
   });
 });
+
+describe('serializeBracketQuery — symbol values ([:] marker)', () => {
+  it('encodes null/boolean leaves via the [:] marker', () => {
+    const params = serializeBracketQuery({ searchFields: { a: { equals: null }, b: { equals: true } } });
+    expect(params.get('searchFields[a][equals][:]')).toBe('null');
+    expect(params.get('searchFields[b][equals][:]')).toBe('true');
+  });
+
+  it('leaves string values un-marked', () => {
+    const params = serializeBracketQuery({ searchFields: { a: { contains: 'x' } } });
+    expect(params.get('searchFields[a][contains]')).toBe('x');
+    expect(params.get('searchFields[a][contains][:]')).toBeNull();
+  });
+});

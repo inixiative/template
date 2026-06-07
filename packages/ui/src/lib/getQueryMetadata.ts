@@ -13,138 +13,98 @@ export type QueryMetadata = {
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-const extractOrderableFields = (schema: any, prefix: string = '', visited: Set<any> = new Set()): string[] => {
-  if (!schema || typeof schema !== 'object' || visited.has(schema)) {
-    return [];
-  }
+type Schema = any;
 
-  visited.add(schema);
+const RELATION_KEYS = new Set(['some', 'every', 'none']);
 
-  const fields: string[] = [];
-  const properties = schema.properties || {};
+const resolveRef = (schema: Schema): Schema => {
+  if (!schema?.$ref) return schema;
+  let resolved: Schema = openApiSpec;
+  for (const part of schema.$ref.replace('#/', '').split('/')) resolved = resolved?.[part];
+  return resolved;
+};
 
-  for (const [key, prop] of Object.entries(properties)) {
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-    const propSchema = prop as any;
-    const fieldPath = prefix ? `${prefix}.${key}` : key;
+// A leaf filter's property values are terminal value-schemas (operator → string/array/
+// enum); a relation node's property values are themselves filters ($ref or nested object).
+// Classifying by value (not key name) avoids misreading a field literally named like an
+// operator (e.g. a `path` column) as a leaf.
+const isValueSchema = (schema: Schema): boolean => !!schema && !schema.$ref && !schema.properties;
+const isLeafFilter = (schema: Schema): boolean => {
+  const props = schema?.properties;
+  return !!props && Object.values(props).every((value) => isValueSchema(value));
+};
 
-    if (propSchema.type === 'array') {
+// `equals.enum` carries a trailing null (equals is nullable); `in.items.enum` is the clean set.
+const enumValuesOf = (leaf: Schema): string[] | undefined => {
+  const fromIn = leaf.properties?.in?.items?.enum;
+  if (Array.isArray(fromIn)) return fromIn;
+  const fromEquals = leaf.properties?.equals?.enum;
+  return Array.isArray(fromEquals) ? fromEquals.filter((v): v is string => v !== null) : undefined;
+};
+
+// Flatten the nested `searchFields` schema → flat dotted paths + enum filters.
+const walkSearchFields = (schema: Schema, prefix: string, out: { searchable: string[]; enums: EnumFilter[] }): void => {
+  const props = resolveRef(schema)?.properties;
+  if (!props) return;
+
+  for (const [key, raw] of Object.entries<Schema>(props)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const child = resolveRef(raw);
+
+    if (isLeafFilter(child)) {
+      out.searchable.push(path);
+      const values = enumValuesOf(child);
+      if (values) out.enums.push({ field: path, values, operators: ['in', 'notIn'] });
       continue;
     }
 
-    if (propSchema.type === 'object' && propSchema.properties) {
-      fields.push(...extractOrderableFields(propSchema, fieldPath, visited));
+    const childProps = child?.properties ?? {};
+    // to-many relations nest under some/every/none (identical shape) — descend `some`.
+    if (Object.keys(childProps).some((k) => RELATION_KEYS.has(k))) {
+      walkSearchFields(childProps.some, path, out);
     } else {
-      fields.push(fieldPath);
+      walkSearchFields(child, path, out);
     }
   }
-
-  return fields;
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-const extractEnumFilters = (schema: any, prefix: string = '', visited: Set<any> = new Set()): EnumFilter[] => {
-  if (!schema || typeof schema !== 'object' || visited.has(schema)) {
-    return [];
+// orderBy is an enum (or array) of `<field>:asc|desc` — strip direction to unique fields.
+const extractOrderableFields = (schema: Schema): string[] => {
+  const resolved = resolveRef(schema);
+  for (const variant of resolved?.anyOf ?? [resolved]) {
+    const values: string[] | undefined = variant?.enum ?? variant?.items?.enum;
+    if (Array.isArray(values)) return [...new Set(values.map((v) => v.split(':')[0]))];
   }
-
-  visited.add(schema);
-
-  const filters: EnumFilter[] = [];
-  const properties = schema.properties || {};
-
-  for (const [key, prop] of Object.entries(properties)) {
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-    const propSchema = prop as any;
-    const fieldPath = prefix ? `${prefix}.${key}` : key;
-
-    if (propSchema.enum && Array.isArray(propSchema.enum)) {
-      filters.push({
-        field: fieldPath,
-        values: propSchema.enum,
-        operators: ['in', 'notIn'],
-      });
-    }
-
-    if (propSchema.type === 'object' && propSchema.properties) {
-      filters.push(...extractEnumFilters(propSchema, fieldPath, visited));
-    }
-  }
-
-  return filters;
-};
-
-// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-const getResponseSchema = (operation: any): any => {
-  const response200 = operation.responses?.['200'];
-  if (!response200) return null;
-
-  const content = response200.content?.['application/json'];
-  if (!content?.schema) return null;
-
-  let schema = content.schema;
-
-  // Handle { data: T } wrapper
-  if (schema.properties?.data) {
-    schema = schema.properties.data;
-  }
-
-  // Handle arrays
-  if (schema.type === 'array' && schema.items) {
-    schema = schema.items;
-  }
-
-  // Resolve $ref
-  if (schema.$ref) {
-    const refPath = schema.$ref.replace('#/', '').split('/');
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-    let resolved: any = openApiSpec;
-    for (const part of refPath) {
-      resolved = resolved[part];
-      if (!resolved) return null;
-    }
-    schema = resolved;
-  }
-
-  return schema;
+  return [];
 };
 
 export const getQueryMetadata = (path: string, method: string = 'get'): QueryMetadata => {
-  // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-  const spec = openApiSpec as any;
+  const spec = openApiSpec as Schema;
   const operation = spec.paths?.[path]?.[method.toLowerCase()];
+  if (!operation) return {};
 
-  if (!operation) {
-    return {};
-  }
+  const params: Schema[] = operation.parameters ?? [];
+  const searchFields = params.find((p) => p.name === 'searchFields');
+  const orderBy = params.find((p) => p.name === 'orderBy');
 
-  const responseSchema = getResponseSchema(operation);
+  const out = { searchable: [] as string[], enums: [] as EnumFilter[] };
+  if (searchFields?.schema) walkSearchFields(searchFields.schema, '', out);
 
   return {
-    searchableFields: operation['x-searchable-fields'] || [],
-    orderableFields: responseSchema ? extractOrderableFields(responseSchema) : [],
-    enumFilters: responseSchema ? extractEnumFilters(responseSchema) : [],
+    searchableFields: out.searchable,
+    orderableFields: orderBy?.schema ? extractOrderableFields(orderBy.schema) : [],
+    enumFilters: out.enums,
   };
 };
 
 export const getQueryMetadataByOperation = (operationId: string): QueryMetadata => {
-  // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-  const spec = openApiSpec as any;
-
-  for (const [path, pathItem] of Object.entries(spec.paths || {})) {
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-    for (const [method, operation] of Object.entries(pathItem as any)) {
-      // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-      const op = operation as any;
-      if (op.operationId === operationId) {
-        return getQueryMetadata(path, method);
-      }
+  const spec = openApiSpec as Schema;
+  for (const [path, pathItem] of Object.entries<Schema>(spec.paths ?? {})) {
+    for (const [method, operation] of Object.entries<Schema>(pathItem)) {
+      if (operation?.operationId === operationId) return getQueryMetadata(path, method);
     }
   }
-
   return {};
 };
 
-export const useQueryMetadata = (operationId: string): QueryMetadata => {
-  return getQueryMetadataByOperation(operationId);
-};
+export const useQueryMetadata = (operationId: string): QueryMetadata => getQueryMetadataByOperation(operationId);

@@ -1,2 +1,2 @@
 export * from './operators';
-export * from './operatorsForFieldKind';
+export * from './symbols';

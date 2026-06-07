@@ -87,9 +87,9 @@ describe('coerceValueForField', () => {
   });
 
   describe('Json', () => {
-    it('always throws — JSON fields are not searchable via this surface', () => {
-      expect(() => coerceValueForField(scalar('Json'), { foo: 'bar' })).toThrow(/JSON fields aren't searchable/);
-      expect(() => coerceValueForField(scalar('Json'), 'anything')).toThrow(/JSON fields aren't searchable/);
+    it('passes values through — json coercion is handled by buildJsonWhere, not here', () => {
+      expect(coerceValueForField(scalar('Json'), { foo: 'bar' })).toEqual({ foo: 'bar' });
+      expect(coerceValueForField(scalar('Json'), 'anything')).toBe('anything');
     });
   });
 

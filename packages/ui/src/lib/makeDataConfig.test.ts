@@ -2,19 +2,21 @@ import { describe, expect, it } from 'bun:test';
 import { makeDataConfig } from '@template/ui/lib/makeDataConfig';
 
 describe('makeDataConfig', () => {
-  it('returns empty searchable fields for admin routes without explicit whitelist', () => {
+  it('returns lens-derived searchable fields for admin routes', () => {
     const config = makeDataConfig('adminOrganizationReadMany');
 
-    expect(config.searchableFields).toEqual([]);
+    expect(config.searchableFields).toContain('name');
+    expect(config.searchableFields).toContain('slug');
   });
 
-  it('returns empty searchable fields for all admin routes', () => {
+  it('includes enum + scalar searchable fields from the lens', () => {
     const config = makeDataConfig('adminInquiryReadMany');
 
-    expect(config.searchableFields).toEqual([]);
+    expect(config.searchableFields).toContain('status');
+    expect(config.searchableFields).toContain('type');
   });
 
-  it('auto-detects orderable fields from response schema (recursive)', () => {
+  it('derives orderable fields from the lens orderBy enum', () => {
     const config = makeDataConfig('adminOrganizationReadMany');
 
     expect(config.orderableFields).toContain('name');
@@ -23,11 +25,12 @@ describe('makeDataConfig', () => {
     expect(config.orderableFields).toContain('updatedAt');
   });
 
-  it('handles nested object paths in orderable fields', () => {
+  it('orderable fields are lens-constrained, not the response shape', () => {
     const config = makeDataConfig('meReadManyOrganizations');
 
-    expect(config.orderableFields).toContain('organizationUser.role');
-    expect(config.orderableFields).toContain('organizationUser.organizationId');
+    expect(config.orderableFields).toContain('name');
+    // the lens does not make the to-one relation sortable, so it is not offered
+    expect(config.orderableFields).not.toContain('organizationUser.role');
   });
 
   it('excludes array fields from orderable fields', () => {
@@ -66,11 +69,10 @@ describe('makeDataConfig', () => {
     expect(config.canOrder).toBe(false);
   });
 
-  it('defaults canSearch to false when no searchable fields, canOrder to true', () => {
+  it('defaults canSearch to true when the route has searchable fields, canOrder to true', () => {
     const config = makeDataConfig('adminOrganizationReadMany');
 
-    // Admin routes have no searchable fields, so canSearch defaults to false
-    expect(config.canSearch).toBe(false);
+    expect(config.canSearch).toBe(true);
     expect(config.canOrder).toBe(true);
   });
 
