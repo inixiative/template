@@ -30,15 +30,3 @@ export const lookupField = (modelName: string, path: string): FieldDef | undefin
   }
   return undefined;
 };
-
-export const isStringPath = (modelName: string, path: string): boolean => {
-  const field = lookupField(modelName, path);
-  return field?.kind === 'scalar' && field.type === 'String';
-};
-
-export const isEnumPath = (modelName: string, path: string): boolean => lookupField(modelName, path)?.kind === 'enum';
-
-export const isDatePath = (modelName: string, path: string): boolean => {
-  const field = lookupField(modelName, path);
-  return field?.kind === 'scalar' && field.type === 'DateTime';
-};

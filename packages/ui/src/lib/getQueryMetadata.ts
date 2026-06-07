@@ -39,7 +39,7 @@ const enumValuesOf = (leaf: Schema): string[] | undefined => {
   const fromIn = leaf.properties?.in?.items?.enum;
   if (Array.isArray(fromIn)) return fromIn;
   const fromEquals = leaf.properties?.equals?.enum;
-  return Array.isArray(fromEquals) ? fromEquals.filter((v: unknown) => v !== null) : undefined;
+  return Array.isArray(fromEquals) ? fromEquals.filter((v): v is string => v !== null) : undefined;
 };
 
 // Flatten the nested `searchFields` schema → flat dotted paths + enum filters.

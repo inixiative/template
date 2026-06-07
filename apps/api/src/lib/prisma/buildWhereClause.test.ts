@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { Prisma } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 
@@ -168,6 +169,15 @@ describe('buildWhereClause', () => {
         searchFields: { content: { path: 'a.b', string_contains: 'x' } },
       });
       expect(JSON.stringify(where)).toContain('"content":{"path":["a","b"],"string_contains":"x"}');
+    });
+
+    it('Json bare null → equals AnyNull (db-NULL or json-null)', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: null },
+      });
+      const inner = (where as { AND: Array<{ content: { equals: unknown } }> }).AND[0].content;
+      expect(inner.equals).toBe(Prisma.AnyNull);
     });
   });
 

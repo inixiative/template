@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { Prisma } from '@template/db';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 
 describe('buildJsonWhere (Postgres)', () => {
@@ -20,5 +21,10 @@ describe('buildJsonWhere (Postgres)', () => {
 
   it('rejects an unknown json operator', () => {
     expect(() => buildJsonWhere({ gt: 'x' }, 'meta')).toThrow();
+  });
+
+  it('maps a null value to AnyNull (matches db-NULL and json-null)', () => {
+    expect(buildJsonWhere({ equals: null }, 'meta')).toEqual({ equals: Prisma.AnyNull });
+    expect(buildJsonWhere({ not: null }, 'meta')).toEqual({ not: Prisma.AnyNull });
   });
 });

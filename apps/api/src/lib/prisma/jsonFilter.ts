@@ -1,3 +1,4 @@
+import { Prisma } from '@template/db';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
@@ -25,7 +26,8 @@ export const buildJsonWhere = (input: BracketQueryRecord, fieldPath: string): Re
         `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
       );
     }
-    out[op] = value;
+    // null on a json field means "db NULL or json null" — Prisma.AnyNull matches both.
+    out[op] = value === null ? Prisma.AnyNull : value;
   }
   return out;
 };

@@ -28,7 +28,9 @@ const operatorObject = (operators: readonly string[], value: z.ZodTypeAny): z.Zo
 export const jsonFilterSchema = z
   .object({
     path: z.union([z.string(), z.array(z.string())]).optional(),
-    ...Object.fromEntries(JSON_FIELD_OPERATORS.map((op) => [op, z.string().optional()])),
+    ...Object.fromEntries(
+      JSON_FIELD_OPERATORS.map((op) => [op, (NULLABLE_OPS.has(op) ? z.string().nullable() : z.string()).optional()]),
+    ),
   })
   .strict()
   .openapi('JsonFilter');

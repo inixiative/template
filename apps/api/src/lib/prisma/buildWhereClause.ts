@@ -1,5 +1,5 @@
 import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
+import { type ModelName, Prisma } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
@@ -38,7 +38,10 @@ const stripRelationOperators = (path: string): string =>
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
-  if (value === null) return { equals: null }; // bare null → is-null
+  // bare null → is-null. Json matches both db-NULL and json-null via AnyNull.
+  if (value === null) {
+    return { equals: field.kind === 'scalar' && field.type === 'Json' ? Prisma.AnyNull : null };
+  }
   const op = getDefaultOperator(field);
   const coerced = coerceValueForField(field, value);
   if (field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
