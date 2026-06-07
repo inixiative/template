@@ -1,9 +1,10 @@
 import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
-import { type ModelName, Prisma } from '@template/db';
+import type { ModelName } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
 import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
+import { dialect } from '#/lib/prisma/dialect';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
@@ -38,14 +39,14 @@ const stripRelationOperators = (path: string): string =>
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
-  // bare null → is-null. Json matches both db-NULL and json-null via AnyNull.
+  // bare null → is-null. Json matches db-NULL/json-null per provider (dialect.jsonNull).
   if (value === null) {
-    return { equals: field.kind === 'scalar' && field.type === 'Json' ? Prisma.AnyNull : null };
+    return { equals: field.kind === 'scalar' && field.type === 'Json' ? dialect.jsonNull : null };
   }
   const op = getDefaultOperator(field);
   const coerced = coerceValueForField(field, value);
-  if (field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
-    return { [op]: coerced, mode: 'insensitive' };
+  if (dialect.stringMode && field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
+    return { [op]: coerced, mode: dialect.stringMode };
   }
   return { [op]: coerced };
 };
@@ -77,15 +78,16 @@ const transformOperatorValue = (
     }
   }
 
-  // String ops support `mode: 'insensitive'`. Auto-add it when any mode-
-  // capable op is present and the caller didn't override `mode`.
+  // String ops support `mode` on Postgres. Auto-add it when any mode-capable op is
+  // present and the caller didn't override `mode`. No-op where dialect omits mode.
   if (
+    dialect.stringMode &&
     field.kind === 'scalar' &&
     field.type === 'String' &&
     out.mode === undefined &&
     Object.keys(out).some((k) => STRING_OPS_WITH_MODE.has(k))
   ) {
-    out.mode = 'insensitive';
+    out.mode = dialect.stringMode;
   }
   return out;
 };

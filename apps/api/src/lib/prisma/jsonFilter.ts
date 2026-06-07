@@ -1,24 +1,24 @@
-import { Prisma } from '@template/db';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
+import { dialect } from '#/lib/prisma/dialect';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const JSON_VALUE_OPERATORS = new Set<string>(JSON_FIELD_OPERATORS);
 
-// Postgres translation: `path` is a key array (`['a','b']`). MySQL diverges
-// (`path` is a JSONPath string like `$.a.b`); that variant lives in zealot's copy.
-const normalizePath = (value: BracketQueryValue): string[] => {
+// `path` arrives as dotted string or array; normalize to segments, then let the
+// dialect render the provider form (Postgres key array / MySQL JSONPath string).
+const toSegments = (value: BracketQueryValue): string[] => {
   if (Array.isArray(value)) return value.map(String);
   if (typeof value === 'string') return value.split('.').filter(Boolean);
   throw new Error('json filter `path` must be a string or string[]');
 };
 
-// Translate a JsonFilter request object into a Prisma (Postgres) JSON where value.
+// Translate a JsonFilter request object into a Prisma JSON where value.
 export const buildJsonWhere = (input: BracketQueryRecord, fieldPath: string): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [op, value] of Object.entries(input)) {
     if (value === undefined) continue;
     if (op === 'path') {
-      out.path = normalizePath(value);
+      out.path = dialect.jsonPath(toSegments(value));
       continue;
     }
     if (!JSON_VALUE_OPERATORS.has(op)) {
@@ -26,8 +26,8 @@ export const buildJsonWhere = (input: BracketQueryRecord, fieldPath: string): Re
         `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
       );
     }
-    // null on a json field means "db NULL or json null" — Prisma.AnyNull matches both.
-    out[op] = value === null ? Prisma.AnyNull : value;
+    // null on a json field → is-null, matched per provider (dialect.jsonNull).
+    out[op] = value === null ? dialect.jsonNull : value;
   }
   return out;
 };
