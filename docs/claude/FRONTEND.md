@@ -10,6 +10,7 @@
   - [State Management](#state-management)
 - [Routing](#routing)
   - [File-Based Routes](#file-based-routes)
+  - [Routes With Children](#routes-with-children)
   - [Guards](#guards)
 - [Navigation Configuration](#navigation-configuration)
   - [Structure](#structure)
@@ -237,6 +238,23 @@ apps/web/app/routes/
 - Focused workflows (onboarding, surveys)
 
 The fullscreen layout preserves context (org/space/spoof) when navigating back via the top-left back button.
+
+### Routes With Children
+
+A route file with a `component` becomes the **parent layout** of any nested routes (`bots.tsx` is the parent of `bots.$id.tsx`). TanStack mounts the parent and slots children into its `<Outlet/>` — so a list page sitting at `bots.tsx` swallows its own detail route (`/bots/:id` renders the list, never the detail) unless it renders an `<Outlet/>`.
+
+Rule:
+
+- **Leaf route** (no children) → flat file: `bots.tsx`.
+- **Route with children** → the page at that path moves to an **index**, and the segment becomes a pure grouping with no component-bearing parent:
+  ```
+  bots/
+    index.tsx   # list   → /bots
+    $id.tsx     # detail → /bots/$id
+  ```
+  Equivalent flat form: `bots.index.tsx` + `bots.$id.tsx` (no `bots.tsx`).
+
+Never leave a `bots.tsx` with a `component` sitting above children. A component-less parent is only for shared layout or redirects (e.g. `communications.tsx` redirects to a default child) and renders children via TanStack's default `<Outlet/>`.
 
 ### Guards
 

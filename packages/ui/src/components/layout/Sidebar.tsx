@@ -67,7 +67,9 @@ export const Sidebar = ({ className }: SidebarProps) => {
     if (item.access && !item.access(permissions, context)) return null;
 
     const fullPath = parentPath + (item.path || '');
-    const hasChildren = item.items && item.items.length > 0;
+    const visibleChildren =
+      item.items?.filter((child) => !child.alias && (!child.access || child.access(permissions, context))) ?? [];
+    const hasChildren = visibleChildren.length > 0;
     const isExpanded = expandedItems.has(item.label);
     const isActive = activeChain.includes(item);
     const iconSlug = item.icon;
@@ -105,7 +107,7 @@ export const Sidebar = ({ className }: SidebarProps) => {
           )}
         </div>
         {hasChildren && isExpanded && (
-          <div className="mt-1 space-y-1">{item.items!.map((child) => renderItem(child, depth + 1, fullPath))}</div>
+          <div className="mt-1 space-y-1">{visibleChildren.map((child) => renderItem(child, depth + 1, fullPath))}</div>
         )}
       </div>
     );
