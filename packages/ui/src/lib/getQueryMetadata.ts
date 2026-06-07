@@ -16,6 +16,9 @@ export type QueryMetadata = {
 type Schema = any;
 
 const RELATION_KEYS = new Set(['some', 'every', 'none']);
+// A json leaf's keys are exactly the json operators — distinguishes it from a
+// to-one relation (whose keys are field names) without descending into it.
+const JSON_LEAF_KEYS = new Set(['path', 'equals', 'not', 'string_contains', 'string_starts_with', 'string_ends_with']);
 
 const resolveRef = (schema: Schema): Schema => {
   if (!schema?.$ref) return schema;
@@ -24,21 +27,23 @@ const resolveRef = (schema: Schema): Schema => {
   return resolved;
 };
 
-// A leaf filter's property values are terminal value-schemas (operator → string/array/
-// enum); a relation node's property values are themselves filters ($ref or nested object).
-// Classifying by value (not key name) avoids misreading a field literally named like an
-// operator (e.g. a `path` column) as a leaf.
-const isValueSchema = (schema: Schema): boolean => !!schema && !schema.$ref && !schema.properties;
-const isLeafFilter = (schema: Schema): boolean => {
+// A scalar/enum leaf is a `bare value | <Type>Filter` union (anyOf). A json leaf is a
+// plain object keyed by json operators. A relation is an object keyed by field names.
+const isJsonLeaf = (schema: Schema): boolean => {
   const props = schema?.properties;
-  return !!props && Object.values(props).every((value) => isValueSchema(value));
+  return !!props && Object.keys(props).every((k) => JSON_LEAF_KEYS.has(k));
 };
 
-// `equals.enum` carries a trailing null (equals is nullable); `in.items.enum` is the clean set.
+// Enum leaves carry a bare `{ enum: [...] }` arm (the clean narrowed set); fall back to
+// the operator arm's `in.items.enum` / `equals.enum` (stripping equals' trailing null).
 const enumValuesOf = (leaf: Schema): string[] | undefined => {
-  const fromIn = leaf.properties?.in?.items?.enum;
+  const arms: Schema[] = Array.isArray(leaf.anyOf) ? leaf.anyOf.map(resolveRef) : [leaf];
+  const bareEnum = arms.find((a) => Array.isArray(a?.enum));
+  if (bareEnum) return bareEnum.enum;
+  const op = arms.find((a) => a?.properties);
+  const fromIn = op?.properties?.in?.items?.enum;
   if (Array.isArray(fromIn)) return fromIn;
-  const fromEquals = leaf.properties?.equals?.enum;
+  const fromEquals = op?.properties?.equals?.enum;
   return Array.isArray(fromEquals) ? fromEquals.filter((v): v is string => v !== null) : undefined;
 };
 
@@ -51,17 +56,21 @@ const walkSearchFields = (schema: Schema, prefix: string, out: { searchable: str
     const path = prefix ? `${prefix}.${key}` : key;
     const child = resolveRef(raw);
 
-    if (isLeafFilter(child)) {
+    // scalar/enum leaf (bare | operator union)
+    if (Array.isArray(child?.anyOf)) {
       out.searchable.push(path);
       const values = enumValuesOf(child);
       if (values) out.enums.push({ field: path, values, operators: ['in', 'notIn'] });
       continue;
     }
 
-    const childProps = child?.properties ?? {};
+    const childProps = child?.properties;
+    if (!childProps) continue;
     // to-many relations nest under some/every/none (identical shape) — descend `some`.
     if (Object.keys(childProps).some((k) => RELATION_KEYS.has(k))) {
       walkSearchFields(childProps.some, path, out);
+    } else if (isJsonLeaf(child)) {
+      out.searchable.push(path);
     } else {
       walkSearchFields(child, path, out);
     }

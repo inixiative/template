@@ -44,6 +44,11 @@ describe('buildSearchFieldsSchema', () => {
   it('rejects unknown fields (strict)', () => {
     bad({ notAField: { equals: 'x' } });
   });
+
+  it('accepts a bare value (no operator) — defaults to the field operator at runtime', () => {
+    ok({ name: 'dragon' });
+    ok({ organizationUsers: { some: { role: 'admin' } } });
+  });
 });
 
 describe('buildSearchFieldsSchema (json)', () => {
