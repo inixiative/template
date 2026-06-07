@@ -33,7 +33,7 @@ const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<st
 // Typed, Prisma-`where`-shaped filter schema for a route's filterLens: a nested tree
 // of per-kind filter leaves (to-one nested directly, to-many under some/every/none),
 // scoped to the lens's redacted+narrowed searchable fields.
-export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodObject<z.ZodRawShape> | undefined => {
+export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny | undefined => {
   const byPath = projectByPath(redactLens(filterLens)) as Map<string, Visit>;
   const rootKey = byPath.keys().next().value;
   if (!rootKey) return undefined;
@@ -42,5 +42,6 @@ export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodObject<
   return z
     .object(shape)
     .strict()
+    .optional()
     .openapi({ param: { in: 'query' } });
 };
