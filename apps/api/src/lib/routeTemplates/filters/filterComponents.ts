@@ -36,7 +36,9 @@ export const jsonFilterSchema = z
 // One shared `<Type>Filter` $ref per scalar type, operators sourced from the same
 // getValidOperators the server validates with (so the schema can never advertise an
 // operator the server rejects). Built once for the fixed scalar set.
-const SCALAR_TYPES = ['String', 'Int', 'BigInt', 'Float', 'Decimal', 'DateTime', 'Boolean'] as const;
+// Only types scalarOperators actually defines operators for. (BigInt/Float/Decimal
+// aren't filterable server-side yet — adding them is scalarOperators + coerceValue work.)
+const SCALAR_TYPES = ['String', 'Int', 'DateTime', 'Boolean'] as const;
 const SCALAR_FILTERS = new Map<string, z.ZodObject<z.ZodRawShape>>(
   SCALAR_TYPES.flatMap((type) => {
     const operators = getValidOperators({ kind: 'scalar', type } as FieldDef);

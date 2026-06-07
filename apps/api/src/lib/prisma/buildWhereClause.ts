@@ -118,6 +118,10 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
+      // Json fields take a JsonFilter object (path/string_contains/…), never a bare value.
+      if (field.kind === 'scalar' && field.type === 'Json' && value !== null) {
+        throw new Error(`Json field '${currentPath}' requires an operator (path, string_contains, …)`);
+      }
       result[key] = wrapBareValue(field, value) as unknown as BracketQueryValue;
       continue;
     }

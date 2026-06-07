@@ -1,5 +1,4 @@
 import openApiSpec from '@template/sdk/openapi.gen.json';
-import { FIELD_OPERATORS, JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
 
 export type EnumFilter = {
   field: string;
@@ -16,8 +15,6 @@ export type QueryMetadata = {
 // biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
 type Schema = any;
 
-// Keys that mark a node as a filter *leaf* (vs a relation node whose keys are field names).
-const OPERATOR_KEYS = new Set<string>([...FIELD_OPERATORS, ...JSON_FIELD_OPERATORS, 'path']);
 const RELATION_KEYS = new Set(['some', 'every', 'none']);
 
 const resolveRef = (schema: Schema): Schema => {
@@ -27,15 +24,23 @@ const resolveRef = (schema: Schema): Schema => {
   return resolved;
 };
 
-// A leaf filter's properties are all operators (StringFilter, JsonFilter, enum filter, …);
-// a relation node's properties are field names (or some/every/none).
+// A leaf filter's property values are terminal value-schemas (operator → string/array/
+// enum); a relation node's property values are themselves filters ($ref or nested object).
+// Classifying by value (not key name) avoids misreading a field literally named like an
+// operator (e.g. a `path` column) as a leaf.
+const isValueSchema = (schema: Schema): boolean => !!schema && !schema.$ref && !schema.properties;
 const isLeafFilter = (schema: Schema): boolean => {
   const props = schema?.properties;
-  return !!props && Object.keys(props).every((key) => OPERATOR_KEYS.has(key));
+  return !!props && Object.values(props).every((value) => isValueSchema(value));
 };
 
-const enumValuesOf = (leaf: Schema): string[] | undefined =>
-  leaf.properties?.equals?.enum ?? leaf.properties?.in?.items?.enum;
+// `equals.enum` carries a trailing null (equals is nullable); `in.items.enum` is the clean set.
+const enumValuesOf = (leaf: Schema): string[] | undefined => {
+  const fromIn = leaf.properties?.in?.items?.enum;
+  if (Array.isArray(fromIn)) return fromIn;
+  const fromEquals = leaf.properties?.equals?.enum;
+  return Array.isArray(fromEquals) ? fromEquals.filter((v: unknown) => v !== null) : undefined;
+};
 
 // Flatten the nested `searchFields` schema → flat dotted paths + enum filters.
 const walkSearchFields = (schema: Schema, prefix: string, out: { searchable: string[]; enums: EnumFilter[] }): void => {
