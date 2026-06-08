@@ -1,5 +1,4 @@
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { orderablePaths } from '@template/db/lens/orderablePaths';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
@@ -78,7 +77,6 @@ export const paginate = async <
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
     clientOrderBy: rawOrderBy,
-    orderableFields: skipFieldValidation ? undefined : orderablePaths(filterLens),
   });
 
   const paginatedArgs = {
