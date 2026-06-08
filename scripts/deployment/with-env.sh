@@ -40,19 +40,18 @@ run_with_env_overrides() {
     ' bash "$@"
 }
 
-if [ "$ENV" != "test" ]; then
+# FOOTGUN (do not "fix" by erroring when infisical is missing — that breaks
+# every build): the `command -v infisical` guard is load-bearing. Vercel/Railway/
+# CI builds run this (e.g. generate:sdk via `with local api`) with NO infisical
+# CLI and rely on injected env / .env files. If the CLI is absent we MUST skip to
+# .env composition, never exit non-zero.
+# When the CLI IS present + a projectId is configured (local dev), infisical is the
+# source of truth: don't silently fall back to .env, and fail loudly if the dev
+# isn't logged in (probe below) rather than running against missing secrets.
+if [ "$ENV" != "test" ] && command -v infisical &> /dev/null; then
     PROJECT_ID=$(bash "$SCRIPT_DIR/read-project-config.sh" infisical.projectId)
 
-    # A configured projectId means Infisical is the required source of truth for
-    # non-test envs. Never silently fall back to .env (that would run against
-    # missing/wrong secrets) — fail loudly if the CLI is absent or unauthenticated.
     if [ -n "$PROJECT_ID" ]; then
-        if ! command -v infisical &> /dev/null; then
-            echo "ERROR: Infisical is required for env '$ENV' but the CLI is not installed." >&2
-            echo "Install https://infisical.com/docs/cli then run 'infisical login'." >&2
-            exit 1
-        fi
-
         STAGING_ENABLED=$(bash "$SCRIPT_DIR/read-project-config.sh" features.staging.enabled)
 
         INFISICAL_ENV="$ENV"
