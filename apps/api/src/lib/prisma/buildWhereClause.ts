@@ -1,4 +1,4 @@
-import { type LensNarrowing, toPrisma } from '@inixiative/json-rules';
+import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';
 import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
@@ -234,9 +234,14 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     }
   }
 
-  // Per-request scoping: root-anchored where → Prisma where via toPrisma.
-  if (filterLens.root?.where !== undefined) {
-    const step = toPrisma(filterLens.root.where, { map: lens, mapName: lens.mapName, model }).steps[0];
+  // Row scope: the composed where for the root model. projectByPath walks the whole
+  // narrowing chain (route filterLens + every stacked scopeNarrowing layer), folding in
+  // mapDefaults + filter-first `all`-negation, and exposes the root visit's `whereClauses`.
+  // Each is toPrisma'd and ANDed into `conditions`.
+  const byPath = projectByPath(filterLens) as Map<string, { whereClauses: Condition[] }>;
+  const rootKey = byPath.keys().next().value;
+  for (const clause of (rootKey ? byPath.get(rootKey)?.whereClauses : undefined) ?? []) {
+    const step = toPrisma(clause, { map: lens, mapName: lens.mapName, model }).steps[0];
     if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
   }
 

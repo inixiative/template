@@ -528,4 +528,46 @@ describe('buildWhereClause', () => {
       ).toThrow(/Search query nesting too deep/);
     });
   });
+
+  describe('row scope (narrowing chain composition)', () => {
+    const role = { platformRole: { equals: 'superadmin' } };
+    const verified = { emailVerified: { equals: true } };
+    const named = { name: { equals: 'x' } };
+
+    it('applies the route layer root.where', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
+        },
+      });
+      expect(result).toEqual({ AND: [role] });
+    });
+
+    it('composes every stacked scopeNarrowing layer (route + children), ANDed', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: {
+            parent: lensFor('User'),
+            root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
+          },
+          root: { where: { field: 'emailVerified', operator: 'equals', value: true } },
+        },
+      });
+      const and = (result as { AND: unknown[] }).AND;
+      expect(and).toHaveLength(2);
+      expect(and).toEqual(expect.arrayContaining([role, verified]));
+    });
+
+    it('applies mapDefaults wheres anchored to the root model', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: { picks: [] },
+          mapDefaults: { prisma: { models: { User: { where: { field: 'name', operator: 'equals', value: 'x' } } } } },
+        },
+      });
+      expect(result).toEqual({ AND: [named] });
+    });
+  });
 });
