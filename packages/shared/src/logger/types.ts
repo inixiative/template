@@ -1,9 +1,9 @@
 // Unified logger surface every adapter implements. Matches pino's ILogger
 // (Baileys etc. expect this shape). Adapters are dumb execution sinks — the
 // `log` facade composes args + ALS scopes, then fans pre-formatted output to
-// each adapter. `child` is in the type to satisfy ILogger but every adapter
-// throws — direct callers to `logScope(id, fn)` (our ALS-bound scoping). SDKs
-// that genuinely need pino's child semantics import `pinoLogger` directly.
+// each adapter. `child(bindings)` maps the bindings to an ALS scope tag (see
+// logger.ts) so pino consumers like Baileys work; our own code prefers
+// `logScope(id, fn)` directly.
 export type LoggerAdapter = {
   level: string;
   info: (...args: unknown[]) => void;

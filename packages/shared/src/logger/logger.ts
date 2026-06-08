@@ -1,6 +1,6 @@
 import { consolaAdapter } from '@template/shared/logger/consolaAdapter';
 import { pinoAdapter } from '@template/shared/logger/pinoAdapter';
-import { getLogBroadcasts, getLogScopes, LogScope } from '@template/shared/logger/scope';
+import { getLogBroadcasts, getLogScopes, LogScope, logScope } from '@template/shared/logger/scope';
 import type { LoggerAdapter, LogLevel } from '@template/shared/logger/types';
 import { isLocal, isTest } from '@template/shared/utils/env';
 
@@ -35,6 +35,28 @@ const emit = (level: LogLevel, args: unknown[]) => {
   fireBroadcasts(level, msg);
 };
 
+// pino consumers (e.g. Baileys) call logger.child(bindings); map bindings to an
+// ALS scope tag so child logs flow through our pipeline as [tag]. Recurses —
+// a child of a child accumulates scopes (parent:child).
+const childLabel = (b?: Record<string, unknown>): string =>
+  String(b?.class ?? Object.values(b ?? {})[0] ?? 'child');
+
+const childLogger = (scope: string): LoggerAdapter => {
+  const scoped = (lvl: LogLevel) => (...args: unknown[]) => logScope(scope, () => emit(lvl, args));
+  return {
+    level: process.env.LOG_LEVEL ?? 'info',
+    info: scoped('info'),
+    warn: scoped('warn'),
+    error: scoped('error'),
+    debug: scoped('debug'),
+    fatal: scoped('fatal'),
+    trace: scoped('trace'),
+    success: scoped('success'),
+    box: scoped('box'),
+    child: (b) => childLogger(`${scope}:${childLabel(b)}`),
+  };
+};
+
 export const log: LoggerAdapter = {
   level: process.env.LOG_LEVEL ?? 'info',
   info: (...args) => emit('info', args),
@@ -45,7 +67,5 @@ export const log: LoggerAdapter = {
   trace: (...args) => emit('trace', args),
   success: (...args) => emit('success', args),
   box: (...args) => emit('box', args),
-  child: () => {
-    throw new Error('log.child() not supported — use logScope(id, fn) for ALS-bound scoping');
-  },
+  child: (bindings) => childLogger(childLabel(bindings)),
 };
