@@ -41,31 +41,46 @@ run_with_env_overrides() {
 }
 
 if [ "$ENV" != "test" ]; then
-    if command -v infisical &> /dev/null; then
-        PROJECT_ID=$(bash "$SCRIPT_DIR/read-project-config.sh" infisical.projectId)
+    PROJECT_ID=$(bash "$SCRIPT_DIR/read-project-config.sh" infisical.projectId)
 
-        if [ -n "$PROJECT_ID" ]; then
-            STAGING_ENABLED=$(bash "$SCRIPT_DIR/read-project-config.sh" features.staging.enabled)
-
-            INFISICAL_ENV="$ENV"
-            if [ "$ENV" = "local" ] || [ "$ENV" = "pr" ]; then
-                # When staging isn't configured, local/pr inherit from prod
-                # secrets (that's all there is). When staging IS configured,
-                # they pull from staging so devs don't accidentally read prod.
-                if [ "$STAGING_ENABLED" = "true" ]; then
-                    INFISICAL_ENV="staging"
-                else
-                    INFISICAL_ENV="prod"
-                fi
-            fi
-
-            # Infisical injects first, then run_with_env_overrides sources .env
-            # files which overwrite any Infisical-set vars by the same name.
-            export -f run_with_env_overrides
-            exec infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" --include-imports -- bash -c 'run_with_env_overrides "$@"' bash "$@"
+    # A configured projectId means Infisical is the required source of truth for
+    # non-test envs. Never silently fall back to .env (that would run against
+    # missing/wrong secrets) — fail loudly if the CLI is absent or unauthenticated.
+    if [ -n "$PROJECT_ID" ]; then
+        if ! command -v infisical &> /dev/null; then
+            echo "ERROR: Infisical is required for env '$ENV' but the CLI is not installed." >&2
+            echo "Install https://infisical.com/docs/cli then run 'infisical login'." >&2
+            exit 1
         fi
+
+        STAGING_ENABLED=$(bash "$SCRIPT_DIR/read-project-config.sh" features.staging.enabled)
+
+        INFISICAL_ENV="$ENV"
+        if [ "$ENV" = "local" ] || [ "$ENV" = "pr" ]; then
+            # When staging isn't configured, local/pr inherit from prod secrets
+            # (that's all there is). When staging IS configured, they pull from
+            # staging so devs don't accidentally read prod.
+            if [ "$STAGING_ENABLED" = "true" ]; then
+                INFISICAL_ENV="staging"
+            else
+                INFISICAL_ENV="prod"
+            fi
+        fi
+
+        # Probe auth with a no-op so a logged-out shell gets a clear error
+        # instead of infisical's cryptic interactive-login failure.
+        if ! infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" -- true </dev/null >/dev/null 2>&1; then
+            echo "ERROR: not authenticated with Infisical (env '$INFISICAL_ENV', path '/$APP')." >&2
+            echo "Run 'infisical login' and try again." >&2
+            exit 1
+        fi
+
+        # Infisical injects first, then run_with_env_overrides sources .env
+        # files which overwrite any Infisical-set vars by the same name.
+        export -f run_with_env_overrides
+        exec infisical run --projectId="$PROJECT_ID" --env="$INFISICAL_ENV" --path="/$APP" --include-imports -- bash -c 'run_with_env_overrides "$@"' bash "$@"
     fi
 fi
 
-# No Infisical (test env, or not configured): just .env files.
+# Test env, or a project that doesn't use Infisical (no projectId): just .env files.
 run_with_env_overrides "$@"
