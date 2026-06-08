@@ -1,9 +1,8 @@
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
-import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 
 export const aliasColumns = (model: ModelName, alias?: string, fields?: string[]): string => {
-  const dataModel = getRuntimeDataModel();
-  const modelData = dataModel.models[model];
+  const modelData = prismaMap.models[model];
 
   if (!modelData) {
     throw new Error(`Model "${model}" not found. Available: ${modelNames.join(', ')}`);
@@ -11,18 +10,18 @@ export const aliasColumns = (model: ModelName, alias?: string, fields?: string[]
 
   const prefix = alias || model;
 
-  const columns = modelData.fields
-    .filter((field) => {
+  const columns = Object.entries(modelData.fields as Record<string, { kind: string }>)
+    .filter(([name, field]) => {
       // Only include scalar and enum fields (not relations)
       if (field.kind !== 'scalar' && field.kind !== 'enum') return false;
       // If specific fields requested, filter to those
-      if (fields?.length && !fields.includes(field.name)) return false;
+      if (fields?.length && !fields.includes(name)) return false;
       return true;
     })
-    .map((field) => {
+    .map(([name]) => {
       // Use the field name for both DB column and alias
-      // (Prisma schema uses @map for custom DB names, but field.name is the Prisma name)
-      return `${prefix}."${field.name}" AS "${prefix}.${field.name}"`;
+      // (Prisma schema uses @map for custom DB names, but the field name is the Prisma name)
+      return `${prefix}."${name}" AS "${prefix}.${name}"`;
     });
 
   if (columns.length === 0) {

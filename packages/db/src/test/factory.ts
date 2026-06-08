@@ -12,9 +12,9 @@ import type {
   ModelOf,
   Serialized,
 } from '@template/db/test/factoryTypes';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
-import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
 import { uuidv7 } from 'uuidv7';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -45,11 +45,10 @@ const serializeEntity = <T>(obj: T): Serialized<T> => {
 };
 
 const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
-  const dataModel = getRuntimeDataModel();
-  const model = dataModel.models[modelName];
+  const model = prismaMap.models[modelName];
   if (!model) return {};
 
-  const fieldNames = new Set(model.fields.map((f) => f.name));
+  const fieldNames = new Set(Object.keys(model.fields));
   const injected: Record<string, unknown> = {};
 
   // uuidv7 (not faker's v4) — matches the schema's `dbgenerated("uuidv7()")`

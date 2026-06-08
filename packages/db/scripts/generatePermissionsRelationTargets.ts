@@ -1,23 +1,21 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { type AccessorName, isModelName, toAccessor } from '../src/utils/modelNames';
-import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
+import { getModelRelations } from '../src/utils/runtimeDataModel';
 
 const outFile = join(import.meta.dir, '../../permissions/src/rebac/relationTargetsGen.ts');
-const dataModel = getRuntimeDataModel();
 
 const relationTargets: Partial<Record<AccessorName, Partial<Record<string, AccessorName>>>> = {};
 
-for (const [modelName, model] of Object.entries(dataModel.models)) {
+for (const modelName of Object.keys(prismaMap.models)) {
   if (!isModelName(modelName)) continue;
 
   const sourceAccessor = toAccessor(modelName);
   const targets: Partial<Record<string, AccessorName>> = {};
 
-  for (const field of model.fields) {
-    if (field.kind !== 'object') continue;
-    if (typeof field.type !== 'string' || !isModelName(field.type)) continue;
-    targets[field.name] = toAccessor(field.type);
+  for (const rel of getModelRelations(modelName)) {
+    targets[rel.relationName] = rel.targetAccessor;
   }
 
   if (Object.keys(targets).length > 0) {
