@@ -90,7 +90,10 @@ describe('sendWebhook handler', () => {
         model: 'CustomerRef',
         action: 'create',
         payload: { id: user.id, name: user.name },
+        timestamp: expect.any(Number),
       });
+      const { timestamp } = receivedWebhooks[0].body as { timestamp: number };
+      expect(Math.abs(timestamp - Math.floor(Date.now() / 1000))).toBeLessThan(5);
 
       expect(receivedWebhooks[0].headers['x-webhook-signature']).toBeDefined();
     });
@@ -215,6 +218,40 @@ describe('sendWebhook handler', () => {
       });
       expect(event).toBeNull();
       expect(receivedWebhooks.length).toBe(0);
+    });
+
+    it('blocks private-address URLs in enforced environments without fetching', async () => {
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: 'https://10.0.0.1/hook',
+        model: 'CustomerRef',
+      });
+
+      const previousEnvironment = process.env.ENVIRONMENT;
+      process.env.ENVIRONMENT = 'prod';
+      try {
+        await sendWebhook(
+          { db, log: mockLog },
+          {
+            subscriptionId: sub.id,
+            action: 'create',
+            resourceId: user.id,
+            data: { id: user.id },
+          },
+        );
+      } finally {
+        process.env.ENVIRONMENT = previousEnvironment;
+      }
+
+      expect(receivedWebhooks.length).toBe(0);
+
+      const event = await db.webhookEvent.findFirst({
+        where: { webhookSubscriptionId: sub.id },
+      });
+      expect(event).not.toBeNull();
+      expect(event?.status).toBe('error');
+      expect(event?.error).toContain('private or internal address');
     });
 
     it('skips non-existent subscription', async () => {

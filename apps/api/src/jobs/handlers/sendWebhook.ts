@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
 import type { JobHandler } from '#/jobs/types';
+import { resolveWebhookUrlBlockReason } from '#/lib/webhooks/validateWebhookUrl';
 
 export type SendWebhookPayload = {
   subscriptionId: string;
@@ -20,7 +21,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
-  const body = { model: subscription.model, action, payload: data };
+  // timestamp is inside the signed body so receivers can reject replayed deliveries
+  const body = { model: subscription.model, action, payload: data, timestamp: Math.floor(Date.now() / 1000) };
   const bodyJson = JSON.stringify(body);
 
   // Sign payload with RSA-SHA256
@@ -32,21 +34,27 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   let status: WebhookEventStatus = 'success';
   let error: string | undefined;
 
-  try {
-    const response = await fetch(subscription.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
-      body: bodyJson,
-      signal: AbortSignal.timeout(5000),
-    });
+  const blockReason = await resolveWebhookUrlBlockReason(subscription.url);
+  if (blockReason) {
+    status = 'error';
+    error = `Webhook URL ${blockReason}`;
+  } else {
+    try {
+      const response = await fetch(subscription.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
+        body: bodyJson,
+        signal: AbortSignal.timeout(5000),
+      });
 
-    if (!response.ok) {
-      error = `HTTP ${response.status}: ${response.statusText}`;
-      status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
+      if (!response.ok) {
+        error = `HTTP ${response.status}: ${response.statusText}`;
+        status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      status = 'unreachable';
     }
-  } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
-    status = 'unreachable';
   }
 
   await db.webhookEvent.create({
