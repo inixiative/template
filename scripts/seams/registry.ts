@@ -16,7 +16,7 @@
 // or every file would list them and the seam would carry no signal. They exist
 // in the registry so the reverse index can still resolve them when relevant.
 
-export type SeamClass = 'feature' | 'primitive' | 'infrastructure';
+export type SeamClass = 'feature' | 'primitive' | 'infrastructure' | 'registry';
 export type Status = 'complete' | 'partial' | 'scaffold' | 'planned';
 
 export type SeamEntry = {
@@ -34,9 +34,8 @@ export const SEAMS: Record<string, SeamEntry> = {
   'feature:auth-provider': { status: 'complete', doc: 'AUTH.md' },
   'feature:tokens': { status: 'complete', doc: 'AUTH.md' },
   'feature:impersonation': { status: 'complete', doc: 'AUTH.md' },
-  'feature:organizations': { status: 'complete' },
-  'feature:spaces': { status: 'complete' },
-  'feature:users': { status: 'complete' },
+  'feature:tenancy': { status: 'complete', note: 'organizations + spaces + memberships' },
+  'feature:users': { status: 'complete', note: 'user mgmt, profile, verification, GDPR redaction' },
   'feature:inquiry': { status: 'complete', ticket: 'FEAT-001' },
   'feature:contact': { status: 'complete' },
   'feature:customer': { status: 'partial', note: 'CustomerRef schema/queries; no full API/UI' },
@@ -48,7 +47,7 @@ export const SEAMS: Record<string, SeamEntry> = {
   'feature:admin': { status: 'complete' },
 
   // ── primitives ──────────────────────────────────────────────────────────
-  'primitive:rebac': { status: 'complete', doc: 'PERMISSIONS.md' },
+  'primitive:authz': { status: 'complete', doc: 'PERMISSIONS.md', note: 'rebac/permix — authorization' },
   'primitive:app-events': { status: 'complete', doc: 'APP_EVENTS.md' },
   'primitive:jobs': { status: 'complete', doc: 'JOBS.md' },
   'primitive:hooks': { status: 'complete', doc: 'HOOKS.md' },
@@ -66,9 +65,24 @@ export const SEAMS: Record<string, SeamEntry> = {
   'primitive:hydration': { status: 'complete', doc: 'DATABASE.md' },
   'primitive:typed-ids': { status: 'complete', doc: 'DATABASE.md' },
   'primitive:errors': { status: 'complete', doc: 'API_ROUTES.md' },
+  'primitive:json-rules': { status: 'complete', note: '@inixiative/json-rules; used by rebac, filtering' },
+
+  // ── registries (the registry pattern — declarative config tables) ─────────
+  'registry:false-polymorphism': { status: 'complete', doc: 'DATABASE.md' },
+  'registry:soft-delete': { status: 'complete', doc: 'DATABASE.md' },
+  'registry:audit-enabled': { status: 'complete', ticket: 'FEAT-005' },
+  'registry:encryption': { status: 'partial', ticket: 'FEAT-013' },
+  'registry:ordered-list': { status: 'complete', doc: 'HOOKS.md' },
+  'registry:webhook-enabled': { status: 'complete' },
+  'registry:redact-fields': { status: 'complete' },
+  'registry:cache-keys': { status: 'complete', doc: 'REDIS.md' },
+  'registry:seams': { status: 'partial', ticket: 'DEV-003', note: 'this system' },
 
   // ── infrastructure ──────────────────────────────────────────────────────
-  'infrastructure:postgres': { status: 'complete', ambient: true, note: 'db client — ambient, not @uses-tagged' },
+  // postgres = the database itself (ambient — everything queries it).
+  // prisma   = deep ORM coupling (client, extensions, runtime introspection) — selective, tagged.
+  'infrastructure:postgres': { status: 'complete', ambient: true, note: 'the DB — ambient via context, not @uses-tagged' },
+  'infrastructure:prisma': { status: 'complete', doc: 'DATABASE.md', note: 'deep ORM coupling only (client/extensions), not incidental queries' },
   'infrastructure:redis': { status: 'complete', doc: 'REDIS.md' },
   'infrastructure:bullmq': { status: 'complete', doc: 'JOBS.md' },
   'infrastructure:s3': { status: 'partial', note: 'storage adapter target' },
@@ -76,8 +90,10 @@ export const SEAMS: Record<string, SeamEntry> = {
   'infrastructure:infisical': { status: 'complete', doc: 'ENVIRONMENTS.md' },
 };
 
+const SEAM_CLASSES: Record<SeamClass, true> = { feature: true, primitive: true, infrastructure: true, registry: true };
+
 export const isSeam = (target: string): boolean => target in SEAMS;
-export const seamClass = (target: string): SeamClass | null =>
-  (target.split(':')[0] as SeamClass) in { feature: 1, primitive: 1, infrastructure: 1 }
-    ? (target.split(':')[0] as SeamClass)
-    : null;
+export const seamClass = (target: string): SeamClass | null => {
+  const prefix = target.split(':')[0];
+  return prefix in SEAM_CLASSES ? (prefix as SeamClass) : null;
+};

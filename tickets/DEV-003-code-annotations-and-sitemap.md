@@ -201,5 +201,15 @@ annotation + honesty rule turns the manual scorecard into an automatic, always-g
 - `entrypoint` and `utils` are `@kind` values.
 - Enforce presence on all non-test/non-barrel files; **auto-fill by path-derivable class, overload
   to override, explicit wins.**
-- **Open:** `@uses` presence-vs-reconciliation (leaning reconciliation-only); `@uses` scope
-  (leaning infra+primitive mandatory, feature→feature optional).
+- **`@uses` = deep/selective association only — RESOLVED.** Incidental use (a controller running a
+  query through the request context, a route using a route-template) does NOT earn `@uses`; only
+  genuine coupling does. Ambient infra (`infrastructure:postgres`, request context) and "fabric"
+  primitives (route-templates, errors, pagination, typed-ids) are never `@uses`-tagged. This makes
+  `@uses` answer "which files *selectively* depend on X," not "which files exist."
+- Seam classes: `feature` · `primitive` · `infrastructure` · `registry` (the registry pattern is a
+  first-class category — config table is `registry:x`, the hook enforcing it `@uses registry:x`).
+- `infrastructure:postgres` (the DB, ambient) is distinct from `infrastructure:prisma` (deep ORM
+  coupling — client/extensions/introspection — which IS tagged).
+- `@kind` additions: `registry`, `component` (frontend), `transformer`; `validation`→`validator`.
+- **Still open:** `@uses` presence-vs-reconciliation on freshly-stamped files (leaning
+  reconciliation-only, no `@uses none` boilerplate).

@@ -7,17 +7,21 @@ export const KINDS = [
   'route', // route definition in modules/*/routes
   'route-template', // readRoute/createRoute/… in lib/routeTemplates
   'middleware', // middleware/*
-  'hook', // mutation-lifecycle hooks in hooks/*
-  'job', // BullMQ job handler in jobs/handlers
-  'app-event-handler', // appEvents/handlers/*
+  'handler', // a handler — pair with @partOf to say handler-of-WHAT
+  //   (jobs, app-events, db hooks are all `handler` + their seam, never fused)
+  'hook', // mutation-lifecycle hook (handler bound to the db mutation pipeline)
+  'helper', // small focused helper bound to a seam (vs generic `utils`)
   'service', // domain logic in modules/*/services and internal module parts
   'schema', // request/response schemas in modules/*/schemas
-  'validation', // modules/*/validations
+  'validator', // modules/*/validations
+  'transformer', // value/shape transformers (serialize, normalize, project)
   'integration', // external-service integration
   'factory', // test factory (packages/db/src/test/factories)
   'constructor', // a make*() factory that produces a category of thing; pair with @constructs
+  'registry', // a declarative config table (the registry pattern)
   'primitive', // a reusable building block's own implementation
-  'infrastructure', // connection/client to an external dependency (redis, s3…)
+  'infrastructure', // connection/client to an external dependency (redis, prisma, s3…)
+  'component', // frontend React component
   'utils', // generic helper; also the catch-all when path can't classify
   'entrypoint', // the way into a seam (ws/index, app bootstrap)
   'config', // configuration / env wiring
