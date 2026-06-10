@@ -42,10 +42,13 @@ templates, `makeController`, plain modules). Use a top-of-file JSDoc block comme
 aesthetic with the mechanism of a comment: attaches to any file, zero runtime cost, parseable by
 regex / comment-AST.
 
+**One tag per line** (clean diffs — adding a `@uses` is a one-line add; line-oriented parse
+`^\s*\*\s*@(\w+)\s+(.*)$`):
+
 ```ts
 /**
  * @kind controller
- * @partOf feature:organization
+ * @partOf feature:organizations
  * @uses infrastructure:redis
  */
 import { ... }
@@ -189,7 +192,8 @@ annotation + honesty rule turns the manual scorecard into an automatic, always-g
 
 ## Decisions log (this thread)
 
-- Comments, not TS decorators (functional codebase).
+- Comments, not TS decorators (functional codebase). One tag per line; repeated tags (multiple
+  `@uses`, primary + secondary `@partOf`) each get their own line.
 - Three core questions: `@kind` (what is this) · `@partOf` (part of what) · `@uses` (uses what);
   `@constructs` for factories.
 - `class:name` seam syntax; names validated against a typed seam registry.
