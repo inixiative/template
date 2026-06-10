@@ -69,6 +69,19 @@ YAGNI is about **what was asked**, not **how complete the asked-for thing is**. 
 
 **Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Build it complete. Is it feature code? Trim hard.
 
+## 0.3. Interrogate Before Proposing (Discovery Work)
+
+For anything where the **shape is not yet known** — design, taxonomy, modeling, naming, architecture — the shape is discovered by **interrogation, not assertion**. Lead with questions; hold the confident synthesis until the shape has been interrogated.
+
+- **Interrogate before you propose.** Open the design space before closing it. Ask what you'd need to know; surface the forks. Questions are the deliverable here, not a failure to deliver — a premature closed proposal forecloses the discovery.
+- **At a fork, ASK — do not assume.** When more than one defensible shape exists and the choice depends on intent you don't have, stop and ask. Do not pick the option your prior pattern-matches to and present it as the answer.
+- **Name your assumptions and mark confidence.** Distinguish *recommendation* from *low-confidence guess*. Tag the soft calls so they're easy to spot and challenge — for you as much as for the reader.
+- **Prefer options with tradeoffs over a single recommendation** when the shape is unsettled. Breadth first, commitment later.
+- **Small piece → validate → extend.** Propose one concrete sample, get it validated, then widen. Caps the blast radius of any wrong assumption to one batch.
+- **If you catch yourself assuming, stop.** To assume is to make an *ass* of *u* and *me*. Beware especially of applying a good heuristic (e.g. "keep taxonomies minimal") as a *conclusion* before you've confirmed it fits the actual goal.
+
+This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is genuinely shape-finding, not execution.
+
 ## 1. Mandatory Task Intake (Always)
 
 Before editing, restate:
