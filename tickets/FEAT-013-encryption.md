@@ -4,7 +4,20 @@
 **Assignee**: TBD
 **Priority**: High
 **Created**: 2026-03-02
-**Updated**: 2026-03-02
+**Updated**: 2026-06-09
+
+---
+
+## Current State (2026-06-09)
+
+Built: AES-256-GCM service (`packages/db/src/lib/encryption/`) with random IV, AAD binding, and
+key-version support; unit-tested (round-trip, tamper-detect, AAD). Coverage is **1 of 23 models**
+(`authProvider.secrets`) — by design for now, not a gap.
+
+The `rotateEncryptionKeys` job is real and enqueued on worker start, but **meaningful rotation is
+blocked on CICD** — rolling a new key version is a CD/ops operation, and with one model at version 1
+rotation is effectively a no-op until then. So the missing rotation integration test is **deferred,
+not owed**: it lands with the CD pipeline that makes rotation exercisable end to end.
 
 ---
 

@@ -245,7 +245,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
 
-- ✅ **19 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact
+- ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -339,7 +339,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Keepalive & Heartbeat** - Client sends ping messages, server responds with pong and updates last ping timestamp. Connections without ping for 5+ minutes automatically closed and cleaned up. Prevents resource leaks from abandoned connections
 
-- ✅ **Event Broadcasting Pattern** - Infrastructure ready for app events to broadcast over WebSocket. Planned pattern: register app event handler that publishes to relevant channels based on event resource type/ID. Not yet wired up but all plumbing exists
+- ✅ **Event Broadcasting Pattern** - App events broadcast over WebSocket via the `websocket` bridge in `makeAppEvent` — a handler's `websocket(data)` selector returns refresh triggers (`{category:'query', action:'refetch', key}`) that publish to channels via `sendToChannel`. Live (e.g. `inquiryResolved`) and consumed by the frontend's `addLiveQuery` → TanStack Query invalidation. (Channel subscription is not yet permission-gated — see INFRA-004 security gap)
 
 - ✅ **App Events System** - `emitAppEvent('event.name', data)` for business events; actor context auto-enriches from `auditActorContext` (AsyncLocalStorage). Handlers defined via `makeAppEvent` fan out across bridges in parallel (`Promise.allSettled`): **observe** (BullMQ job → AppEvent audit table), **email** (typed handoffs → sendEmail jobs with declarative targeting), **websocket** (Redis pub/sub channel broadcasts), and **direct callbacks**. Centralized handler map at `apps/api/src/appEvents/handlers/index.ts` mirrors the BullMQ job-handler pattern. Events inside `db.txn()` defer to `onCommit`; events outside fire immediately
 
@@ -351,7 +351,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Email System
 
-**Database-Driven Email Templates with Multi-Tenancy** - MJML-based email system with reusable components, variable substitution, and polymorphic ownership. Organizations can customize templates with their branding. Schema and infrastructure ready, awaiting provider configuration and template authoring.
+**Database-Driven Email Templates with Multi-Tenancy** - MJML-based email system with reusable components, variable substitution, and polymorphic ownership. Organizations can customize templates with their branding. Send pipeline is operational end to end (Resend adapter + BullMQ job); remaining work is standard-template authoring, delivery tracking, preferences, and an admin authoring UI (see ticket COMM-001).
 
 - ✅ **EmailTemplate Schema** - Database model for email templates using MJML (responsive email markup). Templates have slug (otp, welcome), locale (en, es), subject with variables (`{{code}}`), and full MJML body with `{{component:slug}}` references and `{{variable.*}}` placeholders. Category (system/promotional) controls unsubscribe requirements
 
@@ -365,11 +365,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Email Clients** - Resend client (production) and Console client (dev/test) implemented in `packages/email`. Clients provide unified interface for sending with from/to/subject/html. No Postmark or SendGrid clients
 
-- ✅ **Template Rendering Pipeline** - Complete MJML rendering system in `packages/email/src/render/`: `compose()` fetches templates and recursively expands `{{component:slug}}` refs, `interpolate()` substitutes `{{variable.*}}` placeholders, `expand()` handles nested components, `lookupCascade()` resolves templates with owner fallbacks (Space → Org → default). MJML validation included. Ready to use, just needs API endpoint wiring
+- ✅ **Template Rendering Pipeline** - Complete MJML rendering system in `packages/email/src/render/`: `compose()` fetches templates and recursively expands `{{component:slug}}` refs, `interpolate()` substitutes `{{variable.*}}` placeholders, `expand()` handles nested components, `lookupCascade()` resolves templates with owner fallbacks (Space → Org → default). MJML validation included. Actively used by the `sendEmail` job (compose → interpolate → mjml2html → send); the remaining gap is an admin authoring endpoint/UI, not the render path
 
 - 🟡 **Common Flow Templates** - No templates created yet for standard flows (welcome email, password reset, email verification, invitation). Each needs MJML authoring and variable schema definition
 
-- 🟡 **Job Queue Integration** - Email sending should enqueue as background jobs to avoid blocking requests and enable retries. Pattern exists (see webhooks) but not wired for emails
+- ✅ **Job Queue Integration** - Email sending enqueues as BullMQ background jobs via the app-event email bridge → `sendEmail` handler (`apps/api/src/jobs/handlers/sendEmail.ts`). Non-blocking, retried; nothing synchronous hits the provider in the request path
 
 - 🟣 **Email System Completion** (ticket COMM-001, depends on INFRA-002) - Wire up template rendering, configure providers, author standard templates, integrate with job queue, add admin UI for template management
 

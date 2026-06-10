@@ -47,7 +47,7 @@
 
 ## Missing Deps (install when needed)
 
-- [ ] `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` - S3 file uploads
+- [x] `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `@aws-sdk/s3-presigned-post` - installed; storage adapter built in `apps/api/src/lib/storage/` (unused until FEAT-009 file module)
 - [ ] `stripe` - payments
 
 ## Future Work
@@ -95,7 +95,7 @@
   - [ ] Superadmin UI: Platform-wide feature flags + analytics
   - [ ] Integration with conditional component props
   - [ ] Flag change webhooks/events (external systems)
-- [ ] Wire up WebSocket event handlers
+- [x] Wire up WebSocket event handlers — app-event `websocket` bridge live (`makeAppEvent` → `sendToChannel`); refetch triggers consumed by FE `addLiveQuery`. (Remaining: permission-gate subscribe — see Security section)
 - [ ] Optional modules system (opt-in features)
 - [ ] I18n package
 - [ ] Mermaid diagram support in markdown
