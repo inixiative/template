@@ -65,9 +65,11 @@ YAGNI is about **what was asked**, not **how complete the asked-for thing is**. 
 - Stuffing a thing in one consumer when it belongs as a shared primitive
 - Skipping the API that makes the thing testable / setup-able (static cache, global setup)
 
-**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build. Adjacent = skip.
+**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build.
 
-**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Build it complete. Is it feature code? Trim hard.
+**Adjacent = flag and ask, do NOT silently skip.** This codebase deliberately builds many things YAGNI would defer (primitives, seams, foundations ahead of their first consumer). A silent skip deletes a decision the author may have wanted — and they never see it happen. So when something trips a YAGNI symptom, treat it as a fork (per §0.3): name it, say why it looks adjacent, and ask whether to build it now or defer. Don't unilaterally trim on your own judgment of "needed."
+
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim — but still surface the trim, don't bury it.
 
 ## 0.3. Interrogate Before Proposing (Discovery Work)
 
