@@ -22,6 +22,14 @@
 
 <!-- toc:end -->
 
+## Security
+
+- [ ] **WS channel subscription requires permission** (INFRA-004 §Security Gap) — `subscribe`
+  currently accepts any channel from any (even anonymous) connection with no authz. Payloads are
+  refresh triggers only, so it's a side-channel (change-activity/existence oracle by guessable
+  channel key), not a data leak — but subscribe must run the underlying route's read permission
+  check, require identity, and re-authorize on identity change. Tests must cover rejection.
+
 ## In Progress
 
 - [x] Token permission tests - comprehensive tests for OrganizationUser and SpaceUser tokens

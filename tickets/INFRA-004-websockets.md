@@ -16,6 +16,53 @@ Complete WebSocket event system with 4 core event types: feature flags, refresh 
 
 ---
 
+## ⚠️ SECURITY GAP — Channel subscription has no authorization (added 2026-06-09)
+
+Found by reading the code, not the map. **`subscribe` accepts any channel from any
+connection with zero authorization** — and connections are anonymous by default (identity is
+set later via the `authenticate` message, never required for `subscribe`).
+
+Evidence:
+- `apps/api/src/ws/handler.ts` `dispatch()` — the `subscribe` case calls
+  `subscribeToChannel(ws, msg.channel)` with no identity or permission check.
+- `apps/api/src/ws/subscriptions.ts:7` — `subscribeToChannel` just indexes the connection
+  into `byChannel`. No authz.
+- `apps/api/src/ws/delivery.ts:18` — `sendToChannelLocal` fans the event to every subscriber
+  with no per-recipient re-check.
+- `packages/shared/src/ws/channelKey.ts` — channel keys are deterministic and guessable:
+  `channelKey({_id:'inquiryRead', path:{id:'X'}})` → `'inquiryRead:id:X'` (route id + sorted
+  path params; no secret, no per-user component).
+
+**Severity: side-channel, not data leak.** WS payloads are refresh triggers only —
+`{category:'query', action:'refetch', key}` (see `inviteOrganizationUser/appEvents.ts:28`),
+and the FE dispatch (`packages/ui/src/lib/ws/dispatch.ts`) only calls `invalidateQueries`. The
+actual data refetch goes back through the permission-checked REST endpoint. So an unauthorized
+subscriber to `inquiryRead:id:X` does NOT receive X's data — but DOES learn *that* X changed
+and *when* (an activity + existence oracle by guessable id). Blast radius is bounded today by
+`LIVE_QUERIES` having a single entry (`inquiryRead`, `packages/shared/src/ws/liveQueries.ts`),
+but the system is designed so adding `spaceRead`/`organizationRead` is a one-line change — at
+which point every tenant's change-activity becomes observable by id.
+
+**Fix — subscribe must require permission:**
+- [ ] Require an established identity before `subscribe` (reject if `ws.data.userId` is null).
+- [ ] On subscribe, resolve the channel back to its resource (`_id` → route, path params →
+      resource id) and run the SAME read permission check the underlying REST route uses;
+      reject otherwise with `send(ws, { type: 'subscribeRejected', channel })`.
+- [ ] Re-authorize on identity change (`authenticate`/`spoof`/`unspoof`/`logout` must drop or
+      re-validate existing channel subscriptions — a connection that downgrades identity should
+      lose channels it no longer qualifies for).
+- [ ] Add tests asserting unauthorized subscribe is rejected (current ws tests cover the
+      mechanism — indexing/delivery — but none cover authorization, which is why the gap is
+      invisible to CI).
+
+> Note: the "Current State ✅ / Infrastructure COMPLETE" section below predates the ws/
+> rewrite and is stale — it lists `connections.ts` / `events/` which no longer exist (actual
+> layout: `registry.ts`, `identity.ts`, `subscriptions.ts`, `delivery.ts`, `lifecycle.ts`,
+> `pubsub.ts`, `handler.ts`, `auth.ts`). Infrastructure is transport-complete but NOT
+> authorization-complete.
+
+---
+
 ## Current State ✅
 
 **Infrastructure (COMPLETE):**
