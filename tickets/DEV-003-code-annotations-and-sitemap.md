@@ -201,11 +201,18 @@ annotation + honesty rule turns the manual scorecard into an automatic, always-g
 - `entrypoint` and `utils` are `@kind` values.
 - Enforce presence on all non-test/non-barrel files; **auto-fill by path-derivable class, overload
   to override, explicit wins.**
-- **`@uses` = deep/selective association only — RESOLVED.** Incidental use (a controller running a
-  query through the request context, a route using a route-template) does NOT earn `@uses`; only
-  genuine coupling does. Ambient infra (`infrastructure:postgres`, request context) and "fabric"
-  primitives (route-templates, errors, pagination, typed-ids) are never `@uses`-tagged. This makes
-  `@uses` answer "which files *selectively* depend on X," not "which files exist."
+- **`@uses` = load-bearing, NOT ubiquity — RESOLVED.** Tag `@uses X` when X is integral to what
+  the file *does* (part of its contract; someone reasoning about X's blast radius needs this file),
+  regardless of how common X is. Two failure modes to avoid:
+  - don't *skip* a load-bearing dep because it's common — `json-rules` is everywhere but is tagged
+    wherever a file is built on it; `find.ts`/user-hydration is `@uses primitive:caching` because
+    it's literally a cache wrapper (warms sibling caches too).
+  - don't *add* a tag for an incidental touch — a controller running one `db.x.update()` through
+    the request context is not "using the database"; its job is the mutation, not the DB.
+  So `infrastructure:postgres` is mostly untagged because the context-query path is *incidental*
+  (not because it's common); files genuinely coupled to the ORM (client, mutation-lifecycle
+  extension) tag `infrastructure:prisma`. The discriminator is "is X shaping this file's behavior,"
+  never "is X widely used."
 - Seam classes: `feature` · `primitive` · `infrastructure` · `registry` (the registry pattern is a
   first-class category — config table is `registry:x`, the hook enforcing it `@uses registry:x`).
 - `infrastructure:postgres` (the DB, ambient) is distinct from `infrastructure:prisma` (deep ORM
