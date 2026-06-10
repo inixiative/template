@@ -579,11 +579,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Testing & Quality
 
-- ✅ **93 Test Files with Bun Test Runner** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
+- ✅ **~172 Test Files with Bun Test Runner** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
 
 - ✅ **Test Factories with Faker** - `create*()` and `build*()` functions generate realistic test data. `create*()` persists to DB, `build*()` is in-memory only. Auto-infers relationships (creating user auto-creates account). Override only what matters for your test. Entities expose `__serialize()` for API/UI-shaped assertions (converts `Date` fields to ISO strings). Factories for 20/23 models (auth/log models excluded by design). Tests run against a dedicated test database
 
-- ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and HMAC signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
+- ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and RSA-SHA256 signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
 
 - ✅ **Automatic Test Cleanup** - Database hooks track which tables were touched during tests. `cleanupTouchedTables()` utility truncates only modified tables after test suite completes. Temporarily disables FK constraints, uses TRUNCATE CASCADE for efficiency. Prevents test data buildup without manual cleanup
 
