@@ -10,7 +10,7 @@ export const KINDS = [
   // ── backend / shared ────────────────────────────────────────────────────
   'controller', // request handler in modules/*/controllers
   'route', // route definition in modules/*/routes
-  'route-template', // readRoute/createRoute/… in lib/routeTemplates
+  'routeTemplate', // readRoute/createRoute/… in lib/routeTemplates
   'middleware', // middleware/*
   'handler', // handler — pair with @partOf (jobs, app-events, db mutation hooks)
   'helper', // small focused helper bound to a seam (vs generic `utils`)

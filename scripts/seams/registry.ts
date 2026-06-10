@@ -6,15 +6,18 @@
 // status / doc / ticket are properties of the feature or primitive, not of any
 // one file that happens to be part of it.
 //
+// Naming: class prefix is lowercase (feature/primitive/infrastructure/registry);
+// the seam name is camelCase (no kebab — matches the codebase convention).
+//
 // class meanings:
 //   feature        — user-facing capability (maps to a FEATURES.md section / ticket)
 //   primitive      — reusable building block features are made of
-//   infrastructure — a connection/dependency consumed via @uses (never @partOf by consumers)
+//   infrastructure — a connection/dependency consumed via @uses
+//   registry       — a declarative config table (the registry pattern)
 //
 // `ambient: true` marks ubiquitous infrastructure (the db client, the request
-// context) that virtually every file touches — these are NOT tagged via @uses,
-// or every file would list them and the seam would carry no signal. They exist
-// in the registry so the reverse index can still resolve them when relevant.
+// context) touched incidentally by ~every file — NOT tagged via @uses (load-
+// bearing only). It exists here so the reverse index can resolve it when needed.
 
 export type SeamClass = 'feature' | 'primitive' | 'infrastructure' | 'registry';
 export type Status = 'complete' | 'partial' | 'scaffold' | 'planned';
@@ -27,11 +30,11 @@ export type SeamEntry = {
   note?: string;
 };
 
-// Keyed `class:name`. STARTER SET — validate/extend before bulk tagging (DEV-003 Phase 1).
+// Keyed `class:name` (name is camelCase). STARTER SET — validate/extend before bulk tagging.
 export const SEAMS: Record<string, SeamEntry> = {
   // ── features ────────────────────────────────────────────────────────────
   'feature:auth': { status: 'complete', doc: 'AUTH.md' },
-  'feature:auth-provider': { status: 'complete', doc: 'AUTH.md' },
+  'feature:authProvider': { status: 'complete', doc: 'AUTH.md' },
   'feature:tokens': { status: 'complete', doc: 'AUTH.md' },
   'feature:impersonation': { status: 'complete', doc: 'AUTH.md' },
   'feature:tenancy': { status: 'complete', note: 'organizations + spaces + memberships' },
@@ -41,41 +44,41 @@ export const SEAMS: Record<string, SeamEntry> = {
   'feature:customer': { status: 'partial', note: 'CustomerRef schema/queries; no full API/UI' },
   'feature:email': { status: 'partial', ticket: 'COMM-001', doc: 'COMMUNICATIONS.md' },
   'feature:webhooks': { status: 'complete' },
-  'feature:audit-logs': { status: 'complete', ticket: 'FEAT-005', doc: 'HOOKS.md' },
+  'feature:auditLogs': { status: 'complete', ticket: 'FEAT-005', doc: 'HOOKS.md' },
   'feature:encryption': { status: 'partial', ticket: 'FEAT-013', note: '1/23 models; rotation blocked on CICD' },
   'feature:tags': { status: 'complete' },
   'feature:admin': { status: 'complete' },
 
   // ── primitives ──────────────────────────────────────────────────────────
   'primitive:authz': { status: 'complete', doc: 'PERMISSIONS.md', note: 'rebac/permix — authorization' },
-  'primitive:app-events': { status: 'complete', doc: 'APP_EVENTS.md' },
+  'primitive:appEvents': { status: 'complete', doc: 'APP_EVENTS.md' },
   'primitive:jobs': { status: 'complete', doc: 'JOBS.md' },
   'primitive:hooks': { status: 'complete', doc: 'HOOKS.md' },
-  'primitive:mutation-lifecycle': { status: 'complete', doc: 'HOOKS.md' },
-  'primitive:false-polymorphism': { status: 'complete', doc: 'DATABASE.md' },
+  'primitive:mutationLifecycle': { status: 'complete', doc: 'HOOKS.md' },
+  'primitive:falsePolymorphism': { status: 'complete', doc: 'DATABASE.md' },
   'primitive:adapter': { status: 'complete', doc: 'ADAPTERS.md' },
-  'primitive:route-templates': { status: 'complete', doc: 'API_ROUTES.md' },
+  'primitive:routeTemplates': { status: 'complete', doc: 'API_ROUTES.md' },
   'primitive:caching': { status: 'complete', doc: 'REDIS.md' },
   'primitive:websockets': { status: 'partial', ticket: 'INFRA-004', doc: 'APP_EVENTS.md', note: 'subscribe authz pending' },
   'primitive:storage': { status: 'partial', ticket: 'FEAT-009', doc: 'ADAPTERS.md', note: 'adapter built, no file module' },
   'primitive:batch': { status: 'complete', doc: 'BATCH.md' },
-  'primitive:ordered-list': { status: 'complete', doc: 'HOOKS.md' },
+  'primitive:orderedList': { status: 'complete', doc: 'HOOKS.md' },
   'primitive:filtering': { status: 'complete', doc: 'API_ROUTES.md' },
   'primitive:pagination': { status: 'complete', doc: 'API_ROUTES.md' },
   'primitive:hydration': { status: 'complete', doc: 'DATABASE.md' },
-  'primitive:typed-ids': { status: 'complete', doc: 'DATABASE.md' },
+  'primitive:typedIds': { status: 'complete', doc: 'DATABASE.md' },
   'primitive:errors': { status: 'complete', doc: 'API_ROUTES.md' },
-  'primitive:json-rules': { status: 'complete', note: '@inixiative/json-rules; used by rebac, filtering' },
+  'primitive:jsonRules': { status: 'complete', note: '@inixiative/json-rules; used by authz, filtering' },
 
   // ── registries (the registry pattern — declarative config tables) ─────────
-  'registry:false-polymorphism': { status: 'complete', doc: 'DATABASE.md' },
-  'registry:soft-delete': { status: 'complete', doc: 'DATABASE.md' },
-  'registry:audit-enabled': { status: 'complete', ticket: 'FEAT-005' },
+  'registry:falsePolymorphism': { status: 'complete', doc: 'DATABASE.md' },
+  'registry:softDelete': { status: 'complete', doc: 'DATABASE.md' },
+  'registry:auditEnabled': { status: 'complete', ticket: 'FEAT-005' },
   'registry:encryption': { status: 'partial', ticket: 'FEAT-013' },
-  'registry:ordered-list': { status: 'complete', doc: 'HOOKS.md' },
-  'registry:webhook-enabled': { status: 'complete' },
-  'registry:redact-fields': { status: 'complete' },
-  'registry:cache-keys': { status: 'complete', doc: 'REDIS.md' },
+  'registry:orderedList': { status: 'complete', doc: 'HOOKS.md' },
+  'registry:webhookEnabled': { status: 'complete' },
+  'registry:redactFields': { status: 'complete' },
+  'registry:cacheKeys': { status: 'complete', doc: 'REDIS.md' },
   'registry:seams': { status: 'partial', ticket: 'DEV-003', note: 'this system' },
 
   // ── infrastructure ──────────────────────────────────────────────────────

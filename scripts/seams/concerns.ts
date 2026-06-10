@@ -17,11 +17,11 @@ export const CONCERNS = [
   'security', // a security boundary / sensitive surface (authz checks, signing, validation of untrusted input)
   'secrets', // handles secrets / encryption-at-rest / key material
   'money', // billing, payments, entitlements with cost implications
-  'tenant-isolation', // enforces or depends on org/space data isolation
+  'tenantIsolation', // enforces or depends on org/space data isolation
   'retention', // data lifecycle: retention, archival, deletion, GDPR erase
   'idempotency', // must be safe to run more than once (jobs, reconcilers, webhooks)
-  'hot-path', // performance-sensitive (per-request, high-frequency)
-  'public-surface', // reachable unauthenticated / externally exposed
+  'hotPath', // performance-sensitive (per-request, high-frequency)
+  'publicSurface', // reachable unauthenticated / externally exposed
   'audit', // produces or depends on the audit trail
 ] as const;
 

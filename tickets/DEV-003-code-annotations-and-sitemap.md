@@ -50,7 +50,7 @@ are a list — block stays compact; parse is `^\s*\*\s*@(\w+)\s+(.*)$` then `val
  * @kind controller
  * @partOf feature:tenancy
  * @uses primitive:authz, infrastructure:redis
- * @concern tenant-isolation
+ * @concern tenantIsolation
  */
 import { ... }
 ```
@@ -69,13 +69,16 @@ tag. Most files will carry **multiple `@partOf` and/or `@uses`**, and that's exp
 
 ### Per-file tags (four axes)
 
+All axes are **multi-valued** (comma-separated list), uniformly — a file can play several roles,
+belong to several seams, and the intersection is the meaning.
+
 | Question | Tag | Value | Cardinality |
 |----------|-----|-------|-------------|
-| **What is this?** | `@kind` | enum role (closed set) | 1 |
-| **What is it part of?** | `@partOf` | `class:name` seam (registry) | 1 primary + secondaries; multi is normal |
-| **What does it use?** | `@uses` | `class:name` seam it depends on but isn't part of | 0..n (load-bearing only) |
-| **What cross-cutting properties?** | `@concern` | closed set (concerns.ts) | 0..n |
-| **What does it build?** | `@constructs` | the thing a factory produces (constructors only) | 0..n |
+| **What is this?** | `@kind` | enum role(s), closed set | 1+ (e.g. `entrypoint, registry`) |
+| **What is it part of?** | `@partOf` | `class:name` seam(s), registry | 1 primary + secondaries; multi normal |
+| **What does it use?** | `@uses` | `class:name` seam(s) it depends on but isn't part of | 0+ (load-bearing only) |
+| **What cross-cutting properties?** | `@concern` | closed set (concerns.ts) | 0+ |
+| **What does it build?** | `@constructs` | the thing a factory produces (constructors only) | 0+ |
 
 **`class:name` style is required** for `@partOf`/`@uses` — the prefix *is* the seam's type, so the
 generator groups by type for free and CI rejects typo'd/unknown names against the registry. Same
@@ -85,13 +88,17 @@ discipline as `Modules.x`. Examples: `@partOf feature:email`, `@uses primitive:c
 **part-of vs uses is the membership/dependency distinction:** `ws/pubsub.ts` is **part-of**
 `primitive:websockets` (remove it and websockets breaks) but **uses** `infrastructure:redis` (a
 separate thing it calls). **Multi-`@partOf` is the bridge case** — the app-event email bridge is
-`@partOf primitive:app-events` *and* `@partOf feature:email`; that's a real seam, not dilution.
+`@partOf primitive:appEvents` *and* `@partOf feature:email`; that's a real seam, not dilution.
 
 ### `@kind` enum (closed set, lives in the registry)
 
-`controller` · `route` · `route-template` · `middleware` · `hook` · `job` · `app-event-handler` ·
-`service` · `schema` · `validation` · `integration` · `factory` · `constructor` · `primitive` ·
-`infrastructure` · `utils` · `entrypoint` · `config` · `seed`
+backend/shared: `controller` · `route` · `routeTemplate` · `middleware` · `handler` · `helper` ·
+`service` · `schema` · `validator` · `transformer` · `integration` · `factory` · `constructor` ·
+`registry` · `primitive` · `infrastructure` · `entrypoint` · `config` · `seed` · `utils`
+frontend: `component` · `page` · `hook` · `store`
+
+(`handler` is never fused with its seam — a db mutation-lifecycle hook is
+`@kind handler @partOf primitive:mutationLifecycle`; `hook` here = a React hook.)
 
 - `entrypoint` is a kind, not a flag — "the way into a seam" (e.g. `ws/index.ts`).
 - `constructor` is for factories (`makeController`, `makeJob`, route templates); pair with
@@ -209,6 +216,12 @@ annotation + honesty rule turns the manual scorecard into an automatic, always-g
 
 - Comments, not TS decorators (functional codebase). One line per axis; multiple values are a
   comma-separated list on that axis's line (`@partOf a, b, c`), never a repeated tag.
+- **Token convention is uniform across every axis** (kind, partOf, uses, concern, constructs):
+  value is **camelCase** (no kebab), seam class prefix is lowercase, `class:name` colon separator.
+  e.g. `routeTemplate`, `appEventHandler`, `primitive:mutationLifecycle`, `concern tenantIsolation`.
+- Four axes: `@kind` · `@partOf` · `@uses` · `@concern` (+ `@constructs` for factories). **All
+  multi-valued** — `@kind` too (a file can be `entrypoint, registry`); auto-fill stamps the
+  path-derived primary kind, additional roles are added by overload.
 - Three core questions: `@kind` (what is this) · `@partOf` (part of what) · `@uses` (uses what);
   `@constructs` for factories.
 - `class:name` seam syntax; names validated against a typed seam registry.
