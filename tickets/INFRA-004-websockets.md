@@ -43,17 +43,32 @@ and *when* (an activity + existence oracle by guessable id). Blast radius is bou
 but the system is designed so adding `spaceRead`/`organizationRead` is a one-line change — at
 which point every tenant's change-activity becomes observable by id.
 
-**Fix — subscribe must require permission:**
-- [ ] Require an established identity before `subscribe` (reject if `ws.data.userId` is null).
-- [ ] On subscribe, resolve the channel back to its resource (`_id` → route, path params →
-      resource id) and run the SAME read permission check the underlying REST route uses;
-      reject otherwise with `send(ws, { type: 'subscribeRejected', channel })`.
-- [ ] Re-authorize on identity change (`authenticate`/`spoof`/`unspoof`/`logout` must drop or
-      re-validate existing channel subscriptions — a connection that downgrades identity should
-      lose channels it no longer qualifies for).
-- [ ] Add tests asserting unauthorized subscribe is rejected (current ws tests cover the
-      mechanism — indexing/delivery — but none cover authorization, which is why the gap is
-      invisible to CI).
+**Fix — subscribe is a read check (≈5 lines), plus one prerequisite.**
+
+The check itself mirrors `validatePermission` (hydrate the record, run `check(permix, rebacSchema,
+model, record, 'read')`):
+
+```ts
+// subscribe case in handler.ts, replacing the bare subscribeToChannel(ws, msg.channel)
+const { _id, path } = parseChannelKey(msg.channel);
+const model = liveQueryAccessor(_id);
+const record = path?.id ? await hydrate(db, model, { id: path.id }) : null;
+if (!record || !check(ws.data.permix, rebacSchema, model, record, 'read'))
+  return send(ws, { type: 'subscribeRejected', channel: msg.channel });
+subscribeToChannel(ws, msg.channel);
+```
+
+Prerequisite (the only real work): the connection has no `permix` today — only `userId`
+(`identity.ts:13`). Build the user's permix **once at `authenticate` time** on `ws.data.permix`,
+reusing the existing `setUserContext`/`setupOrgPermissions`/`setupSpacePermissions` logic adapted
+to read from `ws.data` instead of the Hono `Context`. Rebuilding it inside `setIdentity` makes
+re-auth-on-identity-change fall out for free (drop channels that no longer pass).
+
+- [ ] Build `ws.data.permix` at authenticate (reuse setUserContext logic; rebuild in setIdentity).
+- [ ] Add `liveQueryAccessor(_id)` — operation id → accessor (`inquiryRead`→`inquiry`); natural
+      home is the `LIVE_QUERIES` registry (map entry instead of bare Set).
+- [ ] The 5-line read check above; reject with `{ type: 'subscribeRejected', channel }`.
+- [ ] Test: unauthorized subscribe is rejected (current ws tests cover indexing/delivery, not authz).
 
 > Note: the "Current State ✅ / Infrastructure COMPLETE" section below predates the ws/
 > rewrite and is stale — it lists `connections.ts` / `events/` which no longer exist (actual
