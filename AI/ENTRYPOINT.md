@@ -46,9 +46,9 @@ Never merge distinct concerns into one place for convenience — the convenience
 
 ## 0.2. YAGNI — Scope Invention vs. Completion
 
-YAGNI is about **what was asked**, not **how complete the asked-for thing is**. Two distinct rules, often conflated.
+**The error runs BOTH directions — be vigilant for both.** Overbuilding (scope invention) and underbuilding (trimming real completion) are equal failure modes, and both feel virtuous from the inside: trimming feels *disciplined*, adding feels *thorough*. Neither is the safe default. The danger in both is the **silent** call — quietly adding coupling the author didn't want, or quietly deleting a thing the author wanted. Watch yourself in both directions, not just the one that's salient.
 
-**YAGNI applies to: scope invention.** Adding things adjacent to the task that nobody asked for. Symptoms:
+**Overbuild (scope invention).** Adding things adjacent to the task that nobody asked for. Symptoms:
 
 - Extra fields on a model "in case we need them later"
 - Wrapper functions around single-call sites
@@ -58,18 +58,17 @@ YAGNI is about **what was asked**, not **how complete the asked-for thing is**. 
 - Re-exports / barrels that nothing imports
 - Comments explaining what well-named code already says
 
-**YAGNI does NOT apply to: completing the asked-for thing.** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* applying YAGNI here:
+**Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* trimming:
 
 - Shipping a v1 that forces a v2 in a week (binary support, version-awareness, config flexibility)
 - Hardcoding what should be parameterized (CLI flag, regex)
 - Stuffing a thing in one consumer when it belongs as a shared primitive
 - Skipping the API that makes the thing testable / setup-able (static cache, global setup)
+- Deferring a primitive/seam/foundation the codebase deliberately builds ahead of its first consumer
 
-**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build.
+**Discriminator:** "is this in service of what was asked, or adjacent to it?" Clear in-service → build. Clearly adjacent noise (dead barrel, redundant comment) → skip. **A genuine judgment call in EITHER direction → flag and ask, don't decide silently** (per §0.3): name it, say which way it leans and why, and ask build-now / defer / drop. Don't silently add on a guess of "thorough," and don't silently trim on a guess of "needed."
 
-**Adjacent = flag and ask, do NOT silently skip.** This codebase deliberately builds many things YAGNI would defer (primitives, seams, foundations ahead of their first consumer). A silent skip deletes a decision the author may have wanted — and they never see it happen. So when something trips a YAGNI symptom, treat it as a fork (per §0.3): name it, say why it looks adjacent, and ask whether to build it now or defer. Don't unilaterally trim on your own judgment of "needed."
-
-**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim — but still surface the trim, don't bury it.
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim. Either way, if it's a real judgment call, surface it — don't bury the add *or* the trim.
 
 ## 0.3. Interrogate Before Proposing (Discovery Work)
 
