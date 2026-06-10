@@ -54,23 +54,37 @@ regex / comment-AST.
 import { ... }
 ```
 
-### Per-file tags (the file answers three questions)
+### Capturing meaning via convergence (the core philosophy)
+
+The goal is to **capture meaning**, and meaning emerges from the **intersection of several true
+edges**, not from one hyper-specific label. Keep the vocabulary **broad but closed**; apply it
+**liberally**. "The thing that redacts user PII for retention" is not a bespoke tag — it's
+`@kind handler` ∩ `@partOf feature:users` ∩ `@concern pii` ∩ `@concern retention` converging.
+**Prefer multiple broad-true tags over one narrow tag** — it builds a denser, more queryable graph.
+
+Discipline that keeps convergence from becoming noise: every edge must still be **true and
+load-bearing**. Multiplicity is in how many tags *genuinely apply*, not in lowering the bar per
+tag. Most files will carry **multiple `@partOf` and/or `@uses`**, and that's expected.
+
+### Per-file tags (four axes)
 
 | Question | Tag | Value | Cardinality |
 |----------|-----|-------|-------------|
-| **What is this?** | `@kind` | enum role (closed set, below) | 1 |
-| **What is it part of?** | `@partOf` | `class:name` seam (see registry) | 1 primary, + secondaries allowed |
-| **What does it use?** | `@uses` | `class:name` seam it depends on but isn't part of | 0..n |
+| **What is this?** | `@kind` | enum role (closed set) | 1 |
+| **What is it part of?** | `@partOf` | `class:name` seam (registry) | 1 primary + secondaries; multi is normal |
+| **What does it use?** | `@uses` | `class:name` seam it depends on but isn't part of | 0..n (load-bearing only) |
+| **What cross-cutting properties?** | `@concern` | closed set (concerns.ts) | 0..n |
 | **What does it build?** | `@constructs` | the thing a factory produces (constructors only) | 0..n |
 
-**`class:name` style is required** — the prefix *is* the seam's type, so the generator groups by
-type for free and CI rejects typo'd/unknown names against the registry. Same discipline as
-`Modules.x`. Examples: `@partOf feature:email`, `@partOf primitive:websockets`,
-`@uses infrastructure:redis`, `@uses primitive:caching`.
+**`class:name` style is required** for `@partOf`/`@uses` — the prefix *is* the seam's type, so the
+generator groups by type for free and CI rejects typo'd/unknown names against the registry. Same
+discipline as `Modules.x`. Examples: `@partOf feature:email`, `@uses primitive:caching`,
+`@concern pii`.
 
-**part-of vs uses is the load-bearing distinction:** `ws/pubsub.ts` is **part-of**
-`primitive:websockets` (remove it and websockets breaks) but **uses** `infrastructure:redis`
-(a separate thing it calls). Membership vs dependency.
+**part-of vs uses is the membership/dependency distinction:** `ws/pubsub.ts` is **part-of**
+`primitive:websockets` (remove it and websockets breaks) but **uses** `infrastructure:redis` (a
+separate thing it calls). **Multi-`@partOf` is the bridge case** — the app-event email bridge is
+`@partOf primitive:app-events` *and* `@partOf feature:email`; that's a real seam, not dilution.
 
 ### `@kind` enum (closed set, lives in the registry)
 
