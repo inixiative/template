@@ -75,6 +75,7 @@ Mapping built primitives → product features:
 | OpenAPI 3.1 → generated typed SDK + TanStack Query hooks | Customer integration SDK — a selling point, generated for free |
 | Webhooks (HMAC, delivery tracking, retries) | "Template published" / "render failed" events to customer systems |
 | BullMQ queues, app events, websockets | Async render/send, live preview collaboration later |
+| Contact model (19 channel types) + `CommunicationCategory` enum (system vs promotional) on EmailTemplate | Foundation for unsubscribe + communication preferences (§4.1): system email can't be unsubscribed, promotional must be — the enum and the per-contact anchor already exist; preference management itself is an open TODO |
 | Field encryption (AES-256-GCM) | Customer's ESP API keys at rest |
 | Superadmin app + spoofing | Our own support tooling, day one |
 
@@ -139,6 +140,7 @@ Competitive contrast worth marketing copy: incumbents' "saved rows" and template
 | S3 adapter + buckets | INFRA-011 | Unblocks files |
 | File management | FEAT-009 | **Scope v1 to template assets**: upload, bind (image → template/component via ResourceBinding), serve. Defer folders/sharing UX |
 | Email completion | COMM-001 | Render pipeline hardening, BYO provider keys per org (Resend/SES/Postmark adapters, encrypted), send tracking. **Ticket is stale** — rewrite around the implemented MJML EmailTemplate/EmailComponent system, not React Email. The render pipeline itself does not need INFRA-002 (conditional sending is out of v1 scope) — but the builder UI does (next row) |
+| Unsubscribe + communication preferences | COMM-001 (open TODO in `docs/claude/COMMUNICATIONS.md`) | **Launch scope, not optional** — promotional sending without working unsubscribe is a CAN-SPAM/GDPR/CASL violation, and a *governance* product cannot ship non-compliant. The pieces anchor on what exists: `CommunicationCategory` (system vs promotional) drives whether the unsubscribe link renders (reserved variable, lens-locked — subtenants can't remove it); per-contact preferences hang off the Contact model (opt-out per category, per tenant); suppression enforced in the send job, scoped per tenant so an unsubscribe from one platform never bleeds into another. Preference-center UI overlaps FEAT-012 (notifications) — design the model so both consume it |
 | Rules Builder | INFRA-002 | Already planned for the next month or two — and it supplies **~80% of the builder's editing primitives**: lens traversal UI, field selection/pickers, enum evaluation, value injection/interpolation. Building a rule and editing a template are the same interaction (walk a lens, pick fields, put in values, evaluate enums); the email builder is that engine plus an email-specific rendering layer. This reframes the builder from "the big lift" to a composition exercise |
 
 ### 4.2 Net-new — the actual product delta
@@ -265,7 +267,8 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 
 ## Related Tickets
 
-- **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite; render pipeline doesn't need INFRA-002), INFRA-002 (rules builder — supplies the builder's editing primitives)
+- **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite; render pipeline doesn't need INFRA-002; includes unsubscribe + preference management as launch scope), INFRA-002 (rules builder — supplies the builder's editing primitives)
+- **Unsubscribe/preferences:** COMM-002 (email validation), FEAT-012 (notifications — preference-center model should be shared)
 - **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), FEAT-007 (white-labeling — theme persistence serves both), INFRA-007 / INFRA-009-cold-storage (retention exemption)
 - **Agent-friendliness (§6):** FEAT-014 (AI developer experience — MCP infrastructure), DOC-002 (AI-discoverable API metadata — promote to launch scope), API-001 (idempotency — launch dependency of the public API)
 - **Agent payments (§6.3):** FIN-001 (financial fiat — billing module, ACP-compatible checkout), FIN-002 (financial web3 — x402/USDC machine-payment settlement)
@@ -284,3 +287,5 @@ _2026-06-11 — Revision: pinned the tenancy vocabulary (org = tenant, space = s
 _2026-06-11 — Revision: INFRA-002 Rules Builder added as a builder prerequisite (~80% of the editing primitives: lens traversal, field pickers, enum evaluation, value injection — building a rule and editing a template are the same interaction); theme build-out added as a net-new workstream (SpaceTheme type + useSpaceTheme exist frontend-only, nothing persisted; persist at org+space, expose `{{theme.*}}` reserved variables, overlaps FEAT-007); delegated subtenant billing added (per-space metering day one, invoicing v1, Stripe Connect direct payment v2)._
 
 _2026-06-11 — Revision: added §3.3 — verified that copy-on-write per-component inheritance is already implemented (`lookupCascade` resolves each component slug independently through space → org → default). Subtenant customization = sparse overrides, everything else inherits live; no fork rot; overridable surface = lens surface. Builder inheritance UX (inherited/overridden badges, revert-to-inherited) added to §4.2._
+
+_2026-06-11 — Revision: unsubscribe + contact communication preferences referenced as launch scope (§4.1): `CommunicationCategory` enum exists, preference management is an open COMM-001 TODO; unsubscribe link as a lens-locked reserved variable; per-contact, per-tenant preferences on the Contact model; per-tenant suppression in the send job. Refs COMM-002, FEAT-012._
