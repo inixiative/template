@@ -5,6 +5,7 @@
 **Priority**: High
 **Created**: 2026-06-11
 **Updated**: 2026-06-11
+**Dependencies**: Files (INFRA-011 → FEAT-009), Email completion (COMM-001), Billing (net-new), Email-builder frontend (net-new)
 
 ---
 
@@ -112,6 +113,13 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 
 ## 4. What We Need to Build to Launch
 
+**Hard launch dependencies — the product cannot ship without all four:**
+
+1. **Files** (INFRA-011 → FEAT-009) — template image assets need multi-tenant storage, binding, and serving
+2. **Email completion** (COMM-001) — render pipeline, BYO provider keys, send tracking
+3. **Billing** (net-new) — Stripe subscriptions per org; no billing, no product
+4. **Email-builder frontend** (net-new) — the structured editor is the product's interface; API-only is a design-partner phase, not a launch
+
 ### 4.1 Prerequisites — already on the roadmap (work we'd do anyway)
 
 | Work | Ticket | Product-specific notes |
@@ -166,7 +174,34 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
 
 ---
 
-## 6. Risks
+## 6. Agent-Friendly by Design
+
+A growing share of buyer integration work — and, increasingly, day-to-day template editing — is done by AI agents, not humans. Beefree/Unlayer are agent-opaque: an iframe drag-and-drop canvas that no agent can drive. Our architecture is agent-legible by accident; making it agent-friendly on purpose is cheap and is a genuine differentiator worth a pricing-page line.
+
+### 6.1 Why our architecture is already agent-shaped
+
+- **Structured blocks, not freeform HTML.** The v1 editor's data model is a JSON composition of typed EmailComponent blocks with schema'd props. Agents edit JSON-against-schema reliably; they mangle freeform MJML/HTML. The same decision that makes the builder safe for tenant humans makes it tractable for tenant agents.
+- **Lens = agent guardrails.** An agent authenticates with the same scoped token a human session would, and gets the same server-enforced narrowing — it physically cannot see other tenants' templates, touch locked blocks, or override reserved variables. We don't need a separate "AI safety" layer; the guardrail story *is* the agent story. ("Give your customers' AI agents edit access without giving them a way to break production email.")
+- **OpenAPI 3.1 + generated typed SDK + structured `makeError` responses with guidance text.** Agents self-serve the spec, get compile-checked calls via the SDK, and receive actionable errors instead of opaque 400s.
+- **Human-in-the-loop is already built.** The Inquiry publish flow is the natural checkpoint: agents draft and propose, humans approve. Audit rows attribute agent actions via `actorTokenId`, so "which agent changed what, and who approved it" is answerable from day one — governance positioning extends to agent actors for free.
+
+### 6.2 What to build for it
+
+| Item | Effort | Notes |
+|---|---|---|
+| **MCP server** exposing template ops (list/get/edit-blocks/preview/render-test/propose-publish) | Small–medium | Thin wrapper over the public API; auth via existing scoped tokens so lens/permissions apply unchanged. FEAT-014 already plans MCP infrastructure for the template — this is its first product-grade consumer |
+| **Agent discovery**: `llms.txt`, `/.well-known/api-docs`, `<link rel="api">` metadata | Small | DOC-002 verbatim — promote it from "optional" to launch scope for this product |
+| **Idempotency keys** on mutating API routes | Medium | Agents retry; double-publish and double-send must be impossible. API-001 already specs this — becomes a launch dependency of the API surface |
+| **Agent-mode docs**: quickstart written as a prompt ("point your coding agent at this page"), copy-paste MCP config | Small | Cheap, high-signal for the dev-tools audience |
+| **Per-token agent labeling** (e.g. a `kind: agent` flag on tokens) | Small | Lets customers filter audit timelines and approval queues by human vs. agent actors; additive field, no signature churn |
+
+### 6.3 What not to do
+
+No bundled "AI template generator" in v1 (everyone has one, it's table stakes via the customer's own agent + our MCP server anyway), and no agent autonomy past the Inquiry gate — auto-approve stays a customer-side policy decision, not our default.
+
+---
+
+## 7. Risks
 
 | Risk | Mitigation |
 |---|---|
@@ -179,7 +214,7 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
 
 ---
 
-## 7. Open Questions
+## 8. Open Questions
 
 - Product name / domain (working title: *Lensmail*? decide before marketing work)
 - Hosted-only at launch, or self-host tier later (Novu-style open-core is a real option given the repo *is* the product)?
@@ -193,6 +228,7 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
 
 - **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite, unblock from INFRA-002)
 - **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), INFRA-007 / INFRA-009-cold-storage (retention exemption)
+- **Agent-friendliness (§6):** FEAT-014 (AI developer experience — MCP infrastructure), DOC-002 (AI-discoverable API metadata — promote to launch scope), API-001 (idempotency — launch dependency of the public API)
 - **Unblocked-for-template by this plan:** billing module, rate limiting, embed/token packaging
 
 ---
@@ -200,3 +236,5 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
 ## Comments
 
 _2026-06-11 — Created from product exploration session: market scan of embedded editor SDKs (Beefree $350–$5k/mo, Unlayer $250–$2k/mo), confirmation that AuditLog `before`/`after` + EmailTemplate subject FK already constitutes version history, and lens/permission design sketch._
+
+_2026-06-11 — Revision: made the four hard launch dependencies explicit (files, email completion, billing, builder frontend) and added §6 Agent-Friendly by Design (MCP server, llms.txt/.well-known discovery, idempotency, agent actor labeling; ties to FEAT-014, DOC-002, API-001)._
