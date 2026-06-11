@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { faker } from '@faker-js/faker';
 import { createFactory, getNextSeq } from '@template/db/test/factory';

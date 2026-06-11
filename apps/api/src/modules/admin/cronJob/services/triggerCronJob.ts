@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf superadmin
+ * @uses primitive:jobs
  */
 import type { CronJob } from '@template/db/generated/client/client';
 import { enqueueJob } from '#/jobs/enqueue';

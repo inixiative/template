@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf superadmin
+ * @uses primitive:ui
  */
 import { Icon } from '@iconify/react';
 import { createFileRoute } from '@tanstack/react-router';

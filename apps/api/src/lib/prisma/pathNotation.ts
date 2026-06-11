@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf infrastructure:prisma
+ * @uses none
  */
 export const buildNestedPath = (path: string, value: unknown): Record<string, unknown> => {
   const parts = path.split('.');

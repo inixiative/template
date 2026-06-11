@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind utils
+ * @uses infrastructure:prisma, infrastructure:redis, primitive:caching, primitive:shared
  */
 import { clearKey, db, type Prisma } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';

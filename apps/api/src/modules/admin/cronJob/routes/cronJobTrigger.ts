@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf superadmin
+ * @uses primitive:routeTemplates
  */
 import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';

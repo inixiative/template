@@ -2,6 +2,7 @@
  * @atlas
  * @kind schema
  * @partOf primitive:authz
+ * @uses none
  */
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';

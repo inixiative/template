@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf primitive:caching, superadmin
+ * @uses primitive:routeTemplates, infrastructure:redis
  */
 import { cacheKey, clearKey, redisNamespace } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';

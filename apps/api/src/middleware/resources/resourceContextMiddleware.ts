@@ -2,6 +2,7 @@
  * @atlas
  * @kind middleware
  * @partOf primitive:requestContext
+ * @uses infrastructure:prisma, primitive:shared, primitive:errors
  */
 import { type AccessorName, type Db, toModelName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';

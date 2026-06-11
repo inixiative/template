@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:requestContext
+ * @uses none
  */
 import type { Context } from 'hono';
 

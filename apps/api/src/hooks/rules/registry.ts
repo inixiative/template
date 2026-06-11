@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind registry
+ * @uses infrastructure:prisma
  */
 import type { Condition } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';

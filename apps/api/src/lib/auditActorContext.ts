@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf feature:auditLogs
+ * @uses none
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 

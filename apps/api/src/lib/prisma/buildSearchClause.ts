@@ -2,6 +2,7 @@
  * @atlas
  * @kind query
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { dialect } from '#/lib/prisma/dialect';
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';

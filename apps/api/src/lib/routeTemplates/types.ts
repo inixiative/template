@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import type { RouteConfig, z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';

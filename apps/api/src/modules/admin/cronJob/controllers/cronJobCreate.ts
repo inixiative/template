@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf superadmin
+ * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { makeController } from '#/lib/utils/makeController';
 import { cronJobCreateRoute } from '#/modules/admin/cronJob/routes/cronJobCreate';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind query
  * @partOf infrastructure:prisma
+ * @uses primitive:shared
  */
 import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';

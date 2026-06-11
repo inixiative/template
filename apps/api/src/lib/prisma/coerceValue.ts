@@ -2,6 +2,7 @@
  * @atlas
  * @kind transformer
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 

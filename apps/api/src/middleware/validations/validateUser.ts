@@ -2,6 +2,7 @@
  * @atlas
  * @kind validator, middleware
  * @partOf feature:auth
+ * @uses primitive:errors
  */
 import type { Context, Next } from 'hono';
 import { makeError } from '#/lib/errors';

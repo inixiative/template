@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import { camelCase, upperFirst } from 'lodash-es';
 import pluralize from 'pluralize';

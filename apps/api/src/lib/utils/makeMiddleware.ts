@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind utils
+ * @uses none
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { AppEnv } from '#/types/appEnv';

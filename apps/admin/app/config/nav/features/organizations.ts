@@ -2,6 +2,7 @@
  * @atlas
  * @kind config
  * @partOf feature:tenancy
+ * @uses none
  */
 import type { NavItem } from '@template/ui/components';
 

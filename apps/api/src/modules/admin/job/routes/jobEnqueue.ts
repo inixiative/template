@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf superadmin
+ * @uses primitive:routeTemplates, primitive:jobs
  */
 import { z } from '@hono/zod-openapi';
 import { JobHandlerName } from '#/jobs/handlers';

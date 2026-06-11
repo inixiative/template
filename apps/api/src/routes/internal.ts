@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind route
+ * @uses primitive:errors
  */
 import crypto from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';

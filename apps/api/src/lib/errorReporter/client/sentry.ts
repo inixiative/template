@@ -2,6 +2,7 @@
  * @atlas
  * @kind client
  * @partOf infrastructure:observability
+ * @uses none
  */
 import * as Sentry from '@sentry/bun';
 import type { ErrorReporter } from '#/lib/errorReporter/types';

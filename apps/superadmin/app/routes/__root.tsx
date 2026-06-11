@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf superadmin
+ * @uses primitive:ui
  */
 import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { RootNotFound, RouteError, Toaster } from '@template/ui/components';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf primitive:authz
+ * @uses infrastructure:prisma
  */
 import type { SpaceId } from '@template/db';
 import { type Entitlements, getSpacePermissions, intersectEntitlements, lesserRole } from '@template/permissions';

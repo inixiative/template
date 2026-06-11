@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf superadmin
+ * @uses primitive:routeTemplates, primitive:jobs
  */
 import { enqueueJob } from '#/jobs/enqueue';
 import type { JobPayloads } from '#/jobs/handlers';

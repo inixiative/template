@@ -2,6 +2,7 @@
  * @atlas
  * @kind middleware
  * @partOf primitive:requestContext
+ * @uses none
  */
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { Context } from 'hono';

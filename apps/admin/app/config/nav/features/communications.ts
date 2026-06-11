@@ -2,6 +2,7 @@
  * @atlas
  * @kind config
  * @partOf feature:inquiry
+ * @uses none
  */
 import type { NavItem } from '@template/ui/components';
 import { getContextParams } from '@template/ui/lib';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:requestContext
+ * @uses none
  */
 import type { Context, Input } from 'hono';
 import type { InputToDataByTarget, ValidationTargets } from 'hono/types';

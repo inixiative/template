@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind constant
+ * @uses none
  */
 import { AccessorNames } from '@template/db';
 

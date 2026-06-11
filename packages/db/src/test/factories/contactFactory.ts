@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { faker } from '@faker-js/faker';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';

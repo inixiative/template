@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind utils
+ * @uses primitive:shared, primitive:routeTemplates
  */
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';

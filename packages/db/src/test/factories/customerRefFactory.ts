@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { createFactory } from '@template/db/test/factory';
 

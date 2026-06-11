@@ -2,6 +2,7 @@
  * @atlas
  * @kind config
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { Prisma } from '@template/db';
 

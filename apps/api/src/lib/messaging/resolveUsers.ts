@@ -2,6 +2,7 @@
  * @atlas
  * @kind query
  * @partOf infrastructure:prisma, primitive:messaging
+ * @uses infrastructure:prisma
  */
 import { type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { db } from '@template/db';

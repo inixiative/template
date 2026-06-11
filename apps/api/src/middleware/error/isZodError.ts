@@ -2,6 +2,7 @@
  * @atlas
  * @kind middleware, error
  * @partOf primitive:errors
+ * @uses none
  */
 import { ZodError } from 'zod';
 

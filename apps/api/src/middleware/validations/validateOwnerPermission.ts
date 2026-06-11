@@ -2,6 +2,7 @@
  * @atlas
  * @kind validator, middleware
  * @partOf primitive:authz
+ * @uses infrastructure:prisma, primitive:errors
  */
 import { db, hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
 import type { Action } from '@template/permissions/client';

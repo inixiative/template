@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type * as runtime from '@prisma/client/runtime/client';
 import type { Prisma } from '@template/db/generated/client/client';

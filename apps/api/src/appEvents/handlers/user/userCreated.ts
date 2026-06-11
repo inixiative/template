@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler
  * @partOf primitive:appEvents
+ * @uses none
  */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 

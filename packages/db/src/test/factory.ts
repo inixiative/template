@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';

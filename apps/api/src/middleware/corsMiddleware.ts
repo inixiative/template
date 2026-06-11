@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware
+ * @uses infrastructure:env
  */
 import { cors } from 'hono/cors';
 import type { Env } from '#/config/env';

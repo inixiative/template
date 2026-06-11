@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind registry
+ * @uses infrastructure:prisma
  */
 import { getModelRelations, type ModelName } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';

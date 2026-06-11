@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:routeTemplates
+ * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
 import type { Prisma } from '@template/db';

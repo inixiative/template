@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf superadmin
+ * @uses primitive:ui
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { faker } from '@faker-js/faker';
