@@ -64,7 +64,7 @@ Mapping built primitives → product features:
 
 | Primitive (built) | Product feature |
 |---|---|
-| Org → space tenancy, memberships, context routing | Customer's tenant model maps 1:1 (their platform = org, their customers = spaces) |
+| Org → space tenancy, memberships, context routing | The tenancy model maps 1:1: **an org is a tenant** (the paying platform — our customer), **its spaces are subtenants** (that platform's customers). Every cascade, lens scope, permission grant, and bill in this plan hangs off that two-level mapping |
 | EmailTemplate with default/admin/org/space polymorphic ownership + locale fallback | The override cascade — the core product mechanic |
 | EmailComponent (`{{component:slug}}` composition) | Structured block system the builder edits |
 | Lens system (`packages/db/src/lens`) | Field/block-level edit guardrails per tenant role (§3) |
@@ -102,7 +102,7 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 
 ### 3.2 Permission layer — *what a viewer can do with that surface*
 
-- **Role mapping.** Our customer's admins = org owner/admin; their customers' users = space members with space roles. Existing hierarchical inheritance (org owner ⇒ space access) gives platform staff implicit reach into every tenant's templates — exactly the support model this product needs.
+- **Role mapping.** Tenant (org) admins = our customer's platform staff; subtenant (space) members = their customers' users with space roles. Existing hierarchical inheritance (org owner ⇒ space access) gives the tenant's staff implicit reach into every subtenant's templates — exactly the support model this product needs — while subtenants stay walled off from each other by token scope.
 - **Actions.** `template:view / edit / publish / approve / manage-guardrails` as permix checks. `manage-guardrails` (editing the lens narrowings themselves) is org-admin-only — tenants never edit their own cage.
 - **Row-level sharing.** Existing `permissionRules` overrides cover "share this one template with an outside contractor" without widening role grants.
 - **Approval flow.** Publish raises an Inquiry (source: editing space user, target: org admin). On approve, the publish mutation runs with `sourceInquiryId` stamped into the audit row — version → approval lineage for free. Platforms that don't want approvals just grant `publish` directly; the workflow is opt-in per org.
@@ -117,7 +117,7 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 
 1. **Files** (INFRA-011 → FEAT-009) — template image assets need multi-tenant storage, binding, and serving
 2. **Email completion** (COMM-001) — render pipeline, BYO provider keys, send tracking
-3. **Billing** (net-new) — Stripe subscriptions per org; no billing, no product
+3. **Billing** (net-new) — Stripe subscriptions per tenant org; no billing, no product. Built API-first so an agent can subscribe and pay without a human (§6.3)
 4. **Email-builder frontend** (net-new) — the structured editor is the product's interface; API-only is a design-partner phase, not a launch
 
 ### 4.1 Prerequisites — already on the roadmap (work we'd do anyway)
@@ -138,7 +138,7 @@ Ordered by size, largest first:
 3. **Embed flow.** Iframe or web component + the scoped-token handshake; postMessage events (saved, published, approval-requested). Token infra exists; the packaging is new.
 4. **Version timeline + restore.** Read endpoint over AuditLog + restore endpoint + timeline UI. Small (§3.2).
 5. **Guardrail management UI.** Org-admin screens to define per-role narrowings (which blocks/props/variables each tenant role gets). Start opinionated: 3 preset profiles (locked-down / branding-only / full) + JSON escape hatch; visual narrowing editor later (overlaps FEAT-008 permissions builder — this is its first concrete consumer).
-6. **Billing.** Stripe subscriptions per org, plan gates (tenant count, renders/sends per month), usage metering via existing app events. Flows back into the template as the missing billing module.
+6. **Billing.** Stripe subscriptions per tenant org, plan gates (subtenant count, renders/sends per month), usage metering via existing app events. **API-first**: every billing operation exposed as API + MCP tools so agents can purchase (§6.3), dashboard as a consumer. Flows back into the template as the missing billing module (FIN-001).
 7. **Rate limiting.** Middleware over existing Redis. Required for a public API; flows back into template.
 8. **Marketing site + docs.** Landing page, quickstart ("branded tenant emails in 30 minutes"), SDK docs from OpenAPI.
 
@@ -169,6 +169,7 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
   - **Growth** — ~$399/mo: 250 tenants, approvals + audit timeline + embed
   - **Scale** — ~$999+/mo: unlimited tenants, SSO, retention guarantees, SLA
   Governance features (approvals, audit, rollback) gate the Growth/Scale tiers — they're what the compliance segment pays for.
+  Additionally, a **metered agent tier** (fast-follow, §6.3): pay-per-render/per-send via x402-style machine payments, no subscription — priced per call, purchasable by an agent with no human in the loop.
 - **Wedge ICP:** B2B vertical SaaS (10–200 employees) in compliance-adjacent verticals — fintech infra, insurance, health, HR — whose customers demand branded transactional email.
 - **GTM channels:** integration-first content ("multi-tenant email templates with Resend/SES/Postmark"), the template itself as a public case study, OpenAPI/SDK-driven DX as the demo, template-gallery SEO, 2–3 design partners from network before launch.
 
@@ -195,7 +196,24 @@ A growing share of buyer integration work — and, increasingly, day-to-day temp
 | **Agent-mode docs**: quickstart written as a prompt ("point your coding agent at this page"), copy-paste MCP config | Small | Cheap, high-signal for the dev-tools audience |
 | **Per-token agent labeling** (e.g. a `kind: agent` flag on tokens) | Small | Lets customers filter audit timelines and approval queues by human vs. agent actors; additive field, no signature churn |
 
-### 6.3 What not to do
+### 6.3 Agents as buyers — agent-payable billing
+
+Agents shouldn't just integrate the product; they should be able to **buy** it. The payment rails matured in the last year and this is now a launch-realistic differentiator rather than speculation:
+
+- [Stripe's Agentic Commerce Protocol](https://docs.stripe.com/agentic-commerce/acp) (co-developed with OpenAI) is live with scoped tokens, buyer auth, and native MCP transport; Stripe's [Agentic Commerce Suite](https://stripe.com/blog/agentic-commerce-suite) makes a business sellable *to* agents with one integration.
+- [Stripe Machine Payments shipped x402 support](https://thepaypers.com/payments/expert-views/x402-standardising-the-protocol-for-agent-to-agent-commerce) (USDC on Base) in Feb 2026; x402 is doing real volume ([165M transactions, ~$0.30 average — built for per-call micropayments](https://www.chainalysis.com/blog/x402-agentic-payments-adoption/)).
+- [Google's AP2](https://blog.google/products-and-platforms/platforms/google-pay/agent-payments-protocol-fido-alliance/) was donated to FIDO with v0.2 "human not present" mandates for pre-authorized autonomous purchases.
+
+What it means for us, in two phases:
+
+| Phase | Capability | Notes |
+|---|---|---|
+| **Launch** | Agent-driven self-serve: an agent can sign up, provision a tenant org, subscribe to a plan, and mint scoped tokens — entirely through the API/MCP server, paying via Stripe with ACP-compatible checkout | Mostly falls out of building billing API-first instead of dashboard-first. The billing module (net-new, flows back into the template / FIN-001) should expose every billing operation as API + MCP tools, with the dashboard as a consumer |
+| **Fast-follow** | Metered machine payments: pay-per-render/per-send via x402 (Stripe Machine Payments) with no subscription at all — an agent hits the render API, gets HTTP 402, pays, proceeds | This is the natural pricing unit for agent traffic and a true "no human in the signup loop" tier. Web3 settlement details belong to FIN-002 |
+
+Guardrail consistency: a paying agent gets a tenant org and scoped tokens like any customer — lens narrowing, Inquiry approvals, and audit attribution apply identically. Agent-payable does not mean governance-exempt; it means the governance product is purchasable without a human filling out a form.
+
+### 6.4 What not to do
 
 No bundled "AI template generator" in v1 (everyone has one, it's table stakes via the customer's own agent + our MCP server anyway), and no agent autonomy past the Inquiry gate — auto-approve stays a customer-side policy decision, not our default.
 
@@ -229,6 +247,7 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 - **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite, unblock from INFRA-002)
 - **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), INFRA-007 / INFRA-009-cold-storage (retention exemption)
 - **Agent-friendliness (§6):** FEAT-014 (AI developer experience — MCP infrastructure), DOC-002 (AI-discoverable API metadata — promote to launch scope), API-001 (idempotency — launch dependency of the public API)
+- **Agent payments (§6.3):** FIN-001 (financial fiat — billing module, ACP-compatible checkout), FIN-002 (financial web3 — x402/USDC machine-payment settlement)
 - **Unblocked-for-template by this plan:** billing module, rate limiting, embed/token packaging
 
 ---
@@ -238,3 +257,5 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 _2026-06-11 — Created from product exploration session: market scan of embedded editor SDKs (Beefree $350–$5k/mo, Unlayer $250–$2k/mo), confirmation that AuditLog `before`/`after` + EmailTemplate subject FK already constitutes version history, and lens/permission design sketch._
 
 _2026-06-11 — Revision: made the four hard launch dependencies explicit (files, email completion, billing, builder frontend) and added §6 Agent-Friendly by Design (MCP server, llms.txt/.well-known discovery, idempotency, agent actor labeling; ties to FEAT-014, DOC-002, API-001)._
+
+_2026-06-11 — Revision: pinned the tenancy vocabulary (org = tenant, space = subtenant) throughout, and added §6.3 Agents as buyers — API-first billing purchasable by agents at launch (Stripe ACP), metered x402 machine payments as fast-follow; ties to FIN-001/FIN-002._
