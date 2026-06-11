@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import * as React from 'react';
 

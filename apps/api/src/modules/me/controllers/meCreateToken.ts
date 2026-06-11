@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, feature:auth
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';
 import { createToken } from '#/modules/me/services/createToken';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import { db, type HydratedRecord, hydrate } from '@template/db';
 import { greaterRole } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';

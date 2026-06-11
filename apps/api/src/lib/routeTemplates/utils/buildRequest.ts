@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import type { Prisma } from '@template/db';
 import { searchablePaths } from '@template/db/lens';

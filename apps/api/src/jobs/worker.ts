@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:jobs
+ */
 import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler, type
+ * @partOf feature:inquiry
+ */
 import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { z } from 'zod';

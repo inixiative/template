@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind validator, middleware
+ */
 import type { Context, Next } from 'hono';
 import { getActor } from '#/lib/context/getActor';
 import { makeError } from '#/lib/errors';

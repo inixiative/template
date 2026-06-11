@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import type { InquiryReceivedItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useResolveInquiryMutation } from '@template/ui/hooks/inquiry';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { adminAuditLogRouter } from '#/modules/admin/auditLog';

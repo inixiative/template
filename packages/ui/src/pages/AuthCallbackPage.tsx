@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { useNavigate } from '@tanstack/react-router';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { setToken } from '@template/ui/lib/auth/token';

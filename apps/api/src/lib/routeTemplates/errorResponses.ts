@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { type RouteConfig, z } from '@hono/zod-openapi';
 
 const errorDescriptions: { code: string; description: string }[] = [

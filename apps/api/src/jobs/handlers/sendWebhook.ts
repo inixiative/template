@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ */
 import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';

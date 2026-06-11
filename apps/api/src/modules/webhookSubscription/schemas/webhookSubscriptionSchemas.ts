@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:webhooks
+ */
 import { WebhookSubscriptionScalarInputSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 
 export const webhookSubscriptionCreateBodySchema = WebhookSubscriptionScalarInputSchema.pick({

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { useAppStore } from '@template/ui/store';
 import type { PageContext } from '@template/ui/store/types/tenant';
 import { useEffect, useMemo } from 'react';

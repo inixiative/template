@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:authz
+ */
 import type { OrganizationId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Entitlements, PermissionEntry } from '@template/permissions/client';

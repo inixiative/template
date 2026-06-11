@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:contact
+ */
 import { ContactScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';

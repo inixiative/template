@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 
 // `id` is intentionally lax at the schema level so the same routes can be

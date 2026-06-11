@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { LogScope, log } from '@template/shared/logger';
 
 export enum DbAction {

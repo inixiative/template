@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { deleteRoute } from '#/lib/routeTemplates';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { validatePermission } from '#/middleware/validations/validatePermission';

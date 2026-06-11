@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { AppStore } from '@template/ui/store/types';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 

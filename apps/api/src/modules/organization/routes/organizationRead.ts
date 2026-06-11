@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { OrganizationScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:authz
+ */
 import type { ActionRule, ModelPermission } from '@template/permissions/rebac/types';
 
 // Spreadable rebac action block for owner-polymorphic models. The model has

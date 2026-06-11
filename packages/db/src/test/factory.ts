@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { db } from '@template/db/client';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';

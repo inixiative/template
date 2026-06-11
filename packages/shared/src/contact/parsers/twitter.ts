@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { parseSimpleHandleUrl } from '@template/shared/contact/parsers/url';
 
 export type TwitterValue = { handle: string };

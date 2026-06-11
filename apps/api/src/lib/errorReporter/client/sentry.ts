@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind client
+ */
 import * as Sentry from '@sentry/bun';
 import type { ErrorReporter } from '#/lib/errorReporter/types';
 

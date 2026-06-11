@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ */
 import type { ModelName } from '@template/db';
 
 // Archive target options for stale-data cold storage. Stub — none implemented

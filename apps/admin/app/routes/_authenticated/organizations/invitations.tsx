@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind page
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { UserReceivedInvitationsPage } from '@template/ui/pages';
 

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Toaster as SonnerToaster } from 'sonner';
 
 export const Toaster = () => {

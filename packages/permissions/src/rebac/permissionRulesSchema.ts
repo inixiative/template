@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:authz
+ */
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';

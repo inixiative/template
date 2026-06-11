@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { cn } from '@template/ui/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 import type * as React from 'react';

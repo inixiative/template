@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 
 export const webhookOwnerAllowedModels: Record<WebhookOwnerModel, WebhookModel[]> = {

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf feature:inquiry
+ */
 import { contentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser/schema';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 

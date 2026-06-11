@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 import { usePageMeta } from '@template/ui/hooks';

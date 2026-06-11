@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:inquiry, superadmin
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { findRoute } from '@template/ui/lib/findRoute';
 import type { AuthSlice } from '@template/ui/store/types/auth';

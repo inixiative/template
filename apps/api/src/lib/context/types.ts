@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind type
+ */
 import type {
   Organization,
   OrganizationUser,

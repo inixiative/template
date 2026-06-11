@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { OrganizationUserScalarInputSchema, OrganizationUserScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';

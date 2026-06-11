@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ */
 import type { RouteConfig } from '@hono/zod-openapi';
 import { omit } from 'lodash-es';
 

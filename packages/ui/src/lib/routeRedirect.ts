@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { redirect } from '@tanstack/react-router';
 import { pickSearchParams } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';

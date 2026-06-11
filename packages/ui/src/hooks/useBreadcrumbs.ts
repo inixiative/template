@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { buildBreadcrumbs } from '@template/ui/lib';
 import { useAppStore } from '@template/ui/store';
 import { useCallback, useMemo } from 'react';

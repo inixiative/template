@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { type FieldMapEntry, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
 import { redactLens } from '@template/db/lens/redactLens';
 

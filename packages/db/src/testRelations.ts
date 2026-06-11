@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 
 console.log('User relations:');

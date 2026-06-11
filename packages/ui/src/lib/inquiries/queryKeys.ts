@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { QueryKey } from '@tanstack/react-query';
 import type { InquiryItem } from '@template/sdk';
 import {

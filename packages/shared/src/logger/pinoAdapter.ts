@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { LoggerAdapter } from '@template/shared/logger/types';
 import { pino } from 'pino';
 

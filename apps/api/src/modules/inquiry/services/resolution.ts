@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:inquiry
+ */
 import type { Prisma } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
 import { ProfileFormCard } from '@template/ui/components/settings';

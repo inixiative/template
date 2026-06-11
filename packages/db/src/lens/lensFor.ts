@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { createLens, type FieldMap, type Lens } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';

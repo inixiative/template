@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 
 export type OrderedListConfig = Record<string, string[]>;

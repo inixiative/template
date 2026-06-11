@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import type { PrismaClient } from '@template/db/generated/client/client';
 import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';

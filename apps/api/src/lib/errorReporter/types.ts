@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind type
+ */
 export type ErrorContext = {
   extra?: Record<string, unknown>;
 };

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ */
 import { Tags } from '#/modules/tags';
 
 type BuildTagsArgs = {

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { cn } from '@template/ui/lib/utils';
 
 export type MasterDetailLayoutProps = {

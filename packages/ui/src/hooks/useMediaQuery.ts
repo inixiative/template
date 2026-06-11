@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { useEffect, useState } from 'react';
 
 export const useMediaQuery = (query: string): boolean => {

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { ContactId } from '@template/db/typedModelIds';
 import type { z } from 'zod';
 

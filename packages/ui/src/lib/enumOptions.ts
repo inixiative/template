@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 export type SelectOption<TValue extends string = string> = {
   value: TValue;
   label: string;

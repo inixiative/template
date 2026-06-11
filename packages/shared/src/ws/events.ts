@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { ChannelKeyInput } from '@template/shared/ws/channelKey';
 
 // Server → client WS events: flat, discriminated by category + action. `key` is the query the

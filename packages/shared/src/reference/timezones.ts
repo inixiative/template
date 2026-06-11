@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { z } from 'zod';
 
 // IANA tz database canonical zone IDs (link/alias zones excluded).

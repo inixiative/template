@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import { db, organizationId } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { getResource } from '#/lib/context/getResource';

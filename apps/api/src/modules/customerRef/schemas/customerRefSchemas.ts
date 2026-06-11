@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:customer
+ */
 import { CustomerRefScalarSchema, OrganizationScalarSchema, SpaceScalarSchema, UserScalarSchema } from '@template/db';
 import { Tags } from '#/modules/tags';
 

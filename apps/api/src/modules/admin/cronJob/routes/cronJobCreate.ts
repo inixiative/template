@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ */
 import { CronJobScalarInputSchema, CronJobScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates/create';
 import { Modules } from '#/modules/modules';

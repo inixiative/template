@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:contact
+ */
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';

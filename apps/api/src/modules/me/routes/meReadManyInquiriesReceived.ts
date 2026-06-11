@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, feature:inquiry
+ */
 import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';

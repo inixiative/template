@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type, hook
+ * @partOf primitive:ui
+ */
 export type RoutingSearchParams = {
   organizationId: string | null;
   spaceId: string | null;

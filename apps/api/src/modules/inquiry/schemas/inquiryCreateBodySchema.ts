@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:inquiry
+ */
 import { z } from '@hono/zod-openapi';
 import { InquiryScalarInputSchema } from '@template/db';
 import { InquiryStatus } from '@template/db/generated/client/enums';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import * as Ariakit from '@ariakit/react';
 import { cn } from '@template/ui/lib/utils';
 

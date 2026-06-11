@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 export type SearchInput = string | URLSearchParams | Record<string, unknown> | null | undefined;
 
 const readStringValue = (value: unknown): string | null => {

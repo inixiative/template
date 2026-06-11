@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { handleApiError, shouldSkipToast } from '@template/ui/lib/handleApiError';
 

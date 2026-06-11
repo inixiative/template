@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import type { Db } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind type
+ */
 export type Bucket = 'system' | 'user';
 
 export type PresignPostInput = {

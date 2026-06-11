@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf superadmin
+ */
 import { enqueueJob } from '#/jobs/enqueue';
 import type { JobPayloads } from '#/jobs/handlers';
 import { makeController } from '#/lib/utils/makeController';

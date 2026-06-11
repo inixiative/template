@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { PHONE_SUBTYPES } from '@template/shared/contact/constants/phone';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { phoneToStubEmail } from '@template/shared/contact/stubEmail';

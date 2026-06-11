@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { type Client, createClient } from '@template/sdk/client';
 import { getToken } from '@template/ui/lib/auth/token';

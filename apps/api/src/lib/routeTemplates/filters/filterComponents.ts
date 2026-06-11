@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import type { FieldMapEntry } from '@inixiative/json-rules';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';

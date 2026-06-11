@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:prisma
+ */
 import { createHash } from 'node:crypto';
 import type { Token } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';

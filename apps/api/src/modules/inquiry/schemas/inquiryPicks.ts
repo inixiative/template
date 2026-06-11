@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:inquiry
+ */
 export const inquiryPicks: string[] = [
   'type',
   'status',

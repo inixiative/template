@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:appEvents
+ */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type UserCreatedPayload = {

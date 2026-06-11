@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Button } from '@template/ui/components/primitives/Button';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAppStore } from '@template/ui/store';

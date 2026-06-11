@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { AuthStrategyContext } from '@template/ui/hooks/useAuthStrategy/provider';
 import { useContext } from 'react';
 

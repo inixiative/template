@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import { AuditSubjectModel } from '@template/db/generated/client/enums';
 
 export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [

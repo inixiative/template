@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { z } from 'zod';
 
 export const ResponseMetadataSchema = z.object({

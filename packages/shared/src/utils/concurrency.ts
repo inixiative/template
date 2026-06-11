@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ */
 export const ConcurrencyType = {
   db: 'db',
   redis: 'redis',

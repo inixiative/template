@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type, store
+ * @partOf primitive:ui
+ */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Permix } from '@template/permissions/client';
 import type { ActionRule } from '@template/permissions/rebac/types';

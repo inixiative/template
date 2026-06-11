@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf feature:email
+ * @uses none
+ */
 export type SendEmailOptions = {
   to: string | string[];
   cc?: string | string[];

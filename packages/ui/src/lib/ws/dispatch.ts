@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { WSEvent } from '@template/shared/ws';
 import { useAppStore } from '@template/ui/store';
 

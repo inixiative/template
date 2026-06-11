@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import type { AuthProvider } from '@template/db/generated/client/client';
 import type { EncryptedModelConfig } from '@template/db/lib/encryption/types';
 import { upperFirst } from 'lodash-es';

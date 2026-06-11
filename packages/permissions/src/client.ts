@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf primitive:authz
+ */
 import type { AccessorName, UserId } from '@template/db';
 import { castArray } from 'lodash-es';
 import { createPermix } from 'permix';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { InquiriesPage } from '@template/ui/pages/InquiriesPage';
 
 export const OrganizationSentInvitationsPage = () => (

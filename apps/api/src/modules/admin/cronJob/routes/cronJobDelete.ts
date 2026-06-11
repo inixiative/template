@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ */
 import { deleteRoute } from '#/lib/routeTemplates/delete';
 import { Modules } from '#/modules/modules';
 

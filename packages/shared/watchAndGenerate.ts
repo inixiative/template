@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { spawn } from 'node:child_process';
 import { watch } from 'node:fs';
 import { resolve } from 'node:path';

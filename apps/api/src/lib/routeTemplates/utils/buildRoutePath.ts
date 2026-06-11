@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ */
 import pluralize from 'pluralize';
 
 type BuildRoutePathArgs = {

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { type BlueskyValue, parseBlueskyUrl } from '@template/shared/contact/parsers/bluesky';
 import { z } from 'zod';

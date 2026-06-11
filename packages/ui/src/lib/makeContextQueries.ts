@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';

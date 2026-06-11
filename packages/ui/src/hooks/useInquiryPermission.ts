@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { HydratedRecord } from '@template/db';
 import type { ActionRule } from '@template/permissions/rebac/types';
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';

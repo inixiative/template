@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import * as React from 'react';
 
 export type UseInfiniteScrollTriggerOptions = {

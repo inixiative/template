@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:batch
+ */
 import { db } from '@template/db';
 import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';

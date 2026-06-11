@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:sdk
+ */
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 

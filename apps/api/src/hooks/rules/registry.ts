@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind registry
+ */
 import type { Condition } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';

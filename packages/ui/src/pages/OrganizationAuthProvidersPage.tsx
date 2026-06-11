@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { Icon } from '@iconify/react';
 import {
   type AuthProviderDeleteData,

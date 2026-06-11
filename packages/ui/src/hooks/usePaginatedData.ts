@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
 import { useScrollState } from '@template/ui/hooks/useScrollState';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind validator, middleware
+ */
 import type { AccessorName } from '@template/db';
 import { db, hydrate } from '@template/db';
 import type { Action } from '@template/permissions/client';

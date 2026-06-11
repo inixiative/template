@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth
+ * @uses infrastructure:redis, infrastructure:prisma, primitive:authz
+ */
 import { createHash } from 'node:crypto';
 import { cache, cacheKey, upsertCache } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';

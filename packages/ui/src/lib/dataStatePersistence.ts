@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 export type PersistedState = {
   page?: number;
   pageSize?: number;

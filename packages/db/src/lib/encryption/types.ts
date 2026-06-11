@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf infrastructure:prisma
+ */
 import type { AccessorName, ModelName, ModelNameFromAccessor, ModelTypeMap } from '@template/db/utils/modelNames';
 
 export interface EncryptedFieldData {

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';

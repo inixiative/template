@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { SignupForm } from '@template/ui/components/auth/SignupForm';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { useAppStore } from '@template/ui/store';

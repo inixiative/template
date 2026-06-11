@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import { type AccessorName, type Db, toModelName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';
 import type { MiddlewareHandler } from 'hono';

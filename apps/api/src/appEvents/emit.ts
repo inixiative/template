@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:appEvents
+ */
 import { db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { AppEventPayloads } from '#/appEvents/handlers';

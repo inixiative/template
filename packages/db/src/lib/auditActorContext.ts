@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export type AuditActor = {

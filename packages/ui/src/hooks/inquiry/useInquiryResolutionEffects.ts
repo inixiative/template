@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import {
   meReadManyOrganizationsQueryKey,

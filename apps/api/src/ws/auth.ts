@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:websockets
+ */
 import { db } from '@template/db';
 import { auth } from '#/lib/auth';
 import { findUserByEmail, findUserWithRelations } from '#/modules/user/services/find';

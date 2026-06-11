@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:email
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import type { EmailTemplate } from '@template/db/generated/client/client';
 import type { SaveContext } from '@template/email/render/types';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:inquiry, superadmin
+ */
 import { createRoute } from '#/lib/routeTemplates';
 import { inquiryCreateBodySchema, inquiryCreateSanitizeKeys } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';

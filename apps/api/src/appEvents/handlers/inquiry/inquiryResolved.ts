@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:appEvents
+ */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { InquiryWithIncludes } from '#/modules/inquiry/handlers/types';

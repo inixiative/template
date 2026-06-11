@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma, infrastructure:redis
+ */
 export const redisNamespace = {
   bull: 'bull',
   cache: 'cache',

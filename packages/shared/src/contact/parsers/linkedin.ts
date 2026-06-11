@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { LinkedinClassifier } from '@template/shared/contact/constants/linkedin';
 import { splitUrl } from '@template/shared/contact/parsers/url';
 

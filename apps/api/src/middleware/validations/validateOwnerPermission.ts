@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind validator, middleware
+ */
 import { db, hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';

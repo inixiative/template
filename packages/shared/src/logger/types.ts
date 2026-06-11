@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:shared
+ */
 // Unified logger surface every adapter implements. Matches pino's ILogger
 // (Baileys etc. expect this shape). Adapters are dumb execution sinks — the
 // `log` facade composes args + ALS scopes, then fans pre-formatted output to

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:inquiry
+ */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';

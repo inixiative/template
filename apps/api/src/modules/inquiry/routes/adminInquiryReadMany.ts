@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:inquiry, superadmin
+ */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { inquiryResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';

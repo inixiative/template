@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ */
 import type { Condition } from '@inixiative/json-rules';
 import type { CommunicationKind } from '@template/db/generated/client/enums';
 import { makeJob } from '#/jobs/makeJob';

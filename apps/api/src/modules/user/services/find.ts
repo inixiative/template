@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:users
+ * @uses infrastructure:prisma, primitive:caching
+ */
 import type { Db, UserWithRelations } from '@template/db';
 import { cache, cacheKey, upsertCache } from '@template/db';
 import type { User } from '@template/db/generated/client/client';

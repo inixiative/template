@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auditLogs, superadmin
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { auditLogReadManyRoute } from '#/modules/admin/auditLog/routes/auditLogReadMany';

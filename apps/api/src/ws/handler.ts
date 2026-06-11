@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:websockets
+ */
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
 import type { Server } from 'bun';

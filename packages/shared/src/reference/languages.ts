@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { z } from 'zod';
 
 // ISO-639-1 two-letter language codes with English name + endonym (native name).

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ */
 export const resolveAll = async <T>(fns: (() => Promise<T>)[], concurrency?: number): Promise<T[]> => {
   if (!concurrency || concurrency >= fns.length) {
     return Promise.all(fns.map((fn) => fn()));

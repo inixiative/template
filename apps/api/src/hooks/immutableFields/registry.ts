@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind registry
+ */
 import { getModelRelations, type ModelName } from '@template/db';
 import { polymorphismImmutableFields } from '#/hooks/falsePolymorphism/toImmutableFields';
 

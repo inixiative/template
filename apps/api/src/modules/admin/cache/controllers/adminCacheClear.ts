@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf primitive:caching, superadmin
+ */
 import { cacheKey, clearKey, redisNamespace } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { adminCacheClearRoute } from '#/modules/admin/cache/routes/adminCacheClear';

@@ -1,4 +1,9 @@
 #!/usr/bin/env bun
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:prisma
+ */
 
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';

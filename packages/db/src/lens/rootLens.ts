@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 
 export const rootLens = (narrowing: LensNarrowing): Lens => {

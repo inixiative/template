@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import crypto from 'node:crypto';
 import type { EncryptedFieldData, EncryptionKeyring } from '@template/db/lib/encryption/types';
 

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import type { Db } from '@template/db/clientTypes';
 import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mutationLifeCycle';
 

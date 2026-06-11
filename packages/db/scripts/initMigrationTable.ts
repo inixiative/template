@@ -1,0 +1,4 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */

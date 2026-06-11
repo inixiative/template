@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { Context } from 'hono';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';

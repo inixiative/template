@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:appEvents
+ */
 import { log } from '@template/shared/logger';
 import type { AppEventPayload, EmailHandoff } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';

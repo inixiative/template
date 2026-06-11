@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:auditLogs, superadmin
+ */
 import {
   AuditLogScalarSchema,
   OrganizationScalarSchema,

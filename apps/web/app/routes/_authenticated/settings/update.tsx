@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind page
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { SpaceUpdateInquiryPage } from '@template/ui/pages';
 

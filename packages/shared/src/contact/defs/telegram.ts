@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseTelegramUrl, type TelegramValue } from '@template/shared/contact/parsers';
 import { stubEmailDomain } from '@template/shared/contact/stubEmail';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind client, store
+ * @partOf primitive:ui
+ */
 import { channelKey, LIVE_QUERIES } from '@template/shared/ws';
 import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import type { AppStore } from '@template/ui/store/types';

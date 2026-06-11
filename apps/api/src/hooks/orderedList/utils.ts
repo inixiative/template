@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind utils
+ */
 import { clearKey, db, type Prisma } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray } from 'lodash-es';

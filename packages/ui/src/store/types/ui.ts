@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type, store
+ * @partOf primitive:ui
+ */
 export type Theme = 'light' | 'dark' | 'system';
 
 export type UISlice = {

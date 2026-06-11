@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { orderablePaths } from '@template/db/lens';

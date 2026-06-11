@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Icon } from '@iconify/react';
 import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf primitive:batch
+ */
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';

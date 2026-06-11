@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Icon } from '@iconify/react';
 import { Button, Input, Label, Modal, SlugInput } from '@template/ui/components';
 import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';

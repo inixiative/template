@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind page
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { Unauthorized } from '@template/ui/components';
 import { OrganizationIncomingTransfersPage } from '@template/ui/pages';

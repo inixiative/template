@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind page
+ */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { FullscreenLayout, Unauthorized } from '@template/ui/components';
 import { useAuthenticatedRouting } from '@template/ui/hooks';

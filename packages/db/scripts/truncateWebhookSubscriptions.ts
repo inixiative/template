@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';

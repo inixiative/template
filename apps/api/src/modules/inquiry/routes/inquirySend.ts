@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:inquiry
+ */
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';

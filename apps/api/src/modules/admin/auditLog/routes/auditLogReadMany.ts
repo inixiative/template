@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:auditLogs, superadmin
+ */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates/read';
 import { auditLogResponseSchema } from '#/modules/admin/auditLog/schemas/auditLogResponseSchema';

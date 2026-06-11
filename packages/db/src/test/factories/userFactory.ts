@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { faker } from '@faker-js/faker';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { createFactory, getNextSeq } from '@template/db/test/factory';

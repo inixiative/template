@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler, schema
+ * @partOf feature:inquiry
+ */
 import { z } from 'zod';
 
 export const baseResolutionInputSchema = z.object({

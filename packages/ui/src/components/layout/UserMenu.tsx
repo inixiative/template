@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Icon } from '@iconify/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@template/ui/components/primitives/Avatar';
 import { Button } from '@template/ui/components/primitives/Button';

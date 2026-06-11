@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { QueryKey } from '@tanstack/react-query';
 import type { InfiniteScrollProps } from '@template/ui/components/primitives/Table';
 import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';

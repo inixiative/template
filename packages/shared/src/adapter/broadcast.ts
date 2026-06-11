@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 export type BroadcastRegistry<A> = {
   register: (name: string, adapter: A) => void;
   unregister: (name: string) => void;

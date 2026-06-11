@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:tenancy
+ */
 import { z } from '@hono/zod-openapi';
 
 const schema = z

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 // TODO: Add refresh token support (AUTH-002)
 // - Store refresh token in localStorage
 // - Auto-refresh access token when expired

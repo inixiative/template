@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ */
 import { CronJobScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates/read';
 import { Modules } from '#/modules/modules';

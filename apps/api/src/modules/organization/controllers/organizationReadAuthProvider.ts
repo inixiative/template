@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getPlatformProviders } from '#/lib/auth/platformProviders';
 import { getResource } from '#/lib/context/getResource';

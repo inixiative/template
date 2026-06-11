@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ */
 import { log } from '@template/shared/logger';
 import type { AppEventActor, ObserveData } from '#/appEvents/types';
 import { makeJob } from '#/jobs/makeJob';

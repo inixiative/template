@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { NotFound } from '@template/ui/components/utility/NotFound';
 import { useAppStore } from '@template/ui/store';
 

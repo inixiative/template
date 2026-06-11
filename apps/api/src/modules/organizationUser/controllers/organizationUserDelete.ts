@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import type { OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';

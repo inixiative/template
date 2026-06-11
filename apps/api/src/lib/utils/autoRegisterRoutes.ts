@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind utils
+ */
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';

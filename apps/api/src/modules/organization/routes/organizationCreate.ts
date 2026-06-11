@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { OrganizationScalarInputSchema, OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';
 import { validateUser } from '#/middleware/validations/validateUser';

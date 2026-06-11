@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind constant
+ */
 import type { ModelTypeMap, Prisma } from '@template/db';
 import { cacheKey } from '@template/db';
 

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:jobs
+ */
 import { createRedisConnection } from '@template/db';
 import { LogScope } from '@template/shared/logger';
 import { Queue } from 'bullmq';

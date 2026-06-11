@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind store
+ * @partOf primitive:ui
+ */
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signin';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signup';

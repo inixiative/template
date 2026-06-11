@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler, schema
+ * @partOf feature:inquiry
+ */
 import { Role } from '@template/db/generated/client/enums';
 import { z } from 'zod';
 

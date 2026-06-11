@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';

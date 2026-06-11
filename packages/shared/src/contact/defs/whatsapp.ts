@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { phoneToStubEmail } from '@template/shared/contact/stubEmail';
 import { z } from 'zod';

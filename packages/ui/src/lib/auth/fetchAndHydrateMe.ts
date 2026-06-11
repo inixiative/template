@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { type MeReadResponses, meRead } from '@template/sdk';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { AppStore } from '@template/ui/store/types';

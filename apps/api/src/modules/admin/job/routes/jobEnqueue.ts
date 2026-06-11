@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ */
 import { z } from '@hono/zod-openapi';
 import { JobHandlerName } from '#/jobs/handlers';
 import { createRoute } from '#/lib/routeTemplates';

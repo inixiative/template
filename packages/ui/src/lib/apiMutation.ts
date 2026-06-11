@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { SdkFunction } from '@template/ui/lib/sdkTypes';
 import { useAppStore } from '@template/ui/store';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { RouteMatch } from '@template/ui/lib/findRoute';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 

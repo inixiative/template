@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ */
 import type { Db } from '@template/db/clientTypes';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';

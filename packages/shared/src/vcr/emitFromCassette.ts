@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { readFileSync } from 'node:fs';
 import type { Fixture } from '@template/shared/vcr/vcr';
 

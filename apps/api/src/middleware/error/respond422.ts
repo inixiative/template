@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { PublicZodIssue } from '#/middleware/error/types';

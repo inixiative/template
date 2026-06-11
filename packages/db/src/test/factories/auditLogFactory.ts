@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { AuditAction, AuditSubjectModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 

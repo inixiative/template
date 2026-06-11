@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy, superadmin
+ */
 import { z } from '@hono/zod-openapi';
 import { OrganizationScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';

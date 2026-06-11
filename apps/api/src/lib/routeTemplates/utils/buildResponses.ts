@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';
 import { paginateResponseSchema } from '#/lib/routeTemplates/paginationSchemas';

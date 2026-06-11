@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 const SECTION_ATTR = 'data-section';
 
 export function resolveSectionTarget(sectionId: string): Element | null {

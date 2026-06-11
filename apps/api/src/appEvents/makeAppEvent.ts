@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:appEvents
+ */
 import { channelKey } from '@template/shared/ws';
 import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';

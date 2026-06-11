@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, infrastructure:prisma, feature:webhooks
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateWebhookSubscriptionRoute } from '#/modules/me/routes/meCreateWebhookSubscription';
 

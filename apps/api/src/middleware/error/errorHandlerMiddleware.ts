@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';

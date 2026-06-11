@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { ApiErrorBody } from '@template/shared/errors';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';

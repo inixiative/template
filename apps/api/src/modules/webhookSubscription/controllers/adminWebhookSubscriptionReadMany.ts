@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:webhooks, superadmin
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { adminWebhookSubscriptionReadManyRoute } from '#/modules/webhookSubscription/routes/adminWebhookSubscriptionReadMany';

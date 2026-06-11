@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ */
 import stringify from 'safe-stable-stringify';
 
 const defaultKeyBy = (x: unknown): unknown => {

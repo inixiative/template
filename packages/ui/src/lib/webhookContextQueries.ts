@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import {
   meCreateWebhookSubscription,
   meReadManyWebhookSubscriptions,

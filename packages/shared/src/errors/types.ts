@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:shared
+ */
 export const HTTP_ERROR_MAP = {
   // 4xx Client Errors
   400: { label: 'BAD_REQUEST', name: 'Bad Request', guidance: 'fixInput' },

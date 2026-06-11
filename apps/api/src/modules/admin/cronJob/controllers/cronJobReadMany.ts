@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf superadmin
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { cronJobReadManyRoute } from '#/modules/admin/cronJob/routes/cronJobReadMany';
 

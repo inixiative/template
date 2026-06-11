@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { faker } from '@faker-js/faker';
 import { createFactory } from '@template/db/test/factory';
 

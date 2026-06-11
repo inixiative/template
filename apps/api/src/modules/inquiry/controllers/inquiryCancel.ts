@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:inquiry
+ */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, feature:tenancy
+ */
 import {
   OrganizationScalarSchema,
   OrganizationUserScalarSchema,

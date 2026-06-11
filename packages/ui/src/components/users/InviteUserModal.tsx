@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Button, Input, Label, Modal } from '@template/ui/components';
 import { memo, useState } from 'react';
 

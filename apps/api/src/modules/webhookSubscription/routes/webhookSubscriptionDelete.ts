@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:webhooks
+ */
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { deleteRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';

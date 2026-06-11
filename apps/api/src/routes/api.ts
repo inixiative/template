@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind route
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';

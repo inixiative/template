@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import { ZodError } from 'zod';
 
 export const isZodError = (err: unknown): err is ZodError => {

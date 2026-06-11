@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';

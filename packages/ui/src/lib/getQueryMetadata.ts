@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import openApiSpec from '@template/sdk/openapi.gen.json';
 
 export type EnumFilter = {

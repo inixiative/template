@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ */
 export type Environment = 'local' | 'test' | 'pr' | 'staging' | 'prod';
 
 export const isTest = process.env.ENVIRONMENT === 'test';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ */
 import { Icon } from '@iconify/react';
 import { createFileRoute } from '@tanstack/react-router';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';

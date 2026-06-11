@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind validator, middleware
+ */
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';

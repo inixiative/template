@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ */
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import type { EmailTarget } from '@template/email/targeting';
 import { log } from '@template/shared/logger';

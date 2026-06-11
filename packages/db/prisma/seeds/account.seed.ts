@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:prisma
+ */
 import { hashSync } from 'bcryptjs';
 import type { Account } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';

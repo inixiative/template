@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const emailTemplateFactory = createFactory('EmailTemplate', {

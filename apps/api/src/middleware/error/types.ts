@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware, type
+ */
 import type { ZodIssue } from 'zod';
 
 export type IssueItem = ZodIssue;

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:jobs
+ */
 import { db, redisNamespace } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';

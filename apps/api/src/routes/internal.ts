@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind route
+ */
 import crypto from 'node:crypto';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { makeError } from '#/lib/errors';

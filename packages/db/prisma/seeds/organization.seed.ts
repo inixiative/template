@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:prisma
+ */
 import type { Organization } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 

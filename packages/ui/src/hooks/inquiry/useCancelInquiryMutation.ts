@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { inquiryCancel } from '@template/sdk';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';

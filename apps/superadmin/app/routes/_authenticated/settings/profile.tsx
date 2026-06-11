@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { ProfilePage } from '@template/ui/pages';
 

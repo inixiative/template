@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:inquiry
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { inquiryResolveRoute } from '#/modules/inquiry/routes/inquiryResolve';

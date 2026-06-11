@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:inquiry, superadmin
+ */
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
 import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind client
+ */
 import { log } from '@template/shared/logger';
 import type { ErrorReporter } from '#/lib/errorReporter/types';
 

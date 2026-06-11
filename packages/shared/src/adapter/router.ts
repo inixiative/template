@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import type { Environment } from '@template/shared/utils/env';
 
 export const makeAdapterRouter = <A>(map: Partial<Record<Environment | 'default', A>>): A => {

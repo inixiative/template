@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:ui
+ */
 export type EmailAuthMethod = {
   type: 'email';
   email: string;

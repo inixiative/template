@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { type EnumFilter, getQueryMetadataByOperation } from '@template/ui/lib/getQueryMetadata';
 
 export type SearchMode = 'combined' | 'field';

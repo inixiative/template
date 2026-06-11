@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
 
 export const useInquirySendEffects = () => {

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import { useEffect } from 'react';
 
 export type ThemeMode = 'light' | 'dark' | 'system';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind type
+ */
 import type { RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { AccessorName, Db, Prisma } from '@template/db';

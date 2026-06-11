@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils, hook
+ * @partOf primitive:ui
+ */
 import type { AuthStrategy } from '@template/ui/hooks/useAuthStrategy/types';
 
 export const isEmbedded = (): boolean => {

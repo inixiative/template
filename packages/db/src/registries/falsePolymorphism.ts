@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import type { ModelName } from '@template/db/utils/modelNames';
 
 // ============================================================================

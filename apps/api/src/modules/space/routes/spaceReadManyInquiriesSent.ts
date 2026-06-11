@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
 import { getResource } from '#/lib/context/getResource';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf infrastructure:prisma
+ */
 import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
 import {
   OrganizationScalarSchema,

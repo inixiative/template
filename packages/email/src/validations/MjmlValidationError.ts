@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:email
+ * @uses none
+ */
 export type MjmlIssue = {
   line: number;
   message: string;

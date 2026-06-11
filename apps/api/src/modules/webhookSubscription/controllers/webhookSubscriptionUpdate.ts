@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:webhooks
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionUpdateRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionUpdate';

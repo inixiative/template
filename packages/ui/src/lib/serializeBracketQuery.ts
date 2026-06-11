@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { BRACKET_SYMBOL_SEGMENT, bracketSymbolToken, isBracketSymbol } from '@template/shared/bracketQuery';
 
 export const serializeBracketQuery = (obj: Record<string, unknown>, prefix = ''): URLSearchParams => {

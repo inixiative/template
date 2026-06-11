@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ */
 import type { RoutingSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/types';
 import type { SearchInput } from '@template/ui/lib/searchParams';
 import { readSearchParam } from '@template/ui/lib/searchParams';

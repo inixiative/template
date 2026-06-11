@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf superadmin
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { cronJobTriggerRoute } from '#/modules/admin/cronJob/routes/cronJobTrigger';

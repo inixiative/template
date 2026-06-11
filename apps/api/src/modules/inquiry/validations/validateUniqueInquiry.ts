@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:inquiry
+ */
 import { type Db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';

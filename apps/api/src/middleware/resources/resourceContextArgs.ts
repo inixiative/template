@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import { type AccessorName, Prisma } from '@template/db';
 import { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind client
+ */
 export {};
 
 /*

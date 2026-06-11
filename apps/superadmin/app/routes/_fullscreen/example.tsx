@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ */
 import { createFileRoute } from '@tanstack/react-router';
 
 const ExampleFullscreenPage = () => {

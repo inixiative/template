@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:customer
+ */
 import type { Prisma } from '@template/db';
 
 // Include customer side relations

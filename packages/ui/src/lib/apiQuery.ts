@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { SdkFunction } from '@template/ui/lib/sdkTypes';

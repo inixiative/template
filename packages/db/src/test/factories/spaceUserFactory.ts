@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { Role } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 import type { BuildContext, CreateInputOf, TypedBuildResult } from '@template/db/test/factoryTypes';

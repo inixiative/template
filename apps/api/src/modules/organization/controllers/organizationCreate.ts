@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 

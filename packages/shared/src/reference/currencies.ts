@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { z } from 'zod';
 
 // ISO-4217 active currency codes with minor-unit decimals + display symbol.

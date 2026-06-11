@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:customer
+ */
 import { z } from '@hono/zod-openapi';
 import { CustomerModelSchema, ProviderModelSchema } from '@template/db';
 

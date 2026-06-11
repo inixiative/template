@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ */
 import { ContactScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { getResource } from '#/lib/context/getResource';

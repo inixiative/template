@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:shared
+ */
 import type { ContactType } from '@template/db/generated/client/enums';
 import {
   blueskyDef,

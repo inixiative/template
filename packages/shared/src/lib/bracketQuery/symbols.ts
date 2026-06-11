@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 // Bracket-query values are string-only on the wire, so a trailing `[:]` marker
 // segment distinguishes a SYMBOL value (null / true / false) from the literal
 // string of the same text. Allowlist — never eval / JSON.parse.

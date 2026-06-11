@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:ui
+ */
 export type SpaceTheme = {
   // Brand colors (HSL format: "H S% L%")
   primary?: string;

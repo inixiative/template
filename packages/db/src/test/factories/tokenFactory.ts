@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ */
 import { createHash, randomBytes } from 'node:crypto';
 import { faker } from '@faker-js/faker';
 import { Role, TokenOwnerModel } from '@template/db/generated/client/enums';

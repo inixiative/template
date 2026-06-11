@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import type { FlexibleRef } from '@template/db';
 
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {

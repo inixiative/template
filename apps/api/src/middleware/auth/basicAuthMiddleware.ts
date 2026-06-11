@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth
+ * @uses none
+ */
 import type { Context, Next } from 'hono';
 
 export const basicAuthMiddleware = (username: string, password: string, realm = 'Secure Area') => {

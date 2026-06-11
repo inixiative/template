@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { orderByRequestSchema } from '#/lib/routeTemplates/orderBySchema';
 

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:shared
+ */
 import { splitUrl } from '@template/shared/contact/parsers/url';
 
 export type MastodonValue = { instance: string; handle: string };

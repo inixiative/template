@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:appEvents
+ */
 import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 import type { WSEvent } from '@template/shared/ws';
 

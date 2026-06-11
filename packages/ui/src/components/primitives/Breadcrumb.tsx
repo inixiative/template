@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { Icon } from '@iconify/react';
 import { cn } from '@template/ui/lib/utils';
 import * as React from 'react';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ */
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 
 const HOOK_REDACT_FIELDS_BASE: Record<string, string[]> = {

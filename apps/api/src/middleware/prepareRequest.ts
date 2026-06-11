@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind middleware
+ */
 import { db } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions } from '@template/permissions';
