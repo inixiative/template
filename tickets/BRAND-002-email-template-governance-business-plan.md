@@ -66,7 +66,7 @@ Mapping built primitives → product features:
 |---|---|
 | Org → space tenancy, memberships, context routing | The tenancy model maps 1:1: **an org is a tenant** (the paying platform — our customer), **its spaces are subtenants** (that platform's customers). Every cascade, lens scope, permission grant, and bill in this plan hangs off that two-level mapping |
 | EmailTemplate with default/admin/org/space polymorphic ownership + locale fallback | The override cascade — the core product mechanic |
-| EmailComponent (`{{component:slug}}` composition) | Structured block system the builder edits |
+| EmailComponent (`{{component:slug}}` composition, per-slug cascade resolution) | Structured block system the builder edits — and the copy-on-write inheritance mechanic (§3.3): subtenants override individual blocks, inherit the rest live |
 | Lens system (`packages/db/src/lens`) | Field/block-level edit guardrails per tenant role (§3) |
 | RBAC/ABAC/ReBAC + permix + row-level `permissionRules` | Who can view/edit/publish/approve which templates |
 | Inquiry state machine (draft→sent→approved/denied) | Approval-before-publish workflow |
@@ -109,6 +109,18 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 - **Embed auth.** The embedded builder boots with a space-scoped token minted by the customer's backend. Token scope *is* the tenant boundary; the lens composes from it. No new auth concepts.
 - **Versioning/rollback.** Timeline reads `AuditLog` filtered by `subjectEmailTemplateId` (already indexed). Restore endpoint requires `template:publish` (a restore is a publish) and writes the chosen `after` state back. Constraint to encode now: **audit rows for email subjects are exempt from any future retention policy** (see INFRA-007/INFRA-009 — cold storage is fine, deletion is not), or "version history" silently becomes "recent history."
 
+### 3.3 Inheritance is copy-on-write per component — already built
+
+The customization model is **not** "fork the template." `lookupCascade` (`packages/email/src/render/lookupCascade.ts`) resolves each component slug *independently* through space → org → default, and `expand` recursively expands refs through that cascade. So when a subtenant customizes a template:
+
+- "Use my parent's template, change the logo" = materialize **one** space-level `EmailComponent` with slug `logo`. Every other block keeps resolving live from the parent at render time. Nothing is copied.
+- **No fork rot.** When the tenant fixes its footer or rebrands a shared component, every subtenant gets it instantly — except where they've deliberately overridden. The classic failure mode ("200 customer copies of a template, now patch the unsubscribe link in all of them") cannot happen.
+- **The builder's "edit this block" action *is* copy-on-write.** Editing an inherited block creates the subtenant-level override record; "revert to inherited" deletes it and inheritance resumes. The builder UI should badge every block as *inherited from {level}* / *overridden here*.
+- **Customization is queryable.** A subtenant's entire delta is exactly its set of space-level records — "show me what this subtenant changed" is a one-line query, and audit history per override is already attributed.
+- **Lens and inheritance compose.** "Which blocks may this subtenant override" is the same narrowing as "which blocks are editable" (§3.1.2) — the overridable surface is the lens surface. A subtenant can never override a block the tenant locked, because the override record can't be written through the narrowing.
+
+Competitive contrast worth marketing copy: incumbents' "saved rows" and template duplication are **copies that drift**. Ours are **live-inherited deltas**. That single design difference is why governance at scale works here and doesn't there.
+
 ---
 
 ## 4. What We Need to Build to Launch
@@ -136,6 +148,7 @@ Ordered by size, largest first:
 1. **Structured block builder UI** (de-risked by INFRA-002).
    v1 is a *structured* editor over EmailComponent — tenants compose lens-exposed blocks and edit lens-exposed props — **not** freeform drag-and-drop. This is dramatically less work than a Beefree clone, it's safer (which is the whole pitch), and "guardrailed by design" reframes the missing freeform editor as a feature.
    The editing core (lens traversal, field pickers, enum evaluation, value injection) comes from the Rules Builder — what's genuinely email-specific shrinks to: block composition UX over EmailComponent, live MJML preview (server-rendered via existing MJML packages — don't hand-roll HTML email rendering), locale switcher, lens-filtered variable palette, asset picker (FEAT-009 files), and theme-token integration (item 2).
+   Inheritance UX (§3.3): every block badged *inherited from {level}* vs *overridden here*; editing an inherited block materializes the copy-on-write override; one-click "revert to inherited."
 2. **Theme build-out** (prerequisite for the builder's brand story).
    `SpaceTheme` exists today as a frontend type (5-role brand palette + logo/logoDark/favicon) with a `useSpaceTheme` hook — but nothing is persisted. Build: persist themes at org *and* space level (tenant default, subtenant override — same cascade as templates), a theme editor (reusing the same field/color primitives), and expose theme tokens to templates as **platform-reserved variables** (`{{theme.primary}}`, `{{theme.logo}}`). This is the "brand kit" feature: default templates auto-brand per subtenant with *zero* editing — a subtenant gets on-brand email the moment its theme is set, before anyone opens the builder. Overlaps FEAT-007 (white-labeling); whatever persists here serves both.
 3. **Public API surface.** CRUD/render/preview/send/test-send routes via existing route templates; API keys = existing tokens; OpenAPI → SDK generated. Mostly assembly.
@@ -269,3 +282,5 @@ _2026-06-11 — Revision: made the four hard launch dependencies explicit (files
 _2026-06-11 — Revision: pinned the tenancy vocabulary (org = tenant, space = subtenant) throughout, and added §6.3 Agents as buyers — API-first billing purchasable by agents at launch (Stripe ACP), metered x402 machine payments as fast-follow; ties to FIN-001/FIN-002._
 
 _2026-06-11 — Revision: INFRA-002 Rules Builder added as a builder prerequisite (~80% of the editing primitives: lens traversal, field pickers, enum evaluation, value injection — building a rule and editing a template are the same interaction); theme build-out added as a net-new workstream (SpaceTheme type + useSpaceTheme exist frontend-only, nothing persisted; persist at org+space, expose `{{theme.*}}` reserved variables, overlaps FEAT-007); delegated subtenant billing added (per-space metering day one, invoicing v1, Stripe Connect direct payment v2)._
+
+_2026-06-11 — Revision: added §3.3 — verified that copy-on-write per-component inheritance is already implemented (`lookupCascade` resolves each component slug independently through space → org → default). Subtenant customization = sparse overrides, everything else inherits live; no fork rot; overridable surface = lens surface. Builder inheritance UX (inherited/overridden badges, revert-to-inherited) added to §4.2._
