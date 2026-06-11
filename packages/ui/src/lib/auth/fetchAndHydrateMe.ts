@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:ui
  */
 import { type MeReadResponses, meRead } from '@template/sdk';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, feature:inquiry
  */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';

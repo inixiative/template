@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 import { GITHUB_CLASSIFIERS } from '@template/shared/contact/constants/github';

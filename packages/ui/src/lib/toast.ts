@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 import { toast as sonnerToast } from 'sonner';

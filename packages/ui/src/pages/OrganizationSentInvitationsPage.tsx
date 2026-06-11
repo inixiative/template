@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import { InquiriesPage } from '@template/ui/pages/InquiriesPage';

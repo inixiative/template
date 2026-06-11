@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf infrastructure:prisma
  */
 import { type FieldMapEntry, type LensNarrowing, projectByPath } from '@inixiative/json-rules';

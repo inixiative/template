@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 export type SelectOption<TValue extends string = string> = {

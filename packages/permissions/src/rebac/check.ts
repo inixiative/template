@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:authz
+ * @uses infrastructure:prisma
  */
 import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord } from '@template/db';

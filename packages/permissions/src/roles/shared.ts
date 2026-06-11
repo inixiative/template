@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:authz
  */
 import type { User } from '@template/db/generated/client/client';

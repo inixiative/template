@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind registry
  * @partOf primitive:ui
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind registry
  * @partOf primitive:authz
  */
 import type { SpaceId } from '@template/db';

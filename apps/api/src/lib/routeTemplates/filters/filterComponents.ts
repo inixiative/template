@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind schema
  * @partOf primitive:routeTemplates
+ * @uses primitive:shared
  */
 import { z } from '@hono/zod-openapi';
 import type { FieldMapEntry } from '@inixiative/json-rules';

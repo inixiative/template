@@ -1,6 +1,9 @@
 /**
  * @atlas
+ * @kind constructor
+ * @constructs appEventHandler
  * @partOf primitive:appEvents
+ * @uses primitive:websockets
  */
 import { channelKey } from '@template/shared/ws';
 import { deliverEmailHandoffs } from '#/appEvents/bridges/email';

@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:jobs
+ * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
 import { queue } from '#/jobs/queue';

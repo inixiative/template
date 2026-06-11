@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
+ * @uses none
  */
 import type { Context } from 'hono';
 import { getValidatedBody } from '#/lib/context/getValidatedData';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
  */
 import { deleteRoute } from '#/lib/routeTemplates';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind type
  * @partOf primitive:shared
  */
 import type { ContactId } from '@template/db/typedModelIds';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 export type ChannelKeyInput = { _id: string; path?: Record<string, unknown> | null };

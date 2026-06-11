@@ -1,7 +1,9 @@
 /**
  * @atlas
- * @kind utils
+ * @kind constructor
+ * @constructs controller
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';

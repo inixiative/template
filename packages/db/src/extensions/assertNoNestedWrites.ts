@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf infrastructure:prisma
  */
 import type { Prisma } from '@template/db/generated/client/client';

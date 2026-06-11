@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:shared
  */
 import { consolaAdapter } from '@template/shared/logger/consolaAdapter';

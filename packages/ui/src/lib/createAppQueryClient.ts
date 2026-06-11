@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:ui
  */
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';

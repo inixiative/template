@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:routeTemplates
+ * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';

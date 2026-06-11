@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:contact
+ * @uses primitive:routeTemplates
  */
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';

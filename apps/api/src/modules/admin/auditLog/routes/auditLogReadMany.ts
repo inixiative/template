@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:auditLogs, superadmin
+ * @uses primitive:routeTemplates
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates/read';

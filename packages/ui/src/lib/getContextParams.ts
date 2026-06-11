@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 import type { AccessorName, HydratedRecord } from '@template/db';

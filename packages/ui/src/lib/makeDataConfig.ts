@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:ui
  */
 import { type EnumFilter, getQueryMetadataByOperation } from '@template/ui/lib/getQueryMetadata';

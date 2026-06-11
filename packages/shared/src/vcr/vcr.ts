@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:shared
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

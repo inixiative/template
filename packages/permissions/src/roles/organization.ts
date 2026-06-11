@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind registry
  * @partOf primitive:authz
  */
 import type { OrganizationId } from '@template/db';

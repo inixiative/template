@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind handler
  * @partOf primitive:appEvents
+ * @uses primitive:jobs
  */
 import { log } from '@template/shared/logger';
 import type { AppEventPayload, EmailHandoff } from '#/appEvents/types';

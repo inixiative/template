@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import { AsyncLocalStorage } from 'node:async_hooks';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 import { redirect } from '@tanstack/react-router';

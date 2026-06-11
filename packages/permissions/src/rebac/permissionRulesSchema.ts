@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind schema
  * @partOf primitive:authz
  */
 import type { AccessorName } from '@template/db';

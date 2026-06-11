@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
  */
 import { SpaceScalarInputSchema, SpaceScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import type { HydratedRecord } from '@template/db';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, feature:customer
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';

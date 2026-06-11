@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf primitive:batch
+ * @uses primitive:routeTemplates
  */
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';

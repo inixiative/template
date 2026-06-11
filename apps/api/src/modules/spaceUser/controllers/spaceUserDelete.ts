@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:tenancy
+ * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
 import { db, type HydratedRecord, hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';

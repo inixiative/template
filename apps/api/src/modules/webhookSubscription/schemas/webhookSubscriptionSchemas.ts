@@ -2,6 +2,7 @@
  * @atlas
  * @kind schema
  * @partOf feature:webhooks
+ * @uses none
  */
 import { WebhookSubscriptionScalarInputSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 

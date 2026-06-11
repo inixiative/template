@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, feature:contact
  */
 import { ContactScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';

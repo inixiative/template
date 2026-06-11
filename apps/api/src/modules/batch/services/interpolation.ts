@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
+ * @uses none
  */
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
 

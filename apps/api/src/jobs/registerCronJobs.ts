@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:jobs
+ * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';

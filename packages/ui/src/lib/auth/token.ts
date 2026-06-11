@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 // TODO: Add refresh token support (AUTH-002)

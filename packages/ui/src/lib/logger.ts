@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind adapter
  * @partOf primitive:ui
  */
 import { createFrontendLogger, FrontendScope } from './frontendLogger';

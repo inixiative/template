@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind registry
  * @partOf primitive:authz
  */
 import type { UserId } from '@template/db';

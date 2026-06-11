@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 import { WEBSITE_SUBTYPES } from '@template/shared/contact/constants/website';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:authz
  */
 import type { ActionRule, ModelPermission } from '@template/permissions/rebac/types';

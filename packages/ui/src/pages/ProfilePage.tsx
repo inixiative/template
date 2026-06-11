@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import { OrganizationProfilePage } from '@template/ui/pages/OrganizationProfilePage';

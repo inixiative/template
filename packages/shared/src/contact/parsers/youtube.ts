@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import { splitUrl } from '@template/shared/contact/parsers/url';

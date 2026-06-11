@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind entrypoint
  * @partOf primitive:websockets
+ * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';

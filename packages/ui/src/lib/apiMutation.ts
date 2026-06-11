@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:ui
  */
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';

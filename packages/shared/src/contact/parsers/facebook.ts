@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import { parseSimpleHandleUrl } from '@template/shared/contact/parsers/url';

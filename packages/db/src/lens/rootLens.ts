@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf infrastructure:prisma
  */
 import type { Lens, LensNarrowing } from '@inixiative/json-rules';

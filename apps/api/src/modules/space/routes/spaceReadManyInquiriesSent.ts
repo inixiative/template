@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, feature:inquiry
  */
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';

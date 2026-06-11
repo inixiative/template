@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import { meRead, meReadQueryKey } from '@template/sdk';

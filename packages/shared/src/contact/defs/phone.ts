@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 import { PHONE_SUBTYPES } from '@template/shared/contact/constants/phone';

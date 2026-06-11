@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import { buttonVariants } from '@template/ui/components/primitives/Button';

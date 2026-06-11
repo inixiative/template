@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf infrastructure:prisma
  */
 import crypto from 'node:crypto';

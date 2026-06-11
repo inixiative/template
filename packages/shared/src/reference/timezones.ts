@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 import { z } from 'zod';

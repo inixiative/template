@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import { exec } from 'node:child_process';

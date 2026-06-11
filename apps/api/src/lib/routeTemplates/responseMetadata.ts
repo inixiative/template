@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind schema
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import { z } from 'zod';
 

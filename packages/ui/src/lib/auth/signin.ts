@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf primitive:ui
  */
 import { setToken } from '@template/ui/lib/auth/token';

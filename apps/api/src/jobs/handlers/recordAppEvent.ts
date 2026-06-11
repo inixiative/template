@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler
  * @partOf primitive:jobs
+ * @uses primitive:appEvents, infrastructure:prisma
  */
 import { log } from '@template/shared/logger';
 import type { AppEventActor, ObserveData } from '#/appEvents/types';

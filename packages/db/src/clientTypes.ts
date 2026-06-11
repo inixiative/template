@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind type
  * @partOf infrastructure:prisma
  */
 import type { PrismaClient } from '@template/db/generated/client/client';

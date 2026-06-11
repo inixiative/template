@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:ui
  */
 import type { QueryFunctionContext } from '@tanstack/react-query';

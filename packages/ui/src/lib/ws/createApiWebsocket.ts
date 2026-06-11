@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind client
  * @partOf primitive:ui
  */
 import { createWebSocketClient, type WSEvent } from '@template/shared/ws';

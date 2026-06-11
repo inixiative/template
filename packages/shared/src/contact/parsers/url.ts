@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 // Shared URL helpers for handle-type contact parsers. Each per-type parser

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind registry
  * @partOf infrastructure:prisma
  */
 import { LogScope, log } from '@template/shared/logger';

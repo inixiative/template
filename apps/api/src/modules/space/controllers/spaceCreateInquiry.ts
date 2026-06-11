@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:tenancy
+ * @uses primitive:authz, primitive:routeTemplates, feature:inquiry, infrastructure:prisma
  */
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';

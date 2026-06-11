@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
  * @atlas
+ * @kind helper
  * @partOf infrastructure:prisma
  */
 

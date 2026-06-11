@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf infrastructure:prisma
  */
 import type { Db } from '@template/db/clientTypes';

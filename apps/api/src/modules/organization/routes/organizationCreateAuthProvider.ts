@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
 import { AuthProviderScalarSchema, AuthProviderTypeSchema } from '@template/db';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf infrastructure:prisma
  */
 import { createEncryption } from '@template/db/lib/encryption/encryptionService';

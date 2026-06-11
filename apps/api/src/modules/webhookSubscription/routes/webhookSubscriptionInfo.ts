@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:webhooks
+ * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';

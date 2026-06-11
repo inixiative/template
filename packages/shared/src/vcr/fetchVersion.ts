@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 // Resolve a version string by fetching a URL. Used as the VCR version

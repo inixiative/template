@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
  */
 import { SpaceUserScalarSchema, UserScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';

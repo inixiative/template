@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import type { LinkedinClassifier } from '@template/shared/contact/constants/linkedin';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';

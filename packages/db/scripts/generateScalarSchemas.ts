@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind utils
  * @partOf infrastructure:prisma
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';

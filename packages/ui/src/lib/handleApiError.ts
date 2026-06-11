@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 import type { ApiErrorBody } from '@template/shared/errors';

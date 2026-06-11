@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind entrypoint
  * @partOf primitive:jobs
+ * @uses infrastructure:redis
  */
 import { db, redisNamespace } from '@template/db';
 import { log } from '@template/shared/logger';

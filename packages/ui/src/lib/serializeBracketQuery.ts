@@ -1,6 +1,8 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
+ * @uses primitive:shared
  */
 import { BRACKET_SYMBOL_SEGMENT, bracketSymbolToken, isBracketSymbol } from '@template/shared/bracketQuery';
 

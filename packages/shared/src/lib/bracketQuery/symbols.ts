@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf primitive:shared
  */
 // Bracket-query values are string-only on the wire, so a trailing `[:]` marker

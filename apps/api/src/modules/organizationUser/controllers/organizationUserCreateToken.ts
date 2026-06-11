@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:tenancy
+ * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';

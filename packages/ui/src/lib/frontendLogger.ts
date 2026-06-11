@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind adapter
  * @partOf primitive:ui
  */
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';

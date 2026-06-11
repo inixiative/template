@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind service
  * @partOf infrastructure:prisma
  */
 import { AsyncLocalStorage } from 'node:async_hooks';

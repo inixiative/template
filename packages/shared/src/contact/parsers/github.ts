@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:shared
  */
 import type { GithubClassifier } from '@template/shared/contact/constants/github';

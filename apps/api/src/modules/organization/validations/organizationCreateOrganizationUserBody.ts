@@ -2,6 +2,7 @@
  * @atlas
  * @kind validator
  * @partOf feature:tenancy
+ * @uses none
  */
 import { z } from '@hono/zod-openapi';
 

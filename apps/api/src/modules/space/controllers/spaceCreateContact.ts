@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';

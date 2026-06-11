@@ -1,6 +1,9 @@
 /**
  * @atlas
+ * @kind constructor
+ * @constructs route
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import { createRoute } from '@hono/zod-openapi';
 import pluralize from 'pluralize';

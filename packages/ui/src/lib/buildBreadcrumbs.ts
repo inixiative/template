@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind helper
  * @partOf primitive:ui
  */
 import type { RouteMatch } from '@template/ui/lib/findRoute';

@@ -1,6 +1,9 @@
 /**
  * @atlas
+ * @kind constructor
+ * @constructs route
  * @partOf primitive:routeTemplates
+ * @uses none
  */
 import { createRoute } from '@hono/zod-openapi';
 import type { RouteArgs } from '#/lib/routeTemplates/types';

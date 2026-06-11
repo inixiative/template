@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
  */
 import { OrganizationScalarInputSchema, OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';

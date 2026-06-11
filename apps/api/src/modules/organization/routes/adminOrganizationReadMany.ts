@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:tenancy, superadmin
+ * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
 import { OrganizationScalarSchema } from '@template/db';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf primitive:shared
  */
 export type BroadcastRegistry<A> = {

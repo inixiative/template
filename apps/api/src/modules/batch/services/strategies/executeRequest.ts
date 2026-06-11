@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
+ * @uses none
  */
 import type { Hono } from 'hono';
 import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';

@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind type
  * @partOf primitive:shared
  */
 import type { ChannelKeyInput } from '@template/shared/ws/channelKey';

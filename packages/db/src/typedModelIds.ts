@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constant
  * @partOf infrastructure:prisma
  */
 // Phantom type brand for model IDs

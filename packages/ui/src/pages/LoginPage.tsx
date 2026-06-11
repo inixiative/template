@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind component
  * @partOf primitive:ui
  */
 import { LoginForm } from '@template/ui/components/auth/LoginForm';

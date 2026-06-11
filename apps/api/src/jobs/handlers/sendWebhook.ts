@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler
  * @partOf primitive:jobs
+ * @uses infrastructure:prisma, feature:webhooks
  */
 import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';

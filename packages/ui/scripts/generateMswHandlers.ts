@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind utils
  * @partOf primitive:ui
  */
 import fs from 'fs';

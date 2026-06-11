@@ -2,6 +2,7 @@
  * @atlas
  * @kind schema
  * @partOf feature:contact
+ * @uses primitive:authz
  */
 import { ContactScalarInputSchema, ContactScalarSchema } from '@template/db';
 import { CommunicationKindSchema } from '@template/db/zod/enums/CommunicationKind.schema';

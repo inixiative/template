@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:webhooks, superadmin
+ * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
 import { WebhookSubscriptionScalarSchema } from '@template/db';

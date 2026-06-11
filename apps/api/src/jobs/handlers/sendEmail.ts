@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler
  * @partOf primitive:jobs
+ * @uses feature:email
  */
 import { composeTemplate, interpolate, type Variables } from '@template/email/render';
 import type { EmailTarget } from '@template/email/targeting';

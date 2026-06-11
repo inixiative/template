@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind utils
  * @partOf primitive:sdk
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs';

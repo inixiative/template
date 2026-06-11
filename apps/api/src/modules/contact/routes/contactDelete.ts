@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:contact
+ * @uses primitive:routeTemplates, primitive:authz
  */
 import { ContactScalarSchema } from '@template/db';
 import { deleteRoute } from '#/lib/routeTemplates';

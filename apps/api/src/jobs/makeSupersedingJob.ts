@@ -1,6 +1,9 @@
 /**
  * @atlas
+ * @kind constructor
+ * @constructs jobHandler
  * @partOf primitive:jobs
+ * @uses infrastructure:redis
  */
 import { redisNamespace } from '@template/db';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';

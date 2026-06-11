@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind factory
  * @partOf infrastructure:prisma
  */
 import { createLens, type FieldMap, type Lens } from '@inixiative/json-rules';
