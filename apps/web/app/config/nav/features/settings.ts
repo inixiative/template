@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind config
+ * @partOf feature:users
  */
 import type { NavItem } from '@template/ui/components';
 import { getContextParams } from '@template/ui/lib';

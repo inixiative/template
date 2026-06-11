@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf primitive:authz
+ */
 import { Role } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 

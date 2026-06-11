@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind service
+ */
 import { LogScope, log } from '@template/shared/logger';
 
 type ShutdownHandler = () => Promise<void> | void;

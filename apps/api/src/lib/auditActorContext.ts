@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:auditLogs
+ */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export type AuditActor = {

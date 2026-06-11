@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ */
 import { getRuntimeDataModel, isModelName, type ModelName, toModelName } from '@template/db';
 
 type SearchableEntry = string | { [relation: string]: SearchableEntry | SearchableEntry[] };

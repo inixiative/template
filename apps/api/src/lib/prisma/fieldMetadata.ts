@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ */
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 export type FieldDef = {

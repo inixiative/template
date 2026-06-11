@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind config
+ * @partOf infrastructure:prisma
+ */
 import { Prisma } from '@template/db';
 
 // Per-provider query differences, isolated here so the rest of the filter logic

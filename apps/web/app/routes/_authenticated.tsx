@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind page
+ * @uses primitive:ui
  */
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { AppShell, ErrorBoundary, RouteError, Unauthorized } from '@template/ui/components';

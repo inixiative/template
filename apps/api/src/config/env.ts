@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind config
+ */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
 import { isTest } from '@template/shared/utils';
 import { z } from 'zod';

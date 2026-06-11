@@ -1,6 +1,8 @@
 /**
  * @atlas
  * @kind middleware
+ * @partOf primitive:authz
+ * @uses primitive:batch
  */
 import { db } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';

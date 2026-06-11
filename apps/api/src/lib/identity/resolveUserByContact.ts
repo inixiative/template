@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:contact, feature:users
+ */
 import { db, type Prisma } from '@template/db';
 import { ContactOwnerModel, type ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';

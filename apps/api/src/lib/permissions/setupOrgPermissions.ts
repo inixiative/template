@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ */
 import type { OrganizationId } from '@template/db';
 import { type Entitlements, getOrgPermissions, intersectEntitlements, lesserRole } from '@template/permissions';
 import type { Context } from 'hono';

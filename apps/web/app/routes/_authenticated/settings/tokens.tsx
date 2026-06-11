@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind page
+ * @partOf feature:auth
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { TokensPage } from '@template/ui/pages';

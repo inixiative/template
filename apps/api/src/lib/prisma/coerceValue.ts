@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind transformer
+ * @partOf infrastructure:prisma
+ */
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 type Coercer = (value: unknown) => unknown;

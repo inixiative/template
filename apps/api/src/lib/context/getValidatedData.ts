@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind helper
+ */
 import type { Context, Input } from 'hono';
 import type { InputToDataByTarget, ValidationTargets } from 'hono/types';
 import type { AppEnv } from '#/types/appEnv';

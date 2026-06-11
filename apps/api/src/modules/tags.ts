@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind constant
+ */
 import { Modules } from '#/modules/modules';
 
 export const Tags = {

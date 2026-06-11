@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ */
 import type { Db } from '@template/db';
 import type { Context } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';

@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind validator, middleware
+ * @partOf feature:auth
  */
 import type { Context, Next } from 'hono';
 import { getActor } from '#/lib/context/getActor';

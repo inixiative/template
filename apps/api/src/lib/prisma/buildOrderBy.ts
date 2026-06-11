@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ */
 import { Prisma } from '@template/db';
 import { castArray, uniqBy } from 'lodash-es';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ */
 import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';

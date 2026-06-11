@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ */
 import { type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { Contact, User } from '@template/db/generated/client/client';

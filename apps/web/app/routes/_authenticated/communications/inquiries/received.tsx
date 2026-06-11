@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind page
+ * @partOf feature:inquiry
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { InquiriesPage } from '@template/ui/pages';

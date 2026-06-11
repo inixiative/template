@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind constant
+ * @partOf infrastructure:prisma
+ */
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma supports `mode: 'insensitive'` on these string ops. We always emit

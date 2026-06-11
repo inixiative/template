@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind validator, middleware
+ * @partOf primitive:authz
  */
 import type { AccessorName } from '@template/db';
 import { db, hydrate } from '@template/db';

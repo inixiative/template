@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind constant
+ */
 import { AccessorNames } from '@template/db';
 
 export const Modules = {

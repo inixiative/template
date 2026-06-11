@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ */
 import type { UserWithRelations } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';
 import { isSuperadmin } from '@template/permissions';

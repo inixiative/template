@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind transformer
+ */
 import { interpolate, type Variables } from '@template/email/render/interpolate';
 import type { MessageContent } from '#/lib/messaging/providers';
 

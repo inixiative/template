@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind page
+ * @partOf feature:tenancy
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { Unauthorized } from '@template/ui/components';

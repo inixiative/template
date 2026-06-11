@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses primitive:routeTemplates
+ */
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { orderablePaths } from '@template/db/lens/orderablePaths';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';

@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind helper
+ */
 import type { AccessorName, ModelName, ModelTypeMap } from '@template/db';
 import type { Context } from 'hono';
 import type { ResourcePayloadMap } from '#/middleware/resources/resourceContextArgs';
