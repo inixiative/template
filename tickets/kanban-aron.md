@@ -34,7 +34,7 @@ kanban
 ### 🆕 Todo
 
 **Product:**
-- [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-011, FEAT-009, COMM-001
+- [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-002, INFRA-011, FEAT-009, COMM-001 + net-new billing/themes/builder
 
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)

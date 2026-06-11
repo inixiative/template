@@ -5,7 +5,7 @@
 **Priority**: High
 **Created**: 2026-06-11
 **Updated**: 2026-06-11
-**Dependencies**: Files (INFRA-011 → FEAT-009), Email completion (COMM-001), Billing (net-new), Email-builder frontend (net-new)
+**Dependencies**: Files (INFRA-011 → FEAT-009), Email completion (COMM-001), Billing (net-new), Email-builder frontend (net-new, built on INFRA-002 Rules Builder primitives), Theme build-out (net-new)
 
 ---
 
@@ -126,21 +126,26 @@ The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in
 |---|---|---|
 | S3 adapter + buckets | INFRA-011 | Unblocks files |
 | File management | FEAT-009 | **Scope v1 to template assets**: upload, bind (image → template/component via ResourceBinding), serve. Defer folders/sharing UX |
-| Email completion | COMM-001 | Render pipeline hardening, BYO provider keys per org (Resend/SES/Postmark adapters, encrypted), send tracking. **Ticket is stale** — rewrite around the implemented MJML EmailTemplate/EmailComponent system, not React Email. Drop the INFRA-002 rules-builder blocker: conditional sending is not needed for this product's v1 |
+| Email completion | COMM-001 | Render pipeline hardening, BYO provider keys per org (Resend/SES/Postmark adapters, encrypted), send tracking. **Ticket is stale** — rewrite around the implemented MJML EmailTemplate/EmailComponent system, not React Email. The render pipeline itself does not need INFRA-002 (conditional sending is out of v1 scope) — but the builder UI does (next row) |
+| Rules Builder | INFRA-002 | Already planned for the next month or two — and it supplies **~80% of the builder's editing primitives**: lens traversal UI, field selection/pickers, enum evaluation, value injection/interpolation. Building a rule and editing a template are the same interaction (walk a lens, pick fields, put in values, evaluate enums); the email builder is that engine plus an email-specific rendering layer. This reframes the builder from "the big lift" to a composition exercise |
 
 ### 4.2 Net-new — the actual product delta
 
 Ordered by size, largest first:
 
-1. **Structured block builder UI** (the big lift, ~weeks not days).
-   v1 is a *structured* editor over EmailComponent — tenants compose lens-exposed blocks and edit lens-exposed props — **not** freeform drag-and-drop. This is dramatically less work than a Beefree clone, it's safer (which is the whole pitch), and "guardrailed by design" reframes the missing freeform editor as a feature. Includes live MJML preview (server-rendered), locale switcher, variable palette (lens-filtered).
-2. **Public API surface.** CRUD/render/preview/send/test-send routes via existing route templates; API keys = existing tokens; OpenAPI → SDK generated. Mostly assembly.
-3. **Embed flow.** Iframe or web component + the scoped-token handshake; postMessage events (saved, published, approval-requested). Token infra exists; the packaging is new.
-4. **Version timeline + restore.** Read endpoint over AuditLog + restore endpoint + timeline UI. Small (§3.2).
-5. **Guardrail management UI.** Org-admin screens to define per-role narrowings (which blocks/props/variables each tenant role gets). Start opinionated: 3 preset profiles (locked-down / branding-only / full) + JSON escape hatch; visual narrowing editor later (overlaps FEAT-008 permissions builder — this is its first concrete consumer).
-6. **Billing.** Stripe subscriptions per tenant org, plan gates (subtenant count, renders/sends per month), usage metering via existing app events. **API-first**: every billing operation exposed as API + MCP tools so agents can purchase (§6.3), dashboard as a consumer. Flows back into the template as the missing billing module (FIN-001).
-7. **Rate limiting.** Middleware over existing Redis. Required for a public API; flows back into template.
-8. **Marketing site + docs.** Landing page, quickstart ("branded tenant emails in 30 minutes"), SDK docs from OpenAPI.
+1. **Structured block builder UI** (de-risked by INFRA-002).
+   v1 is a *structured* editor over EmailComponent — tenants compose lens-exposed blocks and edit lens-exposed props — **not** freeform drag-and-drop. This is dramatically less work than a Beefree clone, it's safer (which is the whole pitch), and "guardrailed by design" reframes the missing freeform editor as a feature.
+   The editing core (lens traversal, field pickers, enum evaluation, value injection) comes from the Rules Builder — what's genuinely email-specific shrinks to: block composition UX over EmailComponent, live MJML preview (server-rendered via existing MJML packages — don't hand-roll HTML email rendering), locale switcher, lens-filtered variable palette, asset picker (FEAT-009 files), and theme-token integration (item 2).
+2. **Theme build-out** (prerequisite for the builder's brand story).
+   `SpaceTheme` exists today as a frontend type (5-role brand palette + logo/logoDark/favicon) with a `useSpaceTheme` hook — but nothing is persisted. Build: persist themes at org *and* space level (tenant default, subtenant override — same cascade as templates), a theme editor (reusing the same field/color primitives), and expose theme tokens to templates as **platform-reserved variables** (`{{theme.primary}}`, `{{theme.logo}}`). This is the "brand kit" feature: default templates auto-brand per subtenant with *zero* editing — a subtenant gets on-brand email the moment its theme is set, before anyone opens the builder. Overlaps FEAT-007 (white-labeling); whatever persists here serves both.
+3. **Public API surface.** CRUD/render/preview/send/test-send routes via existing route templates; API keys = existing tokens; OpenAPI → SDK generated. Mostly assembly.
+4. **Embed flow.** People want a builder they can plug in — this is the product's front door, not an afterthought. Iframe or web component + the scoped-token handshake; postMessage events (saved, published, approval-requested). Token infra exists; the packaging is new.
+5. **Version timeline + restore.** Read endpoint over AuditLog + restore endpoint + timeline UI. Small (§3.2).
+6. **Guardrail management UI.** Org-admin screens to define per-role narrowings (which blocks/props/variables each tenant role gets). Start opinionated: 3 preset profiles (locked-down / branding-only / full) + JSON escape hatch; visual narrowing editor later (overlaps FEAT-008 permissions builder — INFRA-002 primitives apply here too).
+7. **Billing.** Stripe subscriptions per tenant org, plan gates (subtenant count, renders/sends per month), usage metering via existing app events. **API-first**: every billing operation exposed as API + MCP tools so agents can purchase (§6.3), dashboard as a consumer. Flows back into the template as the missing billing module (FIN-001).
+   **Delegated subtenant billing:** usage is already attributable per space, so meter per subtenant from day one. v1 ships **subtenant invoicing** — the tenant sees per-space line items and can generate pass-through invoices to its customers (their re-billing problem, solved). v2 is **true delegated billing**: a space carries its own payment method and pays directly (likely Stripe Connect — tenant as connected account). This monetizes the tenant's side too: platforms can *charge their customers* for email customization, which makes buying us revenue-positive for them — a sales argument no incumbent can make.
+8. **Rate limiting.** Middleware over existing Redis. Required for a public API; flows back into template.
+9. **Marketing site + docs.** Landing page, quickstart ("branded tenant emails in 30 minutes"), SDK docs from OpenAPI.
 
 ### 4.3 Explicit non-goals for v1
 
@@ -152,12 +157,12 @@ Ordered by size, largest first:
 
 ### 4.4 Rough sequencing
 
-- **Phase 1 — Foundations** (roadmap work, product-scoped): INFRA-011 → FEAT-009-lite → COMM-001 rewrite. Exit: an org can upload an asset, edit a template via API, render and send through its own Resend key.
-- **Phase 2 — Governance**: lens narrowings on template routes, permix actions, Inquiry publish flow, version timeline + restore. Exit: full edit→approve→publish→rollback loop via API, fully audited.
-- **Phase 3 — Builder + embed**: structured editor, guardrail presets UI, embed handshake. Exit: a space-scoped token can open the builder and safely edit only its surface.
-- **Phase 4 — Launch**: billing, rate limiting, docs/marketing, 2–3 design-partner integrations. Exit: first paying org.
+- **Phase 1 — Foundations** (roadmap work, product-scoped): INFRA-011 → FEAT-009-lite → COMM-001 rewrite, with **INFRA-002 (Rules Builder) proceeding in parallel** as already planned — it lands the lens-traversal/field-selection/enum primitives the builder consumes in Phase 3. Exit: an org can upload an asset, edit a template via API, render and send through its own Resend key.
+- **Phase 2 — Governance + theming**: lens narrowings on template routes, permix actions, Inquiry publish flow, version timeline + restore, theme persistence + `{{theme.*}}` tokens. Exit: full edit→approve→publish→rollback loop via API, fully audited; default templates auto-brand per subtenant.
+- **Phase 3 — Builder + embed**: structured editor composed from Rules Builder primitives + MJML preview layer, guardrail presets UI, embed handshake. Exit: a space-scoped token can open the embedded builder and safely edit only its surface.
+- **Phase 4 — Launch**: billing (incl. per-subtenant metering + invoicing), rate limiting, docs/marketing, 2–3 design-partner integrations. Exit: first paying org.
 
-Realistic horizon: ~2–3 months of focused work given Phases 1 is already-planned roadmap, with Phase 3 the schedule risk.
+Realistic horizon: ~2–3 months of focused work. Phase 1 is already-planned roadmap; the Phase 3 schedule risk is substantially reduced by riding INFRA-002 — the builder's editing core arrives with the Rules Builder instead of being built twice.
 
 ---
 
@@ -170,6 +175,7 @@ Realistic horizon: ~2–3 months of focused work given Phases 1 is already-plann
   - **Scale** — ~$999+/mo: unlimited tenants, SSO, retention guarantees, SLA
   Governance features (approvals, audit, rollback) gate the Growth/Scale tiers — they're what the compliance segment pays for.
   Additionally, a **metered agent tier** (fast-follow, §6.3): pay-per-render/per-send via x402-style machine payments, no subscription — priced per call, purchasable by an agent with no human in the loop.
+- **Delegated subtenant billing as a revenue argument:** per-space metering ships day one, subtenant invoicing in v1, direct subtenant payment (Stripe Connect) in v2. The tenant can re-bill or directly charge its customers for email customization — buying us becomes revenue-positive for the platform, not a cost line. Gate invoicing at Growth and delegated payment at Scale.
 - **Wedge ICP:** B2B vertical SaaS (10–200 employees) in compliance-adjacent verticals — fintech infra, insurance, health, HR — whose customers demand branded transactional email.
 - **GTM channels:** integration-first content ("multi-tenant email templates with Resend/SES/Postmark"), the template itself as a public case study, OpenAPI/SDK-driven DX as the demo, template-gallery SEO, 2–3 design partners from network before launch.
 
@@ -224,7 +230,7 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 | Risk | Mitigation |
 |---|---|
 | Editor UX bar — buyers compare against Beefree polish | Don't compete there: structured editor, governance positioning; freeform later or embedded underneath |
-| Builder UI eats the schedule (frontend pages are the template's weakest area today) | Phase 3 is deliberately last; Phases 1–2 ship an API-first product usable by design partners without the builder |
+| Builder UI eats the schedule (frontend pages are the template's weakest area today) | Phase 3 is deliberately last; Phases 1–2 ship an API-first product usable by design partners without the builder. ~80% of the editing core (lens traversal, field pickers, enum handling, value injection) arrives with INFRA-002, which is happening anyway; the email-specific remainder rides existing MJML packages |
 | Deliverability blame lands on us | BYO sending keys only; we render, they send |
 | Crowded adjacent markets blur positioning | Lead every page with governance/audit, not "builder" |
 | Solo bandwidth / template roadmap stalls | Every phase-1/2 artifact is roadmap work anyway; worst case the product is shelved and the template kept everything |
@@ -235,6 +241,8 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 ## 8. Open Questions
 
 - Product name / domain (working title: *Lensmail*? decide before marketing work)
+- Delegated billing v2: Stripe Connect (tenant as connected account, space pays directly) vs. invoice-only pass-through — Connect adds onboarding friction but makes us the money rail; decide after design-partner feedback
+- Theme persistence shape: JSON column on Organization/Space vs. a Theme model with its own audit/version history (themes are customer-facing brand assets — versioning may matter here too)
 - Hosted-only at launch, or self-host tier later (Novu-style open-core is a real option given the repo *is* the product)?
 - Does the embed ship as iframe (safest) or web component (nicer DX) first?
 - Design partners: which 2–3 contacts get free Scale tier for feedback?
@@ -244,8 +252,8 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 
 ## Related Tickets
 
-- **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite, unblock from INFRA-002)
-- **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), INFRA-007 / INFRA-009-cold-storage (retention exemption)
+- **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite; render pipeline doesn't need INFRA-002), INFRA-002 (rules builder — supplies the builder's editing primitives)
+- **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), FEAT-007 (white-labeling — theme persistence serves both), INFRA-007 / INFRA-009-cold-storage (retention exemption)
 - **Agent-friendliness (§6):** FEAT-014 (AI developer experience — MCP infrastructure), DOC-002 (AI-discoverable API metadata — promote to launch scope), API-001 (idempotency — launch dependency of the public API)
 - **Agent payments (§6.3):** FIN-001 (financial fiat — billing module, ACP-compatible checkout), FIN-002 (financial web3 — x402/USDC machine-payment settlement)
 - **Unblocked-for-template by this plan:** billing module, rate limiting, embed/token packaging
@@ -259,3 +267,5 @@ _2026-06-11 — Created from product exploration session: market scan of embedde
 _2026-06-11 — Revision: made the four hard launch dependencies explicit (files, email completion, billing, builder frontend) and added §6 Agent-Friendly by Design (MCP server, llms.txt/.well-known discovery, idempotency, agent actor labeling; ties to FEAT-014, DOC-002, API-001)._
 
 _2026-06-11 — Revision: pinned the tenancy vocabulary (org = tenant, space = subtenant) throughout, and added §6.3 Agents as buyers — API-first billing purchasable by agents at launch (Stripe ACP), metered x402 machine payments as fast-follow; ties to FIN-001/FIN-002._
+
+_2026-06-11 — Revision: INFRA-002 Rules Builder added as a builder prerequisite (~80% of the editing primitives: lens traversal, field pickers, enum evaluation, value injection — building a rule and editing a template are the same interaction); theme build-out added as a net-new workstream (SpaceTheme type + useSpaceTheme exist frontend-only, nothing persisted; persist at org+space, expose `{{theme.*}}` reserved variables, overlaps FEAT-007); delegated subtenant billing added (per-space metering day one, invoicing v1, Stripe Connect direct payment v2)._
