@@ -247,6 +247,7 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 |---|---|
 | Editor UX bar — buyers compare against Beefree polish | Don't compete there: structured editor, governance positioning; freeform later or embedded underneath |
 | Builder UI eats the schedule (frontend pages are the template's weakest area today) | Phase 3 is deliberately last; Phases 1–2 ship an API-first product usable by design partners without the builder. ~80% of the editing core (lens traversal, field pickers, enum handling, value injection) arrives with INFRA-002, which is happening anyway; the email-specific remainder rides existing MJML packages |
+| **Abuse vector: tenant miscategorizes marketing as `system`** to bypass unsubscribe injection and the `canDeliver` gates | Layered defense, ToS last: (1) **default-deny** — new templates default to `marketing`; `system` is never the default. (2) **Permission-gated** — assigning `kind=system` requires tenant org-admin rights at minimum; subtenants can never set it. (3) **Audited + flagged** — kind is an audited field; *recategorizing* an existing template marketing→system is a high-signal event worth an automatic review flag (the audit hook makes this nearly free). (4) **Behavioral detection** — system email is 1:1 and event-driven; bulk fan-out on a `system` template is a red flag the send job can rate-alarm on. (5) **BYO-key alignment** — sending runs on the tenant's own ESP account, so their sender reputation and their ESP's AUP are also at stake, not just ours. (6) **ToS/AUP** as the contractual backstop defining miscategorization as a violation with suspension rights — necessary because layers 1–5 constrain and detect but cannot adjudicate intent |
 | Deliverability blame lands on us | BYO sending keys only; we render, they send |
 | Crowded adjacent markets blur positioning | Lead every page with governance/audit, not "builder" |
 | Solo bandwidth / template roadmap stalls | Every phase-1/2 artifact is roadmap work anyway; worst case the product is shelved and the template kept everything |
@@ -262,7 +263,7 @@ No bundled "AI template generator" in v1 (everyone has one, it's table stakes vi
 - Hosted-only at launch, or self-host tier later (Novu-style open-core is a real option given the repo *is* the product)?
 - Does the embed ship as iframe (safest) or web component (nicer DX) first?
 - Design partners: which 2–3 contacts get free Scale tier for feedback?
-- Legal/entity/ToS — out of repo scope, needs a parallel track before charging.
+- Legal/entity/ToS — out of repo scope, needs a parallel track before charging. ToS must include the AUP clause covering `system`-kind miscategorization (see Risks) — industry-standard for ESPs, and our preference gates make it load-bearing here
 
 ---
 
@@ -294,3 +295,5 @@ _2026-06-11 — Revision: unsubscribe + contact communication preferences refere
 _2026-06-11 — Correction: the multilayered preference check is already designed in the schema — `CommunicationKind` policy with `Contact.acceptedKinds` AND `CustomerRef.acceptedKinds` dual-gated via `canDeliver`; CustomerRef being the (customer, provider) pair makes tenant scoping structural (supersedes the earlier suppression-key migration warning). Remaining: unsubscribe link/landing flow, send-job wiring, preference-center UI, and reconciling `EmailTemplate.category` with `CommunicationKind`._
 
 _2026-06-11 — Design decision: unsubscribe is injected automatically by the send pipeline for non-system kinds, sits **above lens control** (not part of any editable surface), cannot be deleted by any narrowing at any level — restyle-only via theme tokens. Compliance enforced by code, not configuration._
+
+_2026-06-11 — Abuse vector added to Risks: tenant miscategorizing marketing as `system` to bypass unsubscribe. Layered defense (default-deny, permission-gated, audited recategorization flag, bulk-fan-out detection, BYO-key reputation alignment) with ToS/AUP as the contractual backstop — necessary because code can constrain and detect but not adjudicate intent._
