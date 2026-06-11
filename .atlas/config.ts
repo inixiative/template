@@ -16,7 +16,7 @@ export default defineConfig({
   stamp: [
     // @kind — structural globs (no capture)
     { include: '**/controllers/**', kind: 'controller' },
-    { include: '**/routes/**', kind: 'route' },
+    { include: 'apps/api/src/**/routes/**', kind: 'route' }, // backend HTTP routes
     { include: '**/services/**', kind: 'service' },
     { include: '**/queries/**', kind: 'query' },
     { include: '**/schemas/**', kind: 'schema' },
@@ -25,10 +25,28 @@ export default defineConfig({
     { include: '**/middleware/**', kind: 'middleware' },
     { include: ['**/constants/**', '**/constants.ts'], kind: 'constant' },
     { include: ['**/utils/**', '**/utils.ts'], kind: 'utils' },
+    // structural roles common in packages + frontend
+    { include: ['**/types/**', '**/*.types.ts'], kind: 'type' },
+    { include: '**/factories/**', kind: 'factory' },
+    { include: ['**/client.ts', '**/*.client.ts'], kind: 'client' },
+    { include: '**/*.config.ts', kind: 'config' },
+    { include: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'], kind: 'seed' },
+    { include: '**/components/**', kind: 'component' },
+    { include: ['**/store/**', '**/*.store.ts'], kind: 'store' },
+    // React hooks only (frontend + ui pkg) — NOT apps/api/src/hooks (those are db lifecycle handlers)
+    { include: ['packages/ui/**/hooks/**', 'apps/web/**/hooks/**', 'apps/admin/**/hooks/**', 'apps/superadmin/**/hooks/**'], kind: 'hook' },
+    // frontend (TanStack apps): file-based routes are pages, app bootstrap is an entrypoint
+    { include: ['apps/web/**/routes/**', 'apps/admin/**/routes/**', 'apps/superadmin/**/routes/**'], kind: 'page' },
+    { include: ['apps/*/app/main.tsx', 'apps/*/app/client.tsx', 'apps/*/app/router.tsx', 'apps/*/app/ssr.tsx'], kind: 'entrypoint' },
+    { include: 'apps/*/app/lib/**', kind: 'utils' },
+    { include: 'apps/*/app/config/**', kind: 'config' },
+    { include: 'apps/*/app/guards/**', kind: 'middleware' },
     // @partOf — resolve a captured segment through membership (multi-@partOf normal)
     { include: 'apps/api/src/modules/$1/**', partOf: partOfFor('module', '$1') },
     // admin sub-modules also map to their own feature (e.g. admin/auditLog → feature:auditLogs)
     { include: 'apps/api/src/modules/admin/$1/**', partOf: partOfFor('module', '$1') },
+    // top-level api dirs (appEvents/jobs/ws/…) map to their primitive if registered
+    { include: 'apps/api/src/$1/**', partOf: partOfFor('module', '$1') },
     { include: 'packages/$1/**', partOf: partOfFor('package', '$1') },
     // superadmin (classless, derived): the BE admin folder + admin-prefixed
     // controllers/routes anywhere + the superadmin app.

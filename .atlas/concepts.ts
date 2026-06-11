@@ -20,8 +20,12 @@ export const CONCEPTS: ConceptRegistry = {
 
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
-  'primitive:appEvents': { docs: ['APP_EVENTS.md'] },
-  'primitive:jobs': { docs: ['JOBS.md'] },
+  'primitive:ui': { package: ['ui'] }, // the component library
+  'primitive:shared': { package: ['shared'] }, // shared utils/types
+  'primitive:sdk': { package: ['sdk'] }, // generated API client
+  'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
+  'primitive:jobs': { module: ['jobs'], docs: ['JOBS.md'] },
+  'primitive:websockets': { module: ['ws'], docs: ['APP_EVENTS.md'] },
   'primitive:routeTemplates': { docs: ['API_ROUTES.md'] },
   'primitive:adapter': { docs: ['ADAPTERS.md'] },
 
