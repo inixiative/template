@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware
+ * @partOf primitive:errors
  */
 import type { ZodError } from 'zod';
 import type { IssueItem, PublicZodIssue } from '#/middleware/error/types';

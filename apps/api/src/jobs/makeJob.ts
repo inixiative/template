@@ -1,9 +1,9 @@
 /**
  * @atlas
  * @kind constructor
- * @constructs jobHandler
  * @partOf primitive:jobs
  * @uses none
+ * @constructs jobHandler
  */
 import type { JobHandler } from '#/jobs/types';
 

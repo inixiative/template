@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind service
+ * @partOf primitive:lifecycle
  */
 import { LogScope, log } from '@template/shared/logger';
 

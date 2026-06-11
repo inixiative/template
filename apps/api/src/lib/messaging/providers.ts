@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind registry
- * @partOf primitive:adapter
+ * @partOf primitive:adapter, primitive:messaging
  */
 import type { Contact } from '@template/db/generated/client/client';
 import type { CommunicationKind, ContactType } from '@template/db/generated/client/enums';

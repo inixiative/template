@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind type
+ * @kind type, service
  * @partOf primitive:batch
  * @uses none
  */

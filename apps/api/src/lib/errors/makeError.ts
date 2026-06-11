@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind factory, error
+ * @partOf primitive:errors
  */
 import { type Guidance, HTTP_ERROR_MAP, type HttpErrorCode } from '@template/shared/errors';
 import { HTTPException } from 'hono/http-exception';

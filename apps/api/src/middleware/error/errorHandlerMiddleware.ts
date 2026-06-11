@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware
+ * @partOf primitive:errors
  */
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';

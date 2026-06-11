@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind service
- * @partOf primitive:authz
+ * @partOf primitive:authz, primitive:requestContext
  */
 import type { Db } from '@template/db';
 import type { Context } from 'hono';

@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind type
+ * @partOf primitive:requestContext
  */
 import type {
   Organization,

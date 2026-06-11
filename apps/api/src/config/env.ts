@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind config
+ * @partOf infrastructure:env
  */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
 import { isTest } from '@template/shared/utils';

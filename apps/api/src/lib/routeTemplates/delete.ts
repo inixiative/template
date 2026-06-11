@@ -1,9 +1,9 @@
 /**
  * @atlas
  * @kind constructor
- * @constructs route
  * @partOf primitive:routeTemplates
  * @uses none
+ * @constructs route
  */
 import { createRoute } from '@hono/zod-openapi';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';

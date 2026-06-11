@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind helper
+ * @partOf primitive:requestContext
  */
 import type { AccessorName, ModelName, ModelTypeMap } from '@template/db';
 import type { Context } from 'hono';

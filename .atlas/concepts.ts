@@ -29,6 +29,18 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:routeTemplates': { docs: ['API_ROUTES.md'] },
   'primitive:adapter': { docs: ['ADAPTERS.md'] },
 
+  'primitive:requestContext': { docs: ['CONTEXT.md'] }, // request-scoped actor/resource context
+  'primitive:errors': { docs: ['API_ROUTES.md'] }, // error model + HTTP error formatting
+  'primitive:messaging': {}, // multi-channel message delivery
+  'primitive:lifecycle': {}, // process lifecycle / graceful shutdown
+
   'infrastructure:prisma': { package: ['db'], docs: ['DATABASE.md'] },
   'infrastructure:redis': { docs: ['REDIS.md'] },
+  'infrastructure:storage': { docs: ['ADAPTERS.md'] }, // object storage (s3)
+  'infrastructure:observability': { docs: ['LOGGING.md'] }, // otel / sentry / error reporting
+  'infrastructure:env': { docs: ['ENVIRONMENTS.md'] }, // env schema + validation
+
+  // integration: — the external-service boundary layer (4th concept class)
+  'integration:stripe': {},
+  'integration:resend': {},
 };

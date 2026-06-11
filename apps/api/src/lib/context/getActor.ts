@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind helper
+ * @partOf primitive:requestContext
  */
 import type { Context } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';

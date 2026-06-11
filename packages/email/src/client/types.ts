@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind type
+ * @kind type, client
  * @partOf feature:email
  * @uses none
  */

@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind client
+ * @partOf infrastructure:observability
  */
 import { log } from '@template/shared/logger';
 import type { ErrorReporter } from '#/lib/errorReporter/types';

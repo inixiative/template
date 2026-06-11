@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind client
- * @partOf feature:email
+ * @partOf feature:email, integration:resend
  * @uses primitive:shared
  */
 import { join } from 'node:path';

@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware, type
+ * @partOf primitive:errors
  */
 import type { ZodIssue } from 'zod';
 

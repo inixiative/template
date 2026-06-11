@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind registry
- * @partOf primitive:adapter
+ * @partOf infrastructure:observability, primitive:adapter
  * @uses primitive:appEvents, primitive:jobs
  */
 import { makeBroadcastRegistry } from '@template/shared/adapter';

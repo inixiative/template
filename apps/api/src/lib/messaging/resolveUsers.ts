@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind query
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:messaging
  */
 import { type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { db } from '@template/db';

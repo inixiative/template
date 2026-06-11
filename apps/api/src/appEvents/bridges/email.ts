@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind handler
+ * @kind handler, bridge
  * @partOf primitive:appEvents
  * @uses primitive:jobs
  */

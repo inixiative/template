@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware
+ * @partOf primitive:requestContext
  */
 import { type AccessorName, type Db, toModelName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';

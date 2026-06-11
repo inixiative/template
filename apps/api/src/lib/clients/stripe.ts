@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind client
+ * @partOf integration:stripe
  */
 export {};
 

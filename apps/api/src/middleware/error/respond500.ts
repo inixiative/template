@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind middleware
+ * @partOf primitive:errors
  */
 import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';

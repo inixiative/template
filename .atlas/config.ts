@@ -59,6 +59,16 @@ export default defineConfig({
     { include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'], partOf: 'primitive:routeTemplates' },
     { include: ['apps/api/src/lib/auth.ts', 'apps/api/src/middleware/auth/**'], partOf: 'feature:auth' },
     { include: ['packages/db/src/redis/**', 'packages/db/src/lock/**'], partOf: 'infrastructure:redis' },
+    // api lib/middleware primitives + infrastructure + external integrations
+    { include: ['apps/api/src/lib/context/**', 'apps/api/src/middleware/resources/**'], partOf: 'primitive:requestContext' },
+    { include: ['apps/api/src/lib/errors/**', 'apps/api/src/middleware/error/**'], partOf: 'primitive:errors' },
+    { include: 'apps/api/src/lib/messaging/**', partOf: 'primitive:messaging' },
+    { include: 'apps/api/src/lib/shutdown.ts', partOf: 'primitive:lifecycle' },
+    { include: ['apps/api/src/lib/storage/**', 'apps/api/src/lib/clients/s3.ts'], partOf: 'infrastructure:storage' },
+    { include: ['apps/api/src/config/otel.ts', 'apps/api/src/lib/observe.ts', 'apps/api/src/lib/errorReporter/**'], partOf: 'infrastructure:observability' },
+    { include: 'apps/api/src/config/env.ts', partOf: 'infrastructure:env' },
+    { include: 'apps/api/src/lib/clients/stripe.ts', partOf: 'integration:stripe' },
+    { include: 'packages/email/src/client/resend.ts', partOf: 'integration:resend' },
     // superadmin (classless, derived): the BE admin folder + admin-prefixed
     // controllers/routes anywhere + the superadmin app.
     { include: 'apps/api/src/modules/admin/**', partOf: 'superadmin' },

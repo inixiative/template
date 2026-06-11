@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind helper
+ * @partOf primitive:requestContext
  */
 import type { Context, Input } from 'hono';
 import type { InputToDataByTarget, ValidationTargets } from 'hono/types';

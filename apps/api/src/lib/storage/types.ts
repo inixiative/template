@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind type
+ * @partOf infrastructure:storage
  */
 export type Bucket = 'system' | 'user';
 
