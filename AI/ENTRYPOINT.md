@@ -238,6 +238,22 @@ Read docs based on task type:
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
 
+## 11.5 Atlas — the code map
+
+This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`).
+
+**To navigate by concept instead of crawling folders:**
+- Read `MAP.md` for the high-level concept map (features / primitives / infrastructure, each with its files + role breakdown).
+- Run `bunx atlas graph --json` for reverse indexes (concept → files, concept → consumers) and `bunx atlas query --kind controller --partOf feature:inquiry` (or a json-rules predicate) to find files by axis.
+- A file's top-of-file `@atlas` block tells you its role + memberships + dependencies before you open it.
+- Prefer these over `grep` for "what touches X" / "what's part of Y".
+
+**When you add or move a file, keep its `@atlas` block true:**
+- `@kind` = the file's ROLE (controller/service/query/schema/handler/client/type/component/hook/page/…), never a layer.
+- `@partOf` = the concept(s) it composes (`feature:*` / `primitive:*` / `infrastructure:*`, or the `superadmin` tag). Multiple is normal.
+- `@uses` = load-bearing dependencies only (the concepts this file's behavior is built on), or `@uses none` if truly none. Not every import.
+- `bunx atlas stamp <path>` fills the derivable `@kind`/`@partOf` from the rules; you curate `@uses` by hand. Validate names exist in `.atlas/concepts.ts`. See the atlas README for the full authoring guide.
+
 ## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
