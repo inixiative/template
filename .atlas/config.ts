@@ -30,6 +30,10 @@ export default defineConfig({
     { include: '**/factories/**', kind: 'factory' },
     { include: ['**/client.ts', '**/*.client.ts', '**/client/**', '**/clients/**'], kind: 'client' },
     { include: ['**/registries/**', '**/registry.ts'], kind: 'registry' },
+    { include: '**/bridges/**', kind: 'bridge' },
+    { include: '**/defs/**', kind: 'definition' },
+    { include: '**/*Error.ts', kind: 'error' },
+    { include: '**/generate*.ts', kind: 'generator' },
     { include: ['**/schema.ts', '**/schemas.ts', '**/*.schema.ts'], kind: 'schema' }, // bare schema files (incl. in handlers/)
     { include: '**/types.ts', kind: 'type' }, // bare types.ts not in a types/ folder
     { include: '**/*.config.ts', kind: 'config' },

@@ -7,12 +7,12 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:auth': { module: ['token', 'authProvider'], docs: ['AUTH.md'] },
   'feature:tenancy': { module: ['organization', 'space', 'organizationUser', 'spaceUser'] },
   'feature:users': { module: ['user', 'me'] },
-  'feature:inquiry': { module: ['inquiry'] },
+  'feature:inquiry': { module: ['inquiry'], docs: ['INQUIRIES.md'] },
   'feature:contact': { module: ['contact'] },
   'feature:customer': { module: ['customerRef'] },
-  'feature:auditLogs': { module: ['auditLog'] }, // lives under modules/admin/, but is its own feature
+  'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
   'primitive:caching': { module: ['cache'], docs: ['REDIS.md'] }, // built on infrastructure:redis
-  'feature:webhooks': { module: ['webhookSubscription'] },
+  'feature:webhooks': { module: ['webhookSubscription'], docs: ['HOOKS.md'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.
@@ -20,12 +20,12 @@ export const CONCEPTS: ConceptRegistry = {
 
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
-  'primitive:ui': { package: ['ui'] }, // the component library
-  'primitive:shared': { package: ['shared'] }, // shared utils/types
+  'primitive:ui': { package: ['ui'], docs: ['FRONTEND.md', 'ZUSTAND.md'] }, // the component library
+  'primitive:shared': { package: ['shared'], docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'] }, // shared utils/types
   'primitive:sdk': { package: ['sdk'] }, // generated API client
   'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
   'primitive:jobs': { module: ['jobs'], docs: ['JOBS.md'] },
-  'primitive:websockets': { module: ['ws'], docs: ['APP_EVENTS.md'] },
+  'primitive:websockets': { module: ['ws'], docs: ['WEBSOCKETS.md', 'APP_EVENTS.md'] },
   'primitive:routeTemplates': { docs: ['API_ROUTES.md'] },
   'primitive:adapter': { docs: ['ADAPTERS.md'] },
 
