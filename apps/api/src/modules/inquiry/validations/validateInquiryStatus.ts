@@ -2,6 +2,7 @@
  * @atlas
  * @kind validator
  * @partOf feature:inquiry
+ * @uses none
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';

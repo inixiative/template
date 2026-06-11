@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind type
+ * @uses infrastructure:prisma, primitive:authz, feature:auth, feature:tenancy, feature:users
  */
 import type { RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { getModelRelations } from '@template/db/utils/runtimeDataModel';
 

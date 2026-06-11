@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler, type
  * @partOf feature:inquiry
+ * @uses primitive:appEvents
  */
 import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:inquiry
+ * @uses primitive:routeTemplates
  */
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf feature:inquiry
+ * @uses none
  */
 import type { z } from 'zod';
 

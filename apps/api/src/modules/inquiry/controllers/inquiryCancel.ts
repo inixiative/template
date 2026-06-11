@@ -2,6 +2,7 @@
  * @atlas
  * @kind controller
  * @partOf feature:inquiry
+ * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { getResource } from '#/lib/context/getResource';

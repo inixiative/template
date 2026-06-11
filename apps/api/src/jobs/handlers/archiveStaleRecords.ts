@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler
  * @partOf primitive:jobs
+ * @uses none
  */
 import type { ModelName } from '@template/db';
 

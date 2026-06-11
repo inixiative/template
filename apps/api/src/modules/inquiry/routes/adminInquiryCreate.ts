@@ -2,6 +2,7 @@
  * @atlas
  * @kind route
  * @partOf feature:inquiry, superadmin
+ * @uses primitive:routeTemplates
  */
 import { createRoute } from '#/lib/routeTemplates';
 import { inquiryCreateBodySchema, inquiryCreateSanitizeKeys } from '#/modules/inquiry/schemas/inquiryCreateBodySchema';

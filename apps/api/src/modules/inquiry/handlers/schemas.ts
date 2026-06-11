@@ -2,6 +2,7 @@
  * @atlas
  * @kind handler, schema
  * @partOf feature:inquiry
+ * @uses none
  */
 import { z } from 'zod';
 

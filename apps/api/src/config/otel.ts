@@ -2,6 +2,7 @@
  * @atlas
  * @kind config
  * @partOf infrastructure:observability
+ * @uses primitive:shared
  */
 import { LogScope, log } from '@template/shared/logger';
 import { isLocal, isTest } from '@template/shared/utils';

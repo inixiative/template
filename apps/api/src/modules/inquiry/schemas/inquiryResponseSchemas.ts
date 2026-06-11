@@ -2,6 +2,7 @@
  * @atlas
  * @kind schema
  * @partOf feature:inquiry
+ * @uses feature:auditLogs
  */
 import { z } from '@hono/zod-openapi';
 import { InquiryScalarSchema, OrganizationScalarSchema, SpaceScalarSchema, UserScalarSchema } from '@template/db';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:jobs
+ * @uses infrastructure:prisma, infrastructure:redis
  */
 import type { Db } from '@template/db';
 import type { Job, Queue } from 'bullmq';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf feature:inquiry
+ * @uses feature:tenancy, feature:users
  */
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind client
  * @partOf primitive:authz
+ * @uses none
  */
 import type { AccessorName, UserId } from '@template/db';
 import { castArray } from 'lodash-es';

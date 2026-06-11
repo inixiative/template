@@ -12,6 +12,11 @@ export default defineConfig({
     '**/dist/**',
     '**/generated/**', // Prisma client + zod schemas — generated, not authored
     '**/*.gen.ts',
+    '**/*.config.ts', // build tooling (vite/app/prisma/openapiTs config) — not app source
+    '**/scripts/**', // codegen / build scripts
+    '**/watchAndGenerate.ts',
+    '**/test/**', // test infra (factories, mocks, setup) — singular, complements **/tests/**
+    '**/*.example.tsx',
   ],
   stamp: [
     // @kind — structural globs (no capture)

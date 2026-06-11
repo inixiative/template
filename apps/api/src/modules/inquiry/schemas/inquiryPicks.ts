@@ -2,6 +2,7 @@
  * @atlas
  * @kind schema
  * @partOf feature:inquiry
+ * @uses none
  */
 export const inquiryPicks: string[] = [
   'type',
