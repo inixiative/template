@@ -28,7 +28,10 @@ export default defineConfig({
     // structural roles common in packages + frontend
     { include: ['**/types/**', '**/*.types.ts'], kind: 'type' },
     { include: '**/factories/**', kind: 'factory' },
-    { include: ['**/client.ts', '**/*.client.ts'], kind: 'client' },
+    { include: ['**/client.ts', '**/*.client.ts', '**/client/**', '**/clients/**'], kind: 'client' },
+    { include: ['**/registries/**', '**/registry.ts'], kind: 'registry' },
+    { include: ['**/schema.ts', '**/schemas.ts', '**/*.schema.ts'], kind: 'schema' }, // bare schema files (incl. in handlers/)
+    { include: '**/types.ts', kind: 'type' }, // bare types.ts not in a types/ folder
     { include: '**/*.config.ts', kind: 'config' },
     { include: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'], kind: 'seed' },
     { include: '**/components/**', kind: 'component' },
@@ -48,6 +51,10 @@ export default defineConfig({
     // top-level api dirs (appEvents/jobs/ws/…) map to their primitive if registered
     { include: 'apps/api/src/$1/**', partOf: partOfFor('module', '$1') },
     { include: 'packages/$1/**', partOf: partOfFor('package', '$1') },
+    // wire concepts whose code lives outside a module/package folder:
+    { include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'], partOf: 'primitive:routeTemplates' },
+    { include: ['apps/api/src/lib/auth.ts', 'apps/api/src/middleware/auth/**'], partOf: 'feature:auth' },
+    { include: ['packages/db/src/redis/**', 'packages/db/src/lock/**'], partOf: 'infrastructure:redis' },
     // superadmin (classless, derived): the BE admin folder + admin-prefixed
     // controllers/routes anywhere + the superadmin app.
     { include: 'apps/api/src/modules/admin/**', partOf: 'superadmin' },
