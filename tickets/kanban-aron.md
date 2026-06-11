@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Todo
+    BRAND-002-email-template-governance-business-plan
     INFRA-001-init-script
     INFRA-002-rules-builder
     INFRA-011-railway-buckets
@@ -31,6 +32,9 @@ kanban
 ## Tickets
 
 ### 🆕 Todo
+
+**Product:**
+- [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-011, FEAT-009, COMM-001
 
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)
@@ -68,8 +72,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 14
-- **Todo**: 11
+- **Total Tickets**: 15
+- **Todo**: 12
 - **In Progress**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 2
@@ -93,4 +97,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-05-26_
+_Last Updated: 2026-06-11_

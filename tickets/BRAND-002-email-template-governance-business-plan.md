@@ -1,0 +1,202 @@
+# BRAND-002: Email Template Governance — Business Plan
+
+**Status**: 🆕 Not Started
+**Assignee**: Aron
+**Priority**: High
+**Created**: 2026-06-11
+**Updated**: 2026-06-11
+
+---
+
+## Executive Summary
+
+Launch a standalone SaaS on top of the template: **multi-tenant email template management with a lens-gated builder, a render/send API, and full governance** (approval workflow, audit trail, version history with rollback).
+
+The one-line pitch: *"Let your customers edit the emails your product sends — without letting them break them."*
+
+The buyer is a B2B SaaS company that sends email on behalf of its customers (vertical SaaS, marketplaces, platforms). Today that buyer either embeds an editor widget (Beefree SDK at $350–$5,000/mo, Unlayer at $250–$2,000/mo) and hand-rolls everything around it — per-tenant overrides, variable safety, locale fallback, approvals, audit — or builds nothing and fields endless "can you change our email?" support tickets. We sell the whole layer, and the hard parts are already built in this repo.
+
+**Why this product, why now (the stopgap rationale):**
+
+- The enabling work — files (FEAT-009/INFRA-011) and email completion (COMM-001) — is already next on the roadmap. The product-specific delta is small.
+- Every net-new piece (billing, rate limiting, builder UI patterns, embed/token flow) flows back into the template as reusable infrastructure. Building the product *is* building the template.
+- It dogfoods the template end-to-end and produces a public case study for it.
+- Revenue while the template matures, without committing to a second long-lived codebase — this *is* the codebase.
+
+---
+
+## 1. The Existing Space
+
+Three adjacent categories exist. None of them sells what we'd sell.
+
+### 1.1 Embedded editor SDKs (closest competitors)
+
+These sell a drag-and-drop editor widget you embed in your SaaS. The customer still builds template storage, tenant overrides, variable safety, approvals, and audit themselves.
+
+| Vendor | Pricing (2026) | What they sell | What they lack |
+|--------|---------------|----------------|----------------|
+| [Beefree SDK](https://developers.beefree.io/) | $350–$5,000/mo + usage fees (hosted rows, content API, $2/HTML import) | Polished freeform editor, AI assist, "locked rows" | No tenant hierarchy, no field-level guardrails, no approvals/audit, no render/send API |
+| [Unlayer](https://unlayer.com/blog/best-email-builder-tools) | $250–$2,000/mo + Enterprise | 4-in-1 editor (email, landing pages, popups, docs) | Same gaps; broader but shallower |
+| Stripo, Topol, [Chamaileon](https://chamaileon.io/compare-email-builder-alternatives/embedded-email-builders/) | Lower-priced tiers | Editor plugins | Same gaps |
+
+**Key read:** the market has validated $250–$2,000/mo for *just the editor third* of this product. Their "permissions" story is coarse (lock a row, hide a tab). None of them know what a tenant is.
+
+### 1.2 Notification infrastructure (adjacent, partial overlap)
+
+Knock, Courier, Novu (open source). They sell the *pipeline* — multi-channel orchestration, preferences, batching — with template management as a supporting feature. Their template editors are basic, their tenant-override stories are thin, and they want to own sending. We are not competing on orchestration; we interoperate (our render output feeds whatever sends).
+
+### 1.3 ESPs with templates (not competitors, integration targets)
+
+Resend, Postmark, Loops, Customer.io, SES. Sending + light template features for the sender's *own* emails. No embeddable builder, no multi-tenant overrides. **These are our BYO sending backends, not rivals** — "works with your Resend/SES/Postmark account" is a feature and a distribution channel.
+
+### 1.4 The gap
+
+Nobody sells the **multi-tenant template hierarchy + governance layer**: per-tenant branded overrides with platform-controlled guardrails, approval-gated publishing, attributable history, and a render/send API — as one product. Every B2B SaaS that lets customers customize emails hand-rolls this badly, exactly the way every SaaS hand-rolls event buses badly (see CLAUDE.md §6 — same migration we skip, different domain).
+
+**Positioning: "email template governance for multi-tenant SaaS," not "email builder."** We don't win an editor-polish war against Beefree. We win because the builder is the interface and governance is the product. The compliance-adjacent segment (fintech, insurance, health SaaS) *must* answer "who changed the email our customers received, and who approved it" — incumbents have no answer, and that segment pays $1–2k/mo without blinking.
+
+---
+
+## 2. What Already Exists in This Repo
+
+Mapping built primitives → product features:
+
+| Primitive (built) | Product feature |
+|---|---|
+| Org → space tenancy, memberships, context routing | Customer's tenant model maps 1:1 (their platform = org, their customers = spaces) |
+| EmailTemplate with default/admin/org/space polymorphic ownership + locale fallback | The override cascade — the core product mechanic |
+| EmailComponent (`{{component:slug}}` composition) | Structured block system the builder edits |
+| Lens system (`packages/db/src/lens`) | Field/block-level edit guardrails per tenant role (§3) |
+| RBAC/ABAC/ReBAC + permix + row-level `permissionRules` | Who can view/edit/publish/approve which templates |
+| Inquiry state machine (draft→sent→approved/denied) | Approval-before-publish workflow |
+| AuditLog with full `before`/`after` JSON, EmailTemplate/EmailComponent as indexed subjects, `sourceInquiryId` lineage | **Version history is already built.** Every template state ever, attributed to an actor, linked to its approval. EmailTemplate is not in the redaction registry, so snapshots are complete. Restore = write a prior `after` back as a normal update (which is itself audited — restores are undoable, history never rewrites) |
+| Hierarchical tokens (user/org/space-scoped, SHA-256, Redis-cached) | Embed auth + API keys |
+| OpenAPI 3.1 → generated typed SDK + TanStack Query hooks | Customer integration SDK — a selling point, generated for free |
+| Webhooks (HMAC, delivery tracking, retries) | "Template published" / "render failed" events to customer systems |
+| BullMQ queues, app events, websockets | Async render/send, live preview collaboration later |
+| Field encryption (AES-256-GCM) | Customer's ESP API keys at rest |
+| Superadmin app + spoofing | Our own support tooling, day one |
+
+---
+
+## 3. How Lenses and Permissions Would Work
+
+### 3.1 Lens layer — *what surface a viewer can even see*
+
+Today's mechanics (all in `packages/db/src/lens` + `@inixiative/json-rules`):
+
+- `lensFor(model)` creates a `Lens` over the generated `prismaMap` for any model.
+- `LensNarrowing` composes via `parent` chains: `picks` (whitelist fields), `omits`, `enumOmits` (hide enum values), `where` (server-enforced row scope).
+- Routes declare a static `filterLens`; `scopeNarrowing` middleware merges per-request, ctx-aware `where` conditions; `redactLens` layers the redaction registry on top. The server, not the client, owns the narrowing.
+
+Product application — three narrowings, all composed from the same primitive:
+
+1. **Catalog narrowing (row scope).** Which template slugs a tenant sees at all. `where` keyed off the requesting token's org/space — a space-scoped token literally cannot list, render, or reference templates outside its cascade. This is the existing `scopeNarrowing` pattern applied to EmailTemplate routes; near-zero new code.
+
+2. **Edit-surface narrowing (field/block scope).** The platform owner (our customer) defines, per tenant level and role, which parts of a template are editable: `picks` over template fields (e.g. space members may touch `subject` and designated content slots, never the MJML skeleton or system variables), `enumOmits` over block/component types (tenant can insert `hero` and `text` blocks, not `raw-html`), and component-prop narrowing for which props of each EmailComponent are exposed (logo URL yes, padding no). The builder UI asks the server "what is my editable surface for this template?", receives the composed narrowing as JSON, and renders *only those controls*. Server enforces the same narrowing on write — the UI is a convenience, the lens is the boundary.
+
+3. **Variable narrowing (render safety).** Render/send API calls validate supplied variables against the lens for the calling token. A tenant cannot override `{{reset_link}}`, `{{unsubscribe_url}}`, or any platform-reserved variable; attempting it is a structured `makeError` response, not a silent merge. This is the line item that makes "let customers edit transactional email" safe at all, and no incumbent has it.
+
+The differentiator vs. Beefree/Unlayer "locked rows": their locking is a flag in a client-side JSON design document. Ours is server-enforced, role-aware, composable narrowing that also scopes *rows* and *enum values* — and it already exists.
+
+### 3.2 Permission layer — *what a viewer can do with that surface*
+
+- **Role mapping.** Our customer's admins = org owner/admin; their customers' users = space members with space roles. Existing hierarchical inheritance (org owner ⇒ space access) gives platform staff implicit reach into every tenant's templates — exactly the support model this product needs.
+- **Actions.** `template:view / edit / publish / approve / manage-guardrails` as permix checks. `manage-guardrails` (editing the lens narrowings themselves) is org-admin-only — tenants never edit their own cage.
+- **Row-level sharing.** Existing `permissionRules` overrides cover "share this one template with an outside contractor" without widening role grants.
+- **Approval flow.** Publish raises an Inquiry (source: editing space user, target: org admin). On approve, the publish mutation runs with `sourceInquiryId` stamped into the audit row — version → approval lineage for free. Platforms that don't want approvals just grant `publish` directly; the workflow is opt-in per org.
+- **Embed auth.** The embedded builder boots with a space-scoped token minted by the customer's backend. Token scope *is* the tenant boundary; the lens composes from it. No new auth concepts.
+- **Versioning/rollback.** Timeline reads `AuditLog` filtered by `subjectEmailTemplateId` (already indexed). Restore endpoint requires `template:publish` (a restore is a publish) and writes the chosen `after` state back. Constraint to encode now: **audit rows for email subjects are exempt from any future retention policy** (see INFRA-007/INFRA-009 — cold storage is fine, deletion is not), or "version history" silently becomes "recent history."
+
+---
+
+## 4. What We Need to Build to Launch
+
+### 4.1 Prerequisites — already on the roadmap (work we'd do anyway)
+
+| Work | Ticket | Product-specific notes |
+|---|---|---|
+| S3 adapter + buckets | INFRA-011 | Unblocks files |
+| File management | FEAT-009 | **Scope v1 to template assets**: upload, bind (image → template/component via ResourceBinding), serve. Defer folders/sharing UX |
+| Email completion | COMM-001 | Render pipeline hardening, BYO provider keys per org (Resend/SES/Postmark adapters, encrypted), send tracking. **Ticket is stale** — rewrite around the implemented MJML EmailTemplate/EmailComponent system, not React Email. Drop the INFRA-002 rules-builder blocker: conditional sending is not needed for this product's v1 |
+
+### 4.2 Net-new — the actual product delta
+
+Ordered by size, largest first:
+
+1. **Structured block builder UI** (the big lift, ~weeks not days).
+   v1 is a *structured* editor over EmailComponent — tenants compose lens-exposed blocks and edit lens-exposed props — **not** freeform drag-and-drop. This is dramatically less work than a Beefree clone, it's safer (which is the whole pitch), and "guardrailed by design" reframes the missing freeform editor as a feature. Includes live MJML preview (server-rendered), locale switcher, variable palette (lens-filtered).
+2. **Public API surface.** CRUD/render/preview/send/test-send routes via existing route templates; API keys = existing tokens; OpenAPI → SDK generated. Mostly assembly.
+3. **Embed flow.** Iframe or web component + the scoped-token handshake; postMessage events (saved, published, approval-requested). Token infra exists; the packaging is new.
+4. **Version timeline + restore.** Read endpoint over AuditLog + restore endpoint + timeline UI. Small (§3.2).
+5. **Guardrail management UI.** Org-admin screens to define per-role narrowings (which blocks/props/variables each tenant role gets). Start opinionated: 3 preset profiles (locked-down / branding-only / full) + JSON escape hatch; visual narrowing editor later (overlaps FEAT-008 permissions builder — this is its first concrete consumer).
+6. **Billing.** Stripe subscriptions per org, plan gates (tenant count, renders/sends per month), usage metering via existing app events. Flows back into the template as the missing billing module.
+7. **Rate limiting.** Middleware over existing Redis. Required for a public API; flows back into template.
+8. **Marketing site + docs.** Landing page, quickstart ("branded tenant emails in 30 minutes"), SDK docs from OpenAPI.
+
+### 4.3 Explicit non-goals for v1
+
+- Freeform drag-and-drop editing (v2, or embed Unlayer beneath the lens layer if demanded)
+- Being an ESP — we never own deliverability; BYO sending keys only
+- SMS/push/in-app channels (notification-infra turf; later via app-event bridges)
+- Permissions-as-a-service as a standalone product (Permit.io/Oso/WorkOS FGA turf — we *use* permissions as a feature, we don't sell them)
+- Open/click analytics beyond provider passthrough
+
+### 4.4 Rough sequencing
+
+- **Phase 1 — Foundations** (roadmap work, product-scoped): INFRA-011 → FEAT-009-lite → COMM-001 rewrite. Exit: an org can upload an asset, edit a template via API, render and send through its own Resend key.
+- **Phase 2 — Governance**: lens narrowings on template routes, permix actions, Inquiry publish flow, version timeline + restore. Exit: full edit→approve→publish→rollback loop via API, fully audited.
+- **Phase 3 — Builder + embed**: structured editor, guardrail presets UI, embed handshake. Exit: a space-scoped token can open the builder and safely edit only its surface.
+- **Phase 4 — Launch**: billing, rate limiting, docs/marketing, 2–3 design-partner integrations. Exit: first paying org.
+
+Realistic horizon: ~2–3 months of focused work given Phases 1 is already-planned roadmap, with Phase 3 the schedule risk.
+
+---
+
+## 5. Business Model
+
+- **Pricing anchor:** incumbents validated $250–$2,000/mo for the editor alone. Price on **tenant count + monthly renders/sends**, not seats:
+  - **Dev** — free: 1 org, 3 tenants, test sending only
+  - **Starter** — ~$99/mo: 25 tenants, builder + API, community support
+  - **Growth** — ~$399/mo: 250 tenants, approvals + audit timeline + embed
+  - **Scale** — ~$999+/mo: unlimited tenants, SSO, retention guarantees, SLA
+  Governance features (approvals, audit, rollback) gate the Growth/Scale tiers — they're what the compliance segment pays for.
+- **Wedge ICP:** B2B vertical SaaS (10–200 employees) in compliance-adjacent verticals — fintech infra, insurance, health, HR — whose customers demand branded transactional email.
+- **GTM channels:** integration-first content ("multi-tenant email templates with Resend/SES/Postmark"), the template itself as a public case study, OpenAPI/SDK-driven DX as the demo, template-gallery SEO, 2–3 design partners from network before launch.
+
+---
+
+## 6. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Editor UX bar — buyers compare against Beefree polish | Don't compete there: structured editor, governance positioning; freeform later or embedded underneath |
+| Builder UI eats the schedule (frontend pages are the template's weakest area today) | Phase 3 is deliberately last; Phases 1–2 ship an API-first product usable by design partners without the builder |
+| Deliverability blame lands on us | BYO sending keys only; we render, they send |
+| Crowded adjacent markets blur positioning | Lead every page with governance/audit, not "builder" |
+| Solo bandwidth / template roadmap stalls | Every phase-1/2 artifact is roadmap work anyway; worst case the product is shelved and the template kept everything |
+| Audit-as-version-history undermined later | Encode the email-subject retention exemption now (ties into INFRA-007, INFRA-009-cold-storage) |
+
+---
+
+## 7. Open Questions
+
+- Product name / domain (working title: *Lensmail*? decide before marketing work)
+- Hosted-only at launch, or self-host tier later (Novu-style open-core is a real option given the repo *is* the product)?
+- Does the embed ship as iframe (safest) or web component (nicer DX) first?
+- Design partners: which 2–3 contacts get free Scale tier for feedback?
+- Legal/entity/ToS — out of repo scope, needs a parallel track before charging.
+
+---
+
+## Related Tickets
+
+- **Prerequisites:** INFRA-011 (Railway buckets), FEAT-009 (file management — scoped v1), COMM-001 (email system — needs rewrite, unblock from INFRA-002)
+- **Consumed by this plan:** FEAT-001 (inquiry, done), FEAT-017 (audit explorer — version timeline overlaps), FEAT-008 (permissions builder — guardrail UI is its first consumer), INFRA-007 / INFRA-009-cold-storage (retention exemption)
+- **Unblocked-for-template by this plan:** billing module, rate limiting, embed/token packaging
+
+---
+
+## Comments
+
+_2026-06-11 — Created from product exploration session: market scan of embedded editor SDKs (Beefree $350–$5k/mo, Unlayer $250–$2k/mo), confirmation that AuditLog `before`/`after` + EmailTemplate subject FK already constitutes version history, and lens/permission design sketch._
