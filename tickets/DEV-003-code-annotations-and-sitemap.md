@@ -68,7 +68,8 @@ validates `@partOf` / `@uses` names against it.
 bunx atlas graph      // reverse indexes: seam → files, file → seams, ticket → seams, doc → seams
 bunx atlas check      // presence + vocab existence (the CI command)
 bunx atlas coverage   // unannotated files; files missing @uses vs explicit-empty @uses
-bunx atlas generate   // → MAP.md (+ stamps blocks via the config rules)
+bunx atlas stamp      // write/refresh @atlas blocks from the config rules (the patcher)
+bunx atlas generate   // → MAP.md from the annotated tree
 ```
 
 ---
@@ -250,6 +251,32 @@ written). So atlas **leaves it out entirely** — and that makes absence meaning
 `coverage` reports those as two distinct buckets — a signal you lose the moment you auto-stamp
 `@uses none` everywhere.
 
+### Patching: `atlas stamp` (dry-run, targeting, additive / overwriting)
+
+Blanks aren't permanent — they're fillable on demand. `atlas stamp` is the patcher: it materializes
+`@atlas` blocks from the config rules, re-runnable whenever rules or the tree change (the
+`eslint --fix` / codemod shape). Always preview first.
+
+- **Targeting** — `all` (default), a folder, or a single file: `atlas stamp`,
+  `atlas stamp apps/api/src/modules/billing`, `atlas stamp path/to/one.ts`. Optionally scoped by
+  axis: `atlas stamp --uses src/jobs`.
+- **`--dry-run`** — print the diff, write nothing. This is also the review surface: a proposal only
+  becomes a real (curated) tag when a human/agent **accepts** the diff. An untouched file stays
+  tagless — i.e. still *uncurated*, preserving the absence-as-signal invariant.
+- **Additive mode (default, safe)** — fill only what's *absent*; never modify an existing tag. This
+  is the only mode that touches `@uses`, and it touches it as *proposals*, not facts.
+- **Overwriting mode (`--overwrite`)** — force-resync the **derivable** axes (`@kind`/`@partOf`) to
+  the current rules, for when rules or membership changed and files drifted. Guardrails: it
+  **never overwrites the curated axes** (`@uses`/`@concern`), and the dry-run diff is the safety —
+  the human rejects any line that's an intentional overload. (Optional belt-and-suspenders: a pin
+  marker on a tag exempts it from overwrite.)
+
+Because `@uses` can't be derived mechanically without reintroducing ubiquity-noise, `atlas stamp
+--uses` is really *import graph proposes → agent applies the load-bearing judgment → dry-run diff →
+human accepts*. Per-folder targeting is what makes that agent pass tractable and reviewable instead
+of one 850-file blob nobody trusts. `coverage` can surface three buckets: untouched / proposed
+(e.g. a tentative `@uses?` marker) / curated.
+
 ### Enforcement: existence, NOT correctness
 
 atlas checks that the annotations **exist and use valid vocabulary** — nothing that requires a
@@ -282,9 +309,11 @@ From one pass over annotated files + the seam registry:
 
 - **Phase 1** — parser + seam registry + `@kind`/`@partOf` vocab + `MAP.md` generator + the `atlas`
   CLI skeleton.
-- **Phase 2** — auto-stamp rules (config-driven glob+capture); agent-assisted overload pass for
-  exceptions (the 2026-06-09 scorecard was a manual prototype of this).
-- **Phase 3** — `@uses` curation pass + coverage buckets.
+- **Phase 2** — `atlas stamp` patcher (config-driven glob+capture; `--dry-run`, targeting,
+  additive/overwriting); agent-assisted overload pass for exceptions (the 2026-06-09 scorecard was a
+  manual prototype of this).
+- **Phase 3** — `@uses` curation pass (`atlas stamp --uses`: import-graph proposals → agent judgment
+  → accepted) + coverage buckets (untouched / proposed / curated).
 - **Phase 4** — CI rule (presence + vocab existence) warn-only → enforcing.
 
 ~850 source files: **do not hand-annotate** — auto-stamp + agent backfill.
@@ -321,6 +350,11 @@ From one pass over annotated files + the seam registry:
 - **Enforcement is existence + vocab-validity only** — presence, vocab exists in registry, doc/ticket
   paths exist. **No import reconciliation, no "is partOf true", no derived status.**
 - **`@kind` additions**: `constant`, `type`.
+- **Patcher (`atlas stamp`)**: dry-run + targeting (all / folder / individual / `--axis`). **Additive**
+  (default; fill only absent; the only mode that touches `@uses`, as proposals) vs **overwriting**
+  (`--overwrite`; force-resync derivable axes `@kind`/`@partOf` only — never the curated `@uses`/
+  `@concern`; dry-run diff is the safety). Acceptance promotes a proposal to a curated tag, which
+  preserves absence-as-signal. `@uses` fill = import-graph proposes → agent judges → human accepts.
 
 ### 2026-06-09/10 (foundation)
 
