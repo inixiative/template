@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf primitive:shared
+ * @uses none
  */
 import type { Environment } from '@template/shared/utils/env';
 

@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';

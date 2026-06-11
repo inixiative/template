@@ -2,6 +2,7 @@
  * @atlas
  * @kind client
  * @partOf primitive:shared
+ * @uses none
  */
 // Generic browser WebSocket client — transport only. Owns the socket lifecycle
 // (connect, auto-reconnect), queues sends until open, and forwards parsed inbound

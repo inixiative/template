@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 export type SelectOption<TValue extends string = string> = {
   value: TValue;

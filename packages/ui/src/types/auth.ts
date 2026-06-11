@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:ui
+ * @uses none
  */
 export type LoginCredentials = {
   email: string;

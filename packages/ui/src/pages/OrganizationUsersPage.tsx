@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { Icon } from '@iconify/react';
 import { useMutation } from '@tanstack/react-query';

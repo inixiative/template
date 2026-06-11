@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:shared
+ * @uses infrastructure:prisma
  */
 import type { ContactId } from '@template/db/typedModelIds';
 import type { z } from 'zod';

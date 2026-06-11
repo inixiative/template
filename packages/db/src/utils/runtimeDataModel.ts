@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

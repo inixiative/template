@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses primitive:shared
  */
 import type { ApiErrorBody } from '@template/shared/errors';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';

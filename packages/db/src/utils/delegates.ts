@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type { Prisma } from '@template/db/generated/client/client';
 

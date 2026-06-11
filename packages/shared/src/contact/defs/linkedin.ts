@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 import { LINKEDIN_CLASSIFIERS } from '@template/shared/contact/constants/linkedin';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';

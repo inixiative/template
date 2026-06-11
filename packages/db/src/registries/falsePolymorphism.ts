@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type { ModelName } from '@template/db/utils/modelNames';
 

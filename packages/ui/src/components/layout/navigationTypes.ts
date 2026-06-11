@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:authz
  */
 import type { PermissionsCheck } from '@template/permissions/types';
 import type { PageContext, TenantContext } from '@template/ui/store/types/tenant';

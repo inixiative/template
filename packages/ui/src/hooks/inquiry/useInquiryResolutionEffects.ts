@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import {

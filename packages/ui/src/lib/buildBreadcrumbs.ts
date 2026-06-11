@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 import type { RouteMatch } from '@template/ui/lib/findRoute';
 import type { TenantContext } from '@template/ui/store/types/tenant';

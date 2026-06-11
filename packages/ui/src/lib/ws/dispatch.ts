@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses primitive:shared
  */
 import type { WSEvent } from '@template/shared/ws';
 import { useAppStore } from '@template/ui/store';

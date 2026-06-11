@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { inquiryResolve } from '@template/sdk';
 import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';

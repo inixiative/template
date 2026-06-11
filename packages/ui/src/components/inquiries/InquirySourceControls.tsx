@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import type { InquirySentItem } from '@template/sdk';
 import { Button } from '@template/ui/components/primitives/Button';

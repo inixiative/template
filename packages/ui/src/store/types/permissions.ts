@@ -2,6 +2,7 @@
  * @atlas
  * @kind type, store
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Permix } from '@template/permissions/client';

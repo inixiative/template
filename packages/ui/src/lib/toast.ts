@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 import { toast as sonnerToast } from 'sonner';
 

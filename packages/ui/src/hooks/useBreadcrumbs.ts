@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { buildBreadcrumbs } from '@template/ui/lib';
 import { useAppStore } from '@template/ui/store';

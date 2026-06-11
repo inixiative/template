@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { AUDIT_ENABLED_MODELS } from '@template/db/registries/auditEnabledModels';
 

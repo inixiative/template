@@ -2,6 +2,7 @@
  * @atlas
  * @kind store
  * @partOf primitive:ui
+ * @uses none
  */
 import type { AppStore } from '@template/ui/store/types';
 import type { PageContext, TenantSlice } from '@template/ui/store/types/tenant';

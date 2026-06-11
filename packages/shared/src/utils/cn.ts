@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:shared
+ * @uses none
  */
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';

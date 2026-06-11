@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import type { RoutingSearchParams, UrlSearchParamUpdates } from '@template/ui/hooks/useAuthenticatedRouting/types';
 import type { TenantContext } from '@template/ui/store/types/tenant';

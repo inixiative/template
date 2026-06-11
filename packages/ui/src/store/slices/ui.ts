@@ -2,6 +2,7 @@
  * @atlas
  * @kind store
  * @partOf primitive:ui
+ * @uses none
  */
 import type { StateCreator } from 'zustand';
 

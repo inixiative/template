@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses none
  */
 import { useNavigate } from '@tanstack/react-router';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';

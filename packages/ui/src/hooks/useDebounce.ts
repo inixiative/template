@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 

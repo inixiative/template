@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 

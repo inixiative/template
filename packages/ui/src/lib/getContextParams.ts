@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { useAppStore } from '@template/ui/store';

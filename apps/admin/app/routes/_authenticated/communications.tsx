@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf feature:inquiry
+ * @uses none
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { redirectPreservingContext } from '@template/ui/lib';

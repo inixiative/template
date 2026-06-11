@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:shared
+ * @uses none
  */
 export type SearchInput = string | URLSearchParams | Record<string, unknown> | null | undefined;
 

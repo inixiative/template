@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type { Db } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';

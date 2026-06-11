@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 // Registry of operation ids (queryKey[0]._id) with a realtime producer. The FE pipes every query
 // through addLiveQuery, which early-returns unless its _id is in here — so this is the single on/off

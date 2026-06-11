@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:shared
+ * @uses none
  */
 export type AuthUser = {
   id: string;

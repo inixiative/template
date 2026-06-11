@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf primitive:ui
+ * @uses none
  */
 import { type EnumFilter, getQueryMetadataByOperation } from '@template/ui/lib/getQueryMetadata';
 

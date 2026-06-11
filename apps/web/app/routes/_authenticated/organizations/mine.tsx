@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf feature:tenancy
+ * @uses primitive:ui
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { OrganizationsPage } from '@template/ui/pages';

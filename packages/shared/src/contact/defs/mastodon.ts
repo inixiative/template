@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { type MastodonValue, parseMastodonUrl } from '@template/shared/contact/parsers/mastodon';

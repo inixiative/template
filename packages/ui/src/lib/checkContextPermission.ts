@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { findRoute } from '@template/ui/lib/findRoute';

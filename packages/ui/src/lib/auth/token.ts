@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 // TODO: Add refresh token support (AUTH-002)
 // - Store refresh token in localStorage

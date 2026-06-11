@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { useLocation } from '@tanstack/react-router';
 import { applyAuthorizedContext, hasContextChanged } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';

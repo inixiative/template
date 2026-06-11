@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 import { EMAIL_SUBTYPES } from '@template/shared/contact/constants/email';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';

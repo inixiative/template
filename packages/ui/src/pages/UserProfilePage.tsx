@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { meRead, meReadQueryKey } from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';

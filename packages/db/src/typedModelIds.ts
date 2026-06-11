@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf infrastructure:prisma
+ * @uses none
  */
 // Phantom type brand for model IDs
 export type Id<Model> = string & { readonly __model: Model };

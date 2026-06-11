@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import {
   meReceivedManyInquiries,

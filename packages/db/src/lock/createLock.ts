@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @partOf infrastructure:prisma, infrastructure:redis
+ * @uses none
  */
 // Single-node Redis lock. Footguns:
 //   - Not Redlock — do not rely across cluster nodes.

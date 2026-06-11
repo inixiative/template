@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses none
  */
 import { Icon } from '@iconify/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';

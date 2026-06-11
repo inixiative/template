@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { inquirySend } from '@template/sdk';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';

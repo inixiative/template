@@ -2,6 +2,7 @@
  * @atlas
  * @kind type, store
  * @partOf primitive:ui
+ * @uses none
  */
 export type Theme = 'light' | 'dark' | 'system';
 

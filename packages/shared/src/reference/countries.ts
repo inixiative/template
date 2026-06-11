@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 import { z } from 'zod';
 

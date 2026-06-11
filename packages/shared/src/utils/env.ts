@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:shared
+ * @uses none
  */
 export type Environment = 'local' | 'test' | 'pr' | 'staging' | 'prod';
 

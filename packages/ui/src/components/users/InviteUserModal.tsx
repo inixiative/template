@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses none
  */
 import { Button, Input, Label, Modal } from '@template/ui/components';
 import { memo, useState } from 'react';

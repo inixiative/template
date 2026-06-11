@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import type { Db } from '@template/db/clientTypes';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';

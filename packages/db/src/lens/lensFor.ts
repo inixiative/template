@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { createLens, type FieldMap, type Lens } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';

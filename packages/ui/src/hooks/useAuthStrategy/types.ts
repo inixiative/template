@@ -2,6 +2,7 @@
  * @atlas
  * @kind type, hook
  * @partOf primitive:ui
+ * @uses none
  */
 import type { AuthStrategy as StoreAuthStrategy } from '@template/ui/store/types/auth';
 

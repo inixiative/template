@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';

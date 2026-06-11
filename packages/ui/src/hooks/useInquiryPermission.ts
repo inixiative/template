@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import type { HydratedRecord } from '@template/db';
 import type { ActionRule } from '@template/permissions/rebac/types';

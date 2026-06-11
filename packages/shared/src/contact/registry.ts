@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf primitive:shared
+ * @uses infrastructure:prisma
  */
 import type { ContactType } from '@template/db/generated/client/enums';
 import {

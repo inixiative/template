@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 

@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils, hook
  * @partOf primitive:ui
+ * @uses none
  */
 import type { AuthStrategy } from '@template/ui/hooks/useAuthStrategy/types';
 

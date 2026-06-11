@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses none
  */
 import { Icon } from '@iconify/react';
 import { cn } from '@template/ui/lib/utils';

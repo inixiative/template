@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf infrastructure:prisma
+ * @uses infrastructure:redis
  */
 import type { Db } from '@template/db/clientTypes';
 import { fetchOne } from '@template/db/hydrate/fetchOne';

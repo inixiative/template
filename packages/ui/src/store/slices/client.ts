@@ -2,6 +2,7 @@
  * @atlas
  * @kind client, store
  * @partOf primitive:ui
+ * @uses primitive:shared
  */
 import { channelKey, LIVE_QUERIES } from '@template/shared/ws';
 import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';

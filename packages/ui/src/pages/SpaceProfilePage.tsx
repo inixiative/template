@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/sdk';
 import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';

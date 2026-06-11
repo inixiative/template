@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { AuditSubjectModel } from '@template/db/generated/client/enums';
 

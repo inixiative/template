@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:shared
+ * @uses none
  */
 export const resolveAll = async <T>(fns: (() => Promise<T>)[], concurrency?: number): Promise<T[]> => {
   if (!concurrency || concurrency >= fns.length) {

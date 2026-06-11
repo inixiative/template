@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import type { QueryKey } from '@tanstack/react-query';
 import type { InfiniteScrollProps } from '@template/ui/components/primitives/Table';

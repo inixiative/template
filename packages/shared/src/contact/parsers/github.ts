@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:shared
+ * @uses none
  */
 import type { GithubClassifier } from '@template/shared/contact/constants/github';
 import { parseSimpleHandleUrl } from '@template/shared/contact/parsers/url';

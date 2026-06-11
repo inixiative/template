@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf primitive:shared
+ * @uses none
  */
 export type BroadcastRegistry<A> = {
   register: (name: string, adapter: A) => void;

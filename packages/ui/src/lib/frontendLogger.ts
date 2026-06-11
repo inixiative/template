@@ -2,6 +2,7 @@
  * @atlas
  * @kind adapter
  * @partOf primitive:ui
+ * @uses none
  */
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 

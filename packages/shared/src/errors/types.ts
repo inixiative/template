@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf primitive:shared
+ * @uses none
  */
 export const HTTP_ERROR_MAP = {
   // 4xx Client Errors

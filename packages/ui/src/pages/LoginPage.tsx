@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses none
  */
 import { LoginForm } from '@template/ui/components/auth/LoginForm';
 import { navigateToSignup } from '@template/ui/lib/routeRedirect';

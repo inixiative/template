@@ -2,6 +2,7 @@
  * @atlas
  * @kind page
  * @partOf feature:webhooks
+ * @uses primitive:ui
  */
 import { createFileRoute } from '@tanstack/react-router';
 import { WebhooksPage } from '@template/ui/pages';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 // Bracket-query values are string-only on the wire, so a trailing `[:]` marker
 // segment distinguishes a SYMBOL value (null / true / false) from the literal

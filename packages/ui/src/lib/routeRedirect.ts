@@ -2,6 +2,7 @@
  * @atlas
  * @kind helper
  * @partOf primitive:ui
+ * @uses none
  */
 import { redirect } from '@tanstack/react-router';
 import { pickSearchParams } from '@template/ui/lib/searchParams';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { type ModelName, modelNames } from '@template/db/utils/modelNames';
 import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';

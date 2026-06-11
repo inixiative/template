@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { useAppStore } from '@template/ui/store';
 import { useEffect } from 'react';

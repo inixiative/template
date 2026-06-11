@@ -2,6 +2,7 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
+ * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';

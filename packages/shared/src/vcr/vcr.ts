@@ -2,6 +2,7 @@
  * @atlas
  * @kind service
  * @partOf primitive:shared
+ * @uses none
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';

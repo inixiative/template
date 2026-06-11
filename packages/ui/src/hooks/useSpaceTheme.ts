@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import type { SpaceTheme } from '@template/ui/types';
 import { useEffect, useRef } from 'react';

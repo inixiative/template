@@ -2,6 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui
+ * @uses none
  */
 import { buildFilterQuery, type FilterState } from '@template/ui/lib/buildFilterQuery';
 import type { DataConfig } from '@template/ui/lib/makeDataConfig';

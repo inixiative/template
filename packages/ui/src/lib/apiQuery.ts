@@ -2,6 +2,7 @@
  * @atlas
  * @kind factory
  * @partOf primitive:ui
+ * @uses none
  */
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';

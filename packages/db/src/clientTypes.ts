@@ -2,6 +2,7 @@
  * @atlas
  * @kind type
  * @partOf infrastructure:prisma
+ * @uses primitive:shared
  */
 import type { PrismaClient } from '@template/db/generated/client/client';
 import type { ModelName } from '@template/db/utils/modelNames';

@@ -2,6 +2,7 @@
  * @atlas
  * @kind constant
  * @partOf primitive:shared
+ * @uses none
  */
 export const RELATION_OPERATORS = ['some', 'every', 'none', 'is', 'isNot'] as const;
 

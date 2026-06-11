@@ -2,6 +2,7 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
+ * @uses none
  */
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 

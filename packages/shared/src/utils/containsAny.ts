@@ -2,6 +2,7 @@
  * @atlas
  * @kind utils
  * @partOf primitive:shared
+ * @uses none
  */
 import stringify from 'safe-stable-stringify';
 

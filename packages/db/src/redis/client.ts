@@ -2,6 +2,7 @@
  * @atlas
  * @kind client
  * @partOf infrastructure:prisma, infrastructure:redis
+ * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
