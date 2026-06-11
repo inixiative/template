@@ -35,9 +35,13 @@ it sits on. "Show me everything that touches caching" becomes one traversal.
 
 ## The tool: `atlas`
 
-DEV-003 ships as a **standalone, Biome-shaped tool** named **`atlas`** — the map of the codebase.
-The template is consumer #1. The name carries the whole thing: the package, the `@atlas` block tag,
-the `.atlas/` config folder, and the `atlas` CLI binary.
+DEV-003 ships as a **standalone, Biome-shaped tool** named **`atlas`**, in its own repo
+(`git@github.com:inixiative/atlas.git`) — the map of the codebase. The template is consumer #1. The
+name carries the whole thing: the package, the `@atlas` block tag, the `.atlas/` config folder, and
+the `atlas` CLI binary.
+
+The vocabulary + registry types (`kinds`, `concerns`, the seam registry shape, the `invert` export)
+live in the **atlas repo**, not here — a consuming repo only keeps its own `.atlas/` config.
 
 Two nouns, layered: **atlas** is the tool/map; **seams** are the nodes it charts (what `@partOf` /
 `@uses` point at — `feature:x`, `primitive:y`, `infrastructure:z`).
