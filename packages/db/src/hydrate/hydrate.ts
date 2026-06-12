@@ -3,7 +3,7 @@ import { fetchOne } from '@template/db/hydrate/fetchOne';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
-import { getAccessorRelations, type Identifier } from '@template/db/utils/runtimeDataModel';
+import { getAccessorRelations, type Identifier } from '@template/db/utils/prismaMapRelations';
 
 type PendingMap = Map<string, Promise<HydratedRecord | null>>;
 

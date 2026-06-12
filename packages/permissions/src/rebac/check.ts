@@ -10,7 +10,7 @@ const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: s
   if (!modelEntry) return null;
 
   const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[relationName];
-  if (!field || field.kind !== 'object') return null;
+  if (field?.kind !== 'object') return null;
   if (!field.type) return null;
 
   return lowerFirst(field.type) as AccessorName;

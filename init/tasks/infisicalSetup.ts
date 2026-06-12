@@ -234,7 +234,7 @@ export const setupInfisical = async (
           environment: step.environment,
           path: '/api',
         });
-        hasKeypair = Boolean(existing && existing.includes('PRIVATE KEY'));
+        hasKeypair = Boolean(existing?.includes('PRIVATE KEY'));
       } catch {
         // Missing secret expected on first run.
       }
