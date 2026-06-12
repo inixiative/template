@@ -13,6 +13,9 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
 
 const receivedWebhooks: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
 
+// Event time is stamped once at the hook and carried through the job; tests pass it explicitly.
+const eventTimestamp = new Date().toISOString();
+
 describe('sendWebhook handler', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
@@ -73,6 +76,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id, name: user.name },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -86,14 +90,13 @@ describe('sendWebhook handler', () => {
 
       expect(receivedWebhooks.length).toBe(1);
       expect(receivedWebhooks[0].url).toBe(testUrl);
+      // timestamp is carried through from the hook unchanged (passthrough, not re-stamped)
       expect(receivedWebhooks[0].body).toEqual({
         model: 'CustomerRef',
         action: 'create',
         payload: { id: user.id, name: user.name },
-        timestamp: expect.any(Number),
+        timestamp: eventTimestamp,
       });
-      const { timestamp } = receivedWebhooks[0].body as { timestamp: number };
-      expect(Math.abs(timestamp - Math.floor(Date.now() / 1000))).toBeLessThan(5);
 
       expect(receivedWebhooks[0].headers['x-webhook-signature']).toBeDefined();
     });
@@ -114,6 +117,7 @@ describe('sendWebhook handler', () => {
           action: 'update',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -152,6 +156,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -182,6 +187,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -210,6 +216,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -262,6 +269,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -302,6 +310,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -349,6 +358,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -388,6 +398,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 

@@ -1,6 +1,6 @@
 import { WebhookSubscriptionScalarInputSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 import { z } from 'zod';
-import { validateWebhookUrl } from '#/lib/webhooks/validateWebhookUrl';
+import { validateWebhookUrl } from '#/lib/webhooks/validators/validateWebhookUrl';
 
 export const webhookUrlSchema = z.string().superRefine((url, ctx) => {
   const error = validateWebhookUrl(url);
