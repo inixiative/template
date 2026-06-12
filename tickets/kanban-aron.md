@@ -13,6 +13,7 @@ kanban
     INFRA-002-rules-builder
     INFRA-011-railway-buckets
     INFRA-012-typed-prisma-results
+    DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
     FEAT-004-ai-providers
@@ -41,6 +42,9 @@ kanban
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (separate repo)
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - S3 adapter + MinIO local + bucket provisioning (blocks FEAT-009)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+
+**Developer Tooling:**
+- [DEV-004: prisma-map doc-comment tags](./DEV-004-prisma-map-doc-comment-tags.md) - `///` tag for self-relation parent direction → factory traversal + hydration tree auto-fill (feature lives in `@inixiative/prisma-map`)
 
 **Features:**
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
@@ -72,8 +76,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 15
-- **Todo**: 12
+- **Total Tickets**: 16
+- **Todo**: 13
 - **In Progress**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 2
@@ -97,4 +101,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-06-11_
+_Last Updated: 2026-06-12_
