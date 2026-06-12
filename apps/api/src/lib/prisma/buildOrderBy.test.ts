@@ -20,14 +20,17 @@ describe('buildOrderBy', () => {
   });
 
   it('keeps distinct fields of the same relation (dedupe by full path, not top-level key)', () => {
-    expect(
-      buildOrderBy({ clientOrderBy: ['user.name:asc', 'user.email:desc'] }),
-    ).toEqual([{ user: { name: 'asc' } }, { user: { email: 'desc' } }, { id: 'desc' }]);
+    expect(buildOrderBy({ clientOrderBy: ['user.name:asc', 'user.email:desc'] })).toEqual([
+      { user: { name: 'asc' } },
+      { user: { email: 'desc' } },
+      { id: 'desc' },
+    ]);
   });
 
   it('builds nested orderBy for deep relation dot-paths', () => {
-    expect(
-      buildOrderBy({ clientOrderBy: ['user.organization.name:asc'] }),
-    ).toEqual([{ user: { organization: { name: 'asc' } } }, { id: 'desc' }]);
+    expect(buildOrderBy({ clientOrderBy: ['user.organization.name:asc'] })).toEqual([
+      { user: { organization: { name: 'asc' } } },
+      { id: 'desc' },
+    ]);
   });
 });

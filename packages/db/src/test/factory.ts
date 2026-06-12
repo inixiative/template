@@ -1,4 +1,5 @@
 import { db } from '@template/db/client';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
@@ -12,7 +13,6 @@ import type {
   ModelOf,
   Serialized,
 } from '@template/db/test/factoryTypes';
-import { prismaMap } from '@template/db/generated/prismaMap';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
 import { uuidv7 } from 'uuidv7';

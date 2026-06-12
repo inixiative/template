@@ -38,11 +38,13 @@ const emit = (level: LogLevel, args: unknown[]) => {
 // pino consumers (e.g. Baileys) call logger.child(bindings); map bindings to an
 // ALS scope tag so child logs flow through our pipeline as [tag]. Recurses —
 // a child of a child accumulates scopes (parent:child).
-const childLabel = (b?: Record<string, unknown>): string =>
-  String(b?.class ?? Object.values(b ?? {})[0] ?? 'child');
+const childLabel = (b?: Record<string, unknown>): string => String(b?.class ?? Object.values(b ?? {})[0] ?? 'child');
 
 const childLogger = (scope: string): LoggerAdapter => {
-  const scoped = (lvl: LogLevel) => (...args: unknown[]) => logScope(scope, () => emit(lvl, args));
+  const scoped =
+    (lvl: LogLevel) =>
+    (...args: unknown[]) =>
+      logScope(scope, () => emit(lvl, args));
   return {
     level: process.env.LOG_LEVEL ?? 'info',
     info: scoped('info'),
