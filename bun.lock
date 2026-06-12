@@ -5,7 +5,7 @@
     "": {
       "name": "template",
       "dependencies": {
-        "@inixiative/json-rules": "^2.5.0",
+        "@inixiative/json-rules": "^2.6.0",
         "ink": "^6.8.0",
         "ink-select-input": "^6.2.0",
         "ink-spinner": "^5.0.0",
@@ -77,7 +77,7 @@
         "@bull-board/api": "^6.20.3",
         "@bull-board/hono": "^6.20.3",
         "@hono/zod-openapi": "^1.2.2",
-        "@inixiative/json-rules": "^2.5.0",
+        "@inixiative/json-rules": "^2.6.0",
         "@opentelemetry/auto-instrumentations-node": "^0.71.0",
         "@opentelemetry/exporter-metrics-otlp-http": "^0.215.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.215.0",
@@ -177,7 +177,7 @@
       "name": "@template/db",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.5.0",
+        "@inixiative/json-rules": "^2.6.0",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "@supercharge/promise-pool": "^3.3.0",
@@ -191,7 +191,7 @@
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
-        "@inixiative/prisma-map": "^0.0.4",
+        "@inixiative/prisma-map": "^0.1.0",
         "@types/bcryptjs": "^3.0.0",
         "@types/ioredis-mock": "^8.2.7",
         "@types/lodash-es": "^4.17.12",
@@ -205,7 +205,7 @@
       "name": "@template/email",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.5.0",
+        "@inixiative/json-rules": "^2.6.0",
         "@template/db": "workspace:*",
         "@template/shared": "workspace:*",
         "lodash-es": "^4.18.1",
@@ -249,7 +249,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@hey-api/client-fetch": "^0.13.1",
-        "@inixiative/json-rules": "^2.5.0",
+        "@inixiative/json-rules": "^2.6.0",
         "clsx": "^2.1.1",
         "consola": "^3.4.2",
         "lodash-es": "^4.18.1",
@@ -622,9 +622,9 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.33.5", "", { "os": "win32", "cpu": "x64" }, "sha512-MpY/o8/8kj+EcnxwvrP4aTJSWw/aZ7JIGR4aBeZkZw5B7/Jn+tY9/VNwtcoGmdT7GfggGIU4kygOMSbYnOrAbg=="],
 
-    "@inixiative/json-rules": ["@inixiative/json-rules@2.5.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-fmHPhIsreGjJqu6KPGf/g2DtM1a0mx9SNOVfpCAtjSNrdtFi5reek3lWSFRKKsY8CSXIdJ9IXSsdq/UGUx+5Zg=="],
+    "@inixiative/json-rules": ["@inixiative/json-rules@2.6.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-babxwDMNbtsyMOxQhEsLpkRB2dSGyskrOcl5k128raJhb2KaGKTsu/J4R1SJu9onfdT8yn7wo1m4XWTQuK+G/Q=="],
 
-    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.0.4", "", {}, "sha512-Wdvr/ST3sCX+ZTfZwFNLiq1o3gW/sLcetOFngaKhblF+1kABkm14TQeNv9qqBJqdXbRVB//uRcKiDuQoaOIDSg=="],
+    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.1.0", "", {}, "sha512-wb/Pc5q6SQvb3LrKR2Hz/SuYFnd9biyojnpd962bndq/Zjf1kUH8PdKxjQ0b532fm9Fw8SiDwRmsg/rY3KLjuw=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 

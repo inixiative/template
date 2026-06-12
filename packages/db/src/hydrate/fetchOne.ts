@@ -3,7 +3,7 @@ import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import type { AccessorName } from '@template/db/utils/modelNames';
-import type { Identifier } from '@template/db/utils/runtimeDataModel';
+import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 const DEFAULT_TTL = 60 * 60; // 1 hour
 

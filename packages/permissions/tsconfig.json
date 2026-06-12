@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "typeRoots": ["../../node_modules/@types", "../../node_modules"],
-    "types": ["bun-types"],
+    "types": ["bun"],
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
