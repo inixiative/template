@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { getAccessorRelations, getModelRelations } from '@template/db/utils/runtimeDataModel';
+import { getAccessorRelations, getModelRelations } from '@template/db/utils/prismaMapRelations';
 
 describe('getModelRelations', () => {
   it('returns relations for a model', () => {

@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { type AccessorName, isModelName, toAccessor } from '../src/utils/modelNames';
-import { getModelRelations } from '../src/utils/runtimeDataModel';
+import { getModelRelations } from '../src/utils/prismaMapRelations';
 
 const outFile = join(import.meta.dir, '../../permissions/src/rebac/relationTargetsGen.ts');
 

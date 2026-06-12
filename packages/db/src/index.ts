@@ -80,7 +80,7 @@ export {
   toModelName,
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
-export { getModelRelations } from './utils/runtimeDataModel';
+export { getModelRelations } from './utils/prismaMapRelations';
 
 // Hook shared utilities (ignore fields, redact fields)
 
