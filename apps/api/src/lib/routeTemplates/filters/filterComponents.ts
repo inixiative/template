@@ -29,14 +29,19 @@ const operatorObject = (operators: readonly string[], value: z.ZodTypeAny): z.Zo
     )
     .strict();
 
+// JSON operator values: the backend buildJsonWhere accepts non-string scalars
+// (null→provider json-null, booleans, numbers) in addition to strings, so the
+// schema must not reject those. NULLABLE_OPS (equals/not) carry the null is-null
+// symbol; string-prefix ops (string_contains/…) are string-only by nature, but
+// the shared value union keeps the schema permissive in line with the server.
+const JSON_VALUE = z.union([z.string(), z.boolean(), z.number(), z.null()]);
+
 // Open-ended JSON filter — its own shared $ref. `path` is string|string[] to cover
 // both providers (MySQL string, Postgres array); server translates per provider.
 export const jsonFilterSchema = z
   .object({
     path: z.union([z.string(), z.array(z.string())]).optional(),
-    ...Object.fromEntries(
-      JSON_FIELD_OPERATORS.map((op) => [op, (NULLABLE_OPS.has(op) ? z.string().nullable() : z.string()).optional()]),
-    ),
+    ...Object.fromEntries(JSON_FIELD_OPERATORS.map((op) => [op, JSON_VALUE.optional()])),
   })
   .strict()
   .openapi('JsonFilter');

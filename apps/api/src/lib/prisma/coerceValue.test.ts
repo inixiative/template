@@ -103,6 +103,26 @@ describe('coerceValueForField', () => {
     });
   });
 
+  describe('null + boolean symbols', () => {
+    it('null passes through untouched for any field (is-null sentinel)', () => {
+      expect(coerceValueForField(scalar('Int'), null)).toBe(null);
+      expect(coerceValueForField(scalar('DateTime'), null)).toBe(null);
+      expect(coerceValueForField(scalar('String'), null)).toBe(null);
+    });
+
+    it('a boolean is accepted only for a Boolean field', () => {
+      expect(coerceValueForField(scalar('Boolean'), true)).toBe(true);
+      expect(coerceValueForField(scalar('Boolean'), false)).toBe(false);
+    });
+
+    it('a boolean on a non-Boolean field is rejected (no invalid Prisma filter)', () => {
+      expect(() => coerceValueForField(scalar('DateTime'), true)).toThrow(/Cannot coerce/);
+      expect(() => coerceValueForField(scalar('Int'), true)).toThrow(/Cannot coerce/);
+      expect(() => coerceValueForField(scalar('String'), false)).toThrow(/Cannot coerce/);
+      expect(() => coerceValueForField(enumField, true)).toThrow(/Cannot coerce/);
+    });
+  });
+
   describe('relations and unknown types', () => {
     it('passes through values for object-kind fields (relations are handled separately)', () => {
       const objField: FieldDef = { kind: 'object', type: 'User' };
