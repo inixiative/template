@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
 import type { JobHandler } from '#/jobs/types';
-import { resolveWebhookUrlBlockReason } from '#/lib/webhooks/validators/resolveWebhookUrlBlockReason';
 
 export type SendWebhookPayload = {
   subscriptionId: string;
@@ -35,27 +34,21 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   let status: WebhookEventStatus = 'success';
   let error: string | undefined;
 
-  const blockReason = await resolveWebhookUrlBlockReason(subscription.url);
-  if (blockReason) {
-    status = 'error';
-    error = `Webhook URL ${blockReason}`;
-  } else {
-    try {
-      const response = await fetch(subscription.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
-        body: bodyJson,
-        signal: AbortSignal.timeout(5000),
-      });
+  try {
+    const response = await fetch(subscription.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
+      body: bodyJson,
+      signal: AbortSignal.timeout(5000),
+    });
 
-      if (!response.ok) {
-        error = `HTTP ${response.status}: ${response.statusText}`;
-        status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      status = 'unreachable';
+    if (!response.ok) {
+      error = `HTTP ${response.status}: ${response.statusText}`;
+      status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
     }
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+    status = 'unreachable';
   }
 
   await db.webhookEvent.create({

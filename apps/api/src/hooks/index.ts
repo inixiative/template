@@ -8,6 +8,7 @@ import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
+import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 
 export const registerHooks = () => {
   registerAuditLogHook();
@@ -20,4 +21,5 @@ export const registerHooks = () => {
   registerRulesHook();
   registerTagOwnerCategoryHook();
   registerWebhookHook();
+  registerWebhookSubscriptionUrlHook();
 };

@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { validateWebhookUrl } from '#/lib/webhooks/validators/validateWebhookUrl';
 
 export const webhookUrlSchema = z.string().superRefine((url, ctx) => {
-  const error = validateWebhookUrl(url);
-  if (error) ctx.addIssue({ code: 'custom', message: `Webhook URL ${error}` });
+  try {
+    validateWebhookUrl(url);
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : 'Invalid webhook URL' });
+  }
 });
 
 export const webhookSubscriptionCreateBodySchema = WebhookSubscriptionScalarInputSchema.pick({

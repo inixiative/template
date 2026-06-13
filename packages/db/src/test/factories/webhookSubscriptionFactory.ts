@@ -5,7 +5,8 @@ import { createFactory } from '@template/db/test/factory';
 const webhookSubscriptionFactory = createFactory('WebhookSubscription', {
   defaults: () => ({
     model: WebhookModel.CustomerRef,
-    url: faker.internet.url(),
+    // public https URL — passes the SSRF policy (the url hook validates on every create)
+    url: `https://${faker.internet.domainName()}/${faker.string.alphanumeric(8)}`,
     ownerModel: WebhookOwnerModel.User,
     isActive: true,
   }),
