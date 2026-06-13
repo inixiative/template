@@ -4,12 +4,12 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { ModelPermission } from '@inixiative/permissions';
+import type { RebacSchema as EngineRebacSchema } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 
-// The permission algebra (ActionRule + its parts) is imported from @inixiative/permissions, not
-// recapitulated here. RebacSchema is the one app-specific narrowing: keyed by this repo's model
-// AccessorNames instead of the engine's generic string key.
+// The permission algebra (ActionRule + its parts) and the schema shape are imported from
+// @inixiative/permissions, not recapitulated. RebacSchema is the engine's generic schema
+// instantiated with this repo's model AccessorNames — so authoring one enforces real model names.
 export type {
   ActionRule,
   ModelPermission,
@@ -18,4 +18,4 @@ export type {
   SelfCheck,
 } from '@inixiative/permissions';
 
-export type RebacSchema = Partial<Record<AccessorName, ModelPermission>>;
+export type RebacSchema = EngineRebacSchema<AccessorName>;
