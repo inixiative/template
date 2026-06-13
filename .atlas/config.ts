@@ -63,6 +63,7 @@ export default defineConfig({
     // wire concepts whose code lives outside a module/package folder:
     { include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'], partOf: 'primitive:routeTemplates' },
     { include: ['apps/api/src/lib/auth.ts', 'apps/api/src/middleware/auth/**'], partOf: 'feature:auth' },
+    { include: ['apps/api/src/lib/webhooks/**', 'apps/api/src/hooks/webhookSubscriptionUrl/**'], partOf: 'feature:webhooks' },
     { include: ['packages/db/src/redis/**', 'packages/db/src/lock/**'], partOf: 'infrastructure:redis' },
     // api lib/middleware primitives + infrastructure + external integrations
     { include: ['apps/api/src/lib/context/**', 'apps/api/src/middleware/resources/**'], partOf: 'primitive:requestContext' },
