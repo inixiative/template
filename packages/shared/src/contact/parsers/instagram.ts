@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { parseSimpleHandleUrl } from '@template/shared/contact/parsers/url';
 
 export type InstagramValue = { handle: string };

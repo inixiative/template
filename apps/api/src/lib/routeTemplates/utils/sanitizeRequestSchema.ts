@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ * @uses none
+ */
 import { z } from '@hono/zod-openapi';
 import { omit } from 'lodash-es';
 import type { ZodSchema } from '#/lib/routeTemplates/types';

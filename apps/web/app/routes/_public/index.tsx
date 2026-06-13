@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind page
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { HomePage } from '@template/ui/pages';
 

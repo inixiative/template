@@ -79,9 +79,8 @@ export {
   toAccessor,
   toModelName,
 } from './utils/modelNames';
-export type { RuntimeDataModel, RuntimeField, RuntimeModel } from './utils/runtimeDataModel';
-// Runtime schema introspection (Prisma 7)
-export { getModelRelations, getRuntimeDataModel } from './utils/runtimeDataModel';
+// Relation introspection, derived from the generated prismaMap (single source of truth)
+export { getModelRelations } from './utils/prismaMapRelations';
 
 // Hook shared utilities (ignore fields, redact fields)
 

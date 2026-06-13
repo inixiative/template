@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:contact
+ * @uses primitive:routeTemplates
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { contactDeleteRoute } from '#/modules/contact/routes/contactDelete';

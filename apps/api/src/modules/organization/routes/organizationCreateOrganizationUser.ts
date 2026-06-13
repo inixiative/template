@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { OrganizationUserScalarSchema, UserScalarSchema } from '@template/db';
 import { createRoute } from '#/lib/routeTemplates';

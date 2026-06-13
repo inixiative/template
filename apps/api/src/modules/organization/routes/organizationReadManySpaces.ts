@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
+ */
 import { SpaceScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { OrganizationProfilePage } from '@template/ui/pages/OrganizationProfilePage';
 import { SpaceProfilePage } from '@template/ui/pages/SpaceProfilePage';
 import { UserProfilePage } from '@template/ui/pages/UserProfilePage';

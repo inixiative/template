@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf feature:tenancy
+ * @uses none
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { redirectPreservingContext } from '@template/ui/lib';
 

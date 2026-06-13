@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type { SpaceUser } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 

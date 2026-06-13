@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:users
+ * @uses infrastructure:prisma, primitive:shared, feature:contact
+ */
 import type { Prisma } from '@template/db';
 import type { ContactType } from '@template/db/generated/client/enums';
 import { contactId as toContactId } from '@template/db/typedModelIds';

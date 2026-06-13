@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:messaging
+ * @uses infrastructure:prisma
+ */
 import type { Contact, CustomerRef } from '@template/db/generated/client/client';
 import type { CommunicationKind } from '@template/db/generated/client/enums';
 

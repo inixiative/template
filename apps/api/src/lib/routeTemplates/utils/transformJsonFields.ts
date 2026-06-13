@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ * @uses none
+ */
 import { z } from '@hono/zod-openapi';
 import { mapValues } from 'lodash-es';
 

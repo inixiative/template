@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 export const stubEmailDomain = (type: string): string => {
   const project = process.env.PROJECT_NAME ?? 'app';
   return `${type}.${project}`;

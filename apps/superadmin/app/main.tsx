@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf superadmin
+ * @uses primitive:ui
+ */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';

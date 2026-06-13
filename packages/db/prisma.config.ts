@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind config
+ * @partOf infrastructure:prisma
+ */
 import path from 'node:path';
 import { defineConfig } from 'prisma/config';
 

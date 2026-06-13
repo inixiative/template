@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
 
 export const UserWebhooksTab = () => {

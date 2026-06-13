@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components/primitives/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';

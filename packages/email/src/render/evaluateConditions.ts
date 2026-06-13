@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:email
+ * @uses primitive:shared
+ */
 import { type Condition, check } from '@inixiative/json-rules';
 import type { Variables } from '@template/email/render/interpolate';
 import { isLocal, isTest } from '@template/shared/utils';

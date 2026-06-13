@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { Button } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';

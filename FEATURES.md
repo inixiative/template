@@ -56,7 +56,7 @@
 
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
-**Last Updated:** 2026-05-09
+**Last Updated:** 2026-06-09
 
 ## How to Read This
 
@@ -77,7 +77,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Multi-Environment Setup** - Three environments: `pr` (ephemeral per PR), `staging`, `prod`. Each has isolated Infisical project, database, and Redis. PR environments auto-cleaned on merge
 - ✅ **Environment Composition** - `with-env.sh` injects secrets at runtime: `bun run with prod api turbo watch local#api` runs local code against production secrets. No committed `.env` files
 - ✅ **Docker Compose** - PostgreSQL 18 (alpine) and Redis 7 (alpine) for local dev. Persistent volumes, health checks, auto-restart. Bun servers run natively via Turborepo, not containerized
-- ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. No `any`, enforced null checks, proper error handling. Catches entire classes of bugs at compile time
+- ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. `any` avoided in application code (rare casts only at framework/type boundaries), enforced null checks, proper error handling. Catches entire classes of bugs at compile time
 - 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Core flow complete; PlanetScale, Infisical, Railway integrations working. Additional provider integrations in progress
 
 ---
@@ -127,7 +127,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **OAuth Flow → Bearer Token** - OAuth callback (`/auth/callback`) extracts the returned JWT from the URL param and stores it in **localStorage** via `setToken()`. All subsequent API requests send it as `Authorization: Bearer <token>`. No cookie involved for OAuth users
 - ✅ **Stateless JWT** - No server-side session storage. Both email/password (cookie) and OAuth (localStorage Bearer) use the same JWT format. `cookieCache.maxAge: 300` means BetterAuth skips DB validation for up to 5 minutes per JWT
 - ✅ **Redis Secondary Storage** - Frequently-accessed data (permission caches, org lists) cached in Redis. Not the primary auth store — JWTs are self-contained
-- ✅ **OAuth Social Providers** - Google, Microsoft, GitHub via BetterAuth social plugin. Callback handling, account linking, and token issuance built-in
+- ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
 - ✅ **BetterAuth Models** - Session (persisted for revocation), Verification (email verification tokens), Account (OAuth provider linkage) models in Prisma
 
 ### Multi-Provider Auth (AuthProvider)
@@ -160,7 +160,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Authorization & Permissions
 
-**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permify with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
+**Full RBAC/ABAC/ReBAC Authorization** - Comprehensive permission system supporting Role-Based (RBAC), Attribute-Based (ABAC), and Relationship-Based (ReBAC) access control powered by Permix with JSON-Rules support. This unified system lets you define permissions using simple roles, complex attribute-based rules, or relationship graphs - all within the same framework. JSON-Rules integration enables dynamic permission logic without code deployment.
 
 - ✅ **Multi-Level RBAC** - Roles at platform (superadmin, user), organization (owner, admin, member), and space (owner, admin, member) levels with clear hierarchies
 
@@ -235,7 +235,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Split Schema Architecture** - One Prisma file per model in `packages/db/prisma/schema/` for better organization and merge conflict reduction. Schema files dynamically combined during generation. Makes large schemas manageable
 
-- ✅ **Test Factory System** - `create*()` functions generate realistic test data with Faker integration. Auto-infers relationships (creating user automatically creates account if needed). Override only what matters for your test. 100% model coverage with factories. [Learn more: TESTING.md](docs/claude/TESTING.md)
+- ✅ **Test Factory System** - `create*()` functions generate realistic test data with Faker integration. Auto-infers relationships (creating user automatically creates account if needed). Override only what matters for your test. Factories for 20/23 models (auth/log models — Account, Verification, AppEvent — excluded by design). [Learn more: TESTING.md](docs/claude/TESTING.md)
 
 - ✅ **Database Utilities** - dump, restore, and clone operations for database management. Clone auto-truncates webhook subscriptions to prevent duplicate deliveries in copied environments
 
@@ -245,7 +245,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
 
-- ✅ **19 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact
+- ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -305,13 +305,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Webhooks
 
-**Event-Driven Integration System** - Notify external systems when data changes. Organizations/spaces subscribe to events, receive HMAC-signed payloads. Automatic retries, delivery tracking, and async processing via job queue.
+**Event-Driven Integration System** - Notify external systems when data changes. Organizations/spaces subscribe to events, receive RSA-SHA256-signed payloads. Automatic retries, delivery tracking, and async processing via job queue.
 
-- ✅ **Webhook Subscriptions** - Organizations and spaces can subscribe to events (user.created, organization.updated, etc.). Each subscription has URL, events list, secret for HMAC signing, and active/inactive status. False polymorphism pattern allows User/Organization/Space ownership
+- ✅ **Webhook Subscriptions** - Organizations and spaces can subscribe to events (user.created, organization.updated, etc.). Each subscription has URL, events list, and active/inactive status. Payloads are signed with a server-held RSA private key (asymmetric); receivers verify with the published public key. False polymorphism pattern allows User/Organization/Space ownership
 
 - ✅ **Event-Based Triggers** - Database hooks automatically fire webhook deliveries after successful mutations. Hook system ensures webhooks only sent after transaction commits. Events follow pattern: `{resource}.{action}` (user.created, token.deleted)
 
-- ✅ **HMAC Signature Verification** - Each webhook includes `x-webhook-signature` header with HMAC-SHA256 signature. Receiving systems verify payload authenticity using shared secret. Prevents webhook spoofing and tampering
+- ✅ **RSA Signature Verification** - Each webhook includes `x-webhook-signature` header with an RSA-SHA256 signature (base64). Signed with a server-held private key; receivers verify with the public key exposed at `/webhookSubscription/info`. Asymmetric — no shared secret to leak. Signed body includes a unix `timestamp` so receivers can reject replays. Prevents webhook spoofing and tampering
 
 - ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs (separate webhook queue). Never blocks request processing. Failed deliveries retry automatically (3 attempts, exponential backoff). Webhook jobs run outside transaction to avoid timeouts
 
@@ -339,7 +339,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Keepalive & Heartbeat** - Client sends ping messages, server responds with pong and updates last ping timestamp. Connections without ping for 5+ minutes automatically closed and cleaned up. Prevents resource leaks from abandoned connections
 
-- ✅ **Event Broadcasting Pattern** - Infrastructure ready for app events to broadcast over WebSocket. Planned pattern: register app event handler that publishes to relevant channels based on event resource type/ID. Not yet wired up but all plumbing exists
+- ✅ **Event Broadcasting Pattern** - App events broadcast over WebSocket via the `websocket` bridge in `makeAppEvent` — a handler's `websocket(data)` selector returns refresh triggers (`{category:'query', action:'refetch', key}`) that publish to channels via `sendToChannel`. Live (e.g. `inquiryResolved`) and consumed by the frontend's `addLiveQuery` → TanStack Query invalidation. (Channel subscription is not yet permission-gated — see INFRA-004 security gap)
 
 - ✅ **App Events System** - `emitAppEvent('event.name', data)` for business events; actor context auto-enriches from `auditActorContext` (AsyncLocalStorage). Handlers defined via `makeAppEvent` fan out across bridges in parallel (`Promise.allSettled`): **observe** (BullMQ job → AppEvent audit table), **email** (typed handoffs → sendEmail jobs with declarative targeting), **websocket** (Redis pub/sub channel broadcasts), and **direct callbacks**. Centralized handler map at `apps/api/src/appEvents/handlers/index.ts` mirrors the BullMQ job-handler pattern. Events inside `db.txn()` defer to `onCommit`; events outside fire immediately
 
@@ -351,7 +351,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Email System
 
-**Database-Driven Email Templates with Multi-Tenancy** - MJML-based email system with reusable components, variable substitution, and polymorphic ownership. Organizations can customize templates with their branding. Schema and infrastructure ready, awaiting provider configuration and template authoring.
+**Database-Driven Email Templates with Multi-Tenancy** - MJML-based email system with reusable components, variable substitution, and polymorphic ownership. Organizations can customize templates with their branding. Send pipeline is operational end to end (Resend adapter + BullMQ job); remaining work is standard-template authoring, delivery tracking, preferences, and an admin authoring UI (see ticket COMM-001).
 
 - ✅ **EmailTemplate Schema** - Database model for email templates using MJML (responsive email markup). Templates have slug (otp, welcome), locale (en, es), subject with variables (`{{code}}`), and full MJML body with `{{component:slug}}` references and `{{variable.*}}` placeholders. Category (system/promotional) controls unsubscribe requirements
 
@@ -365,11 +365,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Email Clients** - Resend client (production) and Console client (dev/test) implemented in `packages/email`. Clients provide unified interface for sending with from/to/subject/html. No Postmark or SendGrid clients
 
-- ✅ **Template Rendering Pipeline** - Complete MJML rendering system in `packages/email/src/render/`: `compose()` fetches templates and recursively expands `{{component:slug}}` refs, `interpolate()` substitutes `{{variable.*}}` placeholders, `expand()` handles nested components, `lookupCascade()` resolves templates with owner fallbacks (Space → Org → default). MJML validation included. Ready to use, just needs API endpoint wiring
+- ✅ **Template Rendering Pipeline** - Complete MJML rendering system in `packages/email/src/render/`: `compose()` fetches templates and recursively expands `{{component:slug}}` refs, `interpolate()` substitutes `{{variable.*}}` placeholders, `expand()` handles nested components, `lookupCascade()` resolves templates with owner fallbacks (Space → Org → default). MJML validation included. Actively used by the `sendEmail` job (compose → interpolate → mjml2html → send); the remaining gap is an admin authoring endpoint/UI, not the render path
 
 - 🟡 **Common Flow Templates** - No templates created yet for standard flows (welcome email, password reset, email verification, invitation). Each needs MJML authoring and variable schema definition
 
-- 🟡 **Job Queue Integration** - Email sending should enqueue as background jobs to avoid blocking requests and enable retries. Pattern exists (see webhooks) but not wired for emails
+- ✅ **Job Queue Integration** - Email sending enqueues as BullMQ background jobs via the app-event email bridge → `sendEmail` handler (`apps/api/src/jobs/handlers/sendEmail.ts`). Non-blocking, retried; nothing synchronous hits the provider in the request path
 
 - 🟣 **Email System Completion** (ticket COMM-001, depends on INFRA-002) - Wire up template rendering, configure providers, author standard templates, integrate with job queue, add admin UI for template management
 
@@ -406,7 +406,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - 🟣 **Rate Limiting** - Redis infrastructure in place for sliding window rate limits. Implementation pending (ticket INFRA-002 dependency)
-- 🟡 **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 12 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job, admin API, and UI pending (ticket FEAT-005)
+- ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
 
 ---
 
@@ -579,11 +579,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Testing & Quality
 
-- ✅ **93 Test Files with Bun Test Runner** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
+- ✅ **~172 Test Files with Bun Test Runner** - Unit and integration tests, backend focused. Fast execution with watch mode for TDD workflow. Frontend app tests minimal (web/admin/superadmin apps have near-zero coverage)
 
-- ✅ **Test Factories with Faker** - `create*()` and `build*()` functions generate realistic test data. `create*()` persists to DB, `build*()` is in-memory only. Auto-infers relationships (creating user auto-creates account). Override only what matters for your test. Entities expose `__serialize()` for API/UI-shaped assertions (converts `Date` fields to ISO strings). 100% model coverage. Tests run against a dedicated test database
+- ✅ **Test Factories with Faker** - `create*()` and `build*()` functions generate realistic test data. `create*()` persists to DB, `build*()` is in-memory only. Auto-infers relationships (creating user auto-creates account). Override only what matters for your test. Entities expose `__serialize()` for API/UI-shaped assertions (converts `Date` fields to ISO strings). Factories for 20/23 models (auth/log models excluded by design). Tests run against a dedicated test database
 
-- ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and HMAC signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
+- ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and RSA-SHA256 signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
 
 - ✅ **Automatic Test Cleanup** - Database hooks track which tables were touched during tests. `cleanupTouchedTables()` utility truncates only modified tables after test suite completes. Temporarily disables FK constraints, uses TRUNCATE CASCADE for efficiency. Prevents test data buildup without manual cleanup
 
@@ -591,7 +591,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Type Safety & Code Generation
 
-- ✅ **TypeScript Strict Mode** - Strictest compiler settings across all packages. No `any`, null checks enforced, proper error handling required. Catches bugs at compile time, not runtime
+- ✅ **TypeScript Strict Mode** - Strictest compiler settings across all packages. `any` avoided in application code (rare casts only at framework/type boundaries), null checks enforced, proper error handling required. Catches bugs at compile time, not runtime
 
 - ✅ **OpenAPI SDK Auto-Generation** - Type-safe client SDK generated from route definitions. Every endpoint becomes typed function with request/response inference. Changes to API automatically flow to frontend types. Run `generate:sdk` after route changes
 
@@ -739,9 +739,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
   - Backend: ~25,000 lines
   - Frontend: ~15,000 lines
   - Shared Packages: ~20,000 lines
-- **Tests:** 93 test files across packages and API (backend focused, frontend tests minimal)
-- **API Endpoints:** 70+ documented REST endpoints with OpenAPI specs
-- **Database Models:** 19 Prisma models with full relations and hooks (auditLog, customerRef, contact included)
+- **Tests:** ~172 test files across packages and API (backend focused, frontend tests minimal)
+- **API Endpoints:** 90 route files (one endpoint each) with OpenAPI specs
+- **Database Models:** 23 Prisma models with full relations and hooks
 - **Frontend Hooks:** 20+ custom hooks for common patterns
 - **UI Components:** 50+ Shadcn UI components with variants
 
@@ -785,11 +785,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## 🎯 Unique Selling Points
 
 - ⭐ **Multi-Provider Auth** - Configure OAuth/SAML per organization with encrypted secrets
-- ⭐ **ReBAC Permissions** - Advanced relationship-based access control with Permify
+- ⭐ **ReBAC Permissions** - Advanced relationship-based access control with Permix
 - ⭐ **Batch API** - Execute multiple operations atomically with result interpolation
 - ⭐ **Route Templates** - Consistent API patterns with automatic OpenAPI docs
 - ⭐ **Navigation Config** - Declarative, context-aware, permission-based menus
-- ⭐ **Backend Testing** - 93 test files with factories, backend API fully covered
+- ⭐ **Backend Testing** - ~172 test files with factories, backend API fully covered
 - ⭐ **Production Ready Backend** - Full job queue, webhooks, caching, OpenTelemetry. Frontend under active development
 - ⭐ **Field-Level Encryption** - AES-256-GCM with registry pattern, auto-rotation, CI validation
 - ⭐ **Developer Experience** - Hot reload, monorepo tooling, type-safe everything

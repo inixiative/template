@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:observability, primitive:adapter
+ * @uses primitive:appEvents, primitive:jobs
+ */
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 import type { AppEventPayload, ObserveAdapter, ObserveData } from '#/appEvents/types';
 import { enqueueJob } from '#/jobs/enqueue';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:webhooks
+ * @uses primitive:routeTemplates, primitive:authz
+ */
 import { WebhookEventScalarSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';

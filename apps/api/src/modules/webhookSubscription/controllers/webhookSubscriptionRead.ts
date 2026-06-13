@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:webhooks
+ * @uses primitive:routeTemplates
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionReadRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionRead';

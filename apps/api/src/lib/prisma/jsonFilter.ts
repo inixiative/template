@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses primitive:shared
+ */
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
 import { dialect } from '#/lib/prisma/dialect';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ * @uses infrastructure:prisma
+ */
 import { check as checkRule } from '@inixiative/json-rules';
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
@@ -10,7 +16,7 @@ const getRelationTargetAccessor = (sourceAccessor: AccessorName, relationName: s
   if (!modelEntry) return null;
 
   const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[relationName];
-  if (!field || field.kind !== 'object') return null;
+  if (field?.kind !== 'object') return null;
   if (!field.type) return null;
 
   return lowerFirst(field.type) as AccessorName;

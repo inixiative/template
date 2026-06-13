@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma, infrastructure:redis
+ * @uses none
+ */
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';

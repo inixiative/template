@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:ui
+ * @uses primitive:shared
+ */
 import type { ArrayFieldOperator, ScalarFieldOperator } from '@template/shared/bracketQuery';
 import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';

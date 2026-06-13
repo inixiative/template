@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type { LensNarrowing, NarrowingDefaults } from '@inixiative/json-rules';
 import { HOOK_REDACT_FIELDS } from '@template/db/registries/redactFields';
 

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf feature:email
+ * @uses none
+ */
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 
 export type SaveContext = {

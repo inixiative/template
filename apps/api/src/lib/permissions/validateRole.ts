@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf primitive:authz
+ * @uses infrastructure:prisma, primitive:errors
+ */
 import { Role } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 

@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ */
 import { ResponsiveDrawer } from '@template/ui/components/layout/ResponsiveDrawer';
 import { Button } from '@template/ui/components/primitives/Button';
 import { useState } from 'react';

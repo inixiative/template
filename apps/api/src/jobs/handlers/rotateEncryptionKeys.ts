@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ * @uses infrastructure:prisma
+ */
 import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
 import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';

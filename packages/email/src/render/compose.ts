@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:email
+ * @uses none
+ */
 import type { CommunicationCategory } from '@template/db';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';

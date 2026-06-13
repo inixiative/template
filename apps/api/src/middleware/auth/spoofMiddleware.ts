@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth, superadmin
+ * @uses none
+ */
 import type { Context, Next } from 'hono';
 
 import { isSuperadmin } from '#/lib/context/isSuperadmin';

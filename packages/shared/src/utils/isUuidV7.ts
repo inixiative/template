@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { z } from 'zod';
 
 // uuidv7: 32 hex chars in 8-4-4-4-12 grouping, version nibble = 7,

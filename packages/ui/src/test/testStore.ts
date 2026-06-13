@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { QueryClient } from '@tanstack/react-query';
 import type { Permix } from '@template/permissions/client';
 import { createAuthSlice } from '@template/ui/store/slices/auth';

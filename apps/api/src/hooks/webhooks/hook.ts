@@ -36,6 +36,7 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
       action: payload.action,
       resourceId: payload.resourceId,
       data: payload.data,
+      timestamp: payload.timestamp,
     });
   });
 };

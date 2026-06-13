@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:auth
+ * @uses none
+ */
 import { z } from '@hono/zod-openapi';
 import { TokenScalarSchema } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';

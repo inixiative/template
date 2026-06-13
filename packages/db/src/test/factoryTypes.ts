@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type * as runtime from '@prisma/client/runtime/client';
 import type { Prisma } from '@template/db/generated/client/client';
 
@@ -58,7 +63,7 @@ export type TypedBuildResult<
   context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
 };
 
-import type { Identifier } from '@template/db/utils/runtimeDataModel';
+import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 export type DependencyConfig = {
   modelName: ModelName;

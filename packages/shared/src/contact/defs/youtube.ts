@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseYoutubeUrl, type YoutubeValue } from '@template/shared/contact/parsers/youtube';
 import { z } from 'zod';

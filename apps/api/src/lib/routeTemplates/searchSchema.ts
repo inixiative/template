@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf primitive:routeTemplates
+ * @uses none
+ */
 import { z } from '@hono/zod-openapi';
 
 export const simpleSearchSchema = z

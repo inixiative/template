@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:email
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:auth
+ * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
+ */
 import { db, getRedisClient, redisNamespace } from '@template/db';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';

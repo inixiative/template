@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @uses primitive:routeTemplates
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';

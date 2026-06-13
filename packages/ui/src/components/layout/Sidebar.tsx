@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { useLocation } from '@tanstack/react-router';
 import type { NavItem } from '@template/ui/components/layout/navigationTypes';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 import * as React from 'react';
 

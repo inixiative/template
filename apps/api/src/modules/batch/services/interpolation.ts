@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:batch
+ * @uses none
+ */
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
 
 const INTERPOLATION_PATTERN = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/;

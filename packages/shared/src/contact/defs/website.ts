@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { WEBSITE_SUBTYPES } from '@template/shared/contact/constants/website';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { canonicalUrl } from '@template/shared/contact/parsers';

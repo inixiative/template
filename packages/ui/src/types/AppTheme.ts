@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:ui
+ * @uses none
+ */
 export type AppTheme = {
   // Brand colors with shades
   primary: string;

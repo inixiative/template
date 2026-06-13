@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auth, superadmin
+ * @uses none
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { adminAuthProviderReadManyRoute } from '#/modules/authProvider/routes/adminAuthProviderReadMany';
