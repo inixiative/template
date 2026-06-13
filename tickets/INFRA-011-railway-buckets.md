@@ -1,6 +1,6 @@
 # INFRA-011: Railway Buckets + S3 Storage Adapter
 
-**Status**: Planning
+**Status**: 🚧 In Progress
 **Priority**: Medium
 **Created**: 2026-05-26
 **Dependencies**: INFRA-001 (init script), INFRA-009 (adapter primitives)

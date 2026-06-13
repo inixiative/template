@@ -30,7 +30,7 @@ kanban
     COMM-002-email-validation
     AUTH-003-saml-sso
     INFRA-009-adapter-primitives
-    INFRA-013-audit-logs-cold-storage
+    INFRA-020-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
@@ -63,7 +63,7 @@ kanban
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
-- [INFRA-013: Audit Log Cold Storage](./INFRA-013-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
+- [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 
 **Audit & Compliance:**
