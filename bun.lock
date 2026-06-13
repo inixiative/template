@@ -221,6 +221,7 @@
       "name": "@template/permissions",
       "version": "0.0.1",
       "dependencies": {
+        "@inixiative/permissions": "^0.1.0",
         "@template/db": "workspace:*",
         "lodash-es": "^4.18.1",
         "permix": "^3.6.0",
@@ -627,6 +628,8 @@
     "@inixiative/atlas": ["@inixiative/atlas@0.1.0", "", { "dependencies": { "@inixiative/json-rules": "^2.6.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-vHLSVVmMmPZcGCMIcO3ojoR6k1Eu0u+xuzlMMB/CaAwX6SaF8seoviRVqWbAuorGrrbuD9V5/y0lL81JPWcDxg=="],
 
     "@inixiative/json-rules": ["@inixiative/json-rules@2.6.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-babxwDMNbtsyMOxQhEsLpkRB2dSGyskrOcl5k128raJhb2KaGKTsu/J4R1SJu9onfdT8yn7wo1m4XWTQuK+G/Q=="],
+
+    "@inixiative/permissions": ["@inixiative/permissions@0.1.0", "", { "dependencies": { "@inixiative/json-rules": "^2.6.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-dZdZlgL3aXOLAe7gvsEAZECpPR1ZU27YS8QCfTQ4lOZV3TVINYaNzUk6CXbWMXbeFFwzvWy1xRoetzd2hIsTSg=="],
 
     "@inixiative/prisma-map": ["@inixiative/prisma-map@0.1.0", "", {}, "sha512-wb/Pc5q6SQvb3LrKR2Hz/SuYFnd9biyojnpd962bndq/Zjf1kUH8PdKxjQ0b532fm9Fw8SiDwRmsg/rY3KLjuw=="],
 
