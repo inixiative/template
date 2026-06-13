@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:webhooks
+ * @uses infrastructure:env
+ */
 import type { Env } from '#/config/env';
 
 // SSRF rules apply everywhere except local (where dev loops hit localhost). test enforces so the

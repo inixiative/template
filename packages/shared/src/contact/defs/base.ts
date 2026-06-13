@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind type
+ * @kind type, definition
  * @partOf primitive:shared
  * @uses infrastructure:prisma
  */

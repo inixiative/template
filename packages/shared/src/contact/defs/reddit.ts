@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind constant
+ * @kind constant, definition
  * @partOf primitive:shared
  * @uses none
  */

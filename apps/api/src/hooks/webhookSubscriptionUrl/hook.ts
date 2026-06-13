@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf feature:webhooks
+ * @uses infrastructure:prisma
+ */
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
 import { castArray } from 'lodash-es';
 import { validateWebhookUrl } from '#/lib/webhooks/validators/validateWebhookUrl';
