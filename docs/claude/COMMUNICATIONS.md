@@ -61,7 +61,8 @@ Located in `packages/email` (`@template/email`).
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
-| **Data hydration** | TODO | How to pipe in variables |
+| **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
+| **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
 | **Sending jobs** | TODO | Queue-based async sending |
 | **Preference management** | TODO | Unsubscribe, categories |
 
@@ -245,6 +246,37 @@ const html = interpolate(template, {
 ```
 
 ---
+
+### Authoring & Data Surface (planned)
+
+Today conditions are hand-written `Condition` JSON inside `{{#if rule=…}}` and
+variables are hand-typed `{{recipient.x}}` tokens. The authoring layer (COMM-001,
+built on the rules builder INFRA-002 + builder surface INFRA-017) replaces the
+hand-writing with a typed editor over a **narrowed lens**:
+
+- The lens is a schema over the three roots `{ sender, recipient, data }`,
+  **narrowed per actor-context** (space → space+org → org → platform) and per
+  template/event type. It is handed to the builder as `exposedSurface`
+  (where-stripped); the `where` scope floor is re-applied server-side at send.
+- The rule builder emits the exact `Condition` JSON `evaluateConditions` already
+  runs; the field selector emits the `{{recipient.x}}` tokens `interpolate`
+  already substitutes. The editor front-ends the existing runtime; it does not
+  change it.
+- Narrowing governs *what an author can reference and how far up the graph they
+  can traverse* — not what they must include.
+
+**Deferred (documented, not built):**
+
+- **Subtenancy brand lock** — an `Organization`-level `spaceEmailPolicy:
+  free | locked` (+ locked/required component slugs). On `locked`, the cascade
+  stops letting a Space override the locked slugs and save/render
+  requires/injects them. The component-inheritance mechanism already exists; only
+  the lock/enforcement is missing. No settings table exists today; this would land
+  on the `Organization` app-fields fence.
+- **FF-gated additive lens grants** — entitlement/module ownership stitches extra
+  `data` fields into the lens; the base lens stays static + superadmin-authored.
+- **Predicate-composited surfaces** — not pursued (no stable contract to validate
+  against); content variation stays in conditional blocks.
 
 ### Cascade Resolution
 

@@ -11,6 +11,11 @@ kanban
     BRAND-002-email-template-governance-business-plan
     INFRA-001-init-script
     INFRA-002-rules-builder
+    INFRA-013-source-map-importer
+    INFRA-014-source-primitive
+    INFRA-015-bridge-registry
+    INFRA-016-lens-serialization-by-ref
+    INFRA-018-lens-builder
     INFRA-011-railway-buckets
     INFRA-012-typed-prisma-results
     DEV-004-prisma-map-doc-comment-tags
@@ -24,6 +29,7 @@ kanban
   In Progress
     AUTH-002-unified-auth-system
     INFRA-004-websockets
+    INFRA-017-builder-surface
   Review
   Done
     FE-002-navigation-refactoring
@@ -39,9 +45,18 @@ kanban
 
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)
-- [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (separate repo)
+- [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - S3 adapter + MinIO local + bucket provisioning (blocks FEAT-009)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+
+**Rules / Lens Platform** (json-rules + rules-builder):
+- [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) ⭐ - exposedSurface ✅ + serializable projection + describeRule (🚧 in progress)
+- [INFRA-016: Lens Serialization + seal](./INFRA-016-lens-serialization-by-ref.md) - Parallel serializable types (refs not parent objects) + seal (tenant→subtenant)
+- [INFRA-015: Bridge Registry](./INFRA-015-bridge-registry.md) - Save & reuse bridges across lenses
+- [INFRA-014: Source Primitive](./INFRA-014-source-primitive.md) - Formalize sources (hydrated tables) + custom-field tables
+- [INFRA-013: Source-Map Importer](./INFRA-013-source-map-importer.md) - Non-Prisma schema → FieldMap (in rules-builder)
+- [INFRA-018: Lens Builder](./INFRA-018-lens-builder.md) - Compose lens + narrowings (in rules-builder)
+- [INFRA-019: json-rules target sharp edges](./INFRA-019-json-rules-target-sharp-edges.md) - Backlog of check-only operators / target asymmetry
 
 **Developer Tooling:**
 - [DEV-004: prisma-map doc-comment tags](./DEV-004-prisma-map-doc-comment-tags.md) - `///` tag for self-relation parent direction → factory traversal + hydration tree auto-fill (feature lives in `@inixiative/prisma-map`)
