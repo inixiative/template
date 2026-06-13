@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { db, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { lookupField } from '#/lib/prisma/fieldMetadata';

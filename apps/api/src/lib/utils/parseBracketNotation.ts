@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @uses primitive:shared
+ */
 import { BRACKET_SYMBOL_SEGMENT, castBracketSymbol } from '@template/shared/bracketQuery';
 
 export type BracketQueryPrimitive = string | number | boolean | null;

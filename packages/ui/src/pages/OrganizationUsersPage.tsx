@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { Icon } from '@iconify/react';
 import { useMutation } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ * @uses infrastructure:prisma
+ */
 import { z } from '@hono/zod-openapi';
 import { validateNarrowing } from '@inixiative/json-rules';
 import type { Prisma } from '@template/db';

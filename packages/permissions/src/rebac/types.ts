@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:authz
+ * @uses none
+ */
 import type { Condition } from '@inixiative/json-rules';
 import type { AccessorName } from '@template/db';
 

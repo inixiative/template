@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:email
+ * @uses none
+ */
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 import mjml2html from 'mjml';
 

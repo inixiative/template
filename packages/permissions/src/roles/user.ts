@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:authz
+ * @uses feature:users
+ */
 import type { UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/client';
 import type { Entitlements, PermissionEntry } from '@template/permissions/client';

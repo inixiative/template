@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
+ */
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';

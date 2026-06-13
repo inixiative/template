@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:webhooks
+ * @uses primitive:errors
+ */
 import { makeError } from '#/lib/errors';
 import { hostnameOf } from '#/lib/webhooks/validators/hostnameOf';
 import { isEnforcedEnvironment } from '#/lib/webhooks/validators/isEnforcedEnvironment';

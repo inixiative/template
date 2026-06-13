@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind store
+ * @partOf primitive:ui
+ * @uses none
+ */
 import type { StateCreator } from 'zustand';
 
 export type Theme = 'light' | 'dark' | 'system';

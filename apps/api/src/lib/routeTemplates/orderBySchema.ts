@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf primitive:routeTemplates
+ * @uses infrastructure:prisma
+ */
 import { z } from '@hono/zod-openapi';
 import { Prisma } from '@template/db';
 import { castArray } from 'lodash-es';

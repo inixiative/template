@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:adapter, primitive:messaging
+ * @uses infrastructure:prisma, primitive:shared
+ */
 import type { Contact } from '@template/db/generated/client/client';
 import type { CommunicationKind, ContactType } from '@template/db/generated/client/enums';
 import { makeBroadcastRegistry } from '@template/shared/adapter';

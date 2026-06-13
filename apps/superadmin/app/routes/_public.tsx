@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ * @uses primitive:ui
+ */
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { ErrorBoundary, RouteError } from '@template/ui/components';
 import { useAppStore } from '@template/ui/store';

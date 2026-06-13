@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { Prisma } from '@template/db/generated/client/client';
 import { lowerFirst, upperFirst } from 'lodash-es';
 

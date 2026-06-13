@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseThreadsUrl, type ThreadsValue } from '@template/shared/contact/parsers/threads';
 import { z } from 'zod';

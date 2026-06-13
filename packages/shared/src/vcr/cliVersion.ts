@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 

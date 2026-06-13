@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { omit } from 'lodash-es';

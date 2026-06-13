@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { adminOrganizationReadManyRoute } from '#/modules/organization/routes/adminOrganizationReadMany';

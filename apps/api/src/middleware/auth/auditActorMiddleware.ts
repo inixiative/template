@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth
+ * @uses primitive:appEvents
+ */
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { Context, Next } from 'hono';
 import type { AppEnv } from '#/types/appEnv';

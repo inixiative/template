@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @uses feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:users, feature:webhooks, primitive:batch
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';

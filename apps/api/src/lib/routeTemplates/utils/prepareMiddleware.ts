@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:routeTemplates
+ * @uses primitive:requestContext
+ */
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';

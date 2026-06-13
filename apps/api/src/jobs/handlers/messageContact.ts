@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import type { CommunicationKind } from '@template/db/generated/client/enums';
 import { makeJob } from '#/jobs/makeJob';

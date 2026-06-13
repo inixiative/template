@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auth
+ * @uses none
+ */
 import { getPlatformProviders } from '#/lib/auth/platformProviders';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderReadManyRoute } from '#/modules/authProvider/routes/authProviderReadMany';

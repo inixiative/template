@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
+ */
 import type { Prisma } from '@template/db';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';

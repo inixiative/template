@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type, store
+ * @partOf primitive:ui
+ * @uses none
+ */
 import type { UseNavigateResult } from '@tanstack/react-router';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import type { RouteMatch } from '@template/ui/lib/findRoute';

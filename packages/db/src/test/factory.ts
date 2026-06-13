@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';

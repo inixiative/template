@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, infrastructure:prisma
+ */
 import { db, organizationId } from '@template/db';
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { getResource } from '#/lib/context/getResource';

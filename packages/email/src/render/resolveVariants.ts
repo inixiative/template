@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:email
+ * @uses none
+ */
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import type { RefMap } from '@template/email/render/extractRefs';
 import type { SaveContext } from '@template/email/render/types';

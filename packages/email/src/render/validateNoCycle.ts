@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:email
+ * @uses none
+ */
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { SaveContext } from '@template/email/render/types';

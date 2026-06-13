@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind store
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import { createPermissions, type Entitlements } from '@template/permissions/client';

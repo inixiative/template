@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:webhooks
+ */
 import { isIP } from 'node:net';
 
 const isPrivateIPv4 = (ip: string): boolean => {

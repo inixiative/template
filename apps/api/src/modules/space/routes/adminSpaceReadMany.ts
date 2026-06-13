@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:tenancy, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { SpaceScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';

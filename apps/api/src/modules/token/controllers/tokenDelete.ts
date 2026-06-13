@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auth
+ * @uses primitive:authz
+ */
 import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';

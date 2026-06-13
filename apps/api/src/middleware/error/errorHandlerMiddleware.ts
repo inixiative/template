@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf primitive:errors
+ * @uses infrastructure:prisma, primitive:shared, infrastructure:observability, primitive:routeTemplates
+ */
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';

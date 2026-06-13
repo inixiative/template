@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:jobs
+ * @uses infrastructure:redis, infrastructure:prisma
+ */
 import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';

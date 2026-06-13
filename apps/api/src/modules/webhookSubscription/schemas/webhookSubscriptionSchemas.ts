@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:webhooks
+ * @uses none
+ */
 import { WebhookSubscriptionScalarInputSchema, WebhookSubscriptionScalarSchema } from '@template/db';
 import { z } from 'zod';
 import { validateWebhookUrl } from '#/lib/webhooks/validators/validateWebhookUrl';

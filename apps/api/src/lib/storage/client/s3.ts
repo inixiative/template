@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf infrastructure:storage
+ * @uses none
+ */
 import {
   CopyObjectCommand,
   DeleteObjectCommand,

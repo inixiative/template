@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:inquiry
+ * @uses none
+ */
 import type { Db } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';

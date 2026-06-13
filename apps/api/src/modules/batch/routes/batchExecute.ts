@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf primitive:batch
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { actionRoute } from '#/lib/routeTemplates';
 import { batchExecutionStrategyEnum, batchStatusEnum } from '#/modules/batch/constants';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { useQuery } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import {

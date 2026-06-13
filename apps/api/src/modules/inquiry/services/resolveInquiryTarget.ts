@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:inquiry
+ * @uses infrastructure:prisma, feature:tenancy, feature:users
+ */
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { getValidatedBody, type ValidatedContext } from '#/lib/context/getValidatedData';

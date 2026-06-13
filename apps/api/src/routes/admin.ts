@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf superadmin
+ * @uses feature:auditLogs, primitive:caching, feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:webhooks
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { adminAuditLogRouter } from '#/modules/admin/auditLog';

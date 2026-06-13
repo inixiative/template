@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates, infrastructure:prisma
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 

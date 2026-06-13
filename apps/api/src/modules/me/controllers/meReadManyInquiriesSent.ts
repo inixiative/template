@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ */
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';

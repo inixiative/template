@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:authz
+ * @uses feature:tenancy
+ */
 import type { SpaceId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Entitlements, PermissionEntry } from '@template/permissions/client';

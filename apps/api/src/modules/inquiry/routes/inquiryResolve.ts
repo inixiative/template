@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:inquiry
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { actionRoute } from '#/lib/routeTemplates';

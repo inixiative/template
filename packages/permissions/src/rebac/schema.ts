@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf primitive:authz
+ * @uses none
+ */
 import { Operator } from '@inixiative/json-rules';
 import { ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, infrastructure:prisma, feature:webhooks
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyWebhookSubscriptionsRoute } from '#/modules/me/routes/meReadManyWebhookSubscriptions';

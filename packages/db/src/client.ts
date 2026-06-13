@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf infrastructure:prisma
+ * @uses primitive:shared
+ */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';

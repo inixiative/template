@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:batch
+ * @uses none
+ */
 import type { Db } from '@template/db';
 import type { Context } from 'hono';
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
