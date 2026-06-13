@@ -70,6 +70,13 @@ Roles, kept distinct: `exposedSurface`/projection = *what to show*;
 - `describeRule` is the source-awareness primitive feature flags / email / the
   builder all need — bridge-crossing rules are `check()`-only after hydration via
   `buildBridgeDictionary`.
+- **Email consumer surface (COMM-001).** For email the lens roots are
+  `{ sender, recipient, data }`, narrowed per actor-context (space → space+org →
+  org → platform) and per template/event type; `exposedSurface` ships it
+  where-stripped to the builder, `where` is re-applied server-side at send. The
+  email render runtime (`packages/email/render/*`) already consumes the builder's
+  outputs (`Condition` JSON via `evaluateConditions`, `{{recipient.x}}` via
+  `interpolate`), so the surface only has to describe those three roots.
 - Leak invariant to test on every surface artifact: no field/enum value present
   that is omitted on every reachable path; no `where` clause present.
 - `exposedSurface` strips `where` because the client never executes. The

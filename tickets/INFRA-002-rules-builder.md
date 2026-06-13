@@ -72,6 +72,10 @@ old PLAN.md (predates Lens v2.2) and may be deleted wholesale — it hand-rolls 
       dependency-light; shadcn/radix/tailwind variant is a styling swap).
 - [ ] **Ladle** stories showcasing each slot/component + state (matches template
       `packages/ui`, which uses Ladle — template PR 5).
+- [ ] **Extract a generic `FieldSelector`** — the field-path picker half of
+      `RuleRow`, standalone + slot-injected, with relation drill-down (delivers the
+      drill-down the rule builder itself also needs). Reused as the email
+      interpolation injector (COMM-001) and by filter UIs (FE-003).
 - [ ] Slot contract test suite (`testing/`); preview panel (run `check()` on
       sample data; hydration spec for bridge-crossing rules); relation drill-down
       (array operators / nested-model field resolution — v1 is anchor-model fields).
@@ -95,6 +99,14 @@ symlink is in use for dev).
 
 Feature flag targeting, email automation, notification rules, permission
 conditions, approval workflows.
+
+**Email is the first real consumer (COMM-001).** Its render runtime already
+exists (`packages/email/render/*`): `evaluateConditions` runs json-rules `check`
+on `{{#if rule=<Condition>}}` blocks, and `interpolate` substitutes
+`{{recipient.x}}` tokens. So the builder here is purely an *authoring* front-end —
+it must emit that exact `Condition` JSON and those tokens, over a lens narrowed to
+`{ sender, recipient, data }` per actor-context. This makes the **FieldSelector**
+(see Tasks) load-bearing, not optional: it is the variable/interpolation injector.
 
 ## Critical path (revised after review)
 
