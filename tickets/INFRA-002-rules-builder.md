@@ -1,6 +1,6 @@
 # INFRA-002: Rules Builder (Separate Repo)
 
-**Status**: 🚧 In Progress (headless core done; React layer next)
+**Status**: 🚧 In Progress (headless core + React layer + example shipped; FieldSelector / shadcn slots / Ladle / preview next)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06

@@ -322,7 +322,7 @@ bun add -d <package>
 | API routes | `apps/api/src/modules/<model>/routes/` |
 | Database hooks | `apps/api/src/modules/<model>/hooks/` |
 | Background jobs | `apps/api/src/modules/<model>/jobs/` or `apps/api/src/jobs/` |
-| Prisma schema | `packages/db/prisma/schema.prisma` |
+| Prisma schema | `packages/db/prisma/schema/` (modular — one `.prisma` file per model) |
 | Database client | `packages/db/src/client.ts` |
 | Logger | `packages/shared/src/logger/` |
 | Permissions | `packages/permissions/src/` |

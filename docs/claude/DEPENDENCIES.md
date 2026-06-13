@@ -42,6 +42,7 @@
 | `@prisma/adapter-pg` | Postgres driver | Native pg adapter for Prisma |
 | `pg` | Postgres client | Connection pooling |
 | `prisma-zod-generator` | Zod schemas | Generates Zod from Prisma models |
+| `@inixiative/prisma-map` (`^0.1.0`) | Runtime model map | Generates `prismaMap.gen.ts` (packages/db); replaces hand-maintained runtime data model |
 
 ---
 
@@ -62,7 +63,8 @@
 | Package | Purpose | Notes |
 |---------|---------|-------|
 | `better-auth` | Authentication | Session-based auth, social providers |
-| `permix` | Permissions | RBAC with runtime checks |
+| `@template/permissions` (`workspace:*`) | RBAC/ReBAC package | In-repo private package (packages/permissions); consumed by apps/api and packages/ui |
+| `permix` (`^3.6.0`) | Permissions | RBAC with runtime checks; declared inside `@template/permissions` |
 
 ---
 
@@ -71,7 +73,7 @@
 | Package | Purpose | Notes |
 |---------|---------|-------|
 | `zod` | Schema validation | Runtime type checking, OpenAPI integration |
-| `@inixiative/json-rules` | Rules engine | Declarative validation in hooks |
+| `@inixiative/json-rules` (`^2.8.0`) | Rules engine | Declarative validation in hooks |
 
 ---
 

@@ -36,7 +36,7 @@ in naming everywhere):
    applied via `applyLens` at execution, never sent to the client).
 3. **describeRule** — static analysis of a finished rule against a lens:
    which sources it touches, which bridges it crosses, which targets
-   (`check`/`toPrisma`/`toSql`) remain valid. Does not exist yet.
+   (`check`/`toPrisma`/`toSql`) remain valid. ✅ Shipped in json-rules 2.8.
 
 Roles, kept distinct: `exposedSurface`/projection = *what to show*;
 `checkRuleAgainstLens` = *the gate*; `describeRule` = *source/target classification*.

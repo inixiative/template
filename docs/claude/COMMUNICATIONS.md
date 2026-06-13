@@ -23,7 +23,7 @@
     - [Interpolate (per recipient)](#interpolate-per-recipient)
   - [Save Pipeline](#save-pipeline)
   - [MJML Validation](#mjml-validation)
-  - [TODO: Send Pipeline](#todo-send-pipeline)
+  - [Send Pipeline](#send-pipeline)
 - [Notifications](#notifications)
   - [Planned: Novu](#planned-novu)
 - [SMS](#sms)
@@ -56,14 +56,14 @@ Located in `packages/email` (`@template/email`).
 | Email clients | Done | Resend + Console |
 | MJML validation | Done | Syntax checking |
 | Component extraction | Done | `mapRefs()` |
-| Variable interpolation | Done | sender/recipient/variable + conditionals |
+| Variable interpolation | Done | sender/recipient/data + conditionals |
 | Cascade resolution | Done | Space → Org → default |
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
+| **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
-| **Sending jobs** | TODO | Queue-based async sending |
 | **Preference management** | TODO | Unsubscribe, categories |
 
 ### Package Structure
@@ -80,9 +80,14 @@ packages/email/src/
 │   ├── extractRefs.ts    # Component extraction (mapRefs)
 │   ├── interpolate.ts    # Variable substitution + conditionals
 │   ├── evaluateConditions.ts  # {{#if rule=...}} evaluation
-│   ├── lookupTemplate.ts # Cascade lookup for templates/components
-│   ├── lookupCascade.ts  # Cascade lookup for component refs
-│   ├── save.ts           # Save pipeline coordinator
+│   ├── lookup.ts         # Single-tier ownership lookup
+│   ├── lookupCascade.ts  # Cascade lookup across ownership tiers
+│   ├── lookupTemplate.ts # lookupTemplate/lookupComponent entrypoints
+│   ├── resolveVariants.ts # Match-or-create component variants
+│   ├── validateNoCycle.ts # Component ref cycle guard
+│   ├── save.ts           # saveEmailTemplate coordinator
+│   ├── saveComponents.ts # Component persistence
+│   ├── saveTemplate.ts   # Template persistence
 │   ├── errors.ts         # EmailRenderError
 │   └── types.ts          # SaveContext, etc.
 └── validations/          # MJML validation
@@ -308,7 +313,7 @@ The render pipeline has two phases:
 ┌─────────────────────────────────────────────────────────────┐
 │  PHASE 2: Interpolate (per recipient)                       │
 │  for (recipient of recipients) {                            │
-│    interpolate(mjml, { sender, recipient, variable })       │
+│    interpolate(mjml, { sender, recipient, data })           │
 │      └── evaluateConditions ({{#if rule=...}})              │
 │      └── substituteVariables ({{sender.*}}, etc.)           │
 │  }                                                          │
@@ -349,7 +354,7 @@ for (const recipient of recipients) {
   const html = interpolate(mjml, {
     sender: { name: 'Acme Corp', logo: 'https://...' },
     recipient: { name: recipient.name, email: recipient.email, role: recipient.role },
-    variable: { code: generateOtp() },
+    data: { code: generateOtp() },
   });
 
   // Now render MJML to HTML and send
@@ -389,45 +394,63 @@ Pipeline steps:
 ### MJML Validation
 
 ```typescript
-import { validateMjml, MjmlValidationError } from '@template/email/validations';
+import { validateMjml } from '@template/email/validations/validateMjml';
+import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
+// Both are also re-exported from the package root: '@template/email'
 
 try {
-  validateMjml(mjmlString);
+  await validateMjml(mjmlString);
 } catch (err) {
   if (err instanceof MjmlValidationError) {
-    // err.issues: { line, message, tagName }[]
+    // err.issues: MjmlIssue[]
   }
 }
 ```
 
 ---
 
-### TODO: Send Pipeline
+### Send Pipeline
 
-Not yet implemented. Planned flow:
+Sending runs as a BullMQ job (`apps/api/src/jobs/handlers/sendEmail.ts`,
+`makeJob<SendEmailPayload>`). Producers enqueue it by name (`sendEmail`) rather
+than calling the email client directly.
 
 ```typescript
-// Future API
-await sendEmail({
-  template: 'welcome',
-  locale: 'en',
-  to: user.email,
-  context: {
-    ownerModel: 'Organization',
-    organizationId: org.id,
-  },
-  variables: {
-    firstName: user.firstName,
-  },
-});
+import type { EmailTarget } from '@template/email/targeting';
+
+export type SendEmailPayload = {
+  to: EmailTarget[];
+  cc?: EmailTarget[];
+  bcc?: EmailTarget[];
+  template: string;
+  data: Record<string, unknown>;
+  tags: string[];
+};
 ```
 
-Will:
-1. Lookup template via cascade
-2. Resolve all component refs
-3. Interpolate variables
-4. Render MJML to HTML
-5. Queue via BullMQ job
+Targeting is declarative — recipients are resolved inside the worker, not by the
+caller (`@template/email/targeting`):
+
+```typescript
+type EmailTarget =
+  | { userIds: string[] }
+  | { raw: string[] }
+  | { orgRole: { organizationId: string; role: string } }
+  | { spaceRole: { spaceId: string; role: string } };
+```
+
+The worker:
+1. Resolves `to`/`cc`/`bcc` targets to addresses (and the `from` sender).
+2. Verifies recipient addresses; drops risky ones.
+3. Skips cleanly if no email adapter is registered.
+4. Composes the template via cascade (`composeTemplate`).
+5. Interpolates `{ sender, recipient, data }` per recipient.
+6. Renders MJML to HTML (`mjml2html`, awaited).
+7. Sends via the adapter's `sendBatch`.
+
+> Stub edges: sender owner-model/locale resolution currently defaults to
+> `{ ownerModel: 'default', locale: 'en' }`; future work resolves these from the
+> sender context.
 
 ---
 
