@@ -7,6 +7,7 @@
 import type { Prisma } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { toAccessor } from '@template/db/utils/modelNames';
+import { castArray } from 'lodash-es';
 
 const NESTED_WRITE_OPS = new Set([
   'create',
@@ -25,7 +26,7 @@ export const assertNoNestedWrites = (model: Prisma.ModelName, args: unknown): vo
   if (!fields) return;
 
   const { data, create, update } = (args ?? {}) as { data?: unknown; create?: unknown; update?: unknown };
-  for (const payload of [data, create, update].flatMap((d) => (Array.isArray(d) ? d : [d]))) {
+  for (const payload of [data, create, update].flatMap((d) => castArray(d))) {
     if (!payload || typeof payload !== 'object') continue;
     for (const [field, value] of Object.entries(payload)) {
       if (fields[field]?.kind !== 'object' || !value || typeof value !== 'object') continue;

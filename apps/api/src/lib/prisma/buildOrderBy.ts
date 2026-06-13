@@ -13,7 +13,6 @@ type OrderByEntry = Record<string, unknown>;
 type BuildOrderByOptions = {
   callerOrderBy?: unknown;
   clientOrderBy?: string[];
-  orderableFields?: readonly string[];
 };
 
 // Dotted leaf path of a single-chain orderBy entry — `{ user: { name: 'asc' } }` → `user.name`.
@@ -30,13 +29,9 @@ const orderKey = (entry: OrderByEntry): string => {
   return path.join('.');
 };
 
-export const buildOrderBy = ({
-  callerOrderBy,
-  clientOrderBy,
-  orderableFields,
-}: BuildOrderByOptions): OrderByEntry[] => {
+export const buildOrderBy = ({ callerOrderBy, clientOrderBy }: BuildOrderByOptions): OrderByEntry[] => {
   const caller = callerOrderBy ? (castArray(callerOrderBy) as OrderByEntry[]) : [];
-  const client = clientOrderBy ? (parseOrderBy(clientOrderBy, orderableFields) as OrderByEntry[]) : [];
+  const client = clientOrderBy ? (parseOrderBy(clientOrderBy) as OrderByEntry[]) : [];
   const tiebreaker: OrderByEntry[] = [{ id: Prisma.SortOrder.desc }];
 
   return uniqBy([...caller, ...client, ...tiebreaker], orderKey);

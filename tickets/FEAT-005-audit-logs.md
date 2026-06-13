@@ -1,10 +1,10 @@
 # FEAT-005: Audit Logs
 
-**Status**: 🚧 In Progress
+**Status**: ✅ Complete — schema, hooks, retention job, API shipped (audit UI deferred to FEAT-017)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-03-18
+**Updated**: 2026-06-09
 
 ---
 

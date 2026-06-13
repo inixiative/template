@@ -1,9 +1,3 @@
-/**
- * @atlas
- * @kind adapter
- * @partOf primitive:ui
- * @uses none
- */
-import { createFrontendLogger, FrontendScope } from './frontendLogger';
+import { createFrontendLogger, FrontendScope } from '@template/ui/lib/frontendLogger';
 
 export const log = createFrontendLogger(FrontendScope.ui);

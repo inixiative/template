@@ -1,61 +1,7 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
-import {
-  clearRuntimeCaches,
-  getAccessorRelations,
-  getModelRelations,
-  getRuntimeDataModel,
-} from '@template/db/utils/runtimeDataModel';
-
-describe('getRuntimeDataModel', () => {
-  beforeEach(() => {
-    clearRuntimeCaches();
-  });
-
-  it('returns models from generated client', () => {
-    const dm = getRuntimeDataModel();
-
-    expect(dm.models).toBeDefined();
-    expect(dm.models.User).toBeDefined();
-    expect(dm.models.Organization).toBeDefined();
-    expect(dm.models.Token).toBeDefined();
-  });
-
-  it('contains fields for each model', () => {
-    const dm = getRuntimeDataModel();
-    const user = dm.models.User;
-
-    expect(user.fields).toBeArray();
-    expect(user.fields.length).toBeGreaterThan(0);
-
-    const idField = user.fields.find((f) => f.name === 'id');
-    expect(idField).toBeDefined();
-    expect(idField?.kind).toBe('scalar');
-  });
-
-  it('identifies relation fields with kind=object', () => {
-    const dm = getRuntimeDataModel();
-    const token = dm.models.Token;
-
-    const userRel = token.fields.find((f) => f.name === 'user');
-    expect(userRel).toBeDefined();
-    expect(userRel?.kind).toBe('object');
-    expect(userRel?.type).toBe('User');
-    expect(userRel?.relationName).toBeDefined();
-  });
-
-  it('caches the result', () => {
-    const dm1 = getRuntimeDataModel();
-    const dm2 = getRuntimeDataModel();
-
-    expect(dm1).toBe(dm2);
-  });
-});
+import { describe, expect, it } from 'bun:test';
+import { getAccessorRelations, getModelRelations } from '@template/db/utils/prismaMapRelations';
 
 describe('getModelRelations', () => {
-  beforeEach(() => {
-    clearRuntimeCaches();
-  });
-
   it('returns relations for a model', () => {
     const relations = getModelRelations('Token');
 
@@ -126,10 +72,6 @@ describe('getModelRelations', () => {
 });
 
 describe('getAccessorRelations', () => {
-  beforeEach(() => {
-    clearRuntimeCaches();
-  });
-
   it('works with camelCase accessor names', () => {
     const relations = getAccessorRelations('organizationUser');
 

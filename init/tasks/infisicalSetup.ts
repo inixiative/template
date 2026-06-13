@@ -2,7 +2,7 @@ import { generateKeyPairSync, randomBytes } from 'crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
-import { execAsync } from '../utils/exec';
+import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
 import {
@@ -234,7 +234,7 @@ export const setupInfisical = async (
           environment: step.environment,
           path: '/api',
         });
-        hasKeypair = Boolean(existing && existing.includes('PRIVATE KEY'));
+        hasKeypair = Boolean(existing?.includes('PRIVATE KEY'));
       } catch {
         // Missing secret expected on first run.
       }
@@ -339,12 +339,12 @@ export const getSecretAsync = async (
   },
 ): Promise<string> => {
   const realFn = async (): Promise<string> => {
-    let cmd = `infisical secrets get ${key}`;
-    if (options?.projectId) cmd += ` --projectId="${options.projectId}"`;
-    if (options?.environment) cmd += ` --env="${options.environment}"`;
-    if (options?.path) cmd += ` --path="${options.path}"`;
-    cmd += ' --plain';
-    const { stdout } = await execAsync(cmd);
+    const args = ['secrets', 'get', key];
+    if (options?.projectId) args.push(`--projectId=${options.projectId}`);
+    if (options?.environment) args.push(`--env=${options.environment}`);
+    if (options?.path) args.push(`--path=${options.path}`);
+    args.push('--plain');
+    const { stdout } = await execFileAsync('infisical', args);
     return stdout.trim();
   };
 
@@ -365,9 +365,14 @@ export const setSecretAsync = async (
   path: string = '/',
 ): Promise<void> => {
   const realFn = async (): Promise<void> => {
-    await execAsync(
-      `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
-    );
+    await execFileAsync('infisical', [
+      'secrets',
+      'set',
+      `--projectId=${projectId}`,
+      `--env=${environment}`,
+      `--path=${path}`,
+      `${key}=${value}`,
+    ]);
   };
 
   if (process.env.NODE_ENV === 'test') {

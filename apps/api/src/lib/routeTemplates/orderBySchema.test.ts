@@ -36,10 +36,5 @@ describe('orderBySchema', () => {
       const result = parseOrderBy(['name:ASC', 'email:DESC']);
       expect(result).toEqual([{ name: Prisma.SortOrder.asc }, { email: Prisma.SortOrder.desc }]);
     });
-
-    it('throws error for invalid path notation', () => {
-      expect(() => parseOrderBy(['user$email:asc'])).toThrow('Invalid orderBy path');
-      expect(() => parseOrderBy(['../user:asc'])).toThrow('Invalid orderBy path');
-    });
   });
 });

@@ -63,7 +63,7 @@ export type TypedBuildResult<
   context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
 };
 
-import type { Identifier } from '@template/db/utils/runtimeDataModel';
+import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 export type DependencyConfig = {
   modelName: ModelName;

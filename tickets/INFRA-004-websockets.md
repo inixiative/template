@@ -16,6 +16,68 @@ Complete WebSocket event system with 4 core event types: feature flags, refresh 
 
 ---
 
+## ⚠️ SECURITY GAP — Channel subscription has no authorization (added 2026-06-09)
+
+Found by reading the code, not the map. **`subscribe` accepts any channel from any
+connection with zero authorization** — and connections are anonymous by default (identity is
+set later via the `authenticate` message, never required for `subscribe`).
+
+Evidence:
+- `apps/api/src/ws/handler.ts` `dispatch()` — the `subscribe` case calls
+  `subscribeToChannel(ws, msg.channel)` with no identity or permission check.
+- `apps/api/src/ws/subscriptions.ts:7` — `subscribeToChannel` just indexes the connection
+  into `byChannel`. No authz.
+- `apps/api/src/ws/delivery.ts:18` — `sendToChannelLocal` fans the event to every subscriber
+  with no per-recipient re-check.
+- `packages/shared/src/ws/channelKey.ts` — channel keys are deterministic and guessable:
+  `channelKey({_id:'inquiryRead', path:{id:'X'}})` → `'inquiryRead:id:X'` (route id + sorted
+  path params; no secret, no per-user component).
+
+**Severity: side-channel, not data leak.** WS payloads are refresh triggers only —
+`{category:'query', action:'refetch', key}` (see `inviteOrganizationUser/appEvents.ts:28`),
+and the FE dispatch (`packages/ui/src/lib/ws/dispatch.ts`) only calls `invalidateQueries`. The
+actual data refetch goes back through the permission-checked REST endpoint. So an unauthorized
+subscriber to `inquiryRead:id:X` does NOT receive X's data — but DOES learn *that* X changed
+and *when* (an activity + existence oracle by guessable id). Blast radius is bounded today by
+`LIVE_QUERIES` having a single entry (`inquiryRead`, `packages/shared/src/ws/liveQueries.ts`),
+but the system is designed so adding `spaceRead`/`organizationRead` is a one-line change — at
+which point every tenant's change-activity becomes observable by id.
+
+**Fix — subscribe is a read check (≈5 lines), plus one prerequisite.**
+
+The check itself mirrors `validatePermission` (hydrate the record, run `check(permix, rebacSchema,
+model, record, 'read')`):
+
+```ts
+// subscribe case in handler.ts, replacing the bare subscribeToChannel(ws, msg.channel)
+const { _id, path } = parseChannelKey(msg.channel);
+const model = liveQueryAccessor(_id);
+const record = path?.id ? await hydrate(db, model, { id: path.id }) : null;
+if (!record || !check(ws.data.permix, rebacSchema, model, record, 'read'))
+  return send(ws, { type: 'subscribeRejected', channel: msg.channel });
+subscribeToChannel(ws, msg.channel);
+```
+
+Prerequisite (the only real work): the connection has no `permix` today — only `userId`
+(`identity.ts:13`). Build the user's permix **once at `authenticate` time** on `ws.data.permix`,
+reusing the existing `setUserContext`/`setupOrgPermissions`/`setupSpacePermissions` logic adapted
+to read from `ws.data` instead of the Hono `Context`. Rebuilding it inside `setIdentity` makes
+re-auth-on-identity-change fall out for free (drop channels that no longer pass).
+
+- [ ] Build `ws.data.permix` at authenticate (reuse setUserContext logic; rebuild in setIdentity).
+- [ ] Add `liveQueryAccessor(_id)` — operation id → accessor (`inquiryRead`→`inquiry`); natural
+      home is the `LIVE_QUERIES` registry (map entry instead of bare Set).
+- [ ] The 5-line read check above; reject with `{ type: 'subscribeRejected', channel }`.
+- [ ] Test: unauthorized subscribe is rejected (current ws tests cover indexing/delivery, not authz).
+
+> Note: the "Current State ✅ / Infrastructure COMPLETE" section below predates the ws/
+> rewrite and is stale — it lists `connections.ts` / `events/` which no longer exist (actual
+> layout: `registry.ts`, `identity.ts`, `subscriptions.ts`, `delivery.ts`, `lifecycle.ts`,
+> `pubsub.ts`, `handler.ts`, `auth.ts`). Infrastructure is transport-complete but NOT
+> authorization-complete.
+
+---
+
 ## Current State ✅
 
 **Infrastructure (COMPLETE):**

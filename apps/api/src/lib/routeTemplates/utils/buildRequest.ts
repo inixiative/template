@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
+import { validateNarrowing } from '@inixiative/json-rules';
 import type { Prisma } from '@template/db';
 import { searchablePaths } from '@template/db/lens';
 import { buildOrderBySchema } from '#/lib/routeTemplates/filters/buildOrderBySchema';
@@ -95,6 +96,9 @@ export const buildRequest = <const T extends RouteArgs>(
     filterLens,
   } = args;
 
+  // projectByPath silently drops unresolved paths, so validate the authored narrowing up front.
+  if (filterLens) validateNarrowing(filterLens);
+
   const searchableFields = filterLens ? searchablePaths(filterLens) : undefined;
 
   // Need ID when: not skipId AND (has submodel OR not many)
@@ -111,16 +115,12 @@ export const buildRequest = <const T extends RouteArgs>(
 
   if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
 
-  // Lens-constrained orderBy (enum of orderable fields) overrides the generic one.
   if (filterLens) {
     const orderBy = buildOrderBySchema(filterLens);
     if (orderBy) querySchema = querySchema.merge(z.object({ orderBy }));
   }
 
-  // Admin routes have unlocked search at runtime (paginate.ts skips field
-  // validation when isSuperadmin), so always expose the searchFields schema
-  // for them. With a filterLens we emit the typed, prisma-where-shaped schema;
-  // otherwise (admin without a lens) fall back to the loose record schema.
+  // admin routes skip search field validation at runtime, so expose searchFields even without a lens.
   if (admin || searchableFields?.length) {
     const searchFields =
       (filterLens && buildSearchFieldsSchema(filterLens)) || createAdvancedSearchSchema(searchableFields ?? []);

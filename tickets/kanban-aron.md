@@ -8,10 +8,12 @@ config:
 ---
 kanban
   Todo
+    BRAND-002-email-template-governance-business-plan
     INFRA-001-init-script
     INFRA-002-rules-builder
     INFRA-011-railway-buckets
     INFRA-012-typed-prisma-results
+    DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
     FEAT-004-ai-providers
@@ -32,11 +34,17 @@ kanban
 
 ### 🆕 Todo
 
+**Product:**
+- [BRAND-002: Email Template Governance — Business Plan](./BRAND-002-email-template-governance-business-plan.md) ⭐ - Stopgap SaaS launch plan (lens-gated template builder + API); sequences INFRA-002, INFRA-011, FEAT-009, COMM-001 + net-new billing/themes/builder
+
 **Infrastructure:**
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) ⭐ - One-command setup wizard (accounts, DNS, Doppler)
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (separate repo)
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - S3 adapter + MinIO local + bucket provisioning (blocks FEAT-009)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+
+**Developer Tooling:**
+- [DEV-004: prisma-map doc-comment tags](./DEV-004-prisma-map-doc-comment-tags.md) - `///` tag for self-relation parent direction → factory traversal + hydration tree auto-fill (feature lives in `@inixiative/prisma-map`)
 
 **Features:**
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
@@ -68,8 +76,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 14
-- **Todo**: 11
+- **Total Tickets**: 16
+- **Todo**: 13
 - **In Progress**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 2
@@ -93,4 +101,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-05-26_
+_Last Updated: 2026-06-12_

@@ -46,9 +46,9 @@ Never merge distinct concerns into one place for convenience — the convenience
 
 ## 0.2. YAGNI — Scope Invention vs. Completion
 
-YAGNI is about **what was asked**, not **how complete the asked-for thing is**. Two distinct rules, often conflated.
+**The error runs BOTH directions — be vigilant for both.** Overbuilding (scope invention) and underbuilding (trimming real completion) are equal failure modes, and both feel virtuous from the inside: trimming feels *disciplined*, adding feels *thorough*. Neither is the safe default. The danger in both is the **silent** call — quietly adding coupling the author didn't want, or quietly deleting a thing the author wanted. Watch yourself in both directions, not just the one that's salient.
 
-**YAGNI applies to: scope invention.** Adding things adjacent to the task that nobody asked for. Symptoms:
+**Overbuild (scope invention).** Adding things adjacent to the task that nobody asked for. Symptoms:
 
 - Extra fields on a model "in case we need them later"
 - Wrapper functions around single-call sites
@@ -58,16 +58,30 @@ YAGNI is about **what was asked**, not **how complete the asked-for thing is**. 
 - Re-exports / barrels that nothing imports
 - Comments explaining what well-named code already says
 
-**YAGNI does NOT apply to: completing the asked-for thing.** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* applying YAGNI here:
+**Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* trimming:
 
 - Shipping a v1 that forces a v2 in a week (binary support, version-awareness, config flexibility)
 - Hardcoding what should be parameterized (CLI flag, regex)
 - Stuffing a thing in one consumer when it belongs as a shared primitive
 - Skipping the API that makes the thing testable / setup-able (static cache, global setup)
+- Deferring a primitive/seam/foundation the codebase deliberately builds ahead of its first consumer
 
-**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build. Adjacent = skip.
+**Discriminator:** "is this in service of what was asked, or adjacent to it?" Clear in-service → build. Clearly adjacent noise (dead barrel, redundant comment) → skip. **A genuine judgment call in EITHER direction → flag and ask, don't decide silently** (per §0.3): name it, say which way it leans and why, and ask build-now / defer / drop. Don't silently add on a guess of "thorough," and don't silently trim on a guess of "needed."
 
-**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Build it complete. Is it feature code? Trim hard.
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim. Either way, if it's a real judgment call, surface it — don't bury the add *or* the trim.
+
+## 0.3. Interrogate Before Proposing (Discovery Work)
+
+For anything where the **shape is not yet known** — design, taxonomy, modeling, naming, architecture — the shape is discovered by **interrogation, not assertion**. Lead with questions; hold the confident synthesis until the shape has been interrogated.
+
+- **Interrogate before you propose.** Open the design space before closing it. Ask what you'd need to know; surface the forks. Questions are the deliverable here, not a failure to deliver — a premature closed proposal forecloses the discovery.
+- **At a fork, ASK — do not assume.** When more than one defensible shape exists and the choice depends on intent you don't have, stop and ask. Do not pick the option your prior pattern-matches to and present it as the answer.
+- **Name your assumptions and mark confidence.** Distinguish *recommendation* from *low-confidence guess*. Tag the soft calls so they're easy to spot and challenge — for you as much as for the reader.
+- **Prefer options with tradeoffs over a single recommendation** when the shape is unsettled. Breadth first, commitment later.
+- **Small piece → validate → extend.** Propose one concrete sample, get it validated, then widen. Caps the blast radius of any wrong assumption to one batch.
+- **If you catch yourself assuming, stop.** To assume is to make an *ass* of *u* and *me*. Beware especially of applying a good heuristic (e.g. "keep taxonomies minimal") as a *conclusion* before you've confirmed it fits the actual goal.
+
+This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is genuinely shape-finding, not execution.
 
 ## 1. Mandatory Task Intake (Always)
 
