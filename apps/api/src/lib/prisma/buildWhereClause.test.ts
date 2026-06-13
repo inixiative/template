@@ -179,6 +179,30 @@ describe('buildWhereClause', () => {
       const inner = (where as { AND: Array<{ content: { equals: unknown } }> }).AND[0].content;
       expect(inner.equals).toBe(Prisma.AnyNull);
     });
+
+    it('Json bare true → equals true (symbol, no operator required)', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: true },
+      });
+      expect(where).toEqual({ AND: [{ content: { equals: true } }] });
+    });
+
+    it('Json bare false → equals false (symbol, no operator required)', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: false },
+      });
+      expect(where).toEqual({ AND: [{ content: { equals: false } }] });
+    });
+
+    it('Json equals operator preserves a boolean value', () => {
+      const where = buildWhereClause({
+        filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
+        searchFields: { content: { equals: true } },
+      });
+      expect(where).toEqual({ AND: [{ content: { equals: true } }] });
+    });
   });
 
   describe('searchFields — explicit operators', () => {
