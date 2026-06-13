@@ -7,7 +7,12 @@
 import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { rootLens, searchablePaths } from '@template/db/lens';
-import { FIELD_OPERATORS, isArrayFieldOperator, isRelationOperator } from '@template/shared/bracketQuery';
+import {
+  FIELD_OPERATORS,
+  isArrayFieldOperator,
+  isBracketSymbol,
+  isRelationOperator,
+} from '@template/shared/bracketQuery';
 import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { dialect } from '#/lib/prisma/dialect';
@@ -45,9 +50,13 @@ const stripRelationOperators = (path: string): string =>
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
-  // bare null → is-null. Json matches db-NULL/json-null per provider (dialect.jsonNull).
+  // Bare symbols (null/true/false) on a json column → equals that json scalar (null
+  // is the provider json-null). Non-symbol bare values never reach here for json.
+  if (field.kind === 'scalar' && field.type === 'Json' && isBracketSymbol(value)) {
+    return { equals: value === null ? dialect.jsonNull : value };
+  }
   if (value === null) {
-    return { equals: field.kind === 'scalar' && field.type === 'Json' ? dialect.jsonNull : null };
+    return { equals: null };
   }
   const op = getDefaultOperator(field);
   const coerced = coerceValueForField(field, value);
@@ -129,8 +138,9 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
-      // Json fields take a JsonFilter object (path/string_contains/…), never a bare value.
-      if (field.kind === 'scalar' && field.type === 'Json' && value !== null) {
+      // Json fields take a JsonFilter object (path/string_contains/…). The only bare
+      // values allowed are symbols (null/true/false → equals that json scalar).
+      if (field.kind === 'scalar' && field.type === 'Json' && !isBracketSymbol(value)) {
         throw new Error(`Json field '${currentPath}' requires an operator (path, string_contains, …)`);
       }
       result[key] = wrapBareValue(field, value) as unknown as BracketQueryValue;
