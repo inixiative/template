@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @partOf superadmin
+ * @partOf primitive:jobs, superadmin
  * @uses primitive:routeTemplates, primitive:jobs
  */
 import { z } from '@hono/zod-openapi';

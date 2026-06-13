@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @partOf superadmin
+ * @partOf feature:cronJob, superadmin
  * @uses primitive:routeTemplates
  */
 import { CronJobScalarInputSchema, CronJobScalarSchema } from '@template/db';

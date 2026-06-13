@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind controller
- * @partOf superadmin
+ * @partOf feature:cronJob, superadmin
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { getResource } from '#/lib/context/getResource';

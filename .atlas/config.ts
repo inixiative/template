@@ -54,11 +54,15 @@ export default defineConfig({
     { include: 'apps/*/app/config/**', kind: 'config' },
     { include: 'apps/*/app/guards/**', kind: 'middleware' },
     // @partOf — resolve a captured segment through membership (multi-@partOf normal)
-    { include: 'apps/api/src/modules/$1/**', partOf: partOfFor('module', '$1') },
-    // admin sub-modules also map to their own feature (e.g. admin/auditLog → feature:auditLogs)
+    // exclude admin/: it's a positional grouping, not a feature module ($1 would be 'admin').
+    { include: 'apps/api/src/modules/$1/**', exclude: 'apps/api/src/modules/admin/**', partOf: partOfFor('module', '$1') },
+    // admin sub-modules map to their own concept (e.g. admin/auditLog → feature:auditLogs)
     { include: 'apps/api/src/modules/admin/$1/**', partOf: partOfFor('module', '$1') },
-    // top-level api dirs (appEvents/jobs/ws/…) map to their primitive if registered
-    { include: 'apps/api/src/$1/**', partOf: partOfFor('module', '$1') },
+    // top-level api dirs that ARE registered primitives — explicit, not a blanket $1 capture
+    // (the old `apps/api/src/$1/**` rule phantom-tagged modules/lib/hooks/middleware/… too)
+    { include: 'apps/api/src/appEvents/**', partOf: 'primitive:appEvents' },
+    { include: 'apps/api/src/jobs/**', partOf: 'primitive:jobs' },
+    { include: 'apps/api/src/ws/**', partOf: 'primitive:websockets' },
     { include: 'packages/$1/**', partOf: partOfFor('package', '$1') },
     // wire concepts whose code lives outside a module/package folder:
     { include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'], partOf: 'primitive:routeTemplates' },

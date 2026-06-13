@@ -11,6 +11,7 @@ export const CONCEPTS: ConceptRegistry = {
   'feature:contact': { module: ['contact'] },
   'feature:customer': { module: ['customerRef'] },
   'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
+  'feature:cronJob': { module: ['cronJob'] }, // admin/cronJob — scheduled job management (own model + CRUD)
   'primitive:caching': { module: ['cache'], docs: ['REDIS.md'] }, // built on infrastructure:redis
   'feature:webhooks': { module: ['webhookSubscription'], docs: ['HOOKS.md'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
@@ -24,7 +25,7 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:shared': { package: ['shared'], docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'] }, // shared utils/types
   'primitive:sdk': { package: ['sdk'] }, // generated API client
   'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
-  'primitive:jobs': { module: ['jobs'], docs: ['JOBS.md'] },
+  'primitive:jobs': { module: ['jobs', 'job'], docs: ['JOBS.md'] }, // 'job' = admin/job enqueue surface
   'primitive:websockets': { module: ['ws'], docs: ['WEBSOCKETS.md', 'APP_EVENTS.md'] },
   'primitive:routeTemplates': { docs: ['API_ROUTES.md'] },
   'primitive:adapter': { docs: ['ADAPTERS.md'] },

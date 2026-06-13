@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind service
- * @partOf superadmin
+ * @partOf feature:cronJob, superadmin
  * @uses primitive:jobs
  */
 import type { CronJob } from '@template/db/generated/client/client';
