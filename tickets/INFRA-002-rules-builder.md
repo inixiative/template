@@ -55,26 +55,26 @@ old PLAN.md (predates Lens v2.2) and may be deleted wholesale — it hand-rolls 
       operators + label decoration (`schema/surface.ts`)
 - [x] Condition-tree engine — pure path-addressed mutations (`core/tree.ts`)
 - [x] Slot contracts (`builder/slots.ts`)
-- [ ] UI-decoration layer over the pure tree: stable ids for React keys
-      (`stripMeta` before serialize, `trimEmptyGroups`, `switchGroupOperator`
-      AND↔OR toggle) — keep `core/tree.ts` pure `Condition`; ids live in a parallel
-      decorated layer. (Pattern proven in Zealot PR 1022 `treeOps.ts`.)
-- [ ] `useRuleBuilder` hook wrapping the tree engine + surface + validation/describe.
-      **Editor boundary contract:** the persisted/DB Condition is CLEAN (no
-      `_id`/`_groupId`). The hook `withIds` on load (in), keeps the decorated tree
-      only for React rendering, and `onChange`/`getValue()` always return
-      `stripMeta(trimEmptyGroups(...))` (out). Decorated form never escapes the
-      editor; validation/describe/preview/persist all run on the clean form.
-- [ ] Recursive component hierarchy mirroring Zealot PR 1022:
-      `RuleBuilder` → `RuleGroup` (recursive AND/OR, depth cap) → `RuleRow`,
-      with `GroupHeader`/`GroupFooter`, and a `SchemaContext` carrying the surface.
-- [ ] **Out-of-the-box shadcn slot implementation** of all the builder pieces
-      (the example set the slot contracts are designed for).
-- [ ] **Storybook** showcasing each slot/component and state in isolation.
-- [ ] **Example app** with the shadcn components factored into a separate
-      module and consumed by the app (TanStack Start or Vite — TBD).
+- [x] UI-decoration layer (`core/decorate.ts`): `withIds` (stable React keys),
+      `switchGroupOperator` (AND↔OR), `trimEmptyGroups`, generic `stripMeta`
+      (strips any `_`-prefixed key, artifact-agnostic). Plus tree-engine
+      `groupSiblings` (group N siblings down a layer) + dissolve-`unwrapCompound`.
+- [x] `useRuleBuilder` hook — composes the surface from serializable maps
+      (parent-less narrowing), holds decorated state, enforces the editor boundary
+      (clean in/out), exposes mutations + fields()/describe()/validate().
+- [x] Recursive components (slot-injected): `RuleBuilder` → `RuleGroup` (recursive
+      AND/OR, depth cap) → `RuleRow`, + `GroupHeader`/`GroupFooter` + context.
+      RuleRow picks the value slot by `ValueShape`.
+- [x] **Example app** (Vite) with a factored-out slot set (`examples/`); verified
+      via `vite build`. DOM test harness (happy-dom + @testing-library/react, React
+      19); 42 tests incl. a render→add-rule→clean-condition integration test.
+- [ ] **Out-of-the-box shadcn slot implementation** (the example set is currently
+      dependency-light; shadcn/radix/tailwind variant is a styling swap).
+- [ ] **Ladle** stories showcasing each slot/component + state (matches template
+      `packages/ui`, which uses Ladle — template PR 5).
 - [ ] Slot contract test suite (`testing/`); preview panel (run `check()` on
-      sample data; hydration spec for bridge-crossing rules).
+      sample data; hydration spec for bridge-crossing rules); relation drill-down
+      (array operators / nested-model field resolution — v1 is anchor-model fields).
 
 ### Reference: Zealot PR 1022 (`userevidence/Zealot-Monorepo`)
 
