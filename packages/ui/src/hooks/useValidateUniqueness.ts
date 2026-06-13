@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { organizationRead, spaceRead } from '@template/sdk';
 import { useQuery } from '@template/ui/hooks/useQuery';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, infrastructure:prisma, feature:contact
+ */
 import type { Prisma } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateContactRoute } from '#/modules/me/routes/meCreateContact';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:email
+ * @uses none
+ */
 const OPEN_TAG = /\{\{#component:([a-z0-9-]+)\}\}/g;
 
 export type MappedComponent = {

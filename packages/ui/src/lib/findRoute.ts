@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:ui
+ * @uses none
+ */
 import type { NavConfig, NavItem } from '@template/ui/components/layout/navigationTypes';
 
 export type RouteMatch = {

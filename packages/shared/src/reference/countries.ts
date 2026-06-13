@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { z } from 'zod';
 
 // ISO-3166-1 alpha-2 country codes with English short name + ITU calling code.

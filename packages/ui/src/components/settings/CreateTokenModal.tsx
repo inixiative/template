@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import type { MeCreateTokenData } from '@template/sdk';
 import { Button, Input, Label, Modal, Select } from '@template/ui/components';
 import { enumToSelectOptions } from '@template/ui/lib/enumOptions';

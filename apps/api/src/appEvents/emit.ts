@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:appEvents
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { AppEventPayloads } from '#/appEvents/handlers';

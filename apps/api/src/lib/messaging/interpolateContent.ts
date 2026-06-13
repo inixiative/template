@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind transformer
+ * @partOf primitive:messaging
+ * @uses feature:email
+ */
 import { interpolate, type Variables } from '@template/email/render/interpolate';
 import type { MessageContent } from '#/lib/messaging/providers';
 

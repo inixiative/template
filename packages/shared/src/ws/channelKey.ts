@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 export type ChannelKeyInput = { _id: string; path?: Record<string, unknown> | null };
 
 // Mirrors cacheKey serialization (packages/db redis/cache.ts): route identity, then path scope

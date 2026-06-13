@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant
+ * @partOf primitive:batch
+ * @uses none
+ */
 export type { BatchExecutionStrategy } from '#/modules/batch/services/executor';
 
 export const BatchStatus = {

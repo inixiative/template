@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:authz
+ * @uses none
+ */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Role as PrismaRole } from '@template/db/generated/client/enums';
 import type { ActionRule } from '@template/permissions/rebac/types';

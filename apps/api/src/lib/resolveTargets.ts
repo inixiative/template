@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:email
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting/types';
 import { rolesAtOrAbove } from '@template/permissions';

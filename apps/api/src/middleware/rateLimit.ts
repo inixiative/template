@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf infrastructure:redis
+ * @uses primitive:errors
+ */
 import { getRedisClient, redisNamespace } from '@template/db';
 import type { Context, Next } from 'hono';
 

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:inquiry
+ * @uses primitive:routeTemplates, infrastructure:prisma, primitive:appEvents
+ */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';

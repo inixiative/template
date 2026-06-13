@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { inquiryUpdate } from '@template/sdk';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf superadmin
+ * @uses primitive:ui
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { HomePage } from '@template/ui/pages';
 import { requirePublic } from '#/guards';

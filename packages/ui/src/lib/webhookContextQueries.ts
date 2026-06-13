@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import {
   meCreateWebhookSubscription,
   meReadManyWebhookSubscriptions,

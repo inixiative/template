@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:websockets
+ * @uses none
+ */
 import { byChannel, byId, byUser, removeConnection } from '#/ws/registry';
 import type { WSOutbound } from '#/ws/types';
 

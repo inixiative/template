@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @uses infrastructure:prisma
+ */
 import { filterIgnoredFields, getPolymorphismConfig, redactSensitiveFields } from '@template/db';
 import { isEqual } from 'lodash-es';
 

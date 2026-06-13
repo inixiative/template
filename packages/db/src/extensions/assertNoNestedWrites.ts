@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type { Prisma } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { toAccessor } from '@template/db/utils/modelNames';

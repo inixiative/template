@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth
+ * @uses none
+ */
 import type { Context, Next } from 'hono';
 import { auth } from '#/lib/auth';
 import { setUserContext } from '#/lib/context/setUserContext';

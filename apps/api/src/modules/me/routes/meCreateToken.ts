@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, feature:auth
+ */
 import { createRoute } from '#/lib/routeTemplates';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { Modules } from '#/modules/modules';

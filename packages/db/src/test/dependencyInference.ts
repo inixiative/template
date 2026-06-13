@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import * as zodSchemasNs from '@template/db/generated/zod/schemas/objects';
 import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes';
 import { getModelRelations } from '@template/db/utils/prismaMapRelations';

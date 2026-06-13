@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator, middleware
+ * @partOf feature:auth
+ * @uses primitive:requestContext, primitive:errors
+ */
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';

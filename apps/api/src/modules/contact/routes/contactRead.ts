@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:contact
+ * @uses primitive:routeTemplates, primitive:authz
+ */
 import { ContactScalarSchema } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';

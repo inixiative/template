@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:contact, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { adminContactReadManyRoute } from '#/modules/contact/routes/adminContactReadMany';

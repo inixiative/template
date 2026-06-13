@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:cronJob, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';
 

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { adminUserRedactRoute } from '#/modules/user/routes/adminUserRedact';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constructor
+ * @partOf feature:email
+ * @uses none
+ */
 export type EmailErrorType = 'component_missing' | 'template_missing' | 'circular_ref';
 
 export class EmailRenderError extends Error {

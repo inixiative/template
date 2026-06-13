@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, ThemeToggle } from '@template/ui/components';
 
 export const UserProfileTab = () => {

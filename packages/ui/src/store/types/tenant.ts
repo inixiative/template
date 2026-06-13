@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type, store
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import type { MeReadResponses } from '@template/sdk';
 
 type MeData = MeReadResponses[200]['data'];

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export const useDebounce = <T>(value: T, delay: number = 300): T => {

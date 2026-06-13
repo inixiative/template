@@ -1,6 +1,6 @@
 # COMM-001: Email System
 
-**Status**: 🚧 In Progress (render runtime built; authoring layer is the gap)
+**Status**: 🚧 In Progress — render + send engine built; authoring layer (rules/lens) + tracking/prefs/admin UI pending
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-02-06
@@ -8,54 +8,63 @@
 
 ---
 
-## Overview
+## Current State
 
-The email **render runtime already exists** in `packages/email`. MJML templates,
-reusable components, the ownership cascade, variable interpolation, and
-json-rules conditional blocks all work today. What's missing is the **authoring
-layer**: a typed, narrowed data surface to build conditions and insert variables
-against, instead of hand-writing `Condition` JSON and `{{recipient.x}}` tokens
-into MJML. That layer is the rules builder (INFRA-002) over a lens (INFRA-017),
-pointed at the email variable roots.
+The original scope below imagined React Email + SendGrid/SES. The team actually
+built an **MJML-based engine that is send-capable end to end today** — so this is
+not "not started," and `packages/email` is not a stub. What remains is the
+**authoring layer** (typed, narrowed data surface for composing conditions and
+inserting variables) plus delivery tracking, preferences, and admin UI.
 
-## What already works (`packages/email/render/*`)
+**Built and operational (verified in code):**
+- `packages/email/src/client/` — Resend adapter (real batch send) + Console fallback.
+- `packages/email/src/render/` — `compose`/`interpolate`/`expand` MJML pipeline:
+  nested components, cycle detection, owner-cascade lookup (Space → Org →
+  default/admin), and json-rules **conditional blocks** (`evaluateConditions.ts`
+  parses `{{#if rule=<Condition JSON>}}…{{/if}}` → `check(rule, data)`).
+- `packages/email/src/targeting/` — declarative recipient resolution (userIds/emails).
+- `packages/email/src/verification/` — Bouncer deliverability check + noop fallback.
+- `apps/api/src/jobs/handlers/sendEmail.ts` — wired end to end (resolveTargets →
+  composeTemplate → interpolate → mjml2html → `client.sendBatch`); emails enqueue
+  as BullMQ jobs via the app-event email bridge, not synchronously.
 
-- **Conditional blocks, on json-rules** — `evaluateConditions.ts` parses
-  `{{#if rule=<Condition JSON>}}…{{/if}}` and runs `check(rule, data)`.
-- **Interpolation** — `interpolate.ts`, three fixed roots `sender` / `recipient`
-  / `data` (`VariablePrefix`), HTML-escaped.
-- **Component system + cascade** — `EmailComponent` / `EmailTemplate` polymorphic
-  ownership (`default | admin | Organization | Space`) + `inheritToSpaces`,
-  `{{component:slug}}` expansion (`expand.ts`), resolved Space → Org →
-  default/admin (`lookupCascade.ts`). An org-owned `default-header`/footer that
-  spaces inherit is the existing brand mechanism.
-- Save pipeline, MJML validation, Resend/Console clients.
+**Interpolation** today is three fixed roots `sender` / `recipient` / `data`
+(`VariablePrefix`, HTML-escaped). See `docs/claude/COMMUNICATIONS.md`.
 
-Remaining **runtime** TODOs (separate from this ticket's authoring scope): data
-hydration into `Variables`, BullMQ send job, preference/unsubscribe management.
-See `docs/claude/COMMUNICATIONS.md`.
+## The gap = the authoring layer
 
-## Build scope (authoring layer)
+Conditions are currently hand-written `Condition` JSON inside `{{#if rule=…}}`,
+and variables are hand-typed `{{recipient.x}}` tokens. The authoring layer
+replaces the hand-writing with a typed editor over a **narrowed lens**:
 
 1. **Per-actor narrowed lens** over `{ sender, recipient, data }`, per
    actor-context and template/event type. Space-context authors get a lens
    narrowed to their space (optionally space + org); org-context wider; superadmin
    widest. Shipped to the builder as `exposedSurface` (where-stripped); the `where`
-   scope floor is re-applied server-side at send via `applyLens`. Narrowing
-   governs *what data can be referenced and how far up the graph an author may
-   traverse* — not what they must include.
+   scope floor is re-applied server-side at send via `applyLens`. Narrowing governs
+   *what data can be referenced and how far up the graph an author may traverse* —
+   not what they must include.
 2. **Authoring UI** — the rules builder (INFRA-002) emitting the exact `Condition`
    JSON `evaluateConditions` already consumes, plus a **field selector**
    (FieldSelector, extracted from the builder) emitting the `{{recipient.x}}`
    tokens `interpolate` already consumes. The builder is the editor for a runtime
    that already runs; it does not replace it.
-3. The lens also buys safety the hand-written form lacks today: author-time
-   narrowing (can't reference off-surface fields) + save-time validation
-   (`describeRule` / `checkRuleAgainstLens`).
+3. The lens also buys safety the hand-written form lacks: author-time narrowing
+   (can't reference off-surface fields) + save-time validation (`describeRule` /
+   `checkRuleAgainstLens`).
 
 For **custom** (no fixed template/payload) emails: the author gets a base lens
 over `{ sender, recipient, data }` for their role — same lens, role-differentiated
 narrowing.
+
+## Remaining (non-authoring)
+
+- Standard template authoring (welcome, password-reset, verification, invitation)
+  — none created yet.
+- Admin UI for template management.
+- Delivery tracking (open/click/bounce) and per-user preferences/opt-out.
+- Per-tenant provider/adapter resolution (sendEmail uses the first registered
+  adapter today).
 
 ## Deferred — documented, not built
 
@@ -83,6 +92,6 @@ deferrals above.
 
 ## Related Tickets
 
-- **Blocked by**: INFRA-002 (rules builder), INFRA-017 (builder surface)
+- **Blocked by**: INFRA-002 (rules builder), INFRA-017 (builder surface) — for the authoring layer only; core send works today.
 - **Benefits from** (not blocking): INFRA-016 (lens serialization), INFRA-018 (lens builder)
 - **Blocks**: FEAT-001 (Inquiry system — needs invite emails)

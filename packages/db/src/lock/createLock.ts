@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma, infrastructure:redis
+ * @uses none
+ */
 // Single-node Redis lock. Footguns:
 //   - Not Redlock — do not rely across cluster nodes.
 //   - Worker suspension > ttlMs (debugger pause, OS sleep) → key expires + another holder takes it

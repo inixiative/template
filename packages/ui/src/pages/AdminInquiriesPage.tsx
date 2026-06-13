@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import {
   type AdminInquiryReadManyResponses,
   adminInquiryReadMany,

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:requestContext
+ * @uses infrastructure:prisma
+ */
 import type {
   Organization,
   OrganizationUser,

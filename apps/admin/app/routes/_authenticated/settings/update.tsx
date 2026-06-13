@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf feature:inquiry
+ * @uses primitive:ui
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { SpaceUpdateInquiryPage } from '@template/ui/pages';
 

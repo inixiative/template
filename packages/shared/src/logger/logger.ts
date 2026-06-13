@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { consolaAdapter } from '@template/shared/logger/consolaAdapter';
 import { pinoAdapter } from '@template/shared/logger/pinoAdapter';
 import { getLogBroadcasts, getLogScopes, LogScope, logScope } from '@template/shared/logger/scope';

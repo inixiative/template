@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:email, integration:resend
+ * @uses primitive:shared
+ */
 import { join } from 'node:path';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { VCR } from '@template/shared/vcr';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:batch
+ * @uses none
+ */
 import type { Context } from 'hono';
 import { getValidatedBody } from '#/lib/context/getValidatedData';
 import { allowFailures } from '#/modules/batch/services/strategies/allowFailures';

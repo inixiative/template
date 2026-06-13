@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 // Shared URL helpers for handle-type contact parsers. Each per-type parser
 // file under `parsers/` consumes these to peel a URL down to its handle.
 

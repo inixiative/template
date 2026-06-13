@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';

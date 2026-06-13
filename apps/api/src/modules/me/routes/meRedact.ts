@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users
+ * @uses primitive:routeTemplates
+ */
 import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';

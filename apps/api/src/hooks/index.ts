@@ -7,6 +7,7 @@ import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
+import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
@@ -20,4 +21,5 @@ export const registerHooks = () => {
   registerRulesHook();
   registerTagOwnerCategoryHook();
   registerWebhookHook();
+  registerWebhookSubscriptionUrlHook();
 };

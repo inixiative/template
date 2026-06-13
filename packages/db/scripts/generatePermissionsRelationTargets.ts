@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { prismaMap } from '@template/db/generated/prismaMap';

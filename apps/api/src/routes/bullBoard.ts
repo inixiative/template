@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @uses primitive:jobs, primitive:shared, feature:auth
+ */
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';

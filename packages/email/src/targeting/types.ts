@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf feature:email
+ * @uses none
+ */
 export type EmailTarget =
   | { userIds: string[] }
   | { raw: string[] }

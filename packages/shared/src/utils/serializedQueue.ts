@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ * @uses none
+ */
 // Per-instance serialized queue. Each call to `run(fn)` waits for the previous
 // to settle (success or failure) before invoking fn. Failures don't poison the
 // chain — the next call still runs.
