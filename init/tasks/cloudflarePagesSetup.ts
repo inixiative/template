@@ -1,6 +1,6 @@
 import { cloudflareApi } from '../api/cloudflare';
 import { updateConfigField } from '../utils/configHelpers';
-import { execAsync } from '../utils/exec';
+import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { clearError, isComplete, markComplete, setError } from '../utils/progressTracking';
 import { getSecretAsync, setSecretAsync } from './infisicalSetup';
@@ -166,8 +166,9 @@ const fetchEnvVars = async (
 ): Promise<Record<string, string>> => {
   const result: Record<string, string> = {};
   // Use infisical CLI to dump secrets (exec is already available in init utils).
-  const { stdout } = await execAsync(
-    `infisical secrets --projectId="${projectId}" --env=${env} --path=${path} --plain`,
+  const { stdout } = await execFileAsync(
+    'infisical',
+    ['secrets', `--projectId=${projectId}`, `--env=${env}`, `--path=${path}`, '--plain'],
     { timeout: 15000 },
   );
   for (const line of stdout.split('\n')) {

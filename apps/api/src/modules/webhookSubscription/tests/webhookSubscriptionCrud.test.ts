@@ -108,6 +108,18 @@ describe('WebhookSubscription CRUD', () => {
       expect(data.url).toBe('https://new-url.com/webhook');
     });
 
+    it('rejects a private/internal URL (SSRF guard)', async () => {
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        isActive: true,
+      });
+
+      const response = await fetch(patch(`/api/v1/webhookSubscription/${sub.id}`, { url: 'https://10.0.0.1/hook' }));
+
+      expect(response.status).toBe(400);
+    });
+
     it('keeps inactive when explicitly set', async () => {
       const { entity: sub } = await createWebhookSubscription({
         ownerModel: 'User',

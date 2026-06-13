@@ -3,7 +3,7 @@
 **Status**: Planning
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-03-29
+**Updated**: 2026-06-09 (added section 18 — design review addendum; no prior content removed)
 **Dependencies**: Railway Buckets, Space Transfer (inquiry system)
 
 ---
@@ -1651,6 +1651,158 @@ Storage billing questions that need answers before pricing:
 - Who pays for shared files? The storage owner (uploader's scope), not the viewer.
 - Quota enforcement point: at presign time (reject before upload) or at confirm time (reject after)?
 - Recommendation: enforce at presign (fail fast), with a grace buffer for in-flight uploads.
+
+---
+
+## 18. Design Review Addendum — 2026-06-09
+
+> Notes from an independent design review (a plan was drafted blind against the codebase, then
+> compared with this ticket). **Everything above is preserved unchanged** — these notes layer on
+> top for evaluation. Items are tagged: **ACCEPTED** (owner has signed off), **RECOMMENDED**
+> (review position, pending owner decision), **OPEN** (genuinely contested, both sides documented).
+
+### 18.1 ACCEPTED — Ownership via false polymorphism (align with current codebase pattern)
+
+The File model in section 3.1 (nullable `organizationId` + `uploadedBy`/`uploadedByModel`)
+predates the now-standard registry-enforced false polymorphism (Contact, WebhookSubscription)
+and predates Spaces as first-class owners. Update to the house pattern:
+
+```prisma
+model File {
+  // Owner — false polymorphism, exactly one FK populated (registry + hook enforced)
+  ownerModel     FileOwnerModel   // User | Organization | Space
+  userId         String? @db.VarChar(36)
+  organizationId String? @db.VarChar(36)
+  spaceId        String? @db.VarChar(36)
+  // relations with onDelete: Cascade, partial composite uniques/indexes per FK — Contact pattern
+
+  // Provenance — who performed the upload; distinct from storage ownership
+  uploadedBy      String
+  uploadedByModel String  @default("User")   // User | CustomerRef
+}
+```
+
+- `PolymorphismRegistry` entry for the `ownerModel` axis; falsePolymorphism hook enforces FK/discriminator match.
+- "Personal file" = `ownerModel: User` (replaces "organizationId null means personal").
+- Space becomes a real owner FK instead of being inferred from folder path.
+- `uploadedBy`/`uploadedByModel` survive unchanged as provenance — the storage-vs-access
+  ownership distinction in section 3.3 is orthogonal and intact.
+- `FilePermission.targetModel`/`granteeModel` and Folder ownership should use the same
+  registry pattern (they already follow its spirit; make them registry entries).
+- Ripple: section 4's "ownership by path scope" table becomes "ownership by owner FK";
+  key prefixes (if kept) derive from ownerModel.
+
+### 18.2 OPEN — S3 key strategy: path-mirrored (sections 4–5) vs immutable owner-prefixed id keys
+
+The current design mirrors materialized paths into S3 keys, which requires keys to move when
+files/folders move — that single decision generates the FileJob `move` type, `reconcileMove`,
+the four-state read table, the move-remnant orphan class, and the stalled-move sweeper cases.
+
+**Alternative under consideration:** keys are immutable and owner-prefixed:
+
+```
+org_{orgId}/{fileId}-{filename}
+user_{userId}/{fileId}-{filename}
+```
+
+Valid *because of* this ticket's own invariant: storage ownership is immutable (cross-owner is
+always copy → new File → new key). The folder tree then lives only in Postgres; space/folder
+context goes into S3 object tags at confirm time; moves and renames become pure DB row updates.
+
+| Dimension | Path-mirrored keys (current) | Immutable id keys (alternative) |
+|---|---|---|
+| Railway S3 browser | navigable to folder level | navigable to owner level; UUIDv7 sorts by upload time within prefix; filename suffix readable |
+| Folder browse while debugging | prefix-list the bucket | DB query first, then jump to exact key |
+| Ownership from key alone | yes (path prefix) | yes (owner prefix) |
+| Move/rename cost | durable FileJob: S3 copy → verify → DB swap → delete, per descendant file | DB update only; no S3 ops |
+| FileJob table | needed for `move` + `lazy_copy` | needed for `lazy_copy` only |
+| Orphan classes | + move remnants, + stalled moves | both classes eliminated |
+| Bucket-scan reconciliation | ambiguous during in-flight moves (two keys legitimately exist per file; scan must join FileJob state) | unambiguous: parse fileId from any key → exact DB lookup; no match = orphan; prefix names the owner |
+| DB↔S3 divergence window | exists during every move | none (keys never change) |
+
+**Orphan analysis (the deciding concern either way):** the sweeper must exist in both designs
+(stale pending, failed uploads, retention purge, no-DB-record scan are shared). Mirrored keys
+*add* two orphan classes and make the bucket scan conditional on job state; id keys *remove*
+those classes and make the scan a pure set-difference. What id keys lose is eyeball-detection —
+a human browsing the bucket noticing "this folder shouldn't have stuff in it." Systematic vs
+eyeballable.
+
+**Review recommendation:** id keys. The upgrade path is additive — if raw-console folder
+browsing proves load-bearing in practice, mirrored keys + the move machinery can be introduced
+later (the FileJob table already exists for lazy copy); the reverse migration is much harder.
+
+**Counter-position (status quo):** Railway's browser is the only storage UI until the file
+browser ships, ownership/location is self-evident per object, and the move machinery is
+designed and bounded. Decision deferred to implementation.
+
+### 18.3 RECOMMENDED — Per-purpose validation moves to Phase 1
+
+Sections 12's "Size limits" / "Allowed content types" open decisions are v1 safety
+requirements, not polish: without them the first avatar endpoint accepts arbitrary bytes.
+Proposed: a purpose/kind registry in `packages/shared` mirroring `shared/contact/registry` —
+single source of truth consumed by presign validation and confirm verification:
+
+```typescript
+// packages/shared/src/file/registry.ts (shape sketch)
+{
+  avatar:     { contentTypes: [image mimes], maxSize: 5_MB,  singlePerOwner: true },
+  logo:       { contentTypes: [image mimes], maxSize: 5_MB,  singlePerOwner: true },
+  attachment: { contentTypes: '*',           maxSize: 100_MB },
+  export:     { contentTypes: [zip, csv],    maxSize: 1_GB,  ttl: 7_DAYS },
+}
+```
+
+`singlePerOwner` gives avatar/logo replace semantics; `ttl` feeds the sweeper for ephemeral
+kinds. Note the overlap with v2 `bindingType` — when ResourceBinding lands, kind may either
+migrate onto the binding or remain as upload-time constraint while bindingType is display-time
+role. Both are defensible; flagged so v1 kinds don't paint v2 into a corner.
+
+### 18.4 NEW — Transfer semantics: grant disposition (extends sections 6 and 15)
+
+Principle: **bindings follow the asset; permissions follow the authority.**
+
+- The usage chain must never silently break (this ticket's core thesis).
+- The access chain must not silently *persist* across an authority change (old grantees
+  retaining access to a file the new owner now controls = tenant leak), **and** must not
+  silently *sever* (a dependent expecting live updates gets a frozen snapshot and discovers
+  the fork months later). Both are silent failures; the fix is making disposition explicit.
+
+Cross-owner transfer is therefore a negotiated operation (inquiry flow, same vehicle as space
+transfer) with a per-dependent disposition chosen by the **receiving** owner:
+
+| Disposition | Grant | Binding | Result |
+|---|---|---|---|
+| **maintain** | re-issued under new authority | keeps pointing at the (transferred) original | live sync, consensual |
+| **sever** (default) | revoked | repointed to lazy-copy snapshot (or nothing if `preserveOnRevoke: false`) | clean boundary, nothing 404s |
+
+- Default is sever — fail-closed for the tenant boundary, with lazy copy as the safety net.
+- Mechanical identity: live sync = keep binding + re-issue grant; snapshot = repoint binding +
+  revoke grant. Both compose entirely from machinery already in this ticket (lazy copy,
+  revocation, binding repointing).
+- The "this file has N active dependents" list shown at transfer time falls out of the
+  bidirectional binding graph — it's the section 2 thesis paying rent.
+- Ripple for section 15 (space transfer cascade): file dispositions become terms on the
+  transfer inquiry rather than an unconditional permission upsert.
+
+### 18.5 Misc review notes
+
+- `File.size` should be `BigInt` — `Int` caps at ~2 GB.
+- Storage client now exists as an adapter (`apps/api/src/lib/storage/`, see ADAPTERS.md) with
+  `system`/`user` buckets, `presignPost` (content-length-range conditions), `presignGet`,
+  `headObject`, `copyObject`, `deleteObject`, `tagObject` — section 11's s3Client/presign
+  services are partially built; NoopStorageClient should slot into `makeAdapterRouter` env
+  routing rather than being bespoke.
+- ReBAC step (section 6, step 2a) can be expressed as a rebac `file` entry delegating to the
+  owner (Contact pattern), with per-row `permissionRules` JSON available for row-level
+  overrides; FilePermission remains the explicit ABAC layer on top.
+- Consider `File.expiresAt` for ephemeral kinds (exports, imports) — the retention sweeper
+  already has the natural hook.
+- An independently-drafted plan converged on: the three-layer separation, presign → confirm
+  (HEAD-verified) → tag upload flow, pending/stale sweeper timings, soft-delete → async
+  hard-delete, public-as-usage-concern, ids-canonical naming, deferred
+  checksums/quotas/derivatives. Divergences were exactly the parts not yet encoded in code:
+  folders/paths, FilePermission ABAC, lazy copy, FileJob — treat those sections as the ones
+  needing the most careful implementation review since no second derivation exists for them.
 
 ---
 
