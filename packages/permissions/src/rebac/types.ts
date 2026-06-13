@@ -4,27 +4,18 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { Condition } from '@inixiative/json-rules';
+import type { ModelPermission } from '@inixiative/permissions';
 import type { AccessorName } from '@template/db';
 
-export type RelationCheck = {
-  rel: string; // Field name on record (e.g., 'organization')
-  action: string;
-};
-export type RuleCheck = { rule: Condition };
-export type SelfCheck = { self: string }; // FK field to match against current user (e.g., 'userId')
-
-export type ActionRule =
-  | string // inherit action from same model
-  | RelationCheck
-  | RuleCheck
-  | SelfCheck
-  | { any: ActionRule[] }
-  | { all: ActionRule[] }
-  | null;
-
-export type ModelPermission = {
-  actions: Record<string, ActionRule>;
-};
+// The permission algebra (ActionRule + its parts) is imported from @inixiative/permissions, not
+// recapitulated here. RebacSchema is the one app-specific narrowing: keyed by this repo's model
+// AccessorNames instead of the engine's generic string key.
+export type {
+  ActionRule,
+  ModelPermission,
+  RelationCheck,
+  RuleCheck,
+  SelfCheck,
+} from '@inixiative/permissions';
 
 export type RebacSchema = Partial<Record<AccessorName, ModelPermission>>;
