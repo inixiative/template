@@ -149,8 +149,15 @@ describe('parseBracketNotation — symbol values ([:] marker)', () => {
     expect(parseBracketNotation('?searchFields[a][equals]=true').searchFields).toEqual({ a: { equals: 'true' } });
   });
 
-  it('falls back to the literal string for non-allowlisted [:] tokens (no eval)', () => {
-    expect(parseBracketNotation('?searchFields[a][equals][:]=bogus').searchFields).toEqual({ a: { equals: 'bogus' } });
+  it('skips a [:] marker whose value is not a valid symbol (no eval, no raw-string fallback)', () => {
+    // `[:]` marks a symbol (null/true/false); a non-symbol value is malformed and
+    // the leaf is dropped rather than silently stored as a raw string. The
+    // intermediate parent object is still created before the skip.
+    expect(parseBracketNotation('?searchFields[a][equals][:]=bogus').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[name][:]=dragon').searchFields).toEqual({});
+    expect(parseBracketNotation('?searchFields[name][:]=dragon&searchFields[email]=a@b.com').searchFields).toEqual({
+      email: 'a@b.com',
+    });
   });
 
   it('supports a bare [:] symbol value', () => {

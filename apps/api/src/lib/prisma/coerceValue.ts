@@ -3,6 +3,11 @@
  * @kind transformer
  * @partOf infrastructure:prisma
  * @uses none
+ *
+ * null (the `[:]` is-null wire symbol) passes through untouched for any field —
+ * it's the is-null sentinel, valid on every field. A boolean is only accepted for
+ * a Boolean-kind field; on any other field it is rejected with an error (so e.g.
+ * `searchFields[createdAt][:]=true` no longer builds an invalid Prisma filter).
  */
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
@@ -48,9 +53,18 @@ const COERCERS: Record<string, Coercer> = {
   // handled by buildJsonWhere, not coercion — pass through unchanged.
 };
 
+const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+
 export const coerceValueForField = (field: FieldDef, value: unknown): unknown => {
-  if (value === null || typeof value === 'boolean') return value; // symbol values pass through
+  // null is the `[:]` is-null wire symbol — valid on any field, pass through.
+  if (value === null) return value;
   if (Array.isArray(value)) return value.map((item) => coerceValueForField(field, item));
+  // A boolean is only valid for a Boolean-kind field. For everything else it must
+  // be rejected here rather than passing through and building an invalid Prisma filter.
+  if (typeof value === 'boolean') {
+    if (field.kind === 'scalar' && field.type === 'Boolean') return value;
+    throw new Error(`Cannot coerce ${JSON.stringify(value)} to ${kindLabel(field)}`);
+  }
   if (field.kind !== 'scalar') return value; // enums + relations pass through
   return COERCERS[field.type]?.(value) ?? value;
 };
