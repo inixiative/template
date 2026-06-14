@@ -272,19 +272,10 @@ fi
 # ---------------------------------------------------------------------------
 # 6b. Create MinIO buckets for this slot
 # ---------------------------------------------------------------------------
-MINIO_CONTAINER="${PROJECT_NAME}_minio"
-echo -e "${BLUE}Creating MinIO buckets on $MINIO_CONTAINER...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
-  for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-                 "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-    docker run --rm --network "${PROJECT_NAME}_default" \
-      -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
-      minio/mc:latest mb --ignore-existing "local/${BUCKET}" >/dev/null 2>&1 || true
-  done
-  echo -e "${GREEN}Created: 4 buckets for slot ${SLOT}${NC}"
-else
-  echo -e "${YELLOW}Warning: $MINIO_CONTAINER not running — skipping bucket creation.${NC}"
-fi
+echo -e "${BLUE}Provisioning MinIO buckets for slot ${SLOT}...${NC}"
+"$ROOT_DIR/scripts/db/minio-provision.sh" \
+  "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+  "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"
 
 # ---------------------------------------------------------------------------
 # 7. Push schema to both DBs
