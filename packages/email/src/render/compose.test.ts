@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
-import { composeComponent, composeTemplate } from '@template/email/render/compose';
+import { composeComponent, composeTemplate, parentOwner } from '@template/email/render/compose';
 import { EmailRenderError } from '@template/email/render/errors';
 
 describe('composeTemplate', () => {
@@ -33,6 +33,9 @@ describe('composeTemplate', () => {
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
     expect(result.category).toBe('system');
+    // Resolved owner + render-error policy drive the send-side fallback loop.
+    expect(result.ownerModel).toBe('default');
+    expect(result.onError).toBe('fail');
   });
 
   it('composes template with single component', async () => {
@@ -197,6 +200,15 @@ describe('composeTemplate', () => {
     });
 
     expect(result.mjml).toContain('Default Footer');
+  });
+});
+
+describe('parentOwner', () => {
+  it('walks the cascade Space → Organization → default and stops at base owners', () => {
+    expect(parentOwner('Space')).toBe('Organization');
+    expect(parentOwner('Organization')).toBe('default');
+    expect(parentOwner('default')).toBeNull();
+    expect(parentOwner('admin')).toBeNull();
   });
 });
 

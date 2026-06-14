@@ -33,7 +33,9 @@ export type SaveTemplateResult = {
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
+  // Subjects are interpolated too, so they carry conditionals and need the same floor.
   assertValidConditions(input.mjml);
+  if (input.subject) assertValidConditions(input.subject);
 
   const ctx: SaveContext = {
     ownerModel: input.ownerModel,

@@ -4,7 +4,7 @@
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-02-06
-**Updated**: 2026-06-13
+**Updated**: 2026-06-14
 
 ---
 
@@ -27,6 +27,14 @@ inserting variables) plus delivery tracking, preferences, and admin UI.
 - `apps/api/src/jobs/handlers/sendEmail.ts` — wired end to end (resolveTargets →
   composeTemplate → interpolate → mjml2html → `client.sendBatch`); emails enqueue
   as BullMQ jobs via the app-event email bridge, not synchronously.
+- **Render-error policy** — per-template `onError` enum (`fail`/`degrade`/`fallback`,
+  default `fail`). A conditional rule that *throws* at render (not a non-match) is
+  surfaced via the evaluator's `onError` sink, always logged, then handled per
+  policy: `fail` → `EmailRenderError` → BullMQ retries → DLQ; `degrade` → send with
+  the throwing block dropped; `fallback` → re-compose one owner up (`parentOwner`:
+  Space → Org → default). Base owners always `fail`. Save-time validates conditionals
+  in both `mjml` and `subject`. Debug-only inline error comments gate on
+  `EMAIL_INLINE_RENDER_ERRORS` (decoupled from env, so testable).
 
 **Interpolation** today is three fixed roots `sender` / `recipient` / `data`
 (`VariablePrefix`, HTML-escaped). See `docs/claude/COMMUNICATIONS.md`.
@@ -63,8 +71,11 @@ narrowing.
   — none created yet.
 - Admin UI for template management.
 - Delivery tracking (open/click/bounce) and per-user preferences/opt-out.
-- Per-tenant provider/adapter resolution (sendEmail uses the first registered
-  adapter today).
+- Per-tenant provider/adapter + template owner/locale resolution (sendEmail uses
+  the first registered adapter and `{ ownerModel: 'default', locale: 'en' }` today).
+  This is also the seam that activates the render-error policy beyond `fail` — until
+  a send resolves to a non-base owner, `degrade`/`fallback` are unreachable. The
+  policy machinery ships now and threads through the cascade unchanged.
 
 ## Deferred — documented, not built
 

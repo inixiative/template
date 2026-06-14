@@ -4,9 +4,17 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import { composeTemplate, interpolate, type Variables } from '@template/email/render';
+import {
+  type ComposeTemplateResult,
+  composeTemplate,
+  EmailRenderError,
+  interpolate,
+  parentOwner,
+  type RuleErrorSink,
+  type Variables,
+} from '@template/email/render';
 import type { EmailTarget } from '@template/email/targeting';
-import { log } from '@template/shared/logger';
+import { LogScope, log } from '@template/shared/logger';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
@@ -77,27 +85,70 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   // Stub: always uses first registered adapter. Future: resolve per-tenant via sender context.
   const client = emailRegistry.getOrDefault(undefined, adapterName);
 
-  // Stub: always default templates, en locale. Future: resolve from sender.ownerModel + locale.
-  const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
   const senderData = senderVars();
+  // Stub: always default templates, en locale. Future: resolve per-tenant org/space context here —
+  // it threads through the fallback cascade below unchanged.
+  const renderCtx = { locale: 'en' };
 
-  const rendered = await Promise.all(
-    validRecipients.map(async (recipient) => {
-      const variables: Variables = {
-        sender: senderData,
-        recipient: { name: recipient.name, email: recipient.to },
-        data,
-      };
+  // Render the batch for one resolved template, collecting any render-time rule throws via onError.
+  const renderBatch = async (composed: ComposeTemplateResult) => {
+    const errors: string[] = [];
+    const onError: RuleErrorSink = (message) => errors.push(message);
 
-      const mjml = interpolate(composed.mjml, variables);
-      const subject = interpolate(composed.subject, variables);
-      const { html } = await mjml2html(mjml, { validationLevel: 'skip' });
+    const messages = await Promise.all(
+      validRecipients.map(async (recipient) => {
+        const variables: Variables = {
+          sender: senderData,
+          recipient: { name: recipient.name, email: recipient.to },
+          data,
+        };
 
-      return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
-    }),
-  );
+        const mjml = interpolate(composed.mjml, variables, onError);
+        const subject = interpolate(composed.subject, variables, onError);
+        const { html } = await mjml2html(mjml, { validationLevel: 'skip' });
 
-  await client.sendBatch(rendered);
+        return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
+      }),
+    );
 
-  log.info(`Email sent: template=${template} recipients=${rendered.length}`);
+    return { messages, errors };
+  };
+
+  // Render-error policy: a clean render sends. On a render throw we always log, then apply the
+  // resolved template's onError — degrade (send with the throwing blocks dropped), fallback
+  // (re-compose one owner up: Space → Org → default), or fail (throw → retries → DLQ). Base owners
+  // (default/admin) aren't author-configurable and have no parent, so they always fail.
+  let composed = await composeTemplate(template, { ...renderCtx, ownerModel: 'default' });
+
+  while (true) {
+    const { messages, errors } = await renderBatch(composed);
+
+    if (!errors.length) {
+      await client.sendBatch(messages);
+      log.info(`Email sent: template=${template} recipients=${messages.length}`, LogScope.email);
+      return;
+    }
+
+    const unique = [...new Set(errors)];
+    log.warn(
+      `Email render error: template=${template} owner=${composed.ownerModel} — ${unique.join('; ')}`,
+      LogScope.email,
+    );
+
+    const parent = parentOwner(composed.ownerModel);
+    const policy = parent ? composed.onError : 'fail';
+
+    if (policy === 'degrade') {
+      await client.sendBatch(messages);
+      log.warn(`Email sent degraded: template=${template} recipients=${messages.length}`, LogScope.email);
+      return;
+    }
+
+    if (policy === 'fallback' && parent) {
+      composed = await composeTemplate(template, { ...renderCtx, ownerModel: parent });
+      continue;
+    }
+
+    throw new EmailRenderError(template, 'render_failed');
+  }
 });

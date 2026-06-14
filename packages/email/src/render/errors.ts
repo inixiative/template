@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-export type EmailErrorType = 'component_missing' | 'template_missing' | 'circular_ref';
+export type EmailErrorType = 'component_missing' | 'template_missing' | 'circular_ref' | 'render_failed';
 
 export class EmailRenderError extends Error {
   readonly slug: string;
@@ -29,6 +29,8 @@ export class EmailRenderError extends Error {
         return path && path.length > 0
           ? `Circular reference detected: ${path.join(' → ')}`
           : `Circular reference detected: ${slug}`;
+      case 'render_failed':
+        return `Template render failed (unrenderable conditional rule): ${slug}`;
     }
   }
 }
