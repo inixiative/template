@@ -61,6 +61,36 @@ describe('evaluateConditions — regression', () => {
   });
 });
 
+describe('evaluateConditions — render-error reporting', () => {
+  const broken = '{{#if rule={bad json}}}A{{else}}B{{/if}}';
+
+  it('reports a malformed rule via onError and skips the branch (degrades) by default', () => {
+    const errors: string[] = [];
+    const out = evaluateConditions(broken, {}, (m) => errors.push(m));
+    expect(out).toBe('B');
+    expect(errors).toHaveLength(1);
+  });
+
+  it('never calls onError when every rule is valid', () => {
+    const errors: string[] = [];
+    evaluateConditions('{{#if rule=true}}X{{else}}Y{{/if}}', {}, (m) => errors.push(m));
+    expect(errors).toEqual([]);
+  });
+
+  it('emits the offending block inline only when EMAIL_INLINE_RENDER_ERRORS is set', () => {
+    const prev = process.env.EMAIL_INLINE_RENDER_ERRORS;
+    process.env.EMAIL_INLINE_RENDER_ERRORS = 'true';
+    try {
+      const out = evaluateConditions(broken, {});
+      expect(out).toContain('RULE ERROR');
+      expect(out).toContain('A');
+    } finally {
+      if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
+      else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
+    }
+  });
+});
+
 describe('evaluateConditions — non-object rules', () => {
   it('renders bare boolean rules (true/false are valid Conditions)', () => {
     expect(evaluateConditions('{{#if rule=true}}X{{/if}}', {})).toBe('X');

@@ -18,11 +18,13 @@ export const lookupAtSpace = async (
   componentSlugs: string[],
   ctx: SaveContext,
 ): Promise<LookupResult> => {
+  // Coalesce a missing tenant id to null (no match at this tier → cascade down), never undefined —
+  // in a Prisma `where`, undefined drops the filter, which would match across tenants.
   const base = {
     locale: ctx.locale,
     ownerModel: 'Space' as const,
-    organizationId: ctx.organizationId,
-    spaceId: ctx.spaceId,
+    organizationId: ctx.organizationId ?? null,
+    spaceId: ctx.spaceId ?? null,
   };
 
   const [comps, template] = await Promise.all([
@@ -45,10 +47,12 @@ export const lookupAtOrg = async (
   ctx: SaveContext,
   requireInherit = false,
 ): Promise<LookupResult> => {
+  // See lookupAtSpace: a missing organizationId must be null (no match → cascade), not undefined
+  // (which would drop the filter and match other tenants' org templates).
   const base = {
     locale: ctx.locale,
     ownerModel: 'Organization' as const,
-    organizationId: ctx.organizationId,
+    organizationId: ctx.organizationId ?? null,
     spaceId: null,
     ...(requireInherit && { inheritToSpaces: true }),
   };

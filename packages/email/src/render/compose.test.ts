@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
-import { composeComponent, composeTemplate } from '@template/email/render/compose';
+import { composeComponent, composeTemplate, parentOwner } from '@template/email/render/compose';
 import { EmailRenderError } from '@template/email/render/errors';
 
 describe('composeTemplate', () => {
@@ -33,6 +33,9 @@ describe('composeTemplate', () => {
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
     expect(result.category).toBe('system');
+    // Resolved owner + render-error policy drive the send-side fallback loop.
+    expect(result.ownerModel).toBe('default');
+    expect(result.onError).toBe('fail');
   });
 
   it('composes template with single component', async () => {
@@ -197,6 +200,40 @@ describe('composeTemplate', () => {
     });
 
     expect(result.mjml).toContain('Default Footer');
+  });
+
+  it('does not match another tenant when organizationId is missing (no match-any)', async () => {
+    const { entity: org } = await createOrganization();
+
+    await createEmailTemplate({
+      slug: 'tenant-scoped',
+      name: 'Tenant Scoped',
+      subject: 'Test',
+      category: 'system',
+      mjml: '<mjml><mj-body><mj-text>Org Only</mj-text></mj-body></mjml>',
+      componentRefs: [],
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+
+    // Org lookup with no organizationId must not resolve org's template (undefined → null, not
+    // match-any). With no default fallback, it throws rather than leaking another tenant's template.
+    try {
+      await composeTemplate('tenant-scoped', { ownerModel: 'Organization', locale: 'en' });
+      expect(true).toBe(false); // should not reach
+    } catch (err) {
+      expect(err).toBeInstanceOf(EmailRenderError);
+      expect((err as EmailRenderError).type).toBe('template_missing');
+    }
+  });
+});
+
+describe('parentOwner', () => {
+  it('walks the cascade Space → Organization → default and stops at base owners', () => {
+    expect(parentOwner('Space')).toBe('Organization');
+    expect(parentOwner('Organization')).toBe('default');
+    expect(parentOwner('default')).toBeNull();
+    expect(parentOwner('admin')).toBeNull();
   });
 });
 

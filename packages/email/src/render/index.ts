@@ -4,9 +4,10 @@ export {
   type ComposeTemplateResult,
   composeComponent,
   composeTemplate,
+  parentOwner,
 } from './compose';
 export { type EmailErrorType, EmailRenderError } from './errors';
-export { evaluateConditions } from './evaluateConditions';
+export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';
 export { type MappedComponent, type MapResult, mapRefs, type RefMap } from './extractRefs';
 export { interpolate, VariablePrefix, type Variables } from './interpolate';

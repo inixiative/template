@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import { evaluateConditions } from '@template/email/render/evaluateConditions';
+import { evaluateConditions, type RuleErrorSink } from '@template/email/render/evaluateConditions';
 // biome-ignore lint/suspicious/noShadowRestrictedNames: lodash escape is the intended import
 import { escape, isNil } from 'lodash-es';
 
@@ -22,9 +22,9 @@ export type Variables = {
   data?: Record<string, unknown>;
 };
 
-export const interpolate = (template: string, variables: Variables): string => {
+export const interpolate = (template: string, variables: Variables, onError?: RuleErrorSink): string => {
   // 1. Evaluate conditionals
-  const evaluated = evaluateConditions(template, variables);
+  const evaluated = evaluateConditions(template, variables, onError);
 
   // 2. Substitute variables
   return evaluated.replace(VARIABLE_PATTERN, (match, prefix, key) => {

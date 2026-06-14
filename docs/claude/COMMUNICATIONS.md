@@ -17,6 +17,7 @@
     - [Syntax](#syntax)
     - [Extraction (mapRefs)](#extraction-maprefs)
   - [Variable Interpolation](#variable-interpolation)
+  - [Authoring & Data Surface (planned)](#authoring--data-surface-planned)
   - [Cascade Resolution](#cascade-resolution)
   - [Render Pipeline](#render-pipeline)
     - [Compose](#compose)
@@ -24,6 +25,7 @@
   - [Save Pipeline](#save-pipeline)
   - [MJML Validation](#mjml-validation)
   - [Send Pipeline](#send-pipeline)
+    - [Render-error policy](#render-error-policy)
 - [Notifications](#notifications)
   - [Planned: Novu](#planned-novu)
 - [SMS](#sms)
@@ -61,6 +63,7 @@ Located in `packages/email` (`@template/email`).
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
+| Render-error policy | Done | Per-template `onError` (`fail`/`degrade`/`fallback`) on render-time rule throws |
 | **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
@@ -155,6 +158,8 @@ model EmailTemplate {
   organizationId   String?
   spaceId          String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
+
+  onError          EmailErrorPolicy    // fail|degrade|fallback on a render-time rule throw
 }
 ```
 
@@ -191,6 +196,12 @@ enum EmailOwnerModel {
   admin         // Platform internal - super admin only
   Organization  // Tenant-branded
   Space         // Space-specific overrides
+}
+
+enum EmailErrorPolicy {
+  fail          // throw → job retries → DLQ (safest default)
+  degrade       // drop the throwing block(s), send the rest
+  fallback      // re-render at the next owner up: Space → Organization → default
 }
 ```
 
@@ -361,6 +372,16 @@ for (const recipient of recipients) {
 }
 ```
 
+`interpolate(template, variables, onError?)` and `evaluateConditions(template,
+variables, onError?)` take an optional `onError: RuleErrorSink` (`(message:
+string) => void`). It fires **only** when a conditional rule *throws* at render
+(malformed/uncheckable rule) — never on a normal non-match. The throwing branch is
+dropped (the next branch / `{{else}}` renders), so a clean render is the default;
+the caller uses `onError` to drive the send-side policy below. Setting
+`EMAIL_INLINE_RENDER_ERRORS=true` additionally emits the offending block inline as
+an HTML comment (a debug override, independent of environment — useful in a
+template preview or a single test).
+
 ---
 
 ### Save Pipeline
@@ -383,11 +404,14 @@ const { template, components } = await saveEmailTemplate(db, {
 ```
 
 Pipeline steps:
-1. Validate MJML syntax
+1. Validate MJML syntax + conditional rules in `mjml` and `subject`
+   (`assertValidConditions`) — fail fast instead of shipping a render-time time-bomb
 2. Extract component refs (`mapRefs`)
 3. Lookup existing components via cascade
 4. Resolve variants (match or create)
-5. Save template + components in transaction
+5. Save template + components in transaction (each component re-validates its own
+   conditionals at the unit boundary; component MJML is a fragment, so it is not
+   run through the full-document MJML validator)
 
 ---
 
@@ -443,14 +467,33 @@ The worker:
 1. Resolves `to`/`cc`/`bcc` targets to addresses (and the `from` sender).
 2. Verifies recipient addresses; drops risky ones.
 3. Skips cleanly if no email adapter is registered.
-4. Composes the template via cascade (`composeTemplate`).
-5. Interpolates `{ sender, recipient, data }` per recipient.
-6. Renders MJML to HTML (`mjml2html`, awaited).
-7. Sends via the adapter's `sendBatch`.
+4. Composes the template via cascade (`composeTemplate`) — which also returns the
+   resolved `ownerModel` and `onError` policy.
+5. Renders the batch: interpolates `{ sender, recipient, data }` per recipient and
+   `mjml2html` (awaited), collecting any render-time rule throws via `onError`.
+6. Applies the **render-error policy** (below) — clean batch sends; otherwise
+   `degrade` / `fallback` / `fail`.
+
+#### Render-error policy
+
+A conditional rule that *throws* at render (not a non-match) triggers the resolved
+template's `onError`. The error is always logged (`LogScope.email`), then:
+
+- **`fail`** (default) — throw `EmailRenderError('render_failed')` → BullMQ retries
+  → DLQ-equivalent (`attempts: 3`, `removeOnFail: { age: 30d }`). Safest.
+- **`degrade`** — send the batch with the throwing blocks dropped (the evaluator
+  already excluded them).
+- **`fallback`** — re-compose one owner up (`parentOwner`: Space → Organization →
+  default) and re-render; loops until it renders clean or hits a base owner.
+
+Base owners (`default`/`admin`) aren't author-configurable and have no parent, so
+they always `fail`. The loop is bounded — `parentOwner` strictly walks down to a
+base owner where the policy is forced to `fail`.
 
 > Stub edges: sender owner-model/locale resolution currently defaults to
-> `{ ownerModel: 'default', locale: 'en' }`; future work resolves these from the
-> sender context.
+> `{ ownerModel: 'default', locale: 'en' }`, so the policy resolves to `fail` until
+> per-tenant resolution lands. The machinery + seam ship now; that resolution
+> threads through the fallback cascade unchanged (`{ ...renderCtx, ownerModel }`).
 
 ---
 
