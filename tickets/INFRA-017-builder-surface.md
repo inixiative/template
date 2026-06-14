@@ -47,15 +47,19 @@ Roles, kept distinct: `exposedSurface`/projection = *what to show*;
   client surface; `where`-stripped; union per model)
 - ✅ `describeRule(condition, lens)` → `{ sources, bridgesCrossed, supportedTargets, violations }`
   (shipped in 2.8 with `exposedSurface`)
-- [ ] Serializable, where-stripped projection surface for the browser (only needed
-  when the builder requires path-specific divergence; deferred until then)
+- [ ] Serializable lens for persistence/handoff = the **ref-id form** (`parent` as
+  a lens id resolved from a registry; bridges already ref maps by name). The lens
+  is **already serializable in object form** (`JSON.stringify` works; `where` is a
+  `Condition` — part of the DSL — and stays). This is INFRA-016. `where`-stripping
+  is NOT a serialization step; only the client-facing `exposedSurface` strips it.
 
 ## Tasks
 
-- [ ] Serializable projection: JSON shape, strip `where`, **strip physical
-      details** (`dbName`, `fromFields`/`toFields`, `relationName`, bridge `on`),
-      cycle handling consistent with `exposedSurface`. (`exposedSurface` returns a
-      full in-memory `Lens`; the stripping happens at the serialization boundary.)
+- [ ] Ref-id lens form (INFRA-016): `parent`-as-id + registry resolution; the
+      object form already serializes. **No `where`-strip here** — `where` is DSL.
+      Stripping `where` + physical details (`dbName`, `fromFields`/`toFields`,
+      `relationName`, bridge `on`) is the *client-surface* concern (`exposedSurface`),
+      separate from serialization — keep them distinct.
 - [ ] `describeRule`: walk the rule (like checkRuleAgainstLens), intersect
       per-operator catalog targets with bridge-crossing (bridge ⇒ check-only)
 - [ ] Decide how the exposed surface + projection are bundled for the builder

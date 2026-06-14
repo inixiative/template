@@ -21,6 +21,31 @@ Two things land together here: a **parallel serializable type hierarchy** (refs,
 not object pointers), and **`seal`** — the where-preserving collapse that makes a
 tenant→subtenant handoff safe.
 
+**Two orthogonal axes — do not conflate them (we did):**
+1. **Representation** — *object form* (`parent` inlined) vs *ref-id form* (`parent`
+   = a lens id; sources/bridges = registry refs). Serialization is just the ref-id
+   form; the lens is **already serializable in object form** (`JSON.stringify`
+   works — `maps` are data, `bridges` ref maps by name, `where` is a `Condition`).
+2. **Surface** — *full lens* (`where` + physical details, server-side) vs
+   *client-exposed surface* (`where` + physical details stripped, leak-safe) =
+   `exposedSurface` (INFRA-017, shipped).
+
+`where` is part of the lens DSL and lives in the lens. **Serialization never strips
+it.** Only the *surface* axis (`exposedSurface`) strips it, for the untrusted
+client. The axes compose: you serialize either a full lens (`where` kept) or an
+exposed surface (`where` already gone before serialization). This ticket is axis 1.
+
+**Why ref-id, not inline — this is the point, not size:** inlining the parent +
+maps + bridges produces a **snapshot** — a frozen copy. A persisted lens/narrowing
+must stay **live to upstream changes**. Storing the narrowing + *refs* (parent lens
+id, source-map ids, bridge ids) means deserialization resolves against the
+**current** registry, so when an upstream source map gains a field, a bridge is
+re-defined, or the parent lens evolves, **every persisted narrowing reflects it on
+load** — automatically. Inlined copies silently go stale. This is *config*
+liveness, and it's distinct from source **data**: the hydrated rows are genuinely a
+runtime snapshot and are never serialized as config (a saved lens refs the source's
+*schema*, then re-hydrates live data at query time).
+
 ## Type taxonomy (canonical)
 
 Two shapes, each with an in-memory (object) form and a wire (ref) form. Naming
@@ -29,7 +54,7 @@ must always make clear which you hold.
 | Shape | In-memory | Wire (serializable) |
 | --- | --- | --- |
 | **Lens** (maps intact — the graph) | `Lens` / `LensNarrowing` — `parent` = object, maps/bridges inlined | `SerializedLens` / `SerializedNarrowing` — `parent` = id; sources/bridges = registry refs |
-| **Projection** (path-keyed view) | `PathProjection` (`Map`), includes `where` | `SerializedProjection` — plain object, **where-stripped** for client |
+| **Projection** (path-keyed view) | `PathProjection` (`Map`), includes `where` | `SerializedProjection` — plain object; **keeps `where`** (serialization never strips it; a client projection is one derived from `exposedSurface`, where already absent) |
 
 ```ts
 type SerializedLens = { id; sourceRefs: string[]; bridgeRefs: string[]; mapName; model };
@@ -88,11 +113,12 @@ Open before building `seal`:
 - [ ] `serializeLens` / `serializeNarrowing` → ref-based JSON (no embedded maps)
 - [ ] `deserializeLens` resolving source-schema refs + bridge refs (INFRA-015)
 - [ ] `seal(lensOrNarrowing)` → `SerializedLens` (where + path-specific preserved, baked)
-- [ ] Strip `where` from any client-facing serialized narrowing/projection
-- [ ] Strip physical/query-planning details from any **client-facing** form —
-      `dbName`, `fromFields`/`toFields`, `relationName`, bridge `on` keys. The
-      client needs only `{ kind, type, isList, values }`; the in-memory `Lens`
-      keeps the rest for server-side `toPrisma`/`toSql`.
+- [ ] (Separate axis — NOT serialization) `where`-stripping + physical-detail
+      stripping (`dbName`, `fromFields`/`toFields`, `relationName`, bridge `on`;
+      client needs only `{ kind, type, isList, values }`) for the untrusted client
+      is `exposedSurface` (INFRA-017, shipped). Serialization keeps both; a client
+      artifact is the exposedSurface output serialized. Do **not** fold this into
+      `serialize`.
 - [ ] Round-trip tests, incl. a multi-source narrowed lens
 - [ ] `seal` tests: subtenant can't read past / can't widen; `where` floor inherited;
       path-specific restriction survives (no union-collapse leak)
