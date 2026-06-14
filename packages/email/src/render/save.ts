@@ -12,6 +12,7 @@ import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { SaveContext } from '@template/email/render/types';
+import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
 
@@ -31,6 +32,8 @@ export type SaveTemplateResult = {
 
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
+  // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
+  assertValidConditions(input.mjml);
 
   const ctx: SaveContext = {
     ownerModel: input.ownerModel,
