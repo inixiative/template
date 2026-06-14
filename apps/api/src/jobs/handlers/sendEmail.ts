@@ -86,9 +86,11 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const client = emailRegistry.getOrDefault(undefined, adapterName);
 
   const senderData = senderVars();
-  // Stub: always default templates, en locale. Future: resolve per-tenant org/space context here —
-  // it threads through the fallback cascade below unchanged.
-  const renderCtx = { locale: 'en' };
+  // The per-send tenant context — reused for the initial compose AND every fallback re-compose, so
+  // walking the owner cascade stays scoped to this send's tenant. Stub: default templates, en locale,
+  // no org/space yet. Future: resolve organizationId/spaceId here from sender context; they thread
+  // through the fallback unchanged (lookup coalesces a missing id to null, never match-any).
+  const renderCtx: { locale: string; organizationId?: string; spaceId?: string } = { locale: 'en' };
 
   // Render the batch for one resolved template, collecting any render-time rule throws via onError.
   const renderBatch = async (composed: ComposeTemplateResult) => {

@@ -201,6 +201,31 @@ describe('composeTemplate', () => {
 
     expect(result.mjml).toContain('Default Footer');
   });
+
+  it('does not match another tenant when organizationId is missing (no match-any)', async () => {
+    const { entity: org } = await createOrganization();
+
+    await createEmailTemplate({
+      slug: 'tenant-scoped',
+      name: 'Tenant Scoped',
+      subject: 'Test',
+      category: 'system',
+      mjml: '<mjml><mj-body><mj-text>Org Only</mj-text></mj-body></mjml>',
+      componentRefs: [],
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+
+    // Org lookup with no organizationId must not resolve org's template (undefined → null, not
+    // match-any). With no default fallback, it throws rather than leaking another tenant's template.
+    try {
+      await composeTemplate('tenant-scoped', { ownerModel: 'Organization', locale: 'en' });
+      expect(true).toBe(false); // should not reach
+    } catch (err) {
+      expect(err).toBeInstanceOf(EmailRenderError);
+      expect((err as EmailRenderError).type).toBe('template_missing');
+    }
+  });
 });
 
 describe('parentOwner', () => {
