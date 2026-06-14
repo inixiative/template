@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
+import { createRebacCheck } from '@inixiative/permissions';
 import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
@@ -691,9 +692,15 @@ describe('rebac check', () => {
       expect(check(permix, deepSchema, 'organization', record, 'd')).toBe(false);
     });
 
-    // Cycle detection is in place but hard to test without real cyclic Prisma relations
-    it.skip('throws on cycle in permission graph', async () => {
-      const cyclicSchema: RebacSchema = {
+    it('throws on cycle in permission graph', () => {
+      // The prisma map template bakes into `check` has no cycle, so generate a relation map with a
+      // real space <-> organization cycle and drive the imported engine with it directly.
+      const relations: Record<string, Record<string, string>> = {
+        space: { organization: 'organization' },
+        organization: { parentSpace: 'space' },
+      };
+      const cyclicCheck = createRebacCheck((model, segment) => relations[model]?.[segment] ?? null);
+      const cyclicSchema = {
         organization: { actions: { own: { rel: 'parentSpace', action: 'own' } } },
         space: { actions: { own: { rel: 'organization', action: 'own' } } },
       };
@@ -701,7 +708,9 @@ describe('rebac check', () => {
       const org: Record<string, unknown> = { id: 'org-1', parentSpace: space };
       space.organization = org;
 
-      expect(() => check(permix, cyclicSchema, 'space', space as { id: string }, 'own')).toThrow(/Cycle detected/);
+      // No grants — forces schema evaluation down the cyclic relation walk.
+      const noGrants = { check: () => false, isSuperadmin: () => false, getUserId: () => null };
+      expect(() => cyclicCheck(noGrants, cyclicSchema, 'space', space, 'own')).toThrow(/Cycle detected/);
     });
   });
 
