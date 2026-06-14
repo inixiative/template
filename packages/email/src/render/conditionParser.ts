@@ -14,9 +14,9 @@ export const ELSE = '{{else}}';
 export const END = '{{/if}}';
 
 export type Branch = {
-  kind: 'if' | 'elseif' | 'else';
-  rule?: Condition; // present for if/elseif when the embedded JSON parsed
-  ruleError?: string; // present for if/elseif when the embedded JSON was invalid
+  kind: 'if' | 'elseIf' | 'else';
+  rule?: Condition; // present for if/elseIf when the embedded JSON parsed
+  ruleError?: string; // present for if/elseIf when the embedded JSON was invalid
   body: string;
 };
 
@@ -54,15 +54,34 @@ export const findJsonEnd = (str: string, start: number): number => {
 
 type RuleMarker = { rule?: Condition; ruleError?: string; next: number };
 
-// Read a rule-bearing marker (IF / ELSE_IF) whose token starts at `i`. Returns the parsed rule
-// (or a parse error) and the index past the marker's closing `}}`. null if the marker is malformed.
+const isSpace = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
+
+// Read a rule-bearing marker (IF / ELSE_IF) whose token starts at `i`. The value is any JSON
+// Condition: an object `{…}` (brace-matched, string-aware) or a bare literal like `true`/`false`
+// (a valid Condition with no braces — fall back to the marker's closing `}}`). Leading/trailing
+// whitespace around the value is tolerated. Returns the parsed rule (or a parse error) and the
+// index past `}}`, or null if the marker has no closing `}}`.
 const readRuleMarker = (content: string, i: number, token: string): RuleMarker | null => {
-  const jsonStart = i + token.length;
-  const jsonEnd = findJsonEnd(content, jsonStart);
-  if (jsonEnd === -1) return null;
-  if (content.slice(jsonEnd + 1, jsonEnd + 3) !== '}}') return null;
-  const json = content.slice(jsonStart, jsonEnd + 1);
-  const next = jsonEnd + 3;
+  let jsonStart = i + token.length;
+  while (jsonStart < content.length && isSpace(content[jsonStart])) jsonStart++;
+
+  let valueEnd: number;
+  if (content[jsonStart] === '{') {
+    const braceEnd = findJsonEnd(content, jsonStart);
+    if (braceEnd === -1) return null;
+    valueEnd = braceEnd + 1;
+  } else {
+    const close = content.indexOf('}}', jsonStart);
+    if (close === -1) return null;
+    valueEnd = close;
+  }
+
+  let end = valueEnd;
+  while (end < content.length && isSpace(content[end])) end++;
+  if (content.slice(end, end + 2) !== '}}') return null;
+
+  const json = content.slice(jsonStart, valueEnd).trim();
+  const next = end + 2;
   try {
     return { rule: JSON.parse(json) as Condition, next };
   } catch (err) {
@@ -103,7 +122,7 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = nested.next;
         continue;
       }
-      i++;
+      i += IF.length; // malformed nested open — skip the token, don't char-walk into it
       continue;
     }
     if (content.startsWith(END, i)) {
@@ -120,12 +139,12 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
       if (m) {
         if (depth === 1) {
           closeCurrent(i);
-          current = { kind: 'elseif', rule: m.rule, ruleError: m.ruleError, bodyStart: m.next };
+          current = { kind: 'elseIf', rule: m.rule, ruleError: m.ruleError, bodyStart: m.next };
         }
         i = m.next;
         continue;
       }
-      i++;
+      i += ELSE_IF.length; // malformed else-if — skip the token
       continue;
     }
     if (content.startsWith(ELSE, i)) {

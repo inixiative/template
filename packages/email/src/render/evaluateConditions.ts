@@ -37,6 +37,9 @@ const renderBranches = (branches: Branch[], data: Record<string, unknown>): stri
       continue;
     }
 
+    // `check` returns `true` on match, or a string explaining the mismatch (a *reason*, not an
+    // error) when it doesn't — so only `=== true` renders. A genuinely invalid rule throws, and the
+    // catch surfaces it.
     try {
       if (check(branch.rule!, data) === true) return renderConditions(branch.body, data);
     } catch (err) {

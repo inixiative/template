@@ -47,4 +47,25 @@ describe('validateConditions', () => {
     const tpl = `{{#if rule=${rule({ field: 'recipient.tier', operator: 'equals', value: 'gold' })}}}A{{/if}}`;
     expect(() => assertValidConditions(tpl)).not.toThrow();
   });
+
+  it('flags branches after {{else}} as unreachable dead code', () => {
+    const r = rule({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    const r2 = rule({ field: 'recipient.tier', operator: 'equals', value: 'silver' });
+    const issues = validateConditions(`{{#if rule=${r}}}A{{else}}B{{else if rule=${r2}}}C{{/if}}`);
+    expect(issues.some((x) => x.message.includes('unreachable'))).toBe(true);
+  });
+
+  it('flags multiple {{else}} branches', () => {
+    const r = rule({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    const issues = validateConditions(`{{#if rule=${r}}}A{{else}}B{{else}}C{{/if}}`);
+    expect(issues.some((x) => x.message.includes('multiple {{else}}'))).toBe(true);
+  });
+
+  it('keeps validating blocks after an unterminated one', () => {
+    const ok = rule({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    const bad = rule({ field: 'recipient.tier' }); // missing operator
+    const issues = validateConditions(`{{#if rule=${ok}}}A   {{#if rule=${bad}}}B{{/if}}`);
+    expect(issues.some((x) => x.message.includes('unterminated'))).toBe(true);
+    expect(issues.length).toBeGreaterThanOrEqual(2);
+  });
 });
