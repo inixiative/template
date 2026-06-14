@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma, infrastructure:redis
+ * @partOf primitive:caching, primitive:jobs, primitive:websockets, feature:auth, primitive:shared, infrastructure:redis, infrastructure:prisma
  * @uses none
  */
 export const redisNamespace = {

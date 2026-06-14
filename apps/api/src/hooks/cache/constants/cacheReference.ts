@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind constant
+ * @partOf primitive:caching
  * @uses infrastructure:prisma
  */
 import type { ModelTypeMap, Prisma } from '@template/db';

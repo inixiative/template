@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma, infrastructure:redis
+ * @partOf primitive:caching, infrastructure:redis, infrastructure:prisma
  * @uses none
  */
 import { getRedisClient } from '@template/db/redis/client';
