@@ -1,6 +1,6 @@
 # DEV-004: prisma-map — parse `///` doc-comment tags (self-relation parent direction)
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress (`@tagClass` DSL shipped in `@inixiative/prisma-map`; template consumption + vocab pending)
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-06-12

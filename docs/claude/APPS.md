@@ -67,7 +67,7 @@ All three apps share common frontend infrastructure. See [FRONTEND.md](FRONTEND.
 
 **Shared Stack:**
 - **Router**: TanStack Router v2 with file-based routing and guards
-- **State**: Zustand with 5 slices (Auth, Permissions, Tenant, Api, UI)
+- **State**: Zustand with 6 slices (Client, Auth, Navigation, Permissions, Tenant, UI)
 - **Auth**: BetterAuth + JWT with stateless token validation
 - **Permissions**: Permix/ReBAC integrated into frontend state
 - **UI**: Shared component library (@template/ui) + app-specific components (@template/shared)
@@ -186,7 +186,7 @@ Admin does NOT support context locking - operators need full context switching t
 - Nav configs differ based on app purpose (see navigation section in [FRONTEND.md](FRONTEND.md))
 
 **State & Routing:**
-- All apps use same Zustand store structure (5 slices)
+- All apps use the same shared Zustand store (6 slices)
 - TanStack Router with guards (`requireAuth`, `requireGuest`)
 - Permission checks integrated at route and component level
 - Context switching logic shared between Web/Admin

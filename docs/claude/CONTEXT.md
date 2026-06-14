@@ -297,7 +297,7 @@ const users = await db.user.findMany({
 **Purpose:** Lens narrowing that drives the filter surface — `picks` (whitelisted searchable fields), `enumOmits` (hidden enum values), and `where` (server-enforced row scope). **Does NOT shape the response** — that's `responseSchema`.
 
 **Set by:**
-- `searchableFieldsMiddleware` — reads route's static `filterLens` and sets it on context
+- `prepareMiddleware` (`apps/api/src/lib/routeTemplates/utils/prepareMiddleware.ts`) — its `filterLensSetter` reads the route's static `filterLens` and sets it on context
 - `scopeNarrowing` middleware — merges per-request ctx-aware where conditions into the narrowing
 
 **Example:**
@@ -386,7 +386,7 @@ type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization
 import { getResource, getResourceType } from '#/lib/context/getResource';
 
 const org = getResource<'organization'>(c);  // Typed based on generic
-const modelName = getResourceType(c);        // ModelDelegate | null
+const modelName = getResourceType(c);        // AccessorName | null
 ```
 
 Accesses resources loaded by middleware for routes with `:id` parameter.
@@ -476,24 +476,24 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
 Located in `apps/api/src/middleware/resources/resourceContextMiddleware.ts`. Automatically loads resources from `:id` params.
 
 ```typescript
-// Extracts model from path: /api/v1/organization/:id → 'organization'
-const delegate = pathParts[3] as ModelDelegate;
+// Extracts accessor from path: /api/v1/organization/:id → 'organization'
+const accessor = pathParts[3] as AccessorName;
 
 // Supports alternate lookups: ?lookup=slug
 const lookup = c.req.query('lookup') || 'id';
 
-// Finds resources
-const resources = await model.findMany({
+// Finds resources via the db delegate for that accessor
+const resources = await db[accessor].findMany({
   where: { [lookup]: id },
-  ...resourceContextArgs[delegate],  // Custom inclusions
+  ...resourceContextArgs[accessor],  // Custom inclusions
 });
 
 // Enforces exactly one result
-if (!resources.length) throw new HTTPException(404, { message: 'Resource not found' });
-if (resources.length > 1) throw new HTTPException(409, { message: 'Multiple resources found' });
+if (!resources.length) throw makeError({ status: 404, message: 'Resource not found' });
+if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found' });
 
 c.set('resource', resources[0]);
-c.set('resourceType', delegate);
+c.set('resourceType', accessor);
 ```
 
 ### Enforcement Rules
@@ -526,7 +526,7 @@ The field must be unique or the request returns 409 if multiple matches found.
 Define in `apps/api/src/middleware/resources/resourceContextArgs.ts`:
 
 ```typescript
-export const resourceContextArgs: Partial<Record<ModelDelegate, object>> = {
+export const resourceContextArgs: Partial<Record<AccessorName, object>> = {
   webhookSubscription: {
     include: {
       webhookEvents: { take: 10, orderBy: { createdAt: 'desc' } },
