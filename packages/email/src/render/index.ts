@@ -13,3 +13,9 @@ export { interpolate, VariablePrefix, type Variables } from './interpolate';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
 export { type EmailModel, EmailModels, type EmailModelType, type SaveContext } from './types';
+export {
+  assertValidConditions,
+  type ConditionIssue,
+  ConditionValidationError,
+  validateConditions,
+} from './validateConditions';

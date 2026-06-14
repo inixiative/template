@@ -4,118 +4,69 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { type Condition, check } from '@inixiative/json-rules';
+import { check } from '@inixiative/json-rules';
+import { type Branch, IF, parseIfBlock } from '@template/email/render/conditionParser';
 import type { Variables } from '@template/email/render/interpolate';
 import { isLocal, isTest } from '@template/shared/utils';
 
 const flattenVariables = (variables: Variables): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
-
   for (const [prefix, values] of Object.entries(variables)) {
     if (!values) continue;
     for (const [key, value] of Object.entries(values)) {
       result[`${prefix}.${key}`] = value;
     }
   }
-
   return result;
 };
 
-const findJsonEnd = (str: string, start: number): number => {
-  let depth = 0;
-  let inString = false;
-  let inEscape = false;
+// A malformed/uncheckable rule is surfaced (with its body) in local/test for visibility, and
+// fails closed in production — the same behavior the single-block evaluator had.
+const onRuleError = (message: string, body: string, data: Record<string, unknown>): string | null =>
+  isLocal || isTest ? `<!-- RULE ERROR: ${message} -->\n${renderConditions(body, data)}` : null;
 
-  for (let i = start; i < str.length; i++) {
-    const ch = str[i];
+// Render the first branch whose rule matches (recursing for nested blocks); bare `{{else}}` is the
+// fallback; nothing if no branch matches and there is no else.
+const renderBranches = (branches: Branch[], data: Record<string, unknown>): string => {
+  for (const branch of branches) {
+    if (branch.kind === 'else') return renderConditions(branch.body, data);
 
-    if (inEscape) {
-      inEscape = false;
+    if (branch.ruleError !== undefined) {
+      const rendered = onRuleError(branch.ruleError, branch.body, data);
+      if (rendered !== null) return rendered;
       continue;
     }
-
-    if (ch === '\\' && inString) {
-      inEscape = true;
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) continue;
-
-    switch (ch) {
-      case '{':
-        depth++;
-        break;
-      case '}':
-        depth--;
-        if (depth === 0) return i;
-        break;
-    }
-  }
-  return -1;
-};
-
-export const evaluateConditions = (content: string, variables: Variables): string => {
-  const data = flattenVariables(variables);
-  const OPEN = '{{#if rule=';
-  const CLOSE = '{{/if}}';
-
-  let result = '';
-  let pos = 0;
-
-  while (pos < content.length) {
-    const openIdx = content.indexOf(OPEN, pos);
-    if (openIdx === -1) {
-      result += content.slice(pos);
-      break;
-    }
-
-    result += content.slice(pos, openIdx);
-
-    const jsonStart = openIdx + OPEN.length;
-    const jsonEnd = findJsonEnd(content, jsonStart);
-    if (jsonEnd === -1) {
-      result += content.slice(openIdx);
-      break;
-    }
-
-    const ruleJson = content.slice(jsonStart, jsonEnd + 1);
-    const afterJson = jsonEnd + 1;
-
-    // Expect }} after JSON
-    if (content.slice(afterJson, afterJson + 2) !== '}}') {
-      result += content.slice(openIdx, afterJson);
-      pos = afterJson;
-      continue;
-    }
-
-    const contentStart = afterJson + 2;
-    const closeIdx = content.indexOf(CLOSE, contentStart);
-    if (closeIdx === -1) {
-      result += content.slice(openIdx);
-      break;
-    }
-
-    const innerContent = content.slice(contentStart, closeIdx);
-    pos = closeIdx + CLOSE.length;
 
     try {
-      const rule: Condition = JSON.parse(ruleJson);
-      const matches = check(rule, data);
-      if (matches === true) {
-        result += innerContent;
-      }
+      if (check(branch.rule!, data) === true) return renderConditions(branch.body, data);
     } catch (err) {
-      if (isLocal || isTest) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        result += `<!-- RULE ERROR: ${msg} -->\n${innerContent}`;
-      }
+      const rendered = onRuleError(err instanceof Error ? err.message : 'Unknown error', branch.body, data);
+      if (rendered !== null) return rendered;
     }
   }
-
-  return result;
+  return '';
 };
+
+function renderConditions(content: string, data: Record<string, unknown>): string {
+  let result = '';
+  let i = 0;
+  while (i < content.length) {
+    const openIdx = content.indexOf(IF, i);
+    if (openIdx === -1) {
+      result += content.slice(i);
+      break;
+    }
+    result += content.slice(i, openIdx);
+    const block = parseIfBlock(content, openIdx);
+    if (!block) {
+      result += content.slice(openIdx); // unterminated — pass the rest through unchanged
+      break;
+    }
+    result += renderBranches(block.branches, data);
+    i = block.end;
+  }
+  return result;
+}
+
+export const evaluateConditions = (content: string, variables: Variables): string =>
+  renderConditions(content, flattenVariables(variables));
