@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:caching
+ * @uses infrastructure:prisma
+ */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import { clearKey, DbAction, db, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
