@@ -61,7 +61,7 @@ describe('evaluateConditions — regression', () => {
   });
 });
 
-describe('evaluateConditions — parser hardening (non-object rules, whitespace)', () => {
+describe('evaluateConditions — non-object rules', () => {
   it('renders bare boolean rules (true/false are valid Conditions)', () => {
     expect(evaluateConditions('{{#if rule=true}}X{{/if}}', {})).toBe('X');
     expect(evaluateConditions('{{#if rule=false}}X{{else}}Y{{/if}}', {})).toBe('Y');
@@ -72,10 +72,5 @@ describe('evaluateConditions — parser hardening (non-object rules, whitespace)
     const tpl = `{{#if rule=${outer}}}A{{#if rule=true}}B{{/if}}C{{else}}D{{/if}}`;
     expect(evaluateConditions(tpl, { recipient: { tier: 'gold' } })).toBe('ABC');
     expect(evaluateConditions(tpl, { recipient: { tier: 'x' } })).toBe('D');
-  });
-
-  it('tolerates whitespace between the rule JSON and }}', () => {
-    const r = rule('recipient.tier', 'equals', 'gold');
-    expect(evaluateConditions(`{{#if rule=${r} }}X{{/if}}`, { recipient: { tier: 'gold' } })).toBe('X');
   });
 });

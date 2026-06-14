@@ -54,16 +54,13 @@ export const findJsonEnd = (str: string, start: number): number => {
 
 type RuleMarker = { rule?: Condition; ruleError?: string; next: number };
 
-const isSpace = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
-
 // Read a rule-bearing marker (IF / ELSE_IF) whose token starts at `i`. The value is any JSON
 // Condition: an object `{…}` (brace-matched, string-aware) or a bare literal like `true`/`false`
-// (a valid Condition with no braces — fall back to the marker's closing `}}`). Leading/trailing
-// whitespace around the value is tolerated. Returns the parsed rule (or a parse error) and the
-// index past `}}`, or null if the marker has no closing `}}`.
+// (a valid Condition with no braces — fall back to the marker's closing `}}`). Markers are tight:
+// `}}` immediately follows the value (no padding), matching the interpolation syntax. Returns the
+// parsed rule (or a parse error) and the index past `}}`, or null if there is no closing `}}`.
 const readRuleMarker = (content: string, i: number, token: string): RuleMarker | null => {
-  let jsonStart = i + token.length;
-  while (jsonStart < content.length && isSpace(content[jsonStart])) jsonStart++;
+  const jsonStart = i + token.length;
 
   let valueEnd: number;
   if (content[jsonStart] === '{') {
@@ -75,15 +72,11 @@ const readRuleMarker = (content: string, i: number, token: string): RuleMarker |
     if (close === -1) return null;
     valueEnd = close;
   }
+  if (content.slice(valueEnd, valueEnd + 2) !== '}}') return null;
 
-  let end = valueEnd;
-  while (end < content.length && isSpace(content[end])) end++;
-  if (content.slice(end, end + 2) !== '}}') return null;
-
-  const json = content.slice(jsonStart, valueEnd).trim();
-  const next = end + 2;
+  const next = valueEnd + 2;
   try {
-    return { rule: JSON.parse(json) as Condition, next };
+    return { rule: JSON.parse(content.slice(jsonStart, valueEnd)) as Condition, next };
   } catch (err) {
     return { ruleError: err instanceof Error ? err.message : 'invalid JSON', next };
   }
