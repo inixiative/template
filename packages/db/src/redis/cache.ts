@@ -24,13 +24,14 @@ const dateReviver = (_key: string, value: unknown): unknown => {
   return value;
 };
 
-// A key segment is a model or accessor name (normalized to the accessor, since
-// Redis is case-sensitive and write/clear keys must agree) or any other string.
-type CacheSegment = AccessorName | ModelName | (string & {});
+// The domain is a model or accessor name; normalize it to the accessor so a write
+// keyed 'User' and a clear keyed 'user' agree (Redis is case-sensitive). Tags are
+// opaque grouping labels — used verbatim, never model-normalized.
+type CacheDomain = AccessorName | ModelName | (string & {});
 
-const toCacheSegment = (segment: CacheSegment): string => (isModelName(segment) ? toAccessor(segment) : segment);
+const toAccessorName = (domain: CacheDomain): string => (isModelName(domain) ? toAccessor(domain) : domain);
 
-export const cacheKey = (domain: CacheSegment, identifier: Identifier, tags: CacheSegment[] = [], wildcard = false): string => {
+export const cacheKey = (domain: CacheDomain, identifier: Identifier, tags: string[] = [], wildcard = false): string => {
   const idParts: string[] = [];
 
   if (typeof identifier === 'string') {
@@ -43,7 +44,7 @@ export const cacheKey = (domain: CacheSegment, identifier: Identifier, tags: Cac
     }
   }
 
-  return compact([redisNamespace.cache, toCacheSegment(domain), ...idParts, ...tags.map(toCacheSegment), wildcard && '*']).join(':');
+  return compact([redisNamespace.cache, toAccessorName(domain), ...idParts, ...tags, wildcard && '*']).join(':');
 };
 
 const validateKey = (key: string): void => {

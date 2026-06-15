@@ -22,9 +22,10 @@ describe('cacheKey', () => {
     expect(cacheKey('user', { a: '1', b: '2' })).toBe(cacheKey('user', { b: '2', a: '1' }));
   });
 
-  it('normalizes a model-name tag but leaves a plain label tag', () => {
-    expect(cacheKey('user', 'x', ['User'])).toBe(cacheKey('user', 'x', ['user']));
+  it('uses tags verbatim — opaque labels, never model-normalized', () => {
     expect(cacheKey('user', 'x', ['relations'])).toContain(':relations');
+    // a tag that happens to collide with a model name is NOT rewritten
+    expect(cacheKey('user', 'x', ['User'])).not.toBe(cacheKey('user', 'x', ['user']));
   });
 
   it('appends a wildcard segment only when requested', () => {
