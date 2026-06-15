@@ -29,7 +29,10 @@ export const registerClearCacheHook = () => {
 
   registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
     const { model, action } = options;
-    let allKeys: string[] = [];
+    const keys = new Set<string>();
+    const collect = (record: Record<string, unknown>) => {
+      for (const key of fetchCacheKeys(model as Prisma.ModelName, record)) keys.add(key);
+    };
 
     if (isManyAction(action)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
@@ -47,8 +50,8 @@ export const registerClearCacheHook = () => {
 
         if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData)) continue;
 
-        const keys = fetchCacheKeys(model as Prisma.ModelName, resultData);
-        allKeys = allKeys.concat(keys);
+        collect(resultData);
+        if (previousData) collect(previousData);
       }
     } else {
       const { result, previous } = options as HookOptions & { action: SingleAction };
@@ -60,15 +63,13 @@ export const registerClearCacheHook = () => {
         return;
       }
 
-      allKeys = fetchCacheKeys(model as Prisma.ModelName, resultData);
+      collect(resultData);
+      if (previousData) collect(previousData);
     }
 
-    if (allKeys.length === 0) return;
+    if (keys.size === 0) return;
 
-    // Deduplicate keys
-    const uniqueKeys = [...new Set(allKeys)];
-
-    const clearKeys = uniqueKeys.map((key) => async () => {
+    const clearKeys = [...keys].map((key) => async () => {
       await clearKey(key);
     });
 
