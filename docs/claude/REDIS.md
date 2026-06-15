@@ -243,7 +243,18 @@ await clearKey('cache:Session:userId:abc:*');
 
 ### Automatic Invalidation
 
-Cache keys defined in `CACHE_REFERENCE` are auto-cleared on mutations. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+Cache keys defined in the cache reference map are auto-cleared on mutations via an after-commit db hook. See [HOOKS.md - Cache Invalidation](./HOOKS.md#cache-invalidation).
+
+#### Invalidation conventions
+
+Correctness here is enforced by **discipline and tests, not by types** — nothing compiler-checks that a mutation clears the right keys. These rules are what keep it correct:
+
+- **Reverse-reference map.** The map answers "given this changed record, which keys is it reachable by?" — so a write becomes a key *lookup*, not a search. Per cached model, return every key the record is read under (id, value lookups, and cross-entity tag keys).
+- **One canonical key, or it drifts.** Always build keys with `cacheKey`, never hand-format. The domain (model/accessor) is normalized to the accessor, so a write keyed `'User'` and a clear keyed `'user'` resolve to the *same* key. Hand-built or differently-cased keys silently skip invalidation (Redis keys are case-sensitive).
+- **One tool, every surface — kept sound by Previous ∪ Result.** The data is read under several surfaces (id, value lookups like email/slug, relationship/tag keys) — don't restrict to id-only or relation-only; build keys with the one `cacheKey` tool across all of them. Value keys move with the record, so the hook clears keys derived from **both** the previous and result rows — a value change drops its *old* key too. The tool matches the problem's surfaces; P∪R is what makes the value surfaces correct.
+- **Invalidate on structure, not payload.** A record's payload change and its *linkage* change are different events. A payload update may *read* a relationship-reach cache (e.g. to fire a webhook); only a link change (a `CustomerRef`/subscription mutation) should *bust* it. Express this with different key sets per entry — e.g. `User` clears `user:id` but not `user:…:customerRefs`; only `CustomerRef` clears the linkage.
+- **Know what *not* to cache.** A read whose correct invalidation needs a relationship/graph walk (webhook subscriptions reached via `customerRef`) is fetched fresh, or cached only on the slow-moving *linkage* side. Caching it by affected-model can't be invalidated correctly — a missed clear is a stale read served silently.
+- **Tests are the enforcement.** Because none of the above is compiler-checked, every cached entity needs a read-after-write test (cache under the call-site key → mutate → assert cleared). That test catches drift; nothing else does.
 
 ---
 

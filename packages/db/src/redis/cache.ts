@@ -5,6 +5,7 @@
  */
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
+import { type AccessorName, type ModelName, isModelName, toAccessor } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
 import { compact, isNil } from 'lodash-es';
 
@@ -23,7 +24,13 @@ const dateReviver = (_key: string, value: unknown): unknown => {
   return value;
 };
 
-export const cacheKey = (accessor: string, identifier: Identifier, tags: string[] = [], wildcard = false): string => {
+// A key segment is a model or accessor name (normalized to the accessor, since
+// Redis is case-sensitive and write/clear keys must agree) or any other string.
+type CacheSegment = AccessorName | ModelName | (string & {});
+
+const toCacheSegment = (segment: CacheSegment): string => (isModelName(segment) ? toAccessor(segment) : segment);
+
+export const cacheKey = (domain: CacheSegment, identifier: Identifier, tags: CacheSegment[] = [], wildcard = false): string => {
   const idParts: string[] = [];
 
   if (typeof identifier === 'string') {
@@ -36,7 +43,7 @@ export const cacheKey = (accessor: string, identifier: Identifier, tags: string[
     }
   }
 
-  return compact([redisNamespace.cache, accessor, ...idParts, ...tags, wildcard && '*']).join(':');
+  return compact([redisNamespace.cache, toCacheSegment(domain), ...idParts, ...tags.map(toCacheSegment), wildcard && '*']).join(':');
 };
 
 const validateKey = (key: string): void => {
@@ -44,6 +51,10 @@ const validateKey = (key: string): void => {
     throw new Error(`Cache key contains 'undefined': ${key}`);
   }
 };
+
+// In-process single-flight: concurrent callers missing the same key co-resolve
+// off one compute (per-process; no distributed lock).
+const __inFlight = new Map<string, Promise<unknown>>();
 
 export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> => {
   validateKey(key);
@@ -59,17 +70,29 @@ export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = 
     // Redis down - fall through to compute without cache
   }
 
-  // Cache miss or Redis error - compute value
-  const value = await fn();
+  // Collapse concurrent misses on the same key onto one in-flight compute.
+  const pending = __inFlight.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
 
-  // Cache the result (fire-and-forget on error)
-  // Use short TTL for null/undefined to allow quick discovery of newly created records
-  const effectiveTtl = isNil(value) ? NEGATIVE_TTL : ttl;
-  redis.setex(key, effectiveTtl, JSON.stringify(value)).catch((error) => {
-    log.error(`Cache write error for key ${key}:`, error);
-  });
+  const compute = (async (): Promise<T> => {
+    const value = await fn();
 
-  return value;
+    // Cache the result (fire-and-forget on error)
+    // Use short TTL for null/undefined to allow quick discovery of newly created records
+    const effectiveTtl = isNil(value) ? NEGATIVE_TTL : ttl;
+    redis.setex(key, effectiveTtl, JSON.stringify(value)).catch((error) => {
+      log.error(`Cache write error for key ${key}:`, error);
+    });
+
+    return value;
+  })();
+
+  __inFlight.set(key, compute);
+  try {
+    return await compute;
+  } finally {
+    __inFlight.delete(key);
+  }
 };
 
 export const upsertCache = async <T>(
