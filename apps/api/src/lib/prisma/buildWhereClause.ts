@@ -6,7 +6,7 @@
  */
 import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
-import { rootLens, searchablePaths } from '@template/db/lens';
+import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -16,7 +16,6 @@ import {
 import { makeError } from '#/lib/errors';
 import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
-import { dialect } from '#/lib/prisma/dialect';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';

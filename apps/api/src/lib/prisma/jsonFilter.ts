@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+import { dialect } from '@template/db/lens';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
-import { dialect } from '#/lib/prisma/dialect';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const JSON_VALUE_OPERATORS = new Set<string>(JSON_FIELD_OPERATORS);
