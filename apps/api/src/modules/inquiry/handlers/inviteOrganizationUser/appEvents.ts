@@ -23,10 +23,9 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
             buttonUrl: `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`,
             buttonText: 'Accept Invitation',
           },
-          sender: {
-            ownerModel: 'Organization',
-            organizationId: inquiry.sourceOrganizationId ?? undefined,
-          },
+          sender: inquiry.sourceOrganizationId
+            ? { ownerModel: 'Organization', organizationId: inquiry.sourceOrganizationId }
+            : { ownerModel: 'default' },
           tags: ['inviteOrganizationUser'],
         },
       ];
