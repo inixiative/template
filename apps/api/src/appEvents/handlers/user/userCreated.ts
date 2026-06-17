@@ -14,7 +14,7 @@ export type UserCreatedPayload = {
 export const userCreated = makeAppEvent<UserCreatedPayload>({
   email: (data) => [
     {
-      to: [{ userIds: [data.userId] }],
+      audience: [{ userIds: [data.userId] }],
       template: 'welcome',
       data: { isGuest: data.isGuest },
     },

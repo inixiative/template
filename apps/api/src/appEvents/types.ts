@@ -27,9 +27,7 @@ export type AppEventPayload<T = Record<string, unknown>> = {
 };
 
 export type EmailHandoff = {
-  to: Audience[];
-  cc?: Audience[];
-  bcc?: Audience[];
+  audience: Audience[];
   template: string;
   data: Record<string, unknown>;
   sender?: ReachContext;

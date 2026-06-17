@@ -4,35 +4,19 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import {
-  type ComposeTemplateResult,
-  composeTemplate,
-  EmailRenderError,
-  interpolate,
-  parentOwner,
-  type RuleErrorSink,
-  type Variables,
-} from '@template/email/render';
 import { LogScope, log } from '@template/shared/logger';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
-import { type Audience, contextKey, type ReachContext, type Recipient, resolveAudience } from '#/lib/audience';
-import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
+import { type Audience, contextKey, type ReachContext, resolveAudience, type Recipient } from '#/lib/audience';
+import { emailRegistry, emailVerifier } from '#/lib/email';
 
 export type SendEmailPayload = {
-  to: Audience[];
-  cc?: Audience[];
-  bcc?: Audience[];
+  audience: Audience[];
   template: string;
   data: Record<string, unknown>;
   sender?: ReachContext;
   tags: string[];
 };
-
-const senderVars = (): Record<string, unknown> => ({
-  platformName: process.env.PLATFORM_NAME ?? 'Template',
-  address: process.env.PLATFORM_ADDRESS ?? '',
-});
 
 const verifyAddresses = async (addresses: string[]): Promise<Set<string>> => {
   const ok = new Set<string>();
@@ -56,64 +40,30 @@ const verifyAddresses = async (addresses: string[]): Promise<Set<string>> => {
   return ok;
 };
 
-const composeCtx = (ctx: ReachContext) => ({
-  locale: 'en',
-  ownerModel: ctx.ownerModel,
-  organizationId: ctx.ownerModel === 'Organization' ? ctx.organizationId : undefined,
-  spaceId: ctx.ownerModel === 'Space' ? ctx.spaceId : undefined,
-});
-
-// Settle one context's template: compose at the context owner, probe-render once to surface
-// template-level rule errors (malformed `{{#if rule=...}}` is recipient-independent), then apply
-// the resolved template's policy — degrade (fan out anyway; bad blocks drop per recipient),
-// fallback (re-compose one owner up), or fail (throw → DLQ; this context fans out nothing).
-const settleTemplate = async (template: string, ctx: ReachContext, probe: Variables): Promise<ComposeTemplateResult> => {
-  let composed = await composeTemplate(template, composeCtx(ctx));
-
-  while (true) {
-    const errors: string[] = [];
-    const onError: RuleErrorSink = (message) => errors.push(message);
-    interpolate(composed.mjml, probe, onError);
-    interpolate(composed.subject, probe, onError);
-
-    if (!errors.length) return composed;
-
-    log.warn(
-      `Email render error: template=${template} owner=${composed.ownerModel} — ${[...new Set(errors)].join('; ')}`,
-      LogScope.email,
-    );
-
-    const parent = parentOwner(composed.ownerModel);
-    const policy = parent ? composed.onError : 'fail';
-
-    if (policy === 'degrade') return composed;
-    if (policy === 'fallback' && parent) {
-      composed = await composeTemplate(template, { ...composeCtx(ctx), ownerModel: parent });
-      continue;
-    }
-
-    throw new EmailRenderError(template, 'render_failed');
+const addresses = (recipients: Recipient[], as: Recipient['as'], exclude: Set<string>): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of recipients) {
+    if (r.as !== as || exclude.has(r.user.email) || seen.has(r.user.email)) continue;
+    seen.add(r.user.email);
+    out.push(r.user.email);
   }
+  return out;
 };
 
-// Planner job: resolve the audience to recipients-with-context, compose once per context, then
-// fan out one deliverEmail per recipient. Per-recipient interpolation/render/send happens in
-// deliverEmail so a single bad recipient retries alone and never double-sends.
+// Planner job: resolve the audience to recipients-with-context, then fan out one deliverEmail per
+// `to` recipient. Compose/render/send all happen in deliverEmail (keyed off the template name +
+// context) so a single bad recipient retries alone and never double-sends.
 export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
-  const { to, cc: ccAudience, bcc: bccAudience, template, data, sender, tags } = payload;
+  const { audience, template, data, sender, tags } = payload;
   const fallbackCtx: ReachContext = sender ?? { ownerModel: 'default' };
 
-  const [toRecipients, ccRecipients, bccRecipients, from] = await Promise.all([
-    resolveAudience(to, fallbackCtx),
-    ccAudience?.length ? resolveAudience(ccAudience, fallbackCtx) : Promise.resolve<Recipient[]>([]),
-    bccAudience?.length ? resolveAudience(bccAudience, fallbackCtx) : Promise.resolve<Recipient[]>([]),
-    resolveFromAddress(),
-  ]);
+  const recipients = await resolveAudience(audience, fallbackCtx);
+  const to = recipients.filter((r) => r.as === 'to');
+  if (!to.length) return;
 
-  if (!toRecipients.length) return;
-
-  const verified = await verifyAddresses(toRecipients.map((r) => r.user.email));
-  const valid = toRecipients.filter((r) => verified.has(r.user.email));
+  const verified = await verifyAddresses(to.map((r) => r.user.email));
+  const valid = to.filter((r) => verified.has(r.user.email));
   if (!valid.length) return;
 
   const adapterName = emailRegistry.names()[0];
@@ -122,64 +72,37 @@ export const sendEmail = makeJob<SendEmailPayload>(async (ctx, payload) => {
     return;
   }
 
-  // cc/bcc are recipient roles resolved through the same audience path (context-aware, deduped).
-  // They cohere only on a single addressed message — never broadcast across a fan-out — so they
-  // ride along only when there's exactly one `to` recipient; a `to` recipient never doubles as cc/bcc.
+  // cc/bcc are resolved roles that cohere only on a single addressed message — never broadcast
+  // across a fan-out. They ride along only when there's exactly one `to`; a `to` never doubles
+  // as cc/bcc, and bcc never doubles as cc.
   const toEmails = new Set(valid.map((r) => r.user.email));
-  const ccAddresses = [...new Set(ccRecipients.map((r) => r.user.email))].filter((email) => !toEmails.has(email));
-  const bccAddresses = [...new Set(bccRecipients.map((r) => r.user.email))].filter(
-    (email) => !toEmails.has(email) && !ccAddresses.includes(email),
-  );
+  const cc = addresses(recipients, 'cc', toEmails);
+  const bcc = addresses(recipients, 'bcc', new Set([...toEmails, ...cc]));
   const single = valid.length === 1;
-  if (!single && (ccAddresses.length || bccAddresses.length)) {
+  if (!single && (cc.length || bcc.length)) {
     log.warn(
       `cc/bcc dropped: only valid on a single-recipient message (template=${template} recipients=${valid.length})`,
       LogScope.email,
     );
   }
-  const cc = single && ccAddresses.length ? ccAddresses : undefined;
-  const bcc = single && bccAddresses.length ? bccAddresses : undefined;
-
-  const senderData = senderVars();
-  const probe: Variables = { sender: senderData, recipient: {}, data };
-
-  // Group recipients by context so each owner's template composes once, not per recipient.
-  const groups = new Map<string, { context: ReachContext; recipients: Recipient[] }>();
-  for (const r of valid) {
-    const key = contextKey(r.context);
-    const group = groups.get(key);
-    if (group) group.recipients.push(r);
-    else groups.set(key, { context: r.context, recipients: [r] });
-  }
 
   let fanned = 0;
-  for (const { context, recipients: members } of groups.values()) {
-    const composed = await settleTemplate(template, context, probe);
-
-    for (const r of members) {
-      const variables: Variables = {
-        sender: senderData,
+  for (const r of valid) {
+    await enqueueJob(
+      'deliverEmail',
+      {
+        adapterName,
         recipient: { name: r.user.name, email: r.user.email },
+        cc: single && cc.length ? cc : undefined,
+        bcc: single && bcc.length ? bcc : undefined,
+        template,
+        context: r.context,
         data,
-      };
-
-      await enqueueJob(
-        'deliverEmail',
-        {
-          adapterName,
-          to: r.user.email,
-          cc,
-          bcc,
-          from,
-          subjectTemplate: composed.subject,
-          mjmlTemplate: composed.mjml,
-          variables,
-          tags,
-        },
-        { id: `${ctx.job.id}:${contextKey(r.context)}:${r.user.email}` },
-      );
-      fanned += 1;
-    }
+        tags,
+      },
+      { id: `${ctx.job.id}:${contextKey(r.context)}:${r.user.email}` },
+    );
+    fanned += 1;
   }
 
   log.info(`Email fanned out: template=${template} jobs=${fanned}`, LogScope.email);

@@ -38,7 +38,7 @@ describe('inviteOrganizationUserAppEvents', () => {
 
       expect(handoffs).toHaveLength(1);
       expect(handoffs![0].template).toBe('org-invitation');
-      expect(handoffs![0].to).toEqual([{ userIds: ['user-target'] }]);
+      expect(handoffs![0].audience).toEqual([{ userIds: ['user-target'] }]);
       expect(handoffs![0].data.organizationName).toBe('Acme Corp');
       expect(handoffs![0].data.inviterName).toBe('Alice');
       expect(handoffs![0].data.role).toBe('member');

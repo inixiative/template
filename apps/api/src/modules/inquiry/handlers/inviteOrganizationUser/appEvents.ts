@@ -14,7 +14,7 @@ export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
       const content = contentSchema.parse(inquiry.content);
       return [
         {
-          to: [{ userIds: [inquiry.targetUserId] }],
+          audience: [{ userIds: [inquiry.targetUserId] }],
           template: 'org-invitation',
           data: {
             organizationName: inquiry.sourceOrganization?.name ?? '',
