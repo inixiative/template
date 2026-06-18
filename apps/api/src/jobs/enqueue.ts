@@ -11,12 +11,14 @@ import type { Job } from 'bullmq';
 import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
+import { isOverflowing, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];
   id?: string;
+  bypass?: boolean; // skip the overflow buffer — latency-critical jobs go straight to BullMQ
 };
 
 export const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
@@ -42,7 +44,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     throw new Error(`Unknown job handler: ${handlerName}`);
   }
 
-  const { type = JobType.adhoc, id, ...jobOptions } = options || {};
+  const { type = JobType.adhoc, id, bypass = false, ...jobOptions } = options || {};
 
   const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
 
@@ -63,8 +65,23 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   if (dedupeKey) await signalSupersededJobs(dedupeKey);
 
+  // Overflow buffer — adhoc only; cron/cronTrigger and `bypass` go straight to BullMQ (outbox.ts).
+  if (type === JobType.adhoc && !bypass && (await isOverflowing())) {
+    const jobId = jobOptions.jobId ?? id ?? uuidv7();
+    await spillToOutbox({
+      handlerName,
+      jobId,
+      dedupeKey: dedupeKey ?? null,
+      data: { type, id, payload, dedupeKey },
+      options: jobOptions,
+    });
+    log.info(`Spilled job ${handlerName} to outbox (${jobId})`);
+    return { jobId, name: handlerName, outboxed: true as const };
+  }
+
   // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
   const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
+  if (type === JobType.adhoc) await tripIfFull(); // set the flag if this add crossed the cap
 
   log.info(`Enqueued job ${handlerName} (${job.id})`);
 

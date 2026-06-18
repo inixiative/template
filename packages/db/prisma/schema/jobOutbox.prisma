@@ -1,0 +1,17 @@
+model JobOutbox {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt   DateTime @default(now())
+
+  handlerName String                  // queue.add() name
+  jobId       String   @unique        // stable BullMQ jobId — idempotent re-enqueue + exact-replay dedup (createMany skipDuplicates)
+  dedupeKey   String?                  // superseding lane; null for plain adhoc fan-out
+  data        Json                     // JobData: { type, id, payload, dedupeKey }
+  options     Json?                    // jobOptions (attempts, backoff, priority) for a faithful re-enqueue
+
+  // uuidv7 id is time-ordered, so `orderBy: { id: 'asc' }` is the FIFO drain order — no separate index needed.
+  @@index([handlerName, dedupeKey])    // superseding deleteMany lookup
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+}

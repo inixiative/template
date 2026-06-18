@@ -1,5 +1,6 @@
 import { type CleanStaleDataPayload, cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
+import { drainOutbox } from '#/jobs/handlers/drainOutbox';
 import { type RecordAppEventPayload, recordAppEvent } from '#/jobs/handlers/recordAppEvent';
 import { rotateEncryptionKeys } from '#/jobs/handlers/rotateEncryptionKeys';
 import { type SendEmailPayload, sendEmail } from '#/jobs/handlers/sendEmail';
@@ -13,6 +14,7 @@ export const JobHandlerName = {
   sendWebhook: 'sendWebhook',
   rotateEncryptionKeys: 'rotateEncryptionKeys',
   cleanStaleData: 'cleanStaleData',
+  drainOutbox: 'drainOutbox',
 } as const;
 
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
@@ -24,6 +26,7 @@ export type JobPayloads = {
   sendWebhook: SendWebhookPayload;
   rotateEncryptionKeys: undefined;
   cleanStaleData: CleanStaleDataPayload;
+  drainOutbox: undefined;
 };
 
 export type JobHandlers = {
@@ -37,6 +40,7 @@ export const jobHandlers: JobHandlers = {
   sendWebhook,
   rotateEncryptionKeys,
   cleanStaleData,
+  drainOutbox,
 };
 
 export const isValidHandlerName = (name: string): name is JobHandlerName => name in jobHandlers;
