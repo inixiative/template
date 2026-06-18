@@ -88,6 +88,28 @@ export const warnIfOverflowStuck = async (depth: number): Promise<void> => {
   }
 };
 
+// Hold the flag's TTL open for the duration of `fn` via a recursive renew (like createLock's
+// heartbeat), so a long drain pass can't let it lapse mid-tick regardless of how long it runs —
+// no reliance on TTL > tick duration. renewOverflow (EXPIRE) no-ops on an absent key, so the final
+// renew never resurrects a flag the pass cleared.
+export const withOverflowRenew = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const renewMs = Math.max(1000, Math.floor((overflowTtlSec() * 1000) / 3));
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const beat = (): void => {
+    timer = setTimeout(() => {
+      void renewOverflow().catch(() => {});
+      beat();
+    }, renewMs);
+  };
+  beat();
+  try {
+    return await fn();
+  } finally {
+    if (timer) clearTimeout(timer);
+    await renewOverflow().catch(() => {});
+  }
+};
+
 // Abort any queued/in-flight job sharing this supersede lane. Both the direct enqueue path
 // and the drain call this, so supersession is enforced wherever a superseding job enters.
 export const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {

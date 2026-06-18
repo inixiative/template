@@ -8,14 +8,13 @@ import { LogScope, log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import {
   clearOverflow,
-  isOverflowing,
   lowWater,
   maxQueueDepth,
   queueDepth,
-  renewOverflow,
   runOnOutboxQueue,
   signalSupersededJobs,
   warnIfOverflowStuck,
+  withOverflowRenew,
 } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import type { JobData, JobOptions, WorkerContext } from '#/jobs/types';
@@ -40,44 +39,41 @@ import type { JobData, JobOptions, WorkerContext } from '#/jobs/types';
 export const drainOutbox = makeSingletonJob(async (ctx: WorkerContext) => {
   const { db } = ctx;
 
-  // Renew the flag up front so a long admit pass can't let its TTL lapse mid-tick.
-  if (await isOverflowing()) await renewOverflow();
+  // withOverflowRenew heartbeats the flag's TTL for the whole pass (incl. the final clear/keep
+  // decision), so an arbitrarily long admit loop can't let it lapse mid-tick.
+  await withOverflowRenew(async () => {
+    const room = maxQueueDepth() - (await queueDepth(true));
+    if (room > 0) {
+      await runOnOutboxQueue(async () => {
+        const rows = await db.jobOutbox.findMany({ orderBy: { id: 'asc' }, take: room });
+        const drained: string[] = [];
 
-  const room = maxQueueDepth() - (await queueDepth(true));
-  if (room > 0) {
-    await runOnOutboxQueue(async () => {
-      const rows = await db.jobOutbox.findMany({ orderBy: { id: 'asc' }, take: room });
-      const drained: string[] = [];
-
-      for (const row of rows) {
-        try {
-          const data = row.data as JobData;
-          const opts = (row.options as JobOptions | null) ?? {};
-          if (data.dedupeKey) {
-            await signalSupersededJobs(data.dedupeKey); // abort any in-flight prior, like the direct path
-            await queue.add(row.handlerName, data, opts); // no fixed jobId — supersession governed by the abort flag
-          } else {
-            await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
+        for (const row of rows) {
+          try {
+            const data = row.data as JobData;
+            const opts = (row.options as JobOptions | null) ?? {};
+            if (data.dedupeKey) {
+              await signalSupersededJobs(data.dedupeKey); // abort any in-flight prior, like the direct path
+              await queue.add(row.handlerName, data, opts); // no fixed jobId — supersession governed by the abort flag
+            } else {
+              await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
+            }
+            drained.push(row.id);
+          } catch (e) {
+            // One poison row must not strand the batch; it stays buffered and surfaces here each tick.
+            log.error(`drainOutbox: failed to re-enqueue ${row.handlerName} (${row.jobId})`, e, LogScope.job);
           }
-          drained.push(row.id);
-        } catch (e) {
-          // One poison row must not strand the batch; it stays buffered and surfaces here each tick.
-          log.error(`drainOutbox: failed to re-enqueue ${row.handlerName} (${row.jobId})`, e, LogScope.job);
         }
-      }
 
-      if (drained.length) {
-        await db.jobOutbox.deleteMany({ where: { id: { in: drained } } });
-        log.info(`drainOutbox: admitted ${drained.length}/${rows.length} buffered jobs`, LogScope.job);
-      }
-    });
-  }
+        if (drained.length) {
+          await db.jobOutbox.deleteMany({ where: { id: { in: drained } } });
+          log.info(`drainOutbox: admitted ${drained.length}/${rows.length} buffered jobs`, LogScope.job);
+        }
+      });
+    }
 
-  const depth = await queueDepth(true);
-  if (depth < lowWater()) {
-    await clearOverflow();
-  } else {
-    await renewOverflow(); // still overflowing — keep the flag alive past the next tick
-    await warnIfOverflowStuck(depth); // alert if it's been stuck on — drain isn't keeping up
-  }
+    const depth = await queueDepth(true);
+    if (depth < lowWater()) await clearOverflow();
+    else await warnIfOverflowStuck(depth); // alert if it's been stuck on — drain isn't keeping up
+  });
 });
