@@ -1,10 +1,12 @@
 # INFRA-021: Jobs Overflow Buffer
 
-**Status**: 🆕 Not Started
+**Status**: 👀 Review
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-06-18
 **Updated**: 2026-06-18
+
+> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. Superseding spill is an atomic `upsert` on that lane (race-safe; replaces the deleteMany+create plan). The `enqueueJobs(payloads[])` batch entry point was **not** built — the coalescing accumulator makes a single caller unnecessary (the Sender just loops `enqueueJob`). Drain has per-row error isolation + re-signals superseding rows. Tests written (unrun without Postgres/Redis); cap-edge cases now testable via lazy config.
 
 ---
 
@@ -87,10 +89,13 @@ Full design: [`docs/design/jobs-overflow-buffer.md`](../docs/design/jobs-overflo
 
 Load-bearing invariants (detail in the design doc):
 
-- **The stored `jobId` is the exactly-once fence, not the lock.** `createLock` guarantees one
-  drainer; a crash between `queue.add` and the row delete is made safe by BullMQ jobId dedup on
-  re-enqueue. (`createLock`'s own docs: "fence at the resource for exactly-once.")
-- **Spill resolves on commit** — no in-memory loss window.
+- **The drain is at-least-once — handlers must be idempotent.** `createLock` guarantees one drainer,
+  but a crash between `queue.add` and the row delete re-admits the row. The stored `jobId` dedups a
+  replay only while it's still in Redis — `queue.ts` `removeOnComplete: { count: 100 }` evicts it
+  under load — so the jobId narrows the window but is **not** an exactly-once fence. (Corrected from
+  the original "exactly-once" claim per review.)
+- **Spill resolves on commit** — no in-memory loss window. `flushOutbox` runs after intake stops, on
+  **both** the worker and API shutdown, and observes/logs flush failure.
 - **Flag is set inline** (not only by the cron) — a fan-out fills the queue long before the next
   tick, so the producer side must trip it; the cron only clears it.
 - **No worker-awareness** — the cap is on queue depth, which `getJobCounts` reports fleet-globally;

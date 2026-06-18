@@ -9,7 +9,7 @@ model JobOutbox {
   options     Json?                    // jobOptions (attempts, backoff, priority) for a faithful re-enqueue
 
   // uuidv7 id is time-ordered, so `orderBy: { id: 'asc' }` is the FIFO drain order — no separate index needed.
-  @@index([handlerName, dedupeKey])    // superseding deleteMany lookup
+  @@unique([handlerName, dedupeKey])   // one buffered row per superseding lane — upsert target (nulls are distinct, so fan-out rows don't collide)
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

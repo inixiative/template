@@ -224,8 +224,10 @@ drainOutbox = makeSingletonJob(async () => {     # createLock guarantees one dra
   a time, so no `SELECT … FOR UPDATE SKIP LOCKED` is needed; the select is plain.
 - **Tops up *to* the cap** (`room = cap − depth`), so it self-paces to fleet throughput without
   knowing fleet size.
-- **Re-enqueues with the stored `jobId`** — the idempotent fence (§10). The drain calls `queue.add`
-  **directly**, not `enqueueJob`, so it bypasses its own cap check.
+- **Re-enqueues with the stored `jobId`** (plain adhoc) or re-signals + adds without a fixed jobId
+  (superseding) — see §10. The drain calls `queue.add` **directly**, not `enqueueJob`, so it bypasses
+  its own cap check. Per-row try/catch: one poison row is logged and left buffered, not allowed to
+  strand the batch.
 - **Latency floor** = the tick interval, and only for jobs that spilled during an overflow episode.
   Under normal load nothing spills, zero added latency. Shrink the interval (15s, even 10s — it's a
   tiny job) to lower the overflow-episode latency.
@@ -234,12 +236,19 @@ drainOutbox = makeSingletonJob(async () => {     # createLock guarantees one dra
 
 ## 10. Durability & idempotency invariants
 
-- **The stored `jobId` is the exactly-once fence, not the lock.** A drainer crash between
-  `queue.add` and the delete re-reads those rows next run; BullMQ's jobId dedup makes the
-  re-enqueue idempotent. `createLock` only guarantees one drainer — its own docs say "fence at the
-  resource for exactly-once."
-- **Spill resolves on commit** (§6) — no in-memory loss window.
-- **Flush on shutdown** (§6) — no loss of the buffered batch on redeploy.
+- **The drain is at-least-once, not exactly-once — handlers must be idempotent.** A drainer crash
+  between `queue.add` and the row delete re-admits the row next tick. The stored `jobId` dedups a
+  replay *only while it's still in Redis* — `queue.ts` sets `removeOnComplete: { count: 100 }`, so a
+  completed job's id is evicted under load (exactly when overflow happens), after which a replay is
+  accepted and the job runs twice. So the jobId narrows the window but is **not** an exactly-once
+  fence; job handlers must tolerate re-execution. (`createLock` only guarantees one drainer.)
+- **Superseding rows drain through the same supersession path** — the drain calls
+  `signalSupersededJobs(dedupeKey)` and adds without a fixed jobId, so the abort flag (not jobId
+  dedup) governs supersession, matching the direct enqueue path.
+- **Spill resolves on commit** (§6) — no in-memory loss window. The shutdown `flushOutbox` awaits and
+  *observes* the in-flight flush (logs/throws on failure), and runs **after** intake stops (server
+  stopped / worker closed) so no new spill races it; it's wired into both the worker and the API
+  process shutdown.
 - **At-least-once is the honest ceiling** for the *delivery* a job performs (a crash between an
   external send and marking it done can repeat) — that's the consumer's concern (e.g. the email
   communication record), not the queue's.

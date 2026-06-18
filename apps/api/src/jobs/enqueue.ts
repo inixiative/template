@@ -4,35 +4,21 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { db, redisNamespace } from '@template/db';
+import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
 import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
-import { isOverflowing, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import { isOverflowing, shouldSpill, signalSupersededJobs, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
-import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
+import { type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];
   id?: string;
   bypass?: boolean; // skip the overflow buffer — latency-critical jobs go straight to BullMQ
-};
-
-export const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
-  const redis = queue.redis;
-  const jobs = await queue.getJobs(['active', 'waiting', 'delayed', 'paused']);
-
-  for (const job of jobs) {
-    if (!job.id) continue;
-    const jobData = job.data as JobData;
-    if (jobData.dedupeKey === dedupeKey) {
-      await redis.set(`${redisNamespace.job}:superseded:${job.id}`, '1', 'EX', 300);
-      log.info(`Signaled job ${job.id} to abort (superseded)`);
-    }
-  }
 };
 
 export const enqueueJob = async <K extends keyof JobPayloads>(
@@ -66,7 +52,9 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   if (dedupeKey) await signalSupersededJobs(dedupeKey);
 
   // Overflow buffer — adhoc only; cron/cronTrigger and `bypass` go straight to BullMQ (outbox.ts).
-  if (type === JobType.adhoc && !bypass && (await isOverflowing())) {
+  // isOverflowing() is only probed for spill-eligible jobs (no Redis GET on cron/bypass).
+  const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
+  if (shouldSpill(type, bypass, overflowing)) {
     const jobId = jobOptions.jobId ?? id ?? uuidv7();
     await spillToOutbox({
       handlerName,

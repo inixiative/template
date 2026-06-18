@@ -1,14 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { drainOutbox } from '#/jobs/handlers/drainOutbox';
-import { flushOutbox, isOverflowing, type OutboxRow, spillToOutbox } from '#/jobs/outbox';
+import { isOverflowing, type OutboxRow, queueDepth, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
-// Exercises the real spill + drain paths. enqueueJob short-circuits to synchronous
-// execution under isTest, so the buffer is tested at spillToOutbox/drainOutbox directly.
-
-const OVERFLOW_KEY = 'job:overflow';
+const FLAG_KEY = `${redisNamespace.job}:overflow`;
 
 const fanRow = (jobId: string): OutboxRow => ({
   handlerName: 'sendWebhook',
@@ -18,42 +16,61 @@ const fanRow = (jobId: string): OutboxRow => ({
   options: {},
 });
 
-describe('jobs overflow buffer', () => {
+// Pure routing decision — no DB/queue needed.
+describe('shouldSpill (routing)', () => {
+  it('spills an adhoc, non-bypassed job while overflowing', () => {
+    expect(shouldSpill(JobType.adhoc, false, true)).toBe(true);
+  });
+  it('goes direct when not overflowing', () => {
+    expect(shouldSpill(JobType.adhoc, false, false)).toBe(false);
+  });
+  it('bypass goes direct even while overflowing', () => {
+    expect(shouldSpill(JobType.adhoc, true, true)).toBe(false);
+  });
+  it('cron / cronTrigger go direct even while overflowing', () => {
+    expect(shouldSpill(JobType.cron, false, true)).toBe(false);
+    expect(shouldSpill(JobType.cronTrigger, false, true)).toBe(false);
+  });
+});
+
+describe('jobs overflow buffer (spill + drain)', () => {
   let ctx: WorkerContext;
 
   beforeAll(() => {
     ctx = createTestWorker({ name: 'drainOutbox', data: { id: 'drainOutbox' } });
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // size-trip every spill → deterministic commit
   });
 
   afterEach(async () => {
+    delete process.env.JOBS_MAX_QUEUE_DEPTH;
     await ctx.db.jobOutbox.deleteMany({});
-    await ctx.queue.redis.flushdb();
+    await ctx.queue.redis.flushdb(); // clears queued jobs + the flag
   });
 
   afterAll(async () => {
+    delete process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS;
     await cleanupTouchedTables(ctx.db);
     await ctx.queue.redis.flushdb();
   });
 
-  it('coalesces fan-out spills into one createMany', async () => {
-    await Promise.all([spillToOutbox(fanRow('a')), spillToOutbox(fanRow('b')), flushOutbox()]);
+  it('persists spilled fan-out rows (resolve-on-commit)', async () => {
+    await spillToOutbox(fanRow('a'));
+    await spillToOutbox(fanRow('b'));
     expect(await ctx.db.jobOutbox.count()).toBe(2);
   });
 
-  it('dedupes a re-spilled jobId (createMany skipDuplicates)', async () => {
-    const p1 = spillToOutbox(fanRow('dup'));
-    const p2 = spillToOutbox(fanRow('dup'));
-    await flushOutbox();
-    await Promise.all([p1, p2]);
+  it('dedupes the same jobId across flushes (@unique jobId + skipDuplicates)', async () => {
+    await spillToOutbox(fanRow('dup'));
+    await spillToOutbox(fanRow('dup'));
     expect(await ctx.db.jobOutbox.count()).toBe(1);
   });
 
-  it('superseding spill keeps only the latest (deleteMany first)', async () => {
+  it('superseding upsert keeps only the latest per lane', async () => {
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'recordAppEvent',
       jobId: `sup-${n}`,
       dedupeKey: 'lane-1',
-      data: { type: JobType.adhoc, payload: { n } },
+      data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-1' },
       options: {},
     });
 
@@ -65,25 +82,44 @@ describe('jobs overflow buffer', () => {
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(2);
   });
 
-  it('drain admits buffered jobs to the queue, clears the outbox, and clears the flag', async () => {
-    await ctx.queue.redis.set(OVERFLOW_KEY, '1');
-    await Promise.all([spillToOutbox(fanRow('d1')), spillToOutbox(fanRow('d2')), flushOutbox()]);
+  it('tripIfFull sets the flag once depth reaches the cap', async () => {
+    process.env.JOBS_MAX_QUEUE_DEPTH = '2';
+    await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
+    await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
+
+    await queueDepth(true); // prime the cache to the current depth
+    await tripIfFull();
+
+    expect(await isOverflowing()).toBe(true);
+  });
+
+  it('drain tops up only to the cap, leaving the rest buffered', async () => {
+    process.env.JOBS_MAX_QUEUE_DEPTH = '3';
+    await ctx.queue.redis.set(FLAG_KEY, '1');
+    for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
+    expect(await ctx.db.jobOutbox.count()).toBe(5);
+
+    await drainOutbox(ctx);
+
+    // room = cap(3) − depth(0) → 3 admitted, 2 remain buffered
     expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect((await ctx.queue.getJobCounts('waiting')).waiting).toBe(3);
+  });
+
+  it('drain admits all and clears the flag below low-water', async () => {
+    await ctx.queue.redis.set(FLAG_KEY, '1');
+    await spillToOutbox(fanRow('d1'));
+    await spillToOutbox(fanRow('d2'));
 
     await drainOutbox(ctx);
 
     expect(await ctx.db.jobOutbox.count()).toBe(0);
-    const counts = await ctx.queue.getJobCounts('waiting');
-    expect(counts.waiting).toBeGreaterThanOrEqual(2);
     expect(await isOverflowing()).toBe(false);
   });
 
-  it('re-enqueues with the stored jobId (idempotent drain)', async () => {
-    await Promise.all([spillToOutbox(fanRow('keep-id')), flushOutbox()]);
-
+  it('re-enqueues a plain adhoc row with its stored jobId', async () => {
+    await spillToOutbox(fanRow('keep-id'));
     await drainOutbox(ctx);
-
-    const job = await ctx.queue.getJob('keep-id');
-    expect(job?.id).toBe('keep-id');
+    expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 });

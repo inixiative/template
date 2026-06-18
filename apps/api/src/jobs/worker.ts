@@ -93,8 +93,8 @@ export const initializeWorker = async (): Promise<void> => {
 
   onShutdown(async () => {
     log.info('Stopping job worker...', LogScope.worker);
-    await flushOutbox(); // persist any buffered overflow spills before going down
-    if (jobsWorker) await jobsWorker.close();
+    if (jobsWorker) await jobsWorker.close(); // stop processing first — no new spills from finishing jobs
+    await flushOutbox(); // then persist any buffered overflow spills
     if (workerRedis) await workerRedis.quit();
     log.info('Job worker stopped', LogScope.worker);
   });
