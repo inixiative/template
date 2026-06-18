@@ -209,6 +209,15 @@ many superseding jobs at once). Instead the dedup happens *in the flush*, in one
 This keeps a single batched write path regardless of job mix — N superseding jobs in a window
 collapse to one `deleteMany` + one `createMany`, not N upserts.
 
+**Supersession through the buffer is tick-granular and last-wins.** The drain cancels prior in-queue
+copies and re-admits the latest, but a stale copy admitted in one tick can run before the next tick
+cancels its successor (and at the overflow edge an older buffered copy can briefly win over a newer
+direct one). Superseding handlers are idempotent / last-wins by design, so a re-run is harmless — the
+same requirement the at-least-once drain already imposes. A strict "never re-run" lane would need a
+per-enqueue claim registry in Redis; deliberately **not** built — it isn't needed for last-wins jobs
+and would touch the shared `makeSupersedingJob` path globally. (Singletons never reach the buffer —
+they're crons, which bypass it — and `createLock` already makes a duplicate a no-op at run time.)
+
 ---
 
 ## 9. The drain

@@ -18,6 +18,12 @@ import type { JobData, JobOptions, WorkerContext } from '#/jobs/types';
 // The stored jobId dedups a replay only while it's still in Redis (removeOnComplete evicts
 // it), so job handlers MUST be idempotent. Superseding rows are re-signalled and added
 // without a fixed jobId, matching the direct enqueue path.
+//
+// Supersession through the buffer is tick-granular + last-wins: the drain cancels prior copies
+// and re-admits the latest, but a stale copy can run before the next tick cancels its successor.
+// Superseding handlers are idempotent / last-wins by design, so a re-run is harmless — same
+// requirement as the at-least-once drain. A strict "never re-run" lane would need a per-enqueue
+// claim registry; not built, not needed here.
 
 export const drainOutbox = makeSingletonJob(async (ctx: WorkerContext) => {
   const { db } = ctx;
