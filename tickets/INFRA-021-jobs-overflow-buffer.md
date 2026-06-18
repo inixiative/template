@@ -6,7 +6,7 @@
 **Created**: 2026-06-18
 **Updated**: 2026-06-18
 
-> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. Superseding spill is an atomic `upsert` on that lane (race-safe; replaces the deleteMany+create plan). The `enqueueJobs(payloads[])` batch entry point was **not** built — the coalescing accumulator makes a single caller unnecessary (the Sender just loops `enqueueJob`). Drain has per-row error isolation + re-signals superseding rows. Tests written (unrun without Postgres/Redis); cap-edge cases now testable via lazy config.
+> **Shipped (reconciled with implementation):** depth probe counts `waiting + active` (not `delayed` — that includes scheduled cron repeats). No `collapseKey` column — the row stores `jobId @unique` + nullable `dedupeKey`, with `@@unique([handlerName, dedupeKey])`. **Everything (fan-out + superseding) routes through the one accumulator** — no per-spill upsert; the flush dedups in a txn: latest-per-lane within the batch, `deleteMany` OR'd over the batch's lanes, then `createMany({ skipDuplicates })`. The flush and the drain share one mutex (`runOnOutboxQueue`) so they can't touch the table at once. Shutdown loops + retries (bounded) and is wired into worker **and** API. The `enqueueJobs(payloads[])` batch entry point was **not** built — the accumulator makes a single caller unnecessary. Tests written (unrun without Postgres/Redis); cap-edge cases testable via lazy config.
 
 ---
 

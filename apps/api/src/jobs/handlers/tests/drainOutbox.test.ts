@@ -43,6 +43,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   afterEach(async () => {
     delete process.env.JOBS_MAX_QUEUE_DEPTH;
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // re-assert the suite default
     await ctx.db.jobOutbox.deleteMany({});
     await ctx.queue.redis.flushdb(); // clears queued jobs + the flag
   });
@@ -65,7 +66,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect(await ctx.db.jobOutbox.count()).toBe(1);
   });
 
-  it('superseding upsert keeps only the latest per lane', async () => {
+  it('superseding spills across flushes collapse to the latest (deleteMany OR)', async () => {
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'recordAppEvent',
       jobId: `sup-${n}`,
@@ -74,12 +75,29 @@ describe('jobs overflow buffer (spill + drain)', () => {
       options: {},
     });
 
-    await spillToOutbox(supRow(1));
-    await spillToOutbox(supRow(2));
+    await spillToOutbox(supRow(1)); // size=1 → its own flush
+    await spillToOutbox(supRow(2)); // flush deletes lane-1's prior row, inserts this one
 
     const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-1' } });
     expect(rows).toHaveLength(1);
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(2);
+  });
+
+  it('superseding spills within one batch collapse to the latest', async () => {
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '3'; // hold all three; flush on the 3rd (size trip)
+    const supRow = (n: number): OutboxRow => ({
+      handlerName: 'recordAppEvent',
+      jobId: `b-${n}`,
+      dedupeKey: 'lane-batch',
+      data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-batch' },
+      options: {},
+    });
+
+    await Promise.all([spillToOutbox(supRow(1)), spillToOutbox(supRow(2)), spillToOutbox(supRow(3))]);
+
+    const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
+    expect(rows).toHaveLength(1);
+    expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(3);
   });
 
   it('tripIfFull sets the flag once depth reaches the cap', async () => {

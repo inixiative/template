@@ -156,16 +156,22 @@ Design rules, each load-bearing:
   `Promise.all` over 50k partitions itself inline into 1000-row batches, so there's no separate
   "chunk a huge insert" path. Pick `FLUSH_MAX_ROWS` under Postgres's parameter ceiling
   (~65535 / columns-per-row).
-- **Serialize the flushes** with `createSerializedQueue` so the `createMany`s run one-at-a-time
-  instead of 50 concurrent 1000-row inserts swamping the connection pool. This is the canonical use
-  of the primitive (`CONCURRENCY.md`: "serialize writes to one resource").
+- **One shared mutex for the flush *and* the drain** (`createSerializedQueue`, exposed as
+  `runOnOutboxQueue`). It serializes the `createMany`s so they don't swamp the pool with concurrent
+  inserts, **and** the drain runs its table read+delete through the same queue — so a flush and a
+  drain can never touch `JobOutbox` at the same time (no stale re-enqueue racing a lane delete).
+  Canonical "serialize writes to one resource" (`CONCURRENCY.md`); cross-process the drain is also a
+  `createLock` singleton.
 - **`resolve` is wired to the commit, not to accumulation.** The promise resolves only when the
-  `createMany` lands. If `enqueueJob` returned "ok" the moment a row joined the in-memory
-  accumulator, a crash/redeploy in the flush window would silently drop it — the exact lost-jobs
-  failure this whole design exists to prevent, relocated into process memory. So the accumulator
-  carries resolvers; the flush resolves/rejects them.
-- **Flush on shutdown.** SIGTERM/redeploy must drain the accumulator and resolve awaiters before
-  exit, or the buffered batch is lost. (A synchronous path has nothing pending; this one does.)
+  write lands. If `enqueueJob` returned "ok" the moment a row joined the in-memory accumulator, a
+  crash/redeploy in the flush window would silently drop it — the exact lost-jobs failure this
+  design exists to prevent, relocated into process memory. So the accumulator carries resolvers; the
+  flush resolves/rejects them.
+- **Durable shutdown.** SIGTERM/redeploy runs `flushOutbox` **after intake stops** (server stopped /
+  worker closed), so nothing races it. It clears the pending timer, lets any in-flight flush settle,
+  then drains the accumulator in a loop (catching late arrivals) with a **bounded retry** per batch
+  for transient DB errors — surfacing a final failure loudly rather than dropping the batch. Wired
+  into both the worker *and* the API process shutdown (API request handlers spill too).
 - *(Optional)* **Memory backpressure.** To bound memory under a massive burst, `spill` can await
   the flush queue when it's deep before accepting more. Not needed until burst size threatens
   process memory.
@@ -186,22 +192,22 @@ Design rules, each load-bearing:
 
 ## 8. Dedupe-aware outbox
 
-The outbox is **not** a dumb FIFO append for all types, or singleton/superseding semantics break
-in the buffer.
+**Everything goes through the accumulator** — fan-out *and* superseding. There is no separate
+per-spill upsert path (that would be a DB round-trip per superseding job, which falls over under
+many superseding jobs at once). Instead the dedup happens *in the flush*, in one txn:
 
-- **`collapseKey = dedupeKey ?? id`.** Superseding jobs already carry a `dedupeKey`
-  (`handler.dedupeKeyFn`, `enqueue.ts:62`); singleton lanes key off `options.id`
-  (`makeSingletonJob`). A `@@unique([handlerName, collapseKey])` on the table backs the collapse.
-- **Adhoc jobs (`collapseKey` null) → `createMany`.** Fan-outs are adhoc, all rows distinct — the
-  clean bulk path. Postgres treats nulls as distinct, so they accumulate normally.
-- **Keyed jobs → `upsert`.** Superseding replaces the payload (latest wins); singleton collapses to
-  one row. These are low-volume and never fan out, so they take the individual path, not the bulk
-  one.
-- **Supersede reconciliation spans queue *and* outbox.** `signalSupersededJobs` (`enqueue.ts:22`)
-  scans only BullMQ today. If the prior instance is buffered in the outbox and a newer one arrives,
-  the scan misses it and the stale one drains and runs. Extend it to also delete matching outbox
-  rows by `collapseKey`. Invariant: **at most one live instance per `collapseKey` across queue +
-  outbox.**
+- **Within the batch**, keep only the latest row per superseding lane (`(handlerName, dedupeKey)`);
+  plain fan-out rows (`dedupeKey = null`) are all kept.
+- **`deleteMany` OR'd over the batch's superseding lanes** clears any prior buffered rows for those
+  lanes, then a single **`createMany({ skipDuplicates })`** inserts the batch. `dedupeKey` is the
+  row column; `jobId @unique` dedups plain re-spills; `@@unique([handlerName, dedupeKey])` backs the
+  cross-process collapse (nulls are distinct, so fan-out rows never collide).
+- **Supersede spans queue *and* outbox.** `signalSupersededJobs` aborts in-flight BullMQ copies at
+  enqueue time; the flush's `deleteMany` clears buffered copies; the drain re-signals on re-enqueue.
+  Invariant: **at most one buffered row per superseding lane**, and the latest wins.
+
+This keeps a single batched write path regardless of job mix — N superseding jobs in a window
+collapse to one `deleteMany` + one `createMany`, not N upserts.
 
 ---
 
