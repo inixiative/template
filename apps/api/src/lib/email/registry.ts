@@ -48,6 +48,6 @@ export const registry: Record<string, EmailEntry> = {
     source: (data) => userById(data.userId),
     senders: () => [{ ownerModel: 'default' }],
     recipients: (user) => userById(user.id),
-    data: (_source, handoff) => ({ buttonUrl: handoff.buttonUrl, buttonText: 'Verify Email' }),
+    data: (_source, handoff) => ({ verificationUrl: handoff.verificationUrl }),
   },
 };

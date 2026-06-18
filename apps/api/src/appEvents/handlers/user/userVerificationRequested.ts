@@ -15,7 +15,7 @@ export const userVerificationRequested = makeAppEvent<UserVerificationRequestedP
   email: (data) => [
     {
       template: 'email-verification',
-      data: { userId: data.userId, buttonUrl: data.verificationUrl },
+      data: { userId: data.userId, verificationUrl: data.verificationUrl },
     },
   ],
   observe: (data) => ({ userId: data.userId }),
