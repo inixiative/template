@@ -66,7 +66,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect(await ctx.db.jobOutbox.count()).toBe(1);
   });
 
-  it('superseding spills across flushes collapse to the latest (deleteMany OR)', async () => {
+  it('superseding spills across flushes collapse to the latest (upsert)', async () => {
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'recordAppEvent',
       jobId: `sup-${n}`,
@@ -113,7 +113,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('drain tops up only to the cap, leaving the rest buffered', async () => {
     process.env.JOBS_MAX_QUEUE_DEPTH = '3';
-    await ctx.queue.redis.set(FLAG_KEY, '1');
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
     expect(await ctx.db.jobOutbox.count()).toBe(5);
 
@@ -125,7 +125,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('drain admits all and clears the flag below low-water', async () => {
-    await ctx.queue.redis.set(FLAG_KEY, '1');
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     await spillToOutbox(fanRow('d1'));
     await spillToOutbox(fanRow('d2'));
 

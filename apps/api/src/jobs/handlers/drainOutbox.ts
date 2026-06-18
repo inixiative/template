@@ -6,13 +6,24 @@
  */
 import { LogScope, log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
-import { clearOverflow, lowWater, maxQueueDepth, queueDepth, runOnOutboxQueue, signalSupersededJobs } from '#/jobs/outbox';
+import {
+  clearOverflow,
+  lowWater,
+  maxQueueDepth,
+  queueDepth,
+  renewOverflow,
+  runOnOutboxQueue,
+  signalSupersededJobs,
+  warnIfOverflowStuck,
+} from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import type { JobData, JobOptions, WorkerContext } from '#/jobs/types';
 
 // Meters JobOutbox rows back into BullMQ, topping the queue up to the cap each tick.
-// Singleton (createLock) so only one drainer runs across processes; the table read+delete
-// runs through the shared outbox mutex so it can't interleave with an accumulator flush.
+// Singleton (createLock) so only one drainer runs across processes. The whole admit pass runs
+// through the shared outbox mutex (runOnOutboxQueue) so it never interleaves with an accumulator
+// flush — deliberately held across the queue.add loop too, which briefly blocks this process's
+// flushes during a large drain. That's an accepted, self-recovering stall, not a correctness issue.
 //
 // AT-LEAST-ONCE: a crash between queue.add and the row delete re-admits the row next tick.
 // The stored jobId dedups a replay only while it's still in Redis (removeOnComplete evicts
@@ -58,5 +69,11 @@ export const drainOutbox = makeSingletonJob(async (ctx: WorkerContext) => {
     });
   }
 
-  if ((await queueDepth(true)) < lowWater()) await clearOverflow();
+  const depth = await queueDepth(true);
+  if (depth < lowWater()) {
+    await clearOverflow();
+  } else {
+    await renewOverflow(); // still overflowing — keep the flag alive past the next tick
+    await warnIfOverflowStuck(depth); // alert if it's been stuck on — drain isn't keeping up
+  }
 });

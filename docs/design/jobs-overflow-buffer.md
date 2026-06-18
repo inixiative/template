@@ -84,17 +84,23 @@ Two states, one flag:
 A single Redis key (`${redisNamespace.job}:overflow`) is the shared state. The enqueue hot path
 reads it on every call — one cheap `GET` (cache it for ~1s per process if even that shows up).
 
-- **Set inline.** An enqueue that observes depth ≥ cap sets it. Setting inline (not only from the
-  cron) is what closes the inter-tick hole: a fan-out can fill the queue in seconds, long before
-  the next drain tick, so the producer side has to be able to trip it.
-- **Cleared by the drain** at a low-water mark (e.g. 80% of cap), not exactly at the cap — so it
-  doesn't flap clear→burst→set every tick.
+- **Set inline.** An enqueue that observes depth ≥ cap sets it (with a *fresh* depth probe, not the
+  cached one — a stale read would trip late and let the queue overshoot). Setting inline (not only
+  from the cron) closes the inter-tick hole: a fan-out fills the queue in seconds, long before the
+  next drain tick, so the producer side has to be able to trip it.
+- **Value = the epoch-ms start time, set-once via `NX`** so re-trips keep the original start. It
+  powers a **stuck-overflow alert**: if the drain finds the flag still on and older than a threshold,
+  it logs a warning — overflow that won't clear means the drain can't keep up.
+- **TTL the drain renews each tick.** A safety net (longer than the tick + the 1s depth cache): if
+  the drain process dies the flag self-clears rather than pinning overflow forever; while the drain
+  is alive it `EXPIRE`s the key each tick so the flag survives between ticks. The drain **clears** it
+  outright once depth is below the low-water mark (80% of cap, so it doesn't flap).
 - **Global**, so it coordinates the fleet: the first process to cross the cap sets it, and every
   other process sees it on their next enqueue.
 
-Depth is read with BullMQ's `queue.getJobCounts('waiting', 'delayed')` — fleet-global state in one
-cheap call, cached with a short TTL so it runs ~once/sec regardless of enqueue rate. **No worker
-enumeration needed** (see §7).
+Depth is read with BullMQ's `queue.getJobCounts('waiting', 'active')` — fleet-global state in one
+cheap call, cached ~1s on the hot path (the drain reads it fresh). **No worker enumeration needed**
+(see §7).
 
 ---
 
@@ -198,13 +204,19 @@ many superseding jobs at once). Instead the dedup happens *in the flush*, in one
 
 - **Within the batch**, keep only the latest row per superseding lane (`(handlerName, dedupeKey)`);
   plain fan-out rows (`dedupeKey = null`) are all kept.
-- **`deleteMany` OR'd over the batch's superseding lanes** clears any prior buffered rows for those
-  lanes, then a single **`createMany({ skipDuplicates })`** inserts the batch. `dedupeKey` is the
-  row column; `jobId @unique` dedups plain re-spills; `@@unique([handlerName, dedupeKey])` backs the
-  cross-process collapse (nulls are distinct, so fan-out rows never collide).
-- **Supersede spans queue *and* outbox.** `signalSupersededJobs` aborts in-flight BullMQ copies at
-  enqueue time; the flush's `deleteMany` clears buffered copies; the drain re-signals on re-enqueue.
-  Invariant: **at most one buffered row per superseding lane**, and the latest wins.
+- **Plain rows → `createMany({ skipDuplicates })`** (`jobId @unique` dedups re-spills, nulls are
+  distinct so fan-out rows never collide). **Superseding lanes → `upsert`** on
+  `@@unique([handlerName, dedupeKey])`. The upsert (not delete-then-`createMany`) matters
+  cross-process: two processes flushing the same lane both `INSERT … ON CONFLICT DO UPDATE`, so the
+  *last writer wins* and nothing is silently dropped — whereas `createMany({ skipDuplicates })`
+  resolves a lane collision by keeping whichever **commits first**, which can keep the *stale*
+  payload and drop the latest with no error. Still one batched flush, one txn — the upsert is per
+  distinct lane in the batch (lanes are low-volume), not per spill.
+- **Supersede spans queue *and* outbox.** On the *direct* path `signalSupersededJobs` aborts the
+  in-flight BullMQ copy; the flush's upsert collapses buffered copies; the drain re-signals on
+  re-admit. (The direct-path signal is *not* fired on the spill path — that would cancel the prior
+  ~a tick before its replacement is admitted, leaving a no-job gap.) Invariant: **at most one
+  buffered row per superseding lane**, and the latest wins.
 
 This keeps a single batched write path regardless of job mix — N superseding jobs in a window
 collapse to one `deleteMany` + one `createMany`, not N upserts.

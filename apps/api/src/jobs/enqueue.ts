@@ -49,12 +49,12 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
 
-  if (dedupeKey) await signalSupersededJobs(dedupeKey);
-
   // Overflow buffer — adhoc only; cron/cronTrigger and `bypass` go straight to BullMQ (outbox.ts).
   // isOverflowing() is only probed for spill-eligible jobs (no Redis GET on cron/bypass).
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {
+    // Supersession for spilled jobs is handled at drain admission — signalling here would cancel the
+    // prior job ~a tick before its replacement is admitted (a window with no job in flight).
     const jobId = jobOptions.jobId ?? id ?? uuidv7();
     await spillToOutbox({
       handlerName,
@@ -67,6 +67,8 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
+  // Direct path only: abort the prior in-flight copy now (spilled jobs supersede at drain admission).
+  if (dedupeKey) await signalSupersededJobs(dedupeKey);
   // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
   const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
   if (type === JobType.adhoc) await tripIfFull(); // set the flag if this add crossed the cap
