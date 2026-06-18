@@ -8,6 +8,7 @@ import { LogScope, log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import {
   clearOverflow,
+  isOverflowing,
   lowWater,
   maxQueueDepth,
   queueDepth,
@@ -38,6 +39,9 @@ import type { JobData, JobOptions, WorkerContext } from '#/jobs/types';
 
 export const drainOutbox = makeSingletonJob(async (ctx: WorkerContext) => {
   const { db } = ctx;
+
+  // Renew the flag up front so a long admit pass can't let its TTL lapse mid-tick.
+  if (await isOverflowing()) await renewOverflow();
 
   const room = maxQueueDepth() - (await queueDepth(true));
   if (room > 0) {

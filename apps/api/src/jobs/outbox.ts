@@ -225,7 +225,8 @@ export const flushOutbox = async (): Promise<void> => {
     }
     if (persisted) log.info(`flushOutbox: persisted ${persisted} buffered job(s)`, LogScope.job);
   } finally {
-    closing = false; // don't latch — an aborted shutdown (or a test) must be able to buffer again
-    if (acc.length && !timer) timer = setTimeout(flush, flushLinger()); // re-arm anything that landed mid-drain
+    closing = false; // don't latch — an aborted shutdown (or a test) must be able to buffer again.
+    // No timer re-arm here: during a real shutdown it could fire after Redis/DB are torn down. The
+    // loop above already drained everything present; an aborted shutdown re-arms on its next spill.
   }
 };
