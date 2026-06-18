@@ -21,8 +21,8 @@ export const lowWater = (): number => Math.floor(maxQueueDepth() * 0.8);
 const flushMaxRows = (): number => num(process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS, 1000);
 const flushLinger = (): number => num(process.env.JOBS_OUTBOX_FLUSH_LINGER_MS, 200);
 const overflowStuckMs = (): number => num(process.env.JOBS_OVERFLOW_STUCK_MS, 300_000);
-// Flag TTL — a safety net so a dead drain doesn't pin overflow forever. Must outlast the drain tick
-// (and the 1s depth cache); the drain renews it each tick while still overflowing.
+// Flag TTL — a safety net so a dead drain doesn't pin overflow forever; the drain heartbeats it
+// (withOverflowRenew) while alive. ms→s for Redis EX.
 const overflowTtlSec = (): number => Math.ceil(num(process.env.JOBS_OVERFLOW_TTL_MS, 60_000) / 1000);
 const DEPTH_CACHE_MS = 1000;
 const SHUTDOWN_FLUSH_RETRIES = 3;
@@ -93,7 +93,7 @@ export const warnIfOverflowStuck = async (depth: number): Promise<void> => {
 // no reliance on TTL > tick duration. renewOverflow (EXPIRE) no-ops on an absent key, so the final
 // renew never resurrects a flag the pass cleared.
 export const withOverflowRenew = async <T>(fn: () => Promise<T>): Promise<T> => {
-  const renewMs = Math.max(1000, Math.floor((overflowTtlSec() * 1000) / 3));
+  const renewMs = Math.floor((overflowTtlSec() * 1000) / 3); // a third of the TTL — always below it by construction
   let timer: ReturnType<typeof setTimeout> | null = null;
   const beat = (): void => {
     timer = setTimeout(() => {
