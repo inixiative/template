@@ -15,6 +15,8 @@ export type DeliverEmailPayload = {
   template: string;
   sender: ReachContext;
   recipient: { id: string; name: string; email: string };
+  cc?: string[];
+  bcc?: string[];
   data: Record<string, unknown>;
   tags: string[];
 };
@@ -26,7 +28,7 @@ const senderVars = (): Record<string, unknown> => ({
 });
 
 export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) => {
-  const { adapterName, template, sender, recipient, data, tags } = payload;
+  const { adapterName, template, sender, recipient, cc, bcc, data, tags } = payload;
 
   const variables: Variables = { sender: senderVars(), recipient, data };
   const [{ subject, mjml }, from] = await Promise.all([
@@ -36,5 +38,5 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
   const { html } = await mjml2html(mjml, { validationLevel: 'skip' });
 
   const client = emailRegistry.getOrDefault(undefined, adapterName);
-  await client.send({ to: recipient.email, from, subject, html, tags });
+  await client.send({ to: recipient.email, cc, bcc, from, subject, html, tags });
 });

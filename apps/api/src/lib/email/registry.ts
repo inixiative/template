@@ -16,6 +16,8 @@ export type EmailEntry = {
   source: (data: Record<string, unknown>) => LensNarrowing;
   senders: (source: Source) => ReachContext[];
   recipients: (source: Source, sender: ReachContext) => LensNarrowing;
+  cc?: (recipient: Source, sender: ReachContext) => LensNarrowing;
+  bcc?: (recipient: Source, sender: ReachContext) => LensNarrowing;
   data?: (source: Source, handoff: Record<string, unknown>) => Record<string, unknown>;
 };
 
