@@ -16,6 +16,7 @@ kanban
     INFRA-016-lens-serialization-by-ref
     INFRA-018-lens-builder
     INFRA-012-typed-prisma-results
+    INFRA-021-jobs-overflow-buffer
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
@@ -47,6 +48,7 @@ kanban
 **Infrastructure:**
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+- [INFRA-021: Jobs Overflow Buffer](./INFRA-021-jobs-overflow-buffer.md) ⭐ - Durable outbox in front of BullMQ at the `enqueueJob` chokepoint; bounds Redis depth on fan-outs (createLock singleton refactor landed)
 
 **Rules / Lens Platform** (json-rules + rules-builder):
 - [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) ⭐ - exposedSurface ✅ + serializable projection + describeRule (🚧 in progress)
@@ -94,8 +96,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 16
-- **Todo**: 11
+- **Total Tickets**: 17
+- **Todo**: 12
 - **In Progress**: 5
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
@@ -119,4 +121,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-06-12_
+_Last Updated: 2026-06-18_
