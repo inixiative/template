@@ -11,7 +11,7 @@ import { enqueueJob } from '#/jobs/enqueue';
 export const deliverEmailHandoffs = async (event: AppEventPayload, handoffs: EmailHandoff[]): Promise<void> => {
   await Promise.all(
     handoffs.map(async (handoff) => {
-      const tags = [event.name, handoff.template, ...(handoff.tags ?? [])];
+      const tags = [event.name, handoff.template];
 
       const job = await enqueueJob('sendEmail', { ...handoff, tags });
 

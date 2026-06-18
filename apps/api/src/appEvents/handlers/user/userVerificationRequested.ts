@@ -14,12 +14,8 @@ export type UserVerificationRequestedPayload = {
 export const userVerificationRequested = makeAppEvent<UserVerificationRequestedPayload>({
   email: (data) => [
     {
-      audience: [{ userIds: [data.userId] }],
       template: 'email-verification',
-      data: {
-        buttonUrl: data.verificationUrl,
-        buttonText: 'Verify Email',
-      },
+      data: { userId: data.userId, buttonUrl: data.verificationUrl },
     },
   ],
   observe: (data) => ({ userId: data.userId }),

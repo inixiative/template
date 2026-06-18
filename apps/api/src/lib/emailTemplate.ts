@@ -14,7 +14,7 @@ import {
   type Variables,
 } from '@template/email/render';
 import { LogScope, log } from '@template/shared/logger';
-import type { ReachContext } from '#/lib/audience';
+import type { ReachContext } from '#/lib/email';
 
 export const composeCtx = (ctx: ReachContext): ComposeContext => ({
   locale: 'en',

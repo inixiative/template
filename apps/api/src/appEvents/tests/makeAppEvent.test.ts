@@ -41,7 +41,7 @@ describe('makeAppEvent', () => {
 
   describe('email', () => {
     it('calls email callback with event data', async () => {
-      const emailFn = mock(() => [{ audience: [{ userIds: ['user-1'] }], template: 'test', data: {} }]);
+      const emailFn = mock(() => [{ template: 'test', data: {} }]);
 
       const handler = makeAppEvent({ email: emailFn });
       await handler(createEvent('test', { key: 'val' }));

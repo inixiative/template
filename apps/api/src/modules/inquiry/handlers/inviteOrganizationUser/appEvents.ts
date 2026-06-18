@@ -4,29 +4,16 @@
  * @partOf feature:inquiry
  * @uses feature:tenancy
  */
-import { contentSchema } from '#/modules/inquiry/handlers/inviteOrganizationUser/schema';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 
 export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
   sent: {
     email: (inquiry) => {
       if (!inquiry.targetUserId) return null;
-      const content = contentSchema.parse(inquiry.content);
       return [
         {
-          audience: [{ userIds: [inquiry.targetUserId] }],
-          template: 'org-invitation',
-          data: {
-            organizationName: inquiry.sourceOrganization?.name ?? '',
-            inviterName: inquiry.sourceUser?.name ?? '',
-            role: content.role,
-            buttonUrl: `${process.env.WEB_URL ?? ''}/invitations/${inquiry.id}`,
-            buttonText: 'Accept Invitation',
-          },
-          sender: inquiry.sourceOrganizationId
-            ? { ownerModel: 'Organization', organizationId: inquiry.sourceOrganizationId }
-            : { ownerModel: 'default' },
-          tags: ['inviteOrganizationUser'],
+          template: 'inquiry-invite-organization-user',
+          data: { inquiryId: inquiry.id },
         },
       ];
     },

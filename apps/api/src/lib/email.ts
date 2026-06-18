@@ -9,6 +9,18 @@ import { createBouncerVerifier, createNoopVerifier, type EmailVerifier } from '@
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 import { isTest } from '@template/shared/utils';
 
+export type ReachContext =
+  | { ownerModel: 'default' }
+  | { ownerModel: 'Organization'; organizationId: string }
+  | { ownerModel: 'Space'; spaceId: string };
+
+export const contextKey = (c: ReachContext): string =>
+  c.ownerModel === 'Organization'
+    ? `Organization:${c.organizationId}`
+    : c.ownerModel === 'Space'
+      ? `Space:${c.spaceId}`
+      : 'default';
+
 export const emailRegistry = makeBroadcastRegistry<EmailClient>();
 
 // Only register a connector when one is actually configured. In test, no

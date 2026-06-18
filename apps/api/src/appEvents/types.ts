@@ -5,9 +5,6 @@
  * @uses feature:email, primitive:shared
  */
 import type { WSEvent } from '@template/shared/ws';
-import type { Audience, ReachContext, Recipient } from '#/lib/audience';
-
-export type { Audience, Recipient };
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -27,11 +24,8 @@ export type AppEventPayload<T = Record<string, unknown>> = {
 };
 
 export type EmailHandoff = {
-  audience: Audience[];
   template: string;
   data: Record<string, unknown>;
-  sender?: ReachContext;
-  tags?: string[];
 };
 
 export type ObserveData = Record<string, unknown>;
