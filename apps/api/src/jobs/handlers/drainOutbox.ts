@@ -12,7 +12,7 @@ import {
   maxQueueDepth,
   queueDepth,
   runOnOutboxQueue,
-  signalSupersededJobs,
+  signalSupersededLanes,
   warnIfOverflowStuck,
   withOverflowRenew,
 } from '#/jobs/outbox';
@@ -46,18 +46,23 @@ export const drainOutbox = makeSingletonJob(async (ctx: WorkerContext) => {
     if (room > 0) {
       await runOnOutboxQueue(async () => {
         const rows = await db.jobOutbox.findMany({ orderBy: { id: 'asc' }, take: room });
-        const drained: string[] = [];
 
+        // Cancel in-flight prior copies for every superseding lane in the batch — one queue scan, not one per row.
+        const lanes = new Set<string>();
+        for (const row of rows) {
+          const lane = (row.data as JobData).dedupeKey;
+          if (lane) lanes.add(lane);
+        }
+        await signalSupersededLanes(lanes);
+
+        const drained: string[] = [];
         for (const row of rows) {
           try {
             const data = row.data as JobData;
             const opts = (row.options as JobOptions | null) ?? {};
-            if (data.dedupeKey) {
-              await signalSupersededJobs(data.dedupeKey); // abort any in-flight prior, like the direct path
-              await queue.add(row.handlerName, data, opts); // no fixed jobId — supersession governed by the abort flag
-            } else {
-              await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
-            }
+            // Superseding rows: no fixed jobId — supersession is governed by the abort flag set above.
+            if (data.dedupeKey) await queue.add(row.handlerName, data, opts);
+            else await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             drained.push(row.id);
           } catch (e) {
             // One poison row must not strand the batch; it stays buffered and surfaces here each tick.
