@@ -10,6 +10,7 @@ import {
   webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
 import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -66,6 +67,10 @@ const processSingleRecord = (
     return [];
   }
 
+  const origin = auditActorContext.getScope()?.originIntegration ?? null;
+  const targets = origin ? subscriptions.filter((sub) => sub.integration !== origin) : subscriptions;
+  if (targets.length === 0) return [];
+
   const payload: WebhookPayload = {
     model: webhookModel,
     action: webhookAction,
@@ -75,7 +80,7 @@ const processSingleRecord = (
     timestamp: new Date().toISOString(),
   };
 
-  return getWebhookCallbacks(subscriptions, payload);
+  return getWebhookCallbacks(targets, payload);
 };
 
 export const registerWebhookHook = () => {

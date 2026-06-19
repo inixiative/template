@@ -9,6 +9,7 @@ model WebhookSubscription {
   model     WebhookModel
   url       String
   isActive  Boolean          @default(true)
+  integration Integration?
 
   // Owner (fake polymorphism: User, Organization, or Space)
   ownerModel     WebhookOwnerModel
@@ -32,6 +33,7 @@ model WebhookSubscription {
   @@unique([spaceId, model, url],        where: { spaceId:        { not: null } })
   @@index([ownerModel])
   @@index([model])
+  @@index([integration])
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -16,6 +16,7 @@ model AuditLog {
   actorJobName     String?
   ipAddress        String?
   userAgent        String?
+  originIntegration Integration?
 
   // What happened
   action       AuditAction
