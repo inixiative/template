@@ -5,7 +5,7 @@
  * @uses none
  */
 import { evaluateConditions, type RuleErrorSink } from '@template/email/render/evaluateConditions';
-import { escape, get, isNil } from 'lodash-es';
+import { escape as escapeHtml, get, isNil } from 'lodash-es';
 
 export enum VariablePrefix {
   sender = 'sender',
@@ -27,6 +27,6 @@ export const interpolate = (template: string, variables: Variables, onError?: Ru
   return evaluated.replace(VARIABLE_PATTERN, (match, prefix, path) => {
     const value = get(variables[prefix as keyof Variables], path);
     if (isNil(value)) return match;
-    return escape(String(value));
+    return escapeHtml(String(value));
   });
 };

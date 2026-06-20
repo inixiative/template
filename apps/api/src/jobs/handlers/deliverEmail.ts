@@ -8,6 +8,7 @@ import type { Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry, type ReachContext, resolveFromAddress } from '#/lib/email';
+import { resolveSender } from '#/lib/email/resolveSender';
 import { settleTemplate } from '#/lib/emailTemplate';
 
 export type DeliverEmailPayload = {
@@ -21,16 +22,10 @@ export type DeliverEmailPayload = {
   tags: string[];
 };
 
-const senderVars = (): Record<string, unknown> => ({
-  platformName: process.env.PLATFORM_NAME ?? 'Template',
-  address: process.env.PLATFORM_ADDRESS ?? '',
-  webUrl: process.env.WEB_URL ?? '',
-});
-
 export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) => {
   const { adapterName, template, sender, recipient, cc, bcc, data, tags } = payload;
 
-  const variables: Variables = { sender: senderVars(), recipient, data };
+  const variables: Variables = { sender: await resolveSender(sender), recipient, data };
   const [{ subject, mjml }, from] = await Promise.all([
     settleTemplate(template, sender, variables),
     resolveFromAddress(),

@@ -5,7 +5,7 @@
  */
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
-import { type AccessorName, type ModelName, isModelName, toAccessor } from '@template/db/utils/modelNames';
+import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
 import { compact, isNil } from 'lodash-es';
 
@@ -31,7 +31,12 @@ type CacheDomain = AccessorName | ModelName | (string & {});
 
 const toAccessorName = (domain: CacheDomain): string => (isModelName(domain) ? toAccessor(domain) : domain);
 
-export const cacheKey = (domain: CacheDomain, identifier: Identifier, tags: string[] = [], wildcard = false): string => {
+export const cacheKey = (
+  domain: CacheDomain,
+  identifier: Identifier,
+  tags: string[] = [],
+  wildcard = false,
+): string => {
   const idParts: string[] = [];
 
   if (typeof identifier === 'string') {

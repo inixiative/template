@@ -26,7 +26,8 @@ const usersLens = (ids: string[]): LensNarrowing => ({
   },
 });
 
-const plainMjml = (body: string) => `<mjml><mj-body><mj-section><mj-column><mj-text>${body}</mj-text></mj-column></mj-section></mj-body></mjml>`;
+const plainMjml = (body: string) =>
+  `<mjml><mj-body><mj-section><mj-column><mj-text>${body}</mj-text></mj-column></mj-section></mj-body></mjml>`;
 
 describe('sendEmail handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
@@ -66,7 +67,11 @@ describe('sendEmail handler', () => {
   it('fans out one email per resolved recipient', async () => {
     const { entity: alice } = await createUser({ name: 'Alice' });
     const { entity: bob } = await createUser({ name: 'Bob' });
-    await createEmailTemplate({ slug: 'test-fanout', subject: 'Hi {{recipient.name}}', mjml: plainMjml('Hi {{recipient.name}}') });
+    await createEmailTemplate({
+      slug: 'test-fanout',
+      subject: 'Hi {{recipient.name}}',
+      mjml: plainMjml('Hi {{recipient.name}}'),
+    });
 
     addEntry('test-fanout', {
       source: (data) => userLens(data.userId as string),

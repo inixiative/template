@@ -5,8 +5,8 @@
  * @uses none
  */
 import {
-  check,
   type Condition,
+  check,
   executePrismaQueryPlan,
   type Lens,
   type LensNarrowing,

@@ -41,7 +41,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
         '<mj-section padding="20px 0">',
         '  <mj-column>',
         '    <mj-text align="center" font-size="12px" color="#6b7280">',
-        '      {{sender.platformName}} &mdash; {{sender.address}}',
+        '      {{sender.platformName}}',
         '    </mj-text>',
         '  </mj-column>',
         '</mj-section>',

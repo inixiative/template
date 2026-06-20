@@ -84,7 +84,10 @@ export const warnIfOverflowStuck = async (depth: number): Promise<void> => {
   if (startedAt === null) return;
   const ageMs = Date.now() - Number(startedAt);
   if (ageMs > overflowStuckMs()) {
-    log.warn(`overflow stuck ${Math.round(ageMs / 60_000)}m — drain not keeping up (depth ${depth} ≥ low-water ${lowWater()})`, LogScope.job);
+    log.warn(
+      `overflow stuck ${Math.round(ageMs / 60_000)}m — drain not keeping up (depth ${depth} ≥ low-water ${lowWater()})`,
+      LogScope.job,
+    );
   }
 };
 
@@ -208,7 +211,8 @@ const accumulate = (row: OutboxRow): Promise<void> =>
   new Promise((resolve, reject) => {
     acc.push({ row, resolve, reject });
     if (closing) return; // shutdown drains via flushOutbox (with retry); its finally re-arms mid-drain stragglers
-    if (acc.length >= flushMaxRows()) flush(); // size trip — partitions a Promise.all burst inline
+    if (acc.length >= flushMaxRows())
+      flush(); // size trip — partitions a Promise.all burst inline
     else if (!timer) timer = setTimeout(flush, flushLinger()); // arm for the partial-batch tail
   });
 

@@ -16,7 +16,13 @@ export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>)
     const identifier = (ctx.job.data as { id?: string } | undefined)?.id ?? ctx.job.name;
     if (!identifier) throw new Error('Singleton job missing id and name');
 
-    const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 });
+    const lock = createLock({
+      service: 'job-singleton',
+      identifier,
+      ttlMs: 300_000,
+      heartbeatMs: 60_000,
+      maxMissed: 3,
+    });
     if (!(await lock.acquire())) return;
 
     try {

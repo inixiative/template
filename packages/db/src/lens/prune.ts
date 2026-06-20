@@ -40,9 +40,7 @@ export const prune = <D extends Record<string, unknown> | readonly Record<string
   const [rootKey] = byPath.keys();
   if (!rootKey) return data as unknown as Pruned<D>;
 
-  return (
-    Array.isArray(data)
-      ? data.map((row) => pruneRow(byPath, row, rootKey))
-      : pruneRow(byPath, data as Record<string, unknown>, rootKey)
-  ) as unknown as Pruned<D>;
+  return (Array.isArray(data)
+    ? data.map((row) => pruneRow(byPath, row, rootKey))
+    : pruneRow(byPath, data as Record<string, unknown>, rootKey)) as unknown as Pruned<D>;
 };
