@@ -58,6 +58,12 @@ describe('interpolate', () => {
       });
       expect(result).toBe('Org: Acme, role: admin');
     });
+
+    it('does not resolve prototype-chain or inherited-function paths', () => {
+      const template = '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
+      const result = interpolate(template, { data: {} });
+      expect(result).toBe(template);
+    });
   });
 
   describe('conditional blocks', () => {

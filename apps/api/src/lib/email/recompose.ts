@@ -36,6 +36,8 @@ export const recomposeSnapshot = async (auditLogId: string): Promise<string | nu
   return result;
 };
 
+// @wip — replay a sent communication's exact rendered MJML from its pinned template snapshot.
+// Resend / preview consumer is COMM follow-up; recomposeSnapshot is the live path today.
 export const recomposeCommunication = async (communicationLogId: string): Promise<string | null> => {
   const log = await db.communicationLog.findUnique({
     where: { id: communicationLogId },
