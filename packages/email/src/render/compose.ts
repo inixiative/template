@@ -12,6 +12,7 @@ import type { OwnerScope } from '@template/email/render/types';
 
 export type ComposeTemplateResult = {
   id: string;
+  emailTemplateAuditLogId: string | null; // latest snapshot, read with the template so the send pin matches what rendered
   mjml: string;
   subject: string;
   kind: CommunicationKind;
@@ -36,6 +37,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
 
   return {
     id: template.id,
+    emailTemplateAuditLogId: template.auditLogs[0]?.id ?? null,
     mjml,
     subject: template.subject,
     kind: template.kind,

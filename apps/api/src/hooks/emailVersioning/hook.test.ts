@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { saveEmailTemplate } from '@template/email/render';
+import { expand, saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeSnapshot } from '#/lib/email/recompose';
@@ -78,5 +78,48 @@ describe('emailVersioning', () => {
     const composedV1 = await recomposeSnapshot(v1!.id);
     expect(composedV1).toContain('Hello');
     expect(composedV1).not.toContain('Updated');
+  });
+
+  it('a no-op re-save neither adds nor rewrites a snapshot', async () => {
+    const { template, components } = await saveEmailTemplate(greetingTemplate());
+    const templatesBefore = await db.auditLog.findMany({
+      where: { subjectEmailTemplateId: template.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const componentsBefore = await db.auditLog.count({ where: { subjectEmailComponentId: components[0].id } });
+
+    await saveEmailTemplate(greetingTemplate());
+
+    const templatesAfter = await db.auditLog.findMany({
+      where: { subjectEmailTemplateId: template.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const componentsAfter = await db.auditLog.count({ where: { subjectEmailComponentId: components[0].id } });
+
+    expect(templatesAfter.length).toBe(templatesBefore.length);
+    expect(componentsAfter).toBe(componentsBefore);
+    expect(templatesAfter[0].id).toBe(templatesBefore[0].id);
+    expect(templatesAfter[0].emailComponentAuditLogIds).toEqual(templatesBefore[0].emailComponentAuditLogIds);
+  });
+
+  it('the latest snapshot recomposes to exactly the live composition — no drift', async () => {
+    const { template, components } = await saveEmailTemplate(greetingTemplate());
+    const ctx = {
+      ownerModel: template.ownerModel,
+      organizationId: template.organizationId,
+      spaceId: template.spaceId,
+      locale: template.locale,
+    };
+
+    const live1 = await expand(template.mjml, template.componentRefs, ctx);
+    const snap1 = await latestSnapshot({ subjectEmailTemplateId: template.id });
+    expect(await recomposeSnapshot(snap1!.id)).toBe(live1);
+
+    await db.emailComponent.update({ where: { id: components[0].id }, data: { mjml: '<mj-text>Updated</mj-text>' } });
+
+    const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    const live2 = await expand(liveTemplate.mjml, liveTemplate.componentRefs, ctx);
+    const snap2 = await latestSnapshot({ subjectEmailTemplateId: template.id });
+    expect(await recomposeSnapshot(snap2!.id)).toBe(live2);
   });
 });

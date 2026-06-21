@@ -42,7 +42,13 @@ export const ownerScope = (sender: Sender): OwnerScope => {
   }
 };
 
-export type SettledTemplate = { subject: string; mjml: string; kind: CommunicationKind; emailTemplateId: string };
+export type SettledTemplate = {
+  subject: string;
+  mjml: string;
+  kind: CommunicationKind;
+  emailTemplateId: string;
+  emailTemplateAuditLogId: string | null;
+};
 
 export const settleTemplate = async (
   template: string,
@@ -61,7 +67,13 @@ export const settleTemplate = async (
       : variables;
     const mjml = interpolate(composed.mjml, vars, onError);
     const subject = interpolate(composed.subject, vars, onError);
-    const settled = { subject, mjml, kind: composed.kind, emailTemplateId: composed.id };
+    const settled = {
+      subject,
+      mjml,
+      kind: composed.kind,
+      emailTemplateId: composed.id,
+      emailTemplateAuditLogId: composed.emailTemplateAuditLogId,
+    };
 
     if (!errors.length) return settled;
 

@@ -58,17 +58,10 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     });
     throw error;
   }
-  const emailTemplateAuditLog = settled.emailTemplateId
-    ? await db.auditLog.findFirst({
-        where: { subjectEmailTemplateId: settled.emailTemplateId },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
-      })
-    : null;
   const resolved = {
     kind: settled.kind,
     emailTemplateId: settled.emailTemplateId,
-    emailTemplateAuditLogId: emailTemplateAuditLog?.id ?? null,
+    emailTemplateAuditLogId: settled.emailTemplateAuditLogId,
   };
 
   const deliverable = entry.recipientContact

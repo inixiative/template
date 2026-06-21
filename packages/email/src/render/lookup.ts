@@ -4,11 +4,17 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db/generated/client/client';
+import type { EmailComponent, Prisma, PrismaClient } from '@template/db/generated/client/client';
 import type { OwnerScope } from '@template/email/render/types';
 
+const latestSnapshotInclude = {
+  auditLogs: { take: 1, orderBy: { createdAt: 'desc' }, select: { id: true } },
+} satisfies Prisma.EmailTemplateInclude;
+
+export type TemplateWithSnapshot = Prisma.EmailTemplateGetPayload<{ include: typeof latestSnapshotInclude }>;
+
 type LookupResult = {
-  template: EmailTemplate | null;
+  template: TemplateWithSnapshot | null;
   components: Record<string, EmailComponent>;
 };
 
@@ -30,7 +36,9 @@ export const lookupAtSpace = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -60,7 +68,9 @@ export const lookupAtOrg = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -86,7 +96,9 @@ export const lookupAtDefault = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};
@@ -112,7 +124,9 @@ export const lookupAtAdmin = async (
     componentSlugs.length
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
       : Promise.resolve([]),
-    templateSlug ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base } }) : Promise.resolve(null),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
   ]);
 
   const components: Record<string, EmailComponent> = {};

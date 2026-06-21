@@ -5,13 +5,19 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
-import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
+import type { EmailComponent } from '@template/db/generated/client/client';
+import {
+  lookupAtAdmin,
+  lookupAtDefault,
+  lookupAtOrg,
+  lookupAtSpace,
+  type TemplateWithSnapshot,
+} from '@template/email/render/lookup';
 import type { OwnerScope } from '@template/email/render/types';
 
 type LookupFn<T> = () => Promise<T | null | undefined>;
 
-const getTemplateLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailTemplate>[] => {
+const getTemplateLookups = (slug: string, ctx: OwnerScope): LookupFn<TemplateWithSnapshot>[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -51,7 +57,7 @@ const getComponentLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailCompo
   }
 };
 
-export const lookupTemplate = async (slug: string, ctx: OwnerScope): Promise<EmailTemplate | null> => {
+export const lookupTemplate = async (slug: string, ctx: OwnerScope): Promise<TemplateWithSnapshot | null> => {
   for (const lookup of getTemplateLookups(slug, ctx)) {
     const result = await lookup();
     if (result) return result;
