@@ -211,6 +211,17 @@ describe('Contact CRUD', () => {
       expect(data.position).toBe(1);
     });
 
+    it('locks the email mirroring the user login against update (403)', async () => {
+      const { entity: contact } = await createContact({
+        user,
+        ownerModel: 'User',
+        type: 'email',
+        value: { address: user.email as string },
+      });
+      const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Changed' }));
+      expect(response.status).toBe(403);
+    });
+
     it('rejects updating another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
@@ -248,6 +259,17 @@ describe('Contact CRUD', () => {
       });
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(204);
+    });
+
+    it('locks deleting the email mirroring the user login (403)', async () => {
+      const { entity: contact } = await createContact({
+        user,
+        ownerModel: 'User',
+        type: 'email',
+        value: { address: user.email as string },
+      });
+      const response = await fetch(del(`/api/v1/contact/${contact.id}`));
+      expect(response.status).toBe(403);
     });
 
     it('rejects deleting another user contact (403)', async () => {
