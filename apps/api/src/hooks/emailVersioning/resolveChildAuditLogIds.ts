@@ -30,7 +30,7 @@ export const resolveChildAuditLogIds = async (record: Versioned): Promise<string
 
   const snapshots = await db.auditLog.findMany({
     where: { subjectEmailComponentId: { in: childIds } },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { id: 'desc' },
     select: { id: true, subjectEmailComponentId: true },
   });
 

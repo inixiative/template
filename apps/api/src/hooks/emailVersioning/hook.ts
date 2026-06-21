@@ -32,7 +32,7 @@ const subjectWhere = (model: EmailModel, id: string) =>
 const findLatestSnapshot = (model: EmailModel, id: string) =>
   db.auditLog.findFirst({
     where: subjectWhere(model, id),
-    orderBy: { createdAt: 'desc' },
+    orderBy: { id: 'desc' },
     select: { id: true, emailComponentAuditLogIds: true },
   });
 
