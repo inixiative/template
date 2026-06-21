@@ -7,11 +7,11 @@
 import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
 type LookupFn<T> = () => Promise<T | null | undefined>;
 
-const getTemplateLookups = (slug: string, ctx: SaveContext): LookupFn<EmailTemplate>[] => {
+const getTemplateLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailTemplate>[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -31,7 +31,7 @@ const getTemplateLookups = (slug: string, ctx: SaveContext): LookupFn<EmailTempl
   }
 };
 
-const getComponentLookups = (slug: string, ctx: SaveContext): LookupFn<EmailComponent>[] => {
+const getComponentLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailComponent>[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -51,7 +51,7 @@ const getComponentLookups = (slug: string, ctx: SaveContext): LookupFn<EmailComp
   }
 };
 
-export const lookupTemplate = async (slug: string, ctx: SaveContext): Promise<EmailTemplate | null> => {
+export const lookupTemplate = async (slug: string, ctx: OwnerScope): Promise<EmailTemplate | null> => {
   for (const lookup of getTemplateLookups(slug, ctx)) {
     const result = await lookup();
     if (result) return result;
@@ -59,7 +59,7 @@ export const lookupTemplate = async (slug: string, ctx: SaveContext): Promise<Em
   return null;
 };
 
-export const lookupComponent = async (slug: string, ctx: SaveContext): Promise<EmailComponent | null> => {
+export const lookupComponent = async (slug: string, ctx: OwnerScope): Promise<EmailComponent | null> => {
   for (const lookup of getComponentLookups(slug, ctx)) {
     const result = await lookup();
     if (result) return result;

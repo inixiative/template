@@ -5,6 +5,7 @@
  * @uses none
  */
 import { stableHash } from '@template/shared/utils';
+import type { Sender } from '#/lib/email/sender';
 
 // Shared `{eventName}:{template}` prefix, hash last: a duplicate emit collapses, a changed payload re-sends.
 export const plannerJobId = (eventName: string, template: string, data: unknown): string =>
@@ -13,7 +14,7 @@ export const plannerJobId = (eventName: string, template: string, data: unknown)
 export const deliverJobId = (
   eventName: string,
   template: string,
-  senderKey: string,
+  sender: Sender,
   recipientEmail: string,
   contents: unknown,
-): string => `${eventName}:${template}:${senderKey}:${recipientEmail}:${stableHash(contents)}`;
+): string => `${eventName}:${template}:${stableHash(sender)}:${recipientEmail}:${stableHash(contents)}`;

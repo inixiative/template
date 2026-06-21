@@ -14,6 +14,7 @@ export type SendEmailOptions = {
   replyTo?: string;
   tags?: string[];
   metadata?: Record<string, string>;
+  headers?: Record<string, string>;
 };
 
 export type SendEmailResult = {

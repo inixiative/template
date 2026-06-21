@@ -8,31 +8,31 @@
 // - Audit trail (all Space access traces to Org membership)
 
 model SpaceUser {
-    id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-    createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
-    deletedAt DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-    role         Role @default(member)
-    entitlements Json?
+  role         Role  @default(member)
+  entitlements Json?
 
-    // Relations
-    organizationId   String           @db.VarChar(36)
-    spaceId          String           @db.VarChar(36)
-    userId           String           @db.VarChar(36)
-    organizationUser OrganizationUser @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
-    organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    space            Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-    tokens             Token[]
-    auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectSpaceUser")
+  // Relations
+  organizationId     String           @db.VarChar(36)
+  spaceId            String           @db.VarChar(36)
+  userId             String           @db.VarChar(36)
+  organizationUser   OrganizationUser @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space              Space            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokens             Token[]
+  auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectSpaceUser")
 
-    @@unique([organizationId, spaceId, userId])
-    @@index([userId])
-    @@index([spaceId])
-    @@index([organizationId, userId])
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 
-    // ==========================================================================
-    // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-    // ==========================================================================
+  @@unique([organizationId, spaceId, userId])
+  @@index([userId])
+  @@index([spaceId])
+  @@index([organizationId, userId])
 }

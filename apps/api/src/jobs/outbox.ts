@@ -165,15 +165,15 @@ const dedupeLatestPerLane = (batch: Pending[]): OutboxRow[] => {
   return rows;
 };
 
-// Insert the batch in one txn: plain fan-out rows via createMany (jobId-idempotent), superseding
-// lanes via upsert. Upsert is last-writer-wins with no silent drop even when two processes flush the
-// same lane — `createMany({ skipDuplicates })` would keep whichever COMMITS first, not the latest.
+// Insert the batch in one txn: plain fan-out rows via createManyAndReturn (jobId-idempotent),
+// superseding lanes via upsert. Upsert is last-writer-wins with no silent drop even when two processes
+// flush the same lane — skipDuplicates would keep whichever COMMITS first, not the latest.
 const writeBatch = (batch: Pending[]): Promise<void> =>
   db.txn(async () => {
     const rows = dedupeLatestPerLane(batch);
     const plain = rows.filter((r) => r.dedupeKey === null);
     const keyed = rows.filter((r) => r.dedupeKey !== null);
-    if (plain.length) await db.jobOutbox.createMany({ data: plain.map(toCreateInput), skipDuplicates: true });
+    if (plain.length) await db.jobOutbox.createManyAndReturn({ data: plain.map(toCreateInput), skipDuplicates: true });
     for (const row of keyed) {
       await db.jobOutbox.upsert({
         where: { handlerName_dedupeKey: { handlerName: row.handlerName, dedupeKey: row.dedupeKey as string } },

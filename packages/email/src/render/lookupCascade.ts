@@ -7,11 +7,11 @@
 import { db } from '@template/db';
 import type { EmailComponent } from '@template/db/generated/client/client';
 import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
 type LookupFn = () => Promise<Record<string, EmailComponent>>;
 
-const getLookups = (slugs: string[], ctx: SaveContext): LookupFn[] => {
+const getLookups = (slugs: string[], ctx: OwnerScope): LookupFn[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -33,7 +33,7 @@ const getLookups = (slugs: string[], ctx: SaveContext): LookupFn[] => {
 
 export const lookupCascade = async (
   slugs: string[],
-  ctx: SaveContext,
+  ctx: OwnerScope,
 ): Promise<Record<string, EmailComponent | undefined>> => {
   if (!slugs.length) return {};
 

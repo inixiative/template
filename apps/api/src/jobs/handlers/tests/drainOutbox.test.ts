@@ -1,8 +1,9 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { drainOutbox } from '#/jobs/handlers/drainOutbox';
 import { isOverflowing, type OutboxRow, queueDepth, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
@@ -36,19 +37,48 @@ describe('shouldSpill (routing)', () => {
 describe('jobs overflow buffer (spill + drain)', () => {
   let ctx: WorkerContext;
 
+  // ioredis-mock can't run BullMQ's Lua scripts, so spy the queue boundary and drive the real
+  // outbox logic against an in-memory job map. The overflow flag still uses the (mock) Redis.
+  const queued = new Map<string, { id: string; name: string; data: unknown }>();
+  let restoreQueueSpies = (): void => {};
+
   beforeAll(() => {
     ctx = createTestWorker({ name: 'drainOutbox', data: { id: 'drainOutbox' } });
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // size-trip every spill → deterministic commit
+
+    const add = spyOn(queue, 'add').mockImplementation((async (
+      name: string,
+      data: unknown,
+      opts?: { jobId?: string },
+    ) => {
+      const id = opts?.jobId ?? `${name}-${queued.size}`;
+      if (!queued.has(id)) queued.set(id, { id, name, data });
+      return { id };
+    }) as never);
+    const counts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
+      waiting: queued.size,
+      active: 0,
+    })) as never);
+    const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
+    const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
+    restoreQueueSpies = () => {
+      add.mockRestore();
+      counts.mockRestore();
+      getJob.mockRestore();
+      getJobs.mockRestore();
+    };
   });
 
   afterEach(async () => {
+    queued.clear();
     delete process.env.JOBS_MAX_QUEUE_DEPTH;
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // re-assert the suite default
     await ctx.db.jobOutbox.deleteMany({});
-    await ctx.queue.redis.flushdb(); // clears queued jobs + the flag
+    await ctx.queue.redis.flushdb(); // clears the flag
   });
 
   afterAll(async () => {
+    restoreQueueSpies();
     delete process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS;
     await cleanupTouchedTables(ctx.db);
     await ctx.queue.redis.flushdb();

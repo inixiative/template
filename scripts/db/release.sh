@@ -32,4 +32,4 @@ fi
 # the unique constraint. We don't want that to brick the entire deploy.
 # Failures log; a follow-up pass needs to reconcile manually.
 echo "[release] Seeding non-prime data"
-bun run --cwd packages/db db:seed || echo "[release] WARN: seed had errors; deploy continues"
+bun run --cwd apps/api db:seed || echo "[release] WARN: seed had errors; deploy continues"

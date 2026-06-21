@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { EmailComponent, EmailTemplate, PrismaClient } from '@template/db/generated/client/client';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
 type LookupResult = {
   template: EmailTemplate | null;
@@ -16,14 +16,13 @@ export const lookupAtSpace = async (
   db: PrismaClient,
   templateSlug: string | null,
   componentSlugs: string[],
-  ctx: SaveContext,
+  ctx: OwnerScope,
 ): Promise<LookupResult> => {
   // Coalesce a missing tenant id to null (no match at this tier → cascade down), never undefined —
   // in a Prisma `where`, undefined drops the filter, which would match across tenants.
   const base = {
     locale: ctx.locale,
     ownerModel: 'Space' as const,
-    organizationId: ctx.organizationId ?? null,
     spaceId: ctx.spaceId ?? null,
   };
 
@@ -44,7 +43,7 @@ export const lookupAtOrg = async (
   db: PrismaClient,
   templateSlug: string | null,
   componentSlugs: string[],
-  ctx: SaveContext,
+  ctx: OwnerScope,
   requireInherit = false,
 ): Promise<LookupResult> => {
   // See lookupAtSpace: a missing organizationId must be null (no match → cascade), not undefined
@@ -74,7 +73,7 @@ export const lookupAtDefault = async (
   db: PrismaClient,
   templateSlug: string | null,
   componentSlugs: string[],
-  ctx: SaveContext,
+  ctx: OwnerScope,
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
@@ -100,7 +99,7 @@ export const lookupAtAdmin = async (
   db: PrismaClient,
   templateSlug: string | null,
   componentSlugs: string[],
-  ctx: SaveContext,
+  ctx: OwnerScope,
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,

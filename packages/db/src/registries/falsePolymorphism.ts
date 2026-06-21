@@ -257,6 +257,23 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
   },
+
+  CommunicationLog: {
+    axes: [
+      {
+        field: 'senderType',
+        fkMap: {
+          platform: [],
+          admin: [],
+          User: ['senderUserId'],
+          Organization: ['senderOrganizationId'],
+          Space: ['senderSpaceId'],
+          OrganizationUser: ['senderUserId', 'senderOrganizationId'],
+          SpaceUser: ['senderUserId', 'senderSpaceId'],
+        },
+      },
+    ],
+  },
 };
 
 // Helper to get config for a model

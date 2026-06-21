@@ -19,35 +19,44 @@ describe('email idempotency keys', () => {
   });
 
   describe('deliverJobId', () => {
-    it('shares the planner prefix and puts the content hash last', () => {
-      const id = deliverJobId('inquiry.sent', 'invite', 'Organization:org-1', 'bob@x.com', { role: 'member' });
+    it('shares the planner prefix, keeps the recipient readable, hashes sender + contents', () => {
+      const id = deliverJobId(
+        'inquiry.sent',
+        'invite',
+        { type: 'Organization', organizationId: 'org-1' },
+        'bob@x.com',
+        {
+          role: 'member',
+        },
+      );
       const parts = id.split(':');
       expect(parts.slice(0, 2)).toEqual(['inquiry.sent', 'invite']);
+      expect(parts[2]).toMatch(/^[0-9a-f]{16}$/);
+      expect(parts[3]).toBe('bob@x.com');
       expect(parts.at(-1)).toMatch(/^[0-9a-f]{16}$/);
-      expect(id.startsWith('inquiry.sent:invite:Organization:org-1:bob@x.com:')).toBe(true);
     });
 
-    it('is stable for the same recipient + contents (content order independent)', () => {
-      expect(deliverJobId('e', 't', 'default', 'bob@x.com', { x: 1, y: 2 })).toBe(
-        deliverJobId('e', 't', 'default', 'bob@x.com', { y: 2, x: 1 }),
+    it('is stable for the same sender + recipient + contents (content order independent)', () => {
+      expect(deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { x: 1, y: 2 })).toBe(
+        deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { y: 2, x: 1 }),
       );
     });
 
     it('differs per recipient', () => {
-      expect(deliverJobId('e', 't', 'default', 'a@x.com', { x: 1 })).not.toBe(
-        deliverJobId('e', 't', 'default', 'b@x.com', { x: 1 }),
+      expect(deliverJobId('e', 't', { type: 'platform' }, 'a@x.com', { x: 1 })).not.toBe(
+        deliverJobId('e', 't', { type: 'platform' }, 'b@x.com', { x: 1 }),
       );
     });
 
-    it('differs per sender context', () => {
-      expect(deliverJobId('e', 't', 'Organization:org-1', 'bob@x.com', { x: 1 })).not.toBe(
-        deliverJobId('e', 't', 'Space:space-1', 'bob@x.com', { x: 1 }),
+    it('differs per sender', () => {
+      expect(deliverJobId('e', 't', { type: 'Organization', organizationId: 'org-1' }, 'bob@x.com', { x: 1 })).not.toBe(
+        deliverJobId('e', 't', { type: 'Space', spaceId: 'space-1', organizationId: 'org-1' }, 'bob@x.com', { x: 1 }),
       );
     });
 
     it('differs when the rendered contents change (allows a legitimate resend)', () => {
-      expect(deliverJobId('e', 't', 'default', 'bob@x.com', { role: 'member' })).not.toBe(
-        deliverJobId('e', 't', 'default', 'bob@x.com', { role: 'admin' }),
+      expect(deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'member' })).not.toBe(
+        deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'admin' }),
       );
     });
   });

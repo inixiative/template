@@ -22,16 +22,18 @@ model Contact {
 
   // Owner — false polymorphism, exactly one FK matches the discriminator.
   ownerModel     ContactOwnerModel
-  userId         String? @db.VarChar(36)
-  organizationId String? @db.VarChar(36)
-  spaceId        String? @db.VarChar(36)
+  userId         String?           @db.VarChar(36)
+  organizationId String?           @db.VarChar(36)
+  spaceId        String?           @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
+  communications CommunicationLog[]
+
   type    ContactType
-  subtype String?    // semantics depend on type — see shared/contact/registry
+  subtype String? // semantics depend on type — see shared/contact/registry
 
   label    String?
   position Int     @default(0)
@@ -47,6 +49,10 @@ model Contact {
   verifiedAt DateTime?
   source     String?
 
+  // Bouncer reachability verdict, cached to skip re-verifying every send (distinct from verifiedAt = ownership).
+  deliverability          DeliverabilityStatus?
+  deliverabilityCheckedAt DateTime?
+
   // Communication-kind opt-ins for this specific contact channel.
   // Native postgres enum array — value integrity enforced by the DB. Default
   // [platform, activity] matches the kind-level policy: platform + activity
@@ -59,9 +65,9 @@ model Contact {
   // NULLs as distinct in composite uniques, so a single composite over the
   // polymorphic FKs would let `(User, 'u1', null, null, …)` duplicate. Each
   // partial covers one populated FK and doubles as a lookup index for that owner.
-  @@unique([userId, type, valueKey],         where: { userId:         { not: null } })
+  @@unique([userId, type, valueKey], where: { userId: { not: null } })
   @@unique([organizationId, type, valueKey], where: { organizationId: { not: null } })
-  @@unique([spaceId, type, valueKey],        where: { spaceId:        { not: null } })
+  @@unique([spaceId, type, valueKey], where: { spaceId: { not: null } })
   @@index([userId, type, position])
   @@index([organizationId, type, position])
   @@index([spaceId, type, position])
@@ -73,6 +79,13 @@ enum ContactOwnerModel {
   User
   Organization
   Space
+}
+
+enum DeliverabilityStatus {
+  deliverable
+  undeliverable
+  risky
+  unknown
 }
 
 enum ContactType {

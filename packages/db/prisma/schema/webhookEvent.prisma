@@ -15,13 +15,13 @@ model WebhookEvent {
   webhookSubscription   WebhookSubscription @relation(fields: [webhookSubscriptionId], references: [id], onDelete: Cascade)
   resourceId            String              @db.VarChar(36)
 
-  @@index([webhookSubscriptionId])
-  @@index([resourceId])
-  @@index([status])
-
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([webhookSubscriptionId])
+  @@index([resourceId])
+  @@index([status])
 }
 
 enum WebhookEventStatus {

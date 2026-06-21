@@ -7,17 +7,17 @@
 // - Marketplace: a storefront or seller account
 
 model Space {
-  id             String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  name           String
-  slug           String
+  name String
+  slug String
 
   // White-label/theming (optional)
-  logoUrl        String?
-  primaryColor   String?
+  logoUrl      String?
+  primaryColor String?
 
   // Parent organization (required - Spaces must be owned by Orgs)
   organizationId String       @db.VarChar(36)
@@ -34,17 +34,18 @@ model Space {
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
   customerRefs         CustomerRef[]         @relation("customerRefs")
-  providerRefs         CustomerRef[] @relation("providerRefs")
-  inquiriesSent        Inquiry[]     @relation("InquirySource")
-  inquiriesReceived    Inquiry[]     @relation("InquiryTarget")
-  auditLogsAsContext   AuditLog[]    @relation("AuditLogContextSpace")
-  auditLogsAsSubject   AuditLog[]    @relation("AuditLogSubjectSpace")
-
-  @@unique([organizationId, slug])
-  @@unique([organizationId, id])
-  @@index([slug])
+  providerRefs         CustomerRef[]         @relation("providerRefs")
+  inquiriesSent        Inquiry[]             @relation("InquirySource")
+  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
+  auditLogsAsContext   AuditLog[]            @relation("AuditLogContextSpace")
+  auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectSpace")
+  communicationsSent   CommunicationLog[]    @relation("CommunicationSenderSpace")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, id])
+  @@index([slug])
 }

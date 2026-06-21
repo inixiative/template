@@ -4,45 +4,66 @@
  * @partOf feature:email
  * @uses none
  */
+import type { CommunicationKind } from '@template/db';
 import {
-  type ComposeContext,
   composeTemplate,
   EmailRenderError,
   interpolate,
+  type OwnerScope,
   parentOwner,
   type RuleErrorSink,
   type Variables,
 } from '@template/email/render';
 import { LogScope, log } from '@template/shared/logger';
-import type { ReachContext } from '#/lib/email';
+import type { Sender } from '#/lib/email/sender';
 
-export const composeCtx = (ctx: ReachContext): ComposeContext => ({
-  locale: 'en',
-  ownerModel: ctx.ownerModel,
-  organizationId: ctx.ownerModel === 'Organization' ? ctx.organizationId : undefined,
-  spaceId: ctx.ownerModel === 'Space' ? ctx.spaceId : undefined,
-});
+export const ownerScope = (sender: Sender): OwnerScope => {
+  switch (sender.type) {
+    case 'Organization':
+      return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId };
+    case 'OrganizationUser':
+      return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId, userId: sender.userId };
+    case 'Space':
+      return { locale: 'en', ownerModel: 'Space', spaceId: sender.spaceId, organizationId: sender.organizationId };
+    case 'SpaceUser':
+      return {
+        locale: 'en',
+        ownerModel: 'Space',
+        spaceId: sender.spaceId,
+        organizationId: sender.organizationId,
+        userId: sender.userId,
+      };
+    case 'User':
+      return { locale: 'en', ownerModel: 'default', userId: sender.userId };
+    case 'admin':
+      return { locale: 'en', ownerModel: 'admin' };
+    default:
+      return { locale: 'en', ownerModel: 'default' };
+  }
+};
 
-export type SettledTemplate = { subject: string; mjml: string };
+export type SettledTemplate = { subject: string; mjml: string; kind: CommunicationKind; emailTemplateId: string };
 
-// settle = f(template, context, data) → deliverable subject + mjml. Compose at the context owner,
-// interpolate, then apply the resolved template's render-error policy: degrade (drop the bad
-// block), fallback (re-compose one owner up the cascade), or fail (throw → DLQ). Shared so the
-// deliver job owns the whole resolve-and-render step — the planner only routes the template name.
 export const settleTemplate = async (
   template: string,
-  context: ReachContext,
-  data: Variables,
+  sender: Sender,
+  variables: Variables,
+  recipientVarsForKind?: (kind: CommunicationKind) => Record<string, unknown>,
 ): Promise<SettledTemplate> => {
-  let composed = await composeTemplate(template, composeCtx(context));
+  const scope = ownerScope(sender);
+  let composed = await composeTemplate(template, scope);
 
   while (true) {
     const errors: string[] = [];
     const onError: RuleErrorSink = (message) => errors.push(message);
-    const mjml = interpolate(composed.mjml, data, onError);
-    const subject = interpolate(composed.subject, data, onError);
+    const vars: Variables = recipientVarsForKind
+      ? { ...variables, recipient: { ...variables.recipient, ...recipientVarsForKind(composed.kind) } }
+      : variables;
+    const mjml = interpolate(composed.mjml, vars, onError);
+    const subject = interpolate(composed.subject, vars, onError);
+    const settled = { subject, mjml, kind: composed.kind, emailTemplateId: composed.id };
 
-    if (!errors.length) return { subject, mjml };
+    if (!errors.length) return settled;
 
     log.warn(
       `Email render error: template=${template} owner=${composed.ownerModel} — ${[...new Set(errors)].join('; ')}`,
@@ -52,9 +73,9 @@ export const settleTemplate = async (
     const parent = parentOwner(composed.ownerModel);
     const policy = parent ? composed.onError : 'fail';
 
-    if (policy === 'degrade') return { subject, mjml };
+    if (policy === 'degrade') return settled;
     if (policy === 'fallback' && parent) {
-      composed = await composeTemplate(template, { ...composeCtx(context), ownerModel: parent });
+      composed = await composeTemplate(template, { ...scope, ownerModel: parent });
       continue;
     }
 

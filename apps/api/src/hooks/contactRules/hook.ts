@@ -105,6 +105,9 @@ export const registerContactRulesHook = () => {
       const a = args as Record<string, unknown>;
       const data = a.data as ContactRow | undefined;
       if (!data) return;
+      // Metadata-only updates (e.g. deliverability) don't touch value/type/subtype — nothing to
+      // validate or normalize, and re-parsing a stale stored value here would throw spuriously.
+      if (data.value === undefined && data.type === undefined && data.subtype === undefined) return;
       const prev = previous as ContactRow | undefined;
       const merged: ContactRow = { ...(prev ?? {}), ...data };
       await processContactRow(merged);

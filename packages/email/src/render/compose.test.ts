@@ -19,7 +19,7 @@ describe('composeTemplate', () => {
       slug: 'simple',
       name: 'Simple',
       subject: 'Hello {{recipient.name}}',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body><mj-text>Hello</mj-text></mj-body></mjml>',
       componentRefs: [],
       ownerModel: 'default',
@@ -32,7 +32,7 @@ describe('composeTemplate', () => {
 
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
-    expect(result.category).toBe('system');
+    expect(result.kind).toBe('system');
     // Resolved owner + render-error policy drive the send-side fallback loop.
     expect(result.ownerModel).toBe('default');
     expect(result.onError).toBe('fail');
@@ -49,7 +49,7 @@ describe('composeTemplate', () => {
       slug: 'with-header',
       name: 'With Header',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}<mj-text>Body</mj-text></mj-body></mjml>',
       componentRefs: ['header'],
       ownerModel: 'default',
@@ -84,7 +84,7 @@ describe('composeTemplate', () => {
       slug: 'nested',
       name: 'Nested',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}</mj-body></mjml>',
       componentRefs: ['header'],
       ownerModel: 'default',
@@ -118,7 +118,7 @@ describe('composeTemplate', () => {
       slug: 'missing-ref',
       name: 'Missing Ref',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body>{{#component:missing}}{{/component:missing}}</mj-body></mjml>',
       componentRefs: ['missing'],
       ownerModel: 'default',
@@ -156,7 +156,7 @@ describe('composeTemplate', () => {
       slug: 'org-template',
       name: 'Org Template',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body>{{#component:header}}{{/component:header}}</mj-body></mjml>',
       componentRefs: ['header'],
       ownerModel: 'Organization',
@@ -186,7 +186,7 @@ describe('composeTemplate', () => {
       slug: 'fallback-template',
       name: 'Fallback',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body>{{#component:footer}}{{/component:footer}}</mj-body></mjml>',
       componentRefs: ['footer'],
       ownerModel: 'Organization',
@@ -209,7 +209,7 @@ describe('composeTemplate', () => {
       slug: 'tenant-scoped',
       name: 'Tenant Scoped',
       subject: 'Test',
-      category: 'system',
+      kind: 'system',
       mjml: '<mjml><mj-body><mj-text>Org Only</mj-text></mj-body></mjml>',
       componentRefs: [],
       ownerModel: 'Organization',

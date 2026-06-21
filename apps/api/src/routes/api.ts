@@ -24,6 +24,7 @@ import { tokenRouter } from '#/modules/token';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
 import { internalRouter } from '#/routes/internal';
+import { unsubscribeRouter } from '#/routes/unsubscribe';
 import type { AppEnv } from '#/types/appEnv';
 
 export const apiRouter = new OpenAPIHono<AppEnv>();
@@ -39,6 +40,9 @@ apiRouter.route('/internal', internalRouter);
 
 // Auth routes (better-auth handles its own auth, returns early)
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
+
+// One-click unsubscribe — public (no session/token); authorized by its own signed link.
+apiRouter.route('/unsubscribe', unsubscribeRouter);
 
 // Token first so an Authorization header always wins over a session cookie when
 // both are present (e.g. SDK xhr from a browser). Spoof runs last so it applies
