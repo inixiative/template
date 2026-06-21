@@ -94,6 +94,14 @@ For anything where the **shape is not yet known** — design, taxonomy, modeling
 
 This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is genuinely shape-finding, not execution.
 
+## 0.5. Verification Discipline
+
+Rigor comes from evidence and gates, not goodwill. Each rule below closes a failure that *feels* productive from the inside.
+
+- **Verify before you assert.** Any claim about existing behavior — a bug, a regression, "this is unsound," "this drops rows" — must be backed by a reproduction: a probe, a failing test, or a traced execution path. "I read it and it looks like X" is a hypothesis, not a finding — do not state it as one. A claim relayed from a subagent, a review tool, or a prior assumption is **unverified until you reproduce it yourself.** Adversarial claims about *working* code carry the highest burden of proof, especially when you're contradicting the author — run the probe before you say it.
+- **No deferral as an escape hatch.** "Ticket it," "not reachable yet," "good enough for now" are honest only when the work is genuinely out of scope. They are **not** a way to dodge in-scope work that is correct to do. If it's correct and in scope, do it now; if it's a real scope fork, surface it per §0.4 — never bury the decision behind a convenient defer. "Defer" is a recommendation you justify, not a reflex you reach for when the work turns fiddly.
+- **Exhaust validation before caveating.** "Couldn't run it here" is a last resort *after* genuinely trying to make it run — crack the env, find the gate, run the thing. A caveat is what remains when the work is *actually* blocked, not when running it is inconvenient. Scoped checks passing is not "validated" (§10), and "typecheck-clean" is not "it works."
+
 ## 1. Mandatory Task Intake (Always)
 
 Before editing, restate:
