@@ -1,42 +1,59 @@
-# COMM-005: Rebac Targeting → Prisma (delivery gate ①)
+# COMM-005: inScope — permission check → Prisma (delivery gate ①)
 
-**Status**: 📋 Proposed — deferred, stub in place
+**Status**: 📋 Proposed — deferred, `@wip` stub in place
 **Priority**: Medium
 **Created**: 2026-06-20
 
 ---
 
-## The gap
+## The model
 
-Delivery **gate ①** (scope) answers: *which users are in scope for a communication about
-entity X?* — the read-access filter that drops recipients who can't see the entity. Today this is a
-pass-through stub: `apps/api/src/lib/messaging/inScope.ts` returns `true` for everyone. The real
-check is the inverse of `check(permix, …)` (one actor, one resource) — we need the **set** of
-eligible users, ideally as a query, not N per-recipient permix builds inside a large fan-out.
+Recipients resolve in two layers:
+
+- **recipient lens (json-rules)** → the high-level **targets**: which org/space scopes the
+  communication goes to.
+- **gate ① `inScope`** → decomposes those targets into their **constituent users**, by a
+  **permission check** evaluated within the targeted scopes (e.g. "admin or above").
+
+`inScope` is *any permission check over the candidates*. Where the check maps to the DB (role, in-DB
+relations) it **serializes to a Prisma `where`** and resolves the set in one query. But predicates are
+**lenses (json-rules), which can bridge data sources** — they may reference data outside a single
+query, so the general case still needs a **per-candidate evaluation loop**. Push down what serializes,
+loop the rest. Role is the trivially-serializable first slice.
 
 Designed in [COMM-003](./COMM-003-sender-and-communication-log.md) §1b as gate ①.
 
-## Why it's postponed
+## Today
 
-A general **permissions → Prisma** translation (compile rebac rules into a `where` clause) is genuinely
-complex and must stay in lockstep with the rebac schema. Not worth building speculatively. The stub is
-honest (the socket exists; `inScope` is where it plugs in).
+Pass-through stub: `apps/api/src/lib/messaging/inScope.ts` returns `true` for everyone, marked `@wip`.
+Its signature is a placeholder and will **change**: today it's per-recipient
+(`inScope(recipientUserId, entity) → bool`); the real thing is set-resolving
+(`inScope(targets, check) → where / userIds`) — "resolve the set," not "test one."
 
-## Options (when we build it)
+## Direction (decided)
 
-- **MVP — role-based.** Filter recipients by role on the relevant org/space (no full rebac
-  compilation). Covers the common "notify members with role ≥ X" case. Smallest lift; likely where we
-  start.
-- **(A) Per-actor check loop.** Build a permix per recipient, run `check(...)`. Correct but N
-  builds/queries per send; needs `setup{User,Org,Space}Permissions` made context-free for the worker.
-- **(B) Permissions → Prisma `where` compiler.** Translate rebac relations into a Prisma filter — one
-  query, scales to the fan-out, and reusable for every "list what I can access" surface. The real
-  primitive; biggest lift.
-- **(C) Zanzibar-style relation tuples.** Materialize `(subject, relation, object)` rows and query
-  them. Scales hardest; its own subsystem + sync.
+`inScope` evaluates a predicate over the candidate users in the targeted scopes, with two strategies
+used together:
 
-## Direction
+1. **Serialize to Prisma (push-down).** When the predicate maps to columns/relations in the DB, compile
+   it to a `where` and resolve the set in **one query**. The role MVP lives here: a role floor
+   ("admin or above") resolves the ladder to a role set at compile time (the permissions package owns
+   the ordering via `lesserRole`) → `{ organizationUsers: { some: { organizationId: { in: targets }, role: { in: [...atOrAbove] } } } }`.
+   Roles are columns → direct.
+2. **Per-candidate predicate loop (general).** Predicates are lenses (json-rules) and **can bridge data
+   sources** — they may reference data outside a single query, so they can't always be pushed to SQL.
+   For those, resolve the candidate set first, then evaluate the predicate per candidate. This is the
+   correct general evaluator, not a fallback to avoid.
 
-Leave the `inScope` stub. When recipient scoping becomes a real requirement, start with **role-based (MVP)**
-and only graduate to (B) if the fan-out scale or "list-what-I-can-access" reuse justifies the compiler.
-Do not build interim bypasses before there's a consumer that needs the filter.
+So: push down what serializes, loop-evaluate the rest. Start with the role MVP (pure push-down); the
+loop comes in the moment a predicate bridges sources. The general rebac → Prisma compiler is the
+push-down path's rich end — reusable for every "list what I can access" surface; biggest lift, build
+when a consumer needs beyond-role scoping.
+
+Must stay in lockstep with the rebac schema. Do not build interim bypasses before there's a consumer
+that needs the filter.
+
+## Rejected
+
+- **Zanzibar-style relation tuples** (materialize `(subject, relation, object)` rows) — its own
+  subsystem + sync; not warranted for this.
