@@ -8,9 +8,9 @@
 
 ## The gap
 
-Delivery **gate ①** (targeting) answers: *which users may be targeted for a communication about
+Delivery **gate ①** (scope) answers: *which users are in scope for a communication about
 entity X?* — the read-access filter that drops recipients who can't see the entity. Today this is a
-pass-through stub: `apps/api/src/lib/messaging/canTarget.ts` returns `true` for everyone. The real
+pass-through stub: `apps/api/src/lib/messaging/inScope.ts` returns `true` for everyone. The real
 check is the inverse of `check(permix, …)` (one actor, one resource) — we need the **set** of
 eligible users, ideally as a query, not N per-recipient permix builds inside a large fan-out.
 
@@ -20,7 +20,7 @@ Designed in [COMM-003](./COMM-003-sender-and-communication-log.md) §1b as gate 
 
 A general **permissions → Prisma** translation (compile rebac rules into a `where` clause) is genuinely
 complex and must stay in lockstep with the rebac schema. Not worth building speculatively. The stub is
-honest (the socket exists; `canTarget` is where it plugs in).
+honest (the socket exists; `inScope` is where it plugs in).
 
 ## Options (when we build it)
 
@@ -37,6 +37,6 @@ honest (the socket exists; `canTarget` is where it plugs in).
 
 ## Direction
 
-Leave the `canTarget` stub. When targeting becomes a real requirement, start with **role-based (MVP)**
+Leave the `inScope` stub. When recipient scoping becomes a real requirement, start with **role-based (MVP)**
 and only graduate to (B) if the fan-out scale or "list-what-I-can-access" reuse justifies the compiler.
 Do not build interim bypasses before there's a consumer that needs the filter.

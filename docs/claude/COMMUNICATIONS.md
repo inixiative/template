@@ -524,7 +524,7 @@ user-actor to its containing scope (`SpaceUser → Space`, `OrganizationUser →
 1. Load the log; **skip if already `sent`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
    A render error → mark `failed` → rethrow → retries → DLQ.
-3. **Gate ① targeting** — `canTarget` rebac read-check. STUB pass-through today (see COMM-005).
+3. **Gate ① scope** — `inScope` rebac read-check. STUB pass-through today (see COMM-005).
 4. **Gate ② settings** — `canDeliver(kind, contact)`: honor `acceptedKinds` opt-outs; `system` always
    delivers; a non-`system` send with no `Contact` → `suppressed`.
 5. **Deliverability** — bouncer pre-flight, cached on `Contact.deliverability` (TTL 30d); `undeliverable`
@@ -651,5 +651,5 @@ seam — post-send bounce/complaint webhooks will write here too). Distinct agai
 ### Tickets
 - **COMM-003** — Sender + CommunicationLog (this pipeline).
 - **COMM-004** — Contact channel-ownership verification (gate `verifiedAt`).
-- **COMM-005** — rebac targeting → Prisma (gate ① engine; `canTarget` is the stub).
+- **COMM-005** — rebac scope → Prisma (gate ① engine; `inScope` is the stub).
 
