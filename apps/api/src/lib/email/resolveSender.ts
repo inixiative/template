@@ -12,6 +12,6 @@ export type ResolvedSender = {
 };
 
 export const resolveSender = async (_sender: Sender): Promise<ResolvedSender> => ({
-  platformName: process.env.PLATFORM_NAME ?? 'Template',
+  platformName: process.env.PROJECT_NAME ?? 'Template',
   webUrl: process.env.WEB_URL ?? '',
 });
