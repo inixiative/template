@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { drainOutbox } from '#/jobs/handlers/drainOutbox';
-import { isOverflowing, type OutboxRow, queueDepth, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import { flushOutbox, isOverflowing, type OutboxRow, queueDepth, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -72,6 +72,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   afterEach(async () => {
     queued.clear();
     delete process.env.JOBS_MAX_QUEUE_DEPTH;
+    delete process.env.JOBS_OUTBOX_FLUSH_LINGER_MS;
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // re-assert the suite default
     await ctx.db.jobOutbox.deleteMany({});
     await ctx.queue.redis.flushdb(); // clears the flag
@@ -169,5 +170,32 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await spillToOutbox(fanRow('keep-id'));
     await drainOutbox(ctx);
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
+  });
+
+  it('flushOutbox persists rows still buffered at shutdown', async () => {
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '100'; // no size trip — rows linger in the accumulator
+    process.env.JOBS_OUTBOX_FLUSH_LINGER_MS = '60000'; // no linger flush inside the test window
+    const spills = [spillToOutbox(fanRow('sd1')), spillToOutbox(fanRow('sd2'))];
+
+    await flushOutbox();
+    await Promise.all(spills);
+
+    expect(await ctx.db.jobOutbox.count()).toBe(2);
+  });
+
+  it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
+    await ctx.db.jobOutbox.create({
+      data: { handlerName: 'recordAppEvent', jobId: 'taken', dedupeKey: 'pre', data: {}, options: {} },
+    });
+    // Keyed upsert tries to INSERT a row whose @unique jobId already exists → the commit throws.
+    const collide: OutboxRow = {
+      handlerName: 'recordAppEvent',
+      jobId: 'taken',
+      dedupeKey: 'fresh-lane',
+      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'fresh-lane' },
+      options: {},
+    };
+
+    await expect(spillToOutbox(collide)).rejects.toThrow();
   });
 });
