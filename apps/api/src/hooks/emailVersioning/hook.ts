@@ -6,7 +6,8 @@
  */
 import { DbAction, db, type HookOptions, HookTiming, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
-import { castArray } from 'lodash-es';
+import { castArray, isEqual } from 'lodash-es';
+import { processAuditData } from '#/hooks/auditLog/utils';
 import { resolveChildAuditLogIds } from '#/hooks/emailVersioning/resolveChildAuditLogIds';
 import { createVersionBumpSnapshot } from '#/hooks/emailVersioning/snapshot';
 
@@ -20,6 +21,7 @@ type VersionedRecord = {
   organizationId: string | null;
   spaceId: string | null;
   locale: string;
+  deletedAt: Date | null;
 };
 
 const isEmailModel = (model: string): model is EmailModel => model === 'EmailTemplate' || model === 'EmailComponent';
@@ -36,11 +38,28 @@ const findLatestSnapshot = (model: EmailModel, id: string) =>
 
 const sameIds = (a: string[], b: string[]): boolean => a.length === b.length && a.every((value, i) => value === b[i]);
 
-const extractRecords = (options: HookOptions): VersionedRecord[] => {
+type Change = { record: VersionedRecord; previous?: VersionedRecord };
+
+const extractChanges = (options: HookOptions): Change[] => {
   const result = (options as HookOptions<VersionedRecord>).result;
   if (!result) return [];
-  return castArray(result);
+  const records = castArray(result);
+  const previous = (options as HookOptions<VersionedRecord>).previous;
+  if (Array.isArray(previous)) {
+    const byId = new Map(previous.map((p) => [p.id, p]));
+    return records.map((record) => ({ record, previous: byId.get(record.id) }));
+  }
+  return records.map((record) => ({ record, previous: previous ?? undefined }));
 };
+
+const wroteSnapshot = (model: EmailModel, change: Change): boolean =>
+  !change.previous ||
+  !isEqual(
+    processAuditData(model, change.previous as Record<string, unknown>),
+    processAuditData(model, change.record as Record<string, unknown>),
+  );
+
+const isSoftDelete = (change: Change): boolean => change.previous?.deletedAt == null && change.record.deletedAt != null;
 
 const stampOwnChildIds = async (model: EmailModel, record: VersionedRecord): Promise<void> => {
   const latest = await findLatestSnapshot(model, record.id);
@@ -88,13 +107,18 @@ export const registerEmailVersioningHook = (): void => {
 
   registerDbHook('emailVersioning', '*', HookTiming.after, actions, async (options: HookOptions) => {
     if (!isEmailModel(options.model)) return;
-
-    const isDelete = options.action === DbAction.delete || options.action === DbAction.deleteMany;
+    const model = options.model;
+    const hardDelete = options.action === DbAction.delete || options.action === DbAction.deleteMany;
     const visited = new Set<string>();
 
-    for (const record of extractRecords(options)) {
-      if (!isDelete) await stampOwnChildIds(options.model, record);
-      await walkUp(record.slug, visited);
+    for (const change of extractChanges(options)) {
+      if (hardDelete || isSoftDelete(change)) {
+        await walkUp(change.record.slug, visited);
+        continue;
+      }
+      if (!wroteSnapshot(model, change)) continue;
+      await stampOwnChildIds(model, change.record);
+      await walkUp(change.record.slug, visited);
     }
   });
 };

@@ -5,6 +5,7 @@
  * @uses none
  */
 import { seed } from '@template/db/prisma/seed';
+import { LogScope, log } from '@template/shared/logger';
 import { registerHooks } from '#/hooks';
 
 registerHooks();
@@ -12,6 +13,7 @@ registerHooks();
 try {
   await seed();
   process.exit(0);
-} catch {
+} catch (error) {
+  log.error('Seed failed:', error, LogScope.seed);
   process.exit(1);
 }
