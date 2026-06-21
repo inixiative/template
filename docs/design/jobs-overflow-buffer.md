@@ -1,6 +1,6 @@
 # Jobs Overflow Buffer — durable backpressure in front of BullMQ
 
-> **Status:** Proposal for review · **Area:** Jobs / queue infrastructure · **Type:** Architecture decision + implementation plan
+> **Status:** Implemented (INFRA-021) · **Area:** Jobs / queue infrastructure · **Type:** Architecture decision + implementation plan
 >
 > A generic, durable overflow buffer that sits in front of BullMQ at the single `enqueueJob`
 > chokepoint. When a fan-out would overwhelm Redis, jobs spill to a Postgres outbox table
@@ -238,12 +238,12 @@ A singleton cron (every 15–30s) meters rows back into BullMQ.
 
 ```
 drainOutbox = makeSingletonJob(async () => {     # createLock guarantees one drainer
-  room = MAX_QUEUE_DEPTH - queue.getJobCounts('waiting','delayed')
+  room = MAX_QUEUE_DEPTH - queue.getJobCounts('waiting','active')
   if (room <= 0) return
   rows = db.jobOutbox.findMany({ orderBy: { id: 'asc' }, take: room })   # plain select — singleton, no FOR UPDATE
   for (row of rows) await queue.add(row.name, row.data, { jobId: row.jobId })   # add DIRECTLY (bypasses cap)
   db.jobOutbox.deleteMany({ id: { in: rows.map(r => r.id) } })
-  if (queue.getJobCounts('waiting','delayed') < LOW_WATER) clearOverflowFlag()
+  if (queue.getJobCounts('waiting','active') < LOW_WATER) clearOverflowFlag()
 })
 ```
 
@@ -302,15 +302,17 @@ The drain inherits the fenced lock for free.
 
 ```prisma
 model JobOutbox {
-  id          String   @id @default(dbgenerated("uuidv7()"))
-  handlerName String
-  jobId       String   // stable BullMQ jobId — idempotent re-enqueue
-  collapseKey String?  // dedupeKey ?? options.id; null for adhoc
-  data        Json     // { type, id, payload, dedupeKey }
-  createdAt   DateTime @default(now())
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
 
-  @@unique([handlerName, collapseKey])  // backs the keyed-job collapse
-  @@index([id])                          // FIFO drain order
+  handlerName String
+  jobId       String  @unique // stable BullMQ jobId — idempotent re-enqueue + exact-replay dedup
+  dedupeKey   String? // superseding lane; null for plain adhoc fan-out
+  data        Json    // { type, id, payload, dedupeKey }
+  options     Json?   // jobOptions (attempts, backoff, priority) for a faithful re-enqueue
+
+  // uuidv7 id is time-ordered, so `orderBy: { id: 'asc' }` is the FIFO drain order — no separate index needed.
+  @@unique([handlerName, dedupeKey]) // one buffered row per superseding lane (nulls distinct → fan-out rows don't collide)
 }
 ```
 
