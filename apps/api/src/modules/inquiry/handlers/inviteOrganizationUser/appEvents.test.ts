@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test';
+import { channelKey } from '@template/shared/ws';
 import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/inviteOrganizationUser/appEvents';
+
+const refetchHandoff = (id: string) => {
+  const key = { _id: 'inquiryRead', path: { id } };
+  return {
+    target: { channels: [channelKey(key)] },
+    message: { data: { category: 'query', action: 'refetch', key } },
+  };
+};
 
 const makeInquiry = (overrides = {}) => ({
   id: 'inq-1',
@@ -51,18 +60,14 @@ describe('inviteOrganizationUserAppEvents', () => {
   describe('sent.websocket', () => {
     it('refetches the inquiry the send touched', () => {
       const events = inviteOrganizationUserAppEvents.sent!.websocket!(makeInquiry() as never);
-      expect(events).toEqual([
-        { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: 'inq-1' } } },
-      ]);
+      expect(events).toEqual([refetchHandoff('inq-1')]);
     });
   });
 
   describe('resolved.websocket', () => {
     it('refetches the inquiry the resolution touched', () => {
       const events = inviteOrganizationUserAppEvents.resolved!.websocket!(makeInquiry() as never);
-      expect(events).toEqual([
-        { category: 'query', action: 'refetch', key: { _id: 'inquiryRead', path: { id: 'inq-1' } } },
-      ]);
+      expect(events).toEqual([refetchHandoff('inq-1')]);
     });
   });
 });

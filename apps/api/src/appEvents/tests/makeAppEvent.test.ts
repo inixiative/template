@@ -95,7 +95,7 @@ describe('makeAppEvent', () => {
       const handler = makeAppEvent({
         websocket: (data) => {
           received = data;
-          return [{ category: 'query' as const, action: 'refetch' as const, key: { _id: 'userRead' } }];
+          return [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }];
         },
       });
 
