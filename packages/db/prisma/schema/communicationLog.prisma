@@ -32,7 +32,6 @@ model CommunicationLog {
   providerMessageId String?
   error             String?
   sentAt            DateTime?
-  deliveredAt       DateTime?
 
   @@index([sendKey])
   @@index([emailTemplateId])
