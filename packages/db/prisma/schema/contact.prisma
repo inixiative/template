@@ -61,13 +61,13 @@ model Contact {
   // See `apps/api/src/lib/messaging/canDeliver.ts`.
   acceptedKinds CommunicationKind[] @default([platform, activity])
 
-  // Per-owner uniqueness on valueKey — partial uniques because Postgres treats
-  // NULLs as distinct in composite uniques, so a single composite over the
-  // polymorphic FKs would let `(User, 'u1', null, null, …)` duplicate. Each
-  // partial covers one populated FK and doubles as a lookup index for that owner.
-  @@unique([userId, type, valueKey], where: { userId: { not: null } })
-  @@unique([organizationId, type, valueKey], where: { organizationId: { not: null } })
-  @@unique([spaceId, type, valueKey], where: { spaceId: { not: null } })
+  // Per-owner uniqueness on valueKey — one composite per populated FK (NOT a single
+  // composite over all three, which NULLS-distinct would let duplicate). Non-partial:
+  // NULLS DISTINCT already leaves the null-FK branch unconstrained, and a plain unique is
+  // a valid ON CONFLICT target so `upsert` works. Each doubles as that owner's lookup index.
+  @@unique([userId, type, valueKey])
+  @@unique([organizationId, type, valueKey])
+  @@unique([spaceId, type, valueKey])
   @@index([userId, type, position])
   @@index([organizationId, type, position])
   @@index([spaceId, type, position])

@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind seed
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:seed
  * @uses none
  */
 import type { EmailComponent } from '../../src/generated/client/client';

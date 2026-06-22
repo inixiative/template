@@ -25,6 +25,7 @@ model EmailTemplate {
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)
   spaceId        String?         @db.VarChar(36)
+  userId         String?         @db.VarChar(36)
 
   // For org-owned: should spaces inherit this template?
   inheritToSpaces Boolean @default(true)
@@ -35,6 +36,7 @@ model EmailTemplate {
 
   organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space             Space?             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs         AuditLog[]
   communicationLogs CommunicationLog[]
 
@@ -43,9 +45,13 @@ model EmailTemplate {
   @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailTemplate_slug_locale_platform_key")
   @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"), map: "EmailTemplate_slug_locale_organization_key")
   @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space'"), map: "EmailTemplate_slug_locale_space_key")
+  @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User'"), map: "EmailTemplate_slug_locale_user_key")
+  @@unique([slug, locale, organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser'"), map: "EmailTemplate_slug_locale_orguser_key")
+  @@unique([slug, locale, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser'"), map: "EmailTemplate_slug_locale_spaceuser_key")
   @@index([kind])
   @@index([ownerModel])
   @@index([organizationId])
+  @@index([userId])
   @@index([componentRefs(ops: ArrayOps)], type: Gin)
 }
 

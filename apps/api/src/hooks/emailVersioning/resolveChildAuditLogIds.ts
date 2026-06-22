@@ -8,19 +8,20 @@ import { db } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { lookupCascade, type OwnerScope } from '@template/email/render';
 
-type Versioned = Pick<
+export type VersionedRecord = Pick<
   EmailTemplate | EmailComponent,
-  'componentRefs' | 'ownerModel' | 'organizationId' | 'spaceId' | 'locale'
+  'id' | 'slug' | 'componentRefs' | 'ownerModel' | 'organizationId' | 'spaceId' | 'userId' | 'locale' | 'deletedAt'
 >;
 
-const ownerScopeOf = (record: Versioned): OwnerScope => ({
+const ownerScopeOf = (record: VersionedRecord): OwnerScope => ({
   ownerModel: record.ownerModel,
   organizationId: record.organizationId,
   spaceId: record.spaceId,
+  userId: record.userId,
   locale: record.locale,
 });
 
-export const resolveChildAuditLogIds = async (record: Versioned): Promise<string[]> => {
+export const resolveChildAuditLogIds = async (record: VersionedRecord): Promise<string[]> => {
   const refs = record.componentRefs ?? [];
   if (!refs.length) return [];
 
@@ -31,7 +32,6 @@ export const resolveChildAuditLogIds = async (record: Versioned): Promise<string
   const snapshots = await db.auditLog.findMany({
     where: { subjectEmailComponentId: { in: childIds } },
     orderBy: { id: 'desc' },
-    select: { id: true, subjectEmailComponentId: true },
   });
 
   const latestByComponent = new Map<string, string>();

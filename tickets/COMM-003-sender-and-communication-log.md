@@ -1,10 +1,10 @@
 # COMM-003: Sender Model + Communication Log
 
-**Status**: 📋 Proposed — design agreed, not started
+**Status**: 🚧 In progress (ZLT-3008) — user-actor template ownership now IN SCOPE (decided, not deferred)
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-06-20
-**Updated**: 2026-06-20
+**Updated**: 2026-06-21
 
 ---
 
@@ -68,20 +68,27 @@ type RecipientTargets = {
 
 ## 2. Template resolution + fallback + DLQ  *(diverges from Zealot)*
 
-Cascade is **scope-first** — peel the user dimension to its containing scope, then walk scope up. Both rungs (`Space→Org`, `Org→platform`) fire.
+**Two separate ownership chains**, each terminating at the shared `default` floor. A sender walks *its own* chain — the user chain is **not** peeled into the scope chain (this supersedes the earlier "scope-first peel" sketch).
 
 ```
-parentForTemplate(sender):
-  SpaceUser → Space ; OrganizationUser → Organization ; Space → Organization
-  Organization → platform ; User → platform ; admin → platform ; platform → null (floor)
+parentForTemplate(ownerModel):
+  user chain:  SpaceUser → OrganizationUser → User → default
+  org chain:   Space → Organization → default
+  admin → null (platform-internal tier) ; default → null (floor)
 ```
-`SpaceUser → Space → Organization → platform`; `User → platform`. A user-actor may own a template (top of chain) and falls back to its scope's branding — never loses branding.
+A user-actor owns templates along the **user** chain (personal overrides at space/org/global scope), falling to `default` — never into another tenant's shared branding. The **org** chain serves shared/tenant branding.
 
-Two fallback triggers, both walking this chain:
-- **Not-found** lookup cascade (exists today).
-- **Render-error** re-compose — **BUILD** (Zealot cut this; template keeps it). Fixes the current Space→Org skip by walking `parentForTemplate` instead of mutating `ownerModel`.
+**Denormalization — DECIDED: standardize on it.** Every space-bearing owner row carries its parent `organizationId` (a `SpaceUser` carries `organizationId`+`spaceId`+`userId`) so each chain walks up via one cheap indexed read, no join. `fkMap` mirrors `Token`:
+`User:[userId]  OrganizationUser:[organizationId,userId]  SpaceUser:[organizationId,spaceId,userId]  Organization:[organizationId]  Space:[organizationId,spaceId]`.
+Email + `Token` already comply; the FP models that store `spaceId` only (Contact, Tag, TagCategory, TagAttachment, WebhookSubscription, CustomerRef, Inquiry, CommunicationLog) are the inconsistency → app-wide standardization tracked in **COMM-007**.
 
-**DLQ**: when the **`platform`** floor template errors (or none found at floor) → throw `EmailRenderError` → job fails → **DLQ** (build the handling). `{{#if}}` `degrade` (drop one broken block) retained.
+**Cross-chain opt-in** (a Space/user electing a *different* tier's template): explicit target on **manual** sends; **best-effort most-specific** on automatic sends (walk the sender's chain down to the shared `default` floor).
+
+Two fallback triggers, both walking the sender's chain:
+- **Not-found** lookup cascade.
+- **Render-error** re-compose — **BUILD** (Zealot cut this; template keeps it). Walks `parentForTemplate` instead of mutating `ownerModel`.
+
+**DLQ**: when the `default` floor template errors (or none found at floor) → throw `EmailRenderError` → job fails → **DLQ**. `{{#if}}` `degrade` (drop one broken block) retained.
 
 ## 3. CommunicationLog
 
@@ -115,18 +122,19 @@ Intentional resends = distinct events (e.g. `inquiry.resent`), never key mutatio
 | Sender name/shape | `ReachContext` DU on `ownerModel` | **`Sender`** DU on `SenderType` enum |
 | Template owner levels | Org/Space | **+ user-actor levels** (own templates) |
 
-Aligned (no divergence): scope-first cascade, CommunicationLog shape + **FP template ref**, find-or-create fence, event-anchored idempotency, metadata-only + retention.
+Aligned (no divergence): CommunicationLog shape + **FP template ref**, find-or-create fence, event-anchored idempotency, metadata-only + retention. *(Cascade now diverges too: template uses **two separate chains** (user + org), not Zealot's scope-first peel.)*
 
 ## Open questions
-1. Wire user-actor **template ownership** now (grow `EmailOwnerModel` + `EmailTemplate` owner fields + uniqueness — a migration), or land Sender/cascade/log first and add user-owned templates later? The cascade already routes user-actors to their scope, so this is zero-rework to defer.
-2. DLQ mechanism — reuse existing job DLQ, or a dedicated dead-letter for renders?
-3. `CommunicationLog` retention/TTL mechanism.
+1. DLQ mechanism — reuse existing job DLQ, or a dedicated dead-letter for renders?
+2. `CommunicationLog` retention/TTL mechanism.
+
+(Resolved — user-actor template ownership is **built now, not deferred**: two-chain cascade + `userId` owner FK + denormalized parent FKs. See §2 and the build plan.)
 
 ## Build plan (phased)
 1. **Sender** — `SenderType` enum + `Sender` DU + `senderKey`; rename `ReachContext`/`contextKey`; bridge to `ComposeContext`; update registry `senders()` + `deliverJobId`.
 2. **Cascade + fallback** — `parentForTemplate`; rewrite `lookupTemplate`/`settleTemplate` to walk it for not-found **and** render-error; DLQ at floor.
 3. **CommunicationLog** — enums + model + `falsePolymorphism.ts` entry + migration; wire `sendEmail` find-or-create + `deliver` anti-join/status.
-4. *(optional / deferred)* user-actor template ownership migration.
+4. **User-actor template ownership** (not deferred) — grow `EmailOwnerModel` (+`User`/`OrganizationUser`/`SpaceUser`) + `userId` owner FK on `EmailTemplate`/`EmailComponent` + denormalized parent FKs + per-tier partial uniques (migration); add the **user chain** to `parentForTemplate`/`lookupCascade`; map `ownerScope(sender)` user-actors to their own owner tier (not peeled to scope).
 
 ## Acceptance
 - `ReachContext`/`contextKey` gone; `Sender`/`senderKey` throughout; DU type-safety retained.

@@ -8,7 +8,7 @@ import type { EmailComponent, Prisma, PrismaClient } from '@template/db/generate
 import type { OwnerScope } from '@template/email/render/types';
 
 const latestSnapshotInclude = {
-  auditLogs: { take: 1, orderBy: { createdAt: 'desc' }, select: { id: true } },
+  auditLogs: { take: 1, orderBy: { id: 'desc' }, select: { id: true } },
 } satisfies Prisma.EmailTemplateInclude;
 
 export type TemplateWithSnapshot = Prisma.EmailTemplateGetPayload<{ include: typeof latestSnapshotInclude }>;
@@ -116,6 +116,92 @@ export const lookupAtAdmin = async (
   const base = {
     locale: ctx.locale,
     ownerModel: 'admin' as const,
+    organizationId: null,
+    spaceId: null,
+  };
+
+  const [comps, template] = await Promise.all([
+    componentSlugs.length
+      ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
+      : Promise.resolve([]),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
+  ]);
+
+  const components: Record<string, EmailComponent> = {};
+  for (const c of comps) components[c.slug] = c;
+
+  return { template, components };
+};
+
+export const lookupAtSpaceUser = async (
+  db: PrismaClient,
+  templateSlug: string | null,
+  componentSlugs: string[],
+  ctx: OwnerScope,
+): Promise<LookupResult> => {
+  const base = {
+    locale: ctx.locale,
+    ownerModel: 'SpaceUser' as const,
+    spaceId: ctx.spaceId ?? null,
+    userId: ctx.userId ?? null,
+  };
+
+  const [comps, template] = await Promise.all([
+    componentSlugs.length
+      ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
+      : Promise.resolve([]),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
+  ]);
+
+  const components: Record<string, EmailComponent> = {};
+  for (const c of comps) components[c.slug] = c;
+
+  return { template, components };
+};
+
+export const lookupAtOrgUser = async (
+  db: PrismaClient,
+  templateSlug: string | null,
+  componentSlugs: string[],
+  ctx: OwnerScope,
+): Promise<LookupResult> => {
+  const base = {
+    locale: ctx.locale,
+    ownerModel: 'OrganizationUser' as const,
+    organizationId: ctx.organizationId ?? null,
+    userId: ctx.userId ?? null,
+    spaceId: null,
+  };
+
+  const [comps, template] = await Promise.all([
+    componentSlugs.length
+      ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...base } })
+      : Promise.resolve([]),
+    templateSlug
+      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...base }, include: latestSnapshotInclude })
+      : Promise.resolve(null),
+  ]);
+
+  const components: Record<string, EmailComponent> = {};
+  for (const c of comps) components[c.slug] = c;
+
+  return { template, components };
+};
+
+export const lookupAtUser = async (
+  db: PrismaClient,
+  templateSlug: string | null,
+  componentSlugs: string[],
+  ctx: OwnerScope,
+): Promise<LookupResult> => {
+  const base = {
+    locale: ctx.locale,
+    ownerModel: 'User' as const,
+    userId: ctx.userId ?? null,
     organizationId: null,
     spaceId: null,
   };

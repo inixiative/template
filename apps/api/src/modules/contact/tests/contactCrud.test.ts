@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Contact, Organization, OrganizationUser, User } from '@template/db';
 import { clearHookRegistry } from '@template/db';
-import { cleanupTouchedTables, createContact, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createOrganizationUser,
+  createUser,
+  getNextSeq,
+  upsertContact,
+} from '@template/db/test';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { contactRouter } from '#/modules/contact';
 import { meRouter } from '#/modules/me';
@@ -262,12 +269,10 @@ describe('Contact CRUD', () => {
     });
 
     it('locks deleting the email mirroring the user login (403)', async () => {
-      const { entity: contact } = await createContact({
-        user,
-        ownerModel: 'User',
-        type: 'email',
-        value: { address: user.email as string },
-      });
+      const { entity: contact } = await upsertContact(
+        { userId_type_valueKey: { userId: user.id, type: 'email', valueKey: (user.email as string).toLowerCase() } },
+        { user, ownerModel: 'User', type: 'email', value: { address: user.email as string } },
+      );
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);
     });

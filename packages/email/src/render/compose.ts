@@ -20,10 +20,24 @@ export type ComposeTemplateResult = {
   onError: EmailErrorPolicy; // render-error policy for the resolved template
 };
 
-// The next owner up the inheritance cascade, used to re-compose on a `fallback` render error.
-// Space → Organization → default; base owners (default/admin) have no parent and always fail.
-export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null =>
-  owner === 'Space' ? 'Organization' : owner === 'Organization' ? 'default' : null;
+// The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
+// user (SpaceUser→OrganizationUser→User→default) and org (Space→Organization→default); admin/default have no parent.
+export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
+  switch (owner) {
+    case 'SpaceUser':
+      return 'OrganizationUser';
+    case 'OrganizationUser':
+      return 'User';
+    case 'User':
+      return 'default';
+    case 'Space':
+      return 'Organization';
+    case 'Organization':
+      return 'default';
+    default:
+      return null;
+  }
+};
 
 export type ComposeComponentResult = {
   mjml: string;

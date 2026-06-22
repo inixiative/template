@@ -2,8 +2,8 @@
 /**
  * @atlas
  * @kind seed
- * @partOf infrastructure:prisma
- * @uses primitive:shared
+ * @partOf infrastructure:seed
+ * @uses primitive:shared, infrastructure:prisma
  */
 
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';

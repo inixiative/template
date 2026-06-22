@@ -35,12 +35,16 @@ model User {
   auditLogsAsActor       AuditLog[]            @relation("AuditLogActorUser")
   auditLogsAsSpoofActor  AuditLog[]            @relation("AuditLogActorSpoofUser")
   auditLogsAsSubject     AuditLog[]            @relation("AuditLogSubjectUser")
+  auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
   communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
   communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  emailTemplates  EmailTemplate[]
+  emailComponents EmailComponent[]
 }
 
 enum PlatformRole {

@@ -67,7 +67,12 @@ describe('includeFromLens', () => {
         parent: lensFor('Organization'),
         root: {
           picks: ['id'],
-          where: where({ field: 'organizationUsers', aggregate: { mode: 'count' }, operator: Operator.greaterThanEquals, value: 1 }),
+          where: where({
+            field: 'organizationUsers',
+            aggregate: { mode: 'count' },
+            operator: Operator.greaterThanEquals,
+            value: 1,
+          }),
         },
       };
       expect(includeFromLens(lens)).toEqual({ organizationUsers: true });
@@ -112,7 +117,12 @@ describe('includeFromLens', () => {
         root: {
           picks: ['spaces'],
           relations: { spaces: { picks: ['id'] } },
-          where: where({ field: 'organizationUsers', aggregate: { mode: 'count' }, operator: Operator.greaterThanEquals, value: 1 }),
+          where: where({
+            field: 'organizationUsers',
+            aggregate: { mode: 'count' },
+            operator: Operator.greaterThanEquals,
+            value: 1,
+          }),
         },
       };
       expect(includeFromLens(lens)).toEqual({ spaces: true, organizationUsers: true });

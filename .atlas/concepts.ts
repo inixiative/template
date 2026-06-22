@@ -36,6 +36,7 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:lifecycle': {}, // process lifecycle / graceful shutdown
 
   'infrastructure:prisma': { package: ['db'], docs: ['DATABASE.md'] },
+  'infrastructure:seed': {}, // canonical baseline data + the hook-aware runner that loads it (spans db + api)
   'infrastructure:redis': { docs: ['REDIS.md'] },
   'infrastructure:storage': { docs: ['ADAPTERS.md'] }, // object storage (s3)
   'infrastructure:observability': { docs: ['LOGGING.md'] }, // otel / sentry / error reporting

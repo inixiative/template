@@ -17,6 +17,7 @@ const baseAuditLog = {
   changes: null,
   contextOrganizationId: null,
   contextSpaceId: null,
+  contextUserId: null,
   sourceInquiryId: null,
   subjectOrganizationId: null,
   subjectSpaceId: null,

@@ -2,7 +2,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { drainOutbox } from '#/jobs/handlers/drainOutbox';
-import { flushOutbox, isOverflowing, type OutboxRow, queueDepth, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import {
+  flushOutbox,
+  isOverflowing,
+  type OutboxRow,
+  queueDepth,
+  shouldSpill,
+  spillToOutbox,
+  tripIfFull,
+} from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';

@@ -22,21 +22,29 @@ export const ownerScope = (sender: Sender): OwnerScope => {
     case 'Organization':
       return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId };
     case 'OrganizationUser':
-      return { locale: 'en', ownerModel: 'Organization', organizationId: sender.organizationId, userId: sender.userId };
+      return {
+        locale: 'en',
+        ownerModel: 'OrganizationUser',
+        organizationId: sender.organizationId,
+        userId: sender.userId,
+      };
     case 'Space':
       return { locale: 'en', ownerModel: 'Space', spaceId: sender.spaceId, organizationId: sender.organizationId };
     case 'SpaceUser':
       return {
         locale: 'en',
-        ownerModel: 'Space',
+        ownerModel: 'SpaceUser',
         spaceId: sender.spaceId,
         organizationId: sender.organizationId,
         userId: sender.userId,
       };
     case 'User':
-      return { locale: 'en', ownerModel: 'default', userId: sender.userId };
+      return { locale: 'en', ownerModel: 'User', userId: sender.userId };
     case 'admin':
       return { locale: 'en', ownerModel: 'admin' };
+    // `platform` is the SenderType floor; `default` is its EmailOwnerModel branding tier (the one bridge point).
+    case 'platform':
+      return { locale: 'en', ownerModel: 'default' };
     default:
       return { locale: 'en', ownerModel: 'default' };
   }

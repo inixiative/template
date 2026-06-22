@@ -78,7 +78,13 @@ export default defineConfig({
     { include: 'apps/api/src/appEvents/**', partOf: 'primitive:appEvents' },
     { include: 'apps/api/src/jobs/**', partOf: 'primitive:jobs' },
     { include: 'apps/api/src/ws/**', partOf: 'primitive:websockets' },
-    { include: 'packages/$1/**', partOf: partOfFor('package', '$1') },
+    {
+      include: 'packages/$1/**',
+      exclude: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'],
+      partOf: partOfFor('package', '$1'),
+    },
+    // seed files are their own concept, not part of their host package (the db ORM, etc.)
+    { include: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'], partOf: 'infrastructure:seed' },
     // wire concepts whose code lives outside a module/package folder:
     {
       include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'],

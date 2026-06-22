@@ -31,6 +31,8 @@ model AuditLog {
   contextOrganization   Organization? @relation("AuditLogContextOrganization", fields: [contextOrganizationId], references: [id], onDelete: SetNull)
   contextSpaceId        String?       @db.VarChar(36)
   contextSpace          Space?        @relation("AuditLogContextSpace", fields: [contextSpaceId], references: [id], onDelete: SetNull)
+  contextUserId         String?       @db.VarChar(36)
+  contextUser           User?         @relation("AuditLogContextUser", fields: [contextUserId], references: [id], onDelete: SetNull)
 
   // Causal lineage
   sourceInquiryId String?  @db.VarChar(36)
@@ -84,6 +86,7 @@ model AuditLog {
   @@index([createdAt])
   @@index([contextOrganizationId])
   @@index([contextSpaceId])
+  @@index([contextUserId])
   @@index([sourceInquiryId])
   @@index([subjectOrganizationId])
   @@index([subjectSpaceId])

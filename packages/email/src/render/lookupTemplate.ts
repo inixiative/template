@@ -10,7 +10,10 @@ import {
   lookupAtAdmin,
   lookupAtDefault,
   lookupAtOrg,
+  lookupAtOrgUser,
   lookupAtSpace,
+  lookupAtSpaceUser,
+  lookupAtUser,
   type TemplateWithSnapshot,
 } from '@template/email/render/lookup';
 import type { OwnerScope } from '@template/email/render/types';
@@ -34,6 +37,24 @@ const getTemplateLookups = (slug: string, ctx: OwnerScope): LookupFn<TemplateWit
       return [() => lookupAtAdmin(db, slug, [], ctx).then((r) => r.template)];
     case 'default':
       return [() => lookupAtDefault(db, slug, [], ctx).then((r) => r.template)];
+    case 'SpaceUser':
+      return [
+        () => lookupAtSpaceUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtOrgUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
+    case 'OrganizationUser':
+      return [
+        () => lookupAtOrgUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
+    case 'User':
+      return [
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
   }
 };
 
@@ -54,6 +75,24 @@ const getComponentLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailCompo
       return [() => lookupAtAdmin(db, null, [slug], ctx).then((r) => r.components[slug])];
     case 'default':
       return [() => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug])];
+    case 'SpaceUser':
+      return [
+        () => lookupAtSpaceUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtOrgUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
+    case 'OrganizationUser':
+      return [
+        () => lookupAtOrgUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
+    case 'User':
+      return [
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
   }
 };
 

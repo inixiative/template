@@ -60,7 +60,7 @@ Located in `packages/email` (`@template/email`).
 | MJML validation | Done | Syntax checking |
 | Component extraction | Done | `mapRefs()` |
 | Variable interpolation | Done | sender/recipient/data + conditionals |
-| Cascade resolution | Done | Space → Org → default |
+| Cascade resolution | Done | Two chains: user (SpaceUser→OrgUser→User→default) + org (Space→Org→default) |
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
@@ -337,10 +337,13 @@ hand-writing with a typed editor over a **narrowed lens**:
 
 ### Cascade Resolution
 
-Templates and components resolve through ownership hierarchy:
+Two separate ownership chains, selected by the sender's tier — a user-actor walks the **user** chain, a tenant/shared sender walks the **org** chain. Both end at the shared `default` floor.
 
-| Context | Resolution Order |
+| Context (sender tier) | Resolution Order |
 |---------|------------------|
+| SpaceUser | SpaceUser → OrganizationUser → User → default |
+| OrganizationUser | OrganizationUser → User → default |
+| User | User → default |
 | Space | Space → Org (if `inheritToSpaces`) → default |
 | Organization | Org → default |
 | admin | admin only |
@@ -507,9 +510,10 @@ type EmailEntry<E> = {
 The identity an email is sent *as* — a discriminated union keyed on `SenderType`
 (`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
 Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
-from branding (which template), which the cascade resolves. `ownerScope(sender)` peels a
-user-actor to its containing scope (`SpaceUser → Space`, `OrganizationUser → Organization`,
-`User → platform`) carrying the user id for interpolation.
+from branding (which template), which the cascade resolves. `ownerScope(sender)` maps a sender to
+its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
+`platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
+chain (user or org) down to the `default` floor, carrying the user id for interpolation.
 
 #### Planner (`sendEmail`)
 
