@@ -5,13 +5,22 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
-import { lookupAtAdmin, lookupAtDefault, lookupAtOrg, lookupAtSpace } from '@template/email/render/lookup';
-import type { SaveContext } from '@template/email/render/types';
+import type { EmailComponent } from '@template/db/generated/client/client';
+import {
+  lookupAtAdmin,
+  lookupAtDefault,
+  lookupAtOrg,
+  lookupAtOrgUser,
+  lookupAtSpace,
+  lookupAtSpaceUser,
+  lookupAtUser,
+  type TemplateWithSnapshot,
+} from '@template/email/render/lookup';
+import type { OwnerScope } from '@template/email/render/types';
 
 type LookupFn<T> = () => Promise<T | null | undefined>;
 
-const getTemplateLookups = (slug: string, ctx: SaveContext): LookupFn<EmailTemplate>[] => {
+const getTemplateLookups = (slug: string, ctx: OwnerScope): LookupFn<TemplateWithSnapshot>[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -28,10 +37,28 @@ const getTemplateLookups = (slug: string, ctx: SaveContext): LookupFn<EmailTempl
       return [() => lookupAtAdmin(db, slug, [], ctx).then((r) => r.template)];
     case 'default':
       return [() => lookupAtDefault(db, slug, [], ctx).then((r) => r.template)];
+    case 'SpaceUser':
+      return [
+        () => lookupAtSpaceUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtOrgUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
+    case 'OrganizationUser':
+      return [
+        () => lookupAtOrgUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
+    case 'User':
+      return [
+        () => lookupAtUser(db, slug, [], ctx).then((r) => r.template),
+        () => lookupAtDefault(db, slug, [], ctx).then((r) => r.template),
+      ];
   }
 };
 
-const getComponentLookups = (slug: string, ctx: SaveContext): LookupFn<EmailComponent>[] => {
+const getComponentLookups = (slug: string, ctx: OwnerScope): LookupFn<EmailComponent>[] => {
   switch (ctx.ownerModel) {
     case 'Space':
       return [
@@ -48,10 +75,28 @@ const getComponentLookups = (slug: string, ctx: SaveContext): LookupFn<EmailComp
       return [() => lookupAtAdmin(db, null, [slug], ctx).then((r) => r.components[slug])];
     case 'default':
       return [() => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug])];
+    case 'SpaceUser':
+      return [
+        () => lookupAtSpaceUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtOrgUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
+    case 'OrganizationUser':
+      return [
+        () => lookupAtOrgUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
+    case 'User':
+      return [
+        () => lookupAtUser(db, null, [slug], ctx).then((r) => r.components[slug]),
+        () => lookupAtDefault(db, null, [slug], ctx).then((r) => r.components[slug]),
+      ];
   }
 };
 
-export const lookupTemplate = async (slug: string, ctx: SaveContext): Promise<EmailTemplate | null> => {
+export const lookupTemplate = async (slug: string, ctx: OwnerScope): Promise<TemplateWithSnapshot | null> => {
   for (const lookup of getTemplateLookups(slug, ctx)) {
     const result = await lookup();
     if (result) return result;
@@ -59,7 +104,7 @@ export const lookupTemplate = async (slug: string, ctx: SaveContext): Promise<Em
   return null;
 };
 
-export const lookupComponent = async (slug: string, ctx: SaveContext): Promise<EmailComponent | null> => {
+export const lookupComponent = async (slug: string, ctx: OwnerScope): Promise<EmailComponent | null> => {
   for (const lookup of getComponentLookups(slug, ctx)) {
     const result = await lookup();
     if (result) return result;

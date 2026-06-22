@@ -11,7 +11,7 @@ const emailTemplateFactory = createFactory('EmailTemplate', {
     slug: `template-${getNextSeq()}`,
     name: `Template ${getNextSeq()}`,
     locale: 'en',
-    category: 'system' as const,
+    kind: 'system' as const,
     subject: 'Test Subject',
     mjml: '<mjml><mj-body><mj-text>Default</mj-text></mj-body></mjml>',
     ownerModel: 'default' as const,

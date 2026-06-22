@@ -8,7 +8,7 @@ Mechanisms for coordinating async operations. Three different concerns, three di
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
 
-Combine when needed: a per-bot Redis lock + a per-bot serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes." See `apps/golem-shamash/src/lib/botSession.ts` for the wire-up.
+Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
 
 ---
 
@@ -29,10 +29,10 @@ await queue.run(async () => updateB());  // doesn't start until updateA settles
 
 You have multiple async callsites that all mutate the same shared resource (in-memory map, encrypted DB blob, log file, etc.) and they fire concurrently. Without serialization, two read-modify-write cycles interleave and one clobbers the other.
 
-Real example — Baileys' Postgres-backed auth adapter (`packages/baileys/src/authState.ts`):
+Illustrative example — an encrypted-blob auth adapter where two writers share one record:
 - `keys.set` and `creds.update` both rewrite the entire encrypted blob
 - Both fire during normal operation (key rotation, session updates)
-- Without the queue, in-memory `stored` would be read+modified by overlapping writes and silently lose data on persist
+- Without the queue, an in-memory `stored` value would be read+modified by overlapping writes and silently lose data on persist
 
 ### When NOT to use
 

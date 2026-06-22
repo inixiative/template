@@ -3,13 +3,13 @@
 // ============================================================================
 
 model User {
-  id            String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  email         String  @unique
+  emailVerified Boolean @default(false)
   name          String?
   displayName   String?
   image         String?
@@ -18,27 +18,33 @@ model User {
   platformRole PlatformRole @default(user)
 
   // Relations
-  accounts             Account[]
-  sessions             Session[]
-  organizationUsers    OrganizationUser[]
-  spaceUsers           SpaceUser[]
-  tokens               Token[]
-  cronJobsCreated      CronJob[]
-  webhookSubscriptions WebhookSubscription[]
-  contacts             Contact[]
-  tagAttachments       TagAttachment[]
-  tags                 Tag[]
-  tagCategories        TagCategory[]
-  inquiriesSent        Inquiry[]             @relation("InquirySource")
-  inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
-  providerRefs         CustomerRef[]         @relation("providerRefs")
-  auditLogsAsActor      AuditLog[] @relation("AuditLogActorUser")
-  auditLogsAsSpoofActor AuditLog[] @relation("AuditLogActorSpoofUser")
-  auditLogsAsSubject    AuditLog[] @relation("AuditLogSubjectUser")
+  accounts               Account[]
+  sessions               Session[]
+  organizationUsers      OrganizationUser[]
+  spaceUsers             SpaceUser[]
+  tokens                 Token[]
+  cronJobsCreated        CronJob[]
+  webhookSubscriptions   WebhookSubscription[]
+  contacts               Contact[]
+  tagAttachments         TagAttachment[]
+  tags                   Tag[]
+  tagCategories          TagCategory[]
+  inquiriesSent          Inquiry[]             @relation("InquirySource")
+  inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
+  providerRefs           CustomerRef[]         @relation("providerRefs")
+  auditLogsAsActor       AuditLog[]            @relation("AuditLogActorUser")
+  auditLogsAsSpoofActor  AuditLog[]            @relation("AuditLogActorSpoofUser")
+  auditLogsAsSubject     AuditLog[]            @relation("AuditLogSubjectUser")
+  auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
+  communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
+  communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  emailTemplates  EmailTemplate[]
+  emailComponents EmailComponent[]
 }
 
 enum PlatformRole {

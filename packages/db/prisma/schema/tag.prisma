@@ -8,40 +8,40 @@
 // Empty resources array = unrestricted.
 
 model Tag {
-    id          String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
-    deletedAt   DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-    name        String                       // "founders", "us", "jobs"
-    description String?
-    resources   TagResource[]                // mix of PascalCase model names + camelCase use-cases. Empty = unrestricted.
+  name        String // "founders", "us", "jobs"
+  description String?
+  resources   TagResource[] // mix of PascalCase model names + camelCase use-cases. Empty = unrestricted.
 
-    // Owner — false polymorphism. `platform` (default) means no specific
-    // owner row → visible to everyone. PascalCase values pair to one FK
-    // column. Polymorphism config in registries/falsePolymorphism.ts.
-    ownerModel     TagResource @default(platform)
-    userId         String?     @db.VarChar(36)
-    organizationId String?     @db.VarChar(36)
-    spaceId        String?     @db.VarChar(36)
+  // Owner — false polymorphism. `platform` (default) means no specific
+  // owner row → visible to everyone. PascalCase values pair to one FK
+  // column. Polymorphism config in registries/falsePolymorphism.ts.
+  ownerModel     TagResource @default(platform)
+  userId         String?     @db.VarChar(36)
+  organizationId String?     @db.VarChar(36)
+  spaceId        String?     @db.VarChar(36)
 
-    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-    tagCategoryId String      @db.VarChar(36)
-    tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
+  tagCategoryId String      @db.VarChar(36)
+  tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
-    attachments TagAttachment[]
+  attachments TagAttachment[]
 
-    // Per-owner uniqueness on (category, name) — partial uniques (see Contact
-    // for rationale). The platform partial scopes platform-owned tags to one
-    // per (category, name) globally. Tag.ownerModel must match its
-    // tagCategory.ownerModel; enforced by the tagOwnerCategory hook.
-    @@unique([userId, tagCategoryId, name],         where: { userId:         { not: null } })
-    @@unique([organizationId, tagCategoryId, name], where: { organizationId: { not: null } })
-    @@unique([spaceId, tagCategoryId, name],        where: { spaceId:        { not: null } })
-    @@unique([tagCategoryId, name],                 where: raw("\"ownerModel\" = 'platform'"))
-    @@index([tagCategoryId])
-    @@index([ownerModel])
+  // Per-owner uniqueness on (category, name) — partial uniques (see Contact
+  // for rationale). The platform partial scopes platform-owned tags to one
+  // per (category, name) globally. Tag.ownerModel must match its
+  // tagCategory.ownerModel; enforced by the tagOwnerCategory hook.
+  @@unique([userId, tagCategoryId, name], where: { userId: { not: null } })
+  @@unique([organizationId, tagCategoryId, name], where: { organizationId: { not: null } })
+  @@unique([spaceId, tagCategoryId, name], where: { spaceId: { not: null } })
+  @@unique([tagCategoryId, name], where: raw("\"ownerModel\" = 'platform'"))
+  @@index([tagCategoryId])
+  @@index([ownerModel])
 }

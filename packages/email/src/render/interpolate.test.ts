@@ -51,6 +51,19 @@ describe('interpolate', () => {
       });
       expect(result).toBe('Hi John Doe');
     });
+
+    it('resolves nested paths', () => {
+      const result = interpolate('Org: {{data.org.name}}, role: {{data.member.role}}', {
+        data: { org: { name: 'Acme' }, member: { role: 'admin' } },
+      });
+      expect(result).toBe('Org: Acme, role: admin');
+    });
+
+    it('does not resolve prototype-chain or inherited-function paths', () => {
+      const template = '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
+      const result = interpolate(template, { data: {} });
+      expect(result).toBe(template);
+    });
   });
 
   describe('conditional blocks', () => {
@@ -151,20 +164,26 @@ describe('interpolate', () => {
       expect(result).toBe('Matched');
     });
 
-    it('shows error comment for invalid JSON rule in test env', () => {
-      const result = interpolate('{{#if rule={invalid json}}}Content{{/if}}', { recipient: {} });
-      expect(result).toContain('<!-- RULE ERROR:');
-      expect(result).toContain('Content');
+    it('drops a malformed-rule block by default and reports it via onError', () => {
+      const errors: string[] = [];
+      const result = interpolate('{{#if rule={invalid json}}}Content{{else}}Fallback{{/if}}', { recipient: {} }, (m) =>
+        errors.push(m),
+      );
+      expect(result).toBe('Fallback');
+      expect(errors).toHaveLength(1);
     });
 
-    it('shows error comment for valid JSON but invalid rule structure', () => {
-      // Valid JSON but missing required 'operator' field
-      const result = interpolate('{{#if rule={"field":"recipient.name"}}}Content{{/if}}', {
-        recipient: { name: 'John' },
-      });
-      // json-rules check may return false or error string for invalid rules
-      // Either way, we should get some output (content or error)
-      expect(result.length).toBeGreaterThan(0);
+    it('surfaces a malformed rule inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
+      const prev = process.env.EMAIL_INLINE_RENDER_ERRORS;
+      process.env.EMAIL_INLINE_RENDER_ERRORS = 'true';
+      try {
+        const result = interpolate('{{#if rule={invalid json}}}Content{{/if}}', { recipient: {} });
+        expect(result).toContain('<!-- RULE ERROR:');
+        expect(result).toContain('Content');
+      } finally {
+        if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
+        else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
+      }
     });
   });
 });

@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind seed
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:seed
  * @uses none
  */
 import type { EmailTemplate } from '../../src/generated/client/client';
@@ -17,9 +17,9 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       name: 'Email Verification',
       locale: 'en',
       ownerModel: 'default',
-      category: 'system',
+      kind: 'system',
       inheritToSpaces: true,
-      componentRefs: ['system-header', 'system-button', 'system-footer'],
+      componentRefs: ['system-header', 'system-footer'],
       subject: 'Verify your email address',
       mjml: [
         '<mjml>',
@@ -35,7 +35,13 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '        </mj-text>',
         '      </mj-column>',
         '    </mj-section>',
-        '    {{#component:system-button}}{{/component:system-button}}',
+        '    <mj-section padding="10px 0">',
+        '      <mj-column>',
+        '        <mj-button href="{{data.verificationUrl}}" background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" inner-padding="12px 24px">',
+        '          Verify Email',
+        '        </mj-button>',
+        '      </mj-column>',
+        '    </mj-section>',
         '    <mj-section padding="0">',
         '      <mj-column>',
         '        <mj-text font-size="13px" color="#6b7280" line-height="1.5">',
@@ -50,14 +56,14 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
     },
     {
       id: '01936d42-ec00-7000-8000-000000000011',
-      slug: 'org-invitation',
+      slug: 'inquiry-invite-organization-user',
       name: 'Organization Invitation',
       locale: 'en',
       ownerModel: 'default',
-      category: 'system',
+      kind: 'system',
       inheritToSpaces: true,
-      componentRefs: ['system-header', 'system-button', 'system-footer'],
-      subject: "You've been invited to {{data.organizationName}}",
+      componentRefs: ['system-header', 'system-footer'],
+      subject: "You've been invited to {{data.sourceOrganization.name}}",
       mjml: [
         '<mjml>',
         '  <mj-body background-color="#f9fafb">',
@@ -68,12 +74,17 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '          Hi {{recipient.name}},',
         '        </mj-text>',
         '        <mj-text font-size="16px" color="#374151" line-height="1.5">',
-        '          {{data.inviterName}} has invited you to join',
-        '          <strong>{{data.organizationName}}</strong> as a {{data.role}}.',
+        "          You've been invited to join <strong>{{data.sourceOrganization.name}}</strong> as a {{data.content.role}}.",
         '        </mj-text>',
         '      </mj-column>',
         '    </mj-section>',
-        '    {{#component:system-button}}{{/component:system-button}}',
+        '    <mj-section padding="10px 0">',
+        '      <mj-column>',
+        '        <mj-button href="{{sender.webUrl}}/invitations/{{data.id}}" background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" inner-padding="12px 24px">',
+        '          Accept Invitation',
+        '        </mj-button>',
+        '      </mj-column>',
+        '    </mj-section>',
         '    <mj-section padding="0">',
         '      <mj-column>',
         '        <mj-text font-size="13px" color="#6b7280" line-height="1.5">',
@@ -92,7 +103,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       name: 'Welcome',
       locale: 'en',
       ownerModel: 'default',
-      category: 'system',
+      kind: 'system',
       inheritToSpaces: true,
       componentRefs: ['system-header', 'system-footer'],
       subject: 'Welcome to {{sender.platformName}}',

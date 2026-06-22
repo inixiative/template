@@ -20,11 +20,11 @@ model AppEvent {
   // Domain payload
   data Json @default("{}")
 
-  @@index([name])
-  @@index([actorUserId])
-  @@index([createdAt])
-
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([name])
+  @@index([actorUserId])
+  @@index([createdAt])
 }

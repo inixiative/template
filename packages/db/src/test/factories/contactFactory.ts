@@ -37,3 +37,4 @@ const contactFactory = createFactory('Contact', {
 
 export const buildContact = contactFactory.build;
 export const createContact = contactFactory.create;
+export const upsertContact = contactFactory.upsert;

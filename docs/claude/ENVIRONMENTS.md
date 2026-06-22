@@ -74,13 +74,14 @@ Local → PR (feature branch) → Staging (main) → Prod (manual)
 ## Environment Detection
 
 ```typescript
-import { isTest, isLocal, isDev, isProd } from '@template/shared/utils';
+import { isTest, isLocal, isPR, isStaging, isProd } from '@template/shared/utils';
 
-// Set via ENVIRONMENT env var
+// packages/shared/src/utils/env.ts — one flag per Environment value, set via ENVIRONMENT
 export const isTest = process.env.ENVIRONMENT === 'test';
 export const isLocal = process.env.ENVIRONMENT === 'local';
-export const isDev = process.env.ENVIRONMENT === 'develop';
-export const isProd = process.env.ENVIRONMENT === 'production';
+export const isPR = process.env.ENVIRONMENT === 'pr';
+export const isStaging = process.env.ENVIRONMENT === 'staging';
+export const isProd = process.env.ENVIRONMENT === 'prod';
 ```
 
 ---

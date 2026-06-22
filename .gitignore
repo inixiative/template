@@ -187,3 +187,6 @@ packages/sdk/src/client/index.ts
 
 # Init script scratch files
 scripts/init/test-*.ts
+
+# Atlas-generated code map (regenerate with: bunx atlas generate)
+MAP.md

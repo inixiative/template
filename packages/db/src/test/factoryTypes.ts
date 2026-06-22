@@ -13,6 +13,8 @@ export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection
 
 export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 
+export type WhereUniqueOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
+
 export type Serialized<T> = T extends Date
   ? string
   : T extends Array<infer U>
@@ -82,4 +84,9 @@ export type Factory<K extends ModelName> = {
     context?: BuildContext,
   ) => Promise<BuildResult<K, O>>;
   create: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
+  upsert: (
+    where: WhereUniqueOf<K>,
+    overrides?: Partial<CreateInputOf<K>>,
+    context?: BuildContext,
+  ) => Promise<BuildResult<K>>;
 };

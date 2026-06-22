@@ -53,7 +53,17 @@ export const rebacSchema: RebacSchema = {
 
   // Owner-polymorphic models: per-row permissionRules are merged additively
   // over the standard owner-walk by check() — see packages/permissions/src/rebac/ownerActions.ts.
-  contact: { actions: ownerActions() },
+  // Contact: the email mirroring the user's login (valueKey === user.email) is
+  // locked against manage (update/delete both gate on manage) — it stays in sync
+  // with auth, never edited directly. Every other contact takes the owner walk.
+  contact: {
+    actions: {
+      ...ownerActions(),
+      manage: {
+        all: [{ rule: { field: 'valueKey', operator: Operator.notEquals, path: 'user.email' } }, ownerActions().manage],
+      },
+    },
+  },
   webhookSubscription: { actions: ownerActions() },
 
   organizationUser: {

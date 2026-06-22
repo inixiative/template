@@ -272,29 +272,57 @@ fi
 # ---------------------------------------------------------------------------
 # 6b. Create MinIO buckets for this slot
 # ---------------------------------------------------------------------------
-MINIO_CONTAINER="${PROJECT_NAME}_minio"
-echo -e "${BLUE}Creating MinIO buckets on $MINIO_CONTAINER...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
-  for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-                 "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-    docker run --rm --network "${PROJECT_NAME}_default" \
-      -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
-      minio/mc:latest mb --ignore-existing "local/${BUCKET}" >/dev/null 2>&1 || true
-  done
-  echo -e "${GREEN}Created: 4 buckets for slot ${SLOT}${NC}"
-else
-  echo -e "${YELLOW}Warning: $MINIO_CONTAINER not running — skipping bucket creation.${NC}"
+echo -e "${BLUE}Provisioning MinIO buckets for slot ${SLOT}...${NC}"
+"$ROOT_DIR/scripts/db/minio-provision.sh" \
+  "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+  "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"
+
+# ---------------------------------------------------------------------------
+# 7. Install dependencies in the worktree
+# ---------------------------------------------------------------------------
+# A git worktree is a fresh working dir with NO node_modules. Because .worktrees/
+# lives inside the main repo, bun would otherwise resolve UP to the main checkout's
+# hoisted node_modules — where the @template/* symlinks point at MAIN's packages,
+# not this worktree's. The worktree would then silently run main's code (e.g. a
+# generated Prisma client that predates a migration on this branch). Install here
+# so the worktree owns its own resolution.
+# --ignore-scripts mirrors 'bun run setup' (prepare/husky already ran in main).
+echo -e "${BLUE}Installing dependencies (bun install --ignore-scripts)...${NC}"
+if ! (cd "$WORKTREE_DIR" && bun install --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}"); then
+  echo -e "${RED}Error: bun install failed in $WORKTREE_DIR. Fix the issue, then run 'bun install' there.${NC}"
+  exit 1
+fi
+if [ ! -e "$WORKTREE_DIR/node_modules/@template/db" ]; then
+  echo -e "${RED}Error: bun install did not link node_modules/@template/db in $WORKTREE_DIR.${NC}"
+  echo -e "${RED}Without it the worktree resolves the main repo's packages (stale @template/* / Prisma client).${NC}"
+  echo -e "${RED}Run 'bun install' inside the worktree, then 'bun run db:push:dev'.${NC}"
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Push schema to both DBs
+# 8. Push schema to both DBs
 # ---------------------------------------------------------------------------
 echo -e "${BLUE}Pushing Prisma schema to local + test DBs...${NC}"
 (cd "$WORKTREE_DIR" && bun run db:push:dev 2>&1) || \
   echo -e "${YELLOW}Warning: schema push failed; run 'bun run db:push:dev' inside the worktree once issues are fixed.${NC}"
 
 # ---------------------------------------------------------------------------
-# 8. Summary
+# 9. Smoke-test DB connectivity (confirms the slot's local DB is reachable)
+# ---------------------------------------------------------------------------
+echo -e "${BLUE}Verifying DB connectivity...${NC}"
+if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+  DB_PING="$(docker exec "$PG_CONTAINER" psql -U postgres -d "$DB_LOCAL" -tAc "SELECT 1;" 2>/dev/null || true)"
+  if [ "$DB_PING" = "1" ]; then
+    echo -e "${GREEN}DB reachable: $DB_LOCAL${NC}"
+  else
+    echo -e "${YELLOW}Warning: could not verify DB $DB_LOCAL is reachable.${NC}"
+  fi
+else
+  echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB connectivity check.${NC}"
+fi
+
+# ---------------------------------------------------------------------------
+# 10. Summary
 # ---------------------------------------------------------------------------
 cat <<EOF
 

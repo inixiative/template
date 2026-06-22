@@ -1,4 +1,21 @@
 // ============================================================================
+// SENDER TYPE - the actor an outbound communication is sent AS
+// ============================================================================
+// Identity of the sender (drives from-address / display name), distinct from
+// template branding (which cascades by scope). Non-model tiers are lowercase;
+// model-backed types are the PascalCase Prisma model names. `platform` is the
+// platform-wide default. Persisted on CommunicationLog.senderType (false-poly FKs).
+enum SenderType {
+  platform
+  admin
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+}
+
+// ============================================================================
 // COMMUNICATION KIND - Universal classification for outbound messages
 // ============================================================================
 // Applies across every transport (chat, email, in-app notification, future

@@ -41,6 +41,9 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     // Cast `[:]`-marked tokens to symbols; unknown tokens fall back to the literal
     // string (allowlist, no eval). `=== undefined` so the valid null symbol survives.
     const symbol = isSymbol ? castBracketSymbol(decoded) : undefined;
+    // A `[:]` marker with a value that isn't a valid symbol (null/true/false) is
+    // malformed — skip it rather than silently storing the raw string.
+    if (isSymbol && symbol === undefined) continue;
     const decodedValue: BracketQueryPrimitive = symbol !== undefined ? symbol : decoded;
     const leafKey = keys[keys.length - 1];
     const existingValue = current[leafKey];

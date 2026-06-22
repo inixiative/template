@@ -120,7 +120,7 @@ bun run db:studio     # Visual database browser
 ### Redis
 
 ```bash
-docker exec -it template-redis redis-cli
+docker exec -it ${PROJECT_NAME:-template}_redis redis-cli
 > KEYS *              # List all keys
 > GET key             # Get value
 > FLUSHALL            # Clear all (careful!)

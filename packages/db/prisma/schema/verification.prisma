@@ -12,9 +12,9 @@ model Verification {
 
   auditLogs AuditLog[]
 
-  @@index([identifier])
-
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([identifier])
 }
