@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomBytes } from 'crypto';
+import { createPrivateKey, generateKeyPairSync, randomBytes } from 'crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
@@ -225,21 +225,23 @@ export const setupInfisical = async (
     // Step 7: Ensure webhook signing keypair (RSA-SHA256 per sendWebhook.ts)
     for (const step of infisicalWebhookSigningSteps) {
       if (!stagingEnabled && step.environment === 'staging') continue;
-      if (await isComplete('infisical', step.action)) continue;
-
-      let hasKeypair = false;
+      let hasValidKey = false;
       try {
         const existing = await getSecretAsync('WEBHOOK_SIGNING_PRIVATE_KEY', {
           projectId,
           environment: step.environment,
           path: '/api',
         });
-        hasKeypair = Boolean(existing?.includes('PRIVATE KEY'));
+        // Must be a usable RSA key (sendWebhook.ts signs with RSA-SHA256); a missing,
+        // malformed, or wrong-type (e.g. ed25519) key self-heals even if marked complete.
+        hasValidKey = !!existing && createPrivateKey(existing).asymmetricKeyType === 'rsa';
       } catch {
-        // Missing secret expected on first run.
+        // Missing or non-RSA key — regenerate.
       }
 
-      if (!hasKeypair) {
+      if (hasValidKey && (await isComplete('infisical', step.action))) continue;
+
+      if (!hasValidKey) {
         const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
         const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
         const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
