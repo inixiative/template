@@ -4,10 +4,7 @@
  * @partOf primitive:appEvents
  * @uses feature:email, primitive:shared
  */
-import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
 import type { WSEvent } from '@template/shared/ws';
-
-export type { EmailTarget, ResolvedRecipient };
 
 export type AppEventActor = {
   actorUserId: string | null;
@@ -26,21 +23,9 @@ export type AppEventPayload<T = Record<string, unknown>> = {
   timestamp: string;
 };
 
-export type EmailSenderContext = {
-  ownerModel: 'default' | 'Organization' | 'Space' | 'User';
-  organizationId?: string;
-  spaceId?: string;
-  userId?: string;
-};
-
 export type EmailHandoff = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
   template: string;
   data: Record<string, unknown>;
-  sender?: EmailSenderContext;
-  tags?: string[];
 };
 
 export type ObserveData = Record<string, unknown>;

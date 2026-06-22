@@ -5,37 +5,37 @@
 // `audience:founders` is distinct from `vertical:founders`).
 
 model TagCategory {
-    id          String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
-    deletedAt   DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-    name        String                                    // "audience", "region", "vertical", "cohort", …
-    description String?
+  name        String // "audience", "region", "vertical", "cohort", …
+  description String?
 
-    // Owner — same shape as Tag. `platform` = global category, visible
-    // everywhere. PascalCase values scope to a specific row.
-    ownerModel     TagResource @default(platform)
-    userId         String?     @db.VarChar(36)
-    organizationId String?     @db.VarChar(36)
-    spaceId        String?     @db.VarChar(36)
+  // Owner — same shape as Tag. `platform` = global category, visible
+  // everywhere. PascalCase values scope to a specific row.
+  ownerModel     TagResource @default(platform)
+  userId         String?     @db.VarChar(36)
+  organizationId String?     @db.VarChar(36)
+  spaceId        String?     @db.VarChar(36)
 
-    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
-    tags Tag[]
+  tags Tag[]
 
-    // Per-owner uniqueness — partial uniques (see Contact for rationale).
-    // Each partial doubles as a lookup index for that owner FK; the platform
-    // partial scopes uncategorized-tier tag categories to one-per-name globally.
-    @@unique([userId, name],         where: { userId:         { not: null } })
-    @@unique([organizationId, name], where: { organizationId: { not: null } })
-    @@unique([spaceId, name],        where: { spaceId:        { not: null } })
-    @@unique([name],                 where: raw("\"ownerModel\" = 'platform'"))
-    @@index([ownerModel])
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 
-    // ==========================================================================
-    // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-    // ==========================================================================
+  // Per-owner uniqueness — partial uniques (see Contact for rationale).
+  // Each partial doubles as a lookup index for that owner FK; the platform
+  // partial scopes uncategorized-tier tag categories to one-per-name globally.
+  @@unique([userId, name], where: { userId: { not: null } })
+  @@unique([organizationId, name], where: { organizationId: { not: null } })
+  @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@unique([name], where: raw("\"ownerModel\" = 'platform'"))
+  @@index([ownerModel])
 }

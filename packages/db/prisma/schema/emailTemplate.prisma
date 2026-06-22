@@ -5,26 +5,28 @@
 // Supports polymorphic ownership: default (all tenants), admin (platform), Organization (tenant-branded)
 
 model EmailTemplate {
-  id        String                @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  name     String                 // "OTP Verification"
-  slug     String               // "otp"
-  locale   String               @default("en")
-  category CommunicationCategory
+  name   String // "OTP Verification"
+  slug   String // "otp"
+  locale String            @default("en")
+  kind   CommunicationKind
 
-  subject String                // "Your verification code: {{code}}"
-  mjml    String  @db.Text      // Full MJML with {{component:slug}} and {{variable.*}} placeholders
+  subject String // "Your verification code: {{code}}"
+  mjml    String @db.Text // Full MJML with {{component:slug}} and {{variable.*}} placeholders
 
   // Pre-computed component refs (populated on save)
-  componentRefs String[]        // Slugs of nested {{component:slug}} references
+  componentRefs         String[] // Slugs of nested {{component:slug}} references
+  degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)
   spaceId        String?         @db.VarChar(36)
+  userId         String?         @db.VarChar(36)
 
   // For org-owned: should spaces inherit this template?
   inheritToSpaces Boolean @default(true)
@@ -33,27 +35,29 @@ model EmailTemplate {
   // default/admin always fail). See EmailErrorPolicy.
   onError EmailErrorPolicy @default(fail)
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  auditLogs    AuditLog[]
+  organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space             Space?             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditLogs         AuditLog[]
+  communicationLogs CommunicationLog[]
 
   // Per-owner uniqueness — partial uniques per ownerModel branch (see
   // EmailComponent / Contact for rationale).
-  @@unique([slug, locale, ownerModel],     where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailTemplate_slug_locale_platform_key")
-  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"),         map: "EmailTemplate_slug_locale_organization_key")
-  @@unique([slug, locale, spaceId],        where: raw("\"ownerModel\" = 'Space'"),                map: "EmailTemplate_slug_locale_space_key")
-  @@index([category])
+  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin') AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_platform_key")
+  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_organization_key")
+  @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_space_key")
+  @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_user_key")
+  @@unique([slug, locale, organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_orguser_key")
+  @@unique([slug, locale, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "EmailTemplate_slug_locale_spaceuser_key")
+  @@index([kind])
   @@index([ownerModel])
   @@index([organizationId])
-}
-
-enum CommunicationCategory {
-  system      // OTP, password reset, security alerts - cannot unsubscribe
-  promotional // Marketing, newsletters - can unsubscribe
+  @@index([userId])
+  @@index([componentRefs(ops: ArrayOps)], type: Gin)
 }
 
 enum EmailErrorPolicy {
-  fail     // throw → job retries → DLQ (safest default)
-  degrade  // drop the throwing block(s), send the rest
+  fail // throw → job retries → DLQ (safest default)
+  degrade // drop the throwing block(s), send the rest
   fallback // re-render at the next owner up: Space → Organization → default
 }

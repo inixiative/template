@@ -10,21 +10,21 @@ model CustomerRef {
   deletedAt DateTime?
 
   // Customer (false polymorphism: User, Organization, or Space)
-  customerModel        CustomerModel
-  customerUserId       String?       @db.VarChar(36)
-  customerOrganizationId String?     @db.VarChar(36)
-  customerSpaceId      String?       @db.VarChar(36)
+  customerModel          CustomerModel
+  customerUserId         String?       @db.VarChar(36)
+  customerOrganizationId String?       @db.VarChar(36)
+  customerSpaceId        String?       @db.VarChar(36)
 
   customerUser         User?         @relation("providerRefs", fields: [customerUserId], references: [id], onDelete: Cascade)
   customerOrganization Organization? @relation("providerRefs", fields: [customerOrganizationId], references: [id], onDelete: Cascade)
   customerSpace        Space?        @relation("providerRefs", fields: [customerSpaceId], references: [id], onDelete: Cascade)
 
   // Provider (false polymorphism: Space, etc.)
-  providerModel        ProviderModel
-  providerSpaceId      String?       @db.VarChar(36)
+  providerModel   ProviderModel
+  providerSpaceId String?       @db.VarChar(36)
 
-  providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
-  auditLogs AuditLog[]
+  providerSpace Space?     @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+  auditLogs     AuditLog[]
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.
@@ -32,20 +32,20 @@ model CustomerRef {
   // (platform + activity opt-out, marketing opt-in); `system` bypasses.
   acceptedKinds CommunicationKind[] @default([platform, activity])
 
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
   // (customer, provider) pair uniqueness — partial uniques across each
   // populated customer FK paired with each provider FK. Each partial doubles
   // as a lookup index for that customer column. Add new partials when a new
   // ProviderModel FK is introduced.
-  @@unique([customerUserId, providerSpaceId],         where: { customerUserId:         { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerUserId, providerSpaceId], where: { customerUserId: { not: null }, providerSpaceId: { not: null } })
   @@unique([customerOrganizationId, providerSpaceId], where: { customerOrganizationId: { not: null }, providerSpaceId: { not: null } })
-  @@unique([customerSpaceId, providerSpaceId],        where: { customerSpaceId:        { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerSpaceId, providerSpaceId], where: { customerSpaceId: { not: null }, providerSpaceId: { not: null } })
   @@index([customerModel])
   @@index([providerModel])
   @@index([providerSpaceId])
-
-  // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-  // ==========================================================================
 }
 
 enum CustomerModel {

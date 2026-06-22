@@ -17,6 +17,7 @@ import type {
   ModelName,
   ModelOf,
   Serialized,
+  WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
@@ -95,6 +96,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
     persist: boolean,
     overrides?: O,
     context?: BuildContext,
+    upsertWhere?: WhereUniqueOf<K>,
   ): Promise<BuildResult<K, O>> => {
     const ctx: BuildContext = context ?? {};
 
@@ -185,8 +187,11 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       }
     }
 
+    const delegate = db[toAccessor(modelName)] as unknown as RuntimeDelegate;
     const entity: ModelOf<K> = persist
-      ? ((await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged })) as ModelOf<K>)
+      ? upsertWhere
+        ? ((await delegate.upsert({ where: upsertWhere, create: merged, update: {} })) as ModelOf<K>)
+        : ((await delegate.create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
     // Add non-enumerable __serialize() method to convert Date fields to ISO strings
@@ -210,5 +215,6 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
   return {
     build: (overrides, context) => generate(false, overrides, context),
     create: (overrides, context) => generate(true, overrides, context) as Promise<BuildResult<K>>,
+    upsert: (where, overrides, context) => generate(true, overrides, context, where) as Promise<BuildResult<K>>,
   };
 };

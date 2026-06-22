@@ -13,9 +13,9 @@ model Session {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs AuditLog[]
 
-  @@index([userId])
-
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([userId])
 }

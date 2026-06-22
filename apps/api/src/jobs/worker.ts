@@ -13,6 +13,7 @@ import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
 import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { flushOutbox } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
@@ -92,7 +93,8 @@ export const initializeWorker = async (): Promise<void> => {
 
   onShutdown(async () => {
     log.info('Stopping job worker...', LogScope.worker);
-    if (jobsWorker) await jobsWorker.close();
+    if (jobsWorker) await jobsWorker.close(); // stop processing first — no new spills from finishing jobs
+    await flushOutbox(); // then persist any buffered overflow spills
     if (workerRedis) await workerRedis.quit();
     log.info('Job worker stopped', LogScope.worker);
   });

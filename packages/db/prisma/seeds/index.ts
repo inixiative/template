@@ -1,5 +1,6 @@
 import type { SeedFile } from '../seed';
 import { accountSeeds } from './account.seed';
+import { contactSeeds } from './contact.seed';
 import { cronJobSeeds } from './cronJob.seed';
 import { emailComponentSeeds } from './emailComponent.seed';
 import { emailTemplateSeeds } from './emailTemplate.seed';
@@ -13,7 +14,8 @@ import { userSeeds } from './user.seed';
 const seeds: SeedFile[] = [
   // Order matters for FK constraints
   userSeeds, // 1. Users first (no dependencies)
-  accountSeeds, // 2. Accounts with passwords (depends on users)
+  contactSeeds, // 2. Contacts (depends on users) — prime email contacts so seeded users are deliverable
+  accountSeeds, // 3. Accounts with passwords (depends on users)
   organizationSeeds, // 3. Organizations (no dependencies)
   organizationUserSeeds, // 4. Org users (depends on users + orgs)
   spaceSeeds, // 5. Spaces (depends on orgs)

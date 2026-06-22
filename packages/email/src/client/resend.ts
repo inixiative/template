@@ -48,6 +48,7 @@ const toResendPayload = (options: SendEmailOptions) => ({
   html: options.html,
   replyTo: options.replyTo,
   tags: options.tags?.map((name) => ({ name, value: 'true' })),
+  headers: options.headers,
 });
 
 class ResendEmailClient implements EmailClient {

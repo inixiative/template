@@ -6,9 +6,9 @@
  */
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
-export const expand = async (mjml: string, componentRefs: string[], ctx: SaveContext): Promise<string> => {
+export const expand = async (mjml: string, componentRefs: string[], ctx: OwnerScope): Promise<string> => {
   if (!componentRefs.length) return mjml;
 
   // Batch fetch all referenced components

@@ -37,30 +37,14 @@ describe('inviteOrganizationUserAppEvents', () => {
       const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
 
       expect(handoffs).toHaveLength(1);
-      expect(handoffs![0].template).toBe('org-invitation');
-      expect(handoffs![0].to).toEqual([{ userIds: ['user-target'] }]);
-      expect(handoffs![0].data.organizationName).toBe('Acme Corp');
-      expect(handoffs![0].data.inviterName).toBe('Alice');
-      expect(handoffs![0].data.role).toBe('member');
-      expect(handoffs![0].data.buttonUrl).toContain('/invitations/inq-1');
-      expect(handoffs![0].data.buttonText).toBe('Accept Invitation');
-      expect(handoffs![0].tags).toEqual(['inviteOrganizationUser']);
+      expect(handoffs![0].template).toBe('inquiry-invite-organization-user');
+      expect(handoffs![0].data.inquiryId).toBe('inq-1');
     });
 
     it('returns null when no targetUserId', () => {
       const inquiry = makeInquiry({ targetUserId: null });
       const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
       expect(handoffs).toBeNull();
-    });
-
-    it('sets org sender context', () => {
-      const inquiry = makeInquiry();
-      const handoffs = inviteOrganizationUserAppEvents.sent!.email!(inquiry as never);
-
-      expect(handoffs![0].sender).toEqual({
-        ownerModel: 'Organization',
-        organizationId: 'org-1',
-      });
     });
   });
 

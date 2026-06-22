@@ -6,12 +6,14 @@
  */
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import { IF, parseIfBlock } from '@template/email/render/conditionParser';
+import { expand } from '@template/email/render/expand';
 import { mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -30,6 +32,25 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
+// Strip {{#if rule=…}}…{{/if}} blocks so a link that only renders conditionally doesn't satisfy the
+// unsubscribe requirement — the link must be unconditional. Uses the canonical string-aware, depth-aware
+// parser (not a brace-naive regex) so a rule-JSON value containing a literal {{/if}} can't fool it.
+const withoutConditionals = (mjml: string): string => {
+  let out = '';
+  let i = 0;
+  while (i < mjml.length) {
+    const open = mjml.indexOf(IF, i);
+    if (open === -1) {
+      out += mjml.slice(i);
+      break;
+    }
+    out += mjml.slice(i, open);
+    const block = parseIfBlock(mjml, open);
+    i = block ? block.end : open + IF.length;
+  }
+  return out;
+};
+
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
@@ -37,7 +58,7 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject);
 
-  const ctx: SaveContext = {
+  const ctx: OwnerScope = {
     ownerModel: input.ownerModel,
     organizationId: input.organizationId,
     spaceId: input.spaceId,
@@ -65,10 +86,19 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
 
-      const [template, components] = await Promise.all([
-        saveTemplate(finalTemplate, ctx),
-        finalComponents.length ? saveComponents(finalComponents, ctx) : Promise.resolve([]),
-      ]);
+      const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
+      const template = await saveTemplate(finalTemplate, ctx);
+
+      // Non-system kinds are subject to unsubscribe compliance: the composed body (template +
+      // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.
+      if (template.kind && template.kind !== 'system') {
+        const composed = await expand(template.mjml, template.componentRefs ?? [], ctx);
+        if (!withoutConditionals(composed).includes('{{recipient.unsubscribeUrl}}')) {
+          throw new Error(
+            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{recipient.unsubscribeUrl}}.`,
+          );
+        }
+      }
 
       return { template, components };
     },

@@ -26,6 +26,7 @@
   - [MJML Validation](#mjml-validation)
   - [Send Pipeline](#send-pipeline)
     - [Render-error policy](#render-error-policy)
+  - [Template Versioning & Recompose](#template-versioning--recompose)
 - [Notifications](#notifications)
   - [Planned: Novu](#planned-novu)
 - [SMS](#sms)
@@ -59,7 +60,7 @@ Located in `packages/email` (`@template/email`).
 | MJML validation | Done | Syntax checking |
 | Component extraction | Done | `mapRefs()` |
 | Variable interpolation | Done | sender/recipient/data + conditionals |
-| Cascade resolution | Done | Space → Org → default |
+| Cascade resolution | Done | Two chains: user (SpaceUser→OrgUser→User→default) + org (Space→Org→default) |
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
@@ -148,7 +149,7 @@ model EmailTemplate {
   name             String              // "OTP Verification"
   slug             String              // "otp"
   locale           String              // "en"
-  category         CommunicationCategory
+  kind             CommunicationKind   // system|platform|activity|marketing
   subject          String              // "Your code: {{data.code}}"
   mjml             String              // Full MJML with component refs
   componentRefs    String[]            // Pre-computed slugs
@@ -183,12 +184,52 @@ model EmailComponent {
 }
 ```
 
+#### CommunicationLog
+
+Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
+at-most-once dedup fence (`idempotencyKey @unique`). **Metadata only**, never the rendered body
+(re-render from `emailTemplateId` + data). Sender is false-polymorphic; `kind`/`emailTemplateId` are
+filled when deliver resolves the template.
+
+```prisma
+model CommunicationLog {
+  id                   String
+  sendKey              String                // groups a send's recipients (= planner job id)
+  channel              CommunicationChannel  // email|sms|push|inApp
+  kind                 CommunicationKind?    // filled at deliver
+  status               CommunicationStatus   // queued→sending→sent | failed | suppressed | undeliverable
+  emailTemplateId      String?               // resolved template (onDelete: SetNull)
+
+  senderType           SenderType            // false polymorphism (platform/admin carry no FK)
+  senderUserId         String?
+  senderOrganizationId String?
+  senderSpaceId        String?
+
+  recipientUserId      String?
+  recipientContactId   String?
+  address              String
+
+  idempotencyKey       String                // @unique — the fence
+  providerMessageId    String?
+  error                String?
+  sentAt               DateTime?
+}
+```
+
 #### Enums
 
 ```prisma
-enum CommunicationCategory {
-  system        // OTP, password reset - cannot unsubscribe
-  promotional   // Marketing - can unsubscribe
+enum CommunicationKind {
+  system        // OTP, password reset, security — always delivered, un-mute-able
+  platform      // product news, announcements — opt-out
+  activity      // something happened involving you — opt-out
+  marketing     // promo — opt-in only
+}
+
+enum CommunicationChannel { email  sms  push  inApp }
+
+enum CommunicationStatus {
+  queued  sending  sent  failed  suppressed  undeliverable
 }
 
 enum EmailOwnerModel {
@@ -296,10 +337,13 @@ hand-writing with a typed editor over a **narrowed lens**:
 
 ### Cascade Resolution
 
-Templates and components resolve through ownership hierarchy:
+Two separate ownership chains, selected by the sender's tier — a user-actor walks the **user** chain, a tenant/shared sender walks the **org** chain. Both end at the shared `default` floor.
 
-| Context | Resolution Order |
+| Context (sender tier) | Resolution Order |
 |---------|------------------|
+| SpaceUser | SpaceUser → OrganizationUser → User → default |
+| OrganizationUser | OrganizationUser → User → default |
+| User | User → default |
 | Space | Space → Org (if `inheritToSpaces`) → default |
 | Organization | Org → default |
 | admin | admin only |
@@ -316,7 +360,7 @@ The render pipeline has two phases:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  PHASE 1: Compose (once per template)                       │
-│  composeTemplate(slug, ctx) → { mjml, subject, category }   │
+│  composeTemplate(slug, ctx) → { id, mjml, subject, kind }   │
 │     └── expand(mjml, componentRefs, ctx)                    │
 │         └── lookupCascade → fetch components → replace refs │
 └─────────────────────────────────────────────────────────────┘
@@ -341,7 +385,7 @@ The render pipeline has two phases:
 import { composeTemplate, composeComponent } from '@template/email/render';
 
 // Compose a full template
-const { mjml, subject, category } = await composeTemplate('welcome', {
+const { mjml, subject, kind } = await composeTemplate('welcome', {
   ownerModel: 'Organization',
   organizationId: org.id,
   locale: 'en',
@@ -435,44 +479,71 @@ try {
 
 ### Send Pipeline
 
-Sending runs as a BullMQ job (`apps/api/src/jobs/handlers/sendEmail.ts`,
-`makeJob<SendEmailPayload>`). Producers enqueue it by name (`sendEmail`) rather
-than calling the email client directly.
+Outbound email is **event-driven** and runs as two BullMQ jobs — never a direct client
+call. Business logic emits an app event; the email bridge enqueues the **planner**
+(`sendEmail`), which fans out one **deliver** job (`deliverEmail`) per recipient.
+
+```
+emitAppEvent(name, data) → email bridge → sendEmail (planner) → deliverEmail (per recipient)
+```
+
+`SendEmailPayload` is `{ eventName, template, data }` — no caller-supplied recipients.
+
+#### Registry (`apps/api/src/lib/email/registry.ts`)
+
+Each template slug maps to an `EmailEntry` describing how to resolve its data + recipients
+from the event — all as **lenses** (`@inixiative/json-rules`), resolved in the worker:
 
 ```typescript
-import type { EmailTarget } from '@template/email/targeting';
-
-export type SendEmailPayload = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
-  template: string;
-  data: Record<string, unknown>;
-  tags: string[];
+type EmailEntry<E> = {
+  entity: (data) => LensNarrowing;                  // the record the email is about
+  sender: (entity) => Sender;                       // identity the email is sent AS
+  recipients: (entity, sender) => LensNarrowing;
+  cc?:  (recipient, sender) => LensNarrowing;
+  bcc?: (recipient, sender) => LensNarrowing;
+  data?: (entity, handoff) => Record<string, unknown>;  // interpolation variables
 };
 ```
 
-Targeting is declarative — recipients are resolved inside the worker, not by the
-caller (`@template/email/targeting`):
+#### Sender (`apps/api/src/lib/email/sender.ts`)
 
-```typescript
-type EmailTarget =
-  | { userIds: string[] }
-  | { raw: string[] }
-  | { orgRole: { organizationId: string; role: string } }
-  | { spaceRole: { spaceId: string; role: string } };
-```
+The identity an email is sent *as* — a discriminated union keyed on `SenderType`
+(`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
+Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
+from branding (which template), which the cascade resolves. `ownerScope(sender)` maps a sender to
+its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
+`platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
+chain (user or org) down to the `default` floor, carrying the user id for interpolation.
 
-The worker:
-1. Resolves `to`/`cc`/`bcc` targets to addresses (and the `from` sender).
-2. Verifies recipient addresses; drops risky ones.
-3. Skips cleanly if no email adapter is registered.
-4. Composes the template via cascade (`composeTemplate`) — which also returns the
-   resolved `ownerModel` and `onError` policy.
-5. Renders the batch: interpolates `{ sender, recipient, data }` per recipient and
-   `mjml2html` (awaited), collecting any render-time rule throws via `onError`.
-6. Applies the **render-error policy** (below) — clean batch sends; otherwise
-   `degrade` / `fallback` / `fail`.
+#### Planner (`sendEmail`)
+
+1. Resolve the entity lens; bail if missing or no email adapter is registered.
+2. For each recipient (lens): resolve their email `Contact` (settings + deliverability live there).
+3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
+   — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
+4. Enqueue `deliverEmail` with the log id.
+
+#### Deliver (`deliverEmail`) — per recipient
+
+1. Load the log; **skip if already `sent`**.
+2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
+   A render error → mark `failed` → rethrow → retries → DLQ.
+3. **Gate ① scope** — `inScope` rebac read-check. STUB pass-through today (see COMM-005).
+4. **Gate ② settings** — `canDeliver(kind, contact)`: honor `acceptedKinds` opt-outs; `system` always
+   delivers; a non-`system` send with no `Contact` → `suppressed`.
+5. **Deliverability** — bouncer pre-flight, cached on `Contact.deliverability` (TTL 30d); `undeliverable`
+   → mark `undeliverable`, no send.
+6. **Claim** the send — atomic compare-and-set `queued|failed → sending`; a racing/retried sibling that
+   loses the claim bails (no double-send).
+7. Render `mjml2html`, add `List-Unsubscribe` + `List-Unsubscribe-Post` headers (non-`system`), send,
+   then `sent` (+ `providerMessageId`) / `failed`. **Every terminal write is CAS-guarded** so a sibling
+   can't clobber a `sent` row.
+
+`CommunicationLog` is metadata-only (never the rendered body). Re-render the current version from
+`emailTemplateId` + data, or recompose the *exact version sent* from `emailTemplateAuditLogId` (see
+[Template Versioning & Recompose](#template-versioning--recompose)).
+Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{hash(data)}`; deliver adds
+`{hash(sender)}:{email}:{hash(contents)}`. Intentional resends are distinct events, never key mutation.
 
 #### Render-error policy
 
@@ -481,19 +552,38 @@ template's `onError`. The error is always logged (`LogScope.email`), then:
 
 - **`fail`** (default) — throw `EmailRenderError('render_failed')` → BullMQ retries
   → DLQ-equivalent (`attempts: 3`, `removeOnFail: { age: 30d }`). Safest.
-- **`degrade`** — send the batch with the throwing blocks dropped (the evaluator
-  already excluded them).
+- **`degrade`** — send with the throwing blocks dropped (the evaluator already excluded them).
 - **`fallback`** — re-compose one owner up (`parentOwner`: Space → Organization →
   default) and re-render; loops until it renders clean or hits a base owner.
 
-Base owners (`default`/`admin`) aren't author-configurable and have no parent, so
-they always `fail`. The loop is bounded — `parentOwner` strictly walks down to a
-base owner where the policy is forced to `fail`.
+Base owners (`default`/`admin`) have no parent, so they always `fail` — the loop is bounded.
 
-> Stub edges: sender owner-model/locale resolution currently defaults to
-> `{ ownerModel: 'default', locale: 'en' }`, so the policy resolves to `fail` until
-> per-tenant resolution lands. The machinery + seam ship now; that resolution
-> threads through the fallback cascade unchanged (`{ ...renderCtx, ownerModel }`).
+### Template Versioning & Recompose
+
+"What was sent" stays reconstructable after templates and shared components are edited. Live
+`EmailTemplate`/`EmailComponent` rows keep using **slug refs** (late-bound through the cascade — a
+Space override can be added or evacuated and existing templates re-resolve live). The **version graph
+lives in the audit log**:
+
+- Every edit already writes an immutable `AuditLog` snapshot (`after` = full content). The
+  `emailVersioning` hook additionally stamps `AuditLog.emailComponentAuditLogIds` — the audit-log ids of
+  the snapshots the row's children currently resolve to. A template snapshot points at its component
+  snapshots, recursively: a traversable version tree, each version's content stored once and shared by
+  reference when unchanged.
+- **Backprop walk** (`apps/api/src/hooks/emailVersioning`): a component change — content edit, or an
+  override created/deleted that shifts resolution — spawns fresh snapshots for every ancestor whose
+  resolved children moved, stopping a branch where an override shadows the change. Saves run
+  **children-before-parent** so a parent snapshot pins children that already exist; the hook registers
+  *after* the audit hook so the changed row's snapshot exists when the walk runs.
+- **Send pins the version**: `deliverEmail` records the template's current snapshot id on
+  `CommunicationLog.emailTemplateAuditLogId`.
+- **Recompose** (`recomposeCommunication`, `apps/api/src/lib/email/recompose.ts`): walks
+  `emailTemplateAuditLogId → emailComponentAuditLogIds` recursively, reading each pinned snapshot's
+  content, to rebuild the as-sent composition. Version fidelity (template + components as they were),
+  `{{variable.*}}` placeholders intact — not the per-recipient interpolated bytes.
+- **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
+  `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
+  initial snapshots.
 
 ---
 
@@ -534,5 +624,36 @@ db.onCommit(() => enqueue('sendWebhook', { ... }));
 
 ---
 ## Communication Preferences
-TODO: Should be granular and manageable
+
+Per-channel opt-in/opt-out lives on `Contact.acceptedKinds` (`CommunicationKind[]`), gated by
+`canDeliver(kind, contact)` in the deliver path (gate ②). `system` always delivers; `platform`/`activity`
+are opt-out (default on); `marketing` is opt-in. Every `User` gets an email `Contact` at creation
+(`userEmailContact` after-create hook), so the settings always exist to honor.
+
+**Unsubscribe** (non-`system` emails):
+- A signed **HMAC capability link** binds the exact `{userId, contactId, kind}` intersection
+  (`apps/api/src/lib/email/unsubscribe.ts`, keyed off `BETTER_AUTH_SECRET`) — the link can only drop that
+  one kind for that one contact. No DB token row; stateless, re-derived.
+- `List-Unsubscribe` + `List-Unsubscribe-Post` headers (RFC 8058 one-click) point at a public,
+  **POST-only** endpoint (`apps/api/src/routes/unsubscribe.ts`, mounted pre-auth). POST-only so a GET
+  prefetch (scanners, Safe Links, hover previews) can never unsubscribe anyone.
+- Non-`system` templates **must** contain an *unconditional* `{{recipient.unsubscribeUrl}}`, enforced at
+  save (`saveEmailTemplate` — checks the composed body with conditional blocks stripped).
+- Rich preference management (toggle all kinds) is the **authenticated in-app** surface, rebac-governed —
+  not the link. The emailed link is deliberately the narrow one-click only.
+
+**Deliverability** is distinct from preference: the bouncer verdict is cached on `Contact.deliverability`
+(+ `deliverabilityCheckedAt`); a confirmed `undeliverable` address is skipped pre-send (the suppression
+seam — post-send bounce/complaint webhooks will write here too). Distinct again from `Contact.verifiedAt`
+(channel-ownership — see COMM-004).
+
+> **Auth boundary:** anything that *logs a user in* (sessions, magic links, email verification) is
+> **better-auth**'s; the platform `Token` model is for API keys + scoped non-auth capabilities. The
+> unsubscribe link is neither — it's a self-verifying signed capability, the right tool for an
+> unauthenticated, possibly-non-user recipient.
+
+### Tickets
+- **COMM-003** — Sender + CommunicationLog (this pipeline).
+- **COMM-004** — Contact channel-ownership verification (gate `verifiedAt`).
+- **COMM-005** — rebac scope → Prisma (gate ① engine; `inScope` is the stub).
 

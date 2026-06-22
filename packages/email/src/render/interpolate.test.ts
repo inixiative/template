@@ -51,6 +51,19 @@ describe('interpolate', () => {
       });
       expect(result).toBe('Hi John Doe');
     });
+
+    it('resolves nested paths', () => {
+      const result = interpolate('Org: {{data.org.name}}, role: {{data.member.role}}', {
+        data: { org: { name: 'Acme' }, member: { role: 'admin' } },
+      });
+      expect(result).toBe('Org: Acme, role: admin');
+    });
+
+    it('does not resolve prototype-chain or inherited-function paths', () => {
+      const template = '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
+      const result = interpolate(template, { data: {} });
+      expect(result).toBe(template);
+    });
   });
 
   describe('conditional blocks', () => {

@@ -88,6 +88,11 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 };
 
+// Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
+// must run AFTER another (e.g. emailVersioning augments the snapshot auditLog writes, so it must
+// follow auditLog) relies on registration order, which per-model re-registration can silently break.
+// TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
+// check over the declared orderings.
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];

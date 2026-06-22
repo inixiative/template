@@ -40,7 +40,7 @@
     "db:migrate": "bun run --filter=@template/db db:migrate",
     "db:deploy": "bun run --filter=@template/db db:deploy",
     "db:studio": "bun run --filter=@template/db db:studio",
-    "db:seed": "bun run --filter=@template/db db:seed",
+    "db:seed": "bun run --filter=api db:seed",
     "db:truncate:webhooks": "bun run with local api bun run --filter=@template/db db:truncate:webhooks",
     "worktree:create": "./scripts/worktree/create.sh",
     "worktree:destroy": "./scripts/worktree/destroy.sh",
