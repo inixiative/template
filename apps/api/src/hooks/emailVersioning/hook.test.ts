@@ -45,7 +45,7 @@ describe('emailVersioning', () => {
     const templateSnapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
 
     expect(componentSnapshot).not.toBeNull();
-    expect(templateSnapshot?.emailComponentAuditLogIds).toEqual([componentSnapshot!.id]);
+    expect(templateSnapshot?.componentVersions).toEqual({ greeting: componentSnapshot!.id });
   });
 
   it('backpropagates a fresh template snapshot when a child component changes', async () => {
@@ -61,7 +61,7 @@ describe('emailVersioning', () => {
     });
 
     expect(templateSnapshots.length).toBe(templatesBefore + 1);
-    expect(templateSnapshots[0].emailComponentAuditLogIds).toEqual([newComponentSnapshot!.id]);
+    expect(templateSnapshots[0].componentVersions).toEqual({ greeting: newComponentSnapshot!.id });
   });
 
   it('recomposes each version from its snapshot, pinned to that version', async () => {
@@ -99,7 +99,7 @@ describe('emailVersioning', () => {
     expect(templatesAfter.length).toBe(templatesBefore.length);
     expect(componentsAfter).toBe(componentsBefore);
     expect(templatesAfter[0].id).toBe(templatesBefore[0].id);
-    expect(templatesAfter[0].emailComponentAuditLogIds).toEqual(templatesBefore[0].emailComponentAuditLogIds);
+    expect(templatesAfter[0].componentVersions).toEqual(templatesBefore[0].componentVersions);
   });
 
   it('the latest snapshot recomposes to exactly the live composition — no drift', async () => {
@@ -121,5 +121,17 @@ describe('emailVersioning', () => {
     const live2 = await expand(liveTemplate.mjml, liveTemplate.componentRefs, ctx);
     const snap2 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap2!.id)).toBe(live2);
+  });
+
+  it('pins null and flags the live row when a referenced component is removed with no fallback', async () => {
+    const { template, components } = await saveEmailTemplate(greetingTemplate());
+
+    await db.emailComponent.update({ where: { id: components[0].id }, data: { deletedAt: new Date() } });
+
+    const templateSnapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
+    expect(templateSnapshot?.componentVersions).toEqual({ greeting: null });
+
+    const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    expect(liveTemplate.degradedComponentRefs).toEqual(['greeting']);
   });
 });

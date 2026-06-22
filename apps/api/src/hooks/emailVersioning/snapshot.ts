@@ -12,7 +12,7 @@ import { buildContextFkFields, buildSubjectFkFields, processAuditData } from '#/
 export const createVersionBumpSnapshot = async (
   model: AuditSubjectModel,
   record: Record<string, unknown>,
-  emailComponentAuditLogIds: string[],
+  componentVersions: Record<string, string | null>,
 ): Promise<string> => {
   const actor = auditActorContext.getScope();
   const processed = processAuditData(model, record) as Prisma.InputJsonValue;
@@ -23,7 +23,7 @@ export const createVersionBumpSnapshot = async (
     before: processed,
     after: processed,
     changes: Prisma.JsonNull,
-    emailComponentAuditLogIds,
+    componentVersions: componentVersions as Prisma.InputJsonValue,
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,

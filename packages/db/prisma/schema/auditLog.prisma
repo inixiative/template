@@ -75,7 +75,7 @@ model AuditLog {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  emailComponentAuditLogIds String[]
+  componentVersions Json?
 
   communicationLogs CommunicationLog[] @relation("CommunicationEmailTemplateAuditLog")
 

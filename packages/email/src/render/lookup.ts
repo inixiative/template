@@ -28,6 +28,7 @@ export const lookupAtSpace = async (
   // in a Prisma `where`, undefined drops the filter, which would match across tenants.
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'Space' as const,
     spaceId: ctx.spaceId ?? null,
   };
@@ -58,6 +59,7 @@ export const lookupAtOrg = async (
   // (which would drop the filter and match other tenants' org templates).
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'Organization' as const,
     organizationId: ctx.organizationId ?? null,
     spaceId: null,
@@ -87,6 +89,7 @@ export const lookupAtDefault = async (
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'default' as const,
     organizationId: null,
     spaceId: null,
@@ -115,6 +118,7 @@ export const lookupAtAdmin = async (
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'admin' as const,
     organizationId: null,
     spaceId: null,
@@ -143,6 +147,7 @@ export const lookupAtSpaceUser = async (
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'SpaceUser' as const,
     spaceId: ctx.spaceId ?? null,
     userId: ctx.userId ?? null,
@@ -171,6 +176,7 @@ export const lookupAtOrgUser = async (
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'OrganizationUser' as const,
     organizationId: ctx.organizationId ?? null,
     userId: ctx.userId ?? null,
@@ -200,6 +206,7 @@ export const lookupAtUser = async (
 ): Promise<LookupResult> => {
   const base = {
     locale: ctx.locale,
+    deletedAt: null,
     ownerModel: 'User' as const,
     userId: ctx.userId ?? null,
     organizationId: null,

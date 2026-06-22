@@ -15,7 +15,8 @@ model EmailComponent {
   locale String @default("en")
 
   // Pre-computed component refs (populated on save)
-  componentRefs String[] // Slugs of nested {{component:slug}} references
+  componentRefs         String[] // Slugs of nested {{component:slug}} references
+  degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
@@ -38,12 +39,12 @@ model EmailComponent {
   // (keyed on ownerModel) so '(foo,en,default)' and '(foo,en,admin)' coexist
   // while duplicates within either are blocked. Org/Space partials add the
   // tenant FK to allow per-tenant duplicates of the same slug/locale.
-  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailComponent_slug_locale_platform_key")
-  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"), map: "EmailComponent_slug_locale_organization_key")
-  @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space'"), map: "EmailComponent_slug_locale_space_key")
-  @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User'"), map: "EmailComponent_slug_locale_user_key")
-  @@unique([slug, locale, organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser'"), map: "EmailComponent_slug_locale_orguser_key")
-  @@unique([slug, locale, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser'"), map: "EmailComponent_slug_locale_spaceuser_key")
+  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin') AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_platform_key")
+  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_organization_key")
+  @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_space_key")
+  @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_user_key")
+  @@unique([slug, locale, organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_orguser_key")
+  @@unique([slug, locale, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_spaceuser_key")
   @@index([ownerModel])
   @@index([organizationId])
   @@index([userId])

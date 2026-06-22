@@ -10,7 +10,16 @@ import { lookupCascade, type OwnerScope } from '@template/email/render';
 
 export type VersionedRecord = Pick<
   EmailTemplate | EmailComponent,
-  'id' | 'slug' | 'componentRefs' | 'ownerModel' | 'organizationId' | 'spaceId' | 'userId' | 'locale' | 'deletedAt'
+  | 'id'
+  | 'slug'
+  | 'componentRefs'
+  | 'degradedComponentRefs'
+  | 'ownerModel'
+  | 'organizationId'
+  | 'spaceId'
+  | 'userId'
+  | 'locale'
+  | 'deletedAt'
 >;
 
 const ownerScopeOf = (record: VersionedRecord): OwnerScope => ({
@@ -21,18 +30,16 @@ const ownerScopeOf = (record: VersionedRecord): OwnerScope => ({
   locale: record.locale,
 });
 
-export const resolveChildAuditLogIds = async (record: VersionedRecord): Promise<string[]> => {
-  const refs = record.componentRefs ?? [];
-  if (!refs.length) return [];
+export const resolveComponentVersions = async (record: VersionedRecord): Promise<Record<string, string | null>> => {
+  const refs = [...new Set(record.componentRefs ?? [])];
+  if (!refs.length) return {};
 
   const children = await lookupCascade(refs, ownerScopeOf(record));
-  const childIds = [...new Set(refs)].map((slug) => children[slug]?.id).filter((id): id is string => Boolean(id));
-  if (!childIds.length) return [];
+  const componentIds = refs.map((slug) => children[slug]?.id).filter((id): id is string => Boolean(id));
 
-  const snapshots = await db.auditLog.findMany({
-    where: { subjectEmailComponentId: { in: childIds } },
-    orderBy: { id: 'desc' },
-  });
+  const snapshots = componentIds.length
+    ? await db.auditLog.findMany({ where: { subjectEmailComponentId: { in: componentIds } }, orderBy: { id: 'desc' } })
+    : [];
 
   const latestByComponent = new Map<string, string>();
   for (const snapshot of snapshots) {
@@ -41,8 +48,10 @@ export const resolveChildAuditLogIds = async (record: VersionedRecord): Promise<
     }
   }
 
-  return childIds
-    .map((id) => latestByComponent.get(id))
-    .filter((id): id is string => Boolean(id))
-    .sort();
+  const versions: Record<string, string | null> = {};
+  for (const slug of refs) {
+    const childId = children[slug]?.id;
+    versions[slug] = childId ? (latestByComponent.get(childId) ?? null) : null;
+  }
+  return versions;
 };
