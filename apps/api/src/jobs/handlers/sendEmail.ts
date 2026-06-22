@@ -5,7 +5,7 @@
  * @uses feature:email
  */
 import type { LensNarrowing } from '@inixiative/json-rules';
-import { db, Prisma } from '@template/db';
+import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { prune } from '@template/db/lens';
 import { log } from '@template/shared/logger';
@@ -86,42 +86,53 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const recipientLens = entry.recipients(entity, sender);
   const sendKey = plannerJobId(eventName, template, data);
 
-  let fanned = 0;
-  for (const user of await fetchLens(db, recipientLens)) {
+  const users = await fetchLens(db, recipientLens);
+  const plan = users.map((user) => {
     const recipient = prune(user, recipientLens) as Recipient;
+    return { user, recipient, idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars) };
+  });
+  if (!plan.length) {
+    log.info(`Email fanned out: template=${template} jobs=0`);
+    return;
+  }
+
+  const contactRows = await db.contact.findMany({
+    where: { userId: { in: plan.map((p) => p.recipient.id) }, type: 'email', deletedAt: null },
+    orderBy: { position: 'asc' },
+    select: { id: true, userId: true },
+  });
+  const contactByUser = new Map<string, string>();
+  for (const c of contactRows) if (c.userId && !contactByUser.has(c.userId)) contactByUser.set(c.userId, c.id);
+
+  const created = await db.communicationLog.createManyAndReturn({
+    data: plan.map((p) => ({
+      channel: 'email' as const,
+      sendKey,
+      idempotencyKey: p.idempotencyKey,
+      address: p.recipient.email,
+      recipientUserId: p.recipient.id,
+      recipientContactId: contactByUser.get(p.recipient.id) ?? null,
+      ...senderColumns(sender),
+    })),
+    skipDuplicates: true,
+    select: { id: true, idempotencyKey: true },
+  });
+  const logByKey = new Map(created.map((l) => [l.idempotencyKey, l.id]));
+  const missing = plan.filter((p) => !logByKey.has(p.idempotencyKey)).map((p) => p.idempotencyKey);
+  if (missing.length) {
+    const existing = await db.communicationLog.findMany({
+      where: { idempotencyKey: { in: missing } },
+      select: { id: true, idempotencyKey: true },
+    });
+    for (const l of existing) logByKey.set(l.idempotencyKey, l.id);
+  }
+
+  let fanned = 0;
+  for (const { user, recipient, idempotencyKey } of plan) {
+    const communicationLogId = logByKey.get(idempotencyKey);
+    if (!communicationLogId) continue;
     const cc = entry.cc ? await emailsOf(entry.cc(user, sender)) : undefined;
     const bcc = entry.bcc ? await emailsOf(entry.bcc(user, sender)) : undefined;
-
-    const idempotencyKey = deliverJobId(eventName, template, sender, recipient.email, dataVars);
-    const contact = await db.contact.findFirst({
-      where: { userId: recipient.id, type: 'email', deletedAt: null },
-      orderBy: { position: 'asc' },
-      select: { id: true },
-    });
-
-    let communicationLogId: string;
-    try {
-      const row = await db.communicationLog.upsert({
-        where: { idempotencyKey },
-        create: {
-          channel: 'email',
-          sendKey,
-          idempotencyKey,
-          address: recipient.email,
-          recipientUserId: recipient.id,
-          recipientContactId: contact?.id ?? null,
-          ...senderColumns(sender),
-        },
-        update: {},
-        select: { id: true },
-      });
-      communicationLogId = row.id;
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
-      const existing = await db.communicationLog.findUniqueOrThrow({ where: { idempotencyKey }, select: { id: true } });
-      communicationLogId = existing.id;
-    }
-
     await enqueueJob(
       'deliverEmail',
       { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
