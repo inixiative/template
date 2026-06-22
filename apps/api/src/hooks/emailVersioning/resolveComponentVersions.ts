@@ -38,14 +38,16 @@ export const resolveComponentVersions = async (record: VersionedRecord): Promise
   const componentIds = refs.map((slug) => children[slug]?.id).filter((id): id is string => Boolean(id));
 
   const snapshots = componentIds.length
-    ? await db.auditLog.findMany({ where: { subjectEmailComponentId: { in: componentIds } }, orderBy: { id: 'desc' } })
+    ? await db.auditLog.findMany({
+        where: { subjectEmailComponentId: { in: componentIds } },
+        orderBy: { id: 'desc' },
+        distinct: ['subjectEmailComponentId'],
+      })
     : [];
 
   const latestByComponent = new Map<string, string>();
   for (const snapshot of snapshots) {
-    if (snapshot.subjectEmailComponentId && !latestByComponent.has(snapshot.subjectEmailComponentId)) {
-      latestByComponent.set(snapshot.subjectEmailComponentId, snapshot.id);
-    }
+    if (snapshot.subjectEmailComponentId) latestByComponent.set(snapshot.subjectEmailComponentId, snapshot.id);
   }
 
   const versions: Record<string, string | null> = {};

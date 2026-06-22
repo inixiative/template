@@ -13,8 +13,8 @@ import { createVersionBumpSnapshot } from '#/hooks/emailVersioning/snapshot';
 
 type EmailModel = Extract<AuditSubjectModel, 'EmailTemplate' | 'EmailComponent'>;
 
-// '*' (not per-model) is load-bearing: must run AFTER the global audit hook whose snapshot this
-// stamps, and executeHooks runs model hooks before global hooks. (The audit hook is '*' too.)
+// '*' (not per-model) is load-bearing: must run AFTER the global audit hook whose snapshot it
+// augments, and executeHooks runs model hooks before global hooks. (The audit hook is '*' too.)
 const isEmailModel = (model: string): model is EmailModel => model === 'EmailTemplate' || model === 'EmailComponent';
 
 const findLatestSnapshot = (model: EmailModel, id: string) =>
@@ -66,7 +66,7 @@ const syncDegradedRefs = async (
   }
 };
 
-const stampOwnChildIds = async (model: EmailModel, record: VersionedRecord): Promise<void> => {
+const snapshotChildVersions = async (model: EmailModel, record: VersionedRecord): Promise<void> => {
   const latest = await findLatestSnapshot(model, record.id);
   if (!latest) return;
   const versions = await resolveComponentVersions(record);
@@ -124,7 +124,7 @@ export const registerEmailVersioningHook = (): void => {
         continue;
       }
       if (!wroteSnapshot(model, change)) continue;
-      await stampOwnChildIds(model, change.record);
+      await snapshotChildVersions(model, change.record);
       await walkUp(change.record.slug, visited);
     }
   });
