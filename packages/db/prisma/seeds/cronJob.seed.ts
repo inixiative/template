@@ -43,17 +43,5 @@ export const cronJobSeeds: SeedFile<CronJob> = {
       maxAttempts: 3,
       backoffMs: 5000,
     },
-    {
-      id: '01900000-0000-7000-8000-000000000003',
-      name: 'drainOutbox',
-      jobId: 'drainOutbox',
-      description: 'Meters buffered JobOutbox rows back into BullMQ as queue depth frees up.',
-      pattern: '*/15 * * * * *', // every 15s — 6-field cron (leading seconds field), so workers don't starve under sustained overflow
-      enabled: true,
-      handler: 'drainOutbox',
-      payload: {},
-      maxAttempts: 3,
-      backoffMs: 5000,
-    },
   ],
 };

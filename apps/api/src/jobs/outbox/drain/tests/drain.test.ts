@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { drainOutbox } from '#/jobs/handlers/drainOutbox';
+import { claimLane, laneKey, watchLane } from '#/jobs/lanes';
 import {
   flushOutbox,
   isOverflowing,
@@ -11,6 +11,7 @@ import {
   spillToOutbox,
   tripIfFull,
 } from '#/jobs/outbox';
+import { runDrainOutboxPass } from '#/jobs/outbox/drain';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -48,10 +49,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
   // ioredis-mock can't run BullMQ's Lua scripts, so spy the queue boundary and drive the real
   // outbox logic against an in-memory job map. The overflow flag still uses the (mock) Redis.
   const queued = new Map<string, { id: string; name: string; data: unknown }>();
+  const poison = new Set<string>(); // handlerNames whose queue.add throws — drives the quarantine path
   let restoreQueueSpies = (): void => {};
 
   beforeAll(() => {
-    ctx = createTestWorker({ name: 'drainOutbox', data: { id: 'drainOutbox' } });
+    ctx = createTestWorker();
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // size-trip every spill → deterministic commit
 
     const add = spyOn(queue, 'add').mockImplementation((async (
@@ -59,6 +61,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       data: unknown,
       opts?: { jobId?: string },
     ) => {
+      if (poison.has(name)) throw new Error(`poison handler: ${name}`);
       const id = opts?.jobId ?? `${name}-${queued.size}`;
       if (!queued.has(id)) queued.set(id, { id, name, data });
       return { id };
@@ -79,6 +82,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   afterEach(async () => {
     queued.clear();
+    poison.clear();
     delete process.env.JOBS_MAX_QUEUE_DEPTH;
     delete process.env.JOBS_OUTBOX_FLUSH_LINGER_MS;
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // re-assert the suite default
@@ -156,7 +160,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
     expect(await ctx.db.jobOutbox.count()).toBe(5);
 
-    await drainOutbox(ctx);
+    await runDrainOutboxPass();
 
     // room = cap(3) − depth(0) → 3 admitted, 2 remain buffered
     expect(await ctx.db.jobOutbox.count()).toBe(2);
@@ -168,7 +172,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await spillToOutbox(fanRow('d1'));
     await spillToOutbox(fanRow('d2'));
 
-    await drainOutbox(ctx);
+    await runDrainOutboxPass();
 
     expect(await ctx.db.jobOutbox.count()).toBe(0);
     expect(await isOverflowing()).toBe(false);
@@ -176,8 +180,98 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('re-enqueues a plain adhoc row with its stored jobId', async () => {
     await spillToOutbox(fanRow('keep-id'));
-    await drainOutbox(ctx);
+    await runDrainOutboxPass();
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
+  });
+
+  it('supersede lanes are handler-scoped — usurping one lane leaves another handler untouched', async () => {
+    const laneA = laneKey('handlerA', 'shared');
+    const laneB = laneKey('handlerB', 'shared');
+    let aUsurped = false;
+    let bUsurped = false;
+    await claimLane(laneA, 'jobA');
+    await claimLane(laneB, 'jobB');
+    const stopA = watchLane(laneA, 'jobA', () => {
+      aUsurped = true;
+    });
+    const stopB = watchLane(laneB, 'jobB', () => {
+      bUsurped = true;
+    });
+
+    await claimLane(laneA, 'jobA2'); // a newer job takes lane A's baton
+    await new Promise((r) => setTimeout(r, 700)); // > one poll
+    stopA();
+    stopB();
+
+    expect(aUsurped).toBe(true);
+    expect(bUsurped).toBe(false); // different handler's lane — untouched
+  });
+
+  it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {
+    poison.add('poisonHandler');
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    await spillToOutbox({
+      handlerName: 'poisonHandler',
+      jobId: 'p1',
+      dedupeKey: null,
+      data: { type: JobType.adhoc, payload: {} },
+      options: {},
+    });
+    await spillToOutbox(fanRow('good'));
+
+    await runDrainOutboxPass();
+
+    // good row admitted + deleted; the poison row stays buffered with attempts bumped, not stranded
+    const rows = await ctx.db.jobOutbox.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].jobId).toBe('p1');
+    expect(rows[0].attempts).toBe(1);
+  });
+
+  it('skips a quarantined row (attempts >= cap) so it cannot block newer rows', async () => {
+    process.env.JOBS_MAX_QUEUE_DEPTH = '3';
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} }); // hold depth at low-water so the flag-clear branch doesn't reset
+    await ctx.db.jobOutbox.create({
+      data: {
+        handlerName: 'sendWebhook',
+        jobId: 'quarantined',
+        dedupeKey: null,
+        data: { type: JobType.adhoc, payload: {} },
+        options: {},
+        attempts: 5,
+      },
+    });
+    await spillToOutbox(fanRow('fresh'));
+
+    await runDrainOutboxPass();
+
+    // fresh row admitted despite the older quarantined row; quarantined row untouched (not bumped, not reset)
+    const rows = await ctx.db.jobOutbox.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].jobId).toBe('quarantined');
+    expect(rows[0].attempts).toBe(5);
+  });
+
+  it('resets quarantined rows and clears the flag on full recovery', async () => {
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    await ctx.db.jobOutbox.create({
+      data: {
+        handlerName: 'sendWebhook',
+        jobId: 'q-only',
+        dedupeKey: null,
+        data: { type: JobType.adhoc, payload: {} },
+        options: {},
+        attempts: 5,
+      },
+    });
+
+    await runDrainOutboxPass();
+
+    // queue healthy + nothing admittable → the quarantined row gets another chance and the flag clears
+    const row = await ctx.db.jobOutbox.findFirst();
+    expect(row?.attempts).toBe(0);
+    expect(await isOverflowing()).toBe(false);
   });
 
   it('flushOutbox persists rows still buffered at shutdown', async () => {

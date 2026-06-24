@@ -92,7 +92,7 @@ const key = `cache:User:${id}`;  // Don't do this
 |-----------|--------|---------|
 | `bull` | `bull:*` | BullMQ job queues (managed by BullMQ) |
 | `cache` | `cache:*` | Application cache (user lookups, tokens, etc.) |
-| `job` | `job:*` | Job coordination (supersede flags, singleton locks) |
+| `job` | `job:*` | Job coordination (supersede lanes, singleton locks) |
 | `ws` | `ws:*` | WebSocket pub/sub channels |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
@@ -150,8 +150,8 @@ Singleton locks and superseding job signals:
 // Singleton job lock (prevents concurrent runs)
 `${redisNamespace.job}:lock:${cronJobId}`
 
-// Superseding job signal (tells old job to abort)
-`${redisNamespace.job}:superseded:${jobId}`
+// Superseding lane (holds the current holder's jobId; a different holder means the prior job was usurped)
+`${redisNamespace.job}:lane:${handlerName}:${dedupeKey}`
 ```
 
 ### WebSocket Pub/Sub (`ws:*`)
