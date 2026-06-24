@@ -91,9 +91,7 @@ export const initializeWorker = async (): Promise<void> => {
 
   await registerCronJobs();
 
-  // Per-worker in-process drain (not a queued cron — see outbox/drain/loop.ts). Drop any stale queued
-  // repeatable from a prior cron-driven version so the worker can't run a handler that no longer exists.
-  await queue.removeJobScheduler('drainOutbox').catch(() => {});
+  // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
   startOutboxDrainLoop();
 
   await enqueueJob('rotateEncryptionKeys', undefined, { id: 'rotateEncryptionKeys' });
