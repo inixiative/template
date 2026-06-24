@@ -8,9 +8,6 @@ import { createLock } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain/pass';
 
-// Per-worker in-process drain, not a queued cron — a queued drain shares the worker pool with the
-// fan-out it meters and gets starved under load. createLock is the single-drainer guarantee across
-// processes (heartbeated TTL + fenced release).
 const DRAIN_INTERVAL_MS = 15_000;
 const DRAIN_LOCK = { service: 'outbox-drain', identifier: 'drain', ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 };
 

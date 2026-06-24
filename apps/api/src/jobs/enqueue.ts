@@ -68,7 +68,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   // Direct path only: abort the prior in-flight copy now (spilled jobs supersede at drain admission).
-  if (dedupeKey) await signalSupersededJobs(dedupeKey);
+  if (dedupeKey) await signalSupersededJobs(handlerName, dedupeKey);
   // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
   const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
   if (type === JobType.adhoc) await tripIfFull(); // set the flag if this add crossed the cap

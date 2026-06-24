@@ -11,16 +11,13 @@ import { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
 import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { queueDepth } from '#/jobs/outbox/queueDepth';
-import { signalSupersededLanes } from '#/jobs/outbox/supersede';
+import { laneKey, signalSupersededLanes } from '#/jobs/outbox/supersede';
 import { queue } from '#/jobs/queue';
 import type { JobData } from '#/jobs/types';
 
-// Past this many failed re-enqueues a row is quarantined (skipped) so a poison row at the FIFO head
-// can't starve newer rows when room is small.
+// A row that fails re-enqueue this many times is quarantined (skipped) so it can't block newer rows.
 const MAX_DRAIN_ATTEMPTS = 5;
 
-// Meter buffered JobOutbox rows back into BullMQ up to the cap. Driven by the per-worker loop
-// (startOutboxDrainLoop), not a queued cron — see loop.ts.
 export const runDrainOutboxPass = async (): Promise<void> => {
   await withOverflowRenew(async () => {
     const room = maxQueueDepth() - (await queueDepth(true));
@@ -34,8 +31,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
 
         const lanes = new Set<string>();
         for (const row of rows) {
-          const lane = (row.data as JobData).dedupeKey;
-          if (lane) lanes.add(lane);
+          const dedupeKey = (row.data as JobData).dedupeKey;
+          if (dedupeKey) lanes.add(laneKey(row.handlerName, dedupeKey));
         }
         await signalSupersededLanes(lanes);
 
@@ -64,7 +61,10 @@ export const runDrainOutboxPass = async (): Promise<void> => {
         }
         if (failed.length) {
           // updateManyAndReturn, not updateMany — the mutationLifeCycle extension bans the bare form.
-          await db.jobOutbox.updateManyAndReturn({ where: { id: { in: failed } }, data: { attempts: { increment: 1 } } });
+          await db.jobOutbox.updateManyAndReturn({
+            where: { id: { in: failed } },
+            data: { attempts: { increment: 1 } },
+          });
           log.warn(
             `drainOutbox: ${failed.length} row(s) failed re-enqueue (quarantine at ${MAX_DRAIN_ATTEMPTS})`,
             LogScope.job,
@@ -79,7 +79,10 @@ export const runDrainOutboxPass = async (): Promise<void> => {
       // the FIFO. Quarantined rows don't count; reset them on full recovery for one more chance.
       const admittable = await db.jobOutbox.count({ where: { attempts: { lt: MAX_DRAIN_ATTEMPTS } } });
       if (admittable === 0) {
-        await db.jobOutbox.updateManyAndReturn({ where: { attempts: { gte: MAX_DRAIN_ATTEMPTS } }, data: { attempts: 0 } });
+        await db.jobOutbox.updateManyAndReturn({
+          where: { attempts: { gte: MAX_DRAIN_ATTEMPTS } },
+          data: { attempts: 0 },
+        });
         await clearOverflow();
       }
     } else await warnIfOverflowStuck(depth);

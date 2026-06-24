@@ -11,6 +11,7 @@ import {
   tripIfFull,
 } from '#/jobs/outbox';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
+import { laneKey, signalSupersededLanes } from '#/jobs/outbox/supersede';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -181,6 +182,17 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await spillToOutbox(fanRow('keep-id'));
     await runDrainOutboxPass();
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
+  });
+
+  it('supersede lanes are handler-scoped — same dedupeKey, different handler, no cross-abort', async () => {
+    await ctx.queue.add('handlerA', { type: JobType.adhoc, payload: {}, dedupeKey: 'shared' });
+    await ctx.queue.add('handlerB', { type: JobType.adhoc, payload: {}, dedupeKey: 'shared' });
+
+    await signalSupersededLanes(new Set([laneKey('handlerA', 'shared')]));
+
+    const supersededKey = (id: string) => `${redisNamespace.job}:superseded:${id}`;
+    expect(await ctx.queue.redis.get(supersededKey('handlerA-0'))).toBe('1');
+    expect(await ctx.queue.redis.get(supersededKey('handlerB-1'))).toBeNull();
   });
 
   it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {
