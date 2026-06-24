@@ -5,6 +5,7 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
+import { heartbeat } from '@template/shared/utils';
 import { holdsLane, laneKey } from '#/jobs/lanes';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
 
@@ -26,11 +27,8 @@ export const makeSupersedingJob = <TPayload = void>(
     });
 
     // Poll our lane — once a newer job claims it we're no longer the holder, so abort.
-    const checkInterval = setInterval(async () => {
-      if (!(await holdsLane(lane, job.id ?? ''))) {
-        abortController.abort(new SupersededError(job.id));
-        clearInterval(checkInterval);
-      }
+    const stop = heartbeat(async () => {
+      if (!(await holdsLane(lane, job.id ?? ''))) abortController.abort(new SupersededError(job.id));
     }, 500);
 
     try {
@@ -39,7 +37,7 @@ export const makeSupersedingJob = <TPayload = void>(
       if (err instanceof SupersededError || (err instanceof Error && err.name === 'AbortError')) return;
       throw err;
     } finally {
-      clearInterval(checkInterval);
+      stop();
     }
   };
   h.dedupeKeyFn = dedupeKeyFn;

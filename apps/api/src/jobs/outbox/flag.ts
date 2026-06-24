@@ -5,6 +5,7 @@
  * @uses infrastructure:redis
  */
 import { LogScope, log } from '@template/shared/logger';
+import { heartbeat } from '@template/shared/utils';
 import { FLAG_KEY, lowWater, maxQueueDepth, overflowStuckMs, overflowTtlSec } from '#/jobs/outbox/config';
 import { queueDepth } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
@@ -36,24 +37,18 @@ export const warnIfOverflowStuck = async (depth: number): Promise<void> => {
   }
 };
 
-// Hold the flag's TTL open for the duration of `fn` via a recursive renew (like createLock's
-// heartbeat), so a long drain pass can't let it lapse mid-tick regardless of how long it runs —
-// no reliance on TTL > tick duration. renewOverflow (EXPIRE) no-ops on an absent key, so the final
-// renew never resurrects a flag the pass cleared.
+// Hold the flag's TTL open for the duration of `fn` via a heartbeat, so a long drain pass can't let
+// it lapse mid-tick regardless of how long it runs. renewOverflow (EXPIRE) no-ops on an absent key,
+// so the final renew never resurrects a flag the pass cleared.
 export const withOverflowRenew = async <T>(fn: () => Promise<T>): Promise<T> => {
   const renewMs = Math.floor((overflowTtlSec() * 1000) / 3); // a third of the TTL — always below it by construction
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const beat = (): void => {
-    timer = setTimeout(() => {
-      void renewOverflow().catch(() => {});
-      beat();
-    }, renewMs);
-  };
-  beat();
+  const stop = heartbeat(async () => {
+    await renewOverflow();
+  }, renewMs);
   try {
     return await fn();
   } finally {
-    if (timer) clearTimeout(timer);
+    stop();
     await renewOverflow().catch(() => {});
   }
 };
