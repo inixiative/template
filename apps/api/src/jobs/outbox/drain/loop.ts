@@ -15,13 +15,11 @@ const DRAIN_INTERVAL_MS = 15_000;
 const DRAIN_LOCK = { service: 'outbox-drain', identifier: 'drain', ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 };
 
 let drainTimer: ReturnType<typeof setInterval> | null = null;
-let draining = false; // in-process re-entrancy guard
 
+// No re-entrancy guard: createLock's NX acquire already skips a tick whose predecessor is still draining.
 const drainTick = async (): Promise<void> => {
-  if (draining) return;
-  draining = true;
+  const lock = createLock(DRAIN_LOCK);
   try {
-    const lock = createLock(DRAIN_LOCK);
     if (!(await lock.acquire())) return;
     try {
       await runDrainOutboxPass();
@@ -30,8 +28,6 @@ const drainTick = async (): Promise<void> => {
     }
   } catch (err) {
     log.error('Outbox drain tick failed', err, LogScope.job);
-  } finally {
-    draining = false;
   }
 };
 

@@ -13,7 +13,7 @@ import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { queueDepth } from '#/jobs/outbox/queueDepth';
 import { signalSupersededLanes } from '#/jobs/outbox/supersede';
 import { queue } from '#/jobs/queue';
-import type { JobData, JobOptions } from '#/jobs/types';
+import type { JobData } from '#/jobs/types';
 
 // Past this many failed re-enqueues a row is quarantined (skipped) so a poison row at the FIFO head
 // can't starve newer rows when room is small.
@@ -44,9 +44,9 @@ export const runDrainOutboxPass = async (): Promise<void> => {
         for (const row of rows) {
           try {
             const data = row.data as JobData;
-            const opts = ((row.options as JobOptions | null) ?? {}) as JobOptions;
-            if (data.dedupeKey) await queue.add(row.handlerName, data, opts as JobsOptions);
-            else await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId } as JobsOptions);
+            const opts = (row.options ?? {}) as JobsOptions;
+            if (data.dedupeKey) await queue.add(row.handlerName, data, opts);
+            else await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             drained.push(row.id);
           } catch (e) {
             failed.push(row.id);
