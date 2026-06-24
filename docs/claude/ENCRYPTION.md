@@ -377,21 +377,18 @@ interface EncryptedFieldData {
 ```typescript
 // apps/api/src/jobs/makeSingletonJob.ts
 export const makeSingletonJob = <T>(handler: JobHandler<T>) => {
-  return async (ctx, payload) => {
-    if (!jobData.id) throw new Error('Singleton job missing id');
+  return async (ctx, ...args) => {
+    const identifier = (ctx.job.data as { id?: string })?.id ?? ctx.job.name;
+    if (!identifier) throw new Error('Singleton job missing id and name');
 
-    // Redis lock with 5min TTL
-    const acquired = await redis.set(lockKey, '1', 'EX', 300, 'NX');
-    if (!acquired) return;  // Another worker already running
-
-    // Heartbeat extends lock every 2min
-    const heartbeat = setInterval(() => redis.expire(lockKey, 300), 120000);
+    // Cross-process Redis lock (heartbeated TTL + fenced release) — see createLock.
+    const lock = createLock({ service: 'job-singleton', identifier, ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 });
+    if (!(await lock.acquire())) return; // another worker already running
 
     try {
-      await handler(ctx, payload);
+      await handler(ctx, ...args);
     } finally {
-      clearInterval(heartbeat);
-      await redis.del(lockKey);
+      await lock.release();
     }
   };
 };

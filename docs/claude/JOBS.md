@@ -59,11 +59,11 @@ jobs/
 
 ### Job IDs
 
-| Scenario | ID Source |
-|----------|-----------|
-| Ad-hoc job (no dedupeKey) | BullMQ auto-generates |
-| Superseding job | Uses `dedupeKey` as `jobId` (prevents duplicates) |
-| Cron job | Uses `cronJob.jobId` from DB (idempotency key) |
+| Scenario | jobId | `id` (job data) |
+|----------|-------|-----------------|
+| Ad-hoc / superseding | `jobOptions.jobId ?? uuidv7()` | the logical `id` is data-only (the singleton-lock identity) — never the jobId |
+| Superseding | (as above) | supersession is by `dedupeKey` → a per-lane claim (`claimLane`/`watchLane`, last-wins), not the jobId |
+| Cron | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id` — the singleton-lock identity |
 
 Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
 
