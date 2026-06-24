@@ -5,24 +5,24 @@
  * @uses infrastructure:redis
  */
 import { redisNamespace } from '@template/db';
+import { heartbeat } from '@template/shared/utils';
 import { queue } from '#/jobs/queue';
 
-// A supersede lane is scoped to (handlerName, dedupeKey) — only the latest job enqueued in a lane
-// survives; older jobs in the same lane abort. Scoping by handler keeps two handlers whose
-// dedupeKeyFns emit the same string from colliding.
-export const laneKey = (handlerName: string, dedupeKey: string): string => `${handlerName} ${dedupeKey}`;
+const LANE_TTL_SEC = 300;
+const LANE_POLL_MS = 500;
 
-const laneRedisKey = (lane: string): string => `${redisNamespace.job}:lane:${lane}`;
-const LANE_TTL_SEC = 300; // a lane no live job is holding self-expires
+// Full redis key for a supersede lane, scoped to (handlerName, dedupeKey).
+export const laneKey = (handlerName: string, dedupeKey: string): string =>
+  `${redisNamespace.job}:lane:${handlerName}:${dedupeKey}`;
 
-// Record jobId as the lane's current (latest) holder. The prior holder sees the change on its next
-// poll and aborts — no queue scan, no broadcast, just an O(1) write.
+// Take the baton: record jobId as the lane's holder, evicting whoever held it (last claim wins).
 export const claimLane = (lane: string, jobId: string): Promise<unknown> =>
-  queue.redis.set(laneRedisKey(lane), jobId, 'EX', LANE_TTL_SEC);
+  queue.redis.set(lane, jobId, 'EX', LANE_TTL_SEC);
 
-// Whether jobId is still the lane's holder. Absent (expired) counts as held — only a *different* id
-// means a newer job claimed the lane, i.e. this one is superseded.
-export const holdsLane = async (lane: string, jobId: string): Promise<boolean> => {
-  const current = await queue.redis.get(laneRedisKey(lane));
-  return current === null || current === jobId;
-};
+// Hold the lane as jobId and fire onUsurped once a newer job takes the baton; returns stop(). An
+// absent (expired) lane counts as still held — only a *different* holder is a usurp.
+export const watchLane = (lane: string, jobId: string, onUsurped: () => void): (() => void) =>
+  heartbeat(async () => {
+    const holder = await queue.redis.get(lane);
+    if (holder !== null && holder !== jobId) onUsurped();
+  }, LANE_POLL_MS);

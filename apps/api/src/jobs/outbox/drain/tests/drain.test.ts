@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { claimLane, holdsLane, laneKey } from '#/jobs/lanes';
+import { claimLane, laneKey, watchLane } from '#/jobs/lanes';
 import {
   flushOutbox,
   isOverflowing,
@@ -184,16 +184,27 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 
-  it('supersede lanes are handler-scoped — same dedupeKey, different handler, no cross-abort', async () => {
+  it('supersede lanes are handler-scoped — usurping one lane leaves another handler untouched', async () => {
     const laneA = laneKey('handlerA', 'shared');
     const laneB = laneKey('handlerB', 'shared');
+    let aUsurped = false;
+    let bUsurped = false;
     await claimLane(laneA, 'jobA');
     await claimLane(laneB, 'jobB');
+    const stopA = watchLane(laneA, 'jobA', () => {
+      aUsurped = true;
+    });
+    const stopB = watchLane(laneB, 'jobB', () => {
+      bUsurped = true;
+    });
 
-    await claimLane(laneA, 'jobA2'); // a newer job claims lane A only
+    await claimLane(laneA, 'jobA2'); // a newer job takes lane A's baton
+    await new Promise((r) => setTimeout(r, 700)); // > one poll
+    stopA();
+    stopB();
 
-    expect(await holdsLane(laneA, 'jobA')).toBe(false); // A superseded
-    expect(await holdsLane(laneB, 'jobB')).toBe(true); // B's lane (different handler) untouched
+    expect(aUsurped).toBe(true);
+    expect(bUsurped).toBe(false); // different handler's lane — untouched
   });
 
   it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {

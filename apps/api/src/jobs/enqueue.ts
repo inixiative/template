@@ -49,14 +49,11 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
+  const jobId = jobOptions.jobId ?? id ?? uuidv7();
 
-  // Overflow buffer — adhoc only; cron/cronTrigger and `bypass` go straight to BullMQ (outbox.ts).
-  // isOverflowing() is only probed for spill-eligible jobs (no Redis GET on cron/bypass).
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {
-    // Supersession for spilled jobs is handled at drain admission — signalling here would cancel the
-    // prior job ~a tick before its replacement is admitted (a window with no job in flight).
-    const jobId = jobOptions.jobId ?? id ?? uuidv7();
+    // spilled jobs claim their lane at drain admission, not here
     await spillToOutbox({
       handlerName,
       jobId,
@@ -68,13 +65,10 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
-  // Direct path only (spilled jobs claim their lane at drain admission). No fixed jobId for a
-  // superseding job — BullMQ would dedupe + drop the new payload; the lane claim supersedes the prior.
-  const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
-  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), job.id ?? '');
-  if (type === JobType.adhoc) await tripIfFull(); // set the flag if this add crossed the cap
+  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
+  if (type === JobType.adhoc) await tripIfFull();
 
-  log.info(`Enqueued job ${handlerName} (${job.id})`);
-
-  return { jobId: job.id, name: job.name };
+  log.info(`Enqueued job ${handlerName} (${jobId})`);
+  return { jobId, name: handlerName };
 };

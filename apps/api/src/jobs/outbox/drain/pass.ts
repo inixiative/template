@@ -35,13 +35,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
           try {
             const data = row.data as JobData;
             const opts = (row.options ?? {}) as JobsOptions;
-            if (data.dedupeKey) {
-              // Superseding: claim the lane for the re-admitted copy so the prior in-flight one aborts.
-              const job = await queue.add(row.handlerName, data, opts);
-              await claimLane(laneKey(row.handlerName, data.dedupeKey), job.id ?? '');
-            } else {
-              await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
-            }
+            await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
+            if (data.dedupeKey) await claimLane(laneKey(row.handlerName, data.dedupeKey), row.jobId);
             drained.push(row.id);
           } catch (e) {
             failed.push(row.id);
@@ -73,8 +68,7 @@ export const runDrainOutboxPass = async (): Promise<void> => {
 
     const depth = await queueDepth(true);
     if (depth < lowWater()) {
-      // Hold the flag while admittable backlog remains, else new enqueues bypass the buffer and jump
-      // the FIFO. Quarantined rows don't count; reset them on full recovery for one more chance.
+      // clear only with no admittable backlog left, else a fresh enqueue jumps the buffered FIFO
       const admittable = await db.jobOutbox.count({ where: { attempts: { lt: MAX_DRAIN_ATTEMPTS } } });
       if (admittable === 0) {
         await db.jobOutbox.updateManyAndReturn({

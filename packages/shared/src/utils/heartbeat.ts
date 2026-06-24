@@ -1,10 +1,8 @@
 type HeartbeatOptions = { onError?: (err: unknown) => void };
 
-// A self-managing timer loop: runs `beat` every `intervalMs`, scheduling each run only AFTER the
-// previous one settles (recursive setTimeout, not setInterval) so an async beat slower than the
-// interval can never overlap itself. Beat rejections go to `onError`, never unhandled. Returns a
-// stop() that cancels the pending tick and prevents reschedule. No trailing beat on stop — a caller
-// that needs a final action runs it after stop().
+// A self-managing timer loop: runs `beat` every `intervalMs`, scheduling the next only after the
+// previous settles (no overlap of a slow async beat), routing rejections to `onError`. Returns
+// stop(); no trailing beat.
 export const heartbeat = (
   beat: () => Promise<void> | void,
   intervalMs: number,

@@ -5,8 +5,7 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { heartbeat } from '@template/shared/utils';
-import { holdsLane, laneKey } from '#/jobs/lanes';
+import { laneKey, watchLane } from '#/jobs/lanes';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
@@ -26,10 +25,7 @@ export const makeSupersedingJob = <TPayload = void>(
       abortController.signal.addEventListener('abort', () => reject(new SupersededError(job.id)));
     });
 
-    // Poll our lane — once a newer job claims it we're no longer the holder, so abort.
-    const stop = heartbeat(async () => {
-      if (!(await holdsLane(lane, job.id ?? ''))) abortController.abort(new SupersededError(job.id));
-    }, 500);
+    const stopWatch = watchLane(lane, job.id!, () => abortController.abort(new SupersededError(job.id)));
 
     try {
       return await Promise.race([handler({ ...ctx, signal: abortController.signal }, ...args), abortPromise]);
@@ -37,7 +33,7 @@ export const makeSupersedingJob = <TPayload = void>(
       if (err instanceof SupersededError || (err instanceof Error && err.name === 'AbortError')) return;
       throw err;
     } finally {
-      stop();
+      stopWatch();
     }
   };
   h.dedupeKeyFn = dedupeKeyFn;
