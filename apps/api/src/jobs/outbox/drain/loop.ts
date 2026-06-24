@@ -34,7 +34,6 @@ const drainTick = async (): Promise<void> => {
 export const startOutboxDrainLoop = (): void => {
   if (drainTimer) return;
   drainTimer = setInterval(() => void drainTick(), DRAIN_INTERVAL_MS);
-  drainTimer.unref?.(); // don't keep the process alive for the drain alone
   log.info('Started overflow-buffer drain loop (in-process, every 15s)', LogScope.job);
 };
 
