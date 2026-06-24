@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { redisNamespace } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
+import { claimLane, holdsLane, laneKey } from '#/jobs/lanes';
 import {
   flushOutbox,
   isOverflowing,
@@ -11,7 +12,6 @@ import {
   tripIfFull,
 } from '#/jobs/outbox';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
-import { laneKey, signalSupersededLanes } from '#/jobs/outbox/supersede';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -185,14 +185,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('supersede lanes are handler-scoped — same dedupeKey, different handler, no cross-abort', async () => {
-    await ctx.queue.add('handlerA', { type: JobType.adhoc, payload: {}, dedupeKey: 'shared' });
-    await ctx.queue.add('handlerB', { type: JobType.adhoc, payload: {}, dedupeKey: 'shared' });
+    const laneA = laneKey('handlerA', 'shared');
+    const laneB = laneKey('handlerB', 'shared');
+    await claimLane(laneA, 'jobA');
+    await claimLane(laneB, 'jobB');
 
-    await signalSupersededLanes(new Set([laneKey('handlerA', 'shared')]));
+    await claimLane(laneA, 'jobA2'); // a newer job claims lane A only
 
-    const supersededKey = (id: string) => `${redisNamespace.job}:superseded:${id}`;
-    expect(await ctx.queue.redis.get(supersededKey('handlerA-0'))).toBe('1');
-    expect(await ctx.queue.redis.get(supersededKey('handlerB-1'))).toBeNull();
+    expect(await holdsLane(laneA, 'jobA')).toBe(false); // A superseded
+    expect(await holdsLane(laneB, 'jobB')).toBe(true); // B's lane (different handler) untouched
   });
 
   it('bumps a failed re-enqueue and keeps draining the rest (no batch stranding)', async () => {

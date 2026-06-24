@@ -5,7 +5,7 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { redisNamespace } from '@template/db';
+import { holdsLane, laneKey } from '#/jobs/lanes';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
@@ -17,17 +17,17 @@ export const makeSupersedingJob = <TPayload = void>(
   dedupeKeyFn: (payload: TPayload) => string,
 ): SupersedingJobHandler<TPayload> => {
   const h: SupersedingJobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
-    const { queue, job } = ctx;
-    const redis = queue.redis;
-    const supersededKey = `${redisNamespace.job}:superseded:${job.id}`;
+    const { job } = ctx;
+    const lane = laneKey(job.name, dedupeKeyFn(args[0] as TPayload));
     const abortController = new AbortController();
 
     const abortPromise = new Promise<never>((_, reject) => {
       abortController.signal.addEventListener('abort', () => reject(new SupersededError(job.id)));
     });
 
+    // Poll our lane — once a newer job claims it we're no longer the holder, so abort.
     const checkInterval = setInterval(async () => {
-      if (await redis.get(supersededKey)) {
+      if (!(await holdsLane(lane, job.id ?? ''))) {
         abortController.abort(new SupersededError(job.id));
         clearInterval(checkInterval);
       }
@@ -40,7 +40,6 @@ export const makeSupersedingJob = <TPayload = void>(
       throw err;
     } finally {
       clearInterval(checkInterval);
-      await redis.del(supersededKey).catch(() => {});
     }
   };
   h.dedupeKeyFn = dedupeKeyFn;

@@ -10,8 +10,9 @@ import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
 import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
+import { claimLane, laneKey } from '#/jobs/lanes';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
-import { isOverflowing, shouldSpill, signalSupersededJobs, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
@@ -67,10 +68,10 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
-  // Direct path only: abort the prior in-flight copy now (spilled jobs supersede at drain admission).
-  if (dedupeKey) await signalSupersededJobs(handlerName, dedupeKey);
-  // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
+  // Direct path only (spilled jobs claim their lane at drain admission). No fixed jobId for a
+  // superseding job — BullMQ would dedupe + drop the new payload; the lane claim supersedes the prior.
   const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
+  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), job.id ?? '');
   if (type === JobType.adhoc) await tripIfFull(); // set the flag if this add crossed the cap
 
   log.info(`Enqueued job ${handlerName} (${job.id})`);

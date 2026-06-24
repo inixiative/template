@@ -7,11 +7,11 @@
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
+import { claimLane, laneKey } from '#/jobs/lanes';
 import { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
 import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { queueDepth } from '#/jobs/outbox/queueDepth';
-import { laneKey, signalSupersededLanes } from '#/jobs/outbox/supersede';
 import { queue } from '#/jobs/queue';
 import type { JobData } from '#/jobs/types';
 
@@ -29,21 +29,19 @@ export const runDrainOutboxPass = async (): Promise<void> => {
           take: room,
         });
 
-        const lanes = new Set<string>();
-        for (const row of rows) {
-          const dedupeKey = (row.data as JobData).dedupeKey;
-          if (dedupeKey) lanes.add(laneKey(row.handlerName, dedupeKey));
-        }
-        await signalSupersededLanes(lanes);
-
         const drained: string[] = [];
         const failed: string[] = [];
         for (const row of rows) {
           try {
             const data = row.data as JobData;
             const opts = (row.options ?? {}) as JobsOptions;
-            if (data.dedupeKey) await queue.add(row.handlerName, data, opts);
-            else await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
+            if (data.dedupeKey) {
+              // Superseding: claim the lane for the re-admitted copy so the prior in-flight one aborts.
+              const job = await queue.add(row.handlerName, data, opts);
+              await claimLane(laneKey(row.handlerName, data.dedupeKey), job.id ?? '');
+            } else {
+              await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
+            }
             drained.push(row.id);
           } catch (e) {
             failed.push(row.id);

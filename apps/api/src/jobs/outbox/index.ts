@@ -15,5 +15,4 @@ export {
 } from '#/jobs/outbox/flag';
 export { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 export { queueDepth } from '#/jobs/outbox/queueDepth';
-export { signalSupersededJobs, signalSupersededLanes } from '#/jobs/outbox/supersede';
 export { type OutboxRow, shouldSpill } from '#/jobs/outbox/types';
