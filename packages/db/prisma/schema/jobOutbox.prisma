@@ -7,11 +7,13 @@ model JobOutbox {
   dedupeKey   String? // superseding lane; null for plain adhoc fan-out
   data        Json // JobData: { type, id, payload, dedupeKey }
   options     Json? // jobOptions (attempts, backoff, priority) for a faithful re-enqueue
+  attempts    Int     @default(0) // drain re-enqueue failures (distinct from options.attempts); the drain quarantines a row past a threshold so a poison row at the FIFO head can't starve newer rows
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  // uuidv7 id is time-ordered, so `orderBy: { id: 'asc' }` is the FIFO drain order — no separate index needed.
+  // uuidv7 id is time-ordered, so `orderBy: { id: 'asc' }` is the FIFO drain order.
   @@unique([handlerName, dedupeKey]) // one buffered row per superseding lane — upsert target (nulls are distinct, so fan-out rows don't collide)
+  @@index([attempts, id]) // backs the drain's "skip quarantined (attempts >= cap), then oldest-first" fetch
 }

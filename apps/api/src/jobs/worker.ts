@@ -14,6 +14,7 @@ import { registerHooks } from '#/hooks';
 import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { flushOutbox } from '#/jobs/outbox';
+import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
@@ -89,10 +90,17 @@ export const initializeWorker = async (): Promise<void> => {
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+
+  // Per-worker in-process drain (not a queued cron — see outbox/drain/loop.ts). Drop any stale queued
+  // repeatable from a prior cron-driven version so the worker can't run a handler that no longer exists.
+  await queue.removeJobScheduler('drainOutbox').catch(() => {});
+  startOutboxDrainLoop();
+
   await enqueueJob('rotateEncryptionKeys', undefined, { id: 'rotateEncryptionKeys' });
 
   onShutdown(async () => {
     log.info('Stopping job worker...', LogScope.worker);
+    stopOutboxDrainLoop(); // stop arming new drain ticks before tearing down the worker/queue
     if (jobsWorker) await jobsWorker.close(); // stop processing first — no new spills from finishing jobs
     await flushOutbox(); // then persist any buffered overflow spills
     if (workerRedis) await workerRedis.quit();
