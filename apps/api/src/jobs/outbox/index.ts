@@ -1,6 +1,6 @@
 // Durable overflow buffer in front of BullMQ. When queue depth crosses a cap an "overflow" flag
-// flips and adhoc enqueues spill to the JobOutbox table instead of Redis; the drain cron meters
-// them back in. See docs/design/jobs-overflow-buffer.md. Concerns split across this folder; this
+// flips and adhoc enqueues spill to the JobOutbox table instead of Redis; the per-worker drain loop
+// (outbox/drain) meters them back in. See tickets/INFRA-021. Concerns split across this folder; this
 // barrel is the public surface.
 
 export { flushOutbox, spillToOutbox } from '#/jobs/outbox/accumulator';
