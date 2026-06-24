@@ -222,9 +222,9 @@ export const syncData = makeSupersedingJob(
 ```
 
 How it works:
-1. New job enqueued → signals all matching jobs via `job:superseded:{jobId}` Redis key
-2. Running jobs poll for supersede flag every 500ms
-3. Superseded jobs abort via `ctx.signal` and exit gracefully
+1. Enqueue/drain claims the lane: `claimLane(job:lane:{handler}:{dedupeKey}, jobId)` (last claim wins)
+2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
+3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
 ---
 

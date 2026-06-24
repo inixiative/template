@@ -49,11 +49,10 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
-  const jobId = jobOptions.jobId ?? id ?? uuidv7();
+  const jobId = jobOptions.jobId ?? uuidv7();
 
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {
-    // spilled jobs claim their lane at drain admission, not here
     await spillToOutbox({
       handlerName,
       jobId,
@@ -65,8 +64,8 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
-  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
   if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
+  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
   if (type === JobType.adhoc) await tripIfFull();
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);

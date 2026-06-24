@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf primitive:shared
+ * @uses none
+ */
 type HeartbeatOptions = { onError?: (err: unknown) => void };
 
 // A self-managing timer loop: runs `beat` every `intervalMs`, scheduling the next only after the

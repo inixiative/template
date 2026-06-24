@@ -59,7 +59,7 @@ Full architecture in the **Design** section below.
 
 ### Dedupe-aware spill
 - [x] Adhoc (null key) → `createMany({ skipDuplicates })`; keyed (superseding) → `upsert`
-- [x] `signalSupersededJobs` reconciles across queue + outbox
+- [x] supersession reconciles across queue + outbox via per-lane claim (claimLane / watchLane)
 
 ### Drain (`runDrainOutboxPass` + `startOutboxDrainLoop`) — see INFRA-022
 - [x] Per-worker in-process loop (`createLock`-backed), every 15s — **not** a queued cron
@@ -284,10 +284,10 @@ many superseding jobs at once). Instead the dedup happens *in the flush*, in one
   resolves a lane collision by keeping whichever **commits first**, which can keep the *stale*
   payload and drop the latest with no error. Still one batched flush, one txn — the upsert is per
   distinct lane in the batch (lanes are low-volume), not per spill.
-- **Supersede spans queue *and* outbox.** On the *direct* path `signalSupersededJobs` aborts the
-  in-flight BullMQ copy; the flush's upsert collapses buffered copies; the drain re-signals on
-  re-admit. (The direct-path signal is *not* fired on the spill path — that would cancel the prior
-  ~a tick before its replacement is admitted, leaving a no-job gap.) Invariant: **at most one
+- **Supersede spans queue *and* outbox.** On the *direct* path the enqueue claims the lane, so the
+  prior in-flight copy sees a new holder and aborts; the flush's upsert collapses buffered copies; the
+  drain re-claims on re-admit. (The spill path does *not* claim — that would usurp the prior ~a tick
+  before its replacement is admitted, leaving a no-job gap.) Invariant: **at most one
   buffered row per superseding lane**, and the latest wins.
 
 This keeps a single batched write path regardless of job mix — N superseding jobs in a window
@@ -331,9 +331,9 @@ runDrainOutboxPass = async () => {               # createLock (in the loop) guar
   list before the prioritized set, so a prioritized drain runs last.
 - **Tops up *to* the cap** (`room = cap − depth`), self-pacing to fleet throughput without knowing
   fleet size. One drainer (via `createLock`), so the select stays plain — no `FOR UPDATE SKIP LOCKED`.
-- **Re-enqueues with the stored `jobId`** (plain adhoc) or re-signals + adds without a fixed jobId
-  (superseding) — see §10. The drain calls `queue.add` **directly**, not `enqueueJob`, so it bypasses
-  its own cap.
+- **Re-enqueues with the stored `jobId`**; superseding rows additionally re-claim their lane so the
+  prior in-flight copy aborts — see §10. The drain calls `queue.add` **directly**, not `enqueueJob`, so
+  it bypasses its own cap.
 - **Quarantine.** A row that fails re-enqueue bumps an `attempts` counter (via `updateManyAndReturn` —
   the bare `updateMany` is banned by the mutationLifeCycle extension); past a threshold the
   `attempts < CAP` filter skips it, so a poison row at the FIFO head can't occupy a small `room` batch
@@ -352,9 +352,9 @@ runDrainOutboxPass = async () => {               # createLock (in the loop) guar
   completed job's id is evicted under load (exactly when overflow happens), after which a replay is
   accepted and the job runs twice. So the jobId narrows the window but is **not** an exactly-once
   fence; job handlers must tolerate re-execution. (`createLock` only guarantees one drainer.)
-- **Superseding rows drain through the same supersession path** — the drain calls
-  `signalSupersededJobs(dedupeKey)` and adds without a fixed jobId, so the abort flag (not jobId
-  dedup) governs supersession, matching the direct enqueue path.
+- **Superseding rows drain through the same supersession path** — the drain re-claims the lane
+  (`claimLane`) on re-admit, so a newer claim (not jobId dedup) governs supersession, matching the
+  direct enqueue path.
 - **Spill resolves on commit** (§6) — no in-memory loss window. The shutdown `flushOutbox` awaits and
   *observes* the in-flight flush (logs/throws on failure), and runs **after** intake stops (server
   stopped / worker closed) so no new spill races it; it's wired into both the worker and the API

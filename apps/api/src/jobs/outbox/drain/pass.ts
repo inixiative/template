@@ -35,8 +35,8 @@ export const runDrainOutboxPass = async (): Promise<void> => {
           try {
             const data = row.data as JobData;
             const opts = (row.options ?? {}) as JobsOptions;
-            await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             if (data.dedupeKey) await claimLane(laneKey(row.handlerName, data.dedupeKey), row.jobId);
+            await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             drained.push(row.id);
           } catch (e) {
             failed.push(row.id);
