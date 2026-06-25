@@ -1,4 +1,4 @@
-import { createPrivateKey, generateKeyPairSync, randomBytes } from 'crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes } from 'crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
@@ -232,11 +232,20 @@ export const setupInfisical = async (
           environment: step.environment,
           path: '/api',
         });
-        // Must be a usable RSA key (sendWebhook.ts signs with RSA-SHA256); a missing,
-        // malformed, or wrong-type (e.g. ed25519) key self-heals even if marked complete.
-        hasValidKey = !!existing && createPrivateKey(existing).asymmetricKeyType === 'rsa';
+        const existingPublic = await getSecretAsync('WEBHOOK_SIGNING_PUBLIC_KEY', {
+          projectId,
+          environment: step.environment,
+          path: '/api',
+        });
+        // Must be a usable RSA key (sendWebhook.ts signs with RSA-SHA256) AND the stored public key
+        // must match it; a missing, malformed, wrong-type (e.g. ed25519), or mismatched-pair key
+        // self-heals even if marked complete (a valid-but-mismatched pair breaks every receiver).
+        const privateObj = createPrivateKey(existing);
+        const derivedPublic = createPublicKey(privateObj).export({ type: 'spki', format: 'pem' });
+        const storedPublic = createPublicKey(existingPublic).export({ type: 'spki', format: 'pem' });
+        hasValidKey = !!existing && privateObj.asymmetricKeyType === 'rsa' && derivedPublic === storedPublic;
       } catch {
-        // Missing or non-RSA key — regenerate.
+        // Missing, non-RSA, or mismatched-pair key — regenerate.
       }
 
       if (hasValidKey && (await isComplete('infisical', step.action))) continue;
