@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { castArray } from 'lodash-es';
 import { LogScope, log } from '@template/shared/logger';
 
 export enum DbAction {
@@ -61,7 +62,7 @@ const hookRegistry = new Set<string>();
 
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
-  model: string | '*',
+  model: string | string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
@@ -77,14 +78,16 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
 
-  registeredHooks[model] ??= {
-    [HookTiming.before]: {},
-    [HookTiming.after]: {},
-  };
+  for (const target of castArray(model)) {
+    registeredHooks[target] ??= {
+      [HookTiming.before]: {},
+      [HookTiming.after]: {},
+    };
 
-  for (const action of actions) {
-    registeredHooks[model][timing][action] ??= [];
-    registeredHooks[model][timing][action]!.push(hook as HookFunction);
+    for (const action of actions) {
+      registeredHooks[target][timing][action] ??= [];
+      registeredHooks[target][timing][action]!.push(hook as HookFunction);
+    }
   }
 };
 
