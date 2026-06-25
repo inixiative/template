@@ -181,6 +181,42 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Generate worktree .env.local from main's .env.local with slot rewrites
 # ---------------------------------------------------------------------------
+
+# Rewrite the database-name segment of DATABASE_URL in a file to $2, preserving
+# scheme://user:pw@host:port and any ?query. No-op when the file has no
+# DATABASE_URL. In this monorepo the URL lives in different files per env (root
+# .env.test vs apps/api/.env.local), so we rewrite wherever it appears rather than
+# appending it to one fixed file.
+rewrite_database_url() {
+  local file="$1" db="$2"
+  [ -f "$file" ] && grep -q '^DATABASE_URL=' "$file" || return 0
+  sedi -E "s|^(DATABASE_URL=[a-z]+://[^@]+@[^/]+/)[^?[:space:]]*|\1${db}|" "$file"
+}
+
+# Point a localhost REDIS_URL/REDIS_QUEUE_URL at this slot's logical DB ($2).
+# Leaves the 'noop' test sentinel and any non-localhost host untouched.
+rewrite_redis_db() {
+  local file="$1" n="$2"
+  [ -f "$file" ] || return 0
+  sedi -E "s#^(REDIS(_QUEUE)?_URL=redis://([^@/]*@)?(localhost|127\.0\.0\.1):[0-9]+)(/[0-9]+)?[[:space:]]*\$#\1/${n}#" "$file"
+}
+
+# Copy each apps/<app>/.env.<kind> present in main into the worktree (these files
+# are gitignored, so a fresh checkout has none) and slot-localize DATABASE_URL +
+# REDIS. Without this the worktree has no apps/api/.env.test — so the API's env
+# validation (encryption keys) fails — and apps/api/.env.local keeps main's DB.
+localize_app_envs() {
+  local kind="$1" db="$2"
+  for src in "$ROOT_DIR"/apps/*/.env."$kind"; do
+    [ -f "$src" ] || continue
+    local dst="$WORKTREE_DIR/${src#"$ROOT_DIR"/}"
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    rewrite_database_url "$dst" "$db"
+    rewrite_redis_db "$dst" "$REDIS_DB"
+  done
+}
+
 MAIN_ENV="$ROOT_DIR/.env.local"
 if [ ! -f "$MAIN_ENV" ]; then
   echo -e "${RED}Error: $MAIN_ENV not found. Run 'bun run setup' (or sync-env) first.${NC}"
@@ -212,19 +248,22 @@ ensure_env_var "WEB_URL"        "http://localhost:${WEB_PORT}"
 ensure_env_var "ADMIN_URL"      "http://localhost:${ADMIN_PORT}"
 ensure_env_var "SUPERADMIN_URL" "http://localhost:${SUPERADMIN_PORT}"
 
-# Database (preserves protocol + auth + host from main, swaps the DB name)
-DB_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
-ensure_env_var "DATABASE_URL" "${DB_HOST_USER}/${DB_LOCAL}"
+# Database — rewrite DATABASE_URL in place wherever it lives. The local DB URL is
+# in apps/api/.env.local (handled by localize_app_envs below); this covers any
+# root-level DATABASE_URL (root-env stacks) and is a no-op when there is none.
+rewrite_database_url "$WT_ENV" "$DB_LOCAL"
 
 # Storage buckets — slot-isolated
 ensure_env_var "STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_SYSTEM"
 ensure_env_var "STORAGE_BUCKET_USER"   "$STORAGE_BUCKET_USER"
 
-# Redis — append /N to logical DB if a REDIS_URL is present
-if grep -q '^REDIS_URL=' "$WT_ENV"; then
-  REDIS_BASE="$(grep -m1 '^REDIS_URL=' "$WT_ENV" | sed -E 's|^REDIS_URL=(redis://[^/]+)(/[0-9]+)?|\1|')"
-  ensure_env_var "REDIS_URL" "${REDIS_BASE}/${REDIS_DB}"
-fi
+# Redis — point any localhost REDIS_URL at this slot's logical DB (root, if present).
+rewrite_redis_db "$WT_ENV" "$REDIS_DB"
+
+# App-level env: with-env composes root then apps/<app>/.env.local, and the local
+# DATABASE_URL lives in apps/api/.env.local — so the slot DB must be written there,
+# and these gitignored files must be created in the worktree.
+localize_app_envs local "$DB_LOCAL"
 
 # ---------------------------------------------------------------------------
 # 5. Generate worktree .env.test
@@ -246,13 +285,17 @@ if [ -f "$MAIN_TEST_ENV" ]; then
     fi
   }
 
-  TEST_HOST_USER="$(grep -m1 '^DATABASE_URL=' "$MAIN_TEST_ENV" | sed -E 's|^DATABASE_URL=([^/]+://[^@]+@[^/]+)/.*|\1|')"
-  ensure_test_env_var "DATABASE_URL"          "${TEST_HOST_USER}/${DB_TEST}"
+  rewrite_database_url "$WT_TEST_ENV" "$DB_TEST"
   ensure_test_env_var "STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_SYSTEM_TEST"
   ensure_test_env_var "STORAGE_BUCKET_USER"   "$STORAGE_BUCKET_USER_TEST"
 else
-  echo -e "${YELLOW}Warning: $MAIN_TEST_ENV not found, skipping .env.test generation${NC}"
+  echo -e "${YELLOW}Warning: $MAIN_TEST_ENV not found, skipping root .env.test generation${NC}"
 fi
+
+# App-level test env: apps/api/.env.test carries the encryption keys the API's env
+# validation requires (and, for some stacks, the test DATABASE_URL). Generate these
+# regardless of whether the root .env.test existed.
+localize_app_envs test "$DB_TEST"
 
 # ---------------------------------------------------------------------------
 # 6. Create Postgres databases

@@ -153,6 +153,9 @@ CLAUDE.local.md
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 
+# bun run worktree:create checkouts (per-machine; never commit worktree trees)
+.worktrees/
+
 # Template internal config (for template development only)
 project.config.template-internal.ts
 
