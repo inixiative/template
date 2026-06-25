@@ -168,6 +168,37 @@ describe('sendWebhook handler', () => {
       expect(event?.error).toContain('500');
     });
 
+    it('blocks a redirect instead of following it (SSRF)', async () => {
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.resolve(new Response('', { status: 302, statusText: 'Found' }))) as typeof fetch);
+
+      const testUrl = getUniqueUrl('/redirect');
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: testUrl,
+        model: 'CustomerRef',
+      });
+
+      await sendWebhook(
+        { db, log: mockLog },
+        {
+          subscriptionId: sub.id,
+          action: 'create',
+          resourceId: user.id,
+          data: { id: user.id },
+          timestamp: eventTimestamp,
+        },
+      );
+
+      const event = await db.webhookEvent.findFirst({
+        where: { webhookSubscriptionId: sub.id },
+      });
+      expect(event).not.toBeNull();
+      expect(event?.status).toBe('error');
+      expect(event?.error).toContain('Blocked redirect');
+    });
+
     it('creates error event on network failure', async () => {
       spyOn(globalThis, 'fetch').mockImplementation((() =>
         Promise.reject(new Error('Connection refused'))) as typeof fetch);
