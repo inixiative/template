@@ -45,10 +45,17 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
       body: bodyJson,
+      // Never follow redirects: the URL passed SSRF validation at registration, but a
+      // 3xx hop has not — following it would let a receiver bounce us to an internal
+      // address (e.g. cloud metadata) and POST the signed body there.
+      redirect: 'manual',
       signal: AbortSignal.timeout(5000),
     });
 
-    if (!response.ok) {
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      error = `Blocked redirect from webhook URL (HTTP ${response.status})`;
+      status = 'error';
+    } else if (!response.ok) {
       error = `HTTP ${response.status}: ${response.statusText}`;
       status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
     }
