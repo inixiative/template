@@ -33,6 +33,7 @@ If you're evaluating the template or wondering how it stacks up against managed 
 
 ## Documentation
 
+- [Vocabulary](https://www.inixiative.com/vocabulary.html) - Every primitive across the ecosystem and this template, with what it solves and how it works
 - [Developer Guide](docs/claude/DEVELOPER.md) - Setup and tools
 - [Environments](docs/claude/ENVIRONMENTS.md) - Environment configuration
 - [Architecture](docs/claude/ARCHITECTURE.md) - Project structure
