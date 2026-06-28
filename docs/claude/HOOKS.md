@@ -278,7 +278,7 @@ export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
 
 ## Cache Invalidation
 
-Automatic cache clearing on mutations via `CACHE_REFERENCE`.
+Automatic cache clearing on mutations via `cacheReference`.
 
 **Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
 
@@ -286,7 +286,7 @@ Automatic cache clearing on mutations via `CACHE_REFERENCE`.
 
 ```typescript
 // hooks/cache/constants/cacheReference.ts
-export const CACHE_REFERENCE: CacheReference = {
+export const cacheReference: CacheReference = {
   User: (r) => [
     cacheKey('User', r.id),
     cacheKey('User', r.email, ['email']),

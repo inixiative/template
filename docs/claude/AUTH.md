@@ -252,20 +252,14 @@ model AuthProvider {
 **All sensitive data is encrypted** using AES-256-GCM:
 
 ```typescript
-import { encryptionService } from '@template/shared/lib/encryption';
+import { encryptField, decryptField } from '@template/db/lib/encryption/helpers';
 
-// Encrypt secrets
-const { encryptedData, version } = encryptionService.encrypt(
-  { clientSecret: 'secret', certificate: 'cert' },
-  `authProvider:${providerId}`,  // AAD binds ciphertext to context
-);
+// Encrypt secrets (AAD is bound automatically from the ENCRYPTED_MODELS config)
+const encrypted = await encryptField('authProvider', 'secrets', { ...data, secrets });
+// → { encryptedSecrets, secretsMetadata, secretsKeyVersion }
 
 // Decrypt
-const secrets = encryptionService.decrypt(
-  encryptedData,
-  `authProvider:${providerId}`,
-  version,
-);
+const secrets = await decryptField('authProvider', 'secrets', authProvider);
 ```
 
 **Security Features:**

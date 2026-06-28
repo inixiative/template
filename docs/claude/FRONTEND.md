@@ -269,7 +269,7 @@ export const createAuthGuards = (getStore: () => AuthStore) => ({
       });
     }
   },
-  requireGuest: (context?) => {
+  requirePublic: (context?) => {
     const isAuthenticated = getStore().auth.isAuthenticated;
     if (isAuthenticated) {
       throw redirect({
@@ -287,7 +287,7 @@ export const createAuthGuards = (getStore: () => AuthStore) => ({
 import { createAuthGuards } from '@template/ui/guards';
 import { useAppStore } from '@template/ui/store';
 
-export const { requireAuth, requireGuest } = createAuthGuards(() => useAppStore.getState());
+export const { requireAuth, requirePublic } = createAuthGuards(() => useAppStore.getState());
 ```
 
 **Usage in Routes:**
@@ -301,7 +301,7 @@ export const Route = createFileRoute('/_authenticated')({
 
 // apps/web/app/routes/login.tsx
 export const Route = createFileRoute('/login')({
-  beforeLoad: (ctx) => requireGuest(ctx), // Redirect if already logged in
+  beforeLoad: (ctx) => requirePublic(ctx), // Redirect if already logged in
   component: LoginPage,
 });
 ```
@@ -1217,10 +1217,9 @@ export const OrganizationsPage = () => {
   const { data: response } = useQuery(meReadManyOrganizationsOptions());
   const organizations = response?.data || [];
 
-  const deleteMutation = useOptimisticListMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: (vars) => organizationsDeleteMutation({ path: { id: vars.id } }),
-    queryKey: meReadManyOrganizationsQueryKey(),
-    operation: 'delete',
+    targets: [createOptimisticListTarget({ queryKey: meReadManyOrganizationsQueryKey(), operation: 'delete' })],
   });
 
   return (
@@ -1735,10 +1734,9 @@ const editBtn = usePermission({
 **For Lists:**
 
 ```typescript
-const deleteMutation = useOptimisticListMutation({
+const deleteMutation = useOptimisticMutation({
   mutationFn: (vars) => api.delete(vars.id),
-  queryKey: ['organizations'],
-  operation: 'delete', // 'create' | 'update' | 'delete'
+  targets: [createOptimisticListTarget({ queryKey: ['organizations'], operation: 'delete' })], // 'create' | 'update' | 'delete'
 });
 
 deleteMutation.mutate(org);
@@ -2105,10 +2103,9 @@ const editBtn = usePermission({ permissions, model: 'organization', record: org,
 ### 4. Optimistic Mutations
 
 ```typescript
-const deleteMutation = useOptimisticListMutation({
+const deleteMutation = useOptimisticMutation({
   mutationFn: (vars) => api.delete(vars.id),
-  queryKey: ['organizations'],
-  operation: 'delete',
+  targets: [createOptimisticListTarget({ queryKey: ['organizations'], operation: 'delete' })],
 });
 
 deleteMutation.mutate(org);  // Optimistically updates UI, rolls back on error

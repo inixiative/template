@@ -187,7 +187,7 @@ Admin does NOT support context locking - operators need full context switching t
 
 **State & Routing:**
 - All apps use the same shared Zustand store (6 slices)
-- TanStack Router with guards (`requireAuth`, `requireGuest`)
+- TanStack Router with guards (`requireAuth`, `requirePublic`)
 - Permission checks integrated at route and component level
 - Context switching logic shared between Web/Admin
 
