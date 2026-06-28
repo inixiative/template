@@ -93,7 +93,7 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 
 ## Resources
 
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md)
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md)
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md)
 - [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md)
@@ -102,7 +102,7 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 
 ## Related Tickets
 
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md)
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md)
 - [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md)
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md)

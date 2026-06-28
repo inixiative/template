@@ -1,12 +1,14 @@
 # INFRA-017: Builder Surface — Exposed Surface + Projection + describeRule
 
-**Status**: 🚧 In Progress
+**Status**: 🚧 In Progress (exposedSurface + describeRule shipped & published; sourceValues-folding projection landed in 2.10.0; ref-id serializable lens form still deferred to INFRA-016)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-06-13
-**Updated**: 2026-06-13
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: json-rules **2.8.0 published** (was "awaiting npm publish") — `exposedSurface` + `describeRule` are live on npm. Subsequent releases extended this surface: **2.9.0** added per-field eligibility (`sources?: Record<field, Condition>` on the narrowing) + `sourceQueries(lens)` (DISTINCT compiler, Prisma + SQL, SQL degrading to `null` on array-condition predicates); **2.10.0** taught `exposedSurface(lens, { sourceValues })` and `projectByPath(lens, { sourceValues })` to fold fetched option lists into the projection (per-model union / per-path exact) under a canonical `SourceValues = { path, mapName, model, field, values }` and a serializable `{ lens, sourceValues }` wire shape. The serializable **projection surface** (Objectives, last `[ ]`) is therefore partly delivered — sourceValues riding the projection is in — but the **ref-id serializable lens form** (`parent`-as-id + registry resolution) is still deferred to INFRA-016 and unbuilt. Template installs `^2.10.0`._
 
 ## Overview
 
@@ -92,8 +94,10 @@ Roles, kept distinct: `exposedSurface`/projection = *what to show*;
 - [x] `exposedSurface` shipped with tests
 - [x] `describeRule` shipped with tests
 - [x] 2.8.0 cut (version + CHANGELOG + README + LENS docs), committed & pushed
-      (cda7460); awaiting `npm publish`
-- [ ] Serializable projection surface shipped (deferred — see Objectives)
+      (cda7460); **published to npm 2026-06-27** (2.8.0 → 2.9.0 → 2.10.0 all live)
+- [~] Serializable projection surface — `sourceValues`-folding projection + wire
+      shape `{ lens, sourceValues }` shipped in 2.10.0; ref-id lens form still
+      deferred to INFRA-016
 
 ## Related Tickets
 

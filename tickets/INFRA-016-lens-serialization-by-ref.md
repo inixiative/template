@@ -4,9 +4,11 @@
 **Assignee**: Aron
 **Priority**: Medium (High for persistence + multi-tenant delegation; NOT on the first rules-builder critical path — the surface can ship as server-provided JSON first)
 **Created**: 2026-06-13
-**Updated**: 2026-06-13
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: still Not Started — no `serializeLens`/`deserializeLens`, no `SerializedLens`/`SerializedNarrowing`, no `seal`, and no `sourceRefs`/`bridgeRefs` ref-id form shipped. Note for disambiguation: json-rules 2.10.0 added a serializable `{ lens, sourceValues }` wire shape for the builder surface — but that is the **object form** this ticket already calls "works today" (axis 1's left column), carrying inline maps, **not** the ref-id form. The ref-id serialization + `seal` (this ticket's actual scope) remain unbuilt._
 
 ## Overview
 

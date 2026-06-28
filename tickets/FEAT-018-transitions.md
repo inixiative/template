@@ -1,12 +1,14 @@
 # FEAT-018: `@inixiative/transitions` — declarative transition guard + affordance layer
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress (library COMPLETE; only the inquiry consumer migration remains)
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-06-08
-**Updated**: 2026-06-08
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: `@inixiative/transitions` (v0.0.2, not yet published) is built out with its full surface — `check`/`checkPath`, `describe`, `merge` (`applyMerge` + `isSerializableMerge`), `serializable` (`isSerializable`), `validate` (`validateTransition`), `registry` (`checkTransition`/`available`/`eligible`), and injected `rebac` (`makeRebacAuthorize`/`createRebac`, `RebacSchema`), each with tests. Depends only on `@inixiative/json-rules`. **Remaining:** adopt for the first consumer — the template's inquiry status lifecycle (the package is not yet a template dependency and no inquiry-status migration has landed). Not Started → In Progress because the kernel/registry/validator/merge work is done; the consumer migration is the open item._
 
 ## Overview
 

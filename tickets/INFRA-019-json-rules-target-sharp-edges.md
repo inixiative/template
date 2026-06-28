@@ -4,9 +4,11 @@
 **Assignee**: TBD
 **Priority**: Low
 **Created**: 2026-06-13
-**Updated**: 2026-06-13
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: still Backlog — no edges closed. New surface area that exhibits the same SQL edge, handled the right way: json-rules **2.9.0** added `sourceQueries(lens)`, a DISTINCT option-fetch compiler. Its Prisma form always compiles; its SQL form **degrades gracefully** — `compileOne` catches a `toSql` throw and returns `{ sql: null, error }` rather than propagating, so the array-condition / unsupported-operator edges catalogued below now surface as a per-query `error` field on `SourceSqlQuery` (the consumer falls back to the Prisma form). Same contract this ticket advocates (degrade, don't throw at execution), one more entry point._
 
 ## Overview
 

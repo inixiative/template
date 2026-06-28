@@ -4,10 +4,9 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { db } from '@template/db';
+import { claimLane, db, laneKey } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
-import { claimLane, laneKey } from '#/jobs/lanes';
 import { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
 import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/outbox/flag';
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';

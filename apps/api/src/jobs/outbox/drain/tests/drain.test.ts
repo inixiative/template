@@ -1,7 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { redisNamespace } from '@template/db';
+import { claimLane, laneKey, redisNamespace, watchLane } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { claimLane, laneKey, watchLane } from '#/jobs/lanes';
 import {
   flushOutbox,
   isOverflowing,

@@ -1,12 +1,14 @@
 # INFRA-002: Rules Builder (Separate Repo)
 
-**Status**: 🚧 In Progress (headless core + React layer + example shipped; FieldSelector / shadcn slots / Ladle / preview next)
+**Status**: 🚧 In Progress (pivoted to pure-headless descriptor tree in 0.2.0; shadcn drop-in renderer + one-call `resolve` in 0.3.0; Ladle + check()-preview panel + standalone FieldSelector still open. Built locally, NOT published)
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-06-13
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: rules-builder built **0.2.0 + 0.3.0** (local working tree, **not published**). **0.2.0 — pure-headless pivot:** `useRuleBuilder` now returns a **descriptor tree** (`GroupNode`/`LeafNode` = which controls exist + bound actions), and the entire slot system this ticket described — `ComponentSlots`/`RuleBuilder`/`RuleGroup`/`RuleRow`/`builder/slots.ts`/`context.ts`/`GroupHeader`/`GroupFooter` — was **deleted** (so the "recursive components / slot contracts" `[x]` tasks below are now superseded by the descriptor model, not regressed). Added `lensValuePicker`/`useLensValuePicker` (pick any value/path in a lens — the shared field+path atom, i.e. the FieldSelector substrate) and a plain reference renderer. **0.3.0:** `composeSurface` → one-call `resolve(source, { sourceValues })`; `decorateSources` deleted (folded into the projection); a real **shadcn-style drop-in renderer + Tailwind** added in the example app. **Still open:** Ladle stories, the check()-on-sample **preview panel**, and extracting a standalone `FieldSelector` (the descriptor + `lensValuePicker` cover the substrate, but the packaged component isn't cut). The shadcn slot item below is now satisfied by the 0.3.0 renderer._
 
 ## Overview
 
@@ -68,8 +70,9 @@ old PLAN.md (predates Lens v2.2) and may be deleted wholesale — it hand-rolls 
 - [x] **Example app** (Vite) with a factored-out slot set (`examples/`); verified
       via `vite build`. DOM test harness (happy-dom + @testing-library/react, React
       19); 42 tests incl. a render→add-rule→clean-condition integration test.
-- [ ] **Out-of-the-box shadcn slot implementation** (the example set is currently
-      dependency-light; shadcn/radix/tailwind variant is a styling swap).
+- [x] **Out-of-the-box shadcn slot implementation** — shadcn-style drop-in
+      renderer + Tailwind shipped in the 0.3.0 example app (`examples/shadcn/`,
+      `examples/RuleTreeShadcn.tsx`).
 - [ ] **Ladle** stories showcasing each slot/component + state (matches template
       `packages/ui`, which uses Ladle — template PR 5).
 - [ ] **Extract a generic `FieldSelector`** — the field-path picker half of

@@ -797,10 +797,10 @@ export const createAuthSlice: StateCreator<AuthSlice & TenantSlice> = (set, get)
 
 ## DevTools
 
-**Enabled in all apps:**
+**Enabled once in the shared store (all apps share it):**
 
 ```typescript
-devtools((...a) => ({ ...slices }), { name: 'AppStore' })
+devtools((...a) => ({ ...slices }), { name: 'SharedAppStore' })
 ```
 
 **Access:** Redux DevTools extension in browser
