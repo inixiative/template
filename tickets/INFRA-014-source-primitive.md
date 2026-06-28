@@ -1,12 +1,14 @@
 # INFRA-014: Source Primitive in json-rules (Hydrated Tables)
 
-**Status**: 🆕 Not Started
+**Status**: 🆕 Not Started (this ticket's EAV/custom-field hydration scope is untouched; a *different* "source" axis — per-field option eligibility — shipped in 2.9–2.10, see note)
 **Assignee**: Aron
 **Priority**: Medium (multi-source vision — NOT blocking COMM-001/FEAT-008/FEAT-003)
 **Created**: 2026-06-13
-**Updated**: 2026-06-13
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: still Not Started for **this ticket's** core — the custom-field/EAV adapter (EAV pivot + dynamic-schema→`FieldMap`), the documented hydrated-table runtime contract, and sparse-row null semantics are all unbuilt; `buildBridgeDictionary` (the indexer this builds on) is unchanged. Note for disambiguation: json-rules 2.9.0–2.10.0 shipped a **separate, adjacent** "source" concept — per-field option **eligibility** (`sources?: Record<field, Condition>` on the narrowing), `sourceQueries(lens)` (DISTINCT option-fetch compiler), and `applySourceValues`-style folding of fetched option lists into projections via `SourceValues = { path, mapName, model, field, values }`. That is decorating a field's selectable values, not hydrating an EAV table into a map — so it does not satisfy this ticket's objectives._
 
 ## Overview
 

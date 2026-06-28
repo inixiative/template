@@ -27,6 +27,9 @@
   - [Send Pipeline](#send-pipeline)
     - [Render-error policy](#render-error-policy)
   - [Template Versioning & Recompose](#template-versioning--recompose)
+- [Messaging (non-email channels)](#messaging-non-email-channels)
+  - [Provider Registry](#provider-registry)
+  - [Jobs](#jobs)
 - [Notifications](#notifications)
   - [Planned: Novu](#planned-novu)
 - [SMS](#sms)
@@ -42,9 +45,9 @@
 
 Communication channels:
 - Email (transactional, marketing) - **partially implemented**
+- Messaging — direct per-`ContactType` channels (SMS, push, chat) on a pluggable adapter lane - **seam built, no adapters wired**
 - In-app notifications (future)
 - Webhooks (existing)
-- Push notifications (future)
 
 ---
 
@@ -566,10 +569,10 @@ Space override can be added or evacuated and existing templates re-resolve live)
 lives in the audit log**:
 
 - Every edit already writes an immutable `AuditLog` snapshot (`after` = full content). The
-  `emailVersioning` hook additionally stamps `AuditLog.emailComponentAuditLogIds` — the audit-log ids of
-  the snapshots the row's children currently resolve to. A template snapshot points at its component
-  snapshots, recursively: a traversable version tree, each version's content stored once and shared by
-  reference when unchanged.
+  `emailVersioning` hook additionally stamps `AuditLog.componentVersions` — a `{ slug → child snapshot
+  audit-log id }` map of the snapshots the row's children currently resolve to. A template snapshot
+  points at its component snapshots, recursively: a traversable version tree, each version's content
+  stored once and shared by reference when unchanged.
 - **Backprop walk** (`apps/api/src/hooks/emailVersioning`): a component change — content edit, or an
   override created/deleted that shifts resolution — spawns fresh snapshots for every ancestor whose
   resolved children moved, stopping a branch where an override shadows the change. Saves run
@@ -577,13 +580,60 @@ lives in the audit log**:
   *after* the audit hook so the changed row's snapshot exists when the walk runs.
 - **Send pins the version**: `deliverEmail` records the template's current snapshot id on
   `CommunicationLog.emailTemplateAuditLogId`.
-- **Recompose** (`recomposeCommunication`, `apps/api/src/lib/email/recompose.ts`): walks
-  `emailTemplateAuditLogId → emailComponentAuditLogIds` recursively, reading each pinned snapshot's
-  content, to rebuild the as-sent composition. Version fidelity (template + components as they were),
-  `{{variable.*}}` placeholders intact — not the per-recipient interpolated bytes.
+- **Recompose** (`recomposeCommunication`, `apps/api/src/lib/email/recompose.ts`): resolves
+  `CommunicationLog.emailTemplateAuditLogId` then `recomposeSnapshot` walks `componentVersions`
+  recursively, splicing each pinned child snapshot back into its `{{#component:slug}}` block, to rebuild
+  the as-sent composition. Version fidelity (template + components as they were), `{{variable.*}}`
+  placeholders intact — not the per-recipient interpolated bytes.
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots.
+
+---
+
+## Messaging (non-email channels)
+
+A separate lane from email for direct, per-`ContactType` channels (SMS, push, chat). Where email is a
+template/cascade/versioning system, messaging is a thin dispatch primitive: render `{{recipient.*}}` /
+`{{data.*}}` / `{{sender.*}}` into a payload and hand it to a pluggable per-channel sender. Located in
+`apps/api/src/lib/messaging` (jobs in `apps/api/src/jobs/handlers`).
+
+### Provider Registry
+
+`messageProviderRegistry` (`apps/api/src/lib/messaging/providers.ts`) is a `makeBroadcastRegistry` keyed
+by `ContactType`; `getMessageProviderAdapter(type)` returns its channel sender or `undefined`. A
+`MessageProviderAdapter` is `(contact, content, kind, options) => Promise<void>` — the per-channel send.
+
+```typescript
+type MessageContent = {
+  text?: string;       // may contain {{recipient.*}}, {{data.*}}, {{sender.*}}
+  html?: string;       // same — interpolated before dispatch
+  mediaUrls?: string[];
+  data?: Record<string, unknown>;
+};
+
+type MessageDispatchOptions = { replyTo?: { chatMessageId: string } };
+```
+
+### Jobs
+
+Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email jobs but with no template
+cascade, no `CommunicationLog`, and no fan-out planner:
+
+- **`messageUser`** — `{ rule, kind, content }`. `resolveUsers(rule)` runs the `@inixiative/json-rules`
+  `Condition` as a Prisma query, then for each resolved user interpolates `content` and dispatches to
+  every `canDeliver(kind, contact)` contact via that contact's registered adapter. A missing adapter for
+  a `ContactType` throws.
+- **`messageContact`** — `{ contactId, kind, content, replyTo? }`. Loads one `Contact`, gates on
+  `canDeliver`, and dispatches (no interpolation — `content` is pre-rendered).
+
+`canDeliver(kind, contact, customerRef?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
+gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`
+(and, when given, `customerRef.acceptedKinds`).
+
+> **Status:** the lane is built and unit-tested but **not yet registered** in `jobHandlers`
+> (`apps/api/src/jobs/handlers/index.ts`) and has no adapters or callers wired — it is the seam SMS/push
+> plug into, not a live channel yet.
 
 ---
 
@@ -609,7 +659,9 @@ await notify(user.id, 'inquiry.received', {
 
 ---
 ## SMS
-TODO: twilio?
+
+A future channel on the [Messaging](#messaging-non-email-channels) lane: register a Twilio
+`MessageProviderAdapter` under the `sms` `ContactType`. No SMS adapter is wired today.
 
 ---
 

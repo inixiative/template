@@ -92,12 +92,13 @@ const key = `cache:User:${id}`;  // Don't do this
 |-----------|--------|---------|
 | `bull` | `bull:*` | BullMQ job queues (managed by BullMQ) |
 | `cache` | `cache:*` | Application cache (user lookups, tokens, etc.) |
-| `job` | `job:*` | Job coordination (supersede lanes, singleton locks) |
+| `job` | `job:*` | Singleton job locks (cron run-once) |
 | `ws` | `ws:*` | WebSocket pub/sub channels |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
+| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane` |
 
 ---
 
@@ -144,14 +145,20 @@ Request rate limiting by token or IP:
 
 ### Job Coordination (`job:*`)
 
-Singleton locks and superseding job signals:
+Singleton job locks:
 
 ```typescript
 // Singleton job lock (prevents concurrent runs)
 `${redisNamespace.job}:lock:${cronJobId}`
+```
 
+### Supersede Lanes (`lane:*`)
+
+Last-claim-wins batons for superseding jobs (`claimLane`/`watchLane`, in `@template/db`):
+
+```typescript
 // Superseding lane (holds the current holder's jobId; a different holder means the prior job was usurped)
-`${redisNamespace.job}:lane:${handlerName}:${dedupeKey}`
+`${redisNamespace.lane}:${handlerName}:${dedupeKey}`
 ```
 
 ### WebSocket Pub/Sub (`ws:*`)

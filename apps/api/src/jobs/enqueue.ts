@@ -4,13 +4,12 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { db } from '@template/db';
+import { claimLane, db, laneKey } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
 import { uuidv7 } from 'uuidv7';
 import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
-import { claimLane, laneKey } from '#/jobs/lanes';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';

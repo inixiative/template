@@ -12,6 +12,7 @@ export const redisNamespace = {
   session: 'session',
   limit: 'limit',
   lock: 'lock',
+  lane: 'lane',
   // flag: 'flag',
 } as const;
 

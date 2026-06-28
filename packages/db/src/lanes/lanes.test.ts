@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { claimLane, laneKey, watchLane } from '#/jobs/lanes';
-import { queue } from '#/jobs/queue';
+import { claimLane, laneKey, watchLane } from '@template/db/lanes/lanes';
+import { getRedisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins;
 // a running job watchLanes its lane and is usurped the moment a different jobId holds it. Plain SET/GET,
 // so it runs on ioredis-mock — no integration harness needed.
-const redis = queue.redis;
+const redis = getRedisClient();
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const wipe = async (): Promise<void> => {
-  const keys = await redis.keys('job:lane:*');
+  const keys = await redis.keys('lane:*');
   if (keys.length) await redis.del(...keys);
 };
 

@@ -160,6 +160,7 @@
 
 - [ ] Notes system
 - [ ] Properly implement remaining inquiry features
+  - [ ] Migrate inquiry status lifecycle onto `@inixiative/transitions` (lib is complete) — `available()` powers the approval action surface (gate + affordance); inquiry handlers keep the resolution side effects. Maps ~1:1; see FEAT-018.
 
 ---
 

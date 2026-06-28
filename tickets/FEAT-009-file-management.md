@@ -433,6 +433,8 @@ Public download flow (v2, with ResourceBinding):
 
 Railway auto-provisions per environment, so: 2 buckets × N environments.
 
+> **Key strategy is settled in §18.2: immutable flat id keys at the bucket root.** The path-mirrored keys described in this section (§4–5) are superseded — files sit flat in the `user` bucket keyed by id (`{fileId}-{filename}`); the folder/space hierarchy and ownership live in Postgres, not in the S3 key. These sections still need rewriting to match.
+
 **System bucket** — no org scoping. Pure platform assets:
 ```
 system-bucket/
@@ -1692,7 +1694,7 @@ model File {
 - Ripple: section 4's "ownership by path scope" table becomes "ownership by owner FK";
   key prefixes (if kept) derive from ownerModel.
 
-### 18.2 OPEN — S3 key strategy: path-mirrored (sections 4–5) vs immutable owner-prefixed id keys
+### 18.2 DECIDED — immutable flat id keys (everything at the bucket root; hierarchy lives in Postgres)
 
 The current design mirrors materialized paths into S3 keys, which requires keys to move when
 files/folders move — that single decision generates the FileJob `move` type, `reconcileMove`,
@@ -1733,7 +1735,20 @@ later (the FileJob table already exists for lazy copy); the reverse migration is
 
 **Counter-position (status quo):** Railway's browser is the only storage UI until the file
 browser ships, ownership/location is self-evident per object, and the move machinery is
-designed and bounded. Decision deferred to implementation.
+designed and bounded.
+
+**Decision (2026-06-28): immutable id keys.** Path-mirrored keys can't be kept accurate — putting
+`org_/space_/user_/folder` in the key means the key has to move whenever a file or folder moves, so
+every move/rename opens a DB↔S3 divergence window and depends on the durable move job to rekey; any
+failure drifts the key from the logical path. Instead keys are immutable and flat at the
+bucket root — `{fileId}-{filename}`, with no owner/space/folder prefix at all. Ownership and the
+folder/space tree live entirely in Postgres (owner FK + `File.path`); the S3 key carries nothing
+but the file's identity, so it never has to change. (Still two buckets — `system` for platform
+assets, `user` for all uploads — there is just no key hierarchy inside `user`.) Moves and renames
+become pure DB row updates; cross-owner adoption stays copy → new File → new key. This removes the FileJob `move` type,
+`reconcileMove`, the four-state read table, and the move-remnant + stalled-move orphan classes;
+`FileJob` is retained for `lazy_copy` only. **Ripple:** §4–5 (path-mirrored keys), the FileJob
+schema/lifecycle, and the orphan/reconciliation analysis must be rewritten to match.
 
 ### 18.3 RECOMMENDED — Per-purpose validation moves to Phase 1
 

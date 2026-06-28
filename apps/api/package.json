@@ -24,7 +24,7 @@
     "@bull-board/api": "^6.20.3",
     "@bull-board/hono": "^6.20.3",
     "@hono/zod-openapi": "^1.2.2",
-    "@inixiative/json-rules": "^2.8.0",
+    "@inixiative/json-rules": "^2.10.0",
     "@opentelemetry/auto-instrumentations-node": "^0.76.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",

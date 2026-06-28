@@ -187,7 +187,7 @@ This is not hypothetical — secrets manager accidents happen. The escrow system
 ## Related Tickets
 
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) — should auto-generate initial encryption keys
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md) — audit encryption key access/rotation events
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md) — audit encryption key access/rotation events
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) — uses encrypted secrets
 
 ---

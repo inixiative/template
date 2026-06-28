@@ -5,7 +5,7 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { laneKey, watchLane } from '#/jobs/lanes';
+import { laneKey, watchLane } from '@template/db';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { claimLane, laneKey } from '#/jobs/lanes';
+import { claimLane, laneKey } from '@template/db';
 import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -13,7 +13,7 @@ describe('makeSupersedingJob', () => {
 
   afterEach(async () => {
     const redis = ctx.queue.redis;
-    const keys = await redis.keys('job:lane:*');
+    const keys = await redis.keys('lane:*');
     if (keys.length > 0) {
       await redis.del(...keys);
     }
