@@ -155,6 +155,11 @@
   - Schema → generated CRUD UI
   - Based on Prisma model definitions
   - Auto forms, lists, filters, search
+- [ ] **Lens: JSON sub-key authority (pick-only)** — `@inixiative/json-rules`. JSON columns are fully open today (column-level pick/omit works; any dotted sub-path under a visible Json column is allowed via `acceptsSubPath` + `checkRuleAgainstLens`). When a consumer needs per-key control (permissions / email builder exposing partial JSON), add sub-key authority to the narrowing:
+  - **Allowlist only (pick), never omit** — JSON keys are unbounded, so a denylist leaks (`metadata.secret` omitted, `metadata.secrets`/future keys slip through).
+  - **Default stays fully open** — opt-in per narrowing.
+  - **Two costs:** the *gate* (which sub-paths a rule may reference — cheap, extend `walkLensPath`) vs *redaction* (stripping hidden keys from returned data — the real work: `exposedSurface`/`prune`/`redactLens` + `toSql`/`toPrisma` JSON projection via `#-`/`jsonb_path_query`). Gate-without-redaction is not isolation.
+  - Drive from a real consumer so the shape is grounded, not speculative.
 
 ### Modules to Port
 
