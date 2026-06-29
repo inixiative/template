@@ -53,3 +53,7 @@ export const initGracefulShutdown = (
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 };
+
+export const isShutdownInProgress = (): boolean => {
+  return isShuttingDown;
+};
