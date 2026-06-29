@@ -68,6 +68,15 @@ This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = reso
 
 **Sources hydrate *after* bindings — the order matters.** A source's eligibility `where` (the per-field `sources` Condition) carries bind tokens too — "this brand's missions" = `where brandUuid = { bind: 'brandUuid' }`. So the pipeline is **resolve this layer's bindings → then hydrate sources** (run the now-concrete DISTINCT query) → tenant-specific `sourceValues` → fold into the surface. You can't hydrate before binding: you don't yet know *which* tenant's rows to query. Per layer: resolve binds, then hydrate that layer's sources.
 
+## Legibility — reading a complex narrowing's binds
+
+You should never have to eyeball raw `where`s across a deep chain to know what a lens needs. Two affordances:
+
+- **`describeBindings(lensOrNarrowing)`** — the introspection answer: binds **grouped by owning layer**, e.g. `[{ layer: <id>, declares: ['brandUuid'], pending: true }, { layer: <id>, declares: ['region'], pending: true }]`. `requiredBindings` is the flat-set shorthand over the same walk. You *ask the lens*; you don't read its `where`s.
+- **Layer-qualified names** — leaning on INFRA-016's layer ids, a bind reads as `<layer>:<name>` in the composed/serialized view, so a name is unambiguous and self-describing even on raw inspection (and reuse across layers can't confuse). Authors still write bare local names in their own layer; qualification is automatic at compose — the qualifier *is* the owner, so "who fills this token" is obvious.
+
+Net: simple to author (bare local names, per-layer), legible to inspect (grouped + qualified introspection).
+
 ## Open questions
 
 - Token vocabulary + where it's declared (a per-app bindings registry?).
