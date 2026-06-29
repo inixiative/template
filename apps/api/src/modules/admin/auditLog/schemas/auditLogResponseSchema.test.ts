@@ -8,6 +8,7 @@ const baseAuditLog = {
   actorSpoofUserId: null,
   actorTokenId: null,
   actorJobName: null,
+  originIntegration: null,
   ipAddress: null,
   userAgent: null,
   action: 'create' as const,
