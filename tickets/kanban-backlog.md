@@ -35,6 +35,7 @@ kanban
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
+    COMM-009-component-slots-passthrough-children
 ```
 
 ## Tickets
@@ -47,6 +48,9 @@ kanban
 - [FEAT-010: Addresses](./FEAT-010-addresses.md) - Address validation, geocoding, international formats
 - [FEAT-012: Notifications](./FEAT-012-notifications.md) - Novu integration, app-events completion, notification center
 - [COMM-002: Email Validation](./COMM-002-email-validation.md) - Email verification API (Bouncer/Emailable) for deliverability
+
+**Communications:**
+- [COMM-009: Component Slots](./COMM-009-component-slots-passthrough-children.md) - `{{slot:name}}` passthrough children for wrapper components (not registered/cascading subcomponents); from ZLT-3139
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
@@ -115,11 +119,11 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 27
+- **Total Backlog Items**: 28
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
-- **Communication**: 2
+- **Communication**: 3
 - **Infrastructure**: 8
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
@@ -142,4 +146,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-04-02_
+_Last Updated: 2026-06-29_
