@@ -42,9 +42,13 @@ const collectRelationPaths = (
   const c = condition as Record<string, unknown>;
 
   if (Array.isArray(c.all))
-    return void c.all.forEach((s) => collectRelationPaths(s as Condition, model, root, prefix, out));
+    return void c.all.forEach((s) => {
+      collectRelationPaths(s as Condition, model, root, prefix, out);
+    });
   if (Array.isArray(c.any))
-    return void c.any.forEach((s) => collectRelationPaths(s as Condition, model, root, prefix, out));
+    return void c.any.forEach((s) => {
+      collectRelationPaths(s as Condition, model, root, prefix, out);
+    });
   if (c.if) {
     collectRelationPaths(c.if as Condition, model, root, prefix, out);
     collectRelationPaths(c.then as Condition, model, root, prefix, out);

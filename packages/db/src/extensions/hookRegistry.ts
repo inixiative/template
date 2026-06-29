@@ -4,8 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { castArray } from 'lodash-es';
+
 import { LogScope, log } from '@template/shared/logger';
+import { castArray } from 'lodash-es';
 
 export enum DbAction {
   create = 'create',

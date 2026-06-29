@@ -4,8 +4,9 @@
  * @partOf feature:auth
  * @uses primitive:appEvents
  */
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+
 import { Integration } from '@template/db/generated/client/enums';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { Context, Next } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 

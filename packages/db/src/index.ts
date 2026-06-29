@@ -22,10 +22,10 @@ export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
-// Distributed lock
-export { createLock, type Lock, type LockOptions } from './lock';
 // Supersede lanes (last-claim-wins coordination batons)
 export { claimLane, laneKey, watchLane } from './lanes';
+// Distributed lock
+export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities
 export {
   cache,

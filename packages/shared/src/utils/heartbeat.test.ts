@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { heartbeat } from './heartbeat';
+import { heartbeat } from '@template/shared/utils';
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
