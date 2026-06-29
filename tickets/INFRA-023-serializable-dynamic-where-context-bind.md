@@ -22,7 +22,7 @@ The concrete `brandUuid` is baked in by the closure reading it off the request c
 - **INFRA-016 doesn't cover it.** Serialization-by-ref keeps `where` as-is, but only as a **literal** Condition (`{ value: 'brand-abc' }`). Serializing the closure's output bakes one tenant's id in (defeats brandless); serializing without it loses the scope. There's no third option today.
 - **`path` doesn't help.** `ValueSource = { value } | { path }`, and `path` resolves against the **evaluated subject** (the row being filtered) — it is row-relative. The tenant scope is an **external** parameter ("the current brand"), not a field of the row, so `path` can't express it.
 
-Net: every dynamically-scoped narrowing is forced to be a code closure, so it can't ride serialized config — per-slug email narrowings, admin-saved lenses (INFRA-018), tenant→subtenant handoff (`seal`).
+Net: every dynamically-scoped narrowing is forced to be a code closure, so it can't ride serialized config — per-slug email narrowings, admin-saved lenses (INFRA-018).
 
 ## Possible solution — a context-bind value type
 
@@ -62,7 +62,7 @@ Narrowings compose (`parent` chain), so binding is **monotonic partial applicati
 - Stages bind what they know: `{ brandUuid }` at request/author time, `{ recipientUuid }` at send. Execution (`check`/`toPrisma`) requires `requiredBindings` to be **empty** — else throw.
 - Resolving only ever **narrows** (a bound literal adds a concrete filter), never widens — consistent with the chain's existing narrow-only invariant (`validateNarrowing`).
 
-This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = resolve that tenant's binds to literals, **preserve** the subtenant's binds as tokens. `seal` becomes "partial bind + collapse."
+(Partial resolution was also the engine behind the old `seal` idea — resolve a fixed tenant's binds, preserve a subtenant's as tokens. `seal` is now dropped: the server is the sole executor and the floor is structural, so there's no handoff to seal. See INFRA-016.)
 
 **Unique names + `parent:` (decided) — downward-only without per-layer maps.** Bind names are **unique across a composed chain**: a layer may not re-declare a name an ancestor already declares. `validateNarrowing` reads the ancestors' occupied names (`lensRequiredBindings(narrowing.parent)`) and **hard-errors** on a collision, naming it so the author picks better — *not* a warning. Because every name is unique, a single bindings map keyed by name is unambiguous, and downward-only falls out for free: a child can't *re-bind* a parent's scope because it can't even declare the parent's name. To *intentionally* reuse an inherited binding, the child references it read-only as **`parent:name`** — it draws the same value as the ancestor's `name`, is excluded from the collision check, and a `parent:` ref no ancestor declares is rejected. (This supersedes the earlier "reuse is safe — don't forbid it" sketch, which assumed per-layer maps; the unique-name rule is cleaner, is enforceable at author time, and the collision message is itself the "see what the parent occupies" affordance.)
 
@@ -79,7 +79,7 @@ You should never have to eyeball raw `where`s across a deep chain to know what a
 
 - **Bind preprocesses into the lens — nothing new downstream.** `resolveLensBindings` → concrete lens → existing `applyLens`/`toPrisma`/`toSql`/`sources`/projection unchanged. Drops the `bindings`-plumbing, intrinsic-identity, and projection-folding work this ticket originally pulled in.
 - **Unique names + collision = hard error; `parent:name` for intentional read-only reuse.** (See above; supersedes the per-layer-maps sketch.)
-- **`seal` deferred** — "idk if we need right now." Serialization-by-ref + sealed handoff stay INFRA-016, needed only once lenses persist across a tenant boundary; the binding tokens already serialize.
+- **`seal` dropped** — the server is the sole executor and each party authors only its own layer, so the parent floor is structural (chain compose + narrow-only + server-side bind resolution); there's no off-server handoff to seal. INFRA-016 reduced to ref-id serialization (liveness for persisted base lenses), which the bindings path doesn't even need (reattach a code-built parent).
 
 ## Still open
 
@@ -89,6 +89,6 @@ You should never have to eyeball raw `where`s across a deep chain to know what a
 
 ## Related Tickets
 
-- **Sibling to** INFRA-016 (serialize structure-by-ref + `seal`) — this serializes the *dynamic where*; together they make a narrowing fully persistable.
+- **Sibling to** INFRA-016 (serialize structure-by-ref) — this makes the *dynamic where* serializable (bind tokens); together they make a narrowing fully persistable. (INFRA-016 not required for the email path.)
 - **Feeds** INFRA-017 (builder surface), INFRA-018 (lens builder — saved lenses carry scope).
 - **Motivating consumer:** Zealot per-slug email narrowings (`userevidence/Zealot-Monorepo` ZLT-3169) — the default template can only carry its own narrowing as config once the brand scope is a bind token, not a closure.

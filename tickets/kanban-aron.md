@@ -52,7 +52,8 @@ kanban
 
 **Rules / Lens Platform** (json-rules + rules-builder):
 - [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) ⭐ - exposedSurface ✅ + serializable projection + describeRule (🚧 in progress)
-- [INFRA-016: Lens Serialization + seal](./INFRA-016-lens-serialization-by-ref.md) - Parallel serializable types (refs not parent objects) + seal (tenant→subtenant)
+- [INFRA-016: Lens Serialization by Reference](./INFRA-016-lens-serialization-by-ref.md) - Parallel serializable types (refs not parent objects); liveness for persisted base lenses (seal dropped — server is sole executor)
+- [INFRA-023: Serializable Dynamic `where` (context bindings)](./INFRA-023-serializable-dynamic-where-context-bind.md) 🟢 - `{ bind }` value + `resolveLensBindings` (preprocess into lens) + unique-name/`parent:` discipline; core built in json-rules PR #4 (FEAT-004), additive → 2.11
 - [INFRA-015: Bridge Registry](./INFRA-015-bridge-registry.md) - Save & reuse bridges across lenses
 - [INFRA-014: Source Primitive](./INFRA-014-source-primitive.md) - Formalize sources (hydrated tables) + custom-field tables
 - [INFRA-013: Source-Map Importer](./INFRA-013-source-map-importer.md) - Non-Prisma schema → FieldMap (in rules-builder)
