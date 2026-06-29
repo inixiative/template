@@ -36,9 +36,15 @@ type ValueSource<T> =
   | { bind: string; value?: never; path?: never };  // resolved from execution bindings
 ```
 
-- Thread a `bindings` argument through the execution entry points — `applyLens(rule, lens, { bindings })`, `check`, `toPrisma`, `toSql`, `runSources` — resolving each `bind` token to a concrete value before evaluation. In `toPrisma`/`toSql` a `bind` is naturally a query **parameter**.
-- A narrowing's `where` then reads `{ field: 'brandUuid', operator: 'equals', bind: 'brandUuid' }` — fully serializable, **brandless**, storable on the default config row.
-- The only runtime input is the bindings map, supplied where the context is known: `{ brandUuid: getBrand(c).uuid }` on an API request; `{ brandUuid: recipient.brandUuid }` at email send. The `scopeNarrowing((c) => …)` closure collapses into "a static serialized narrowing + a one-line bindings resolver."
+`{ bind }` is a third arm on the **shared** `ValueSource<T>` that every rule kind already uses, so it is valid **anywhere a literal can go** — equality, comparison, `in`/`notIn`, `contains`, `between`, aggregate — for free, no per-rule special-casing. (Date rules carry their own value shape; extend it identically.) A narrowing's `where` then reads `{ field: 'brandUuid', operator: 'equals', bind: 'brandUuid' }` — fully serializable, **brandless**, storable on the default config row.
+
+**Projection is the one interpolation point.** `projectByPath(lens, { bindings })` and `exposedSurface(lens, { bindings })` fold binds into the projection exactly as 2.10 already folds `sourceValues` — same shape, sibling inputs. Without bindings the projection keeps the `{ bind }` tokens (the portable/serializable form); with bindings it resolves them to concrete values. The execution entry points (`applyLens` / `check` / `toPrisma` / `toSql` / `runSources`) accept a `bindings` map but resolve through that **same** projection path — one resolver, never two. In `toPrisma`/`toSql` a resolved `bind` is naturally a query **parameter**.
+
+**Required bindings are introspectable + validated.** `requiredBindings(lensOrRule): Set<string>` — a `collectBinds` walk over the narrowing chain's `where`/`sources` and the rule — returns the set of bind **names** needed, so the builder / `exposedSurface` can declare "this surface needs `{ brandUuid }`." The two shapes are different: introspection is a `Set<string>` (names); the execution input is a `Record<string, RuleValue>` (name → value), since each `{ bind }` resolves to a value. At execution, validate `keys(bindings) ⊇ requiredBindings(lens)` and **throw on any missing required bind**: a forgotten tenant scope is a caller bug, and silently returning no rows would hide it (and risk an unscoped path slipping through).
+
+The only runtime input is then the bindings map, supplied where context is known: `{ brandUuid: getBrand(c).uuid }` on an API request; `{ brandUuid: recipient.brandUuid }` at email send. The `scopeNarrowing((c) => …)` closure collapses into "a static serialized narrowing + a one-line bindings resolver."
+
+**All of this lives in json-rules core** — the `{ bind }` value type, the resolver, `requiredBindings`, and bindings-folding in projection. Template and Zealot just pass a `bindings` map; no app-layer reimplementation.
 
 ### Properties
 
@@ -50,9 +56,9 @@ type ValueSource<T> =
 ## Open questions
 
 - Token vocabulary + where it's declared (a per-app bindings registry?).
-- Missing-binding policy at execution: throw vs. drop-the-clause. Filter-first semantics imply a missing scope should **fail closed** (no rows), never widen.
+- Missing *required* binding → throw (decided above). Remaining nuance: distinguish a missing binding (caller bug → throw) from a deliberately-empty value (follows filter-first: fail closed, never widen).
 - Interaction with `seal` (INFRA-016): does sealing resolve binds to literals for a fixed tenant, or preserve them for a still-dynamic subtenant?
-- Should `describeRule` (INFRA-017) report which binds a rule/narrowing requires, so a caller knows what context it must supply?
+- Is `requiredBindings` its own primitive, or surfaced through `describeRule` (INFRA-017)? (Proposing standalone, with `describeRule` able to include it.)
 
 ## Related Tickets
 
