@@ -221,7 +221,7 @@
       "name": "@template/permissions",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/permissions": "^0.1.0",
+        "@inixiative/permissions": "^0.3.0",
         "@template/db": "workspace:*",
         "lodash-es": "^4.18.1",
         "permix": "^3.6.0",
@@ -629,7 +629,7 @@
 
     "@inixiative/json-rules": ["@inixiative/json-rules@2.10.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-WbtrxDNKc4VrqGpa70Ppg/buayMj2Avpf6JTeDJwsoCfmvWvJ3ZcVhfc+Im1Lztu0VRfXV0d6JPS8XiEcuBJBQ=="],
 
-    "@inixiative/permissions": ["@inixiative/permissions@0.1.0", "", { "dependencies": { "@inixiative/json-rules": "^2.6.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-dZdZlgL3aXOLAe7gvsEAZECpPR1ZU27YS8QCfTQ4lOZV3TVINYaNzUk6CXbWMXbeFFwzvWy1xRoetzd2hIsTSg=="],
+    "@inixiative/permissions": ["@inixiative/permissions@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^2.10.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-owHklfNmaBfkW0mUQITlaHeLj01rkOU72Xu1xCO1QvqQnhzaJzvaKiOSk29lHUONv67dvKFFPs33WNW8a4h0aw=="],
 
     "@inixiative/prisma-map": ["@inixiative/prisma-map@0.1.0", "", {}, "sha512-wb/Pc5q6SQvb3LrKR2Hz/SuYFnd9biyojnpd962bndq/Zjf1kUH8PdKxjQ0b532fm9Fw8SiDwRmsg/rY3KLjuw=="],
 
@@ -2586,8 +2586,6 @@
     "@hey-api/shared/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 
     "@inixiative/atlas/@inixiative/json-rules": ["@inixiative/json-rules@2.8.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-gmVPmp+xaFc11EpjMjTILR7ZMNNMHPA5EG6qvd79BFMfXSkfE7ibrcaUTW3FkZk1utz2niMIUP2nql7/kv+JGA=="],
-
-    "@inixiative/permissions/@inixiative/json-rules": ["@inixiative/json-rules@2.8.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-gmVPmp+xaFc11EpjMjTILR7ZMNNMHPA5EG6qvd79BFMfXSkfE7ibrcaUTW3FkZk1utz2niMIUP2nql7/kv+JGA=="],
 
     "@inquirer/core/signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 

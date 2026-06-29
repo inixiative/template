@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { AccessorName, UserId } from '@template/db';
+import type { UserId } from '@template/db';
 import { castArray } from 'lodash-es';
 import { createPermix } from 'permix';
 
@@ -39,11 +39,11 @@ export type Action = UserAction | OrganizationAction | SpaceAction | InquiryActi
 export type Entitlements = Record<string, boolean> | null;
 
 export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
-export type PermissionEntry = { resource: AccessorName; id?: string; actions: ActionState };
+export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
 type PermissionState = Record<string, ActionState>;
 
 export type Permix = {
-  check: (resource: AccessorName, action: Action, id?: string, data?: unknown) => boolean;
+  check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
   setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
   setSuperadmin: (value: boolean) => void;
   isSuperadmin: () => boolean;
