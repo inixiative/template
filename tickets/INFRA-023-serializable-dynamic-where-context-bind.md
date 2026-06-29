@@ -38,7 +38,7 @@ type ValueSource<T> =
 
 `{ bind }` is a third arm on the **shared** `ValueSource<T>` that every rule kind already uses, so it is valid **anywhere a literal can go** — equality, comparison, `in`/`notIn`, `contains`, `between`, aggregate — for free, no per-rule special-casing. (Date rules carry their own value shape; extend it identically.) A narrowing's `where` then reads `{ field: 'brandUuid', operator: 'equals', bind: 'brandUuid' }` — fully serializable, **brandless**, storable on the default config row.
 
-**Projection is the one interpolation point.** `projectByPath(lens, { bindings })` and `exposedSurface(lens, { bindings })` fold binds into the projection exactly as 2.10 already folds `sourceValues` — same shape, sibling inputs. Without bindings the projection keeps the `{ bind }` tokens (the portable/serializable form); with bindings it resolves them to concrete values. The execution entry points (`applyLens` / `check` / `toPrisma` / `toSql` / `runSources`) accept a `bindings` map but resolve through that **same** projection path — one resolver, never two. In `toPrisma`/`toSql` a resolved `bind` is naturally a query **parameter**.
+**`where` (and its binds) are server-only — that's the protection.** Two artifacts, per INFRA-017: `exposedSurface` is the client-facing surface and is **`where`-stripped**, so neither a `where` nor a `{ bind }` token ever reaches the browser. `projectByPath` keeps `where` (`ProjectedVisit.whereClauses`) and is server-side only. Binds therefore resolve **server-side**: into (a) the source-eligibility queries that produce `sourceValues` — the option lists the client *does* receive, as resolved values, never the binds — and (b) the execution `where` via `applyLens`/`toPrisma`/`toSql`. You protect the scope by **never sending it**, not by trying to make a sent object immutable; the rule the client returns is independently re-validated (`checkRuleAgainstLens`) and the server's `where` is folded in regardless of what the client submits. `bindings` fold into the **server** projection exactly as 2.10 folds `sourceValues` — without bindings the projection keeps `{ bind }` tokens (the portable form), with bindings it resolves them; one resolver, and `toPrisma`/`toSql` emit a resolved bind as a query **parameter**. (If you want the user to *see* their scope as UX — "scoped to your brand" — that's a separate, explicitly read-only informational field, never the executable `where`.)
 
 **Required bindings are introspectable + validated.** `requiredBindings(lensOrRule): Set<string>` — a `collectBinds` walk over the narrowing chain's `where`/`sources` and the rule — returns the set of bind **names** needed, so the builder / `exposedSurface` can declare "this surface needs `{ brandUuid }`." The two shapes are different: introspection is a `Set<string>` (names); the execution input is a `Record<string, RuleValue>` (name → value), since each `{ bind }` resolves to a value. At execution, validate `keys(bindings) ⊇ requiredBindings(lens)` and **throw on any missing required bind**: a forgotten tenant scope is a caller bug, and silently returning no rows would hide it (and risk an unscoped path slipping through).
 
@@ -52,6 +52,19 @@ The only runtime input is then the bindings map, supplied where context is known
 - **Checkable** — `checkRuleAgainstLens` / `validateNarrowing` validate the token structurally (field exists, operator valid) without a value.
 - **Closed vocabulary** — bind names must be a **declared set** (`brandUuid`, `recipientUuid`, `locale`, `senderId`, …), validated at deserialize, so a stored `where` can never reference unbound context.
 - **Generalizes beyond email** — every `scopeNarrowing` closure becomes declarative data; admin-saved lenses (INFRA-018) carry their own scope.
+
+## Progressive binding (partial application)
+
+Narrowings compose (`parent` chain), so binding is **monotonic partial application**, not all-or-nothing:
+
+- Any layer may introduce `{ bind }` tokens in its `where`/`sources`.
+- `resolveBindings(lensOrNarrowing, bindings)` is a chain→chain transform: it resolves the tokens the map covers and **leaves the rest as tokens**; `requiredBindings` shrinks accordingly.
+- Stages bind what they know: `{ brandUuid }` at request/author time, `{ recipientUuid }` at send. Execution (`check`/`toPrisma`) requires `requiredBindings` to be **empty** — else throw.
+- Resolving only ever **narrows** (a bound literal adds a concrete filter), never widens — consistent with the chain's existing narrow-only invariant (`validateNarrowing`).
+
+This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = resolve that tenant's binds to literals, **preserve** the subtenant's binds as tokens. `seal` becomes "partial bind + collapse."
+
+**Nuance — per-layer name collisions.** A flat bindings map keys by name, so two layers both using `{ bind: 'brandUuid' }` for *different* brands (tenant vs subtenant) would conflate. Resolve stage-by-stage (each stage supplies only its layer's names), or namespace bind names per layer; reject same-name/different-meaning across layers at `validateNarrowing` time.
 
 ## Open questions
 
