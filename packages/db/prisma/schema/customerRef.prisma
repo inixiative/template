@@ -32,6 +32,10 @@ model CustomerRef {
   // (platform + activity opt-out, marketing opt-in); `system` bypasses.
   acceptedKinds CommunicationKind[] @default([platform, activity])
 
+  // TODO: lastActiveAt — track last activity on this customer relationship, mirroring
+  // User.lastLoginAt. Must be stamped via an awaited hook / throttled cache write, NEVER a
+  // fire-and-forget mutation (which races concurrent batch reads → P2028).
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================

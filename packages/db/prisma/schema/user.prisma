@@ -14,6 +14,10 @@ model User {
   displayName   String?
   image         String?
 
+  // Stamped on sign-in by the lastLoginAt hook (off Session create). Operational, not
+  // versioned — see registries/ignoreFields.
+  lastLoginAt DateTime?
+
   // Platform-level role (for superadmin access)
   platformRole PlatformRole @default(user)
 

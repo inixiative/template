@@ -16,6 +16,7 @@ const userFactory = createFactory('User', {
     displayName: null,
     image: faker.image.avatar(),
     platformRole: PlatformRole.user,
+    lastLoginAt: null,
   }),
 });
 
