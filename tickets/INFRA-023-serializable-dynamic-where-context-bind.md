@@ -64,7 +64,9 @@ Narrowings compose (`parent` chain), so binding is **monotonic partial applicati
 
 This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = resolve that tenant's binds to literals, **preserve** the subtenant's binds as tokens. `seal` becomes "partial bind + collapse."
 
-**Nuance — per-layer name collisions.** A flat bindings map keys by name, so two layers both using `{ bind: 'brandUuid' }` for *different* brands (tenant vs subtenant) would conflate. Resolve stage-by-stage (each stage supplies only its layer's names), or namespace bind names per layer; reject same-name/different-meaning across layers at `validateNarrowing` time.
+**Layer-local resolution (downward-only) — a hard invariant.** A narrowing resolves only the bind tokens **it** introduced, never its parents'. Just as the chain is narrow-only (a child can't widen a parent's `where`), a child can't *rebind* a parent's scope — else a subtenant could resolve `brandUuid` itself and escape the tenant's floor. So `resolveBindings` is **per-layer**, not a flat walk-the-tree-from-one-map: each layer's bindings apply only to that layer's `where`/`sources`. The serialization split (INFRA-016 object↔ref-id, `seal`) must tag each bind with its **owning layer** so the boundary survives round-trips — a subtenant fills its own tokens and inherits the parent's *as tokens* (resolved only by the parent's owner). Same-name collisions across layers (two `{ bind: 'brandUuid' }` meaning different brands) then stop mattering, since resolution is scoped to the owning layer; `validateNarrowing` can still warn.
+
+**Sources hydrate *after* bindings — the order matters.** A source's eligibility `where` (the per-field `sources` Condition) carries bind tokens too — "this brand's missions" = `where brandUuid = { bind: 'brandUuid' }`. So the pipeline is **resolve this layer's bindings → then hydrate sources** (run the now-concrete DISTINCT query) → tenant-specific `sourceValues` → fold into the surface. You can't hydrate before binding: you don't yet know *which* tenant's rows to query. Per layer: resolve binds, then hydrate that layer's sources.
 
 ## Open questions
 
