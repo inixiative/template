@@ -13,7 +13,7 @@ model EmailTemplate {
   name   String // "OTP Verification"
   slug   String // "otp"
   locale String            @default("en")
-  kind   CommunicationKind
+  kind   CommunicationKind @default(activity)
 
   subject String // "Your verification code: {{code}}"
   mjml    String @db.Text // Full MJML with {{component:slug}} and {{variable.*}} placeholders
