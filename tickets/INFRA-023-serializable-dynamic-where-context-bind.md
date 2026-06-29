@@ -1,6 +1,6 @@
 # INFRA-023: Serializable dynamic `where` — context-bind values in the Condition DSL
 
-**Status**: 🆕 Not Started
+**Status**: 🟢 Core built in json-rules (`feat/context-bind-values` / PR #4); model decided 2026-06-29 — see FEAT-004 there for the implementation plan + semver call.
 **Assignee**: Aron
 **Priority**: Medium (High once per-slug / per-tenant narrowings must persist as config — e.g. email templates)
 **Created**: 2026-06-29
@@ -58,31 +58,34 @@ The only runtime input is then the bindings map, supplied where context is known
 Narrowings compose (`parent` chain), so binding is **monotonic partial application**, not all-or-nothing:
 
 - Any layer may introduce `{ bind }` tokens in its `where`/`sources`.
-- `resolveBindings(lensOrNarrowing, bindings)` is a chain→chain transform: it resolves the tokens the map covers and **leaves the rest as tokens**; `requiredBindings` shrinks accordingly.
+- `resolveLensBindings(lensOrNarrowing, bindings)` is a chain→chain transform: it resolves the tokens the map covers and **leaves the rest as tokens**; `lensRequiredBindings` shrinks accordingly. (`resolveBindings`/`requiredBindings` are the Condition-level primitives it builds on.)
 - Stages bind what they know: `{ brandUuid }` at request/author time, `{ recipientUuid }` at send. Execution (`check`/`toPrisma`) requires `requiredBindings` to be **empty** — else throw.
 - Resolving only ever **narrows** (a bound literal adds a concrete filter), never widens — consistent with the chain's existing narrow-only invariant (`validateNarrowing`).
 
 This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = resolve that tenant's binds to literals, **preserve** the subtenant's binds as tokens. `seal` becomes "partial bind + collapse."
 
-**Layer-local resolution (downward-only) — a hard invariant.** A narrowing resolves only the bind tokens **it** introduced, never its parents'. Just as the chain is narrow-only (a child can't widen a parent's `where`), a child can't *rebind* a parent's scope — else a subtenant could resolve `brandUuid` itself and escape the tenant's floor. So `resolveBindings` is **per-layer**, not a flat walk-the-tree-from-one-map: each layer's bindings apply only to that layer's `where`/`sources`. The serialization split (INFRA-016 object↔ref-id, `seal`) must tag each bind with its **owning layer** so the boundary survives round-trips — a subtenant fills its own tokens and inherits the parent's *as tokens* (resolved only by the parent's owner). **Reusing a parent's bind name is therefore safe — don't forbid it.** Under per-layer resolution a child's `{ bind: 'brandUuid' }` is a *different slot* from the parent's, filled by the child's own map; it can never fill the parent's token. And because the chain ANDs every layer's `where` (narrow-only), the worst a child can do by binding `brandUuid` is over-narrow *itself* to empty (`parentBrand AND childBrand` → ∅, fail-closed) — never widen past the parent's floor. A *no-reuse* rule is the wrong lever: it only matters under a flat global map (which we explicitly don't use), it **leaks the parent's internal bind names** (you'd have to expose them to forbid collision, but the parent's `where` is stripped from the child's surface), and it's unenforceable at author time. So: resolve per-layer with per-layer maps; `validateNarrowing` may *warn* on a visible same-name collision, never hard-reject.
+**Unique names + `parent:` (decided) — downward-only without per-layer maps.** Bind names are **unique across a composed chain**: a layer may not re-declare a name an ancestor already declares. `validateNarrowing` reads the ancestors' occupied names (`lensRequiredBindings(narrowing.parent)`) and **hard-errors** on a collision, naming it so the author picks better — *not* a warning. Because every name is unique, a single bindings map keyed by name is unambiguous, and downward-only falls out for free: a child can't *re-bind* a parent's scope because it can't even declare the parent's name. To *intentionally* reuse an inherited binding, the child references it read-only as **`parent:name`** — it draws the same value as the ancestor's `name`, is excluded from the collision check, and a `parent:` ref no ancestor declares is rejected. (This supersedes the earlier "reuse is safe — don't forbid it" sketch, which assumed per-layer maps; the unique-name rule is cleaner, is enforceable at author time, and the collision message is itself the "see what the parent occupies" affordance.)
 
 **Sources hydrate *after* bindings — the order matters.** A source's eligibility `where` (the per-field `sources` Condition) carries bind tokens too — "this brand's missions" = `where brandUuid = { bind: 'brandUuid' }`. So the pipeline is **resolve this layer's bindings → then hydrate sources** (run the now-concrete DISTINCT query) → tenant-specific `sourceValues` → fold into the surface. You can't hydrate before binding: you don't yet know *which* tenant's rows to query. Per layer: resolve binds, then hydrate that layer's sources.
 
 ## Legibility — reading a complex narrowing's binds
 
-You should never have to eyeball raw `where`s across a deep chain to know what a lens needs. Two affordances:
+You should never have to eyeball raw `where`s across a deep chain to know what a lens needs. Because names are unique across the chain, **the name is the key** — no assigned layer ids are needed (this is why intrinsic lens/narrowing identity, earlier proposed here, dropped out):
 
-- **`describeBindings(lensOrNarrowing)`** — the introspection answer, and it works on the **full object-form** lens already: walk the live `parent` chain and group binds by layer **position / object identity** — no assigned ids needed, available in-memory pre-serialization. Returns binds **grouped by owning layer**, e.g. `[{ layer, declares: ['brandUuid'], pending: true }, { layer, declares: ['region'], pending: true }]`. `requiredBindings` is the flat-set shorthand over the same walk. You *ask the lens*; you don't read its `where`s.
-- **Layer-*qualified names* (`<layer>:<name>`)** need a *stable* id — and that only exists in the ref-id (serialized) form today (object-form `parent` is a bare pointer; chain *positions* shift on re-wrap, so they can't be durable keys). Two options: (a) scope qualified names to the serialized/portable view (in-memory uses positional grouping); or (b) **make the layer id intrinsic** — assigned at authoring (lean human-readable *name*, per INFRA-016's "ids vs names" open Q), carried in *both* forms, doubling as the serialization ref. **(b) is cleaner** — object and ref-id forms then agree, and `describeBindings` + qualified names work everywhere. → Feeds back to INFRA-016: promote its "stable identity for lenses and narrowings" from serialize-only to **intrinsic**.
+- **`lensRequiredBindings(lensOrNarrowing)` → `Set<string>`** — every bind name the lens needs supplied; `parent:` refs collapse to their base name. Pass `narrowing.parent` to see exactly the names a child must not collide with. You *ask the lens*; you don't read its `where`s.
+- **`parent:name`** is the only qualifier needed — it marks an inherited, read-only reference. Since the bare name is already unique chain-wide, there's nothing further to disambiguate.
 
-Net: simple to author (bare local names, per-layer); legible to inspect (positional grouping in-memory, qualified names once ids are intrinsic).
+## Decided 2026-06-29
 
-## Open questions
+- **Bind preprocesses into the lens — nothing new downstream.** `resolveLensBindings` → concrete lens → existing `applyLens`/`toPrisma`/`toSql`/`sources`/projection unchanged. Drops the `bindings`-plumbing, intrinsic-identity, and projection-folding work this ticket originally pulled in.
+- **Unique names + collision = hard error; `parent:name` for intentional read-only reuse.** (See above; supersedes the per-layer-maps sketch.)
+- **`seal` deferred** — "idk if we need right now." Serialization-by-ref + sealed handoff stay INFRA-016, needed only once lenses persist across a tenant boundary; the binding tokens already serialize.
 
-- Token vocabulary + where it's declared (a per-app bindings registry?).
-- Missing *required* binding → throw (decided above). Remaining nuance: distinguish a missing binding (caller bug → throw) from a deliberately-empty value (follows filter-first: fail closed, never widen).
-- Interaction with `seal` (INFRA-016): does sealing resolve binds to literals for a fixed tenant, or preserve them for a still-dynamic subtenant?
-- Is `requiredBindings` its own primitive, or surfaced through `describeRule` (INFRA-017)? (Proposing standalone, with `describeRule` able to include it.)
+## Still open
+
+- Token vocabulary + where it's declared (a per-app bindings registry?) — needed once lenses persist, not for the email path.
+- **Semver**: additive under the decided design → 2.11 vs cut 3.0.0 anyway. See FEAT-004.
+- Missing-vs-deliberately-empty binding nuance (caller bug → throw; empty → fail closed, never widen).
 
 ## Related Tickets
 
