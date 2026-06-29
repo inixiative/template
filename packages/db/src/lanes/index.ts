@@ -1,1 +1,1 @@
-export { claimLane, laneKey, watchLane } from './lanes';
+export { claimLane, laneKey, releaseLane, watchLane } from './lanes';

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { claimLane, laneKey, watchLane } from '@template/db/lanes/lanes';
+import { claimLane, laneKey, releaseLane, watchLane } from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins;
@@ -55,5 +55,24 @@ describe('supersede lane baton', () => {
     await sleep(700);
     stop();
     expect(usurped).toBe(false);
+  });
+
+  test('releaseLane drops the baton only if we still hold it (fenced)', async () => {
+    const lane = laneKey('h', 'release');
+    await claimLane(lane, 'job-a');
+    await releaseLane(lane, 'job-b'); // not the holder — must NOT delete job-a's baton
+    expect(await redis.get(lane)).toBe('job-a');
+    await releaseLane(lane, 'job-a'); // the holder — drops it
+    expect(await redis.get(lane)).toBeNull();
+  });
+
+  test('watchLane refreshes the TTL while this job still holds the lane', async () => {
+    const lane = laneKey('h', 'refresh');
+    await claimLane(lane, 'job-a');
+    await redis.pexpire(lane, 2000); // would lapse soon without a refresh
+    const stop = watchLane(lane, 'job-a', () => {});
+    await sleep(1200); // > two polls (500ms) — a poll while we hold refreshes the TTL back up
+    stop();
+    expect(await redis.pttl(lane)).toBeGreaterThan(5000); // refreshed well past the original 2s
   });
 });

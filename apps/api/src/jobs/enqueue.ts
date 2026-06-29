@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { claimLane, db, laneKey } from '@template/db';
+import { claimLane, db, laneKey, releaseLane } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
@@ -63,8 +63,16 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
+  // Claim the lane BEFORE adding so the job holds the baton the instant it starts. If the add then
+  // fails, no job exists to hold the baton — roll the claim back (fenced, so a concurrent claim isn't
+  // clobbered) rather than leaving the prior job superseded by a phantom that never ran.
   if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
-  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  try {
+    await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  } catch (err) {
+    if (dedupeKey) await releaseLane(laneKey(handlerName, dedupeKey), jobId).catch(() => {});
+    throw err;
+  }
   if (type === JobType.adhoc) await tripIfFull();
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);

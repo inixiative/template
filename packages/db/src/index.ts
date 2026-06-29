@@ -23,7 +23,7 @@ export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
-export { claimLane, laneKey, watchLane } from './lanes';
+export { claimLane, laneKey, releaseLane, watchLane } from './lanes';
 // Distributed lock
 export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities
