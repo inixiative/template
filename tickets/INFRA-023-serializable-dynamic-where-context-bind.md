@@ -72,10 +72,10 @@ This is exactly what `seal` (INFRA-016) needs: sealing for a fixed tenant = reso
 
 You should never have to eyeball raw `where`s across a deep chain to know what a lens needs. Two affordances:
 
-- **`describeBindings(lensOrNarrowing)`** — the introspection answer: binds **grouped by owning layer**, e.g. `[{ layer: <id>, declares: ['brandUuid'], pending: true }, { layer: <id>, declares: ['region'], pending: true }]`. `requiredBindings` is the flat-set shorthand over the same walk. You *ask the lens*; you don't read its `where`s.
-- **Layer-qualified names** — leaning on INFRA-016's layer ids, a bind reads as `<layer>:<name>` in the composed/serialized view, so a name is unambiguous and self-describing even on raw inspection (and reuse across layers can't confuse). Authors still write bare local names in their own layer; qualification is automatic at compose — the qualifier *is* the owner, so "who fills this token" is obvious.
+- **`describeBindings(lensOrNarrowing)`** — the introspection answer, and it works on the **full object-form** lens already: walk the live `parent` chain and group binds by layer **position / object identity** — no assigned ids needed, available in-memory pre-serialization. Returns binds **grouped by owning layer**, e.g. `[{ layer, declares: ['brandUuid'], pending: true }, { layer, declares: ['region'], pending: true }]`. `requiredBindings` is the flat-set shorthand over the same walk. You *ask the lens*; you don't read its `where`s.
+- **Layer-*qualified names* (`<layer>:<name>`)** need a *stable* id — and that only exists in the ref-id (serialized) form today (object-form `parent` is a bare pointer; chain *positions* shift on re-wrap, so they can't be durable keys). Two options: (a) scope qualified names to the serialized/portable view (in-memory uses positional grouping); or (b) **make the layer id intrinsic** — assigned at authoring (lean human-readable *name*, per INFRA-016's "ids vs names" open Q), carried in *both* forms, doubling as the serialization ref. **(b) is cleaner** — object and ref-id forms then agree, and `describeBindings` + qualified names work everywhere. → Feeds back to INFRA-016: promote its "stable identity for lenses and narrowings" from serialize-only to **intrinsic**.
 
-Net: simple to author (bare local names, per-layer), legible to inspect (grouped + qualified introspection).
+Net: simple to author (bare local names, per-layer); legible to inspect (positional grouping in-memory, qualified names once ids are intrinsic).
 
 ## Open questions
 
