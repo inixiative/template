@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:tenancy
+ * @uses none
+ */
 import { Role } from '@template/db/generated/client/enums';
 import type { Db, OrganizationId } from '@template/db/index';
 import { makeError } from '#/lib/errors';

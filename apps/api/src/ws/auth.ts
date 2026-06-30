@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:websockets
+ * @uses feature:auth, feature:users, infrastructure:prisma
+ */
 import { db } from '@template/db';
 import { auth } from '#/lib/auth';
 import { findUserByEmail, findUserWithRelations } from '#/modules/user/services/find';

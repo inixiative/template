@@ -102,6 +102,7 @@ packages/db/prisma/
 ```
 packages/db/src/generated/
 ├── client/           # Prisma client
+├── prismaMap.gen.ts  # Runtime model map (@inixiative/prisma-map)
 └── zod/              # Zod schemas (prisma-zod-generator)
 ```
 
@@ -498,12 +499,16 @@ async create({ model, operation, args, query }) {
 }
 ```
 
-For fetching existing records (before hooks), use `delegateFor`:
+For type-safe access via a concrete delegate, use the `query` helper:
 
 ```typescript
-const previous = await delegateFor(db, model).findUnique({ where });
-// previous: Record<string, unknown> | null
+import { db, query } from '@template/db';
+
+const previous = await query.findUnique(db.user, { where: { id } });
+// fully typed from the delegate
 ```
+
+(Inside the lifecycle extension the prior record is fetched by model name via an internal runtime delegate, and hooks receive it as `previous` automatically.)
 
 ---
 
@@ -694,20 +699,9 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
 
-## Constraint Helpers
+## Constraint Helpers (planned — not yet built)
 
-DB-level constraints for protection when connecting directly (psql, migrations). App-level validation is handled by the [rules hook](HOOKS.md#rules-registry).
-
-Located in `packages/db/src/constraints/`.
-
-| Helper | Use Case |
-|--------|----------|
-| `addCheckConstraint` | CHECK constraints |
-| `addUniqueWhereNotNull` | Partial unique indexes |
-| `addGistIndex` | GIST indexes (range queries, exclusion) |
-| `addPolymorphicConstraint` | Ensures exactly one FK is set (uses `FalsePolymorphismRegistry`) |
-
-**Note**: If using these, wire them into db lifecycle (local setup + CI/CD). See TODO.md.
+DB-level constraint helpers (CHECK constraints, partial unique indexes, GIST indexes, exactly-one-FK polymorphic guards) are **not implemented yet** — `packages/db/src/constraints/` does not exist. App-level validation is handled today by the [rules hook](HOOKS.md#rules-registry); add these helpers when DB-level guards are needed. See TODO.md.
 
 ---
 

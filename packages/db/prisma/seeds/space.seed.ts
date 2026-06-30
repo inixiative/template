@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:seed
+ * @uses none
+ */
 import type { Space } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 

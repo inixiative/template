@@ -2,10 +2,10 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent } from '@template/db/test';
 import { EmailRenderError } from '@template/email/render/errors';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 
-const ctx: SaveContext = { ownerModel: 'default', locale: 'en' };
+const ctx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 
 describe('validateNoCycle', () => {
   afterAll(async () => {

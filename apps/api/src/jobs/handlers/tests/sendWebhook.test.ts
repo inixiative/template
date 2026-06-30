@@ -13,6 +13,9 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
 
 const receivedWebhooks: Array<{ url: string; body: unknown; headers: Record<string, string> }> = [];
 
+// Event time is stamped once at the hook and carried through the job; tests pass it explicitly.
+const eventTimestamp = new Date().toISOString();
+
 describe('sendWebhook handler', () => {
   let db: ReturnType<typeof createTestApp>['db'];
   let user: User;
@@ -73,6 +76,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id, name: user.name },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -86,10 +90,12 @@ describe('sendWebhook handler', () => {
 
       expect(receivedWebhooks.length).toBe(1);
       expect(receivedWebhooks[0].url).toBe(testUrl);
+      // timestamp is carried through from the hook unchanged (passthrough, not re-stamped)
       expect(receivedWebhooks[0].body).toEqual({
         model: 'CustomerRef',
         action: 'create',
         payload: { id: user.id, name: user.name },
+        timestamp: eventTimestamp,
       });
 
       expect(receivedWebhooks[0].headers['x-webhook-signature']).toBeDefined();
@@ -111,6 +117,7 @@ describe('sendWebhook handler', () => {
           action: 'update',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -149,6 +156,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -158,6 +166,37 @@ describe('sendWebhook handler', () => {
       expect(event).not.toBeNull();
       expect(event?.status).toBe('unreachable');
       expect(event?.error).toContain('500');
+    });
+
+    it('blocks a redirect instead of following it (SSRF)', async () => {
+      spyOn(globalThis, 'fetch').mockImplementation((() =>
+        Promise.resolve(new Response('', { status: 302, statusText: 'Found' }))) as typeof fetch);
+
+      const testUrl = getUniqueUrl('/redirect');
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: testUrl,
+        model: 'CustomerRef',
+      });
+
+      await sendWebhook(
+        { db, log: mockLog },
+        {
+          subscriptionId: sub.id,
+          action: 'create',
+          resourceId: user.id,
+          data: { id: user.id },
+          timestamp: eventTimestamp,
+        },
+      );
+
+      const event = await db.webhookEvent.findFirst({
+        where: { webhookSubscriptionId: sub.id },
+      });
+      expect(event).not.toBeNull();
+      expect(event?.status).toBe('error');
+      expect(event?.error).toContain('Blocked redirect');
     });
 
     it('creates error event on network failure', async () => {
@@ -179,6 +218,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -207,6 +247,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -225,6 +266,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -265,6 +307,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -312,6 +355,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 
@@ -351,6 +395,7 @@ describe('sendWebhook handler', () => {
           action: 'create',
           resourceId: user.id,
           data: { id: user.id },
+          timestamp: eventTimestamp,
         },
       );
 

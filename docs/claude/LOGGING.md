@@ -33,7 +33,11 @@
 
 ## Logger
 
-Located in `@template/shared/logger`. Uses [consola](https://github.com/unjs/consola) with automatic scope tagging.
+Located in `@template/shared/logger`. The `log` facade writes through a swappable
+adapter (`packages/shared/src/logger/logger.ts`): [pino](https://github.com/pinojs/pino)
+(`pinoAdapter.ts`) in deployed environments, and [consola](https://github.com/unjs/consola)
+(`consolaAdapter.ts`) in `local`/`test` for readable dev output. Either way, scope
+tagging is automatic.
 
 ### Usage
 

@@ -9,56 +9,56 @@
 // `apps/api/src/hooks/falsePolymorphism/registry.ts`.
 
 model TagAttachment {
-    id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-    createdAt DateTime  @default(now())
-    deletedAt DateTime?
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
-    // Resource — false polymorphism. resourceModel restricts to PascalCase
-    // entries of TagResource (the model names); camelCase entries
-    // (use-cases) are not valid attachment resources.
-    resourceModel  TagResource
-    userId         String? @db.VarChar(36)
-    organizationId String? @db.VarChar(36)
-    spaceId        String? @db.VarChar(36)
-    // ==========================================================================
-    // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
-    // ==========================================================================
+  // Resource — false polymorphism. resourceModel restricts to PascalCase
+  // entries of TagResource (the model names); camelCase entries
+  // (use-cases) are not valid attachment resources.
+  resourceModel  TagResource
+  userId         String?     @db.VarChar(36)
+  organizationId String?     @db.VarChar(36)
+  spaceId        String?     @db.VarChar(36)
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific resource FKs below (e.g. chatGroupId)
+  // ==========================================================================
 
-    tagId String @db.VarChar(36)
+  tagId String @db.VarChar(36)
 
-    user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tag          Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-    // Per-resource uniqueness — partial uniques (see Contact for rationale).
-    // Each partial doubles as a lookup index for that resource FK.
-    @@unique([userId, tagId],         where: { userId:         { not: null } })
-    @@unique([organizationId, tagId], where: { organizationId: { not: null } })
-    @@unique([spaceId, tagId],        where: { spaceId:        { not: null } })
-    @@index([tagId])
+  // Per-resource uniqueness — partial uniques (see Contact for rationale).
+  // Each partial doubles as a lookup index for that resource FK.
+  @@unique([userId, tagId], where: { userId: { not: null } })
+  @@unique([organizationId, tagId], where: { organizationId: { not: null } })
+  @@unique([spaceId, tagId], where: { spaceId: { not: null } })
+  @@index([tagId])
 }
 
 // Mixed enum: PascalCase = physical attachment models, camelCase = use-case
 // concepts (only valid for `Tag.resources`, not `TagAttachment.ownerModel`).
 enum TagResource {
-    // SPECIAL — lowercase, no FK. Used as `Tag.ownerModel` for tags that
-    // aren't owned by any specific row (visible everywhere).
-    platform
+  // SPECIAL — lowercase, no FK. Used as `Tag.ownerModel` for tags that
+  // aren't owned by any specific row (visible everywhere).
+  platform
 
-    // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
-    // TagAttachment (and Tag, when used as the tag's owner) via the
-    // falsePolymorphism registry.
-    User
-    Organization
-    Space
+  // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
+  // TagAttachment (and Tag, when used as the tag's owner) via the
+  // falsePolymorphism registry.
+  User
+  Organization
+  Space
 
-    // USE-CASE CONCEPTS — camelCase. Only valid in `Tag.resources`.
-    userMessages
+  // USE-CASE CONCEPTS — camelCase. Only valid in `Tag.resources`.
+  userMessages
 
-    // ==========================================================================
-    // TEMPLATE ABOVE — Add app-specific resources below.
-    // PascalCase = new attachment models (also add FK + falsePolymorphism entry).
-    // camelCase  = new use-cases (no FK).
-    // ==========================================================================
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific resources below.
+  // PascalCase = new attachment models (also add FK + falsePolymorphism entry).
+  // camelCase  = new use-cases (no FK).
+  // ==========================================================================
 }

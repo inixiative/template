@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type { ModelName } from '@template/db/utils/modelNames';
 
 // ============================================================================
@@ -208,6 +214,9 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           admin: [],
           Organization: ['organizationId'],
           Space: ['organizationId', 'spaceId'],
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],
@@ -222,6 +231,9 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           admin: [],
           Organization: ['organizationId'],
           Space: ['organizationId', 'spaceId'],
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],
@@ -247,6 +259,23 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           EmailTemplate: ['subjectEmailTemplateId'],
           EmailComponent: ['subjectEmailComponentId'],
           CustomerRef: ['subjectCustomerRefId'],
+        },
+      },
+    ],
+  },
+
+  CommunicationLog: {
+    axes: [
+      {
+        field: 'senderType',
+        fkMap: {
+          platform: [],
+          admin: [],
+          User: ['senderUserId'],
+          Organization: ['senderOrganizationId'],
+          Space: ['senderSpaceId'],
+          OrganizationUser: ['senderUserId', 'senderOrganizationId'],
+          SpaceUser: ['senderUserId', 'senderSpaceId'],
         },
       },
     ],

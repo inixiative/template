@@ -1,7 +1,7 @@
 import { homedir } from 'os';
 import { join } from 'path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
-import { execAsync } from '../utils/exec';
+import { execAsync, execFileAsync } from '../utils/exec';
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');
@@ -218,8 +218,9 @@ class InfisicalApi {
           });
         } else if (error instanceof Error && error.message.includes('secretKeyCiphertext')) {
           // E2EE-enabled project — CLI handles the encryption
-          await execAsync(
-            `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
+          await execFileAsync(
+            'infisical',
+            ['secrets', 'set', `--projectId=${projectId}`, `--env=${environment}`, `--path=${path}`, `${key}=${value}`],
             { env: { ...process.env, PATH: CLI_PATH } },
           );
         } else {

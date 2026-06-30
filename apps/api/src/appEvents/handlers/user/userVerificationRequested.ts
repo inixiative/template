@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:appEvents
+ * @uses none
+ */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type UserVerificationRequestedPayload = {
@@ -8,12 +14,8 @@ export type UserVerificationRequestedPayload = {
 export const userVerificationRequested = makeAppEvent<UserVerificationRequestedPayload>({
   email: (data) => [
     {
-      to: [{ userIds: [data.userId] }],
       template: 'email-verification',
-      data: {
-        buttonUrl: data.verificationUrl,
-        buttonText: 'Verify Email',
-      },
+      data: { userId: data.userId, verificationUrl: data.verificationUrl },
     },
   ],
   observe: (data) => ({ userId: data.userId }),

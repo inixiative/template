@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant
+ * @partOf primitive:shared
+ * @uses none
+ */
 export const RELATION_OPERATORS = ['some', 'every', 'none', 'is', 'isNot'] as const;
 
 export const ARRAY_FIELD_OPERATORS = ['in', 'notIn'] as const;

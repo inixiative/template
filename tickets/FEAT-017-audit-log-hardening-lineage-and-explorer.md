@@ -58,7 +58,7 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 
 ### Follow-Up Handshake
 
-- [ ] Confirm retention/cold-storage ownership with `INFRA-007` and `INFRA-009`
+- [ ] Confirm retention/cold-storage ownership with `INFRA-007` and `INFRA-020`
 - [ ] Define the minimum event taxonomy needed for audit browsing and export
 - [ ] Decide what belongs in this ticket vs a dedicated audit UI follow-up
 
@@ -93,19 +93,19 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 
 ## Resources
 
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md)
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md)
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md)
-- [INFRA-009: Audit Log Cold Storage](./INFRA-009-audit-logs-cold-storage.md)
+- [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md)
 - [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md)
 
 ---
 
 ## Related Tickets
 
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md)
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md)
 - [FEAT-016: Inquiry Lineage & Nesting](./FEAT-016-inquiry-lineage-and-nesting.md)
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md)
-- [INFRA-009: Audit Log Cold Storage](./INFRA-009-audit-logs-cold-storage.md)
+- [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md)
 
 ---
 

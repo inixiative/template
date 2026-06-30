@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { faker } from '@faker-js/faker';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
@@ -31,3 +37,4 @@ const contactFactory = createFactory('Contact', {
 
 export const buildContact = contactFactory.build;
 export const createContact = contactFactory.create;
+export const upsertContact = contactFactory.upsert;

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ * @uses infrastructure:prisma, feature:webhooks
+ */
 import crypto from 'node:crypto';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
@@ -8,10 +14,11 @@ export type SendWebhookPayload = {
   action: WebhookEventAction;
   resourceId: string;
   data: Record<string, unknown>; // JSON payload to send
+  timestamp: string; // ISO-8601 event time, stamped once at the hook
 };
 
 export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) => {
-  const { subscriptionId, action, resourceId, data } = payload;
+  const { subscriptionId, action, resourceId, data, timestamp } = payload;
   const { db } = ctx;
 
   const subscription = await db.webhookSubscription.findUnique({ where: { id: subscriptionId } });
@@ -20,7 +27,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
-  const body = { model: subscription.model, action, payload: data };
+  // timestamp (event time, carried from the hook) is inside the signed body so receivers can reject replays
+  const body = { model: subscription.model, action, payload: data, timestamp };
   const bodyJson = JSON.stringify(body);
 
   // Sign payload with RSA-SHA256
@@ -37,10 +45,17 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Webhook-Signature': signature },
       body: bodyJson,
+      // Never follow redirects: the URL passed SSRF validation at registration, but a
+      // 3xx hop has not — following it would let a receiver bounce us to an internal
+      // address (e.g. cloud metadata) and POST the signed body there.
+      redirect: 'manual',
       signal: AbortSignal.timeout(5000),
     });
 
-    if (!response.ok) {
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      error = `Blocked redirect from webhook URL (HTTP ${response.status})`;
+      status = 'error';
+    } else if (!response.ok) {
       error = `HTTP ${response.status}: ${response.statusText}`;
       status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
     }

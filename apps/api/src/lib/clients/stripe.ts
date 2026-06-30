@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf integration:stripe
+ * @uses none
+ */
 export {};
 
 /*

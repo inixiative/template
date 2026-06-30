@@ -8,8 +8,9 @@ Canonical instructions for all coding agents in this repository.
 **This is a template, not a product.** Developer experience (DX) is the #1 priority. Every decision — naming, file structure, API design, decomposition — should optimize for the next developer who reads the code.
 
 - **Naming matters.** If a name doesn't clearly describe what the thing does, rename it. Do not leave misleading or generic names for convenience.
+- **DO NOT WRITE COMMENTS. This is a hard rule, not a style preference.** Code must be self-documenting through precise naming and clean structure. A comment is an admission that the code failed to explain itself — so **fix the code, never annotate it**. Comments rot, drift out of sync, lie, and make files *harder* to scan, not easier. **Never** explain *what* the code does (the code already says that), **never** narrate your reasoning or restate a name, and **never** add a comment out of a sense of thoroughness or to "help the reader." The ONLY permitted comments are: (1) the structured `@atlas` annotation block at the top of a file, and (2) — rarely, and only when genuinely unavoidable — a single short line capturing a non-obvious *why* the code itself cannot express (a workaround for an external bug, a load-bearing invariant, a subtle gotcha). Default to **zero** comments. If you catch yourself writing one, stop and rename or restructure instead. When in doubt, delete it.
 - **One file, one concern.** Each file should have a single clear purpose. If a file has multiple exported functions that serve different consumers, split them. The cost of an extra file is near zero; the cost of hunting through a multi-purpose file is real.
-- **YAGNI applies to scope invention, not to completion.** See section 0.2 for the precise rule.
+- **YAGNI applies to scope invention, not to completion.** See section 0.3 for the precise rule.
 - **No continuous support debt.** Build things that are self-explanatory and do not require hand-holding. If a consumer needs to read the source code to understand the API, the API is wrong.
 - **Adversarial reviews should run regularly.** After any significant implementation, run an adversarial review in the background against the full scope of changes. Do not wait for the user to ask. Flag issues proactively.
 
@@ -25,7 +26,18 @@ Canonical instructions for all coding agents in this repository.
 - **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
 - **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
 
-## 0.1. Decomposition by Default
+## 0.1. Understand the Why First
+
+Before touching the *how* of anything non-trivial, hold the **why** — what the thing is *for*, the problem it exists to solve. Purpose is the frame that makes every downstream choice legible; without it you optimize in the dark.
+
+This is not throat-clearing. Working a mechanism without holding its purpose produces **category errors that feel like progress**: you strip the wrong thing, "simplify" away the load-bearing part, call a dead snapshot "already fine," conflate two concerns because at the mechanism level they rhyme. Each looks locally reasonable and is wrong because it serves no real goal. Correctness is relative to intent — the purpose is the only thing that tells you whether a mechanism choice is *right*.
+
+- **Ask "what is this for?" before "how does it work?"** If you can't state the purpose in a sentence, you're not ready to change the code. Find it — in the user's words, the docs, the consumers, the commit that introduced it — or ask.
+- **A hint about intent is the highest-value input there is.** When the user tells you what something is for, that reframes everything; treat it as ground truth and re-derive from it — don't paste it on top of your mechanism-level model.
+- **Re-anchor after long stretches of mechanism.** Plumbing pulls you down to the token level. Surface periodically and re-ask: does this still serve the why? Repeated "are you sure?" pushback means you've lost the frame — stop and recover the purpose before continuing.
+- **Everything downstream depends on it.** A primitive's boundaries, what's load-bearing vs incidental, how to decompose it (§0.2) — all fall out of what it's for.
+
+## 0.2. Decomposition by Default
 
 Before undertaking any task or planning any approach, decompose first. Do not jump to implementation. Break the problem into its atomic concerns before deciding how to solve it.
 
@@ -44,11 +56,11 @@ Before undertaking any task or planning any approach, decompose first. Do not ju
 
 Never merge distinct concerns into one place for convenience — the convenience is temporary, the coupling is permanent. When the impulse is to do the quick thing, pause and ask whether the quick thing creates a coupling that will cost more later. If the decomposed version is only marginally more work, do it. The codebase should get more decomposed over time, not less.
 
-## 0.2. YAGNI — Scope Invention vs. Completion
+## 0.3. YAGNI — Scope Invention vs. Completion
 
-YAGNI is about **what was asked**, not **how complete the asked-for thing is**. Two distinct rules, often conflated.
+**The error runs BOTH directions — be vigilant for both.** Overbuilding (scope invention) and underbuilding (trimming real completion) are equal failure modes, and both feel virtuous from the inside: trimming feels *disciplined*, adding feels *thorough*. Neither is the safe default. The danger in both is the **silent** call — quietly adding coupling the author didn't want, or quietly deleting a thing the author wanted. Watch yourself in both directions, not just the one that's salient.
 
-**YAGNI applies to: scope invention.** Adding things adjacent to the task that nobody asked for. Symptoms:
+**Overbuild (scope invention).** Adding things adjacent to the task that nobody asked for. Symptoms:
 
 - Extra fields on a model "in case we need them later"
 - Wrapper functions around single-call sites
@@ -58,16 +70,38 @@ YAGNI is about **what was asked**, not **how complete the asked-for thing is**. 
 - Re-exports / barrels that nothing imports
 - Comments explaining what well-named code already says
 
-**YAGNI does NOT apply to: completing the asked-for thing.** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* applying YAGNI here:
+**Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* trimming:
 
 - Shipping a v1 that forces a v2 in a week (binary support, version-awareness, config flexibility)
 - Hardcoding what should be parameterized (CLI flag, regex)
 - Stuffing a thing in one consumer when it belongs as a shared primitive
 - Skipping the API that makes the thing testable / setup-able (static cache, global setup)
+- Deferring a primitive/seam/foundation the codebase deliberately builds ahead of its first consumer
 
-**Discriminator:** ask "is this in service of what was asked, or adjacent to it?" In-service = build. Adjacent = skip.
+**Discriminator:** "is this in service of what was asked, or adjacent to it?" Clear in-service → build. Clearly adjacent noise (dead barrel, redundant comment) → skip. **A genuine judgment call in EITHER direction → flag and ask, don't decide silently** (per §0.4): name it, say which way it leans and why, and ask build-now / defer / drop. Don't silently add on a guess of "thorough," and don't silently trim on a guess of "needed."
 
-**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Build it complete. Is it feature code? Trim hard.
+**Tiebreaker when unsure:** is the thing a foundation (in `packages/shared` or template-level infra)? Lean build-it-complete. Is it feature code? Lean trim. Either way, if it's a real judgment call, surface it — don't bury the add *or* the trim.
+
+## 0.4. Interrogate Before Proposing (Discovery Work)
+
+For anything where the **shape is not yet known** — design, taxonomy, modeling, naming, architecture — the shape is discovered by **interrogation, not assertion**. Lead with questions; hold the confident synthesis until the shape has been interrogated.
+
+- **Interrogate before you propose.** Open the design space before closing it. Ask what you'd need to know; surface the forks. Questions are the deliverable here, not a failure to deliver — a premature closed proposal forecloses the discovery.
+- **At a fork, ASK — do not assume.** When more than one defensible shape exists and the choice depends on intent you don't have, stop and ask. Do not pick the option your prior pattern-matches to and present it as the answer.
+- **Name your assumptions and mark confidence.** Distinguish *recommendation* from *low-confidence guess*. Tag the soft calls so they're easy to spot and challenge — for you as much as for the reader.
+- **Prefer options with tradeoffs over a single recommendation** when the shape is unsettled. Breadth first, commitment later.
+- **Small piece → validate → extend.** Propose one concrete sample, get it validated, then widen. Caps the blast radius of any wrong assumption to one batch.
+- **If you catch yourself assuming, stop.** To assume is to make an *ass* of *u* and *me*. Beware especially of applying a good heuristic (e.g. "keep taxonomies minimal") as a *conclusion* before you've confirmed it fits the actual goal.
+
+This does **not** override section 1's bias to act on clear, in-scope requests. It applies when the work is genuinely shape-finding, not execution.
+
+## 0.5. Verification Discipline
+
+Rigor comes from evidence and gates, not goodwill. Each rule below closes a failure that *feels* productive from the inside.
+
+- **Verify before you assert.** Any claim about existing behavior — a bug, a regression, "this is unsound," "this drops rows" — must be backed by a reproduction: a probe, a failing test, or a traced execution path. "I read it and it looks like X" is a hypothesis, not a finding — do not state it as one. A claim relayed from a subagent, a review tool, or a prior assumption is **unverified until you reproduce it yourself.** Adversarial claims about *working* code carry the highest burden of proof, especially when you're contradicting the author — run the probe before you say it.
+- **No deferral as an escape hatch.** "Ticket it," "not reachable yet," "good enough for now" are honest only when the work is genuinely out of scope. They are **not** a way to dodge in-scope work that is correct to do. If it's correct and in scope, do it now; if it's a real scope fork, surface it per §0.4 — never bury the decision behind a convenient defer. "Defer" is a recommendation you justify, not a reflex you reach for when the work turns fiddly.
+- **Exhaust validation before caveating.** "Couldn't run it here" is a last resort *after* genuinely trying to make it run — crack the env, find the gate, run the thing. A caveat is what remains when the work is *actually* blocked, not when running it is inconvenient. Scoped checks passing is not "validated" (§10), and "typecheck-clean" is not "it works."
 
 ## 1. Mandatory Task Intake (Always)
 
@@ -237,6 +271,22 @@ Read docs based on task type:
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
 - Architecture/monorepo: `docs/claude/ARCHITECTURE.md`, `docs/claude/MONOREPO.md`
+
+## 11.5 Atlas — the code map
+
+This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`).
+
+**To navigate by concept instead of crawling folders:**
+- Read `MAP.md` for the high-level concept map (features / primitives / infrastructure, each with its files + role breakdown).
+- Run `bunx atlas graph --json` for reverse indexes (concept → files, concept → consumers) and `bunx atlas query --kind controller --partOf feature:inquiry` (or a json-rules predicate) to find files by axis.
+- A file's top-of-file `@atlas` block tells you its role + memberships + dependencies before you open it.
+- Prefer these over `grep` for "what touches X" / "what's part of Y".
+
+**When you add or move a file, keep its `@atlas` block true:**
+- `@kind` = the file's ROLE (controller/service/query/schema/handler/client/type/component/hook/page/…), never a layer.
+- `@partOf` = the concept(s) it composes (`feature:*` / `primitive:*` / `infrastructure:*`, or the `superadmin` tag). Multiple is normal.
+- `@uses` = load-bearing dependencies only (the concepts this file's behavior is built on), or `@uses none` if truly none. Not every import.
+- `bunx atlas stamp <path>` fills the derivable `@kind`/`@partOf` from the rules; you curate `@uses` by hand. Validate names exist in `.atlas/concepts.ts`. See the atlas README for the full authoring guide.
 
 ## 12. Tickets and AI Workspace
 

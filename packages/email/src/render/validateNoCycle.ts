@@ -1,8 +1,14 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:email
+ * @uses none
+ */
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
-export const validateNoCycle = async (savingSlug: string, outgoingRefs: string[], ctx: SaveContext): Promise<void> => {
+export const validateNoCycle = async (savingSlug: string, outgoingRefs: string[], ctx: OwnerScope): Promise<void> => {
   // DFS. Each stack frame carries the chain so the error message can name
   // the full cycle: "A → B → C → A".
   const stack: { slug: string; path: string[] }[] = outgoingRefs.map((ref) => ({

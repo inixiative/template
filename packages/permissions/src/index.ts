@@ -16,7 +16,7 @@ export {
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
-export type { ActionRule, ModelPermission, RebacSchema, RelationCheck, RuleCheck } from './rebac/types';
+export type { ActionRule, RebacSchema, RelationCheck, ResourcePermission, RuleCheck } from './rebac/types';
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities

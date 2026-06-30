@@ -108,7 +108,7 @@ class VercelApi {
     projectId: string,
     org: string,
     repo: string,
-    branch: string = 'main',
+    _branch: string = 'main',
     teamId?: string,
   ): Promise<void> {
     return this.vcr.capture('linkGitHub', async () => {

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auth
+ * @uses none
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { authProviderDeleteRoute } from '#/modules/authProvider/routes/authProviderDelete';

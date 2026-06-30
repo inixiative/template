@@ -104,12 +104,12 @@ describe('auditLog/utils', () => {
   describe('buildContextFkFields', () => {
     it('uses record.id as contextOrganizationId for Organization', () => {
       const result = buildContextFkFields('Organization', { id: 'org-123' });
-      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: null });
+      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: null, contextUserId: null });
     });
 
     it('uses organizationId plus record.id for Space', () => {
       const result = buildContextFkFields('Space', { id: 'space-123', organizationId: 'org-123' });
-      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123' });
+      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123', contextUserId: null });
     });
 
     it('passes through organizationId and spaceId for composite members', () => {
@@ -118,7 +118,11 @@ describe('auditLog/utils', () => {
         spaceId: 'space-123',
         userId: 'user-123',
       });
-      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123' });
+      expect(result).toEqual({
+        contextOrganizationId: 'org-123',
+        contextSpaceId: 'space-123',
+        contextUserId: 'user-123',
+      });
     });
   });
 

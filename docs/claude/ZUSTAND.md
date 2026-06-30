@@ -39,13 +39,11 @@
     - [getCurrentContext()](#getcurrentcontext)
     - [getNavContext()](#getnavcontext)
   - [Usage Patterns](#usage-patterns)
-- [4. ApiSlice](#4-apislice)
+- [4. ClientSlice](#4-clientslice)
   - [State](#state)
   - [Actions](#actions)
-    - [setBaseUrl(url)](#setbaseurlurl)
-    - [setAuthToken(token)](#setauthtokentoken)
-    - [setSpoofUserEmail(email)](#setspoofuseremailemail)
-  - [QueryClient Usage](#queryclient-usage)
+    - [setClient(client)](#setclientclient)
+  - [Live queries](#live-queries)
   - [Usage Patterns](#usage-patterns)
 - [5. UISlice](#5-uislice)
   - [State](#state)
@@ -85,36 +83,54 @@ Composable state slices with Zustand for consistent state management across all 
 
 ## Architecture
 
-**Apps compose Zustand slices:**
+**One shared store, composed once and reused by all apps.** The store is built in
+`packages/ui/src/store/index.ts` and consumed via `@template/ui/store`. Web,
+admin, and superadmin all import the same `useAppStore` — there is no per-app
+store composition.
 
-- **Web/Admin:** 6 slices (Auth, Permissions, Tenant, API, UI, Navigation)
-- **Superadmin:** 5 slices (Auth, Permissions, API, UI, Navigation - no Tenant)
+The store composes **6 slices**: Client, Auth, Navigation, Permissions, Tenant,
+UI.
 
 ```typescript
-// apps/web/app/store/index.ts
+// packages/ui/src/store/index.ts
+import { createAuthSlice } from '@template/ui/store/slices/auth';
+import { createClientSlice } from '@template/ui/store/slices/client';
+import { createNavigationSlice } from '@template/ui/store/slices/navigation';
+import { createPermissionsSlice } from '@template/ui/store/slices/permissions';
+import { createTenantSlice } from '@template/ui/store/slices/tenant';
+import { createUISlice } from '@template/ui/store/slices/ui';
+import type { AppStore } from '@template/ui/store/types';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import {
-  createApiSlice,         // QueryClient + API config
-  createAuthSlice,        // User + session + orgs + spaces
-  createNavigationSlice,  // Router navigation + nav config
-  createPermissionsSlice, // ReBAC (Permix)
-  createTenantSlice,      // Context switching
-  createUISlice,          // Theme + UI state
-} from '@template/ui';
-
-export type AppStore = ApiSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 
 export const useAppStore = create<AppStore>()(
   devtools((...a) => ({
-    ...createApiSlice(...a),
+    ...createClientSlice(...a),
     ...createAuthSlice(...a),
     ...createNavigationSlice(...a),
     ...createPermissionsSlice(...a),
     ...createTenantSlice(...a),
     ...createUISlice(...a),
-  }), { name: 'AppStore' }),
+  }), { name: 'SharedAppStore' }),
 );
+```
+
+`AppStore` is the intersection of all slice types
+(`packages/ui/src/store/types/index.ts`):
+
+```typescript
+export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
+```
+
+Apps consume it directly:
+
+```typescript
+// apps/web/app/main.tsx — wire the QueryClient into the store at boot
+import { useAppStore } from '@template/ui/store';
+useAppStore.getState().setClient(queryClient);
+
+// any app component
+const theme = useAppStore((state) => state.ui.theme);
 ```
 
 **Why Zustand?**
@@ -124,7 +140,7 @@ export const useAppStore = create<AppStore>()(
 - DevTools support
 - Slice composition pattern
 
-**Shared slice creators** in `@template/ui/store/slices/*` ensure:
+**Shared slice creators** in `packages/ui/src/store/slices/*` (`@template/ui/store/slices/*`) ensure:
 - Consistent state shape across apps
 - Reusable logic
 - Single source of truth
@@ -133,7 +149,7 @@ export const useAppStore = create<AppStore>()(
 
 ## 1. AuthSlice
 
-**Location:** `/packages/shared/src/store/slices/auth.ts`
+**Location:** `packages/ui/src/store/slices/auth.ts`
 
 ### State
 
@@ -273,7 +289,7 @@ await logout();
 
 ## 2. PermissionsSlice
 
-**Location:** `/packages/shared/src/store/slices/permissions.ts`
+**Location:** `packages/ui/src/store/slices/permissions.ts`
 
 ### State
 
@@ -357,7 +373,7 @@ const { can } = usePermission('organization', org);
 
 ## 3. TenantSlice
 
-**Location:** `/packages/shared/src/store/slices/tenant.ts`
+**Location:** `packages/ui/src/store/slices/tenant.ts`
 
 ### State
 
@@ -495,87 +511,62 @@ tenant.selectSpace('space-456');
 
 ---
 
-## 4. ApiSlice
+## 4. ClientSlice
 
-**Location:** `/packages/shared/src/store/slices/api.ts`
+**Location:** `packages/ui/src/store/slices/client.ts` (type: `packages/ui/src/store/types/client.ts`)
+
+Holds the TanStack `QueryClient` and the live-query websocket. The store is the
+home for the query client so it can be reached outside React (e.g. `auth.initialize()`
+fetches `/me` before render).
 
 ### State
 
 ```typescript
 {
-  baseUrl: string;                // API base URL
-  client: typeof client;          // OpenAPI client
-  queryClient: QueryClient;       // TanStack Query client
-  spoofUserEmail: string | null;  // For dev/testing
+  client: QueryClient | null;   // TanStack Query client (set at app boot)
+  websocket: ApiWebsocket;      // live-query websocket (channelKey subscriptions)
 }
 ```
 
 ### Actions
 
-#### setBaseUrl(url)
+#### setClient(client)
 
-Change API base URL:
-
-```typescript
-api.setBaseUrl('https://api.example.com');
-```
-
-#### setAuthToken(token)
-
-Set JWT bearer token:
+Wire the app's `QueryClient` into the store (called once in `main.tsx`). Also
+subscribes the query cache to live-query channels: when an observer is added for a
+registered live query, the websocket subscribes to its `channelKey`; when removed,
+it unsubscribes.
 
 ```typescript
-api.setAuthToken(jwtToken);
-// Sets header: Authorization: Bearer {token}
+// apps/web/app/main.tsx
+useAppStore.getState().setClient(queryClient);
 ```
 
-#### setSpoofUserEmail(email)
+### Live queries
 
-Enable user spoofing (dev/testing):
-
-```typescript
-api.setSpoofUserEmail('admin@example.com');
-// Sets header: spoof-user-email: admin@example.com
-```
-
-### QueryClient Usage
-
-```typescript
-// Access QueryClient
-const queryClient = useAppStore((state) => state.api.queryClient);
-
-// Or use hook
-import { useQueryClient } from '@template/ui';
-const queryClient = useQueryClient();
-
-// Invalidate queries
-queryClient.invalidateQueries({ queryKey: ['organizations'] });
-
-// Fetch outside React
-const result = await queryClient.fetchQuery(meReadOptions());
-```
-
-**Why in store?**
-- Allows calling `queryClient.fetchQuery()` outside React components
-- Used by `auth.initialize()` to fetch `/me` before render
+`createClientSlice` derives the `ws(s)://` URL from `VITE_API_URL`, builds the
+`ApiWebsocket` (`createApiWebsocket`), and on reconnect refetches any live queries
+to recover invalidations missed while disconnected. Live-query registration lives in
+`@template/shared/ws` (`LIVE_QUERIES`, `channelKey`); the connect is driven by
+`useApiWebsocket` (see [WEBSOCKETS.md](WEBSOCKETS.md)).
 
 ### Usage Patterns
 
 ```typescript
-// Access client
-const client = useAppStore((state) => state.api.client);
-const data = await client.GET('/organizations');
+// Access the query client
+const client = useAppStore((state) => state.client);
+client?.invalidateQueries({ queryKey: ['organizations'] });
 
-// Access QueryClient
-const queryClient = useAppStore((state) => state.api.queryClient);
-await queryClient.fetchQuery(someOptions());
+// Or via hook
+import { useQueryClient } from '@tanstack/react-query';
+const queryClient = useQueryClient();
 ```
 
 ---
 
 ## 5. UISlice
 
-**Location:** `/packages/shared/src/store/slices/ui.ts`
+**Location:** `packages/ui/src/store/slices/ui.ts`
 
 ### State
 
@@ -653,7 +644,7 @@ const appName = useAppStore((state) => state.ui.appName);
 
 ## 6. NavigationSlice
 
-**Location:** `/packages/shared/src/store/slices/navigation.ts`
+**Location:** `packages/ui/src/store/slices/navigation.ts`
 
 ### State
 
@@ -760,7 +751,7 @@ const userName = useAppStore((state) => state.auth.user?.name);
 
 ```typescript
 // Access store outside React
-import { useAppStore } from '#/store';
+import { useAppStore } from '@template/ui/store';
 
 const state = useAppStore.getState();
 const user = state.auth.user;
@@ -782,7 +773,9 @@ TenantSlice ───> AuthSlice (reads organizations/spaces)
 
 PermissionsSlice (standalone)
 
-ApiSlice (standalone)
+ClientSlice (standalone)
+
+NavigationSlice (standalone)
 
 UISlice (standalone)
 ```
@@ -804,10 +797,10 @@ export const createAuthSlice: StateCreator<AuthSlice & TenantSlice> = (set, get)
 
 ## DevTools
 
-**Enabled in all apps:**
+**Enabled once in the shared store (all apps share it):**
 
 ```typescript
-devtools((...a) => ({ ...slices }), { name: 'AppStore' })
+devtools((...a) => ({ ...slices }), { name: 'SharedAppStore' })
 ```
 
 **Access:** Redux DevTools extension in browser
@@ -824,12 +817,12 @@ devtools((...a) => ({ ...slices }), { name: 'AppStore' })
 
 ### 1. Slice Composition
 
-**DO:** Compose slices in app stores:
+**DO:** Compose slices in the shared store type:
 ```typescript
-export type AppStore = ApiSlice & AuthSlice & PermissionsSlice & TenantSlice & UISlice;
+export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
 ```
 
-**DON'T:** Create app-specific slices in apps - keep them in `@template/ui`
+**DON'T:** Create app-specific slices or per-app stores — the store is composed once in `@template/ui/store` and shared by all apps
 
 ### 2. Selectors
 
@@ -893,17 +886,25 @@ const logout = () => {
 
 ### Adding a New Slice
 
-1. **Create slice in shared:**
+1. **Create the slice type:**
    ```typescript
-   // packages/shared/src/store/slices/mySlice.ts
+   // packages/ui/src/store/types/mySlice.ts
    export type MySlice = {
      mySlice: {
        data: string;
        setData: (data: string) => void;
      };
    };
+   ```
 
-   export const createMySlice: StateCreator<MySlice> = (set) => ({
+2. **Create the slice creator:**
+   ```typescript
+   // packages/ui/src/store/slices/mySlice.ts
+   import type { AppStore } from '@template/ui/store/types';
+   import type { MySlice } from '@template/ui/store/types/mySlice';
+   import type { StateCreator } from 'zustand';
+
+   export const createMySlice: StateCreator<AppStore, [], [], MySlice> = (set) => ({
      mySlice: {
        data: '',
        setData: (data) => set((state) => ({ mySlice: { ...state.mySlice, data } })),
@@ -911,33 +912,22 @@ const logout = () => {
    });
    ```
 
-2. **Export from shared index:**
+3. **Add to the shared store + AppStore type:**
    ```typescript
-   // packages/shared/src/store/index.ts
-   export * from './slices/mySlice';
+   // packages/ui/src/store/types/index.ts — add MySlice to the intersection
+   export type AppStore = ClientSlice & ... & MySlice;
+
+   // packages/ui/src/store/index.ts — spread the creator
+   ...createMySlice(...a),
    ```
 
-3. **Add to app stores:**
-   ```typescript
-   // apps/{web,admin,superadmin}/app/store/index.ts
-   import { createMySlice, type MySlice } from '@template/ui';
-
-   export type AppStore = ApiSlice & AuthSlice & ... & MySlice;
-
-   export const useAppStore = create<AppStore>()(
-     devtools((...a) => ({
-       ...createApiSlice(...a),
-       ...createMySlice(...a),
-       // ...
-     })),
-   );
-   ```
+   All apps pick it up automatically through `@template/ui/store`.
 
 ### Removing a Slice
 
-1. Remove from app store compositions
-2. Remove from `@template/ui` exports
-3. Delete slice file
+1. Remove the creator spread from `packages/ui/src/store/index.ts`
+2. Remove from the `AppStore` intersection in `packages/ui/src/store/types/index.ts`
+3. Delete the slice + type files
 4. Search codebase for usage and remove
 
 ---
@@ -945,16 +935,19 @@ const logout = () => {
 ## File Reference
 
 ```
-packages/shared/src/store/
+packages/ui/src/store/
 ├── slices/
-│   ├── api.ts          # ApiSlice
+│   ├── client.ts       # ClientSlice (QueryClient + websocket)
 │   ├── auth.ts         # AuthSlice
+│   ├── navigation.ts   # NavigationSlice
 │   ├── permissions.ts  # PermissionsSlice
 │   ├── tenant.ts       # TenantSlice
-│   ├── ui.ts           # UISlice
-│   └── navigation.ts   # NavigationSlice (planned)
-└── index.ts            # Re-exports
+│   └── ui.ts           # UISlice
+├── types/
+│   ├── client.ts, auth.ts, navigation.ts, permissions.ts, tenant.ts, ui.ts
+│   └── index.ts        # AppStore intersection + re-exports
+└── index.ts            # Composes useAppStore (shared by all apps)
 
-apps/{web,admin,superadmin}/app/store/
-└── index.ts            # App-specific store composition
+apps/{web,admin,superadmin}/app/
+└── main.tsx            # Calls useAppStore.getState().setClient(queryClient)
 ```

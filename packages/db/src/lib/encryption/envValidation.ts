@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 import { z } from 'zod';
 

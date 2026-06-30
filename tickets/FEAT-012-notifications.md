@@ -1,6 +1,6 @@
 # FEAT-012: App Events System & Notification Workflows
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-02-06

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { GITHUB_CLASSIFIERS } from '@template/shared/contact/constants/github';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { type GithubValue, parseGithubUrl } from '@template/shared/contact/parsers';

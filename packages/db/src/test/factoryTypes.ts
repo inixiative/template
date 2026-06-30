@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import type * as runtime from '@prisma/client/runtime/client';
 import type { Prisma } from '@template/db/generated/client/client';
 
@@ -7,6 +12,8 @@ export type ModelName = Prisma.ModelName;
 export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<Prisma.TypeMap['model'][K]['payload']>;
 
 export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
+
+export type WhereUniqueOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
 
 export type Serialized<T> = T extends Date
   ? string
@@ -58,7 +65,7 @@ export type TypedBuildResult<
   context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
 };
 
-import type { Identifier } from '@template/db/utils/runtimeDataModel';
+import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 export type DependencyConfig = {
   modelName: ModelName;
@@ -77,4 +84,9 @@ export type Factory<K extends ModelName> = {
     context?: BuildContext,
   ) => Promise<BuildResult<K, O>>;
   create: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
+  upsert: (
+    where: WhereUniqueOf<K>,
+    overrides?: Partial<CreateInputOf<K>>,
+    context?: BuildContext,
+  ) => Promise<BuildResult<K>>;
 };

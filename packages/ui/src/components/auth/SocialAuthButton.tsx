@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Button } from '@template/ui/components/primitives/Button';
 
 export type SocialAuthButtonProps = {

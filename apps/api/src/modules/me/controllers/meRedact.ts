@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates
+ */
 import { makeController } from '#/lib/utils/makeController';
 import { meRedactRoute } from '#/modules/me/routes/meRedact';
 import { redactUser } from '#/modules/user/services/redactUser';

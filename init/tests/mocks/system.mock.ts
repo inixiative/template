@@ -95,6 +95,19 @@ export const createMockSystem = () => {
               else resolve({ stdout, stderr });
             });
           }),
+        // Routed through mockExec as a joined command string so existing
+        // substring/regex stubs keep matching execFile-based call sites.
+        execFileAsync: (file: string, args?: string[], options?: unknown) =>
+          new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+            mockExec(
+              [file, ...(args ?? [])].join(' '),
+              options,
+              (error: Error | null, stdout: string, stderr: string) => {
+                if (error) reject(error);
+                else resolve({ stdout, stderr });
+              },
+            );
+          }),
       }));
     },
     clearAll: () => {

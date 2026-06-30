@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:websockets
+ * @uses primitive:shared
+ */
 import type { SerializedQueue } from '@template/shared/utils';
 import type { ServerWebSocket } from 'bun';
 

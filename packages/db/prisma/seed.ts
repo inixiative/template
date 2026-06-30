@@ -1,4 +1,10 @@
 #!/usr/bin/env bun
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:seed
+ * @uses primitive:shared, infrastructure:prisma
+ */
 
 import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
@@ -87,7 +93,7 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
   );
 };
 
-const seed = async () => {
+export const seed = async () => {
   const isProduction = process.env.NODE_ENV === 'production';
 
   log.info('Starting database seed...', LogScope.seed);
@@ -106,9 +112,11 @@ const seed = async () => {
   log.success('Seed completed!', LogScope.seed);
 };
 
-seed()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    log.error('Seed failed:', error, LogScope.seed);
-    process.exit(1);
-  });
+if (import.meta.main) {
+  seed()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      log.error('Seed failed:', error, LogScope.seed);
+      process.exit(1);
+    });
+}

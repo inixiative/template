@@ -5,50 +5,60 @@
 // Supports polymorphic ownership: default (all tenants), admin (platform), Organization (tenant-branded)
 
 model EmailComponent {
-  id        String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  slug   String                // "default-header"
-  mjml   String               @db.Text // MJML with {{component:slug}} and {{variable.*}} placeholders
-  locale String               @default("en")
+  slug   String // "default-header"
+  mjml   String @db.Text // MJML with {{component:slug}} and {{variable.*}} placeholders
+  locale String @default("en")
 
   // Pre-computed component refs (populated on save)
-  componentRefs String[]      // Slugs of nested {{component:slug}} references
+  componentRefs         String[] // Slugs of nested {{component:slug}} references
+  degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)
   spaceId        String?         @db.VarChar(36)
+  userId         String?         @db.VarChar(36)
 
   // For org-owned: should spaces inherit this component?
   inheritToSpaces Boolean @default(true)
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
 
   // Per-owner uniqueness — partial uniques per ownerModel branch (see Contact
   // for rationale). default/admin have no FK; Organization populates orgId;
-  // Space populates spaceId (orgId also populated by polymorphism hook).
+  // Space populates spaceId + orgId (caller-supplied; validated by the FP rule, not auto-populated).
   // default + admin are FK-less platform variants; merged into one partial
   // (keyed on ownerModel) so '(foo,en,default)' and '(foo,en,admin)' coexist
   // while duplicates within either are blocked. Org/Space partials add the
   // tenant FK to allow per-tenant duplicates of the same slug/locale.
-  @@unique([slug, locale, ownerModel],     where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailComponent_slug_locale_platform_key")
-  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"),         map: "EmailComponent_slug_locale_organization_key")
-  @@unique([slug, locale, spaceId],        where: raw("\"ownerModel\" = 'Space'"),                map: "EmailComponent_slug_locale_space_key")
+  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin') AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_platform_key")
+  @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_organization_key")
+  @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_space_key")
+  @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_user_key")
+  @@unique([slug, locale, organizationId, userId], where: raw("\"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_orguser_key")
+  @@unique([slug, locale, spaceId, userId], where: raw("\"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "EmailComponent_slug_locale_spaceuser_key")
   @@index([ownerModel])
   @@index([organizationId])
+  @@index([userId])
   // Reverse-lookup: "which components reference this slug?" — used by
   // the save-side cycle validator and future editor "find usages".
   @@index([componentRefs(ops: ArrayOps)], type: Gin)
 }
 
 enum EmailOwnerModel {
-  default      // Base resources - read: all, write: super admin
-  admin        // Platform internal - super admin only
+  default // Base resources - read: all, write: super admin
+  admin // Platform internal - super admin only
   Organization // Tenant-branded - org admins
-  Space        // Space-specific overrides
+  Space // Space-specific overrides
+  User // User chain floor — a user's personal template/component
+  OrganizationUser // User-owned within an org
+  SpaceUser // User-owned within a space
 }

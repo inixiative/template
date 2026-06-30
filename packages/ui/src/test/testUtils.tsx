@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import type { AppStore } from '@template/ui/store/types';
 import { createTestStore } from '@template/ui/test/testStore';
 import type { ReactNode } from 'react';

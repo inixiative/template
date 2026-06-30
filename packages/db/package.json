@@ -26,7 +26,7 @@
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api env __TEST_REDIRECT__=1 bun test --max-concurrency=1 packages/db/",
-    "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && bun run scripts/generateScalarSchemas.ts && bun run scripts/generatePrismaMap.ts && echo $(date) > .prisma.gen",
+    "db:generate": "rm -rf src/generated/zod && PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 bunx prisma generate && bun run scripts/generatePrismaMap.ts && bun run scripts/generateScalarSchemas.ts && echo $(date) > .prisma.gen",
     "db:push": "prisma db push",
     "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",
     "db:migrate": "prisma migrate dev",
@@ -37,7 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.5.0",
+    "@inixiative/json-rules": "^2.10.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@supercharge/promise-pool": "^3.3.0",
@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
-    "@inixiative/prisma-map": "^0.0.4",
+    "@inixiative/prisma-map": "^0.1.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/ioredis-mock": "^8.2.7",
     "@types/lodash-es": "^4.17.12",

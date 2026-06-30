@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @partOf primitive:ui
+ */
 import { buildOrganizationUser, buildSpaceUser, buildUser } from '@template/db/test';
 import { handlers as generatedHandlers } from '@template/ui/test/mocks/handlers.gen';
 import { HttpResponse, http } from 'msw';

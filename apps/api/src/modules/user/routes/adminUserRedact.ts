@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 

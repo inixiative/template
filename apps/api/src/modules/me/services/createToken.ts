@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:users
+ * @uses infrastructure:prisma, feature:auth
+ */
 import { createHash, randomBytes } from 'node:crypto';
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';

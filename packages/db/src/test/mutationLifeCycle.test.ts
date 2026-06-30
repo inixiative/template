@@ -71,6 +71,19 @@ describe('mutationLifeCycle', () => {
       expect(hookFn).toHaveBeenCalledTimes(2);
     });
 
+    it('registers a hook for an array of models', async () => {
+      const hookFn = mock(() => Promise.resolve());
+
+      registerDbHook('test-hook-array', ['User', 'Session'], HookTiming.before, [DbAction.create], hookFn);
+
+      for (const model of ['User', 'Session', 'Account']) {
+        await executeHooks(HookTiming.before, { model, operation: 'create', action: DbAction.create, args: {} });
+      }
+
+      // Fires for each listed model, not for the unlisted one.
+      expect(hookFn).toHaveBeenCalledTimes(2);
+    });
+
     it('skips duplicate hook registration with same name', async () => {
       const hookFn1 = mock(() => Promise.resolve());
       const hookFn2 = mock(() => Promise.resolve());

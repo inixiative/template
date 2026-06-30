@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ * @uses infrastructure:prisma
+ */
 import { type ModelName, toAccessor } from '@template/db';
 import { log } from '@template/shared/logger';
 import { type ArchiveConfig, archiveStaleRecords } from '#/jobs/handlers/archiveStaleRecords';

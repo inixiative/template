@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { type MeReadResponses, meRead } from '@template/sdk';
 import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
 import type { AppStore } from '@template/ui/store/types';

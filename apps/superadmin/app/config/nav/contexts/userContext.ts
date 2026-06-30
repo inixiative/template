@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind config
+ * @partOf superadmin
+ * @uses none
+ */
 import type { NavItem } from '@template/ui/components';
 import { communicationsItem } from '#/config/nav/features/communications';
 import { dashboardItem } from '#/config/nav/features/dashboard';

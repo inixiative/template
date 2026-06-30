@@ -36,6 +36,10 @@ docker-compose up -d
 "$ROOT_DIR/scripts/db/wait-postgres.sh"
 "$ROOT_DIR/scripts/db/wait-redis.sh"
 
+echo "Provisioning MinIO buckets..."
+P="${PROJECT_NAME:-template}"
+"$ROOT_DIR/scripts/db/minio-provision.sh" "${P}-system" "${P}-user" "${P}-system-test" "${P}-user-test"
+
 echo "Generating database client..."
 bun run db:generate
 

@@ -1,8 +1,9 @@
-import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
-import type { WSEvent } from '@template/shared/ws';
-
-export type { EmailTarget, ResolvedRecipient };
-
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:appEvents
+ * @uses feature:email, primitive:shared
+ */
 export type AppEventActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
@@ -20,21 +21,19 @@ export type AppEventPayload<T = Record<string, unknown>> = {
   timestamp: string;
 };
 
-export type EmailSenderContext = {
-  ownerModel: 'default' | 'Organization' | 'Space' | 'User';
-  organizationId?: string;
-  spaceId?: string;
-  userId?: string;
-};
-
 export type EmailHandoff = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
   template: string;
   data: Record<string, unknown>;
-  sender?: EmailSenderContext;
-  tags?: string[];
+};
+
+// Generic websocket envelope: target a set of channels OR a set of users, with an
+// arbitrary message payload. A declarative query-refetch (WSEvent) is just one kind
+// of `message.data` — the producer computes the channel(s) (e.g. channelKey(queryKey))
+// and wraps the event. Broader than refetch-only: also serves user-targeted pushes,
+// presence, toasts, etc.
+export type WSHandoff = {
+  target: { channels: string[] } | { userIds: string[] };
+  message: { data: Record<string, unknown> };
 };
 
 export type ObserveData = Record<string, unknown>;
@@ -45,7 +44,7 @@ export type ObserveAdapter = {
 
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
-  websocket?: (data: T) => WSEvent[] | null;
+  websocket?: (data: T) => WSHandoff[] | null;
   observe?: (data: T) => ObserveData | null;
 
   cb?: Array<(data: T) => Promise<void> | void>;

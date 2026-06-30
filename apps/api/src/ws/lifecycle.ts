@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:websockets
+ * @uses none
+ */
 import { byChannel, byId, byUser, clearRegistry, removeConnection } from '#/ws/registry';
 import type { WSSocket } from '#/ws/types';
 

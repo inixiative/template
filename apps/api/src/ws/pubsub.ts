@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:websockets
+ * @uses infrastructure:redis
+ */
 // @wip — cross-server WebSocket pub/sub layer not yet finalized.
 // Known TODOs for the next pass:
 //   - Three duplicate switches on `type` (init handler, fallback in publish,

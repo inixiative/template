@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, feature:contact
+ */
 import { createRoute } from '#/lib/routeTemplates';
 import {
   CONTACT_CREATE_IMMUTABLE_FIELDS,

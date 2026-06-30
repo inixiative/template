@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ * @uses infrastructure:prisma
+ */
 import type { OrganizationId } from '@template/db';
 import { type Entitlements, getOrgPermissions, intersectEntitlements, lesserRole } from '@template/permissions';
 import type { Context } from 'hono';

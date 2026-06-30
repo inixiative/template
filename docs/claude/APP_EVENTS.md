@@ -301,7 +301,10 @@ See `tickets/FEAT-012-notifications.md` for full roadmap.
 
 ## WebSockets
 
-Located in `apps/api/src/ws/`. Redis pub/sub for multi-instance support.
+Backend in `apps/api/src/ws/`, Redis pub/sub for multi-instance support. The
+socket is a **query-refetch** channel — it never carries domain data, only
+"this query is stale, refetch it." See [WEBSOCKETS.md](WEBSOCKETS.md) for the
+full contract; this is the realtime layer behind an app event's `websocket` reach.
 
 ### Connection
 
@@ -309,25 +312,27 @@ Located in `apps/api/src/ws/`. Redis pub/sub for multi-instance support.
 ws://localhost:8000?token=<bearer_token>
 ```
 
-### Client Messages
+### Channels
+
+Channels are exact-match keys derived from a query's identity via `channelKey({ _id, path })`
+(`@template/shared/ws`) — e.g. `adminBotRead:id:b1`. List surfaces collapse onto one
+channel because `channelKey` drops query params. Identity is set by message
+(`authenticate` / `spoof` / `unspoof` / `logout`), gated by a verified token.
+
+Server → client events are the `WSEvent` discriminated union, e.g.:
 
 ```typescript
-{ "action": "subscribe", "channel": "org:abc123" }
-{ "action": "unsubscribe", "channel": "org:abc123" }
-{ "action": "ping" }
-{ "action": "disconnect" }
-```
-
-### Server Messages
-
-```typescript
-{ "type": "connected", "connectionId": "...", "userId": "..." }
-{ "type": "subscribed", "channel": "org:abc123" }
-{ "type": "pong", "timestamp": 1234567890 }
+{ "category": "query", "action": "refetch", "key": { "_id": "adminBotRead", "path": { "id": "b1" } } }
 ```
 
 ### Frontend
 
-- `useWebSocket` hook (currently named `useAppEvents` — rename pending)
-- `useEventRefetch` — match events to TanStack Query invalidation rules
-- Auto-connect session hook — not yet wired into app layouts
+The hook is **`useApiWebsocket()`** (`packages/ui/src/hooks/useApiWebsocket.ts`) —
+mounted once at each app root (`__root.tsx`) and connecting on load. It is wired
+in all three apps. The refetch model:
+
+- `packages/ui/src/lib/ws/createApiWebsocket.ts` — channel refcount Map + heartbeat.
+- `packages/ui/src/lib/ws/dispatch.ts` — `query.refetch` → `invalidateQueries([event.key])`.
+- The **client slice** (`packages/ui/src/store/slices/client.ts`) pipes mounted live
+  queries to channel subscriptions (gated by `LIVE_QUERIES`); `setClient` wires the
+  query-cache subscriber and recovers missed invalidations on reconnect.

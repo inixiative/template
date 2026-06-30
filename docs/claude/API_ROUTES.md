@@ -948,19 +948,15 @@ import { makeError } from '#/lib/errors';
 throw makeError({
   status: 404,
   message: 'Organization not found',
-  requestId: c.get('requestId'),
 });
 
 // Status defaults to 500, message defaults to HTTP status name
-throw makeError({
-  requestId: c.get('requestId'),
-});
+throw makeError({});
 
 // Override default guidance
 throw makeError({
   status: 404,
   guidance: 'tryAgain',
-  requestId: c.get('requestId'),
 });
 
 // Include field errors for validation
@@ -968,9 +964,12 @@ throw makeError({
   status: 422,
   message: 'Invalid input',
   fieldErrors: { email: ['Must be a valid email'] },
-  requestId: c.get('requestId'),
 });
 ```
+
+> `makeError` options are `{ status?, message?, guidance?, fieldErrors? }` only —
+> do **not** pass `requestId`. The error handler stamps `requestId` onto the
+> thrown `AppError` from request context, so every error response carries it.
 
 **How it works:**
 

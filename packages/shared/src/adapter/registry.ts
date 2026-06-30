@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:shared
+ * @uses none
+ */
 export type AdapterRegistry<A> = {
   register: (name: string, adapter: A) => void;
   get: (name: string) => A;

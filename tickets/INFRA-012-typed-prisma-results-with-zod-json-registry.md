@@ -226,7 +226,7 @@ Each `compute` runs once per row per requested field. Branding is a pointer-equa
 
 ## Related Tickets
 
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md) — `AuditLog.changeSet` is a prime candidate for the JSON registry.
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md) — `AuditLog.changeSet` is a prime candidate for the JSON registry.
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) — shape of typed primitives across the stack.
 
 ---

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import { Icon } from '@iconify/react';
 import type { MeCreateTokenData } from '@template/sdk';
 import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';

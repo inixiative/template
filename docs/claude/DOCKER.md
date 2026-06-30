@@ -122,13 +122,13 @@ See `tickets/INFRA-011-railway-buckets.md` for the full adapter design and `docs
 ### Manual Docker Commands
 
 ```bash
-# View logs
-docker logs -f template-postgres
-docker logs -f template-redis
+# View logs (container names are ${PROJECT_NAME:-template}_<service>)
+docker logs -f ${PROJECT_NAME:-template}_postgres
+docker logs -f ${PROJECT_NAME:-template}_redis
 
 # Shell into container
-docker exec -it template-postgres psql -U postgres -d template
-docker exec -it template-redis redis-cli
+docker exec -it ${PROJECT_NAME:-template}_postgres psql -U postgres -d template
+docker exec -it ${PROJECT_NAME:-template}_redis redis-cli
 
 # Restart single service
 docker-compose restart postgres

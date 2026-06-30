@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:jobs
+ * @uses infrastructure:redis, infrastructure:prisma
+ */
 import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
@@ -7,6 +13,8 @@ import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
 import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { flushOutbox } from '#/jobs/outbox';
+import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
@@ -82,11 +90,17 @@ export const initializeWorker = async (): Promise<void> => {
   log.info('Job worker initialized', LogScope.worker);
 
   await registerCronJobs();
+
+  // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
+  startOutboxDrainLoop();
+
   await enqueueJob('rotateEncryptionKeys', undefined, { id: 'rotateEncryptionKeys' });
 
   onShutdown(async () => {
     log.info('Stopping job worker...', LogScope.worker);
-    if (jobsWorker) await jobsWorker.close();
+    stopOutboxDrainLoop(); // stop arming new drain ticks before tearing down the worker/queue
+    if (jobsWorker) await jobsWorker.close(); // stop processing first — no new spills from finishing jobs
+    await flushOutbox(); // then persist any buffered overflow spills
     if (workerRedis) await workerRedis.quit();
     log.info('Job worker stopped', LogScope.worker);
   });

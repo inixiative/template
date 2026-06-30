@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:auth
+ * @uses none
+ */
 import { encryptField } from '@template/db/lib/encryption/helpers';
 import { isEmpty } from 'lodash-es';
 import { getResource } from '#/lib/context/getResource';

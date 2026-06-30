@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:websockets
+ * @uses none
+ */
 // Storage layer for the local WS connection registry — the maps + generic index
 // primitives + create/delete. Sibling files attach meaning: identity.ts (byUser),
 // subscriptions.ts (byChannel), delivery.ts (reads + sends), lifecycle.ts (sweeps).

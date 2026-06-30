@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind page
+ * @partOf feature:tenancy
+ * @uses primitive:ui
+ */
 import { createFileRoute } from '@tanstack/react-router';
 import { Unauthorized } from '@template/ui/components';
 import { OrganizationUsersPage } from '@template/ui/pages';

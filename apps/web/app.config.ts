@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind config
+ */
 import { defineConfig } from '@tanstack/start/config';
 import viteTsConfigPaths from 'vite-tsconfig-paths';
 

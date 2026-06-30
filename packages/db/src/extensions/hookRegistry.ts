@@ -1,4 +1,12 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
+
 import { LogScope, log } from '@template/shared/logger';
+import { castArray } from 'lodash-es';
 
 export enum DbAction {
   create = 'create',
@@ -55,7 +63,7 @@ const hookRegistry = new Set<string>();
 
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
-  model: string | '*',
+  model: string | string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
@@ -71,17 +79,24 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
 
-  registeredHooks[model] ??= {
-    [HookTiming.before]: {},
-    [HookTiming.after]: {},
-  };
+  for (const target of castArray(model)) {
+    registeredHooks[target] ??= {
+      [HookTiming.before]: {},
+      [HookTiming.after]: {},
+    };
 
-  for (const action of actions) {
-    registeredHooks[model][timing][action] ??= [];
-    registeredHooks[model][timing][action]!.push(hook as HookFunction);
+    for (const action of actions) {
+      registeredHooks[target][timing][action] ??= [];
+      registeredHooks[target][timing][action]!.push(hook as HookFunction);
+    }
   }
 };
 
+// Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
+// must run AFTER another (e.g. emailVersioning augments the snapshot auditLog writes, so it must
+// follow auditLog) relies on registration order, which per-model re-registration can silently break.
+// TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
+// check over the declared orderings.
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];

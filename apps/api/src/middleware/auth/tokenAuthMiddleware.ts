@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf feature:auth
+ * @uses infrastructure:redis, infrastructure:prisma, primitive:authz
+ */
 import { createHash } from 'node:crypto';
 import { cache, cacheKey, upsertCache } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
@@ -27,8 +33,8 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
     const token = await cache<TokenWithRelations | null>(
       cacheKey('Token', { keyHash }),
-      () =>
-        db.token.findUnique({
+      async () => {
+        const found = await db.token.findUnique({
           where: {
             keyHash,
             isActive: true,
@@ -53,7 +59,12 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
               },
             },
           },
-        }),
+        });
+        // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request
+        // hot path and avoids a fire-and-forget write racing the later batch reads (P2028).
+        if (found) await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
+        return found;
+      },
       TOKEN_CACHE_TTL, // 10-minute TTL to balance performance with security (revoked tokens re-checked)
     );
 
@@ -82,16 +93,6 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         token.spaceUser,
         { ttl: TOKEN_CACHE_TTL },
       );
-
-    // Update lastUsedAt (fire and forget, don't block request)
-    db.token
-      .update({
-        where: { id: token.id },
-        data: { lastUsedAt: new Date() },
-      })
-      .catch((err) => {
-        log.warn('token lastUsedAt update failed', { tokenId: token.id, err }, LogScope.auth);
-      });
 
     c.set('token', token);
 

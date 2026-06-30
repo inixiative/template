@@ -1,3 +1,10 @@
+/**
+ * @atlas
+ * @kind store
+ * @partOf primitive:ui
+ * @uses none
+ */
+import type { AppStore } from '@template/ui/store/types';
 import type { StateCreator } from 'zustand';
 
 export type Theme = 'light' | 'dark' | 'system';
@@ -16,7 +23,7 @@ export type UISlice = {
   };
 };
 
-export const createUISlice: StateCreator<UISlice> = (set) => ({
+export const createUISlice: StateCreator<AppStore, [], [], UISlice> = (set) => ({
   ui: {
     theme: 'system',
     isLoading: false,

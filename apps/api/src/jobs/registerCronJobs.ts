@@ -1,10 +1,16 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:jobs
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { isValidHandlerName } from '#/jobs/handlers';
-import { queue } from '#/jobs/queue';
-import { JobType } from '#/jobs/types';
+import { queue as defaultQueue } from '#/jobs/queue';
+import { type JobsQueue, JobType } from '#/jobs/types';
 
-export const registerCronJobs = async (): Promise<void> => {
+export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise<void> => {
   const cronJobs = await db.cronJob.findMany({
     where: { enabled: true },
   });

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { createEncryption } from '@template/db/lib/encryption/encryptionService';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
 import type { EncryptedFieldConfig, EncryptionKeyring } from '@template/db/lib/encryption/types';

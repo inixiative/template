@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz
+ * @uses infrastructure:prisma
+ */
 import type { UserId } from '@template/db';
 import { type Entitlements, getUserPermissions } from '@template/permissions';
 import type { Context } from 'hono';

@@ -1,4 +1,10 @@
-import { dialect } from '#/lib/prisma/dialect';
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
+import { dialect } from '@template/db/lens';
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // The clause for one field under the broad global `search` term. Operator depends

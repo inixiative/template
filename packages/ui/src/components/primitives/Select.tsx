@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import type { SelectOption } from '@template/ui/lib/enumOptions';
 import { cn } from '@template/ui/lib/utils';
 import type * as React from 'react';

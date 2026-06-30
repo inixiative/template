@@ -1,24 +1,17 @@
-import type { Condition } from '@inixiative/json-rules';
-import type { AccessorName } from '@template/db';
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:authz
+ * @uses none
+ */
+import type { RebacSchema as EngineRebacSchema } from '@inixiative/permissions';
 
-export type RelationCheck = {
-  rel: string; // Field name on record (e.g., 'organization')
-  action: string;
-};
-export type RuleCheck = { rule: Condition };
-export type SelfCheck = { self: string }; // FK field to match against current user (e.g., 'userId')
+export type {
+  ActionRule,
+  RelationCheck,
+  ResourcePermission,
+  RuleCheck,
+  SelfCheck,
+} from '@inixiative/permissions';
 
-export type ActionRule =
-  | string // inherit action from same model
-  | RelationCheck
-  | RuleCheck
-  | SelfCheck
-  | { any: ActionRule[] }
-  | { all: ActionRule[] }
-  | null;
-
-export type ModelPermission = {
-  actions: Record<string, ActionRule>;
-};
-
-export type RebacSchema = Partial<Record<AccessorName, ModelPermission>>;
+export type RebacSchema = EngineRebacSchema;

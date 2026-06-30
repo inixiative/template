@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind config
+ * @partOf infrastructure:env
+ * @uses primitive:shared
+ */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
 import { isTest } from '@template/shared/utils';
 import { z } from 'zod';
@@ -23,8 +29,8 @@ const baseEnvSchema = z
     LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']).optional(),
 
     // URLs
-    API_URL: z.string(),
-    WEB_URL: z.string().optional(),
+    API_URL: z.string().url(),
+    WEB_URL: z.string().url().optional(),
     ADMIN_URL: z.string().optional(),
     SUPERADMIN_URL: z.string().optional(),
 

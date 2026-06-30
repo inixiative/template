@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf primitive:ui
+ * @uses none
+ */
 import * as React from 'react';
 
 const DEBOUNCE_MS = 150;

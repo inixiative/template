@@ -240,7 +240,7 @@ You can combine env composition (via `with-env.sh`) with Turborepo watching:
 
 ```bash
 # Pattern: bun run with <env> <app> turbo watch <tasks>
-# Valid envs: local, test, dev, staging, sandbox, prod
+# Valid envs: local, test, pr, staging, prod
 # Valid apps: api, web, admin, superadmin
 
 # Examples:

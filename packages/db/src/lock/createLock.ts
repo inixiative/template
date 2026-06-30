@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma, infrastructure:redis
+ * @uses none
+ */
 // Single-node Redis lock. Footguns:
 //   - Not Redlock — do not rely across cluster nodes.
 //   - Worker suspension > ttlMs (debugger pause, OS sleep) → key expires + another holder takes it
@@ -7,6 +12,7 @@
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
+import { heartbeat } from '@template/shared/utils';
 
 export type LockOptions = {
   service: string;
@@ -38,15 +44,13 @@ export const createLock = (opts: LockOptions): Lock => {
   const redis = getRedisClient();
   const key = `${redisNamespace.lock}:${service}:${identifier}`;
   const processId = crypto.randomUUID();
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let stop: (() => void) | null = null;
   let missed = 0;
   let declared = false;
 
   const stopHeartbeat = () => {
-    if (heartbeat) {
-      clearInterval(heartbeat);
-      heartbeat = null;
-    }
+    stop?.();
+    stop = null;
   };
 
   const compareAndDelete = async () => {
@@ -77,9 +81,7 @@ export const createLock = (opts: LockOptions): Lock => {
   const acquire = async (): Promise<boolean> => {
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
-    heartbeat = setInterval(() => {
-      tick().catch((err) => log.error(`Lock heartbeat error: ${key}`, err));
-    }, heartbeatMs);
+    stop = heartbeat(tick, heartbeatMs, { onError: (err) => log.error(`Lock heartbeat error: ${key}`, err) });
     return true;
   };
 
