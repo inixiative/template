@@ -1,11 +1,11 @@
 /**
  * @atlas
  * @kind helper
- * @partOf primitive:ui
+ * @partOf primitive:sdk
  * @uses none
  */
 import { createLens, type FieldMap, type FieldMapEntry, type Lens } from '@inixiative/json-rules';
-import type { SdkSchema } from '@template/ui/lib/lenses/sdkSchema';
+import type { SdkSchema } from '@template/sdk/lenses/sdkSchema';
 
 const MAP_NAME = 'sdk';
 

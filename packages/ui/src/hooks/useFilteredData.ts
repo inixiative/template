@@ -31,7 +31,7 @@ export type FilteredData<T> = {
 /**
  * Client-side filtering over an already-fetched collection, in the same rule
  * language the server uses (json-rules `check`). Pass a lens (usually
- * `lensFromOperation(operationId)`, optionally narrowed with picks/omits/sources)
+ * `lensFromOperation(operationId)` from `@template/sdk/lenses`, optionally narrowed with picks/omits/sources)
  * to get a rules-builder surface whose pseudo-enum option sets come from the rows
  * themselves. `lens` and `options` must be referentially stable (memoize them) —
  * a fresh narrowing literal per render recomputes the surface every render. Rules

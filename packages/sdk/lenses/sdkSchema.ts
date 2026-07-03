@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind type
- * @partOf primitive:ui
+ * @partOf primitive:sdk
  * @uses none
  */
 

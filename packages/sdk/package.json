@@ -8,14 +8,18 @@
   "exports": {
     ".": "./src/index.ts",
     "./openapi.gen.json": "./openapi.gen.json",
+    "./lenses": "./lenses/index.ts",
+    "./lenses/*": "./lenses/*",
     "./*": "./src/*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "bun test lenses/",
     "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureSdkIndex.ts && bunx biome check --write --only=assist/source/organizeImports src/index.ts"
   },
   "dependencies": {
-    "@hey-api/client-fetch": "^0.13.1"
+    "@hey-api/client-fetch": "^0.13.1",
+    "@inixiative/json-rules": "^2.14.0"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.94.0",

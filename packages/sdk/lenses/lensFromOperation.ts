@@ -1,14 +1,14 @@
 /**
  * @atlas
  * @kind helper
- * @partOf primitive:ui
- * @uses primitive:sdk
+ * @partOf primitive:sdk
+ * @uses none
  */
 import type { Lens } from '@inixiative/json-rules';
+import { lensFromSchema } from '@template/sdk/lenses/lensFromSchema';
+import { resolveRef } from '@template/sdk/lenses/resolveRef';
+import type { SdkSchema } from '@template/sdk/lenses/sdkSchema';
 import openApiSpec from '@template/sdk/openapi.gen.json';
-import { resolveRef } from '@template/ui/lib/getQueryMetadata';
-import { lensFromSchema } from '@template/ui/lib/lenses/lensFromSchema';
-import type { SdkSchema } from '@template/ui/lib/lenses/sdkSchema';
 
 // The slice of the spec this traversal reads: an SdkSchema node that may instead be a $ref.
 type SpecNode = SdkSchema & {

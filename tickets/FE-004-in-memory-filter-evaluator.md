@@ -28,13 +28,13 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ---
 
-## Shipped design (`packages/ui/src/lib/lenses/`, json-rules ^2.14.0)
+## Shipped design (`packages/sdk/lenses/` + `packages/ui` hook, json-rules ^2.14.0)
 
-### `lib/lenses/lensFromOperation.ts`
+### `@template/sdk/lenses` — `lensFromOperation.ts`
 
 `lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `getQueryMetadata`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
 
-### `lib/lenses/lensFromSchema.ts`
+### `@template/sdk/lenses` — `lensFromSchema.ts`
 
 `lensFromSchema(schema, name)` — the schema walk under it (also usable directly with hand-written or `schemas.gen` schemas; `name` is the view identity, never a Prisma model). Scalars keep their kind (`date-time` → `DateTime`), enums carry values (non-string enums degrade to scalars), Json columns (opaque `{}` in the spec — the generator renders `z.unknown()` that way, so the shape split is deterministic) become `scalar Json`, and inline relation objects become traversable child models (`InquiryItem.sourceUser`). Throws on a fieldless schema instead of building an empty lens.
 
@@ -44,7 +44,7 @@ Hoisted into `@inixiative/json-rules@2.14.0` — the in-memory executor of `sour
 
 Relation to INFRA-024: that ticket is the *server* option-set axis (all-configured sets, records/labels, cascading). The client materializer is used-only **by design** — for filtering rows in hand, an option matching zero fetched rows is noise.
 
-### `hooks/useFilteredData.ts`
+### `@template/ui` — `hooks/useFilteredData.ts`
 
 ```ts
 const lens = useMemo(() => {

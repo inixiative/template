@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
+import { lensFromSchema } from '@template/sdk/lenses/lensFromSchema';
+import type { SdkSchema } from '@template/sdk/lenses/sdkSchema';
 import { useFilteredData } from '@template/ui/hooks/useFilteredData';
-import { lensFromSchema } from '@template/ui/lib/lenses/lensFromSchema';
-import type { SdkSchema } from '@template/ui/lib/lenses/sdkSchema';
 import { act, renderHook } from '@testing-library/react';
 
 const RewardSchema = {
