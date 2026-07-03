@@ -5,7 +5,7 @@
     "": {
       "name": "template",
       "dependencies": {
-        "@inixiative/json-rules": "^2.10.0",
+        "@inixiative/json-rules": "^2.13.1",
         "ink": "^6.8.0",
         "ink-select-input": "^6.2.0",
         "ink-spinner": "^5.0.0",
@@ -78,7 +78,7 @@
         "@bull-board/api": "^6.20.3",
         "@bull-board/hono": "^6.20.3",
         "@hono/zod-openapi": "^1.2.2",
-        "@inixiative/json-rules": "^2.10.0",
+        "@inixiative/json-rules": "^2.13.1",
         "@opentelemetry/auto-instrumentations-node": "^0.76.0",
         "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
@@ -178,7 +178,7 @@
       "name": "@template/db",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.10.0",
+        "@inixiative/json-rules": "^2.13.1",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "@supercharge/promise-pool": "^3.3.0",
@@ -206,7 +206,7 @@
       "name": "@template/email",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.10.0",
+        "@inixiative/json-rules": "^2.13.1",
         "@template/db": "workspace:*",
         "@template/shared": "workspace:*",
         "lodash-es": "^4.18.1",
@@ -251,7 +251,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@hey-api/client-fetch": "^0.13.1",
-        "@inixiative/json-rules": "^2.10.0",
+        "@inixiative/json-rules": "^2.13.1",
         "clsx": "^2.1.1",
         "consola": "^3.4.2",
         "lodash-es": "^4.18.1",
@@ -627,7 +627,7 @@
 
     "@inixiative/atlas": ["@inixiative/atlas@0.1.0", "", { "dependencies": { "@inixiative/json-rules": "^2.6.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-vHLSVVmMmPZcGCMIcO3ojoR6k1Eu0u+xuzlMMB/CaAwX6SaF8seoviRVqWbAuorGrrbuD9V5/y0lL81JPWcDxg=="],
 
-    "@inixiative/json-rules": ["@inixiative/json-rules@2.10.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-WbtrxDNKc4VrqGpa70Ppg/buayMj2Avpf6JTeDJwsoCfmvWvJ3ZcVhfc+Im1Lztu0VRfXV0d6JPS8XiEcuBJBQ=="],
+    "@inixiative/json-rules": ["@inixiative/json-rules@2.13.1", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-SF1nA1694E17o4/V+Ou5OdN825CAQiZwGEbyGiG1TkDkSP8ncqWCQ5UKafXWyhaRQ7/scVoOIm5LGNPyZ8QPrw=="],
 
     "@inixiative/permissions": ["@inixiative/permissions@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^2.10.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-owHklfNmaBfkW0mUQITlaHeLj01rkOU72Xu1xCO1QvqQnhzaJzvaKiOSk29lHUONv67dvKFFPs33WNW8a4h0aw=="],
 
@@ -2586,6 +2586,8 @@
     "@hey-api/shared/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 
     "@inixiative/atlas/@inixiative/json-rules": ["@inixiative/json-rules@2.8.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-gmVPmp+xaFc11EpjMjTILR7ZMNNMHPA5EG6qvd79BFMfXSkfE7ibrcaUTW3FkZk1utz2niMIUP2nql7/kv+JGA=="],
+
+    "@inixiative/permissions/@inixiative/json-rules": ["@inixiative/json-rules@2.10.0", "", { "dependencies": { "dayjs": "^1.11.13" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-WbtrxDNKc4VrqGpa70Ppg/buayMj2Avpf6JTeDJwsoCfmvWvJ3ZcVhfc+Im1Lztu0VRfXV0d6JPS8XiEcuBJBQ=="],
 
     "@inquirer/core/signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 
