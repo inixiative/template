@@ -1,4 +1,4 @@
-# COMM-009: Component slots — passthrough children that aren't registered subcomponents
+# COMM-009: Component slots + hydrated-payload cascade-diff decomposer
 
 **Status**: 🟡 Designed — ready to build
 **Assignee**: Unassigned
@@ -10,49 +10,58 @@
 
 ## Overview
 
-The component composition engine registers *every* nested block. In `packages/email/src/render/extractRefs.ts`, `processLevel` extracts each `{{#component:slug}}…{{/component:slug}}` into the `RefMap` (deduped + variant-indexed via `cleanRefs`), pushes it onto the parent's `refs`, and `saveComponents` persists it as its own `EmailComponent` row; `expand.ts` resolves it through the owner cascade (`lookupCascade`) and `validateNoCycle` guards it.
+The composition engine registers *every* nested block: `processLevel` extracts each `{{#component:slug}}…{{/component:slug}}` into the `RefMap`, and `resolveVariants` forks a wrapper into a `slug--N` row on any inline divergence. There is no way to author a **structural wrapper** (`card` / `layout` / `button-shell`) whose job is to surround caller-provided content, and inline edits contaminate shared component rows.
 
-There is no way to author a **structural wrapper** — a `layout` / `card` / `button-shell` whose job is to wrap caller-provided content — without that inner content becoming a shared, registered, cascading component. The two workarounds are both bad: inline the wrapper at every call site (no reuse), or fragment every bit of content into named components (registry bloat, and one-off local content wrongly becomes shared and subject to the owner cascade + versioning backprop).
+The design below (converged with Zealot `ZLT-3271`/`ZLT-3272`, 2026-07-03) replaces the extract/dedup/variant save path with a **cascade-diff decomposer over hydrated payloads**, and adds a **2-directive** slot/component grammar. It supersedes the earlier `{{#fill}}` / `{{#define}}` proposals — both collapse out.
 
-## Proposal — a slot/fill primitive
+## Directives (2 + a modifier)
 
-Add `{{slot:name}}` (and a bare `{{slot}}` = a single default slot). A slot marks a passthrough position for caller-provided content. Unlike a component ref, a slot is **not** extracted into the `RefMap`, **not** registered/deduped, **not** cascaded, and **not** cycle-checked. At expand time the slot is filled with the caller's body for that named slot.
+- `{{#component:slug}}…{{/component:slug}}` — reference. **Open/close wraps children** (the passthrough). Empty = no passthrough, defaults render.
+- `{{#slot:name}}…{{/slot:name}}` — a slot. In a component's own content = injection point; inside a component ref = an **override** (caller-owned passthrough).
+- `{{#slot:name:default}}…{{/slot:name:default}}` — a slot carrying the component's **default child**. Hydrated into payloads for display; the FE **drops the `:default` modifier** (→ plain `{{#slot:name}}`) the instant a caller overrides it.
 
-- **Named children sections** — a component may expose several named slots (a `card` with `header` / `body` / `footer`). In-scope.
-- **Default children** — a slot may carry default content, rendered when the caller doesn't fill it. Block form `{{#slot:footer}}…default…{{/slot:footer}}`; the self-closing `{{slot:name}}` form has no default (renders empty if unfilled).
-- **Explicit fill syntax** — the caller targets a slot with `{{#fill:name}}…{{/fill:name}}`. Required both to target named slots and to disambiguate fill from an inline component definition (see Dependency attribution).
+No `{{#define}}`, no `{{#fill}}`.
 
-Grammar: keep it in the existing `{{#…}}` / `{{…}}` family so the extractor and parser stay uniform — **not** a single-brace token (`{childpassthrough}`), which collides with `{{var}}` interpolation and `{{#if rule=…}}` conditionals.
+## Save — hydrated payload → cascade diff
 
-## Dependency attribution (the subtle requirement)
+The FE always sends a **fully-hydrated payload** (defaults inlined, marked `:default`). The BE decomposes by **diffing against the owner cascade `(slug, owner)`**, per `{{#component:slug}}` block, scoped to the **current tenant**:
 
-When component X is used inside component Y's **fill** — `{{#component:Y}}{{#fill:body}}{{#component:X}}…{{/component:X}}{{/fill:body}}{{/component:Y}}` — X is the **caller's** content passing through Y's slot. So **X is a child of the caller (the template/component that supplied the fill), not of Y**:
+- `:default`-marked slots = the component's own content; un-marked `{{#slot}}` = caller override → stored on the **caller (template/parent)** row.
+- component's own content **== tenant's existing row** → **noop** (no write, no version bump).
+- **== parent/platform** (differs from tenant, or no tenant row) → **inherit**: plain ref, no fork.
+- **diverges from the whole cascade** → current-tenant write: **same slug = shadow, new slug = fork**.
+- **3-way diff** against the base cascade version the FE hydrated from — avoids a stale upstream edit causing a spurious fork/noop.
 
-- No `Y → X` edge. X is **excluded from Y's `componentRefs`**.
-- Y's fills are **not** cascaded as Y's children, **not** cycle-checked against Y, and **not** included in Y's version back-propagation.
-- The fill's refs attribute to the **caller's** `componentRefs` instead.
+Three tenant ops fall out of the one diff, **no fork primitive**: **override** (local), **shadow** (same slug, tenant-owned, cascade-shadows platform, keeps binding + inheritance), **fork** (new slug = a rename on the FE, decoupled).
 
-This is exactly why fills need explicit `{{#fill}}` syntax — it's the only way `extractRefs` can tell "caller fill (attribute up)" from "Y's inline definition (attribute to Y)" at decompose time.
+## Dependency attribution (recursive)
+
+- a `{{#component:Y}}` inside a **default** → the enclosing component **owns** it → normal parent→child edge.
+- a `{{#component:Y}}` inside an **override/passthrough** → attributes to the **caller**, NOT the wrapper. Excluded from the wrapper's refs, cascade, cycle-check, version back-walk.
+- Same `{{#component}}`; *which region it sits in* decides ownership.
+
+## Render (rehydrate)
+
+Resolve each `{{#component:slug}}` → load its row → per slot: override present → inject it (recurse); else render the `:default`. Then interpolate over the whole tree.
 
 ## Tasks
 
-- [ ] `extractRefs.ts` — recognize `{{slot}}` / `{{#slot}}` and `{{#fill}}`; skip slots from the `RefMap` (never a ref); **attribute fill refs to the caller, not the slotted component**.
-- [ ] `expand.ts` — fill slots from the caller's body at compose time (a new slot-fills input alongside `componentRefs`); render default content when unfilled; reuse the depth-aware block matching (see COMM-006 §1), not a third divergent parser.
-- [ ] `saveComponents` / `saveTemplate` — slots persist nothing; a fill's refs land on the **caller's** refs, not the wrapper's.
-- [ ] `validateNoCycle.ts` — slots/fills aren't refs, can't form a cycle; add a test that a wrapper-with-slot doesn't register or cycle-check its filled content.
-- [ ] Tests — one and multiple named slots; default children (filled vs unfilled); nested wrappers; a fill whose body contains a real `{{#component}}` ref (the ref registers on the **caller**, not the wrapper).
+- [ ] **Cascade-diff decomposer** — replaces `mapRefs`/`cleanRefs` dedup + `resolveVariants` variant-indexing. Per component block: separate `:default` (component-owned) from un-marked overrides (caller-owned); 3-way diff vs cascade → noop / inherit / shadow / fork.
+- [ ] `expand.ts` — rewrite: inject overrides at slot markers, render `:default` for unfilled slots, thread per-call-site slot content (signature change); attribution-aware recursion.
+- [ ] `compose.ts` — thread slot content through the compose signature.
+- [ ] `validateNoCycle.ts` — no edges through overrides/passthroughs; test that a wrapper-with-slot doesn't register its fill.
+- [ ] `saveComponents` — slot-aware fragment validation: `{{#slot:name:default}}` defaults must be valid MJML; bare `{{slot}}` only in flow positions.
+- [ ] Tests — named slots; defaults (filled vs unfilled); nested wrappers; a component inside a default (owned) vs inside an override (attributes to caller); noop/shadow/fork routing; 3-way diff against a moved base.
 
-## Open Questions
+## Side case (not in the general flow)
 
-- **Optionality.** Recommendation: optional-by-default — an unfilled slot with no default renders empty (not an error); a slot with default content renders its default. Required-slot enforcement only if a component needs it.
-- **Manifest vs implicit.** Does a component *declare* its slots, or are they implicit from markup? Lean implicit for the engine; the builder infers the slot list from markup to render fill regions and validate that required slots are filled.
+Editing a component at a **parent tenancy** is not reachable from template editing (which is downward-only, current-tenant). It's an explicit manual action in the component editor, gated to operators with rights at that tier. Only upward write; only place a "used in N templates" warning is needed.
 
-## Related Tickets
+## Related
 
-- COMM-001 (email system), COMM-006 (email versioning hardening — §1 flags the brace-naive `replaceBlock` regex; slot replacement must reuse the depth-aware matching).
-- **Zealot `ZLT-3271`** — the port target (mirror this primitive in `@zealot/email`).
-- **Zealot `ZLT-3272`** — the email-builder design that consumes this primitive (named children / default children in the palette).
+- COMM-001 (email system), COMM-006 (versioning — depth-aware block matching must be reused, not re-forked).
+- Zealot `ZLT-3271` (port target — `@zealot/email`), `ZLT-3272` (builder + lens layer that consumes this).
 
 ## Origin
 
-Surfaced from the Zealot MJML email authoring work (ZLT-3139, `userevidence/Zealot-Monorepo#1574`). Filing upstream so template and Zealot don't drift — this is a composition-engine primitive, not Zealot-specific. Design converged in Zealot `ZLT-3271` / `ZLT-3272` on 2026-07-03 (fill syntax, dependency attribution, named + default children); synced back here.
+Surfaced from the Zealot MJML authoring work (ZLT-3139, `userevidence/Zealot-Monorepo#1574`). Filed upstream so template and Zealot don't drift. Design converged in Zealot `ZLT-3271`/`ZLT-3272` on 2026-07-03 and synced back here.
