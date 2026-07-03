@@ -1,6 +1,6 @@
 # FE-004: In-Memory Filter Evaluator
 
-**Status**: 🚧 In Progress — core shipped (endpoint-derived lens + row-materialized sources + hook); builder-UI wiring remains (INFRA-002/INFRA-017 territory)
+**Status**: 🚧 In Progress — core shipped (endpoint-derived lens in `@template/sdk`; row-materialized sources in json-rules 2.14; the headless hook standardized into `@inixiative/rules-builder@0.15.0` as `useFilteredCollection`); builder-UI wiring remains (INFRA-002/INFRA-017 territory)
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-06-30
@@ -28,7 +28,7 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ---
 
-## Shipped design (`packages/sdk/src/lenses/` + `packages/ui` hook, json-rules ^2.14.0)
+## Shipped design (`packages/sdk/src/lenses/` + rules-builder hook, json-rules ^2.14.0)
 
 ### `@template/sdk/lenses` — `lensFromOperation.ts`
 
@@ -44,28 +44,31 @@ Hoisted into `@inixiative/json-rules@2.14.0` — the in-memory executor of `sour
 
 Relation to INFRA-024: that ticket is the *server* option-set axis (all-configured sets, records/labels, cascading). The client materializer is used-only **by design** — for filtering rows in hand, an option matching zero fetched rows is noise.
 
-### `@template/ui` — `hooks/useFilteredData.ts`
+### `@inixiative/rules-builder@0.15.0` — `useFilteredCollection`
 
 ```ts
-const lens = useMemo(() => {
-  const base = lensFromOperation('rewardsReadMany');
-  return { parent: base, root: { picks: [...], sources: { rewardType: true } } };
+const source = useMemo(() => {
+  const { maps, mapName, model } = lensFromOperation('rewardsReadMany');
+  return { maps, mapName, model, narrowing: { root: { picks: [...], sources: { rewardType: true } } } };
 }, []);
-const { data, rule, setRule, surface } = useFilteredData(rows, lens, options?);
+const { data, root, value, setCondition } = useFilteredCollection({ source, rows, checkOptions? });
 ```
 
-Holds the rule, **coercion-stamps it from the lens** (json-rules 2.13 `stampCoercions` — widget-authored values like date strings and stringified numbers get explicit `coerceType`, so `check()` compares them against wire-format rows without inferring types), filters via `check()`, and exposes `surface` — `exposedSurface` + row-materialized sourceValues — for a rules-builder. `lens`/`options` must be referentially stable (memoize); `CheckOptions.bindings` feeds `{bind}` clauses.
+The hook lives in rules-builder, not `@template/ui`, because it knows only json-rules things (a lens, rows, `check()`) — nothing template-shaped; its one template input (the lens) comes from `@template/sdk/lenses` at the call site. Composed **on** `useRuleBuilder` so there is exactly one `Condition` owner, one option-folding seam (`sourceValuesFromRows` through the builder's `resolve`), and stamp-once (the emitted `value` is already coercion-stamped; `data` is `rows.filter(check(value))`). `source`/`rows`/`checkOptions` must be referentially stable (memoize); `CheckOptions.bindings` feeds `{bind}` clauses.
 
-The same stamping runs server-independently in `@inixiative/rules-builder@0.14.0`: `useRuleBuilder` emits coercion-stamped rules from its composed lens.
+> Superseded sketch (3): `@template/ui`'s `useFilteredData(rows, lens)` — a second `Condition` owner beside `useRuleBuilder`, double-folding `sourceValues` (once into `surface`, again in the builder's `resolve`) and double-stamping. Wiring the two hooks per surface was the drift this ticket exists to kill, one level up.
+
+The template takes `@inixiative/rules-builder@^0.15.0` with its first consumer (INFRA-002/INFRA-017 wiring); no template package depends on it yet.
 
 ## Non-goals
 
 - **Replacing server-side filtering.** Visibility, tenancy/scope, sold-out, and ordering stay in the paginate `where` — they are server-enforced and must not move client-side. This is display-only narrowing on data the client already legitimately holds.
 - Facet counts / leave-one-out rescoping (see scope decision above).
-- A filter-builder UI (INFRA-002 / INFRA-017 territory) — `surface` is its input.
+- A filter-builder UI (INFRA-002 / INFRA-017 territory) — `useFilteredCollection`'s `root` descriptor tree is its input.
 - FE-003's server-query construction (`useDataFilters`/`buildFilterQuery`) — unchanged, separate axis.
 
 ## Dependencies
 
-- `@inixiative/json-rules` ^2.14.0 (`check` + `coerceType`, `stampCoercions`, `sourceValuesFromRows`, `createLens`, `projectByPath`, `exposedSurface`)
+- `@inixiative/json-rules` ^2.14.0 (`check` + `coerceType`, `stampCoercions`, `sourceValuesFromRows`, `createLens`, `projectByPath`, `exposedSurface`); 2.14.1 hardens `sources` typing (`{}` rejected — `SourceSpec` requires `where` or `label`)
+- `@inixiative/rules-builder` ^0.15.0 (`useFilteredCollection`) — taken by the first consuming surface, not by the template packages yet
 - `openapi.gen.json` (generated; already bundled via `getQueryMetadata`)
