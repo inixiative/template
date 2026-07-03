@@ -93,9 +93,9 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
       // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.
       if (template.kind && template.kind !== 'system') {
         const composed = await expand(template.mjml, ctx);
-        if (!withoutConditionals(composed).includes('{{recipient.unsubscribeUrl}}')) {
+        if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {
           throw new Error(
-            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{recipient.unsubscribeUrl}}.`,
+            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{system.unsubscribeUrl}}.`,
           );
         }
       }

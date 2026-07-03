@@ -51,7 +51,7 @@ describe('saveEmailTemplate', () => {
       name: 'Promo',
       subject: 'News',
       kind: 'marketing',
-      mjml: mjml('<mj-text>News</mj-text><mj-text>{{recipient.unsubscribeUrl}}</mj-text>'),
+      mjml: mjml('<mj-text>News</mj-text><mj-text>{{system.unsubscribeUrl}}</mj-text>'),
       ownerModel: 'default',
     });
     expect(result.template.slug).toBe('promo-link');
@@ -65,7 +65,7 @@ describe('saveEmailTemplate', () => {
         name: 'Promo',
         subject: 'News',
         kind: 'marketing',
-        mjml: mjml(`<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{recipient.unsubscribeUrl}}</mj-text>{{/if}}`),
+        mjml: mjml(`<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{system.unsubscribeUrl}}</mj-text>{{/if}}`),
         ownerModel: 'default',
       }),
     ).rejects.toThrow(/unconditional/i);

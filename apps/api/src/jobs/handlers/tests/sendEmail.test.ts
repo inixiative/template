@@ -177,7 +177,7 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({
       slug: 'test-unsub-link',
       subject: 'News',
-      mjml: plainMjml('News {{recipient.unsubscribeUrl}}'),
+      mjml: plainMjml('News {{system.unsubscribeUrl}}'),
       kind: 'platform',
     });
     addEntry('test-unsub-link', {
