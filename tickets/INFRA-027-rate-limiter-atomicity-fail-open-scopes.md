@@ -37,6 +37,15 @@ An organization that wants N× throughput just mints N tokens; the per-token cap
 tenant. `Organization` is the tenancy root (`Space.organizationId → Organization`, `onDelete: Cascade`;
 `Token` carries `organizationId` / `spaceId` / `userId`), so the real budget lives one level up.
 
+**4. Spoofable client IP — and it also poisons the audit trail.** The IP branch keys on `getClientIp`,
+which reads `x-forwarded-for.split(',')[0]` — the leftmost hop, which is client-supplied. Behind an
+appending reverse proxy the trustworthy IP is the rightmost hop the proxy added, not the first. As
+written, anyone sets `X-Forwarded-For: <random>` per request and mints a fresh `ip:` bucket every time,
+so the IP-keyed limiters (`authRateLimit`, `emailRateLimit`, and any future public-surface limiter) are
+a no-op against a motivated caller. Worse, the same `getClientIp` feeds `auditActorMiddleware`
+(`packages/db` exports `./lib/auditActorContext`), so the recorded actor IP is forgeable too — spoofed
+provenance in the audit log. IPv6 compounds it: the key is a full /128, so a routine /64 rotates for free.
+
 ## Decision
 
 - **Atomic INCR + EXPIRE-on-first via one Lua eval.** Port Zealot's `INCR_WITH_EXPIRY` — the TTL is set
@@ -71,13 +80,20 @@ tenant. `Organization` is the tenancy root (`Space.organizationId → Organizati
   semantics from a per-second abuse limiter. Do not fold quota into this middleware; it belongs in
   metering.
 
+- **Derive the client IP from the right, in one shared helper.** Parse `X-Forwarded-For` from the
+  trusted end by the known proxy-hop count (or read the edge's `CF-Connecting-IP` / `True-Client-IP`
+  where a CDN overwrites it) — never `[0]`. Mask to /64 for IPv6, /32 for IPv4. Fix it once in the
+  shared `getClientIp` so both the limiter and `auditActorMiddleware` inherit a trustworthy value; the
+  audit-actor spoof closes with the same change.
+
 ## Tasks
 
 - [ ] Replace the two-command INCR/EXPIRE with the atomic `INCR_WITH_EXPIRY` eval in `apiRateLimit` and `rateLimit`
 - [ ] Wrap the Redis call fail-open; `logger.warn` on unreachable and wire an alert on that warn
 - [ ] Add `rateLimitPerSecond` to `Organization`; source the org `max` from it
 - [ ] Make the token limiter (`apiRateLimit`) check actor AND organization scopes in one request, 429 on the first breach
-- [ ] Tests: atomic window (a failure between commands can't strand a key), fail-open on Redis-down, per-scope breach (token over vs org over), org cap holds across multiple tokens
+- [ ] Fix `getClientIp` to parse XFF from the trusted hop (not `[0]`) and mask IPv6 to /64; one shared helper feeding both the limiter and `auditActorMiddleware`
+- [ ] Tests: atomic window (a failure between commands can't strand a key), fail-open on Redis-down, per-scope breach (token over vs org over), org cap holds across multiple tokens, spoofed `X-Forwarded-For` can't mint a fresh IP bucket
 
 ---
 
