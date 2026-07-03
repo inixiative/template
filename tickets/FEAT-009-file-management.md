@@ -199,7 +199,7 @@ model ResourceBinding {
   userId           String? @db.VarChar(36)
   customerRefId    String? @db.VarChar(36)
 
-  bindingType      String                    // key into shared/binding
+  bindingType      String                    // key into shared/resourceBinding
   order            Int      @default(0)       // ordering for many-cardinality types
   media            Json?                     // overrides the type's default render settings
   conditions       Json?                     // device / viewport / darkMode
@@ -209,7 +209,7 @@ model ResourceBinding {
 }
 ```
 
-**Binding-type registry** (`packages/shared/src/binding`) — start minimal, extend as resources need it:
+**Binding-type registry** (`packages/shared/src/resourceBinding`) — start minimal, extend as resources need it:
 
 ```ts
 // binding types

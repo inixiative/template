@@ -1,0 +1,222 @@
+// ============================================================================
+// FILE MANAGEMENT - FEAT-009
+// ============================================================================
+// Storage: File (container) + FileVersion (content) + Folder (tree)
+// Access:  FilePermission (ABAC)
+// Usage:   ResourceBinding
+//
+// False-poly axes are registered in packages/db/src/registries/falsePolymorphism.ts
+// (owner/grantee/target/source/resource). See tickets/FEAT-009-file-management.md.
+
+model File {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Owner - false polymorphism (User | Organization | Space)
+  ownerModel     FileOwnerModel
+  userId         String?        @db.VarChar(36)
+  organizationId String?        @db.VarChar(36)
+  spaceId        String?        @db.VarChar(36)
+
+  user         User?         @relation("FileOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation("FileOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("FileOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  folderId String? @db.VarChar(36)
+  folder   Folder? @relation(fields: [folderId], references: [id])
+  path     String
+
+  filename String
+
+  // Lazy-copy provenance - set when this File is a snapshot of another.
+  sourceFileId String? @db.VarChar(36)
+  source       File?   @relation("FileLazyCopy", fields: [sourceFileId], references: [id])
+  copies       File[]  @relation("FileLazyCopy")
+
+  versions    FileVersion[]
+  permissions FilePermission[]
+  bindings    ResourceBinding[]
+
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([folderId])
+  @@index([path])
+}
+
+model FileVersion {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileId String @db.VarChar(36)
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  version      Int
+  key          String // S3 object key; NOT unique - a revert reuses a prior version's key.
+  contentType  String
+  size         Int
+  status       FileVersionStatus @default(pending)
+  revertedFrom Int?
+
+  @@unique([fileId, version])
+  @@index([fileId, status])
+  @@index([key])
+}
+
+model Folder {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Owner - false polymorphism (User | Organization | Space)
+  ownerModel     FileOwnerModel
+  userId         String?        @db.VarChar(36)
+  organizationId String?        @db.VarChar(36)
+  spaceId        String?        @db.VarChar(36)
+
+  user         User?         @relation("FolderOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation("FolderOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("FolderOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  parentId String?  @db.VarChar(36)
+  parent   Folder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children Folder[] @relation("FolderTree")
+  path     String
+  name     String
+
+  system     Boolean          @default(false)
+  visibility FolderVisibility @default(visible)
+
+  files       File[]
+  permissions FilePermission[]
+
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([parentId])
+  @@index([path])
+}
+
+model FilePermission {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Target - false polymorphism (File | Folder)
+  targetModel FilePermissionTargetModel
+  fileId      String?                   @db.VarChar(36)
+  folderId    String?                   @db.VarChar(36)
+  file        File?                     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  folder      Folder?                   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  // Grantee - false polymorphism. `public` is a sentinel (no FK), viewer-only.
+  granteeModel          FilePermissionGranteeModel
+  granteeUserId         String?                    @db.VarChar(36)
+  granteeOrganizationId String?                    @db.VarChar(36)
+  granteeSpaceId        String?                    @db.VarChar(36)
+  granteeCustomerRefId  String?                    @db.VarChar(36)
+
+  granteeUser         User?         @relation("FilePermissionGranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  granteeOrganization Organization? @relation("FilePermissionGranteeOrganization", fields: [granteeOrganizationId], references: [id], onDelete: Cascade)
+  granteeSpace        Space?        @relation("FilePermissionGranteeSpace", fields: [granteeSpaceId], references: [id], onDelete: Cascade)
+  granteeCustomerRef  CustomerRef?  @relation("FilePermissionGranteeCustomerRef", fields: [granteeCustomerRefId], references: [id], onDelete: Cascade)
+
+  role             Role
+  fromVersion      Int       @default(1)
+  preserveOnRevoke Boolean   @default(false)
+  expiresAt        DateTime?
+
+  @@index([targetModel, fileId])
+  @@index([targetModel, folderId])
+  @@index([granteeModel, granteeUserId])
+  @@index([granteeModel, granteeOrganizationId])
+  @@index([granteeModel, granteeSpaceId])
+  @@index([granteeModel, granteeCustomerRefId])
+}
+
+model ResourceBinding {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Source - false polymorphism. `url` is a sentinel (no FK).
+  sourceModel ResourceBindingSourceModel
+  fileId      String?                    @db.VarChar(36)
+  file        File?                      @relation(fields: [fileId], references: [id])
+  url         String?
+
+  // Resource - false polymorphism (Organization | Space | User | CustomerRef)
+  resourceModel  ResourceBindingResourceModel
+  organizationId String?                      @db.VarChar(36)
+  spaceId        String?                      @db.VarChar(36)
+  userId         String?                      @db.VarChar(36)
+  customerRefId  String?                      @db.VarChar(36)
+
+  organization Organization? @relation("ResourceBindingOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("ResourceBindingSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation("ResourceBindingUser", fields: [userId], references: [id], onDelete: Cascade)
+  customerRef  CustomerRef?  @relation("ResourceBindingCustomerRef", fields: [customerRefId], references: [id], onDelete: Cascade)
+
+  bindingType String
+  order       Int    @default(0)
+  media       Json?
+  conditions  Json?
+
+  @@index([resourceModel, organizationId, bindingType])
+  @@index([resourceModel, spaceId, bindingType])
+  @@index([resourceModel, userId, bindingType])
+  @@index([resourceModel, customerRefId, bindingType])
+  @@index([fileId])
+}
+
+enum FileOwnerModel {
+  User
+  Organization
+  Space
+}
+
+enum FileVersionStatus {
+  pending
+  active
+  purging
+  purged
+  failed
+}
+
+enum FolderVisibility {
+  visible
+  private
+}
+
+enum FilePermissionTargetModel {
+  File
+  Folder
+}
+
+enum FilePermissionGranteeModel {
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+  CustomerRef
+  public
+}
+
+enum ResourceBindingSourceModel {
+  File
+  url
+}
+
+enum ResourceBindingResourceModel {
+  Organization
+  Space
+  User
+  CustomerRef
+}
