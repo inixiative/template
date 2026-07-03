@@ -15,7 +15,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test src/lenses/",
-    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureSdkIndex.ts && bunx biome check --write --only=assist/source/organizeImports src/index.ts"
+    "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
