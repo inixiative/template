@@ -8,13 +8,13 @@
   "exports": {
     ".": "./src/index.ts",
     "./openapi.gen.json": "./openapi.gen.json",
-    "./lenses": "./lenses/index.ts",
-    "./lenses/*": "./lenses/*",
+    "./lenses": "./src/lenses/index.ts",
+    "./lenses/*": "./src/lenses/*",
     "./*": "./src/*"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test lenses/",
+    "test": "bun test src/lenses/",
     "generate:sdk": "OPENAPI_SPEC_PATH=./openapi.gen.json openapi-ts -f openapiTs.config.ts && bun scripts/ensureSdkIndex.ts && bunx biome check --write --only=assist/source/organizeImports src/index.ts"
   },
   "dependencies": {

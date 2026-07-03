@@ -28,7 +28,7 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ---
 
-## Shipped design (`packages/sdk/lenses/` + `packages/ui` hook, json-rules ^2.14.0)
+## Shipped design (`packages/sdk/src/lenses/` + `packages/ui` hook, json-rules ^2.14.0)
 
 ### `@template/sdk/lenses` — `lensFromOperation.ts`
 

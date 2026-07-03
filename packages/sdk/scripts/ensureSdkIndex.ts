@@ -21,6 +21,7 @@ const ensureLine = (content: string, line: string): string =>
 let next = current;
 next = ensureLine(next, "export { client } from './client.gen';");
 next = ensureLine(next, "export * from './@tanstack/react-query.gen';");
+next = ensureLine(next, "export * from './lenses';");
 
 if (next !== current) {
   writeFileSync(indexFile, next);

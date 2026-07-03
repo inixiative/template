@@ -15,6 +15,8 @@ export default defineConfig({
     path: './src',
     format: 'biome',
     lint: 'biome',
+    // src/lenses is hand-written and lives inside the output dir — never clean it away.
+    clean: false,
   },
   logs: {
     level: 'warn',
