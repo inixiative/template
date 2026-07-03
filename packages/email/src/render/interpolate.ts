@@ -7,13 +7,14 @@
 import { evaluateConditions, type RuleErrorSink } from '@template/email/render/evaluateConditions';
 import { escape as escapeHtml, get, isNil } from 'lodash-es';
 
-export enum VariablePrefix {
+export enum Lens {
   sender = 'sender',
   recipient = 'recipient',
   data = 'data',
+  system = 'system',
 }
 
-const VARIABLE_PATTERN = /\{\{(sender|recipient|data)\.([a-zA-Z0-9_.-]+)\}\}/g;
+const VARIABLE_PATTERN = /\{\{(sender|recipient|data|system)\.([a-zA-Z0-9_.-]+)\}\}/g;
 
 const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
 const hasUnsafeSegment = (path: string): boolean =>
@@ -23,6 +24,7 @@ export type Variables = {
   sender?: Record<string, unknown>;
   recipient?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  system?: Record<string, unknown>;
 };
 
 export const interpolate = (template: string, variables: Variables, onError?: RuleErrorSink): string => {

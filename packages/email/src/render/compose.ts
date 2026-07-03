@@ -47,7 +47,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
-  const mjml = await expand(template.mjml, template.componentRefs, ctx);
+  const mjml = await expand(template.mjml, ctx);
 
   return {
     id: template.id,
@@ -64,7 +64,7 @@ export const composeComponent = async (slug: string, ctx: OwnerScope): Promise<C
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
-  const mjml = await expand(component.mjml, component.componentRefs, ctx);
+  const mjml = await expand(component.mjml, ctx);
 
   return { mjml };
 };

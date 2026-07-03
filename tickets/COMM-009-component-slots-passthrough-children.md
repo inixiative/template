@@ -61,11 +61,27 @@ Resolve each `{{#component:slug}}` → load its row → per slot: override prese
 ## Tasks
 
 - [ ] **Cascade-diff decomposer** — replaces `mapRefs`/`cleanRefs` dedup + `resolveVariants` variant-indexing. Per component block: separate `:default` (component-owned) from un-marked overrides (caller-owned); 3-way diff vs cascade → noop / inherit / shadow / fork.
-- [ ] `expand.ts` — rewrite: inject overrides at slot markers, render `:default` for unfilled slots, thread per-call-site slot content (signature change); attribution-aware recursion.
-- [ ] `compose.ts` — thread slot content through the compose signature.
+- [x] `expand.ts` — rewrite: inject overrides at slot markers, render `:default` for unfilled slots, thread per-call-site slot content; attribution-aware recursion. **Done** — now a thin wrapper over `renderBlocks` (see below); signature dropped the redundant `componentRefs` arg (refs are discovered from the parse tree, single source of truth = the MJML). Callers updated: `compose.ts` (×2), `save.ts`, `apps/api/.../emailVersioning/hook.test.ts` (×2).
+- [x] `compose.ts` — call-site updated to the new `expand(mjml, ctx)` signature.
 - [ ] `validateNoCycle.ts` — no edges through overrides/passthroughs; test that a wrapper-with-slot doesn't register its fill.
 - [ ] `saveComponents` — slot-aware fragment validation: `{{#slot:name:default}}` defaults must be valid MJML; bare `{{slot}}` only in flow positions.
 - [ ] Tests — named slots; defaults (filled vs unfilled); empty-default holds position; nested wrappers; a component inside a default (owned) vs inside an override (attributes to caller); noop/shadow/fork routing; 3-way diff against a moved base.
+
+## Implementation progress (2026-07-03)
+
+Built the **grammar + render** foundation first, TDD, decoupled from the DB-heavy save path:
+
+- **`packages/email/src/render/parseBlocks.ts`** — pure, DB-free parser. Tokenizes the pinned grammar (`{{#component:slug}}`, `{{#slot:name}}`, `{{#slot:name:default}}`) into a node tree (`text` / `component` / `slot{isDefault}`). It is **syntax only** — it does *not* decide ownership (override vs injection, caller vs component); that semantic layer lives in the consumers. Interpolation (`{{lens.field}}`) and `{{#if}}` are opaque text to it.
+- **`packages/email/src/render/renderBlocks.ts`** — pure render core, `renderBlocks(mjml, load)` with an injected `load(slug) => Promise<string>`. Per `{{#component}}`: collect caller override slots, load the component body, and for each slot marker inject the override else render the `:default`, recursing throughout. DB-free and fully unit-tested.
+- **`expand.ts`** wraps `renderBlocks` with a cascade-backed, per-slug-memoized loader (dedups the old N+1; missing slug → `EmailRenderError('component_missing')`).
+- Tests: `parseBlocks.test.ts` (9) + `renderBlocks.test.ts` (8) cover all three shapes, empty-default-holds-position, same-slug self-nesting, and the nesting-regression render. Full suite green: 17 unit + 106 email-pkg + 6 versioning (incl. the no-drift invariant).
+
+Backward-compatible: existing pre-slot components (bare refs, no slot markers) render identically under the tree walk.
+
+## Follow-ups surfaced during build
+
+- **`recomposeSnapshot` will drift once slots carry overrides.** `apps/api/src/lib/email/recompose.ts` uses its own regex `replaceBlock` (a *second* block matcher, separate from `expand`) that replaces the whole `{{#component:slug}}…{{/component:slug}}` block — **ignoring caller override slots**. Today (no slot data) it matches `expand` and the no-drift test passes; the moment a template fills a slot, snapshot recomposition and live composition diverge. Recompose must be made slot-aware against pinned child bodies (reuse `parseBlocks`/`renderBlocks`, don't re-fork block matching — cf. COMM-006). Own slice.
+- **Lens-aware interpolation** (raised 2026-07-03): all interpolation is lens-scoped. Decided lens set: **`sender`, `recipient`, `data` (generic/loose bag — the per-template unknown payload), `system`** (platform-injected values). A style/theme lens was floated but is not adopted. `interpolate.ts` grows a `system` lens alongside the existing `sender|recipient|data`; `data` stays a generic `Record<string, unknown>`. Larger direction the user is driving toward: a **typed template registry** (each template declares its lenses + the shape of its `data`) and a **custom template options matrix** (per-template options that expand into a render matrix). Registry/matrix design is being interrogated separately; the lens interpolation change lands with the slot work.
 - [ ] **Nesting regression test** — a parent shipping a child pre-filled:
   ```
   {{component:hero}}
