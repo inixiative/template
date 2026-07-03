@@ -1,6 +1,6 @@
 # FEAT-009: File Management System
 
-**Status**: Planning
+**Status**: In Progress — schema + resourceBinding registry + factories landed (PR #72)
 **Priority**: High
 **Created**: 2026-02-06
 **Updated**: 2026-07-02 (reconciled §3.5–§18 to the §3 model — flat immutable keys, FileVersion lifecycle, no FileJob; §18 retired)
