@@ -22,6 +22,20 @@ The design below (converged with Zealot `ZLT-3271`/`ZLT-3272`, 2026-07-03) repla
 
 No `{{#define}}`, no `{{#fill}}`.
 
+## Grammar (pinned)
+
+Two block tags + a modifier. Three shapes, everything composes from them:
+
+```
+{{component:name}}{{/component:name}}                                              -- ref, no children
+{{component:name}} {{slot:name}}…{{/slot:name}} {{/component:name}}                 -- caller override
+{{component:name}} {{slot:name:default}}…{{/slot:name:default}} {{/component:name}} -- component default
+```
+
+`{{component:x}}` / `{{slot:x}}` are distinguished from `{{lens.field}}` interpolation by the `:` and the matching `{{/…}}` close.
+
+**Empty default holds position (invariant).** Every declared slot always materializes a `:default` region — empty if nothing was authored. So there is no "missing slot" branch at render (override present → inject, else render default, possibly empty), the decomposer always has an explicit component-owned region per slot, and the slot keeps its structural place when empty. Normalization: on component save, ensure each declared slot has a `:default` region. In a structural MJML position the empty default is a minimal *valid* placeholder (e.g. an empty `mj-column`), not literally nothing, so fragment validation still passes.
+
 ## Save — hydrated payload → cascade diff
 
 The FE always sends a **fully-hydrated payload** (defaults inlined, marked `:default`). The BE decomposes by **diffing against the owner cascade `(slug, owner)`**, per `{{#component:slug}}` block, scoped to the **current tenant**:
@@ -51,7 +65,16 @@ Resolve each `{{#component:slug}}` → load its row → per slot: override prese
 - [ ] `compose.ts` — thread slot content through the compose signature.
 - [ ] `validateNoCycle.ts` — no edges through overrides/passthroughs; test that a wrapper-with-slot doesn't register its fill.
 - [ ] `saveComponents` — slot-aware fragment validation: `{{#slot:name:default}}` defaults must be valid MJML; bare `{{slot}}` only in flow positions.
-- [ ] Tests — named slots; defaults (filled vs unfilled); nested wrappers; a component inside a default (owned) vs inside an override (attributes to caller); noop/shadow/fork routing; 3-way diff against a moved base.
+- [ ] Tests — named slots; defaults (filled vs unfilled); empty-default holds position; nested wrappers; a component inside a default (owned) vs inside an override (attributes to caller); noop/shadow/fork routing; 3-way diff against a moved base.
+- [ ] **Nesting regression test** — a parent shipping a child pre-filled:
+  ```
+  {{component:hero}}
+    {{slot:body:default}}
+      {{component:cta}}{{slot:label}}Get started{{/slot:label}}{{/component:cta}}
+    {{/slot:body:default}}
+  {{/component:hero}}
+  ```
+  Assert: `hero.componentRefs` includes `cta` (ref sits in hero's default → hero owns it); the `{{slot:label}}` override lives in **hero's** default content, not on `cta`'s row; render → hero's default body = `cta` with label "Get started".
 
 ## Side case (not in the general flow)
 
