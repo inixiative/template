@@ -228,6 +228,8 @@ model ResourceBinding {
 
 **`requiresPublic` is a validated invariant** (a `requiresPublic` binding implies its file carries the `public` grant), checked both ways: creating such a binding **requires** the `public` grant already exists; removing the `public` grant is **blocked** while any `requiresPublic` binding references the file. A **`removeAllBindings(file)`** call clears the dependencies so `public` can then be revoked.
 
+**`follow` (future binding type, not yet specified):** individual opt-in to preservation on a *public* file. Public consumers ride the shared `public` grant, so they have no permission row to carry `preserveOnRevoke` — instead, following is a **binding** (a declared dependency with no render slot) on the follower's own resource (User first). The existing trigger path then covers it: revoke `public` → dependent bindings snapshot into the follower's `__preserved/`. Details (empty-slot semantics, which resources may follow) deliberately unresolved.
+
 **Upload limits:** none enforced server-side on pure files. The UI validates size/type for files with a planned purpose (it knows the intended binding). The one server invariant is `accepts`, checked at *bind* time.
 
 ### 3.5 How the layers interact
