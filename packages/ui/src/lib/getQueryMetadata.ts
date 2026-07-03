@@ -26,7 +26,7 @@ const RELATION_KEYS = new Set(['some', 'every', 'none']);
 // to-one relation (whose keys are field names) without descending into it.
 const JSON_LEAF_KEYS = new Set(['path', 'equals', 'not', 'string_contains', 'string_starts_with', 'string_ends_with']);
 
-const resolveRef = (schema: Schema): Schema => {
+export const resolveRef = (schema: Schema): Schema => {
   if (!schema?.$ref) return schema;
   let resolved: Schema = openApiSpec;
   for (const part of schema.$ref.replace('#/', '').split('/')) resolved = resolved?.[part];

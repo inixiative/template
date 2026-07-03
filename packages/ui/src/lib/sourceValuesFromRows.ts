@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  type CheckOptions,
   type Condition,
   check,
   type Lens,
@@ -32,20 +33,24 @@ const rowsAtPath = (rows: readonly Row[], path: string): Row[] => {
   return current;
 };
 
-const compose = (whereClauses: Condition[], sourceClauses: Condition[]): Condition => {
-  const all = [...whereClauses, ...sourceClauses];
-  if (all.length === 0) return true;
-  return all.length === 1 ? all[0] : { all };
+const composeEligibility = (sourceClauses: Condition[]): Condition => {
+  if (sourceClauses.length === 0) return true;
+  return sourceClauses.length === 1 ? sourceClauses[0] : { all: sourceClauses };
 };
 
 /**
  * Materialize each sourced field's option set from rows already in memory — the
  * client-side dual of `sourceQueries` (which compiles the same declarations to
- * DISTINCT queries for the DB). Same composition: the visit's own `where`
- * narrowing AND the field's source eligibility, here evaluated via `check()`.
- * Feed the result to `exposedSurface`/`projectByPath` as `{ sourceValues }`.
+ * DISTINCT queries for the DB). Rows are assumed already narrowed to the lens's
+ * scope (the fetch was), so eligibility is the field's source `where` only.
+ * Scalar-list fields contribute one option per element. Feed the result to
+ * `exposedSurface`/`projectByPath` as `{ sourceValues }`.
  */
-export const sourceValuesFromRows = (lensOrNarrowing: Lens | LensNarrowing, rows: readonly Row[]): SourceValues[] => {
+export const sourceValuesFromRows = (
+  lensOrNarrowing: Lens | LensNarrowing,
+  rows: readonly Row[],
+  options?: CheckOptions,
+): SourceValues[] => {
   const out: SourceValues[] = [];
 
   for (const [path, visit] of projectByPath(lensOrNarrowing)) {
@@ -54,22 +59,32 @@ export const sourceValuesFromRows = (lensOrNarrowing: Lens | LensNarrowing, rows
 
     const anchors = rowsAtPath(rows, path);
     for (const [field, sourceClauses] of sourceFields) {
-      const where = compose(visit.whereClauses, sourceClauses);
+      const where = composeEligibility(sourceClauses);
       const label = visit.sourceLabels[field];
 
       const byValue = new Map<string, SourceOption>();
       for (const row of anchors) {
-        if (check(where, row) !== true) continue;
-        const value = row[field];
-        if (value == null || typeof value === 'object') continue;
-        const key = String(value);
-        if (byValue.has(key)) continue;
+        if (check(where, row, options) !== true) continue;
+        const rawValue = row[field];
+        const values = Array.isArray(rawValue) ? rawValue : [rawValue];
         const rowLabel = label === undefined ? undefined : row[label];
-        byValue.set(key, rowLabel == null ? { value: key } : { value: key, label: String(rowLabel) });
+        for (const value of values) {
+          if (value == null || typeof value === 'object') continue;
+          const key = String(value);
+          const existing = byValue.get(key);
+          if (existing === undefined) {
+            byValue.set(key, rowLabel == null ? { value: key } : { value: key, label: String(rowLabel) });
+          } else if (existing.label === undefined && rowLabel != null) {
+            byValue.set(key, { value: key, label: String(rowLabel) });
+          }
+        }
       }
 
-      const options = [...byValue.values()].sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
-      out.push({ path, mapName: visit.mapName, model: visit.modelName, field, options });
+      // Fixed locale: host-locale sorting would make option order machine-dependent.
+      const sorted = [...byValue.values()].sort((a, b) =>
+        (a.label ?? a.value).localeCompare(b.label ?? b.value, 'en', { numeric: true }),
+      );
+      out.push({ path, mapName: visit.mapName, model: visit.modelName, field, options: sorted });
     }
   }
 

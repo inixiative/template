@@ -8,6 +8,7 @@ export * from './enumOptions';
 export * from './findRoute';
 export { getContextParams } from './getContextParams';
 export * from './inquiries';
+export * from './lensFromOperation';
 export * from './lensFromSchema';
 export * from './makeContextQueries';
 export * from './makeDataConfig';

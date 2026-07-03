@@ -37,7 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.10.0",
+    "@inixiative/json-rules": "^2.13.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@supercharge/promise-pool": "^3.3.0",

@@ -6,18 +6,13 @@
  */
 import { createLens, type FieldMap, type FieldMapEntry, type Lens } from '@inixiative/json-rules';
 
-/** The JSON-schema shape the SDK emits in `schemas.gen.ts` (`as const`, so deep-readonly). */
+/** The JSON-schema shape the SDK emits (`as const` in `schemas.gen.ts`, inline in the spec). */
 export type SdkSchema = {
   readonly type?: string | readonly string[];
   readonly format?: string;
   readonly enum?: readonly (string | number | null)[];
   readonly properties?: { readonly [key: string]: SdkSchema };
   readonly items?: SdkSchema;
-};
-
-export type LensFromSchemaOptions = {
-  /** Anchor model name — shows up in builder paths and lens narrowings. */
-  model?: string;
 };
 
 const MAP_NAME = 'sdk';
@@ -43,22 +38,25 @@ const scalarType = (schema: SdkSchema): string => {
   }
 };
 
+const hasProperties = (schema: SdkSchema): boolean =>
+  schema.properties !== undefined && Object.keys(schema.properties).length > 0;
+
 const buildModel = (schema: SdkSchema, modelName: string, models: FieldMap['models']): void => {
   const fields: Record<string, FieldMapEntry> = {};
 
   for (const [field, prop] of Object.entries(schema.properties ?? {})) {
     const isList = primaryType(prop) === 'array' && prop.items !== undefined;
     const target = isList ? (prop.items as SdkSchema) : prop;
+    const enumValues = target.enum?.filter((v): v is string => typeof v === 'string');
 
-    if (target.enum) {
-      const values = target.enum.filter((v): v is string => typeof v === 'string');
+    if (enumValues?.length) {
       fields[field] = {
         kind: 'enum',
         type: `${modelName}.${field}`,
+        values: enumValues,
         ...(isList ? { isList } : {}),
-        ...(values.length ? { values } : {}),
       };
-    } else if (primaryType(target) === 'object' && target.properties) {
+    } else if (primaryType(target) === 'object' && hasProperties(target)) {
       const childName = `${modelName}.${field}`;
       buildModel(target, childName, models);
       fields[field] = { kind: 'object', type: childName, ...(isList ? { isList } : {}) };
@@ -71,19 +69,23 @@ const buildModel = (schema: SdkSchema, modelName: string, models: FieldMap['mode
 };
 
 /**
- * Build a json-rules lens from an SDK response schema — the client-side twin of the
- * backend's Prisma-derived field maps. Anything the SDK returns is filterable in
- * memory, so the response schema IS the filter vocabulary: scalars keep their type
- * (date/number comparisons coerce correctly), enums carry their allowed values, and
- * nested objects/arrays become traversable relations. Narrow with the standard
- * `LensNarrowing` shape (`{ parent: lens, root: { picks: [...] } }`).
+ * Build a json-rules lens from an SDK response schema. The response schema IS the
+ * filter vocabulary — anything the endpoint returns is in memory and filterable,
+ * including computed fields the server can't `WHERE`. `name` is the endpoint view's
+ * identity (the spec component name, e.g. `InquiryReceivedItem`), NOT a Prisma model:
+ * two endpoints share a vocabulary iff they share a response component. Prefer
+ * `lensFromOperation(operationId)`, which resolves schema + name from the spec.
+ * Field kinds drive the builder surface (operators, options, coercion stamping);
+ * narrow with the standard `LensNarrowing` shape.
  */
-export const lensFromSchema = (schema: SdkSchema, options?: LensFromSchemaOptions): Lens => {
-  const model = options?.model ?? 'Item';
+export const lensFromSchema = (schema: SdkSchema, name: string): Lens => {
   const root = primaryType(schema) === 'array' && schema.items ? schema.items : schema;
 
   const models: FieldMap['models'] = {};
-  buildModel(root, model, models);
+  buildModel(root, name, models);
 
-  return createLens({ maps: { [MAP_NAME]: { models } }, mapName: MAP_NAME, model });
+  if (Object.keys(models[name]?.fields ?? {}).length === 0)
+    throw new Error(`lensFromSchema: '${name}' has no fields — not a model response schema`);
+
+  return createLens({ maps: { [MAP_NAME]: { models } }, mapName: MAP_NAME, model: name });
 };

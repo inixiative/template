@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@inixiative/json-rules": "^2.10.0",
+    "@inixiative/json-rules": "^2.13.0",
     "clsx": "^2.1.1",
     "consola": "^3.4.2",
     "lodash-es": "^4.18.1",

@@ -37,7 +37,7 @@ const RewardSchema = {
 } as const satisfies SdkSchema;
 
 describe('lensFromSchema', () => {
-  const lens = lensFromSchema(RewardSchema, { model: 'Reward' });
+  const lens = lensFromSchema(RewardSchema, 'Reward');
   const fields = lens.maps.sdk.models.Reward.fields;
 
   it('anchors the lens at the given model', () => {
@@ -96,18 +96,41 @@ describe('lensFromSchema', () => {
   });
 
   it('unwraps a root array schema to its items', () => {
-    const listLens = lensFromSchema({ type: 'array', items: RewardSchema } as const satisfies SdkSchema, {
-      model: 'Reward',
-    });
+    const listLens = lensFromSchema({ type: 'array', items: RewardSchema } as const satisfies SdkSchema, 'Reward');
     expect(listLens.maps.sdk.models.Reward.fields.itemTitle).toEqual({ kind: 'scalar', type: 'String' });
   });
 
   it('builds from a real generated SDK schema', () => {
-    const inquiryLens = lensFromSchema(InquiryItemSchema, { model: 'Inquiry' });
-    const inquiryFields = inquiryLens.maps.sdk.models.Inquiry.fields;
+    const inquiryLens = lensFromSchema(InquiryItemSchema, 'InquiryItem');
+    const inquiryFields = inquiryLens.maps.sdk.models.InquiryItem.fields;
     expect(inquiryFields.createdAt).toEqual({ kind: 'scalar', type: 'DateTime' });
     expect(inquiryFields.status.kind).toBe('enum');
     expect(inquiryFields.status.values).toContain('approved');
     expect(inquiryFields.sourceUser.kind).toBe('object');
+  });
+
+  it('maps a non-string enum to a plain scalar, not a valueless enum', () => {
+    const schema = {
+      type: 'object',
+      properties: { level: { type: 'integer', enum: [1, 2, 3] } },
+    } as const satisfies SdkSchema;
+    expect(lensFromSchema(schema, 'M').maps.sdk.models.M.fields.level).toEqual({
+      kind: 'scalar',
+      type: 'Int',
+    });
+  });
+
+  it('maps an object with empty properties to Json, not a dead-end child model', () => {
+    const schema = {
+      type: 'object',
+      properties: { cfg: { type: 'object', properties: {} } },
+    } as const satisfies SdkSchema;
+    const lens2 = lensFromSchema(schema, 'M');
+    expect(lens2.maps.sdk.models.M.fields.cfg).toEqual({ kind: 'scalar', type: 'Json' });
+    expect(lens2.maps.sdk.models['M.cfg']).toBeUndefined();
+  });
+
+  it('throws on a schema with no fields instead of building an empty lens', () => {
+    expect(() => lensFromSchema({} as const satisfies SdkSchema, 'M')).toThrow('no fields');
   });
 });

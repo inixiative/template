@@ -4,7 +4,15 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { type Condition, check, exposedSurface, type Lens, type LensNarrowing } from '@inixiative/json-rules';
+import {
+  type CheckOptions,
+  type Condition,
+  check,
+  exposedSurface,
+  type Lens,
+  type LensNarrowing,
+  stampCoercions,
+} from '@inixiative/json-rules';
 import { sourceValuesFromRows } from '@template/ui/lib/sourceValuesFromRows';
 import { useMemo, useState } from 'react';
 
@@ -23,21 +31,28 @@ export type FilteredData<T> = {
 /**
  * Client-side filtering over an already-fetched collection, in the same rule
  * language the server uses (json-rules `check`). Pass a lens (usually
- * `lensFromSchema(<SdkResponseSchema>)`, optionally narrowed with picks/omits/
- * sources) to get a rules-builder surface whose pseudo-enum option sets come
- * from the rows themselves.
+ * `lensFromOperation(operationId)`, optionally narrowed with picks/omits/sources)
+ * to get a rules-builder surface whose pseudo-enum option sets come from the rows
+ * themselves. `lens` and `options` must be referentially stable (memoize them) —
+ * a fresh narrowing literal per render recomputes the surface every render. Rules
+ * whose lens carries `{bind}` clauses need `options.bindings`.
  */
 export const useFilteredData = <T extends Record<string, unknown>>(
   rows: readonly T[],
   lens?: Lens | LensNarrowing,
+  options?: CheckOptions,
 ): FilteredData<T> => {
   const [rule, setRule] = useState<Condition>(true);
 
-  const data = useMemo(() => rows.filter((row) => check(rule, row) === true), [rows, rule]);
+  // Rules are coercion-stamped from the lens before evaluation, so widget-authored
+  // values (date strings, stringified numbers) match wire-format rows.
+  const stamped = useMemo(() => (lens ? stampCoercions(rule, lens) : rule), [rule, lens]);
+
+  const data = useMemo(() => rows.filter((row) => check(stamped, row, options) === true), [rows, stamped, options]);
 
   const surface = useMemo(
-    () => (lens ? exposedSurface(lens, { sourceValues: sourceValuesFromRows(lens, rows) }) : undefined),
-    [lens, rows],
+    () => (lens ? exposedSurface(lens, { sourceValues: sourceValuesFromRows(lens, rows, options) }) : undefined),
+    [lens, rows, options],
   );
 
   return { data, rule, setRule, surface };
