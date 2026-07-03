@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { InquiryItemSchema } from '@template/sdk/schemas.gen';
-import { lensFromSchema, type SdkSchema } from '@template/ui/lib/lensFromSchema';
+import { lensFromSchema } from '@template/ui/lib/lenses/lensFromSchema';
+import type { SdkSchema } from '@template/ui/lib/lenses/sdkSchema';
 
 const RewardSchema = {
   type: 'object',

@@ -41,7 +41,7 @@
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
-    "@inixiative/json-rules": "^2.13.0",
+    "@inixiative/json-rules": "^2.14.0",
     "@tanstack/react-router": "^1.166.2",
     "consola": "^3.4.2",
     "@template/db": "workspace:*",

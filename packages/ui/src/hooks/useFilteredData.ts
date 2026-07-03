@@ -11,9 +11,9 @@ import {
   exposedSurface,
   type Lens,
   type LensNarrowing,
+  sourceValuesFromRows,
   stampCoercions,
 } from '@inixiative/json-rules';
-import { sourceValuesFromRows } from '@template/ui/lib/sourceValuesFromRows';
 import { useMemo, useState } from 'react';
 
 export type FilteredData<T> = {

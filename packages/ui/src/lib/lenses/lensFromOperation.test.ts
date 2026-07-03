@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { lensFromOperation } from '@template/ui/lib/lensFromOperation';
+import { lensFromOperation } from '@template/ui/lib/lenses/lensFromOperation';
 
 describe('lensFromOperation', () => {
   it('resolves a readMany operation to its response component lens', () => {

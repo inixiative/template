@@ -28,19 +28,19 @@ These primitives feed a **rules builder** over an in-memory collection: options 
 
 ---
 
-## Shipped design (`packages/ui`, json-rules ^2.13.0)
+## Shipped design (`packages/ui/src/lib/lenses/`, json-rules ^2.14.0)
 
-### `lib/lensFromOperation.ts`
+### `lib/lenses/lensFromOperation.ts`
 
 `lensFromOperation(operationId)` — the primary entry. Resolves the endpoint's 200 response from `openapi.gen.json` (already in the bundle via `getQueryMetadata`), unwraps the `data` envelope (array → items), and builds the lens named by the response component (`meReceivedManyInquiries` → `InquiryReceivedItem`) or the operationId when inline. Hard-throws on unknown operationId or a response with no data envelope.
 
-### `lib/lensFromSchema.ts`
+### `lib/lenses/lensFromSchema.ts`
 
 `lensFromSchema(schema, name)` — the schema walk under it (also usable directly with hand-written or `schemas.gen` schemas; `name` is the view identity, never a Prisma model). Scalars keep their kind (`date-time` → `DateTime`), enums carry values (non-string enums degrade to scalars), Json columns (opaque `{}` in the spec — the generator renders `z.unknown()` that way, so the shape split is deterministic) become `scalar Json`, and inline relation objects become traversable child models (`InquiryItem.sourceUser`). Throws on a fieldless schema instead of building an empty lens.
 
-### `lib/sourceValuesFromRows.ts`
+### `sourceValuesFromRows` (json-rules 2.14)
 
-`sourceValuesFromRows(lensOrNarrowing, rows, options?)` — the client-side dual of `sourceQueries`: for every field declared in the narrowing's `sources`, materialize its option set from the rows instead of a DISTINCT query. **Rows are lens-scoped by contract** (the fetch already applied the lens's `where`), so eligibility is the field's source `where` only — evaluated via `check()` with `CheckOptions` passthrough for `{bind}` clauses. Scalar-list fields (tags) contribute one option per element, labels take the first non-null sibling, and sorting is numeric-aware in a fixed locale. This is how a plain string column becomes a **pseudo-enum**: declare it in `sources`, and the picker gets the values that actually occur in the fetched collection.
+Hoisted into `@inixiative/json-rules@2.14.0` — the in-memory executor of `sources` declarations, alongside `sourceQueries` (DB DISTINCT) and rules-builder's table-shaped `runSources`: for every field declared in the narrowing's `sources`, materialize its option set from the rows instead of a DISTINCT query. **Rows are lens-scoped by contract** (the fetch already applied the lens's `where`), so eligibility is the field's source `where` only — evaluated via `check()` with `CheckOptions` passthrough for `{bind}` clauses. Scalar-list fields (tags) contribute one option per element, labels take the first non-null sibling, and sorting is numeric-aware in a fixed locale. This is how a plain string column becomes a **pseudo-enum**: declare it in `sources`, and the picker gets the values that actually occur in the fetched collection.
 
 Relation to INFRA-024: that ticket is the *server* option-set axis (all-configured sets, records/labels, cascading). The client materializer is used-only **by design** — for filtering rows in hand, an option matching zero fetched rows is noise.
 
@@ -67,5 +67,5 @@ The same stamping runs server-independently in `@inixiative/rules-builder@0.14.0
 
 ## Dependencies
 
-- `@inixiative/json-rules` ^2.13.0 (`check` + `coerceType`, `stampCoercions`, `createLens`, `projectByPath`, `exposedSurface`, labeled source options)
+- `@inixiative/json-rules` ^2.14.0 (`check` + `coerceType`, `stampCoercions`, `sourceValuesFromRows`, `createLens`, `projectByPath`, `exposedSurface`)
 - `openapi.gen.json` (generated; already bundled via `getQueryMetadata`)
