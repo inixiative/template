@@ -12,7 +12,9 @@ export default defineConfig({
   client: '@hey-api/client-fetch',
   input,
   output: {
-    path: './src',
+    // Generated code owns this subfolder; clean wipes it on every regen. Hand-written
+    // src/lenses + src/index.ts live beside it in src/ and are never touched.
+    path: './src/generated',
     format: 'biome',
     lint: 'biome',
   },
