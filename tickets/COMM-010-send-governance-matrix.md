@@ -40,27 +40,52 @@ vocabulary (transitions already validates predicates against a lens).
 
 ### The two sides are asymmetric (load-bearing)
 
-| side | leaf | varies by | compose mode |
-|---|---|---|---|
-| **sender** | `Organization` / `Space` / `User` / `platform` | **model** (real polymorphism) | discriminated *selection* — pick one model lens |
-| **recipient** | **always `User`** | **provenance context** (plain / org-member / space-member) | base `User` leaf + *additive* provenance overlay |
+| side | cardinality | leaf | varies by | compose mode |
+|---|---|---|---|---|
+| **sender** | **exactly one** (one `From`) | `Organization` / `Space` / `User` / `platform` | **model** (polymorphism) | discriminated *selection* — pick one lens |
+| **recipient** | **a set** (fan-out) | email + `Contact` (a `User` **or** external `Contact`) | filter / scope / type (set-valued, polymorphic) | *union* of the `to` side's lens keys |
 
-You never merge sender lenses (choose one); you always start the recipient from the `User` leaf and
-overlay provenance. So the `lenses` block is `senders` (a model **map**) + `recipient` (**singular**, a
-`User` lens) — not a symmetric `model => model`.
+The real asymmetry is **cardinality** (one sender vs a recipient set), not model. You pick one sender
+lens; you union the `to` side's recipient lenses and fan out. Both sides are name-keyed lens **maps**.
 
-### Recipient — defined
+### Recipient — defined (set-valued, polymorphic)
 
-- **Leaf: always `User`.** Required picks `id, name, email`. `email` is the delivery address — the send
-  **fails** if it can't resolve a `User` with a non-empty email. `{{recipient.name}}`/`{{recipient.email}}`
-  are always these User fields.
-- **Provenance is optional and *bound from the send context*, not walked from the user.** The org isn't
-  discovered by traversing the User's memberships — it's the **send's** org (the resolved sender's
-  `organizationId` / `data.organizationId`) attached for `{{recipient.organization.*}}`. Provenance chain:
-  `organizationUser → organization` (and the parallel `spaceUser → space`).
-- **The matrix `to` side is always `User`;** which provenance is attached is decided by the cell's `from`.
-  `Organization => User` means "the User addressed *as a member of* that Organization" — the `to` binding
-  pulls the sender's org onto the recipient.
+A recipient is **not a single row — it's a SET** (fan-out: one email + one `CommunicationLog` per member).
+So a recipient lens is a **query** (`LensNarrowing`: parent + where + picks + bindings) resolving 0..N
+rows, and the `to` side is a **map of such lenses**, OR-ed (union). This is already how
+`EmailEntry.recipients` works.
+
+- **Cardinality is the real sender/recipient asymmetry** — sender = exactly one identity (one `From`);
+  recipient = a set. Not "recipient is always a `User`."
+- **Multiplicity lives in the lens vocabulary:**
+  - `where` = filter — "org users **of this level**" is a `role`/level clause.
+  - **binding present/absent = scope** — bind the org → that org's users; leave it unbound → *all orgs'*
+    users of that level.
+  - **which lens key = polymorphic type** — "customer refs" resolve via a **map** of lenses keyed by
+    concrete type (`User` | `Contact` | `OrganizationBillingContact`), the matrix cell or a `data`
+    discriminator selecting which.
+- **Deliverable-leaf invariant (generalized):** every resolved row must yield **(a) an email address and
+  (b) a `Contact`** (consent / kind / unsubscribe) — whether the row is a `User` or an external `Contact`.
+- **Provenance** (org/space context for `{{recipient.organization.*}}`) is still **bound from the send
+  context**, attached per resolved row at fan-out.
+- The recipient set is exactly `transitions`' **`eligible(recipientLens)`** bound to context — the guard's
+  set-query and the resolution query are the same query.
+
+### Lens keys — unique descriptive names (model-first)
+
+Keys are **unique names**, not models (a side can hold several lenses of one model — `OrgUsersAll` vs
+`OrgUsersAdmin`). The `parent` model is declared **inside** the lens. Convention: **model-first, modifier
+only when disambiguating** — one lens of a model → `User`, `Organization`; several → `UserAll` /
+`UserAdmin` / `UserBilling` (the modifier names the narrowing). Both sides are uniform name-keyed maps;
+the matrix `from`/`to` reference names; validation checks names are unique and every matrix key resolves.
+
+### One vocabulary for interpolation, conditionals, slots, and governance
+
+A template's declared lenses are the **single field vocabulary** for all of: `{{lens.field}}`
+interpolation, `{{#if …}}` conditional composition (`{{#if recipient.organization}}…{{/if}}` — shown
+per-recipient at fan-out), component/slot refs, and the matrix guard. This **closes the gap COMM-009
+parked**: `validateConditions` says lens-aware field validation is "out of scope until the builder lands"
+— the lens block *is* that builder, so conditionals/slots can now reject fields a lens doesn't `pick`.
 
 ### Sender — defined
 
@@ -76,29 +101,37 @@ Universal (not matrix-varying), like `system`.
 
 ```
 data (root bindings)
-  → select + bind SENDER by model
+  → select + bind the ONE SENDER lens by model
   → merge sender identity into the binding context
-  → bind RECIPIENT (User leaf + provenance) against the MERGED context
-  → assert the User leaf (email present) or fail
-  → hand { sender, recipient, data, system } to interpolation
+  → resolve the RECIPIENT SET = union of the `to` lens keys, bound against the MERGED context
+  → per resolved row: attach provenance, assert email + Contact leaf (else drop/fail)
+  → fan out: hand { sender, recipient(row), data, system } to interpolation per recipient
 ```
 
-This **is** `transitions`' `from → merge → to`: sender = `from` (reads the current/data context),
-recipient = `to` (reads the context **merged** with the sender). Attaching the sender's org onto the
-recipient *is* the merge — so the governance guard and lens composition walk the **same edge, same
-direction, one mechanism.**
+The single-sender / merge / recipient-set step **is** `transitions`' `from → merge → to`: sender = `from`
+(current/data context), recipient = `to` (context **merged** with the sender); the recipient set is
+`eligible(toLenses)` bound to that context. Guard and composition walk the **same edge, same direction,
+one mechanism.**
 
 ### `lenses` block shape
 
 ```jsonc
 {
-  "senders":   { "Organization": { "picks": [...], "bindings": {...} },   // model map (choose one)
-                 "Space": {...}, "User": {...} },
-  "recipient": { "picks": ["id","name","email"],                          // always the User leaf
-                 "provenance": { "organization": { "picks": [...], "bind": "sender.organizationId" },
-                                 "space":        { "picks": [...], "bind": "sender.spaceId" } } },
-  "data":      { /* payload schema — root bindings */ }
+  // both sides: name-keyed maps of lenses; `parent` model declared inside each lens
+  "senders": {
+    "Organization": { "parent": "Organization", "picks": [...], "bindings": { "organizationId": "data.organizationId" } },
+    "Space": { "parent": "Space", ... }
+  },
+  "recipients": {                                            // a MAP of set-valued lenses; `to` unions keys
+    "OrgUsersAll":   { "parent": "User", "where": { "organizationUser": { "organizationId": "⟨bind⟩" } },
+                       "picks": ["id","name","email"],
+                       "provenance": { "organization": { "picks": [...], "bind": "sender.organizationId" } } },
+    "OrgUsersAdmin": { "parent": "User", "where": { "organizationUser": { "organizationId": "⟨bind⟩", "role": "admin" } }, "picks": ["id","name","email"] },
+    "ExternalContacts": { "parent": "Contact", "where": {...}, "picks": ["id","name","email"] }
+  },
+  "data": { /* payload schema — root bindings */ }
 }
+// matrix: { paths: [ { from: "Organization", to: ["OrgUsersAdmin", "ExternalContacts"] } ] }  // keys, OR-ed
 ```
 
 ## Storage: DB, serializable (decided)
