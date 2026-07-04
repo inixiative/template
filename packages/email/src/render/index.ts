@@ -20,3 +20,4 @@ export {
   ConditionValidationError,
   validateConditions,
 } from './validateConditions';
+export { assertValidMatrix, type MatrixIssue, MatrixValidationError, validateMatrix } from './validateMatrix';

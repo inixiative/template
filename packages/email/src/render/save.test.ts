@@ -71,6 +71,41 @@ describe('saveEmailTemplate', () => {
     ).rejects.toThrow(/unconditional/i);
   });
 
+  it('persists a valid send-governance matrix', async () => {
+    const matrix = {
+      paths: [
+        {
+          from: { predicate: { field: 'type', operator: 'equals', value: 'Organization' } },
+          to: { predicate: { field: 'type', operator: 'equals', value: 'User' } },
+        },
+      ],
+    };
+    const result = await saveEmailTemplate({
+      slug: 'governed',
+      name: 'Governed',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: mjml('<mj-text>Hi</mj-text>'),
+      ownerModel: 'default',
+      matrix,
+    });
+    expect(result.template.matrix).toEqual(matrix);
+  });
+
+  it('rejects a template whose matrix is not a well-formed transition Action', async () => {
+    await expect(
+      saveEmailTemplate({
+        slug: 'bad-matrix',
+        name: 'Bad',
+        subject: 'Hi',
+        kind: 'system',
+        mjml: mjml('<mj-text>Hi</mj-text>'),
+        ownerModel: 'default',
+        matrix: { paths: [{ from: {}, to: {} }] },
+      }),
+    ).rejects.toThrow(/matrix/i);
+  });
+
   it('saves template and extracts components', async () => {
     const result = await saveEmailTemplate({
       slug: 'with-header',

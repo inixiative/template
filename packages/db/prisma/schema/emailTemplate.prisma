@@ -22,6 +22,10 @@ model EmailTemplate {
   componentRefs         String[] // Slugs of nested {{component:slug}} references
   degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
+  // Send-governance matrix: a serializable @inixiative/transitions Action ({ paths: [{ from, to }] })
+  // declaring which sender→recipient pairs may send this template. Absent = no restriction. See COMM-010.
+  matrix Json?
+
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)
