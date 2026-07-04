@@ -7,6 +7,34 @@
 
 ---
 
+## ⏸ Resume here (2026-07-04) — read this first
+
+Ideation session; paused, resume with fresh eyes. Honest state of thinking:
+
+**The lens's PRIMARY job is the interpolation surface** — "when I build this template, what data hydrates
+and shows up, and who's allowed to see what?" Safe-navigation-bounded `{{lens.field}}` + `{{#if}}`,
+admin-specified. That is the load-bearing, ship-now value — slice 1b (`validateLenses`) + COMM-009's
+lens-aware conditionals already deliver it. **This is the keeper.**
+
+**Sends are app-event-triggered.** Code emits an app event → look up the template → resolve the recipients
+*for that event* (admins / consumers / compliance). Those might be **different templates per recipient
+type** (what most systems do) **or one template overloaded with multiple recipient lenses**. Unresolved —
+and the *simpler* "one template per recipient type" may well be right.
+
+**Suspected over-engineering to revisit (the "maybe"):** the sender×recipient **matrix multi-modality**,
+multi-lens-per-template **union + collision precedence**, per-recipient dispatch. A defensible MVP: one
+template = one recipient lens (its interpolation surface); fan-out only where a recipient set is naturally
+plural; governance-only; **different audiences = different templates.** Let the simple system teach us
+whether overloading is ever worth it. Don't build slices 2b/3 until this "one-vs-many templates" call is
+made.
+
+**Locked decisions:** governance-only (resolution stays in code `EmailEntry`); two-layer authoring
+(lenses = platform/superadmin, options = tenant-curated — tenants *select*, never compose lenses); options
+is a deferred slice; **system emails first, custom emails much later** (the first teaches the second).
+
+**Already shipped on the branch (safe to leave):** COMM-009 slots + `system` lens + unsubscribe→system;
+COMM-010 storage + structural validation (lenses + lens-keyed matrix). All tested, committed, pushed.
+
 ## Overview
 
 Each email template declares a **matrix of allowed (sender, recipient) pairs** — which sender types
