@@ -7,6 +7,22 @@
 
 ---
 
+## ✅ Direction settled (2026-07-04, later session) — supersedes the pause note below
+
+**Simple model wins for now:** a **code registry** (evolve `apps/api/src/lib/email/registry.ts`
+`EmailEntry` — do NOT rebuild), **one sender + one recipient lens per template** — one path, one
+hydration boundary per side, no lens-selection/resolution logic. Different audiences = different
+templates; one app event may fan out to several handoffs (bridge already supports it). The
+`EmailTemplate.lenses`/`matrix` DB columns stay **modeled but dormant** (validators only fire if
+set). Multi-lens resolution + tenant-editable governance → **COMM-011 (backlog)**, including the
+customer-rep/join-is-the-real-target insight.
+
+**The interface upgrade that matters:** split static from dynamic in the registry entry — recipient
+`picks`/`relations` declared **statically** (the interpolation surface, knowable at template-save
+time), only the scoping `where(entity, sender)` predicate stays a closure. This makes the hydration
+boundary enforceable by construction and unlocks the lens-aware `{{recipient.*}}`/`{{#if}}`
+validation COMM-009 parked. `data` shape declaration = phase 2.
+
 ## ⏸ Resume here (2026-07-04) — read this first
 
 Ideation session; paused, resume with fresh eyes. Honest state of thinking:
