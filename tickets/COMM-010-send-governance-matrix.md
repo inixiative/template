@@ -135,6 +135,39 @@ one mechanism.**
 // matrix: { paths: [ { from: "Organization", to: ["OrgUsersAdmin", "OrgUsersAll"] } ] }  // keys, OR-ed → union
 ```
 
+## Dispatch, hydration boundary & collision (send path)
+
+**Lens selection happens once, at the planner (`sendEmail`) — the send→deliver bridge.** That's already
+where the sender is resolved, recipients are `fetchLens`ed, `prune(user, lens)`d, and fanned out to
+`deliverEmail`. We extend that stage; we don't add a new one.
+
+**The lens is the hydration boundary — and therefore the logic boundary.** `fetchLens` + `prune(rows,
+lens)` load and reduce a recipient to *exactly* the lens's picks/relations. A recipient resolved under
+`OrgUser` physically has org fields loaded; one under `PlainUser` does not. So interpolation and `{{#if}}`
+can only ever see what the lens hydrated — field/logic leakage is structurally impossible, and lens-aware
+validation just turns a render-time empty into a save-time error.
+
+**Encoding (serialized).** The deliver handoff already carries `recipient = prune(user, lens)` — the
+pruned projection *is* the serialized boundary (plain JSON). Two extensions:
+- prune each recipient to its **assigned** lens (richer picks than today's `{id,name,email}`) so
+  `{{recipient.organization.name}}` has data;
+- add `recipientLens: "<key>"` to the payload — the context tag for provenance, the `communicationLog`,
+  and explicit context conditionals. The lens **definition** stays on the template; only the selected
+  **key + its hydrated projection** travel.
+
+**Two collisions, two enforcement points:**
+- *Logic/field collision* — enforced by the hydration boundary (`prune`). Free.
+- *Identity collision* (one person via several `to` lenses → two renders) — the planner already collapses
+  same-email via `idempotencyKey` (email + shared `dataVars`) + `skipDuplicates` + `enqueueJob({ id })`,
+  so one-email-per-person holds today — **but the winner is fetch order.** Fix: **precedence-dedup by
+  identity before building the plan** — group the resolved union by user, pick the highest-precedence lens
+  per person (cascade order `SpaceUser → OrganizationUser → User`, or `to`-list order), then prune + fan
+  out. Deterministic winner, not fetch order. (Precedence is the recipient's *membership context* — a
+  distinct axis from sender-side tenancy; same ladder, don't conflate.)
+
+**Key uniqueness** is free if `lenses` is stored as a JSON **object** (map) — keys can't collide by
+construction.
+
 ## Storage: DB, serializable (decided)
 
 The matrix lives on `EmailTemplate` as a serializable `Json` field, tenant-configurable via the
@@ -175,9 +208,12 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
 - [ ] **Slice 2b — `composeLenses(template, data)`** — the ordered pipeline `data → sender(select+bind)
   → merge → recipient(bind, assert User leaf)`, producing `{ sender, recipient, data, system }` for
   interpolation. Mirrors `transitions` `from → merge → to`.
-- [ ] **Slice 3 — send enforcement.** `canSend(matrix, sender, recipient, { actor, authorize })` over
-  `checkTransition`, wired into the send path (`sendEmail`/`deliverEmail`) with the rebac `authorize`
-  from `@inixiative/permissions`. Absent matrix semantics (open vs closed) decided here.
+- [ ] **Slice 3 — send enforcement + dispatch.** At the planner (`sendEmail`, the send→deliver bridge):
+  resolve each `to` lens → **precedence-dedup by identity** → prune each survivor to its assigned lens →
+  serialize `{ recipient (pruned), recipientLens: key, sender, data }` into the deliver handoff. Guard via
+  `canSend(matrix, sender, recipient, { actor, authorize })` over `checkTransition` (rebac `authorize` from
+  `@inixiative/permissions`). Absent-matrix semantics (open vs closed) decided here. See
+  "Dispatch, hydration boundary & collision".
 - [ ] **Slice 4 — affordances.** `available`/`eligible` for "who can I send this to".
 - [ ] **Slice 5 — DB override UX / superadmin editing** (validate on write via slice-2 validation).
 
