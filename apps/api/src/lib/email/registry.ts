@@ -13,20 +13,40 @@ const eq = (field: string, value: unknown): Condition => ({ field, operator: 'eq
 
 type Row = Record<string, unknown>;
 
+export type RecipientDefinition<E = Row> = {
+  picks: string[];
+  relations?: Record<string, { picks: string[] }>;
+  where: (entity: E, sender: Sender) => Condition;
+};
+
 export type EmailEntry<E = Row> = {
   entity: (data: Record<string, unknown>) => LensNarrowing;
   sender: (entity: E) => Sender;
-  recipients: (entity: E, sender: Sender) => LensNarrowing;
+  recipients: RecipientDefinition<E>;
   cc?: (recipient: Row, sender: Sender) => LensNarrowing;
   bcc?: (recipient: Row, sender: Sender) => LensNarrowing;
   data?: (entity: E, handoff: Record<string, unknown>) => Record<string, unknown>;
 };
+
+export const recipientLens = (recipients: RecipientDefinition, entity: Row, sender: Sender): LensNarrowing => ({
+  parent: lensFor('User'),
+  root: {
+    where: recipients.where(entity, sender),
+    picks: recipients.picks,
+    ...(recipients.relations ? { relations: recipients.relations } : {}),
+  },
+});
 
 const defineEntry = <E>(entry: EmailEntry<E>): EmailEntry => entry as EmailEntry;
 
 const userById = (id: unknown): LensNarrowing => ({
   parent: lensFor('User'),
   root: { where: eq('id', id), picks: ['id', 'name', 'email'] },
+});
+
+const userRecipient = <E>(idOf: (entity: E) => unknown): RecipientDefinition<E> => ({
+  picks: ['id', 'name', 'email'],
+  where: (entity) => eq('id', idOf(entity)),
 });
 
 export const registry: Record<string, EmailEntry> = {
@@ -40,19 +60,19 @@ export const registry: Record<string, EmailEntry> = {
       },
     }),
     sender: (inquiry) => ({ type: 'Organization', organizationId: inquiry.sourceOrganizationId }),
-    recipients: (inquiry) => userById(inquiry.targetUserId),
+    recipients: userRecipient((inquiry) => inquiry.targetUserId),
   }),
 
   welcome: defineEntry<User>({
     entity: (data) => userById(data.userId),
     sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
+    recipients: userRecipient((user) => user.id),
   }),
 
   'email-verification': defineEntry<User>({
     entity: (data) => userById(data.userId),
     sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
+    recipients: userRecipient((user) => user.id),
     data: (_user, handoff) => ({ verificationUrl: handoff.verificationUrl }),
   }),
 };

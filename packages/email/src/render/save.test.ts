@@ -71,63 +71,6 @@ describe('saveEmailTemplate', () => {
     ).rejects.toThrow(/unconditional/i);
   });
 
-  const governance = () => ({
-    lenses: {
-      senders: { Organization: { parent: 'Organization', bindings: { organizationId: 'data.organizationId' } } },
-      recipients: { OrgUsers: { parent: 'User', picks: ['id', 'name', 'email'] } },
-    },
-    matrix: { paths: [{ from: 'Organization', to: ['OrgUsers'] }] },
-  });
-
-  it('persists valid lenses + a lens-keyed matrix', async () => {
-    const { lenses, matrix } = governance();
-    const result = await saveEmailTemplate({
-      slug: 'governed',
-      name: 'Governed',
-      subject: 'Hi',
-      kind: 'system',
-      mjml: mjml('<mj-text>Hi</mj-text>'),
-      ownerModel: 'default',
-      lenses,
-      matrix,
-    });
-    expect(result.template.lenses).toEqual(lenses);
-    expect(result.template.matrix).toEqual(matrix);
-  });
-
-  it('rejects a matrix key that references no declared lens', async () => {
-    const { lenses } = governance();
-    await expect(
-      saveEmailTemplate({
-        slug: 'dangling-matrix',
-        name: 'Bad',
-        subject: 'Hi',
-        kind: 'system',
-        mjml: mjml('<mj-text>Hi</mj-text>'),
-        ownerModel: 'default',
-        lenses,
-        matrix: { paths: [{ from: 'Ghost', to: ['OrgUsers'] }] },
-      }),
-    ).rejects.toThrow(/sender lens|matrix/i);
-  });
-
-  it('rejects a recipient lens that is not parent: User', async () => {
-    await expect(
-      saveEmailTemplate({
-        slug: 'bad-recipient-lens',
-        name: 'Bad',
-        subject: 'Hi',
-        kind: 'system',
-        mjml: mjml('<mj-text>Hi</mj-text>'),
-        ownerModel: 'default',
-        lenses: {
-          senders: { Organization: { parent: 'Organization' } },
-          recipients: { Bad: { parent: 'Organization', picks: ['id', 'name', 'email'] } },
-        },
-      }),
-    ).rejects.toThrow(/User|lens/i);
-  });
-
   it('saves template and extracts components', async () => {
     const result = await saveEmailTemplate({
       slug: 'with-header',

@@ -10,7 +10,7 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
-import { type EmailEntry, registry } from '#/lib/email/registry';
+import { type EmailEntry, type RecipientDefinition, registry } from '#/lib/email/registry';
 import { createTestApp } from '#tests/createTestApp';
 
 registerRulesHook();
@@ -28,12 +28,14 @@ const userLens = (id: unknown): LensNarrowing => ({
   },
 });
 
-const usersLens = (ids: string[]): LensNarrowing => ({
-  parent: lensFor('User'),
-  root: {
-    where: { field: 'id', operator: Operator.in, value: ids } as unknown as Condition,
-    picks: ['id', 'name', 'email'],
-  },
+const recipientSelf: RecipientDefinition = {
+  picks: ['id', 'name', 'email'],
+  where: (user) => ({ field: 'id', operator: Operator.equals, value: (user as { id: string }).id }) as unknown as Condition,
+};
+
+const recipientsIn = (ids: string[]): RecipientDefinition => ({
+  picks: ['id', 'name', 'email'],
+  where: () => ({ field: 'id', operator: Operator.in, value: ids }) as unknown as Condition,
 });
 
 const plainMjml = (body: string) =>
@@ -87,7 +89,7 @@ describe('sendEmail handler', () => {
     addEntry('test-fanout', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: () => usersLens([alice.id, bob.id]),
+      recipients: recipientsIn([alice.id, bob.id]),
     });
 
     await sendEmail(ctx(), { eventName: 'test', template: 'test-fanout', data: { userId: alice.id } });
@@ -104,7 +106,7 @@ describe('sendEmail handler', () => {
     addEntry('test-cc', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
       cc: () => userLens(manager.id),
     });
 
@@ -121,7 +123,7 @@ describe('sendEmail handler', () => {
     addEntry('test-log', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'log-evt', template: 'test-log', data: { userId: u.id } });
@@ -143,7 +145,7 @@ describe('sendEmail handler', () => {
     addEntry('test-dedup', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
     });
 
     const payload = { eventName: 'dedup-evt', template: 'test-dedup', data: { userId: u.id } };
@@ -161,7 +163,7 @@ describe('sendEmail handler', () => {
     addEntry('test-promo', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'promo-evt', template: 'test-promo', data: { userId: u.id } });
@@ -183,7 +185,7 @@ describe('sendEmail handler', () => {
     addEntry('test-unsub-link', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'unsub-link-evt', template: 'test-unsub-link', data: { userId: u.id } });
@@ -205,7 +207,7 @@ describe('sendEmail handler', () => {
     addEntry('test-bad', {
       entity: (data) => userLens(data.userId),
       sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'bad-evt', template: 'test-bad', data: { userId: u.id } });

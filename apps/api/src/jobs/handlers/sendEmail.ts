@@ -13,7 +13,7 @@ import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry } from '#/lib/email';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
-import { registry } from '#/lib/email/registry';
+import { recipientLens, registry } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
 
 export type SendEmailPayload = {
@@ -83,12 +83,12 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   };
 
   const sender = entry.sender(entity);
-  const recipientLens = entry.recipients(entity, sender);
+  const lens = recipientLens(entry.recipients, entity, sender);
   const sendKey = plannerJobId(eventName, template, data);
 
-  const users = await fetchLens(db, recipientLens);
+  const users = await fetchLens(db, lens);
   const plan = users.map((user) => {
-    const recipient = prune(user, recipientLens) as Recipient;
+    const recipient = prune(user, lens) as Recipient;
     return { user, recipient, idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars) };
   });
   if (!plan.length) {

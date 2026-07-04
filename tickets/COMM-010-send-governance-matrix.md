@@ -1,6 +1,6 @@
 # COMM-010: Email send-governance matrix (sender→recipient), transitions-based
 
-**Status**: 🟡 In progress — slice 1 (storage + save validation) building on branch `claude/email-interpolation-slots-pnnkti`
+**Status**: 🟢 Simple registry shipped; matrix/DB-config design preserved here + COMM-011 for if/when needed
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-07-04
@@ -13,15 +13,21 @@
 `EmailEntry` — do NOT rebuild), **one sender + one recipient lens per template** — one path, one
 hydration boundary per side, no lens-selection/resolution logic. Different audiences = different
 templates; one app event may fan out to several handoffs (bridge already supports it). The
-`EmailTemplate.lenses`/`matrix` DB columns stay **modeled but dormant** (validators only fire if
-set). Multi-lens resolution + tenant-editable governance → **COMM-011 (backlog)**, including the
+`EmailTemplate.lenses`/`matrix` DB columns and their validators were **dropped** (rolled back — no
+migrations existed, db-push mode; recover from git history `6278f83` if ever needed). Multi-lens
+resolution + tenant-editable governance → **COMM-011 (backlog)**, including the
 customer-rep/join-is-the-real-target insight.
 
-**The interface upgrade that matters:** split static from dynamic in the registry entry — recipient
-`picks`/`relations` declared **statically** (the interpolation surface, knowable at template-save
-time), only the scoping `where(entity, sender)` predicate stays a closure. This makes the hydration
-boundary enforceable by construction and unlocks the lens-aware `{{recipient.*}}`/`{{#if}}`
-validation COMM-009 parked. `data` shape declaration = phase 2.
+**✅ Shipped (2026-07-04):** the registry interface upgrade — `RecipientDefinition` splits static from
+dynamic: recipient `picks`/`relations` declared **statically** (the interpolation surface, knowable at
+template-save time), only the scoping `where(entity, sender)` predicate is a closure; `recipientLens()`
+assembles the User-rooted narrowing, so the recipient-root invariant and the hydration boundary are
+enforced **by construction** (a closure cannot widen picks). Planner (`sendEmail`) builds the lens from
+the definition. Entries migrated; `registry.test.ts` covers assembly + the delivery-leaf invariant.
+
+**Next when wanted:** save-time `{{recipient.*}}`/`{{#if}}` validation against the entry's static
+surface (the COMM-009 parked check — needs template↔registry linkage at the api boundary); `data`
+shape declaration.
 
 ## ⏸ Resume here (2026-07-04) — read this first
 
@@ -236,6 +242,10 @@ A matched cell **authorizes** the pair. It does **not** select content — conte
 stays with the owner cascade + component slots (COMM-009). No selector semantics in the matrix.
 
 ## Slices
+
+> **⚠ Slices 1/1b were built, then ROLLED BACK on 2026-07-04** when the direction settled on the code
+> registry: columns + validators removed (last commit carrying them: `6278f83`). Slices 2+ are
+> backlog design, gated on COMM-011 ever being picked up. Kept for the record:
 
 - [x] **Slice 1 — matrix storage + structural save validation (this branch).** `matrix Json?` on
   `EmailTemplate`; `validateMatrix`/`assertValidMatrix` (pure) validate a well-formed, **serializable**

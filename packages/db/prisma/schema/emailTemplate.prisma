@@ -22,13 +22,6 @@ model EmailTemplate {
   componentRefs         String[] // Slugs of nested {{component:slug}} references
   degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
-  // Send governance (COMM-010), serializable. `lenses` = named lens maps
-  // { senders, recipients, data } (recipient lenses are parent: User); `matrix` =
-  // { paths: [{ from: senderKey, to: recipientKey[] }] } wiring which pairs may send.
-  // Absent matrix = no restriction.
-  lenses Json?
-  matrix Json?
-
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
   organizationId String?         @db.VarChar(36)

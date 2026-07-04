@@ -10,8 +10,8 @@
 COMM-010 converged on the simple model: **one sender + one recipient lens per template** — one
 matrix path, one hydration boundary per side, zero lens-selection logic. Different audiences =
 different templates (one app event may fan out to several handoffs/templates; the bridge already
-supports this). Registry lives in code; the `EmailTemplate.lenses`/`matrix` DB columns stay modeled
-but dormant.
+supports this). Registry lives in code; the `EmailTemplate.lenses`/`matrix` DB columns were dropped
+(recover from git history `6278f83` if this ticket is ever picked up).
 
 This ticket holds the **complex** version in case the simple system proves it's needed.
 
