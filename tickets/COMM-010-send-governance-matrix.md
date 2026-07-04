@@ -40,34 +40,35 @@ vocabulary (transitions already validates predicates against a lens).
 
 ### The two sides are asymmetric (load-bearing)
 
-| side | cardinality | leaf | varies by | compose mode |
-|---|---|---|---|---|
-| **sender** | **exactly one** (one `From`) | `Organization` / `Space` / `User` / `platform` | **model** (polymorphism) | discriminated *selection* — pick one lens |
-| **recipient** | **a set** (fan-out) | email + `Contact` (a `User` **or** external `Contact`) | filter / scope / type (set-valued, polymorphic) | *union* of the `to` side's lens keys |
+| side | root | cardinality | compose mode |
+|---|---|---|---|
+| **sender** | **polymorphic model** — `Organization` / `Space` / `User` / `platform` (a real different `From`) | exactly one | discriminated *selection* — pick one lens |
+| **recipient** | **always `User`** — reason outward via relations | a **set** (fan-out) | *union* of the `to` side's lens keys |
 
-The real asymmetry is **cardinality** (one sender vs a recipient set), not model. You pick one sender
-lens; you union the `to` side's recipient lenses and fan out. Both sides are name-keyed lens **maps**.
+Two axes of asymmetry: **root** (sender is a polymorphic model; recipient is always `User`) and
+**cardinality** (one sender vs a recipient set). Both sides are name-keyed lens **maps** — but every
+recipient lens is `parent: User`, differing only in the relations/`where` it navigates.
 
-### Recipient — defined (set-valued, polymorphic)
+### Recipient — defined (User-rooted, set-valued)
 
-A recipient is **not a single row — it's a SET** (fan-out: one email + one `CommunicationLog` per member).
-So a recipient lens is a **query** (`LensNarrowing`: parent + where + picks + bindings) resolving 0..N
-rows, and the `to` side is a **map of such lenses**, OR-ed (union). This is already how
-`EmailEntry.recipients` works.
+**The recipient root is always `User`** — the person who receives the email. You **reason outward from
+the User via relations**: org context (`User → organizationUser → organization`), consent + address
+(`User → contact`), space, etc. Nothing is a different *root*; everything hangs off the User. A recipient
+lens is a `parent: User` **query** (`LensNarrowing`: where + picks + bindings) resolving to 0..N Users;
+the `to` side is a **map of such lenses**, OR-ed (union → fan-out). This is how `EmailEntry.recipients`
+already works.
 
-- **Cardinality is the real sender/recipient asymmetry** — sender = exactly one identity (one `From`);
-  recipient = a set. Not "recipient is always a `User`."
-- **Multiplicity lives in the lens vocabulary:**
-  - `where` = filter — "org users **of this level**" is a `role`/level clause.
-  - **binding present/absent = scope** — bind the org → that org's users; leave it unbound → *all orgs'*
-    users of that level.
-  - **which lens key = polymorphic type** — "customer refs" resolve via a **map** of lenses keyed by
-    concrete type (`User` | `Contact` | `OrganizationBillingContact`), the matrix cell or a `data`
-    discriminator selecting which.
-- **Deliverable-leaf invariant (generalized):** every resolved row must yield **(a) an email address and
-  (b) a `Contact`** (consent / kind / unsubscribe) — whether the row is a `User` or an external `Contact`.
-- **Provenance** (org/space context for `{{recipient.organization.*}}`) is still **bound from the send
-  context**, attached per resolved row at fan-out.
+- **It's a SET** — one email + one `CommunicationLog` per resolved User.
+- **Multiplicity lives in the lens's relation-navigating `where`:**
+  - filter — "org users **of this level**" = `where: { organizationUser: { role: … } }`.
+  - **binding present/absent = scope** — bind the org → that org's users; unbound → *all orgs'* users of
+    that level.
+  - a **polymorphic "customer" ref** resolves **down to its User(s)** by walking relations — the lens
+    still lands on `User`. Polymorphism is in the source you navigate *from*, not the recipient root.
+- **Deliverable-leaf invariant:** each resolved User must yield **an email + a `Contact`** (via
+  `User → contact`) for consent / kind / unsubscribe.
+- **Provenance** (`{{recipient.organization.*}}`) is these same relations, **bound from the send context**,
+  attached per resolved row at fan-out.
 - The recipient set is exactly `transitions`' **`eligible(recipientLens)`** bound to context — the guard's
   set-query and the resolution query are the same query.
 
@@ -123,15 +124,15 @@ one mechanism.**
     "Space": { "parent": "Space", ... }
   },
   "recipients": {                                            // a MAP of set-valued lenses; `to` unions keys
+                                                             // EVERY recipient lens is parent: User
     "OrgUsersAll":   { "parent": "User", "where": { "organizationUser": { "organizationId": "⟨bind⟩" } },
-                       "picks": ["id","name","email"],
+                       "picks": ["id","name","email"], "relations": { "contact": { "picks": ["email"] } },
                        "provenance": { "organization": { "picks": [...], "bind": "sender.organizationId" } } },
-    "OrgUsersAdmin": { "parent": "User", "where": { "organizationUser": { "organizationId": "⟨bind⟩", "role": "admin" } }, "picks": ["id","name","email"] },
-    "ExternalContacts": { "parent": "Contact", "where": {...}, "picks": ["id","name","email"] }
+    "OrgUsersAdmin": { "parent": "User", "where": { "organizationUser": { "organizationId": "⟨bind⟩", "role": "admin" } }, "picks": ["id","name","email"] }
   },
   "data": { /* payload schema — root bindings */ }
 }
-// matrix: { paths: [ { from: "Organization", to: ["OrgUsersAdmin", "ExternalContacts"] } ] }  // keys, OR-ed
+// matrix: { paths: [ { from: "Organization", to: ["OrgUsersAdmin", "OrgUsersAll"] } ] }  // keys, OR-ed → union
 ```
 
 ## Storage: DB, serializable (decided)
