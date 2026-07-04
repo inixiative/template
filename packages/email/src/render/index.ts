@@ -20,4 +20,5 @@ export {
   ConditionValidationError,
   validateConditions,
 } from './validateConditions';
+export { assertValidLenses, type LensIssue, LensesValidationError, validateLenses } from './validateLenses';
 export { assertValidMatrix, type MatrixIssue, MatrixValidationError, validateMatrix } from './validateMatrix';

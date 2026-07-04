@@ -15,6 +15,7 @@ import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
 import { assertValidConditions } from '@template/email/render/validateConditions';
+import { assertValidLenses } from '@template/email/render/validateLenses';
 import { assertValidMatrix } from '@template/email/render/validateMatrix';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -58,9 +59,11 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   // Subjects are interpolated too, so they carry conditionals and need the same floor.
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject);
-  // Structural floor for the send-governance matrix (COMM-010): a well-formed, serializable set of
-  // transition paths. Lens-scoped validation (real sender/recipient fields) is the api boundary's job.
-  assertValidMatrix(input.matrix);
+  // Structural floor for send governance (COMM-010): well-formed named lenses (recipient lenses are
+  // parent: User with the delivery leaf) and a matrix whose keys all reference declared lenses. Model/
+  // field-level checks against the real catalog are the api boundary's job (lens-scoped, slice 2).
+  assertValidLenses(input.lenses);
+  assertValidMatrix(input.matrix, input.lenses);
 
   const ctx: OwnerScope = {
     ownerModel: input.ownerModel,

@@ -1,84 +1,54 @@
 import { describe, expect, it } from 'bun:test';
 import { assertValidMatrix, MatrixValidationError, validateMatrix } from '@template/email/render/validateMatrix';
 
-const path = (fromValue: string, toValue: string) => ({
-  from: { predicate: { field: 'type', operator: 'equals', value: fromValue } },
-  to: { predicate: { field: 'type', operator: 'equals', value: toValue } },
-});
+const lenses = {
+  senders: { Organization: { parent: 'Organization' }, Space: { parent: 'Space' } },
+  recipients: { OrgUsers: { parent: 'User' }, OrgAdmins: { parent: 'User' } },
+};
 
 describe('validateMatrix', () => {
   it('treats an absent matrix as valid (open)', () => {
-    expect(validateMatrix(null)).toEqual([]);
-    expect(validateMatrix(undefined)).toEqual([]);
+    expect(validateMatrix(null, lenses)).toEqual([]);
+    expect(validateMatrix(undefined, lenses)).toEqual([]);
   });
 
-  it('accepts a well-formed single-path Action', () => {
-    expect(validateMatrix({ paths: [path('Organization', 'User')] })).toEqual([]);
+  it('accepts a matrix whose keys all reference declared lenses', () => {
+    const matrix = { paths: [{ from: 'Organization', to: ['OrgAdmins', 'OrgUsers'] }, { from: 'Space', to: ['OrgUsers'] }] };
+    expect(validateMatrix(matrix, lenses)).toEqual([]);
   });
 
-  it('accepts an OR-in-side predicate (A|B => C)', () => {
-    const matrix = {
-      paths: [
-        {
-          from: {
-            predicate: {
-              any: [
-                { field: 'type', operator: 'equals', value: 'Organization' },
-                { field: 'type', operator: 'equals', value: 'Space' },
-              ],
-            },
-          },
-          to: { predicate: { field: 'type', operator: 'equals', value: 'User' } },
-        },
-      ],
-    };
-    expect(validateMatrix(matrix)).toEqual([]);
-  });
-
-  it('accepts a serializable per-side permission delegation', () => {
-    const matrix = {
-      paths: [
-        {
-          from: { predicate: { field: 'type', operator: 'equals', value: 'Organization' }, permission: { rel: 'admin', action: 'send' } },
-          to: { predicate: { field: 'type', operator: 'equals', value: 'User' } },
-        },
-      ],
-    };
-    expect(validateMatrix(matrix)).toEqual([]);
+  it('rejects a matrix when no lenses are declared to reference', () => {
+    expect(validateMatrix({ paths: [{ from: 'Organization', to: ['OrgUsers'] }] }, null).length).toBeGreaterThan(0);
   });
 
   it('rejects a non-Action shape', () => {
-    expect(validateMatrix({ foo: 1 }).length).toBeGreaterThan(0);
-    expect(validateMatrix([]).length).toBeGreaterThan(0);
-    expect(validateMatrix('nope').length).toBeGreaterThan(0);
+    expect(validateMatrix({ foo: 1 }, lenses).length).toBeGreaterThan(0);
+    expect(validateMatrix([], lenses).length).toBeGreaterThan(0);
   });
 
-  it('rejects an empty paths array (a matrix that permits nothing is a mistake)', () => {
-    const issues = validateMatrix({ paths: [] });
-    expect(issues.length).toBeGreaterThan(0);
+  it('rejects empty paths', () => {
+    const issues = validateMatrix({ paths: [] }, lenses);
     expect(issues[0].path).toBe('$.paths');
   });
 
-  it('rejects a path missing a side predicate, attributing the path index', () => {
-    const issues = validateMatrix({ paths: [{ from: {}, to: { predicate: { field: 'type', operator: 'equals', value: 'User' } } }] });
-    expect(issues.some((i) => i.path.startsWith('$.paths[0].from'))).toBe(true);
+  it('rejects a `from` key that is not a declared sender lens', () => {
+    const issues = validateMatrix({ paths: [{ from: 'Nope', to: ['OrgUsers'] }] }, lenses);
+    expect(issues.some((i) => i.path.includes('paths[0].from') && /Nope/.test(i.message))).toBe(true);
   });
 
-  it('rejects a malformed permission ActionRule shape', () => {
-    const matrix = {
-      paths: [
-        {
-          from: { predicate: { field: 'type', operator: 'equals', value: 'Organization' }, permission: { bogus: true } },
-          to: { predicate: { field: 'type', operator: 'equals', value: 'User' } },
-        },
-      ],
-    };
-    expect(validateMatrix(matrix).some((i) => i.path.includes('permission'))).toBe(true);
+  it('rejects a `to` key that is not a declared recipient lens', () => {
+    const issues = validateMatrix({ paths: [{ from: 'Organization', to: ['OrgUsers', 'Ghost'] }] }, lenses);
+    expect(issues.some((i) => i.path.includes('paths[0].to') && /Ghost/.test(i.message))).toBe(true);
+  });
+
+  it('rejects an empty or non-array `to`', () => {
+    expect(validateMatrix({ paths: [{ from: 'Organization', to: [] }] }, lenses).length).toBeGreaterThan(0);
+    expect(validateMatrix({ paths: [{ from: 'Organization', to: 'OrgUsers' }] }, lenses).length).toBeGreaterThan(0);
   });
 
   it('assertValidMatrix throws MatrixValidationError carrying issues', () => {
     try {
-      assertValidMatrix({ paths: [] });
+      assertValidMatrix({ paths: [{ from: 'Nope', to: ['OrgUsers'] }] }, lenses);
       expect(true).toBe(false);
     } catch (err) {
       expect(err).toBeInstanceOf(MatrixValidationError);
@@ -87,6 +57,6 @@ describe('validateMatrix', () => {
   });
 
   it('assertValidMatrix is a no-op for a valid matrix', () => {
-    expect(() => assertValidMatrix({ paths: [path('Organization', 'User')] })).not.toThrow();
+    expect(() => assertValidMatrix({ paths: [{ from: 'Organization', to: ['OrgUsers'] }] }, lenses)).not.toThrow();
   });
 });

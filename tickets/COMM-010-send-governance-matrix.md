@@ -160,10 +160,11 @@ pruned projection *is* the serialized boundary (plain JSON). Two extensions:
 - *Identity collision* (one person via several `to` lenses → two renders) — the planner already collapses
   same-email via `idempotencyKey` (email + shared `dataVars`) + `skipDuplicates` + `enqueueJob({ id })`,
   so one-email-per-person holds today — **but the winner is fetch order.** Fix: **precedence-dedup by
-  identity before building the plan** — group the resolved union by user, pick the highest-precedence lens
-  per person (cascade order `SpaceUser → OrganizationUser → User`, or `to`-list order), then prune + fan
-  out. Deterministic winner, not fetch order. (Precedence is the recipient's *membership context* — a
-  distinct axis from sender-side tenancy; same ladder, don't conflate.)
+  identity before building the plan** — group the resolved union by user, pick the **first lens the user
+  matches in declared `to` order** (author orders most-specific first), then prune + fan out. Declaration
+  order *is* the precedence — deterministic, author-controlled, the same first-match rule `transitions`
+  uses for paths. (It's the recipient's *membership context* — a distinct axis from sender-side tenancy;
+  don't conflate.)
 
 **Key uniqueness** is free if `lenses` is stored as a JSON **object** (map) — keys can't collide by
 construction.
@@ -197,10 +198,14 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
   set of transition paths (valid json-rules predicates + valid `ActionRule` permission shapes), wired
   into `saveEmailTemplate`. Domain-agnostic. **Done.** (Inline predicates for now — reshaped into
   lens-keyed form in slice 1b.)
-- [ ] **Slice 1b — `lenses` block + lens-keyed matrix.** Add `lenses Json?` (`senders` model-map +
-  singular `recipient` User-leaf-with-provenance + `data`); matrix `from`/`to` become **lens keys**, not
-  inline predicates. `validateMatrix` cross-checks every key ∈ declared lenses and that `recipient` keeps
-  the required `User(id,name,email)` leaf. Still structural/domain-agnostic.
+- [x] **Slice 1b — `lenses` block + lens-keyed matrix. Done.** Added `lenses Json?` (`senders` +
+  `recipients` name-keyed maps + `data`); matrix reshaped to `{ paths: [{ from: senderKey, to:
+  recipientKey[] }] }`. `validateLenses` (structural: parent model, json-rules `where`, recipient lenses
+  are `parent: User` with the `id/name/email` leaf) + `validateMatrix(matrix, lenses)` (cross-checks every
+  `from`/`to` key ∈ declared lenses, non-empty paths/to). Both wired into `saveEmailTemplate`. Removed
+  `@inixiative/transitions` from `@template/email` — structural validation is json-rules-only; the
+  `checkTransition` **engine belongs at the api boundary** (slice 3), not the domain-agnostic render
+  package.
 - [ ] **Slice 2 — lens-scoped validation** at the domain-aware api boundary: model names are real
   (`lensFor`), `picks` reference real fields, and every `bind` resolves to something the context provides
   (a `data` field or the resolved sender) — a resolvable dependency chain. (Belongs where domain lenses
@@ -212,8 +217,9 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
   resolve each `to` lens → **precedence-dedup by identity** → prune each survivor to its assigned lens →
   serialize `{ recipient (pruned), recipientLens: key, sender, data }` into the deliver handoff. Guard via
   `canSend(matrix, sender, recipient, { actor, authorize })` over `checkTransition` (rebac `authorize` from
-  `@inixiative/permissions`). Absent-matrix semantics (open vs closed) decided here. See
-  "Dispatch, hydration boundary & collision".
+  `@inixiative/permissions`). Absent-matrix semantics (open vs closed) decided here. **Adds
+  `@inixiative/transitions` to `apps/api`** (the enforcement engine's home). See "Dispatch, hydration
+  boundary & collision".
 - [ ] **Slice 4 — affordances.** `available`/`eligible` for "who can I send this to".
 - [ ] **Slice 5 — DB override UX / superadmin editing** (validate on write via slice-2 validation).
 
