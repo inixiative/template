@@ -36,6 +36,71 @@ side's predicate via json-rules `any`, `||` = another path).
 predicates are authored *against* those code-defined lenses — data config within a code-defined
 vocabulary (transitions already validates predicates against a lens).
 
+## Lenses & composition
+
+### The two sides are asymmetric (load-bearing)
+
+| side | leaf | varies by | compose mode |
+|---|---|---|---|
+| **sender** | `Organization` / `Space` / `User` / `platform` | **model** (real polymorphism) | discriminated *selection* — pick one model lens |
+| **recipient** | **always `User`** | **provenance context** (plain / org-member / space-member) | base `User` leaf + *additive* provenance overlay |
+
+You never merge sender lenses (choose one); you always start the recipient from the `User` leaf and
+overlay provenance. So the `lenses` block is `senders` (a model **map**) + `recipient` (**singular**, a
+`User` lens) — not a symmetric `model => model`.
+
+### Recipient — defined
+
+- **Leaf: always `User`.** Required picks `id, name, email`. `email` is the delivery address — the send
+  **fails** if it can't resolve a `User` with a non-empty email. `{{recipient.name}}`/`{{recipient.email}}`
+  are always these User fields.
+- **Provenance is optional and *bound from the send context*, not walked from the user.** The org isn't
+  discovered by traversing the User's memberships — it's the **send's** org (the resolved sender's
+  `organizationId` / `data.organizationId`) attached for `{{recipient.organization.*}}`. Provenance chain:
+  `organizationUser → organization` (and the parallel `spaceUser → space`).
+- **The matrix `to` side is always `User`;** which provenance is attached is decided by the cell's `from`.
+  `Organization => User` means "the User addressed *as a member of* that Organization" — the `to` binding
+  pulls the sender's org onto the recipient.
+
+### Sender — defined
+
+A **model map**: one lens per allowed sender model, each self-contained with its own bindings (e.g.
+`Organization` bound from `data.organizationId`). The matrix `from` selects exactly one.
+
+### Data — defined
+
+The event-payload lens and the **root binding source** (`data.organizationId`, `data.targetUserId`, …).
+Universal (not matrix-varying), like `system`.
+
+### Composition pipeline (ordered, context-threaded)
+
+```
+data (root bindings)
+  → select + bind SENDER by model
+  → merge sender identity into the binding context
+  → bind RECIPIENT (User leaf + provenance) against the MERGED context
+  → assert the User leaf (email present) or fail
+  → hand { sender, recipient, data, system } to interpolation
+```
+
+This **is** `transitions`' `from → merge → to`: sender = `from` (reads the current/data context),
+recipient = `to` (reads the context **merged** with the sender). Attaching the sender's org onto the
+recipient *is* the merge — so the governance guard and lens composition walk the **same edge, same
+direction, one mechanism.**
+
+### `lenses` block shape
+
+```jsonc
+{
+  "senders":   { "Organization": { "picks": [...], "bindings": {...} },   // model map (choose one)
+                 "Space": {...}, "User": {...} },
+  "recipient": { "picks": ["id","name","email"],                          // always the User leaf
+                 "provenance": { "organization": { "picks": [...], "bind": "sender.organizationId" },
+                                 "space":        { "picks": [...], "bind": "sender.spaceId" } } },
+  "data":      { /* payload schema — root bindings */ }
+}
+```
+
 ## Storage: DB, serializable (decided)
 
 The matrix lives on `EmailTemplate` as a serializable `Json` field, tenant-configurable via the
@@ -60,14 +125,22 @@ stays with the owner cascade + component slots (COMM-009). No selector semantics
 
 ## Slices
 
-- [ ] **Slice 1 — storage + save validation (this branch).** `matrix Json?` on `EmailTemplate`;
-  `validateMatrix`/`assertValidMatrix` (pure) validate the Action is a well-formed, **serializable**
+- [x] **Slice 1 — matrix storage + structural save validation (this branch).** `matrix Json?` on
+  `EmailTemplate`; `validateMatrix`/`assertValidMatrix` (pure) validate a well-formed, **serializable**
   set of transition paths (valid json-rules predicates + valid `ActionRule` permission shapes), wired
-  into `saveEmailTemplate`. **Domain-agnostic** — no lens yet (structural floor only). Lives in
-  `@template/email` (transitions/permissions are generic primitives, like json-rules).
-- [ ] **Slice 2 — lens-scoped validation** at the domain-aware api boundary: pass sender/recipient
-  lenses so predicates can only reference real fields. (Belongs where domain lenses live, not the
-  domain-agnostic render package.)
+  into `saveEmailTemplate`. Domain-agnostic. **Done.** (Inline predicates for now — reshaped into
+  lens-keyed form in slice 1b.)
+- [ ] **Slice 1b — `lenses` block + lens-keyed matrix.** Add `lenses Json?` (`senders` model-map +
+  singular `recipient` User-leaf-with-provenance + `data`); matrix `from`/`to` become **lens keys**, not
+  inline predicates. `validateMatrix` cross-checks every key ∈ declared lenses and that `recipient` keeps
+  the required `User(id,name,email)` leaf. Still structural/domain-agnostic.
+- [ ] **Slice 2 — lens-scoped validation** at the domain-aware api boundary: model names are real
+  (`lensFor`), `picks` reference real fields, and every `bind` resolves to something the context provides
+  (a `data` field or the resolved sender) — a resolvable dependency chain. (Belongs where domain lenses
+  live, not the domain-agnostic render package.)
+- [ ] **Slice 2b — `composeLenses(template, data)`** — the ordered pipeline `data → sender(select+bind)
+  → merge → recipient(bind, assert User leaf)`, producing `{ sender, recipient, data, system }` for
+  interpolation. Mirrors `transitions` `from → merge → to`.
 - [ ] **Slice 3 — send enforcement.** `canSend(matrix, sender, recipient, { actor, authorize })` over
   `checkTransition`, wired into the send path (`sendEmail`/`deliverEmail`) with the rebac `authorize`
   from `@inixiative/permissions`. Absent matrix semantics (open vs closed) decided here.
