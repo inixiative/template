@@ -96,3 +96,17 @@ export const decompose = (mjml: string, resolve: ResolveCascade): DecomposeResul
   const { mjml: out, refs } = processCaller(parseBlocks(mjml), ctx);
   return { mjml: out, refs, writes: ctx.writes };
 };
+
+// Every component slug referenced anywhere in the payload (nested, inside slots, and inside
+// overrides). Used to batch the cascade lookup before diffing.
+export const collectSlugs = (mjml: string): string[] => {
+  const out = new Set<string>();
+  const walk = (nodes: Node[]): void => {
+    for (const node of nodes) {
+      if (node.type === 'component') out.add(node.slug);
+      if (node.type !== 'text') walk(node.children);
+    }
+  };
+  walk(parseBlocks(mjml));
+  return [...out];
+};

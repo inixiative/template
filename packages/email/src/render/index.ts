@@ -5,10 +5,10 @@ export {
   composeTemplate,
   parentOwner,
 } from './compose';
+export { type ComponentWrite, collectSlugs, decompose, type DecomposeResult, type ResolveCascade, serialize } from './decompose';
 export { type EmailErrorType, EmailRenderError } from './errors';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';
-export { type MappedComponent, type MapResult, mapRefs, type RefMap } from './extractRefs';
 export { interpolate, Lens, type Variables } from './interpolate';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';

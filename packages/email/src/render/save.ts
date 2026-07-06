@@ -6,11 +6,10 @@
  */
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import { type ComponentWrite, collectSlugs, decompose } from '@template/email/render/decompose';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
 import { expand } from '@template/email/render/expand';
-import { mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
@@ -65,23 +64,35 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
     locale: input.locale ?? 'en',
   };
 
-  // 1. Parse template MJML for component refs (sync, outside tx)
-  const { map, mjml: indexedMjml, refs: templateRefs } = mapRefs(input.mjml);
-  const baseSlugs = Object.keys(map);
+  // Every referenced component slug, so we can diff each inlined body against the cascade.
+  const slugs = collectSlugs(input.mjml);
 
-  // 2. Lookup + resolve + save in transaction
   return db.txn(
     async () => {
-      const existing = await lookupCascade(baseSlugs, ctx);
-      const resolved = resolveVariants(map, indexedMjml, templateRefs, existing, ctx);
+      // The cascade body per slug (tenant → parent → platform) is the diff baseline: an inlined
+      // body equal to it is a noop/inherit; a divergence (or an unknown slug) is a write at this tenant.
+      const existing = await lookupCascade(slugs, ctx);
+      const { mjml, refs, writes } = decompose(input.mjml, (slug) => existing[slug]?.mjml);
 
-      const finalTemplate = { ...input, ...resolved.template, locale: ctx.locale } as EmailTemplate;
-      const finalComponents = resolved.components as EmailComponent[];
+      // A slug defines one component (no variant-indexing) — collapse repeats, keeping child-first order.
+      const bySlug = new Map<string, ComponentWrite>();
+      for (const write of writes) bySlug.set(write.slug, write);
+      const finalComponents = [...bySlug.values()].map((write) => ({
+        slug: write.slug,
+        locale: ctx.locale,
+        mjml: write.mjml,
+        componentRefs: [...new Set(write.refs)],
+      })) as EmailComponent[];
 
-      // Cycle check before writes. mapRefs guarantees the intra-save graph
-      // is a tree (text-nested → can't self-reference); this defends against
-      // cross-save cycles where this save's new edge closes a loop with
-      // edges already in the DB.
+      const finalTemplate = {
+        ...input,
+        mjml,
+        componentRefs: [...new Set(refs)],
+        locale: ctx.locale,
+      } as EmailTemplate;
+
+      // Cycle check before writes: defends against a cross-save cycle where this save's new edge
+      // closes a loop with edges already in the DB (the intra-save graph is a tree by construction).
       for (const component of finalComponents) {
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }

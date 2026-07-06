@@ -1,6 +1,20 @@
 import { describe, expect, test } from 'bun:test';
-import { decompose, serialize } from '@template/email/render/decompose';
+import { collectSlugs, decompose, serialize } from '@template/email/render/decompose';
 import { parseBlocks } from '@template/email/render/parseBlocks';
+
+describe('collectSlugs', () => {
+  test('gathers every referenced slug — nested, in defaults, and in overrides', () => {
+    const src =
+      '{{#component:a}}{{#slot:x:default}}{{#component:b}}{{/component:b}}{{/slot:x:default}}' +
+      '{{#slot:y}}{{#component:c}}{{/component:c}}{{/slot:y}}{{/component:a}}';
+    expect(collectSlugs(src).sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  test('dedupes repeated slugs', () => {
+    const src = '{{#component:a}}{{/component:a}}{{#component:a}}{{/component:a}}';
+    expect(collectSlugs(src)).toEqual(['a']);
+  });
+});
 
 // A cascade resolver that knows nothing (every component is new).
 const noCascade = () => undefined;
