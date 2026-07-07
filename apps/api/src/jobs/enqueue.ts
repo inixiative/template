@@ -50,27 +50,39 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
   const jobId = jobOptions.jobId ?? uuidv7();
 
+  const lane = dedupeKey ? laneKey(handlerName, dedupeKey) : undefined;
+
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {
-    await spillToOutbox({
-      handlerName,
-      jobId,
-      dedupeKey: dedupeKey ?? null,
-      data: { type, id, payload, dedupeKey },
-      options: jobOptions,
-    });
+    // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while
+    // buffered, so an older in-flight run aborts now instead of finishing with stale data during the
+    // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
+    const previousHolder = lane ? await claimLane(lane, jobId) : null;
+    try {
+      await spillToOutbox({
+        handlerName,
+        jobId,
+        dedupeKey: dedupeKey ?? null,
+        data: { type, id, payload, dedupeKey },
+        options: jobOptions,
+      });
+    } catch (err) {
+      if (lane) await releaseLane(lane, jobId, previousHolder).catch(() => {});
+      throw err;
+    }
     log.info(`Spilled job ${handlerName} to outbox (${jobId})`);
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
   // Claim the lane BEFORE adding so the job holds the baton the instant it starts. If the add then
   // fails, no job exists to hold the baton — roll the claim back (fenced, so a concurrent claim isn't
-  // clobbered) rather than leaving the prior job superseded by a phantom that never ran.
-  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
+  // clobbered) rather than leaving the prior job superseded by a phantom that never ran. The claim's
+  // TTL stretches by the job's `delay` — the baton must survive until the job actually runs.
+  const previousHolder = lane ? await claimLane(lane, jobId, jobOptions.delay) : null;
   try {
     await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
   } catch (err) {
-    if (dedupeKey) await releaseLane(laneKey(handlerName, dedupeKey), jobId).catch(() => {});
+    if (lane) await releaseLane(lane, jobId, previousHolder).catch(() => {});
     throw err;
   }
   if (type === JobType.adhoc) await tripIfFull();

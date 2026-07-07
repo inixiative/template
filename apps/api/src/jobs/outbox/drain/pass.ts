@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { claimLane, db, laneKey } from '@template/db';
+import { claimLane, db, laneKey, releaseLane } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
 import { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
@@ -31,13 +31,19 @@ export const runDrainOutboxPass = async (): Promise<void> => {
         const drained: string[] = [];
         const failed: string[] = [];
         for (const row of rows) {
+          const data = row.data as JobData;
+          const opts = (row.options ?? {}) as JobsOptions;
+          const lane = data.dedupeKey ? laneKey(row.handlerName, data.dedupeKey) : undefined;
+          let previousHolder: string | null = null;
           try {
-            const data = row.data as JobData;
-            const opts = (row.options ?? {}) as JobsOptions;
-            if (data.dedupeKey) await claimLane(laneKey(row.handlerName, data.dedupeKey), row.jobId);
+            // Claim TTL stretches by the re-added job's delay, same as the direct enqueue path.
+            if (lane) previousHolder = await claimLane(lane, row.jobId, opts.delay);
             await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             drained.push(row.id);
           } catch (e) {
+            // The re-add failed, so roll back the lane claim (fenced) — the row stays buffered for a
+            // retry; don't leave the prior job superseded by a job that never got created.
+            if (lane) await releaseLane(lane, row.jobId, previousHolder).catch(() => {});
             failed.push(row.id);
             log.error(
               `drainOutbox: failed to re-enqueue ${row.handlerName} (${row.jobId}) — attempt ${row.attempts + 1}`,

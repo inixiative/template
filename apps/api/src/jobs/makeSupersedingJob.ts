@@ -5,7 +5,8 @@
  * @uses infrastructure:redis
  * @constructs jobHandler
  */
-import { laneKey, watchLane } from '@template/db';
+import { getJobSupersededBy, laneKey, reclaimLaneIfVacant, watchLane } from '@template/db';
+import { LogScope, log } from '@template/shared/logger';
 import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
@@ -24,6 +25,21 @@ export const makeSupersedingJob = <TPayload = void>(
     const abortPromise = new Promise<never>((_, reject) => {
       abortController.signal.addEventListener('abort', () => reject(new SupersededError(job.id)));
     });
+
+    // The enqueue-time baton can expire while this job sits queued (its TTL covers delay + a wait
+    // buffer, but congestion is unbounded). The per-job tombstone is the durable edge: a job displaced
+    // while queued exits here even though its lane key already expired. Then re-assert the baton iff
+    // the lane is VACANT — a live holder is never clobbered (NX), so a newer claimant still usurps us
+    // via the first poll below; a lapsed baton is restored so this run is visible to lane reads again.
+    try {
+      if (job.id && (await getJobSupersededBy(job.id))) {
+        log.info(`Job ${job.id} already superseded before start`, LogScope.job);
+        return;
+      }
+      await reclaimLaneIfVacant(lane, job.id!);
+    } catch (err) {
+      log.error(`Supersession check failed at job start (${job.id}) — continuing`, err, LogScope.job);
+    }
 
     const stopWatch = watchLane(lane, job.id!, () => abortController.abort(new SupersededError(job.id)));
 
