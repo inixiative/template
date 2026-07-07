@@ -57,7 +57,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while
     // buffered, so an older in-flight run aborts now instead of finishing with stale data during the
     // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
-    const previousHolder = lane ? await claimLane(lane, jobId) : null;
+    const previousHolder = lane ? await claimLane(lane, jobId, jobOptions.delay) : null;
     try {
       await spillToOutbox({
         handlerName,

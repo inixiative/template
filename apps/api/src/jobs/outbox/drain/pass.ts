@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import { claimLane, db, laneKey, releaseLane } from '@template/db';
+import { claimLane, db, getJobSupersededBy, laneKey, releaseLane } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { JobsOptions } from 'bullmq';
 import { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
@@ -29,6 +29,7 @@ export const runDrainOutboxPass = async (): Promise<void> => {
         });
 
         const drained: string[] = [];
+        const displaced: string[] = [];
         const failed: string[] = [];
         for (const row of rows) {
           const data = row.data as JobData;
@@ -36,14 +37,23 @@ export const runDrainOutboxPass = async (): Promise<void> => {
           const lane = data.dedupeKey ? laneKey(row.handlerName, data.dedupeKey) : undefined;
           let previousHolder: string | null = null;
           try {
+            // A row tombstoned while buffered was displaced by a newer direct enqueue. Re-claiming it
+            // would tombstone the usurper right back (mutual tombstones → neither runs), so drop it.
+            if (lane && (await getJobSupersededBy(row.jobId))) {
+              displaced.push(row.id);
+              continue;
+            }
             // Claim TTL stretches by the re-added job's delay, same as the direct enqueue path.
             if (lane) previousHolder = await claimLane(lane, row.jobId, opts.delay);
             await queue.add(row.handlerName, data, { ...opts, jobId: row.jobId });
             drained.push(row.id);
           } catch (e) {
             // The re-add failed, so roll back the lane claim (fenced) — the row stays buffered for a
-            // retry; don't leave the prior job superseded by a job that never got created.
-            if (lane) await releaseLane(lane, row.jobId, previousHolder).catch(() => {});
+            // retry; don't leave the prior job superseded by a job that never got created. A self-claim
+            // (the spill-time baton, previousHolder === row.jobId) must survive the retry — keep it.
+            if (lane && previousHolder !== row.jobId) {
+              await releaseLane(lane, row.jobId, previousHolder).catch(() => {});
+            }
             failed.push(row.id);
             log.error(
               `drainOutbox: failed to re-enqueue ${row.handlerName} (${row.jobId}) — attempt ${row.attempts + 1}`,
@@ -53,9 +63,14 @@ export const runDrainOutboxPass = async (): Promise<void> => {
           }
         }
 
-        if (drained.length) {
-          await db.jobOutbox.deleteMany({ where: { id: { in: drained } } });
-          log.info(`drainOutbox: admitted ${drained.length}/${rows.length} buffered jobs`, LogScope.job);
+        if (drained.length || displaced.length) {
+          await db.jobOutbox.deleteMany({ where: { id: { in: [...drained, ...displaced] } } });
+          if (drained.length) {
+            log.info(`drainOutbox: admitted ${drained.length}/${rows.length} buffered jobs`, LogScope.job);
+          }
+          if (displaced.length) {
+            log.info(`drainOutbox: dropped ${displaced.length} superseded buffered row(s)`, LogScope.job);
+          }
         }
         if (failed.length) {
           // updateManyAndReturn, not updateMany — the mutationLifeCycle extension bans the bare form.
