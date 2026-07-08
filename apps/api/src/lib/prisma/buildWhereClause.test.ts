@@ -95,6 +95,69 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('folds a visit where with a dotted to-one path — the guard walks a relation off the visited model', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            picks: [],
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'user.emailVerified', operator: 'equals', value: true } },
+            },
+          },
+        },
+        search: 'prod',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                tokens: {
+                  some: {
+                    AND: [
+                      { name: { contains: 'prod', mode: 'insensitive' } },
+                      { user: { emailVerified: { equals: true } } },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('folds a soft-delete guard (`notExists` → equals null) into the `some`', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            picks: [],
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'deletedAt', operator: 'notExists' } },
+            },
+          },
+        },
+        search: 'prod',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                tokens: {
+                  some: {
+                    AND: [{ name: { contains: 'prod', mode: 'insensitive' } }, { deletedAt: { equals: null } }],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
     it("folds a to-one visit's where into the hop (direct nesting, no `some`)", () => {
       const result = buildWhereClause({
         filterLens: {
