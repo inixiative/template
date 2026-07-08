@@ -11,6 +11,7 @@ import {
   tripIfFull,
 } from '#/jobs/outbox';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
+import { flushQueue } from '#/jobs/outbox/mutex';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -341,5 +342,22 @@ describe('jobs overflow buffer (spill + drain)', () => {
     };
 
     await expect(spillToOutbox(collide)).rejects.toThrow();
+  });
+
+  it('rejects spills accepted mid-drain when the shutdown flush gives up (no hung awaits)', async () => {
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '100';
+    process.env.JOBS_OUTBOX_FLUSH_LINGER_MS = '60000';
+    let straggler: Promise<unknown> | null = null;
+    const run = spyOn(flushQueue, 'run').mockImplementation((async () => {
+      straggler ??= spillToOutbox(fanRow('mid-drain')).catch((e) => e); // lands while flushOutbox is draining
+      throw new Error('db down');
+    }) as never);
+
+    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
+    await expect(flushOutbox()).rejects.toThrow('db down');
+    run.mockRestore();
+
+    expect(String(await buffered)).toContain('db down');
+    expect(String(await straggler!)).toContain('gave up');
   });
 });

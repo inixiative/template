@@ -2,7 +2,7 @@ export {
   claimLane,
   getJobSupersededBy,
   laneKey,
-  reclaimLaneIfVacant,
+  reclaimLane,
   releaseLane,
   supersededKey,
   watchLane,

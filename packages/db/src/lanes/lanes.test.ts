@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  claimLane,
-  getJobSupersededBy,
-  laneKey,
-  reclaimLaneIfVacant,
-  releaseLane,
-  watchLane,
-} from '@template/db/lanes/lanes';
+import { claimLane, getJobSupersededBy, laneKey, reclaimLane, releaseLane, watchLane } from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins
@@ -51,14 +44,26 @@ describe('supersede lane baton', () => {
     expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
   });
 
-  test('reclaimLaneIfVacant restores a lapsed baton but never steals from a live holder', async () => {
+  test('reclaimLane restores a lapsed baton but never steals from a newer holder', async () => {
     const lane = laneKey('h', 'reclaim');
     // Vacant (expired while the job sat queued) → the starting job re-asserts itself.
-    await reclaimLaneIfVacant(lane, 'job-a');
-    expect(await redis.get(lane)).toBe('job-a');
-    // Held → NX no-op: a newer claimant keeps the baton (so it still usurps the reclaimer).
-    await reclaimLaneIfVacant(lane, 'job-b');
-    expect(await redis.get(lane)).toBe('job-a');
+    await reclaimLane(lane, 'job-b');
+    expect(await redis.get(lane)).toBe('job-b');
+    // Held by a NEWER job (uuidv7 ids are time-ordered: 'job-a' < 'job-b') → no-op: the newer
+    // claimant keeps the baton, so it still usurps the reclaimer via its watch.
+    await reclaimLane(lane, 'job-a');
+    expect(await redis.get(lane)).toBe('job-b');
+    expect(await getJobSupersededBy('job-b')).toBeNull();
+  });
+
+  test('reclaimLane displaces an OLDER holder and tombstones it (no stale-wins inversion)', async () => {
+    // Both batons lapsed under congestion; the older job started first and re-asserted a vacant lane.
+    // The newer job must take the baton back at start — otherwise last-wins flips to stale-wins.
+    const lane = laneKey('h', 'reclaim-inversion');
+    await reclaimLane(lane, 'job-a');
+    await reclaimLane(lane, 'job-b');
+    expect(await redis.get(lane)).toBe('job-b');
+    expect(await getJobSupersededBy('job-a')).toBe('job-b');
   });
 
   test('watchLane fires onUsurped once a different job claims the lane', async () => {
