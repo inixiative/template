@@ -15,10 +15,11 @@ import {
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
 import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
+import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { validatePathNotation } from '#/lib/prisma/pathNotation';
 import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
@@ -48,6 +49,24 @@ const stripRelationOperators = (path: string): string =>
     .join('.');
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+
+// The lens's composed row-scope (toPrisma'd) for one projectByPath visit key.
+type VisitWhereFn = (visitKey: string) => Record<string, unknown>[];
+
+// Filter-first composition of a visit's row-scope into a relation operator's
+// value. Scope and the caller's condition must hold on the SAME related row —
+// two sibling `some`s would match different rows. `every` composes by
+// implication ("of the rows in scope, every one matches"); plain AND would
+// wrongly demand every related row be in scope.
+const scopeRelationValue = (
+  op: string,
+  value: BracketQueryValue,
+  wheres: Record<string, unknown>[],
+): BracketQueryValue => {
+  if (!wheres.length) return value;
+  if (op === 'every') return { OR: [{ NOT: { AND: wheres } }, value] } as unknown as BracketQueryValue;
+  return { AND: [value, ...wheres] } as unknown as BracketQueryValue;
+};
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
@@ -113,6 +132,7 @@ const validateAndTransformSearchFields = (
   searchableFields: readonly string[],
   skipFieldValidation: boolean,
   model: ModelName,
+  visitWhere: VisitWhereFn,
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
@@ -187,17 +207,20 @@ const validateAndTransformSearchFields = (
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
+      const wheres = visitWhere(`${model}.${stripRelationOperators(currentPath)}`);
       const relationValue: BracketQueryRecord = {};
       for (const [opKey, opValue] of Object.entries(value)) {
         if (isRelationOperator(opKey) && isRecord(opValue)) {
-          relationValue[opKey] = validateAndTransformSearchFields(
+          const transformed = validateAndTransformSearchFields(
             opValue,
             searchableFields,
             skipFieldValidation,
             model,
+            visitWhere,
             currentPath,
             depth + 1,
           );
+          relationValue[opKey] = scopeRelationValue(opKey, transformed as BracketQueryValue, wheres);
         }
       }
       result[key] = relationValue;
@@ -225,14 +248,26 @@ const validateAndTransformSearchFields = (
     }
 
     // No relation/field operators → deeper nesting (e.g. `{ user: { name: 'x' } }`).
-    result[key] = validateAndTransformSearchFields(
+    // A to-one relation traversed this way folds in its visit's row-scope, same
+    // as the operator forms above (plain nesting is Prisma's `is` shorthand).
+    const nested = validateAndTransformSearchFields(
       value,
       searchableFields,
       skipFieldValidation,
       model,
+      visitWhere,
       currentPath,
       depth + 1,
     );
+    const nestedField = lookupField(model, stripRelationOperators(currentPath));
+    result[key] =
+      nestedField?.kind === 'object'
+        ? scopeRelationValue(
+            'is',
+            nested as BracketQueryValue,
+            visitWhere(`${model}.${stripRelationOperators(currentPath)}`),
+          )
+        : (nested as BracketQueryValue);
   }
 
   return result;
@@ -245,21 +280,44 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
+  // Composed row-scope per visit. projectByPath walks the whole narrowing chain
+  // (route filterLens + every stacked scopeNarrowing layer), folding in mapDefaults
+  // + filter-first `all`-negation, keyed by dotted path from the root model. The
+  // root visit's wheres AND into the query below; a relation visit's wheres fold
+  // in wherever a search/filter path bleeds into that relation.
+  const byPath = projectByPath(filterLens);
+  const visitWhere: VisitWhereFn = (visitKey) => {
+    const visit = byPath.get(visitKey);
+    if (!visit) return [];
+    return visit.whereClauses.flatMap((clause: Condition) => {
+      const step = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName }).steps[0];
+      return step && 'where' in step && Object.keys(step.where).length > 0 ? [step.where] : [];
+    });
+  };
+
   // Global search — broad: each searchable field contributes a clause based on its
   // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
+  // Relation paths walk via buildSearchPath: to-many hops wrap in `some`, and each
+  // hop carries its visit's row-scope.
   if (search && searchableFields.length) {
     const searchConditions = searchableFields.flatMap((field) => {
       const def = lookupField(model, stripRelationOperators(field));
       const clause = def && buildSearchClause(def, search);
       if (!clause) return [];
       if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
-      return [buildNestedPath(field, clause)];
+      return [buildSearchPath(model, field, clause, visitWhere)];
     });
     if (searchConditions.length) conditions.push({ OR: searchConditions });
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
+    const transformed = validateAndTransformSearchFields(
+      searchFields,
+      searchableFields,
+      skipFieldValidation,
+      model,
+      visitWhere,
+    );
     for (const [key, value] of Object.entries(transformed)) {
       if (orNullFields.includes(key)) {
         conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
@@ -269,16 +327,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     }
   }
 
-  // Row scope: the composed where for the root model. projectByPath walks the whole
-  // narrowing chain (route filterLens + every stacked scopeNarrowing layer), folding in
-  // mapDefaults + filter-first `all`-negation, and exposes the root visit's `whereClauses`.
-  // Each is toPrisma'd and ANDed into `conditions`.
-  const byPath = projectByPath(filterLens) as Map<string, { whereClauses: Condition[] }>;
-  const rootKey = byPath.keys().next().value;
-  for (const clause of (rootKey ? byPath.get(rootKey)?.whereClauses : undefined) ?? []) {
-    const step = toPrisma(clause, { map: lens, mapName: lens.mapName, model }).steps[0];
-    if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
-  }
+  conditions.push(...visitWhere(model));
 
   return {
     ...filters,

@@ -4,9 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses primitive:routeTemplates
  */
+import { type LensNarrowing, lensRequiredBindings, type RuleValue, resolveLensBindings } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
@@ -29,6 +31,9 @@ type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: 
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
+  // Request-time values for `{ bind }` tokens in the lens chain's wheres
+  // (tenant ids, active sets, …), resolved into the lens before building.
+  bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
   include?: FindManyInclude<T>;
@@ -64,15 +69,36 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const { orderBy: callerOrderByOption, orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
+  const {
+    orderBy: callerOrderByOption,
+    orNullFields,
+    bindings,
+    ...findManyOptions
+  } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
-  const filterLens = c.get('filterLens');
-  if (!filterLens) {
-    throw new Error('paginate: route must declare a filterLens (readRoute({ filterLens: … })).');
+  const declaredLens = c.get('filterLens');
+  if (!declaredLens) {
+    throw makeError({
+      status: 500,
+      message: 'paginate: route must declare a filterLens (readRoute({ filterLens: … })).',
+    });
   }
+  // Resolve `{ bind }` tokens and fail closed: an unresolved bind would silently
+  // weaken row scope, so a missing name is a 500, not a skipped clause.
+  const required = lensRequiredBindings(declaredLens);
+  const missing = [...required].filter((name) => bindings?.[name] === undefined);
+  if (missing.length) {
+    throw makeError({
+      status: 500,
+      message: `paginate: lens requires bindings not provided: ${missing.join(', ')}`,
+    });
+  }
+  const filterLens = required.size
+    ? (resolveLensBindings(declaredLens, bindings ?? {}) as LensNarrowing)
+    : declaredLens;
   const skipFieldValidation = isSuperadmin(c);
 
   const searchWhere = buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });

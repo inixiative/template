@@ -45,6 +45,102 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('wraps a to-many relation path in `some`', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: { picks: ['name'], relations: { tokens: { picks: ['name'] } } },
+        },
+        search: 'prod',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'prod', mode: 'insensitive' } },
+              { tokens: { some: { name: { contains: 'prod', mode: 'insensitive' } } } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("folds a to-many visit's where into the same `some` as the search clause", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            picks: [],
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
+            },
+          },
+        },
+        search: 'prod',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                tokens: {
+                  some: {
+                    AND: [{ name: { contains: 'prod', mode: 'insensitive' } }, { isActive: { equals: true } }],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("folds a to-one visit's where into the hop (direct nesting, no `some`)", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('Inquiry'),
+          root: {
+            picks: [],
+            relations: {
+              sourceUser: { picks: ['email'], where: { field: 'emailVerified', operator: 'equals', value: true } },
+            },
+          },
+        },
+        search: 'aron',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                sourceUser: {
+                  AND: [{ email: { contains: 'aron', mode: 'insensitive' } }, { emailVerified: { equals: true } }],
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("a relation visit's where stays out of the query when nothing traverses the relation", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            picks: ['name'],
+            relations: {
+              tokens: { picks: [], where: { field: 'isActive', operator: 'equals', value: true } },
+            },
+          },
+        },
+        search: 'aron',
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] }],
+      });
+    });
+
     it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', () => {
       const result = buildWhereClause({
         filterLens: {
@@ -436,6 +532,82 @@ describe('buildWhereClause', () => {
       });
       expect(result).toEqual({
         AND: [{ tokens: { every: { isActive: { equals: true } } } }],
+      });
+    });
+
+    it("folds the visit's where into `some` — scope and condition on the same row", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
+            },
+          },
+        },
+        searchFields: { tokens: { some: { name: 'tok-prod' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              some: {
+                AND: [{ name: { contains: 'tok-prod', mode: 'insensitive' } }, { isActive: { equals: true } }],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    it("composes the visit's where into `every` by implication, not plain AND", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
+            },
+          },
+        },
+        searchFields: { tokens: { every: { name: 'tok-prod' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              every: {
+                OR: [
+                  { NOT: { AND: [{ isActive: { equals: true } }] } },
+                  { name: { contains: 'tok-prod', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    it("folds the visit's where into plain to-one nesting (Prisma's `is` shorthand)", () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('Inquiry'),
+          root: {
+            relations: {
+              sourceUser: { picks: ['name'], where: { field: 'emailVerified', operator: 'equals', value: true } },
+            },
+          },
+        },
+        searchFields: { sourceUser: { name: 'aron' } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            sourceUser: {
+              AND: [{ name: { contains: 'aron', mode: 'insensitive' } }, { emailVerified: { equals: true } }],
+            },
+          },
+        ],
       });
     });
 
