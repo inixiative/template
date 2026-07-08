@@ -4,8 +4,14 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
+import {
+  type Condition,
+  executePrismaQueryPlan,
+  type LensNarrowing,
+  projectByPath,
+  toPrisma,
+} from '@inixiative/json-rules';
+import { db, type ModelName } from '@template/db';
 import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
@@ -272,7 +278,7 @@ const validateAndTransformSearchFields = (
   return result;
 };
 
-export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
+export const buildWhereClause = async (options: BuildWhereOptions): Promise<Record<string, unknown>> => {
   const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
@@ -281,25 +287,33 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
 
   // Row scope per projectByPath visit: root wheres AND into the query; relation
   // visits' wheres fold in only where a query path traverses the relation.
-  // Fail closed on wheres that don't compile to a single plain Prisma filter
-  // (count operators emit a groupBy plan; bridges emit the `{}` over-fetch
-  // sentinel) — dropping them would silently widen row scope.
+  // Count-operator clauses compile to a groupBy plan — executed here so every
+  // resolved where is plain. Bridges compile to the `{}` over-fetch sentinel,
+  // which is not expressible as SQL: fail closed rather than widen row scope.
   const byPath = projectByPath(filterLens);
-  const visitWhere: VisitWhereFn = (visitKey) => {
-    const visit = byPath.get(visitKey);
-    if (!visit) return [];
-    return visit.whereClauses.map((clause: Condition) => {
-      const { steps } = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
-      const step = steps[0];
-      if (steps.length !== 1 || !step || !('where' in step) || Object.keys(step.where).length === 0) {
-        throw makeError({
-          status: 500,
-          message: `Narrowing where at '${visitKey}' does not compile to a plain Prisma filter (count/bridge conditions are unsupported in row scope)`,
-        });
-      }
-      return step.where;
-    });
-  };
+  const visitWheres = new Map<string, Record<string, unknown>[]>();
+  for (const [visitKey, visit] of byPath) {
+    if (!visit.whereClauses.length) continue;
+    const wheres = await Promise.all(
+      visit.whereClauses.map(async (clause: Condition) => {
+        const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
+        const step = plan.steps[0];
+        const where =
+          plan.steps.length === 1 && step && 'where' in step
+            ? step.where
+            : await executePrismaQueryPlan(plan, db as never);
+        if (Object.keys(where).length === 0) {
+          throw makeError({
+            status: 500,
+            message: `Narrowing where at '${visitKey}' does not compile to a Prisma filter (bridge conditions are unsupported in row scope)`,
+          });
+        }
+        return where;
+      }),
+    );
+    visitWheres.set(visitKey, wheres);
+  }
+  const visitWhere: VisitWhereFn = (visitKey) => visitWheres.get(visitKey) ?? [];
 
   // Global search — broad: each searchable field contributes a clause based on its
   // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.

@@ -97,7 +97,7 @@ export const paginate = async <
     : declaredLens;
   const skipFieldValidation = isSuperadmin(c);
 
-  const searchWhere = buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
+  const searchWhere = await buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
   const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
