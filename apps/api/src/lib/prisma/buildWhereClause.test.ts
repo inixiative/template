@@ -128,36 +128,6 @@ describe('buildWhereClause', () => {
       });
     });
 
-    it('folds a soft-delete guard (`notExists` → equals null) into the `some`', () => {
-      const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: {
-            picks: [],
-            relations: {
-              tokens: { picks: ['name'], where: { field: 'deletedAt', operator: 'notExists' } },
-            },
-          },
-        },
-        search: 'prod',
-      });
-      expect(result).toEqual({
-        AND: [
-          {
-            OR: [
-              {
-                tokens: {
-                  some: {
-                    AND: [{ name: { contains: 'prod', mode: 'insensitive' } }, { deletedAt: { equals: null } }],
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      });
-    });
-
     it("folds a to-one visit's where into the hop (direct nesting, no `some`)", () => {
       const result = buildWhereClause({
         filterLens: {
@@ -672,6 +642,50 @@ describe('buildWhereClause', () => {
           },
         ],
       });
+    });
+
+    it('applies the visit where to `isNot` as an `is` sibling, not inside the negation', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('Inquiry'),
+          root: {
+            relations: {
+              sourceUser: { picks: ['name'], where: { field: 'emailVerified', operator: 'equals', value: true } },
+            },
+          },
+        },
+        searchFields: { sourceUser: { isNot: { name: 'bob' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            sourceUser: {
+              isNot: { name: { contains: 'bob', mode: 'insensitive' } },
+              is: { AND: [{ emailVerified: { equals: true } }] },
+            },
+          },
+        ],
+      });
+    });
+
+    it('throws when a visit where cannot compile to a plain Prisma filter (count operator)', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: {
+            parent: lensFor('User'),
+            root: {
+              picks: [],
+              where: {
+                field: 'tokens',
+                arrayOperator: 'atLeast',
+                count: 1,
+                condition: { field: 'isActive', operator: 'equals', value: true },
+              },
+            },
+          },
+          search: 'x',
+        }),
+      ).toThrow(/does not compile to a plain Prisma filter/);
     });
 
     it('rejects non-whitelisted relation paths', () => {

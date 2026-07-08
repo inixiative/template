@@ -6,12 +6,8 @@
  */
 import { lookupField } from '#/lib/prisma/fieldMetadata';
 
-// Cardinality-aware companion to `buildNestedPath` for the global-search walk:
-// a to-one hop nests directly, a to-many hop wraps in `some` (from the field's
-// `isList`). Each relation hop folds in `visitWhere(visitKey)` — the lens's
-// composed row-scope for that visit — ANDed with the inner clause inside the
-// same boundary, so scope and match apply to the same related row.
-// The path must resolve on `model`; callers validate via `lookupField` first.
+// Cardinality-aware `buildNestedPath` for global search: to-many hops wrap in
+// `some`; each relation hop ANDs in its visit's row-scope inside the same boundary.
 export const buildSearchPath = (
   model: string,
   path: string,

@@ -15,8 +15,6 @@ const makeDelegate = (captured: Captured): AnyDelegate =>
     count: async () => 0,
   }) as unknown as AnyDelegate;
 
-// paginate reads the context, it doesn't route — a bare object with the vars it
-// touches (validated query, bracketQuery, filterLens, user) stands in for Hono.
 const makeContext = (filterLens: LensNarrowing, query: Record<string, unknown> = {}) => {
   const vars: Record<string, unknown> = { filterLens, bracketQuery: {}, user: undefined };
   return {

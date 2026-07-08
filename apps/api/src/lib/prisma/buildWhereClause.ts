@@ -50,20 +50,18 @@ const stripRelationOperators = (path: string): string =>
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
-// The lens's composed row-scope (toPrisma'd) for one projectByPath visit key.
 type VisitWhereFn = (visitKey: string) => Record<string, unknown>[];
 
-// Filter-first composition of a visit's row-scope into a relation operator's
-// value. Scope and the caller's condition must hold on the SAME related row —
-// two sibling `some`s would match different rows. `every` composes by
-// implication ("of the rows in scope, every one matches"); plain AND would
-// wrongly demand every related row be in scope.
+// `every` composes filter-first by implication; plain AND would demand every
+// related row be in scope. `isNot` gets scope as an `is` sibling (fail closed,
+// matching applyLens's to-one convention) — folding it inside would make an
+// out-of-scope related row pass the negation.
 const scopeRelationValue = (
   op: string,
   value: BracketQueryValue,
   wheres: Record<string, unknown>[],
 ): BracketQueryValue => {
-  if (!wheres.length) return value;
+  if (!wheres.length || op === 'isNot') return value;
   if (op === 'every') return { OR: [{ NOT: { AND: wheres } }, value] } as unknown as BracketQueryValue;
   return { AND: [value, ...wheres] } as unknown as BracketQueryValue;
 };
@@ -223,6 +221,9 @@ const validateAndTransformSearchFields = (
           relationValue[opKey] = scopeRelationValue(opKey, transformed as BracketQueryValue, wheres);
         }
       }
+      if (wheres.length && relationValue.isNot !== undefined && relationValue.is === undefined) {
+        relationValue.is = { AND: wheres } as unknown as BracketQueryValue;
+      }
       result[key] = relationValue;
       continue;
     }
@@ -248,8 +249,6 @@ const validateAndTransformSearchFields = (
     }
 
     // No relation/field operators → deeper nesting (e.g. `{ user: { name: 'x' } }`).
-    // A to-one relation traversed this way folds in its visit's row-scope, same
-    // as the operator forms above (plain nesting is Prisma's `is` shorthand).
     const nested = validateAndTransformSearchFields(
       value,
       searchableFields,
@@ -280,25 +279,30 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  // Composed row-scope per visit. projectByPath walks the whole narrowing chain
-  // (route filterLens + every stacked scopeNarrowing layer), folding in mapDefaults
-  // + filter-first `all`-negation, keyed by dotted path from the root model. The
-  // root visit's wheres AND into the query below; a relation visit's wheres fold
-  // in wherever a search/filter path bleeds into that relation.
+  // Row scope per projectByPath visit: root wheres AND into the query; relation
+  // visits' wheres fold in only where a query path traverses the relation.
+  // Fail closed on wheres that don't compile to a single plain Prisma filter
+  // (count operators emit a groupBy plan; bridges emit the `{}` over-fetch
+  // sentinel) — dropping them would silently widen row scope.
   const byPath = projectByPath(filterLens);
   const visitWhere: VisitWhereFn = (visitKey) => {
     const visit = byPath.get(visitKey);
     if (!visit) return [];
-    return visit.whereClauses.flatMap((clause: Condition) => {
-      const step = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName }).steps[0];
-      return step && 'where' in step && Object.keys(step.where).length > 0 ? [step.where] : [];
+    return visit.whereClauses.map((clause: Condition) => {
+      const { steps } = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
+      const step = steps[0];
+      if (steps.length !== 1 || !step || !('where' in step) || Object.keys(step.where).length === 0) {
+        throw makeError({
+          status: 500,
+          message: `Narrowing where at '${visitKey}' does not compile to a plain Prisma filter (count/bridge conditions are unsupported in row scope)`,
+        });
+      }
+      return step.where;
     });
   };
 
   // Global search — broad: each searchable field contributes a clause based on its
   // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
-  // Relation paths walk via buildSearchPath: to-many hops wrap in `some`, and each
-  // hop carries its visit's row-scope.
   if (search && searchableFields.length) {
     const searchConditions = searchableFields.flatMap((field) => {
       const def = lookupField(model, stripRelationOperators(field));

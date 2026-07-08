@@ -31,8 +31,6 @@ type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: 
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
-  // Request-time values for `{ bind }` tokens in the lens chain's wheres
-  // (tenant ids, active sets, …), resolved into the lens before building.
   bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
@@ -86,8 +84,6 @@ export const paginate = async <
       message: 'paginate: route must declare a filterLens (readRoute({ filterLens: … })).',
     });
   }
-  // Resolve `{ bind }` tokens and fail closed: an unresolved bind would silently
-  // weaken row scope, so a missing name is a 500, not a skipped clause.
   const required = lensRequiredBindings(declaredLens);
   const missing = [...required].filter((name) => bindings?.[name] === undefined);
   if (missing.length) {
