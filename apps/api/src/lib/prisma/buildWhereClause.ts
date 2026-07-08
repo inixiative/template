@@ -252,7 +252,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
       const def = lookupField(model, stripRelationOperators(field));
       const clause = def && buildSearchClause(def, search);
       if (!clause) return [];
-      if (!validatePathNotation(field)) throw new Error(`Invalid searchable field: ${field}`);
+      if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
       return [buildNestedPath(field, clause)];
     });
     if (searchConditions.length) conditions.push({ OR: searchConditions });
