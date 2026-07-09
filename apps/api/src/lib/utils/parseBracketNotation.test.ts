@@ -163,4 +163,45 @@ describe('parseBracketNotation — symbol values ([:] marker)', () => {
   it('supports a bare [:] symbol value', () => {
     expect(parseBracketNotation('?searchFields[a][:]=null').searchFields).toEqual({ a: null });
   });
+
+  it('casts lenient boolean spellings (0/1/t/f)', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][:]=1').searchFields).toEqual({ a: { equals: true } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=0').searchFields).toEqual({ a: { equals: false } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=t').searchFields).toEqual({ a: { equals: true } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=f').searchFields).toEqual({ a: { equals: false } });
+  });
+});
+
+describe('parseBracketNotation — number values ([$] marker)', () => {
+  it('casts [$]-marked tokens to numbers', () => {
+    expect(parseBracketNotation('?searchFields[age][gte][$]=18').searchFields).toEqual({ age: { gte: 18 } });
+    expect(parseBracketNotation('?searchFields[score][equals][$]=-2.5').searchFields).toEqual({
+      score: { equals: -2.5 },
+    });
+  });
+
+  it('keeps plain (un-marked) numeric values as strings', () => {
+    expect(parseBracketNotation('?searchFields[age][gte]=18').searchFields).toEqual({ age: { gte: '18' } });
+  });
+
+  it('collects repeated [$]-marked params into a number array', () => {
+    expect(parseBracketNotation('?searchFields[score][in][$]=1&searchFields[score][in][$]=2').searchFields).toEqual({
+      score: { in: [1, 2] },
+    });
+  });
+
+  it('accumulates mixed-typed items at the same leaf', () => {
+    const url = '?searchFields[a][in][$]=1&searchFields[a][in]=x&searchFields[a][in][:]=null';
+    expect(parseBracketNotation(url).searchFields).toEqual({ a: { in: [1, 'x', null] } });
+  });
+
+  it('skips a [$] marker whose value is not a finite number', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][$]=abc').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[a][equals][$]=Infinity').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[a][equals][$]=').searchFields).toEqual({ a: {} });
+  });
+
+  it('supports a bare [$] number value', () => {
+    expect(parseBracketNotation('?searchFields[a][$]=7').searchFields).toEqual({ a: 7 });
+  });
 });
