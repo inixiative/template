@@ -27,6 +27,7 @@ import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
 import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
+import { hasSoftDelete, mentionsDeletedAt } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
@@ -35,6 +36,11 @@ type BuildWhereOptions = {
   searchFields?: BracketQueryRecord;
   // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
   skipFieldValidation?: boolean;
+  // Superadmin sees soft-deleted rows: skips the per-visit `deletedAt: null` injection.
+  includeSoftDeleted?: boolean;
+  // The caller's own findMany where (paginate's `options.where`) — consulted only to
+  // detect an explicit root-level `deletedAt`, which wins over the injected scope.
+  callerWhere?: Record<string, unknown>;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
 };
@@ -55,6 +61,28 @@ const stripRelationOperators = (path: string): string =>
     .join('.');
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+
+// Visit keys where the client's searchFields already filter `deletedAt` — those
+// nodes keep the caller's filter instead of the injected live scope.
+const collectExplicitDeletedAtVisits = (
+  obj: BracketQueryRecord,
+  model: string,
+  prefix = '',
+  out = new Set<string>(),
+): Set<string> => {
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    const currentPath = prefix ? `${prefix}.${key}` : key;
+    const segments = stripRelationOperators(currentPath).split('.');
+    if (segments[segments.length - 1] === 'deletedAt') {
+      const parent = segments.slice(0, -1).join('.');
+      out.add(parent ? `${model}.${parent}` : model);
+      continue;
+    }
+    if (isRecord(value)) collectExplicitDeletedAtVisits(value, model, currentPath, out);
+  }
+  return out;
+};
 
 type VisitWhereFn = (visitKey: string) => Record<string, unknown>[];
 
@@ -279,7 +307,16 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = async (options: BuildWhereOptions): Promise<Record<string, unknown>> => {
-  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
+  const {
+    filterLens,
+    search,
+    searchFields,
+    skipFieldValidation = false,
+    includeSoftDeleted = false,
+    callerWhere,
+    filters = {},
+    orNullFields = [],
+  } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
   const searchableFields = searchablePaths(filterLens);
@@ -291,9 +328,12 @@ export const buildWhereClause = async (options: BuildWhereOptions): Promise<Reco
   // resolved where is plain. Bridges compile to the `{}` over-fetch sentinel,
   // which is not expressible as SQL: fail closed rather than widen row scope.
   const byPath = projectByPath(filterLens);
+  const explicitDeletedAtVisits = searchFields
+    ? collectExplicitDeletedAtVisits(searchFields, model)
+    : new Set<string>();
+  if (mentionsDeletedAt(callerWhere)) explicitDeletedAtVisits.add(model);
   const visitWheres = new Map<string, Record<string, unknown>[]>();
   for (const [visitKey, visit] of byPath) {
-    if (!visit.whereClauses.length) continue;
     const wheres = await Promise.all(
       visit.whereClauses.map(async (clause: Condition) => {
         const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
@@ -311,7 +351,18 @@ export const buildWhereClause = async (options: BuildWhereOptions): Promise<Reco
         return where;
       }),
     );
-    visitWheres.set(visitKey, wheres);
+    // Live scope: every visited model with a `deletedAt` column reads live rows
+    // only. An explicit `deletedAt` at the node (lens where, caller where at the
+    // root, or client searchFields) wins; superadmin skips injection entirely.
+    if (
+      !includeSoftDeleted &&
+      hasSoftDelete(visit.modelName) &&
+      !explicitDeletedAtVisits.has(visitKey) &&
+      !wheres.some(mentionsDeletedAt)
+    ) {
+      wheres.push({ deletedAt: null });
+    }
+    if (wheres.length) visitWheres.set(visitKey, wheres);
   }
   const visitWhere: VisitWhereFn = (visitKey) => visitWheres.get(visitKey) ?? [];
 

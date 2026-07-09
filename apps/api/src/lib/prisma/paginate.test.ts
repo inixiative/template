@@ -15,13 +15,19 @@ const makeDelegate = (captured: Captured): AnyDelegate =>
     count: async () => 0,
   }) as unknown as AnyDelegate;
 
-const makeContext = (filterLens: LensNarrowing, query: Record<string, unknown> = {}) => {
-  const vars: Record<string, unknown> = { filterLens, bracketQuery: {}, user: undefined };
+const makeContext = (
+  filterLens: LensNarrowing,
+  query: Record<string, unknown> = {},
+  user: Record<string, unknown> | undefined = undefined,
+) => {
+  const vars: Record<string, unknown> = { filterLens, bracketQuery: {}, user };
   return {
     get: (key: string) => vars[key],
     req: { valid: () => query },
   } as unknown as Parameters<typeof paginate>[0];
 };
+
+const superadmin = { platformRole: 'superadmin' };
 
 describe('paginate — lens bindings', () => {
   it('resolves `{ bind }` tokens into the lens before building the where', async () => {
@@ -34,7 +40,7 @@ describe('paginate — lens bindings', () => {
     await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
 
     expect(captured.findManyArgs?.where).toEqual({
-      AND: [{}, { AND: [{ name: { equals: 'aron' } }] }],
+      AND: [{}, { AND: [{ name: { equals: 'aron' } }, { deletedAt: null }] }],
     });
   });
 
@@ -53,7 +59,70 @@ describe('paginate — lens bindings', () => {
 
     const result = await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, { AND: [{ deletedAt: null }] }] });
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  });
+});
+
+describe('paginate — soft-delete scope', () => {
+  const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
+
+  it('folds `deletedAt: null` onto to-many include levels; to-one includes are untouched', async () => {
+    const captured: Captured = {};
+
+    await paginate(makeContext(userLens), makeDelegate(captured), {
+      include: {
+        tokens: { where: { isActive: true }, include: { user: true } },
+        sessions: true,
+      },
+    });
+
+    expect(captured.findManyArgs?.include).toEqual({
+      // Token soft-deletes; Session does not — its include entry stays `true`.
+      tokens: { where: { isActive: true, deletedAt: null }, include: { user: true } },
+      sessions: true,
+    });
+  });
+
+  it('an explicit deletedAt on an include level wins', async () => {
+    const captured: Captured = {};
+
+    await paginate(makeContext(userLens), makeDelegate(captured), {
+      include: { tokens: { where: { deletedAt: { not: null } } } },
+    });
+
+    expect(captured.findManyArgs?.include).toEqual({
+      tokens: { where: { deletedAt: { not: null } } },
+    });
+  });
+
+  it('an explicit root deletedAt in the caller where skips the root injection', async () => {
+    const captured: Captured = {};
+
+    await paginate(makeContext(userLens), makeDelegate(captured), {
+      where: { deletedAt: { not: null } },
+    });
+
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{ deletedAt: { not: null } }, {}] });
+  });
+
+  it('superadmin sees soft-deleted rows: no injection in the where or the include', async () => {
+    const captured: Captured = {};
+
+    await paginate(makeContext(userLens, {}, superadmin), makeDelegate(captured), {
+      include: { tokens: true },
+    });
+
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
+    expect(captured.findManyArgs?.include).toEqual({ tokens: true });
+  });
+
+  it('a model without deletedAt gets no injection', async () => {
+    const captured: Captured = {};
+    const lens: LensNarrowing = { parent: lensFor('WebhookSubscription'), root: { picks: ['url'] } };
+
+    await paginate(makeContext(lens), makeDelegate(captured));
+
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
   });
 });

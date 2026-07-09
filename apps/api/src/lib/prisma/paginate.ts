@@ -6,11 +6,13 @@
  */
 import { type LensNarrowing, lensRequiredBindings, type RuleValue, resolveLensBindings } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
+import { rootLens } from '@template/db/lens';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+import { scopeSoftDeleteInclude } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
@@ -95,12 +97,33 @@ export const paginate = async <
   const filterLens = required.size
     ? (resolveLensBindings(declaredLens, bindings ?? {}) as LensNarrowing)
     : declaredLens;
-  const skipFieldValidation = isSuperadmin(c);
-
-  const searchWhere = await buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
+  // Superadmin bypasses both the searchable-fields whitelist and the injected
+  // `deletedAt: null` live scope.
+  const superadmin = isSuperadmin(c);
 
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
+  const searchWhere = await buildWhereClause({
+    filterLens,
+    search,
+    searchFields,
+    skipFieldValidation: superadmin,
+    includeSoftDeleted: superadmin,
+    callerWhere: baseWhere,
+    orNullFields,
+  });
+
   const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
+
+  // Relation payloads read live rows too: fold `deletedAt: null` onto every
+  // to-many level of the caller's include/select trees.
+  if (!superadmin) {
+    const model = rootLens(filterLens).model;
+    const trees = findManyOptions as Record<string, unknown>;
+    for (const key of ['include', 'select'] as const) {
+      const tree = trees[key];
+      if (tree && typeof tree === 'object') trees[key] = scopeSoftDeleteInclude(model, tree as Record<string, unknown>);
+    }
+  }
 
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
