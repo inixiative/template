@@ -42,8 +42,16 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
   // happen for real, errors propagate, no queue infrastructure involved.
+  // Delayed jobs are the exception: they're scheduled for a future moment, so
+  // running them at enqueue time would execute wrong-time semantics — they
+  // return unrun, like the queue still holding them. To test one, call the
+  // handler directly.
   if (isTest) {
     const jobId = id ?? uuidv7();
+    if (jobOptions.delay !== undefined) {
+      log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
+      return { jobId, name: handlerName };
+    }
     const ctx: WorkerContext = {
       db,
       queue,
