@@ -9,6 +9,7 @@ config:
 kanban
   Backlog
     FEAT-017-audit-log-hardening-lineage-and-explorer
+    FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     INFRA-006-tenant-isolation-test-matrix
@@ -72,6 +73,7 @@ kanban
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
+- [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
 
 **Security & Encryption:**
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
