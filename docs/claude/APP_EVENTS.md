@@ -38,7 +38,7 @@ Every SaaS follows the same painful progression:
 
 4. **The eventual migration.** Everyone ends up with: an event bus that decouples business logic from side effects, adapter registries per delivery channel, and background jobs for anything that talks to external services.
 
-This system skips straight to step 4. Business logic emits events. Everything else is a bridge.
+This system skips straight to step 4. Business logic emits events. Everything else is a channel.
 
 ---
 
@@ -52,7 +52,7 @@ emit.ts (auto-enriches actor from auditActorContext)
   ▼
 appEventHandlers[name](event)  ← centralized map, like jobHandlers
   ▼
-makeAppEvent handler (Promise.allSettled across bridges)
+makeAppEvent handler (Promise.allSettled across channels)
   ├─ observe  → enqueueJob('recordAppEvent')  → AppEvent table
   ├─ email    → enqueueJob('sendEmail')        → Resend/Console
   ├─ websocket → sendToChannel(channelKey(key))  → Redis pub/sub → FE invalidateQueries
@@ -134,7 +134,7 @@ type AppEventHandlerDefinition<T> = {
 };
 ```
 
-Each bridge runs in parallel via `Promise.allSettled`. One bridge failing doesn't affect others.
+Each channel runs in parallel via `Promise.allSettled`. One channel failing doesn't affect others.
 
 ---
 
@@ -143,7 +143,7 @@ Each bridge runs in parallel via `Promise.allSettled`. One bridge failing doesn'
 ```
 Handler returns EmailHandoff[]
   ↓
-Email bridge → enqueueJob('sendEmail', handoff)
+Email channel → enqueueJob('sendEmail', handoff)
   ↓
 sendEmail job (BullMQ worker):
   1. resolveTargets(to/cc/bcc)  → email addresses
@@ -256,7 +256,7 @@ The `inquiry.sent` and `inquiry.resolved` handlers in `appEvents/handlers/inquir
 ```
 apps/api/src/
 ├── appEvents/
-│   ├── bridges/
+│   ├── channels/
 │   │   └── email.ts           handoff → enqueueJob (glue)   [websocket is inlined in makeAppEvent]
 │   ├── handlers/
 │   │   ├── index.ts           AppEventPayloads + AppEventName + appEventHandlers
@@ -288,9 +288,9 @@ apps/api/src/
 | Sender resolution | Stub | Always platform default. Future: cascade Space → Org → User |
 | Template locale | Stub | Hardcoded `en`. Future: recipient preference |
 | Email client selection | Stub | First registered adapter. Future: per-tenant BYOE |
-| SMS bridge | Not started | Add to AppEventHandlerDefinition when needed |
-| Chat bridge (Slack/Teams/Discord) | Not started | Same pattern as email |
-| Notify bridge (in-app) | Not started | Redis-backed, WebSocket push |
+| SMS channel | Not started | Add to AppEventHandlerDefinition when needed |
+| Chat channel (Slack/Teams/Discord) | Not started | Same pattern as email |
+| Notify channel (in-app) | Not started | Redis-backed, WebSocket push |
 | Unsubscribe | Not started | CommunicationCategory exists, need preference model + endpoint |
 | Workflow primitives | Not started | Delay, digest, skip via BullMQ job chains |
 | Email delivery tracking | Not started | Provider webhooks → app events |

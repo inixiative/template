@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind bridge
+ * @kind channel
  * @partOf primitive:appEvents
  */
 import type { WSHandoff } from '#/appEvents/types';

@@ -118,8 +118,8 @@ describe('makeAppEvent', () => {
     });
   });
 
-  describe('bridge isolation', () => {
-    it('one bridge failing does not prevent others from running, but still rejects', async () => {
+  describe('channel isolation', () => {
+    it('one channel failing does not prevent others from running, but still rejects', async () => {
       let cbRan = false;
       const handler = makeAppEvent({
         observe: () => {
@@ -136,7 +136,7 @@ describe('makeAppEvent', () => {
       expect(cbRan).toBe(true);
     });
 
-    it('waits for sibling bridges before rejecting', async () => {
+    it('waits for sibling channels before rejecting', async () => {
       const callOrder: string[] = [];
       const handler = makeAppEvent({
         cb: [
@@ -156,7 +156,7 @@ describe('makeAppEvent', () => {
   });
 
   describe('empty handler', () => {
-    it('completes without error when no bridges defined', async () => {
+    it('completes without error when no channels defined', async () => {
       await makeAppEvent({})(createEvent('test', {}));
     });
   });
