@@ -86,6 +86,11 @@ describe('parseBracketNotation', () => {
     });
   });
 
+  it('does not double-decode: literal % survives and encoded + stays a plus', () => {
+    expect(parseBracketNotation('?filters[promo]=50%25off')).toEqual({ filters: { promo: '50%off' } });
+    expect(parseBracketNotation('?filters[email]=a%2Bb%40x.com')).toEqual({ filters: { email: 'a+b@x.com' } });
+  });
+
   it('ignores non-bracket params', () => {
     const url = '?page=1&filters[status]=active&limit=10';
     const result = parseBracketNotation(url);

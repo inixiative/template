@@ -44,7 +44,10 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
       current = current[keys[i]] as BracketQueryRecord;
     }
 
-    const decoded = decodeURIComponent(value.replace(/\+/g, ' ')).trim();
+    // URLSearchParams already percent-decodes and converts `+` -> ' ' per the
+    // WHATWG URL Standard; a second decodeURIComponent would throw on any literal
+    // `%` in the value ("50%off") and re-space literal `+` ("a+b@x.com").
+    const decoded = value.trim();
     // Cast marked tokens through the allowlist (no eval); a marker whose value
     // doesn't cast is malformed — skip the leaf rather than silently storing the
     // raw string. `=== undefined` so the valid null symbol survives.
