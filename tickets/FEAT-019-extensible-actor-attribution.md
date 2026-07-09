@@ -23,8 +23,19 @@ Each of these currently forces either a new `AuditLog` column or a bespoke `{ ac
 ## Proposal
 
 - Add a freeform extension to the actor primitive — `actorMeta Json?` (name TBD) — carried on the ALS actor scope, stamped onto every `AuditLog` row, and included on the app-event envelope actor capture.
-- Setters at the seams: middleware can record sanctioned inbound headers into it (e.g. `x-acting-user-email`, name TBD) **only on token-authenticated requests**; services can enrich it inside the request scope; job context can stamp job-specific attribution.
-- When an on-behalf-of email resolves to a real user in the org, optionally also set a structured field (or resolve to `actorUserId`-adjacent storage) — the meta keeps the raw claim either way.
+- Setters at the seams: middleware records the inbound generic header (below); services can enrich it inside the request scope; job context can stamp job-specific attribution.
+- When an on-behalf-of email resolves to a real user in the org, also resolve to a structured actor field so it's indexable — the meta keeps the raw claim either way.
+
+## Generic header pattern (ruling 2026-07-09)
+
+One generic header, not per-purpose headers, so external callers can attach arbitrary attribution:
+
+- **`x-actor-meta`**, RFC 8941 structured-field dictionary syntax — `x-actor-meta: onbehalfof.email="jane@acme.com", source.system="salesforce", source.userid="005xx000001"`. Do NOT invent a custom delimiter grammar (colon-separated etc.) — hand-rolled wire formats grow escaping bugs; 8941 has defined quoting and off-the-shelf parsers.
+- **Namespaced lowercase dotted keys, arbitrary keys accepted** — the point is generic capture of extra attribution without schema churn.
+- **Well-known-key registry** (`onbehalfof.email`, `source.system`, `source.userid`, …) gets promoted behavior (e.g. resolve on-behalf-of email to a real user). Unknown keys ride along as claims.
+- **Claims envelope**: header-sourced values land under `actorMeta.claimed` with the source recorded (`{ claimed: {...}, source: 'x-actor-meta' }`) so server-derived facts and caller-asserted claims are never confusable. Explicitly unverified/unenforced by design.
+- **Caps + no silent drops**: size cap (~2KB) and per-key validation; log/count anything dropped rather than silently eating it.
+- **Token-authenticated requests only** to start (that's where the identity gap is); widening to user-JWT requests is a later decision if a use case appears.
 
 ## Contract
 
@@ -36,15 +47,15 @@ Each of these currently forces either a new `AuditLog` column or a bespoke `{ ac
 
 - [ ] Add `actorMeta Json?` to `AuditLog` + the ALS actor context type
 - [ ] Stamp it on the app-event envelope actor capture (emit-time, alongside the existing scope capture)
-- [ ] Middleware: record sanctioned on-behalf-of header(s) on token-authenticated requests, tagged as unverified claims
-- [ ] Decide the resolved-user behavior (meta-only vs also resolving to a structured actor field)
-- [ ] Docs: contract (attribution-only), key namespacing, examples
+- [ ] Middleware: parse `x-actor-meta` (RFC 8941 dictionary) on token-authenticated requests into `actorMeta.claimed`
+- [ ] Well-known-key registry + promotion (on-behalf-of email → resolved structured actor field)
+- [ ] Docs: contract (attribution-only), key namespacing, header syntax, examples
 
 ## Open Questions
 
 - Field name: `actorMeta` vs `actorContext` vs `onBehalfOf` + general meta split?
-- Should verified resolutions (on-behalf-of email matches an org user) promote to a structured column so it's indexable?
 - Does `originIntegration` fold into the meta or stay a first-class column?
+- Should user-JWT requests ever be allowed to send `x-actor-meta` (admin acting "as" a workflow), or token-only forever?
 
 ## Related Tickets
 
