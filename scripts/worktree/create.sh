@@ -324,21 +324,14 @@ echo -e "${BLUE}Provisioning MinIO buckets for slot ${SLOT}...${NC}"
 # 7. Install dependencies in the worktree
 # ---------------------------------------------------------------------------
 # A git worktree is a fresh working dir with NO node_modules. Because .worktrees/
-# lives inside the main repo, bun would otherwise resolve UP to the main checkout's
-# hoisted node_modules — where the @template/* symlinks point at MAIN's packages,
-# not this worktree's. The worktree would then silently run main's code (e.g. a
-# generated Prisma client that predates a migration on this branch). Install here
-# so the worktree owns its own resolution.
+# lives inside the main repo, bun could otherwise resolve UP to the main checkout's
+# node_modules and silently run main's code (e.g. a generated Prisma client that
+# predates a migration on this branch). ALWAYS force a real install into the
+# worktree — never rely on links to (or hoisting from) the main checkout.
 # --ignore-scripts mirrors 'bun run setup' (prepare/husky already ran in main).
-echo -e "${BLUE}Installing dependencies (bun install --ignore-scripts)...${NC}"
-if ! (cd "$WORKTREE_DIR" && bun install --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}"); then
-  echo -e "${RED}Error: bun install failed in $WORKTREE_DIR. Fix the issue, then run 'bun install' there.${NC}"
-  exit 1
-fi
-if [ ! -e "$WORKTREE_DIR/node_modules/@template/db" ]; then
-  echo -e "${RED}Error: bun install did not link node_modules/@template/db in $WORKTREE_DIR.${NC}"
-  echo -e "${RED}Without it the worktree resolves the main repo's packages (stale @template/* / Prisma client).${NC}"
-  echo -e "${RED}Run 'bun install' inside the worktree, then 'bun run db:push:dev'.${NC}"
+echo -e "${BLUE}Installing dependencies (bun install --force --ignore-scripts)...${NC}"
+if ! (cd "$WORKTREE_DIR" && bun install --force --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}"); then
+  echo -e "${RED}Error: bun install --force failed in $WORKTREE_DIR. Fix the issue, then run 'bun install --force' there.${NC}"
   exit 1
 fi
 
