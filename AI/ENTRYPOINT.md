@@ -24,6 +24,7 @@ Canonical instructions for all coding agents in this repository.
 - Do not run git commands unless the user explicitly asks.
 - **NEVER run `git stash` — for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
 - **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
+- **ALL worktree lifecycles go through the repo scripts** — `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach), `bun run worktree:destroy <name>`, `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (ports, `.env.local`/`.env.test`, per-slot databases, dependency install, prisma) — a hand-rolled worktree is a broken half-environment plus orphaned state. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first.
 - **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
 
 ## 0.1. Understand the Why First
