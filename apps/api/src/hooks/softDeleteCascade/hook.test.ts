@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { ContactOwnerModel } from '@template/db/generated/client/enums';
+import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createContact,
@@ -93,10 +93,16 @@ describe('softDeleteCascade hook', () => {
   });
 
   it('exempt reference edges do not cascade: an inquiry outlives its sender', async () => {
-    const { entity: sender } = await createUser();
-    const { entity: inquiry } = await createInquiry({}, { sourceUser: sender });
+    const { entity: sender } = await createOrganization();
+    const { entity: target } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: sender.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: target.id,
+    });
 
-    await db.user.update({ where: { id: sender.id }, data: { deletedAt: new Date() } });
+    await db.organization.update({ where: { id: sender.id }, data: { deletedAt: new Date() } });
 
     expect((await db.inquiry.findUnique({ where: { id: inquiry.id } }))?.deletedAt).toBeNull();
   });
