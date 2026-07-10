@@ -24,6 +24,9 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
   // The channels this socket is subscribed to, refcounted across callers. Single source of truth —
   // replayed on every (re)open since the BE forgets subscriptions when a connection drops.
   const channels = new Map<string, number>();
+  // Last identity frame (authenticate/spoof/unspoof; null after logout) — a (re)opened connection
+  // starts anonymous on the BE, so identity must be replayed before anything identity-dependent.
+  let identityFrame: Record<string, unknown> | null = null;
   let everOpened = false;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let pongTimer: ReturnType<typeof setTimeout> | undefined;
@@ -35,11 +38,20 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
       dispatchMessage(data as WSEvent);
     },
     onOpen: () => {
+      // Identity first — the BE processes each connection's frames in order.
+      if (identityFrame) socket.send(identityFrame);
       for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
       if (everOpened) onReconnect?.(); // re-open only: recover events missed while disconnected
       everOpened = true;
     },
+    // A pong pending from the previous connection must not tear down the next one.
+    onClose: () => clearTimeout(pongTimer),
   });
+
+  const sendIdentity = (frame: Record<string, unknown> | null): void => {
+    identityFrame = frame;
+    socket.send(frame ?? { action: 'logout' });
+  };
 
   return {
     connect: () => {
@@ -54,10 +66,10 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
         pongTimer = setTimeout(() => socket.reconnect(), PONG_TIMEOUT_MS);
       }, HEARTBEAT_MS);
     },
-    authenticate: (token) => socket.send({ action: 'authenticate', token }),
-    spoof: (token, email) => socket.send({ action: 'spoof', token, email }),
-    unspoof: (token) => socket.send({ action: 'unspoof', token }),
-    logout: () => socket.send({ action: 'logout' }),
+    authenticate: (token) => sendIdentity({ action: 'authenticate', token }),
+    spoof: (token, email) => sendIdentity({ action: 'spoof', token, email }),
+    unspoof: (token) => sendIdentity({ action: 'unspoof', token }),
+    logout: () => sendIdentity(null),
     subscribe: (channel) => {
       const refs = channels.get(channel) ?? 0;
       channels.set(channel, refs + 1);
