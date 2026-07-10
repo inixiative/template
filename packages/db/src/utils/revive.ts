@@ -13,7 +13,7 @@ type HasUpdateManyAndReturn = { updateManyAndReturn: (args: any) => Promise<any>
 // revives the subtree that died with them (matched by tombstone timestamp).
 export const revive = <T extends HasUpdateManyAndReturn>(
   delegate: T,
-  where: Prisma.Args<T, 'updateMany'> extends { where?: infer W } ? W : never,
+  where: Prisma.Args<T, 'updateManyAndReturn'> extends { where?: infer W } ? W : never,
 ): Promise<Prisma.Result<T, { data: { deletedAt: null } }, 'updateManyAndReturn'>> =>
   delegate.updateManyAndReturn({
     where: { ...(where as Record<string, unknown>), deletedAt: { not: null } },

@@ -6,7 +6,8 @@
  */
 import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
-import { castArray, isEqual } from 'lodash-es';
+import { toArray } from '@template/shared/utils';
+import { isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
 import { resolveComponentVersions, type VersionedRecord } from '#/hooks/emailVersioning/resolveComponentVersions';
 import { createVersionBumpSnapshot } from '#/hooks/emailVersioning/snapshot';
@@ -28,7 +29,7 @@ type Change = { record: VersionedRecord; previous?: VersionedRecord };
 const extractChanges = (options: HookOptions): Change[] => {
   const result = (options as HookOptions<VersionedRecord>).result;
   if (!result) return [];
-  const records = castArray(result);
+  const records = toArray(result);
   const previous = (options as HookOptions<VersionedRecord>).previous;
   if (Array.isArray(previous)) {
     const byId = new Map(previous.map((p) => [p.id, p]));

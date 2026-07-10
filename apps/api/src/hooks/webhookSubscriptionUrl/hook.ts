@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
-import { castArray } from 'lodash-es';
+import { toArray } from '@template/shared/utils';
 import { validateWebhookUrl } from '#/lib/webhooks/validators/validateWebhookUrl';
 
 // SSRF guard on every WebhookSubscription write: reject URLs targeting a private/internal
@@ -18,7 +18,7 @@ export const registerWebhookSubscriptionUrlHook = () => {
     [DbAction.create, DbAction.createManyAndReturn, DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ args }) => {
       const { data, create, update } = (args ?? {}) as { data?: unknown; create?: unknown; update?: unknown };
-      for (const payload of [data, create, update].flatMap((d) => castArray(d))) {
+      for (const payload of [data, create, update].flatMap((d) => toArray(d))) {
         const url = (payload as { url?: unknown } | undefined)?.url;
         if (typeof url === 'string') validateWebhookUrl(url);
       }

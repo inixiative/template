@@ -6,7 +6,7 @@
  */
 
 import { LogScope, log } from '@template/shared/logger';
-import { castArray } from 'lodash-es';
+import { toArray } from '@template/shared/utils';
 
 export enum DbAction {
   create = 'create',
@@ -79,7 +79,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
 
-  for (const target of castArray(model)) {
+  for (const target of toArray(model)) {
     registeredHooks[target] ??= {
       [HookTiming.before]: {},
       [HookTiming.after]: {},

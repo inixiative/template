@@ -14,7 +14,7 @@ import {
   registerDbHook,
   toAccessor,
 } from '@template/db';
-import { castArray } from 'lodash-es';
+import { toArray } from '@template/shared/utils';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { HARD_DELETE_ON_TOMBSTONE } from '#/hooks/softDeleteCascade/hardDeleteOnTombstone';
 
@@ -67,8 +67,8 @@ export const registerSoftDeleteCascadeHook = () => {
       if (!data || !('deletedAt' in data)) return;
       if (!childRelations(model).length) return;
 
-      const results = castArray(result ?? []) as Row[];
-      const previousById = new Map((castArray(previous ?? []) as Row[]).map((row) => [row.id, row]));
+      const results = toArray(result ?? []) as Row[];
+      const previousById = new Map((toArray(previous ?? []) as Row[]).map((row) => [row.id, row]));
 
       for (const row of results) {
         const prior = previousById.get(row.id);
