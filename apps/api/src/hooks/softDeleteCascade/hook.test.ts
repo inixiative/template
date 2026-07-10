@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, revive } from '@template/db';
 import { ContactOwnerModel, InquiryResourceModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -29,7 +29,7 @@ const makeTree = async () => {
 };
 
 const tombstoneOrg = (id: string) => db.organization.update({ where: { id }, data: { deletedAt: new Date() } });
-const reviveOrg = (id: string) => db.organization.update({ where: { id }, data: { deletedAt: null } });
+const reviveOrg = (id: string) => revive(db.organization, { id });
 
 describe('softDeleteCascade hook', () => {
   afterAll(async () => {

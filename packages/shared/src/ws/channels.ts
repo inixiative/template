@@ -18,7 +18,7 @@ export const WS_CHANNELS = {
   // One inquiry's read query: refetch hints on server-side change. id-keyed.
   inquiryRead: {
     type: 'query',
-    actor: WSActor.USER,
+    actor: WSActor.User,
     name: (id: string) => channelKey({ _id: 'inquiryRead', path: { id } }),
   },
 } as const;

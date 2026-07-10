@@ -67,6 +67,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { revive } from './utils/revive';
 // Model name utilities
 export {
   type AccessorName,
