@@ -10,6 +10,7 @@ import type { Server } from 'bun';
 import { authenticateToken, resolveSpoofTarget } from '#/ws/auth';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
+import { canSubscribe } from '#/ws/probe';
 import { addConnection, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
@@ -36,6 +37,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
   const data: WSData = {
     connectionId: crypto.randomUUID(),
     userId: null,
+    token: null,
     channels: new Set(),
     connectedAt: now,
     lastPing: now,
@@ -65,6 +67,7 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
     case 'unspoof': {
       const userId = await authenticateToken(msg.token);
       setIdentity(ws, userId);
+      ws.data.token = userId ? msg.token : null;
       send(ws, { type: 'identity', userId });
       return;
     }
@@ -75,15 +78,21 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
         return;
       }
       setIdentity(ws, userId);
+      ws.data.token = msg.token;
       send(ws, { type: 'identity', userId });
       return;
     }
     case 'logout': {
       setIdentity(ws, null);
+      ws.data.token = null;
       send(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
+      if (!(await canSubscribe(ws.data.token, msg.channel))) {
+        send(ws, { type: 'subscribeRejected', channel: msg.channel });
+        return;
+      }
       subscribeToChannel(ws, msg.channel);
       send(ws, { type: 'subscribed', channel: msg.channel });
       return;

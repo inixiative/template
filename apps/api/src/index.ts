@@ -6,7 +6,14 @@ import { initializeOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { flushOutbox } from '#/jobs/outbox';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
-import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
+import {
+  acceptWebSocket,
+  drainConnections,
+  initWebSocketPubSub,
+  setProbeApp,
+  startStaleSweep,
+  websocketHandler,
+} from '#/ws';
 
 // Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
 await initializeOpenTelemetry();
@@ -22,6 +29,9 @@ initWebSocketPubSub();
 
 // Start the periodic stale-connection sweep
 startStaleSweep();
+
+// Subscribe authorization dry-runs the channel's route against the app itself.
+setProbeApp({ request: (path, init) => app.fetch(new Request(`http://internal${path}`, init)) });
 
 const server = Bun.serve({
   port: process.env.PORT,

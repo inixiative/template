@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { websocketHandler } from '#/ws/handler';
+import { setProbeApp } from '#/ws/probe';
 import { byChannel, byId, clearRegistry } from '#/ws/registry';
 import { createTestSocket } from '#tests/createTestSocket';
 
@@ -11,6 +12,23 @@ import { createTestSocket } from '#tests/createTestSocket';
 afterEach(() => clearRegistry());
 
 const lastFrame = (sent: string[]) => JSON.parse(sent[sent.length - 1]);
+
+// Transport-level tests: the probe app is the injection seam — REAL route authorization is
+// covered by probe.test.ts. This stand-in mirrors the contract: 401 without a credential,
+// 404 for an id the caller may not read, 204 otherwise.
+const CHANNEL_OK = 'inquiryRead:id:ok';
+const CHANNEL_DENIED = 'inquiryRead:id:denied';
+beforeEach(() =>
+  setProbeApp({
+    request: (path: string, init?: RequestInit) => {
+      if (path === '/openapi/docs') {
+        return Response.json({ paths: { '/api/v1/inquiry/{id}': { get: { operationId: 'inquiryRead' } } } });
+      }
+      if (!new Headers(init?.headers).get('authorization')) return new Response(null, { status: 401 });
+      return new Response(null, { status: path.endsWith('/ok') ? 204 : 404 });
+    },
+  }),
+);
 
 describe('websocketHandler', () => {
   it('open registers the connection and sends a connected frame', () => {
@@ -27,21 +45,37 @@ describe('websocketHandler', () => {
     expect(byId.has('c1')).toBe(false);
   });
 
-  it('subscribe indexes the channel and confirms', async () => {
+  it('subscribe indexes a probe-approved channel and confirms', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_OK }));
+    expect([...(byChannel.get(CHANNEL_OK) ?? [])]).toEqual(['c1']);
+    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel: CHANNEL_OK });
+  });
+
+  it('rejects a subscribe from a connection without a credential', async () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: 'ch1' }));
-    expect([...(byChannel.get('ch1') ?? [])]).toEqual(['c1']);
-    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel: 'ch1' });
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_OK }));
+    expect(byChannel.has(CHANNEL_OK)).toBe(false);
+    expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel: CHANNEL_OK });
+  });
+
+  it('rejects a subscribe the route denies', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_DENIED }));
+    expect(byChannel.has(CHANNEL_DENIED)).toBe(false);
+    expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel: CHANNEL_DENIED });
   });
 
   it('unsubscribe removes the channel and confirms', async () => {
-    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: 'ch1' }));
-    await websocketHandler.message(socket, JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }));
-    expect(byChannel.has('ch1')).toBe(false);
-    expect(lastFrame(sent)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_OK }));
+    await websocketHandler.message(socket, JSON.stringify({ action: 'unsubscribe', channel: CHANNEL_OK }));
+    expect(byChannel.has(CHANNEL_OK)).toBe(false);
+    expect(lastFrame(sent)).toEqual({ type: 'unsubscribed', channel: CHANNEL_OK });
   });
 
   it('ping bumps lastPing and pongs', async () => {

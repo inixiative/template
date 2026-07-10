@@ -59,6 +59,10 @@ export const makeController = <R extends RouteConfig, T>(
   const impl = (c: RouteContext<R, AppEnv>) => {
     c.set('routeConfig', route);
 
+    // WS subscribe probe: reaching the controller means every auth middleware passed —
+    // answer without running the handler.
+    if (c.req.header('x-auth-probe')) return c.body(null, 204) as unknown as TypedResponse;
+
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};
 

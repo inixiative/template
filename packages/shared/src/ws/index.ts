@@ -1,6 +1,5 @@
-export { WSActor } from './actors';
-export { type ChannelKeyInput, channelKey } from './channelKey';
-export { channelFamily, WS_CHANNELS, type WSChannelFamily } from './channels';
+export { type ChannelKeyInput, channelKey, parseChannelKey } from './channelKey';
+export { WS_CHANNELS, type WSChannelFamily } from './channels';
 export {
   createWebSocketClient,
   type WebSocketClient,
