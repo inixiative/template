@@ -35,12 +35,9 @@ type BuildWhereOptions = {
   search?: string;
   searchFields?: BracketQueryRecord;
   // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
+  // Superadmin: skips the searchable-fields whitelist AND the injected `deletedAt: null`
+  // live scope (one flag for both).
   skipFieldValidation?: boolean;
-  // Superadmin sees soft-deleted rows: skips the per-visit `deletedAt: null` injection.
-  includeSoftDeleted?: boolean;
-  // The caller's own findMany where (paginate's `options.where`) — consulted only to
-  // detect an explicit root-level `deletedAt`, which wins over the injected scope.
-  callerWhere?: Record<string, unknown>;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
 };
@@ -307,16 +304,7 @@ const validateAndTransformSearchFields = (
 };
 
 export const buildWhereClause = async (options: BuildWhereOptions): Promise<Record<string, unknown>> => {
-  const {
-    filterLens,
-    search,
-    searchFields,
-    skipFieldValidation = false,
-    includeSoftDeleted = false,
-    callerWhere,
-    filters = {},
-    orNullFields = [],
-  } = options;
+  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
   const searchableFields = searchablePaths(filterLens);
@@ -331,7 +319,6 @@ export const buildWhereClause = async (options: BuildWhereOptions): Promise<Reco
   const explicitDeletedAtVisits = searchFields
     ? collectExplicitDeletedAtVisits(searchFields, model)
     : new Set<string>();
-  if (mentionsDeletedAt(callerWhere)) explicitDeletedAtVisits.add(model);
   const visitWheres = new Map<string, Record<string, unknown>[]>();
   for (const [visitKey, visit] of byPath) {
     const wheres = await Promise.all(
@@ -352,10 +339,12 @@ export const buildWhereClause = async (options: BuildWhereOptions): Promise<Reco
       }),
     );
     // Live scope: every visited model with a `deletedAt` column reads live rows
-    // only. An explicit `deletedAt` at the node (lens where, caller where at the
-    // root, or client searchFields) wins; superadmin skips injection entirely.
+    // only. An explicit `deletedAt` at the node (lens where or client searchFields)
+    // wins; superadmin skips injection entirely. The ROOT visit is paginate's — it owns
+    // the caller where, so explicit-deletedAt-wins composes there without threading it here.
     if (
-      !includeSoftDeleted &&
+      !skipFieldValidation &&
+      visitKey !== model &&
       hasSoftDelete(visit.modelName) &&
       !explicitDeletedAtVisits.has(visitKey) &&
       !wheres.some(mentionsDeletedAt)

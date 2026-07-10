@@ -12,7 +12,7 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { scopeSoftDeleteInclude } from '#/lib/prisma/softDeleteScope';
+import { hasSoftDelete, mentionsDeletedAt, scopeSoftDeleteInclude } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
@@ -107,12 +107,16 @@ export const paginate = async <
     search,
     searchFields,
     skipFieldValidation: superadmin,
-    includeSoftDeleted: superadmin,
-    callerWhere: baseWhere,
     orNullFields,
   });
 
-  const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
+  // Root live scope composes here (paginate owns baseWhere): an explicit `deletedAt`
+  // anywhere in the composed where wins over the injection.
+  const and: Record<string, unknown>[] = [baseWhere, searchWhere as Record<string, unknown>];
+  if (!superadmin && hasSoftDelete(rootLens(filterLens).model) && !and.some(mentionsDeletedAt)) {
+    and.push({ deletedAt: null });
+  }
+  const where = { AND: and } as FindManyWhere<T>;
 
   // Relation payloads read live rows too: fold `deletedAt: null` onto every
   // to-many level of the caller's include/select trees.

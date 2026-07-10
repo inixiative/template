@@ -8,7 +8,7 @@ describe('buildWhereClause', () => {
   describe('global search (single term, fan-out across fields)', () => {
     it('emits a case-insensitive OR across String fields', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name', 'email'] },
@@ -29,7 +29,7 @@ describe('buildWhereClause', () => {
 
     it('walks relation paths', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('Inquiry'),
           root: { picks: [], relations: { sourceUser: { picks: ['name', 'email'] } } },
@@ -50,7 +50,7 @@ describe('buildWhereClause', () => {
 
     it('wraps a to-many relation path in `some`', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'], relations: { tokens: { picks: ['name'] } } },
@@ -71,7 +71,7 @@ describe('buildWhereClause', () => {
 
     it("folds a to-many visit's where into the same `some` as the search clause", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -102,7 +102,7 @@ describe('buildWhereClause', () => {
 
     it('folds a visit where with a dotted to-one path — the guard walks a relation off the visited model', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -136,7 +136,7 @@ describe('buildWhereClause', () => {
 
     it("folds a to-one visit's where into the hop (direct nesting, no `some`)", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('Inquiry'),
           root: {
@@ -165,7 +165,7 @@ describe('buildWhereClause', () => {
 
     it("a relation visit's where stays out of the query when nothing traverses the relation", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -184,7 +184,7 @@ describe('buildWhereClause', () => {
 
     it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name', 'platformRole', 'createdAt', 'emailVerified'] },
@@ -198,7 +198,7 @@ describe('buildWhereClause', () => {
 
     it('emits no OR when every searchable field is non-String', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole', 'createdAt'] },
@@ -210,7 +210,7 @@ describe('buildWhereClause', () => {
 
     it('returns empty when there is no search term and no searchFields', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -223,7 +223,7 @@ describe('buildWhereClause', () => {
   describe('searchFields — bare value applies the kind default operator', () => {
     it('String → contains + insensitive mode', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -237,7 +237,7 @@ describe('buildWhereClause', () => {
 
     it('enum → equals (no contains, no mode)', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
@@ -251,7 +251,7 @@ describe('buildWhereClause', () => {
 
     it('Int → equals, with string coercion to number', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('CronJob'),
           root: { picks: ['maxAttempts'] },
@@ -263,7 +263,7 @@ describe('buildWhereClause', () => {
 
     it('Boolean → equals, coercing "true" / "false" strings', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['emailVerified'] },
@@ -275,7 +275,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ISO string', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
@@ -289,7 +289,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ms-timestamp string', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
@@ -311,7 +311,7 @@ describe('buildWhereClause', () => {
 
     it('Json filter builds a Prisma json where (string_contains + path)', async () => {
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
         searchFields: { content: { path: 'a.b', string_contains: 'x' } },
       });
@@ -320,7 +320,7 @@ describe('buildWhereClause', () => {
 
     it('Json bare null → equals AnyNull (db-NULL or json-null)', async () => {
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
         searchFields: { content: null },
       });
@@ -330,7 +330,7 @@ describe('buildWhereClause', () => {
 
     it('Json bare true → equals true (symbol, no operator required)', async () => {
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
         searchFields: { content: true },
       });
@@ -339,7 +339,7 @@ describe('buildWhereClause', () => {
 
     it('Json bare false → equals false (symbol, no operator required)', async () => {
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
         searchFields: { content: false },
       });
@@ -348,7 +348,7 @@ describe('buildWhereClause', () => {
 
     it('Json equals operator preserves a boolean value', async () => {
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: { parent: lensFor('Inquiry'), root: { picks: ['content'] } },
         searchFields: { content: { equals: true } },
       });
@@ -359,7 +359,7 @@ describe('buildWhereClause', () => {
   describe('searchFields — explicit operators', () => {
     it("auto-adds mode: 'insensitive' for String + mode-capable ops", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -373,7 +373,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode when caller explicitly passes mode", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -387,7 +387,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for String in/notIn (Prisma doesn't support mode on those)", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['email'] },
@@ -401,7 +401,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for enum equals (mode is a String-only Prisma concept)", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
@@ -415,7 +415,7 @@ describe('buildWhereClause', () => {
 
     it('coerces Int operator values', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('CronJob'),
           root: { picks: ['maxAttempts'] },
@@ -427,7 +427,7 @@ describe('buildWhereClause', () => {
 
     it('coerces DateTime operator values (ISO string and ms-timestamp)', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['createdAt'] },
@@ -442,7 +442,7 @@ describe('buildWhereClause', () => {
 
     it('normalises singleton in value to an array', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['platformRole'] },
@@ -573,7 +573,7 @@ describe('buildWhereClause', () => {
   describe('relation operators (some / every / none / is / isNot)', () => {
     it('threads through `some` filter into a to-many relation', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { relations: { tokens: { picks: ['name'] } } },
@@ -587,7 +587,7 @@ describe('buildWhereClause', () => {
 
     it('threads through `every` with kind-aware coercion on the nested field', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { relations: { tokens: { picks: ['isActive'] } } },
@@ -601,7 +601,7 @@ describe('buildWhereClause', () => {
 
     it("folds the visit's where into `some` — scope and condition on the same row", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -627,7 +627,7 @@ describe('buildWhereClause', () => {
 
     it("composes the visit's where into `every` by implication, not plain AND", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -656,7 +656,7 @@ describe('buildWhereClause', () => {
 
     it("folds the visit's where into plain to-one nesting (Prisma's `is` shorthand)", async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('Inquiry'),
           root: {
@@ -680,7 +680,7 @@ describe('buildWhereClause', () => {
 
     it('applies the visit where to `isNot` as an `is` sibling, not inside the negation', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('Inquiry'),
           root: {
@@ -719,7 +719,7 @@ describe('buildWhereClause', () => {
   describe('skipFieldValidation (superadmin bypass)', () => {
     it('allows fields not in picks when bypass is on', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [] },
@@ -747,7 +747,7 @@ describe('buildWhereClause', () => {
 
     it('passes through fields that do not resolve in the schema (synthetic / dynamic paths)', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [] },
@@ -762,7 +762,7 @@ describe('buildWhereClause', () => {
   describe('filters + orNullFields', () => {
     it('combines pre-built filters with search', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -778,7 +778,7 @@ describe('buildWhereClause', () => {
 
     it('widens orNullFields to OR null', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'] },
@@ -828,7 +828,7 @@ describe('buildWhereClause', () => {
 
     it('applies the route layer root.where', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
@@ -839,7 +839,7 @@ describe('buildWhereClause', () => {
 
     it('composes every stacked scopeNarrowing layer (route + children), ANDed', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: {
             parent: lensFor('User'),
@@ -855,7 +855,7 @@ describe('buildWhereClause', () => {
 
     it('applies mapDefaults wheres anchored to the root model', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [] },
@@ -879,7 +879,7 @@ describe('buildWhereClause', () => {
       await createToken({ isActive: false }, { user: unqualified });
 
       const where = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: {
@@ -902,11 +902,11 @@ describe('buildWhereClause', () => {
   });
 
   describe('soft-delete scope injection (deletedAt: null at every visit)', () => {
-    it('injects `deletedAt: null` at the root for a soft-delete model', async () => {
+    it('does not inject at the root — paginate owns the root scope (it holds the caller where)', async () => {
       const result = await buildWhereClause({
         filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
       });
-      expect(result).toEqual({ AND: [{ deletedAt: null }] });
+      expect(result).toEqual({});
     });
 
     it('leaves a model without a deletedAt column untouched', async () => {
@@ -936,19 +936,18 @@ describe('buildWhereClause', () => {
               },
             ],
           },
-          { deletedAt: null },
         ],
       });
     });
 
-    it('appends the injected scope after a visit lens where', async () => {
+    it('a root lens where passes through without an injected root scope', async () => {
       const result = await buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [], where: { field: 'emailVerified', operator: 'equals', value: true } },
         },
       });
-      expect(result).toEqual({ AND: [{ emailVerified: { equals: true } }, { deletedAt: null }] });
+      expect(result).toEqual({ AND: [{ emailVerified: { equals: true } }] });
     });
 
     it('a lens where that already filters deletedAt at the node wins', async () => {
@@ -978,19 +977,13 @@ describe('buildWhereClause', () => {
         searchFields: { tokens: { some: { deletedAt: { not: null } } } },
       });
       expect(result).toEqual({
-        AND: [{ tokens: { some: { deletedAt: { not: null } } } }, { deletedAt: null }],
+        AND: [{ tokens: { some: { deletedAt: { not: null } } } }],
       });
     });
 
-    it('an explicit root deletedAt in the caller where wins (even `undefined` — the tri-state `all` shape)', async () => {
-      const filterLens = { parent: lensFor('User'), root: { picks: ['name'] } };
-      expect(await buildWhereClause({ filterLens, callerWhere: { deletedAt: { not: null } } })).toEqual({});
-      expect(await buildWhereClause({ filterLens, callerWhere: { deletedAt: undefined } })).toEqual({});
-    });
-
-    it('includeSoftDeleted (superadmin) skips injection everywhere', async () => {
+    it('skipFieldValidation (superadmin) skips injection everywhere', async () => {
       const result = await buildWhereClause({
-        includeSoftDeleted: true,
+        skipFieldValidation: true,
         filterLens: {
           parent: lensFor('User'),
           root: { picks: ['name'], relations: { tokens: { picks: ['name'] } } },

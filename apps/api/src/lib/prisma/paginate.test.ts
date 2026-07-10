@@ -40,7 +40,7 @@ describe('paginate — lens bindings', () => {
     await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
 
     expect(captured.findManyArgs?.where).toEqual({
-      AND: [{}, { AND: [{ name: { equals: 'aron' } }, { deletedAt: null }] }],
+      AND: [{}, { AND: [{ name: { equals: 'aron' } }] }, { deletedAt: null }],
     });
   });
 
@@ -59,7 +59,7 @@ describe('paginate — lens bindings', () => {
 
     const result = await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, { AND: [{ deletedAt: null }] }] });
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}, { deletedAt: null }] });
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
   });
 });
