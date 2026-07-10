@@ -28,6 +28,8 @@ export const modelFields = (modelName: string): Record<string, FieldDef> | undef
 
 export const modelNames = (): string[] => Object.keys(MAP);
 
+export const hasDeletedAt = (modelName: string): boolean => getField(modelName, 'deletedAt') !== undefined;
+
 export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;

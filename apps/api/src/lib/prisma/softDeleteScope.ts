@@ -5,14 +5,12 @@
  * @uses none
  */
 import { isRelationOperator } from '@template/shared/bracketQuery';
-import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { type FieldDef, hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const hasDeletedAt = (model: string): boolean => lookupField(model, 'deletedAt') !== undefined;
 
 // Key presence counts even with an `undefined` value — `deletedAt: undefined`
 // is the deliberate opt-out (the admin tri-state `all` branch).

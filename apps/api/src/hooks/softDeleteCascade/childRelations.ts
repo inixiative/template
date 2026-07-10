@@ -5,7 +5,7 @@
  * @uses none
  */
 import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
-import { lookupField, modelFields, modelNames } from '#/lib/prisma/fieldMetadata';
+import { hasDeletedAt, modelFields, modelNames } from '#/lib/prisma/fieldMetadata';
 
 export type ChildRelation = {
   model: string;
@@ -27,7 +27,7 @@ export const childRelations = (model: string): ChildRelation[] => {
       return [
         {
           model: child,
-          hasDeletedAt: lookupField(child, 'deletedAt') !== undefined,
+          hasDeletedAt: hasDeletedAt(child),
           fromFields: def.fromFields,
           toFields: def.toFields,
         },
