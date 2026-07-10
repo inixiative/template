@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind helper
- * @partOf primitive:shared
+ * @partOf primitive:shared, primitive:websockets
  * @uses none
  */
 export type ChannelKeyInput = { _id: string; path?: Record<string, unknown> | null };

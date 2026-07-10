@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind type
- * @partOf primitive:shared
+ * @partOf primitive:shared, primitive:websockets
  * @uses none
  */
 import type { ChannelKeyInput } from '@template/shared/ws/channelKey';

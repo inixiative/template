@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind constant
- * @partOf primitive:shared
+ * @partOf primitive:shared, primitive:websockets
  * @uses none
  */
 // Registry of operation ids (queryKey[0]._id) with a realtime producer. The FE pipes every query
