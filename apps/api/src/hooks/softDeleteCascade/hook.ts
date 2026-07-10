@@ -4,21 +4,27 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { DbAction, db, type HookOptions, HookTiming, type ModelName, registerDbHook, toAccessor } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  type ModelName,
+  type RuntimeDelegate,
+  registerDbHook,
+  toAccessor,
+} from '@template/db';
 import { castArray } from 'lodash-es';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { HARD_DELETE_ON_TOMBSTONE } from '#/hooks/softDeleteCascade/hardDeleteOnTombstone';
 
 type Row = Record<string, unknown>;
-type Delegate = {
-  updateManyAndReturn: (args: object) => Promise<unknown>;
-  deleteMany: (args: object) => Promise<unknown>;
-};
 
 const fkWhere = (child: ChildRelation, row: Row) =>
   Object.fromEntries(child.fromFields.map((from, i) => [from, row[child.toFields[i] ?? 'id']]));
 
-const delegateFor = (model: string): Delegate => db[toAccessor(model as ModelName)] as unknown as Delegate;
+const delegateFor = (model: string): RuntimeDelegate =>
+  db[toAccessor(model as ModelName)] as unknown as RuntimeDelegate;
 
 const tombstone = async (model: string, row: Row) => {
   for (const child of childRelations(model)) {
