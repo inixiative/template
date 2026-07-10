@@ -16,6 +16,6 @@ export const revive = <T extends HasUpdateManyAndReturn>(
   where: Prisma.Args<T, 'updateMany'> extends { where?: infer W } ? W : never,
 ): Promise<Prisma.Result<T, { data: { deletedAt: null } }, 'updateManyAndReturn'>> =>
   delegate.updateManyAndReturn({
-    where: { ...where, deletedAt: { not: null } },
+    where: { ...(where as Record<string, unknown>), deletedAt: { not: null } },
     data: { deletedAt: null },
   });
