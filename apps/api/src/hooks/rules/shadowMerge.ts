@@ -1,5 +1,4 @@
-import { toArray } from '@template/shared/utils';
-import { cloneDeep } from 'lodash-es';
+import { castArray, cloneDeep } from 'lodash-es';
 
 type PrismaOp = {
   increment?: number;
@@ -27,7 +26,7 @@ const applyPrismaOp = (prev: unknown, op: PrismaOp): unknown => {
 
   if ('push' in op) {
     const prevArr = Array.isArray(prev) ? prev : [];
-    const toPush = toArray(op.push);
+    const toPush = castArray(op.push);
     return [...prevArr, ...toPush];
   }
 

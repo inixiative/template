@@ -12,7 +12,8 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
-import { type ConcurrencyType, getConcurrency, resolveAll, toArray } from '@template/shared/utils';
+import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { castArray } from 'lodash-es';
 
 type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -131,8 +132,8 @@ const dbMethods = {
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
     const s = store.getStore();
     if (!s?.txn) throw new Error('db.onCommit() requires db.txn()');
-    const fns = toArray(callbacks);
-    const typeArray = types ? toArray(types) : undefined;
+    const fns = castArray(callbacks);
+    const typeArray = types ? castArray(types) : undefined;
     s.afterCommitBatches.push({ fns, concurrency: getConcurrency(typeArray), types: typeArray });
   },
 

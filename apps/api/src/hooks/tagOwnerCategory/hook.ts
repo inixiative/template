@@ -8,7 +8,7 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import { toArray } from '@template/shared/utils';
+import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type TagRow = Partial<Prisma.TagGetPayload<Record<string, never>>> & Record<string, unknown>;
@@ -83,7 +83,7 @@ const extractCreateRows = (args: unknown): TagRow[] => {
   if (!args || typeof args !== 'object') return [];
   const a = args as Record<string, unknown>;
   if (a.data === undefined) return [];
-  return toArray(a.data) as TagRow[];
+  return castArray(a.data) as TagRow[];
 };
 
 export const registerTagOwnerCategoryHook = () => {

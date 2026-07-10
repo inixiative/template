@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses primitive:routeTemplates
  */
+
 import { Prisma } from '@template/db';
-import { toArray } from '@template/shared/utils';
-import { uniqBy } from 'lodash-es';
+import { castArray, uniqBy } from 'lodash-es';
 import { parseOrderBy } from '#/lib/routeTemplates/orderBySchema';
 
 type OrderByEntry = Record<string, unknown>;
@@ -31,7 +31,7 @@ const orderKey = (entry: OrderByEntry): string => {
 };
 
 export const buildOrderBy = ({ callerOrderBy, clientOrderBy }: BuildOrderByOptions): OrderByEntry[] => {
-  const caller = callerOrderBy ? (toArray(callerOrderBy) as OrderByEntry[]) : [];
+  const caller = callerOrderBy ? (castArray(callerOrderBy) as OrderByEntry[]) : [];
   const client = clientOrderBy ? (parseOrderBy(clientOrderBy) as OrderByEntry[]) : [];
   const tiebreaker: OrderByEntry[] = [{ id: Prisma.SortOrder.desc }];
 
