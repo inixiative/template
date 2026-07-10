@@ -68,7 +68,7 @@ describe('paginate — lens bindings', () => {
 describe('paginate — soft-delete scope', () => {
   const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
 
-  it('folds live scope onto to-many include levels; a column-less target inherits from its parents', async () => {
+  it('folds live scope onto to-many include levels; column-less targets stay bare', async () => {
     const captured: Captured = {};
 
     await paginate(makeContext(userLens), makeDelegate(captured), {
@@ -80,7 +80,7 @@ describe('paginate — soft-delete scope', () => {
 
     expect(captured.findManyArgs?.include).toEqual({
       tokens: { where: { isActive: true, deletedAt: null }, include: { user: true } },
-      sessions: { where: { user: { deletedAt: null } } },
+      sessions: true,
     });
   });
 
@@ -117,23 +117,12 @@ describe('paginate — soft-delete scope', () => {
     expect(captured.findManyArgs?.include).toEqual({ tokens: true });
   });
 
-  it('a model without its own column inherits live scope from its to-one parents', async () => {
+  it('a model without its own column gets no injection (the cascade hook owns consistency)', async () => {
     const captured: Captured = {};
     const lens: LensNarrowing = { parent: lensFor('WebhookSubscription'), root: { picks: ['url'] } };
 
     await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({
-      AND: [
-        { AND: [{}, {}] },
-        {
-          AND: [
-            { OR: [{ organization: { is: null } }, { organization: { deletedAt: null } }] },
-            { OR: [{ space: { is: null } }, { space: { deletedAt: null } }] },
-            { OR: [{ user: { is: null } }, { user: { deletedAt: null } }] },
-          ],
-        },
-      ],
-    });
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
   });
 });

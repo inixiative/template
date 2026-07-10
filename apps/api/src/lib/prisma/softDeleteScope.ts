@@ -5,7 +5,7 @@
  * @uses none
  */
 import { isRelationOperator } from '@template/shared/bracketQuery';
-import { type FieldDef, lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
+import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 
@@ -25,27 +25,15 @@ export const mentionsDeletedAt = (where: unknown): boolean => {
   });
 };
 
-export const liveScope = (model: string, seen: readonly string[] = []): Record<string, unknown> | undefined =>
-  hasDeletedAt(model) ? { deletedAt: null } : liveScopeParent(model, seen);
-
-// Recursion stops at the first ancestor with a `deletedAt` column — deeper
-// liveness is the delete-cascade's job, not the query's.
-export const liveScopeParent = (model: string, seen: readonly string[] = []): Record<string, unknown> | undefined => {
-  if (seen.includes(model)) return undefined;
-  const clauses = Object.entries(modelFields(model) ?? {}).flatMap(([name, field]) => {
-    if (field.kind !== 'object' || field.isList) return [];
-    const live = liveScope(field.type, [...seen, model]);
-    if (!live) return [];
-    return [field.isRequired ? { [name]: live } : { OR: [{ [name]: { is: null } }, { [name]: live }] }];
-  });
-  if (clauses.length === 0) return undefined;
-  return clauses.length === 1 ? clauses[0] : { AND: clauses };
-};
+// A model without its own column has no query-time scope: the soft-delete
+// cascade hook keeps column-bearing descendants consistent at write time.
+export const liveScope = (model: string): Record<string, unknown> | undefined =>
+  hasDeletedAt(model) ? { deletedAt: null } : undefined;
 
 const appendLive = (model: string, node: Record<string, unknown>): Record<string, unknown> => {
   const live = liveScope(model);
   if (!live || mentionsDeletedAt(node)) return node;
-  return Object.keys(live).some((key) => key in node) ? { AND: [node, live] } : { ...node, ...live };
+  return { ...node, ...live };
 };
 
 export const liveWhere = (model: string, where: Record<string, unknown>): Record<string, unknown> =>

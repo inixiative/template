@@ -1,38 +1,20 @@
 import { describe, expect, it } from 'bun:test';
-import { liveIncludes, liveScope, liveScopeParent, liveWhere, mentionsDeletedAt } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveScope, liveWhere, mentionsDeletedAt } from '#/lib/prisma/softDeleteScope';
 
 const LIVE = { deletedAt: null };
 
-const WEBHOOK_LIVE = {
-  AND: [
-    { OR: [{ organization: { is: null } }, { organization: LIVE }] },
-    { OR: [{ space: { is: null } }, { space: LIVE }] },
-    { OR: [{ user: { is: null } }, { user: LIVE }] },
-  ],
-};
-
 describe('liveScope', () => {
-  it('a model with its own deletedAt column speaks for itself', () => {
+  it('a model with a deletedAt column → { deletedAt: null }', () => {
     expect(liveScope('User')).toEqual(LIVE);
   });
 
-  it('a model without one inherits from its to-one parents', () => {
-    expect(liveScope('Session')).toEqual({ user: LIVE });
-    expect(liveScope('WebhookSubscription')).toEqual(WEBHOOK_LIVE);
+  it('a model without one has no query-time scope (the cascade hook owns consistency)', () => {
+    expect(liveScope('Session')).toBeUndefined();
+    expect(liveScope('WebhookSubscription')).toBeUndefined();
   });
 
   it('unknown model → nothing to enforce', () => {
     expect(liveScope('NotAModel')).toBeUndefined();
-  });
-});
-
-describe('liveScopeParent', () => {
-  it('recursion stops at the first deletedAt-bearing ancestor', () => {
-    expect(liveScopeParent('Session')).toEqual({ user: LIVE });
-  });
-
-  it('cycle guard: a model already on the path contributes nothing', () => {
-    expect(liveScopeParent('Session', ['Session'])).toBeUndefined();
   });
 });
 
@@ -57,6 +39,10 @@ describe('liveWhere', () => {
   it('an explicit root deletedAt wins', () => {
     const where = { AND: [{ deletedAt: { not: null } }, {}] };
     expect(liveWhere('User', where)).toEqual(where);
+  });
+
+  it('a column-less root gets no injection', () => {
+    expect(liveWhere('Session', { AND: [{}, {}] })).toEqual({ AND: [{}, {}] });
   });
 
   it('scopes a to-many `some` hop and the root', () => {
@@ -94,16 +80,16 @@ describe('liveWhere', () => {
     });
   });
 
-  it('an explicit deletedAt at a hop wins at that node only', () => {
-    expect(liveWhere('User', { tokens: { some: { deletedAt: { not: null } } } })).toEqual({
-      tokens: { some: { deletedAt: { not: null } } },
+  it('a hop into a column-less model passes through untouched', () => {
+    expect(liveWhere('User', { sessions: { some: { id: 's-1' } } })).toEqual({
+      sessions: { some: { id: 's-1' } },
       deletedAt: null,
     });
   });
 
-  it('a hop into a column-less model gets its inherited scope', () => {
-    expect(liveWhere('User', { sessions: { some: { id: 's-1' } } })).toEqual({
-      sessions: { some: { id: 's-1', user: LIVE } },
+  it('an explicit deletedAt at a hop wins at that node only', () => {
+    expect(liveWhere('User', { tokens: { some: { deletedAt: { not: null } } } })).toEqual({
+      tokens: { some: { deletedAt: { not: null } } },
       deletedAt: null,
     });
   });
@@ -125,10 +111,10 @@ describe('liveWhere', () => {
 });
 
 describe('liveIncludes', () => {
-  it('a bare to-many include grows a live-scope where; to-one stays bare', () => {
-    expect(liveIncludes('Token', { auditLogsAsSubject: true, user: true })).toEqual({
-      auditLogsAsSubject: { where: liveScope('AuditLog') },
-      user: true,
+  it('a bare to-many include grows a live-scope where; to-one and column-less stay bare', () => {
+    expect(liveIncludes('User', { tokens: true, sessions: true })).toEqual({
+      tokens: { where: LIVE },
+      sessions: true,
     });
   });
 
@@ -141,12 +127,6 @@ describe('liveIncludes', () => {
   it('an explicit deletedAt on a level wins', () => {
     expect(liveIncludes('User', { tokens: { where: { deletedAt: { not: null } } } })).toEqual({
       tokens: { where: { deletedAt: { not: null } } },
-    });
-  });
-
-  it('a column-less to-many target inherits its parents scope', () => {
-    expect(liveIncludes('User', { sessions: true })).toEqual({
-      sessions: { where: { user: LIVE } },
     });
   });
 
