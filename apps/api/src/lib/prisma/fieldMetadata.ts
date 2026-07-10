@@ -26,6 +26,8 @@ const getField = (modelName: string, fieldName: string): FieldDef | undefined =>
 
 export const modelFields = (modelName: string): Record<string, FieldDef> | undefined => MAP[modelName]?.fields;
 
+export const modelNames = (): string[] => Object.keys(MAP);
+
 export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;

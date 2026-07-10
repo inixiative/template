@@ -28,7 +28,7 @@ const delegateFor = (model: string): RuntimeDelegate =>
 
 const tombstone = async (model: string, row: Row) => {
   for (const child of childRelations(model)) {
-    if (HARD_DELETE_ON_TOMBSTONE[model]?.includes(child.field)) {
+    if (HARD_DELETE_ON_TOMBSTONE[model]?.includes(child.model)) {
       await delegateFor(child.model).deleteMany({ where: fkWhere(child, row) });
     } else if (child.hasDeletedAt) {
       await delegateFor(child.model).updateManyAndReturn({
