@@ -67,7 +67,6 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { revive } from './utils/revive';
 // Model name utilities
 export {
   type AccessorName,
@@ -84,6 +83,7 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+export { revive } from './utils/revive';
 
 // Hook shared utilities (ignore fields, redact fields)
 

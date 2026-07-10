@@ -51,7 +51,8 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     // Cast marked tokens through the allowlist (no eval); a marker whose value
     // doesn't cast is malformed — skip the leaf rather than silently storing the
     // raw string. `=== undefined` so the valid null symbol survives.
-    const cast = marker === 'symbol' ? castBracketSymbol(decoded) : marker === 'number' ? castBracketNumber(decoded) : undefined;
+    const cast =
+      marker === 'symbol' ? castBracketSymbol(decoded) : marker === 'number' ? castBracketNumber(decoded) : undefined;
     if (marker && cast === undefined) continue;
     const decodedValue: BracketQueryPrimitive = cast !== undefined ? cast : decoded;
     const leafKey = keys[keys.length - 1];
