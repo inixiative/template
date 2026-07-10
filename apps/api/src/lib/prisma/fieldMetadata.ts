@@ -10,6 +10,7 @@ export type FieldDef = {
   kind: 'scalar' | 'enum' | 'object';
   type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Json' | <ModelName> | <EnumName>
   isList?: boolean;
+  isRequired?: boolean;
   values?: readonly string[];
   relationName?: string;
   fromFields?: readonly string[];
@@ -22,6 +23,8 @@ export type FieldDef = {
 const MAP = prismaMap.models as Record<string, { fields: Record<string, FieldDef> }>;
 
 const getField = (modelName: string, fieldName: string): FieldDef | undefined => MAP[modelName]?.fields?.[fieldName];
+
+export const modelFields = (modelName: string): Record<string, FieldDef> | undefined => MAP[modelName]?.fields;
 
 export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');

@@ -4,14 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import {
-  type Condition,
-  executePrismaQueryPlan,
-  type LensNarrowing,
-  projectByPath,
-  toPrisma,
-} from '@inixiative/json-rules';
-import { db, type ModelName } from '@template/db';
+import { type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
+import type { ModelName } from '@template/db';
 import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
@@ -20,23 +14,20 @@ import {
   isRelationOperator,
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
-import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
 import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
 import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
-import { hasSoftDelete, mentionsDeletedAt } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
-  // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
-  // Superadmin: skips the searchable-fields whitelist AND the injected `deletedAt: null`
-  // live scope (one flag for both).
+  // Superadmin: skips the picks whitelist (coercion + op validation still apply).
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
@@ -58,44 +49,6 @@ const stripRelationOperators = (path: string): string =>
     .join('.');
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
-
-// Visit keys where the client's searchFields already filter `deletedAt` — those
-// nodes keep the caller's filter instead of the injected live scope.
-const collectExplicitDeletedAtVisits = (
-  obj: BracketQueryRecord,
-  model: string,
-  prefix = '',
-  out = new Set<string>(),
-): Set<string> => {
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) continue;
-    const currentPath = prefix ? `${prefix}.${key}` : key;
-    const segments = stripRelationOperators(currentPath).split('.');
-    if (segments[segments.length - 1] === 'deletedAt') {
-      const parent = segments.slice(0, -1).join('.');
-      out.add(parent ? `${model}.${parent}` : model);
-      continue;
-    }
-    if (isRecord(value)) collectExplicitDeletedAtVisits(value, model, currentPath, out);
-  }
-  return out;
-};
-
-type VisitWhereFn = (visitKey: string) => Record<string, unknown>[];
-
-// `every` composes filter-first by implication; plain AND would demand every
-// related row be in scope. `isNot` gets scope as an `is` sibling (fail closed,
-// matching applyLens's to-one convention) — folding it inside would make an
-// out-of-scope related row pass the negation.
-const scopeRelationValue = (
-  op: string,
-  value: BracketQueryValue,
-  wheres: Record<string, unknown>[],
-): BracketQueryValue => {
-  if (!wheres.length || op === 'isNot') return value;
-  if (op === 'every') return { OR: [{ NOT: { AND: wheres } }, value] } as unknown as BracketQueryValue;
-  return { AND: [value, ...wheres] } as unknown as BracketQueryValue;
-};
 
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
@@ -161,7 +114,6 @@ const validateAndTransformSearchFields = (
   searchableFields: readonly string[],
   skipFieldValidation: boolean,
   model: ModelName,
-  visitWhere: VisitWhereFn,
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
@@ -236,24 +188,18 @@ const validateAndTransformSearchFields = (
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
         });
       }
-      const wheres = visitWhere(`${model}.${stripRelationOperators(currentPath)}`);
       const relationValue: BracketQueryRecord = {};
       for (const [opKey, opValue] of Object.entries(value)) {
         if (isRelationOperator(opKey) && isRecord(opValue)) {
-          const transformed = validateAndTransformSearchFields(
+          relationValue[opKey] = validateAndTransformSearchFields(
             opValue,
             searchableFields,
             skipFieldValidation,
             model,
-            visitWhere,
             currentPath,
             depth + 1,
-          );
-          relationValue[opKey] = scopeRelationValue(opKey, transformed as BracketQueryValue, wheres);
+          ) as BracketQueryValue;
         }
-      }
-      if (wheres.length && relationValue.isNot !== undefined && relationValue.is === undefined) {
-        relationValue.is = { AND: wheres } as unknown as BracketQueryValue;
       }
       result[key] = relationValue;
       continue;
@@ -279,103 +225,39 @@ const validateAndTransformSearchFields = (
       continue;
     }
 
-    // No relation/field operators → deeper nesting (e.g. `{ user: { name: 'x' } }`).
-    const nested = validateAndTransformSearchFields(
+    result[key] = validateAndTransformSearchFields(
       value,
       searchableFields,
       skipFieldValidation,
       model,
-      visitWhere,
       currentPath,
       depth + 1,
-    );
-    const nestedField = lookupField(model, stripRelationOperators(currentPath));
-    result[key] =
-      nestedField?.kind === 'object'
-        ? scopeRelationValue(
-            'is',
-            nested as BracketQueryValue,
-            visitWhere(`${model}.${stripRelationOperators(currentPath)}`),
-          )
-        : (nested as BracketQueryValue);
+    ) as BracketQueryValue;
   }
 
   return result;
 };
 
-export const buildWhereClause = async (options: BuildWhereOptions): Promise<Record<string, unknown>> => {
+export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
   const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  // Row scope per projectByPath visit: root wheres AND into the query; relation
-  // visits' wheres fold in only where a query path traverses the relation.
-  // Count-operator clauses compile to a groupBy plan — executed here so every
-  // resolved where is plain. Bridges compile to the `{}` over-fetch sentinel,
-  // which is not expressible as SQL: fail closed rather than widen row scope.
-  const byPath = projectByPath(filterLens);
-  const explicitDeletedAtVisits = searchFields
-    ? collectExplicitDeletedAtVisits(searchFields, model)
-    : new Set<string>();
-  const visitWheres = new Map<string, Record<string, unknown>[]>();
-  for (const [visitKey, visit] of byPath) {
-    const wheres = await Promise.all(
-      visit.whereClauses.map(async (clause: Condition) => {
-        const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
-        const step = plan.steps[0];
-        const where =
-          plan.steps.length === 1 && step && 'where' in step
-            ? step.where
-            : await executePrismaQueryPlan(plan, db as never);
-        if (Object.keys(where).length === 0) {
-          throw makeError({
-            status: 500,
-            message: `Narrowing where at '${visitKey}' does not compile to a Prisma filter (bridge conditions are unsupported in row scope)`,
-          });
-        }
-        return where;
-      }),
-    );
-    // Live scope: every visited model with a `deletedAt` column reads live rows
-    // only. An explicit `deletedAt` at the node (lens where or client searchFields)
-    // wins; superadmin skips injection entirely. The ROOT visit is paginate's — it owns
-    // the caller where, so explicit-deletedAt-wins composes there without threading it here.
-    if (
-      !skipFieldValidation &&
-      visitKey !== model &&
-      hasSoftDelete(visit.modelName) &&
-      !explicitDeletedAtVisits.has(visitKey) &&
-      !wheres.some(mentionsDeletedAt)
-    ) {
-      wheres.push({ deletedAt: null });
-    }
-    if (wheres.length) visitWheres.set(visitKey, wheres);
-  }
-  const visitWhere: VisitWhereFn = (visitKey) => visitWheres.get(visitKey) ?? [];
-
-  // Global search — broad: each searchable field contributes a clause based on its
-  // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
   if (search && searchableFields.length) {
     const searchConditions = searchableFields.flatMap((field) => {
       const def = lookupField(model, stripRelationOperators(field));
-      const clause = def && buildSearchClause(def, search);
+      const clause = def && fieldSearchOperator(def, search);
       if (!clause) return [];
       if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
-      return [buildSearchPath(model, field, clause, visitWhere)];
+      return [buildSearchPath(model, field, clause)];
     });
     if (searchConditions.length) conditions.push({ OR: searchConditions });
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(
-      searchFields,
-      searchableFields,
-      skipFieldValidation,
-      model,
-      visitWhere,
-    );
+    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
     for (const [key, value] of Object.entries(transformed)) {
       if (orNullFields.includes(key)) {
         conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
@@ -385,7 +267,32 @@ export const buildWhereClause = async (options: BuildWhereOptions): Promise<Reco
     }
   }
 
-  conditions.push(...visitWhere(model));
+  // Narrowing wheres compose at the root only; one declared on a relation visit
+  // is not applied — fail closed rather than silently widening row scope.
+  const byPath = projectByPath(filterLens);
+  const rootKey = byPath.keys().next().value;
+  const nonRootWheres = [...byPath].filter(([key, visit]) => key !== rootKey && visit.whereClauses.length > 0);
+  if (nonRootWheres.length) {
+    throw makeError({
+      status: 500,
+      message:
+        `Narrowing wheres compose at the root only; declared at: ${nonRootWheres.map(([key]) => key).join(', ')}. ` +
+        `Move the condition into the service's where.`,
+    });
+  }
+
+  const rootVisit = rootKey ? byPath.get(rootKey) : undefined;
+  for (const clause of rootVisit?.whereClauses ?? []) {
+    const plan = toPrisma(clause, { map: lens, mapName: rootVisit!.mapName, model });
+    const step = plan.steps[0];
+    if (plan.steps.length !== 1 || !step || !('where' in step) || Object.keys(step.where).length === 0) {
+      throw makeError({
+        status: 500,
+        message: `Narrowing where at '${rootKey}' does not compile to a plain Prisma filter`,
+      });
+    }
+    conditions.push(step.where);
+  }
 
   return {
     ...filters,

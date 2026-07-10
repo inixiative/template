@@ -40,7 +40,8 @@ describe('paginate — lens bindings', () => {
     await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
 
     expect(captured.findManyArgs?.where).toEqual({
-      AND: [{}, { AND: [{ name: { equals: 'aron' } }] }, { deletedAt: null }],
+      AND: [{}, { AND: [{ name: { equals: 'aron' } }] }],
+      deletedAt: null,
     });
   });
 
@@ -59,7 +60,7 @@ describe('paginate — lens bindings', () => {
 
     const result = await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}, { deletedAt: null }] });
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}], deletedAt: null });
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
   });
 });
@@ -67,7 +68,7 @@ describe('paginate — lens bindings', () => {
 describe('paginate — soft-delete scope', () => {
   const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
 
-  it('folds `deletedAt: null` onto to-many include levels; to-one includes are untouched', async () => {
+  it('folds live scope onto to-many include levels; a column-less target inherits from its parents', async () => {
     const captured: Captured = {};
 
     await paginate(makeContext(userLens), makeDelegate(captured), {
@@ -78,9 +79,8 @@ describe('paginate — soft-delete scope', () => {
     });
 
     expect(captured.findManyArgs?.include).toEqual({
-      // Token soft-deletes; Session does not — its include entry stays `true`.
       tokens: { where: { isActive: true, deletedAt: null }, include: { user: true } },
-      sessions: true,
+      sessions: { where: { user: { deletedAt: null } } },
     });
   });
 
@@ -117,12 +117,23 @@ describe('paginate — soft-delete scope', () => {
     expect(captured.findManyArgs?.include).toEqual({ tokens: true });
   });
 
-  it('a model without deletedAt gets no injection', async () => {
+  it('a model without its own column inherits live scope from its to-one parents', async () => {
     const captured: Captured = {};
     const lens: LensNarrowing = { parent: lensFor('WebhookSubscription'), root: { picks: ['url'] } };
 
     await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
+    expect(captured.findManyArgs?.where).toEqual({
+      AND: [
+        { AND: [{}, {}] },
+        {
+          AND: [
+            { OR: [{ organization: { is: null } }, { organization: { deletedAt: null } }] },
+            { OR: [{ space: { is: null } }, { space: { deletedAt: null } }] },
+            { OR: [{ user: { is: null } }, { user: { deletedAt: null } }] },
+          ],
+        },
+      ],
+    });
   });
 });

@@ -12,7 +12,7 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { hasSoftDelete, mentionsDeletedAt, scopeSoftDeleteInclude } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
@@ -101,8 +101,9 @@ export const paginate = async <
   // `deletedAt: null` live scope.
   const superadmin = isSuperadmin(c);
 
+  const model = rootLens(filterLens).model;
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
-  const searchWhere = await buildWhereClause({
+  const searchWhere = buildWhereClause({
     filterLens,
     search,
     searchFields,
@@ -110,22 +111,14 @@ export const paginate = async <
     orNullFields,
   });
 
-  // Root live scope composes here (paginate owns baseWhere): an explicit `deletedAt`
-  // anywhere in the composed where wins over the injection.
-  const and: Record<string, unknown>[] = [baseWhere, searchWhere as Record<string, unknown>];
-  if (!superadmin && hasSoftDelete(rootLens(filterLens).model) && !and.some(mentionsDeletedAt)) {
-    and.push({ deletedAt: null });
-  }
-  const where = { AND: and } as FindManyWhere<T>;
+  const composed = { AND: [baseWhere, searchWhere as Record<string, unknown>] };
+  const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
 
-  // Relation payloads read live rows too: fold `deletedAt: null` onto every
-  // to-many level of the caller's include/select trees.
   if (!superadmin) {
-    const model = rootLens(filterLens).model;
     const trees = findManyOptions as Record<string, unknown>;
     for (const key of ['include', 'select'] as const) {
       const tree = trees[key];
-      if (tree && typeof tree === 'object') trees[key] = scopeSoftDeleteInclude(model, tree as Record<string, unknown>);
+      if (tree && typeof tree === 'object') trees[key] = liveIncludes(model, tree as Record<string, unknown>);
     }
   }
 
