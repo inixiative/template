@@ -1,4 +1,5 @@
 export { type ChannelKeyInput, channelKey } from './channelKey';
+export { channelFamily, WS_CHANNELS, type WSChannelFamily } from './channels';
 export {
   createWebSocketClient,
   type WebSocketClient,
