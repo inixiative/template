@@ -67,7 +67,7 @@ export const registerSoftDeleteCascadeHook = () => {
       if (!data || !('deletedAt' in data)) return;
       if (!childRelations(model).length) return;
 
-      const results = castArray(result ?? []) as Row[];
+      const results = castArray(result) as Row[];
       const previousById = new Map((castArray(previous ?? []) as Row[]).map((row) => [row.id, row]));
 
       for (const row of results) {
