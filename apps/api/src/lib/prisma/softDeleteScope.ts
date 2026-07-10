@@ -14,7 +14,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 // Key presence counts even with an `undefined` value — `deletedAt: undefined`
 // is the deliberate opt-out (the admin tri-state `all` branch).
-export const mentionsDeletedAt = (where: unknown): boolean => {
+const mentionsDeletedAt = (where: unknown): boolean => {
   if (!isPlainObject(where)) return false;
   return Object.entries(where).some(([key, value]) => {
     if (key === 'deletedAt') return true;
@@ -25,7 +25,7 @@ export const mentionsDeletedAt = (where: unknown): boolean => {
 
 // A model without its own column has no query-time scope: the soft-delete
 // cascade hook keeps column-bearing descendants consistent at write time.
-export const liveScope = (model: string): Record<string, unknown> | undefined =>
+const liveScope = (model: string): Record<string, unknown> | undefined =>
   hasDeletedAt(model) ? { deletedAt: null } : undefined;
 
 const appendLive = (model: string, node: Record<string, unknown>): Record<string, unknown> => {

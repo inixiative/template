@@ -9,7 +9,7 @@ import { isUuidV7 } from '@template/shared/utils';
 import type { MiddlewareHandler } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
-import { liveIncludes, liveScope } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';
 
 export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next) => {
@@ -40,8 +40,8 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   // every resource route instead of per-controller deletedAt checks. Revival
   // flows go through create-path upserts on unique keys, never load-by-id.
   const superadmin = isSuperadmin(c);
-  const where: Record<string, unknown> = { [lookup]: id };
-  if (!superadmin) Object.assign(where, liveScope(modelName));
+  const base: Record<string, unknown> = { [lookup]: id };
+  const where = superadmin ? base : liveWhere(modelName, base);
 
   const resources = await findResources(db, accessor, where, superadmin ? undefined : modelName);
 

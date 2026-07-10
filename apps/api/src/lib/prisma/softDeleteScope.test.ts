@@ -1,48 +1,37 @@
 import { describe, expect, it } from 'bun:test';
-import { liveIncludes, liveScope, liveWhere, mentionsDeletedAt } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const LIVE = { deletedAt: null };
 
-describe('liveScope', () => {
-  it('a model with a deletedAt column → { deletedAt: null }', () => {
-    expect(liveScope('User')).toEqual(LIVE);
-  });
-
-  it('a model without one has no query-time scope (the cascade hook owns consistency)', () => {
-    expect(liveScope('Session')).toBeUndefined();
-    expect(liveScope('WebhookSubscription')).toBeUndefined();
-  });
-
-  it('unknown model → nothing to enforce', () => {
-    expect(liveScope('NotAModel')).toBeUndefined();
-  });
-});
-
-describe('mentionsDeletedAt', () => {
-  it('top-level key, including an explicit `undefined` opt-out', () => {
-    expect(mentionsDeletedAt({ deletedAt: { not: null } })).toBe(true);
-    expect(mentionsDeletedAt({ deletedAt: undefined })).toBe(true);
-  });
-
-  it('recurses through boolean combinators only', () => {
-    expect(mentionsDeletedAt({ AND: [{ name: 'x' }, { OR: [{ deletedAt: null }] }] })).toBe(true);
-    expect(mentionsDeletedAt({ NOT: { deletedAt: null } })).toBe(true);
-    expect(mentionsDeletedAt({ user: { deletedAt: null } })).toBe(false);
-  });
-});
-
 describe('liveWhere', () => {
-  it('appends the root live scope', () => {
+  it('appends the root live scope for a model with a deletedAt column', () => {
     expect(liveWhere('User', { AND: [{}, {}] })).toEqual({ AND: [{}, {}], deletedAt: null });
   });
 
-  it('an explicit root deletedAt wins', () => {
-    const where = { AND: [{ deletedAt: { not: null } }, {}] };
-    expect(liveWhere('User', where)).toEqual(where);
+  it('a column-less model gets no injection (the cascade hook owns consistency)', () => {
+    expect(liveWhere('Session', { AND: [{}, {}] })).toEqual({ AND: [{}, {}] });
+    expect(liveWhere('WebhookSubscription', {})).toEqual({});
   });
 
-  it('a column-less root gets no injection', () => {
-    expect(liveWhere('Session', { AND: [{}, {}] })).toEqual({ AND: [{}, {}] });
+  it('unknown model → untouched', () => {
+    expect(liveWhere('NotAModel', { a: 1 })).toEqual({ a: 1 });
+  });
+
+  it('an explicit root deletedAt wins, wherever it sits under boolean combinators', () => {
+    const where = { AND: [{ deletedAt: { not: null } }, {}] };
+    expect(liveWhere('User', where)).toEqual(where);
+    expect(liveWhere('User', { NOT: { deletedAt: null } })).toEqual({ NOT: { deletedAt: null } });
+  });
+
+  it('an explicit `deletedAt: undefined` opts out (the admin tri-state `all` branch)', () => {
+    expect(liveWhere('User', { deletedAt: undefined, name: 'x' })).toEqual({ deletedAt: undefined, name: 'x' });
+  });
+
+  it('a deletedAt under a relation key does not count as a root mention', () => {
+    expect(liveWhere('Token', { user: { deletedAt: null } })).toEqual({
+      user: { deletedAt: null },
+      deletedAt: null,
+    });
   });
 
   it('scopes a to-many `some` hop and the root', () => {
