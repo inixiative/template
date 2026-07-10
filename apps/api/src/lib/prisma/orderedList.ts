@@ -6,7 +6,7 @@
  */
 import { db, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
+import { hasDeletedAt } from '#/lib/prisma/fieldMetadata';
 
 type Where = Record<string, unknown>;
 type Row = Record<string, unknown>;
