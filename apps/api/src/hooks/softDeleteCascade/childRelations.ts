@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { CASCADE_EXEMPT } from '#/hooks/softDeleteCascade/cascadeExempt';
 import { lookupField, modelFields, modelNames } from '#/lib/prisma/fieldMetadata';
 
 export type ChildRelation = {
@@ -20,8 +21,9 @@ export const childRelations = (model: string): ChildRelation[] => {
   if (cached) return cached;
 
   const children = modelNames().flatMap((child) =>
-    Object.values(modelFields(child) ?? {}).flatMap((def) => {
+    Object.entries(modelFields(child) ?? {}).flatMap(([field, def]) => {
       if (def.kind !== 'object' || def.type !== model || !def.fromFields?.length || !def.toFields?.length) return [];
+      if (CASCADE_EXEMPT[child]?.includes(field)) return [];
       return [
         {
           model: child,

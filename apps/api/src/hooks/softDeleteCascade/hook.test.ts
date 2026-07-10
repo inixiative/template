@@ -4,6 +4,7 @@ import { ContactOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createContact,
+  createInquiry,
   createOrganization,
   createSession,
   createSpace,
@@ -89,6 +90,15 @@ describe('softDeleteCascade hook', () => {
     await db.organization.update({ where: { id: org.id }, data: { name: 'renamed' } });
 
     expect((await spaceById(space.id))?.deletedAt).toBeNull();
+  });
+
+  it('exempt reference edges do not cascade: an inquiry outlives its sender', async () => {
+    const { entity: sender } = await createUser();
+    const { entity: inquiry } = await createInquiry({}, { sourceUser: sender });
+
+    await db.user.update({ where: { id: sender.id }, data: { deletedAt: new Date() } });
+
+    expect((await db.inquiry.findUnique({ where: { id: inquiry.id } }))?.deletedAt).toBeNull();
   });
 
   it('revocation registry: tombstoning a user hard-deletes its sessions, and revive does not resurrect them', async () => {
