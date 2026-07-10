@@ -11,6 +11,7 @@ export type WSData = {
   connectionId: string; // unique per connection (multiple tabs = multiple ids)
   userId: string | null; // effective identity: real, or spoofed-as; null = anonymous
   token: string | null; // the raw credential behind `userId` — subscribe probes present it to the route
+  spoofEmail: string | null; // active spoof target — probes carry it so channel authority is the target's
   channels: Set<string>; // subscribed channels (normalized query keys)
   connectedAt: number;
   lastPing: number; // staleness detection

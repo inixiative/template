@@ -31,6 +31,10 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let pongTimer: ReturnType<typeof setTimeout> | undefined;
 
+  const replaySubscriptions = (): void => {
+    for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
+  };
+
   const socket = createWebSocketClient({
     url,
     onMessage: (data) => {
@@ -40,7 +44,7 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
     onOpen: () => {
       // Identity first — the BE processes each connection's frames in order.
       if (identityFrame) socket.send(identityFrame);
-      for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
+      replaySubscriptions();
       if (everOpened) onReconnect?.(); // re-open only: recover events missed while disconnected
       everOpened = true;
     },
@@ -48,9 +52,11 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
     onClose: () => clearTimeout(pongTimer),
   });
 
+  // Any identity change drops every grant on the BE — resubscribe, re-authorized as the new one.
   const sendIdentity = (frame: Record<string, unknown> | null): void => {
     identityFrame = frame;
     socket.send(frame ?? { action: 'logout' });
+    replaySubscriptions();
   };
 
   return {

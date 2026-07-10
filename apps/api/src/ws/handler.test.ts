@@ -13,18 +13,24 @@ afterEach(() => clearRegistry());
 
 const lastFrame = (sent: string[]) => JSON.parse(sent[sent.length - 1]);
 
-// Transport-level tests: the probe app is the injection seam — REAL route authorization is
-// covered by probe.test.ts. This stand-in mirrors the contract: 401 without a credential,
-// 404 for an id the caller may not read, 204 otherwise.
+// Transport-level tests; real route auth + identity provenance live in probe.test.ts.
 const CHANNEL_OK = 'inquiryRead:id:ok';
 const CHANNEL_DENIED = 'inquiryRead:id:denied';
+const VALID_TOKEN = 't1';
+const UNSPOOFABLE = 'walled@x.com';
 beforeEach(() =>
   setProbeApp({
     request: (path: string, init?: RequestInit) => {
       if (path === '/openapi/docs') {
         return Response.json({ paths: { '/api/v1/inquiry/{id}': { get: { operationId: 'inquiryRead' } } } });
       }
-      if (!new Headers(init?.headers).get('authorization')) return new Response(null, { status: 401 });
+      const headers = new Headers(init?.headers);
+      if (headers.get('authorization') !== `Bearer ${VALID_TOKEN}`) return new Response(null, { status: 401 });
+      if (path === '/api/v1/me') {
+        const spoof = headers.get('x-spoof-user-email');
+        const email = spoof && spoof !== UNSPOOFABLE ? spoof : 'self@x.com';
+        return Response.json({ data: { id: `id-${email}`, email } });
+      }
       return new Response(null, { status: path.endsWith('/ok') ? 204 : 404 });
     },
   }),
@@ -84,6 +90,59 @@ describe('websocketHandler', () => {
     await websocketHandler.message(socket, JSON.stringify({ action: 'ping' }));
     expect(socket.data.lastPing).toBeGreaterThan(0);
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
+  });
+
+  it('authenticate resolves identity as provenance of the token (/me)', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', token: VALID_TOKEN }));
+    expect(socket.data.userId).toBe('id-self@x.com');
+    expect(socket.data.token).toBe(VALID_TOKEN);
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-self@x.com' });
+  });
+
+  it('authenticate with a rejected token resolves to a null identity', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', token: 'not-a-token' }));
+    expect(socket.data.userId).toBeNull();
+    expect(socket.data.token).toBeNull();
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
+  });
+
+  it('spoof swaps identity to the target and remembers the spoof credential', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'spoof', token: VALID_TOKEN, email: 'target@x.com' }),
+    );
+    expect(socket.data.userId).toBe('id-target@x.com');
+    expect(socket.data.spoofEmail).toBe('target@x.com');
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-target@x.com' });
+  });
+
+  it('rejects a spoof the API does not honor, keeping the previous state', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'id-self@x.com', token: VALID_TOKEN });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'spoof', token: VALID_TOKEN, email: UNSPOOFABLE }));
+    expect(socket.data.userId).toBe('id-self@x.com');
+    expect(socket.data.spoofEmail).toBeNull();
+    expect(lastFrame(sent)).toEqual({ type: 'spoofRejected' });
+  });
+
+  it('unspoof restores the token identity and clears the spoof', async () => {
+    const { socket, sent } = createTestSocket({
+      connectionId: 'c1',
+      userId: 'id-target@x.com',
+      token: VALID_TOKEN,
+      spoofEmail: 'target@x.com',
+    });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'unspoof', token: VALID_TOKEN }));
+    expect(socket.data.userId).toBe('id-self@x.com');
+    expect(socket.data.spoofEmail).toBeNull();
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-self@x.com' });
   });
 
   it('logout clears identity to anonymous without a token', async () => {

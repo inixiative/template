@@ -7,10 +7,10 @@
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
 import type { Server } from 'bun';
-import { authenticateToken, resolveSpoofTarget } from '#/ws/auth';
+import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
-import { canSubscribe } from '#/ws/probe';
+import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { addConnection, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
@@ -38,6 +38,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     connectionId: crypto.randomUUID(),
     userId: null,
     token: null,
+    spoofEmail: null,
     channels: new Set(),
     connectedAt: now,
     lastPing: now,
@@ -64,32 +65,30 @@ const parseFrame = (raw: string | Buffer): WSMessage | null => {
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
     case 'authenticate':
+    case 'spoof':
     case 'unspoof': {
-      const userId = await authenticateToken(msg.token);
-      setIdentity(ws, userId);
-      ws.data.token = userId ? msg.token : null;
-      send(ws, { type: 'identity', userId });
-      return;
-    }
-    case 'spoof': {
-      const userId = await resolveSpoofTarget(msg.token, msg.email);
-      if (!userId) {
+      const credential = { token: msg.token, spoofEmail: msg.action === 'spoof' ? msg.email : null };
+      const me = await resolveIdentity(credential);
+      // A spoof /me doesn't honor (non-superadmin) is a rejection, not a silent identity keep.
+      if (msg.action === 'spoof' && (!me || normalizeEmail(me.email) !== normalizeEmail(msg.email))) {
         send(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, userId);
-      ws.data.token = msg.token;
-      send(ws, { type: 'identity', userId });
+      setIdentity(ws, me?.id ?? null);
+      ws.data.token = me ? msg.token : null;
+      ws.data.spoofEmail = me ? credential.spoofEmail : null;
+      send(ws, { type: 'identity', userId: me?.id ?? null });
       return;
     }
     case 'logout': {
       setIdentity(ws, null);
       ws.data.token = null;
+      ws.data.spoofEmail = null;
       send(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
-      if (!(await canSubscribe(ws.data.token, msg.channel))) {
+      if (!(await canSubscribe(ws.data, msg.channel))) {
         send(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
