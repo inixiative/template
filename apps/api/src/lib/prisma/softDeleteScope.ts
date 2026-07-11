@@ -108,10 +108,8 @@ export const liveIncludes = (model: string, tree: Record<string, unknown>): Reco
   return out;
 };
 
-// Parked (Aron, 2026-07-11): walk/hop here (down a query's args) and
-// childRelations in the cascade hook (down the schema's FK graph) are latent
-// general traversal tools. If a third traversal of queries or schemas shows
-// up, extract them as generic walkers — likely into packages/db — instead of
-// writing another one. A full db-read extension was considered and parked:
-// superadmin awareness and revive/tri-state flows conflict with an
-// always-on rewrite.
+// Parked (Aron, 2026-07-11): walk/hop are a latent generic query-args walker
+// (read-time twin of the cascade's schema walker). On a third traversal
+// use-case, extract to packages/db instead of writing another one. A full
+// db-read extension was considered and parked: superadmin awareness and
+// revive/tri-state flows conflict with an always-on rewrite.
