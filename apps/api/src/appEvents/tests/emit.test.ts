@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
+import type { AppEventPayload } from '#/appEvents/types';
+import { observeRegistry } from '#/lib/observe';
 
 describe('emitAppEvent', () => {
   const originalHandlers = { ...appEventHandlers };
@@ -73,8 +75,42 @@ describe('emitAppEvent', () => {
     expect(event.timestamp <= after).toBe(true);
   });
 
-  it('does nothing for unknown event names', async () => {
+  it('dispatches no handler for unknown event names', async () => {
     await emitAppEvent('nonexistent.event' as never, {} as never);
+  });
+
+  describe('universal observe', () => {
+    const observed: AppEventPayload[] = [];
+    beforeAll(() => {
+      observeRegistry.register('test-recorder', {
+        record: (event) => {
+          observed.push(event);
+          return Promise.resolve();
+        },
+      });
+    });
+    afterAll(() => observeRegistry.unregister('test-recorder'));
+    afterEach(() => {
+      observed.length = 0;
+    });
+
+    it('records every emitted event through the registry with the full envelope', async () => {
+      appEventHandlers[AppEventName.userCreated] = mock(async () => {});
+
+      await emitAppEvent('user.created', { userId: 'obs-1', isGuest: false });
+
+      const recorded = observed.filter((e) => e.name === 'user.created');
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0].data).toEqual({ userId: 'obs-1', isGuest: false });
+    });
+
+    it('records even when no handler is registered', async () => {
+      await emitAppEvent('nonexistent.event' as never, { note: 'no-handler' } as never);
+
+      const recorded = observed.filter((e) => e.name === 'nonexistent.event');
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0].data).toEqual({ note: 'no-handler' });
+    });
   });
 
   it('rejects after commit when a deferred handler fails', async () => {

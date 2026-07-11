@@ -1,7 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import type { AppEventPayload, ObserveData } from '#/appEvents/types';
-import { observeRegistry } from '#/lib/observe';
+import type { AppEventPayload } from '#/appEvents/types';
 
 const createEvent = (name: string, data: Record<string, unknown>): AppEventPayload => ({
   name,
@@ -19,44 +18,8 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
 });
 
 describe('makeAppEvent', () => {
-  // A real recording observe adapter — lets us assert that makeAppEvent dispatches
-  // selector output through the real registry (broadcast → adapter.record), rather
-  // than spying on the selector. Registered alongside the default 'db' adapter.
-  const observed: Array<{ event: AppEventPayload; data: ObserveData }> = [];
-  beforeAll(() => {
-    observeRegistry.register('test-recorder', {
-      record: async (event, data) => {
-        observed.push({ event, data });
-      },
-    });
-  });
-  afterAll(() => observeRegistry.unregister('test-recorder'));
-  afterEach(() => {
-    observed.length = 0;
-  });
-
   it('returns a handler function', () => {
     expect(typeof makeAppEvent({})).toBe('function');
-  });
-
-  describe('observe', () => {
-    it('dispatches the selector output through the observe registry', async () => {
-      const handler = makeAppEvent<{ foo: string }>({ observe: (data) => ({ tag: data.foo }) });
-
-      await handler(createEvent('test', { foo: 'bar' }));
-
-      expect(observed).toHaveLength(1);
-      expect(observed[0].data).toEqual({ tag: 'bar' });
-      expect(observed[0].event.name).toBe('test');
-    });
-
-    it('skips dispatch when the selector returns null', async () => {
-      const handler = makeAppEvent({ observe: () => null });
-
-      await handler(createEvent('test', {}));
-
-      expect(observed).toHaveLength(0);
-    });
   });
 
   describe('email', () => {
@@ -122,8 +85,8 @@ describe('makeAppEvent', () => {
     it('one channel failing does not prevent others from running, but still rejects', async () => {
       let cbRan = false;
       const handler = makeAppEvent({
-        observe: () => {
-          throw new Error('observe boom');
+        email: () => {
+          throw new Error('email boom');
         },
         cb: [
           async () => {
@@ -132,7 +95,7 @@ describe('makeAppEvent', () => {
         ],
       });
 
-      await expect(handler(createEvent('test', {}))).rejects.toThrow('observe boom');
+      await expect(handler(createEvent('test', {}))).rejects.toThrow('email boom');
       expect(cbRan).toBe(true);
     });
 
