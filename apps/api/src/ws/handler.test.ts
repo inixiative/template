@@ -1,13 +1,12 @@
-import { createHash, randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createInquiry, createOrganization, createToken, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
 import { byChannel, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
+import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createTestSocket } from '#tests/createTestSocket';
 
 // Transport tests against the REAL app — probes are requests. Credentialed acceptance
@@ -15,18 +14,9 @@ import { createTestSocket } from '#tests/createTestSocket';
 
 const lastFrame = (sent: string[]) => JSON.parse(sent[sent.length - 1]);
 
-const createBearerFor = async (user: User): Promise<string> => {
-  const rawKey = randomBytes(24).toString('hex');
-  await createToken(
-    { keyHash: createHash('sha256').update(rawKey).digest('hex'), keyPrefix: rawKey.slice(0, 16) },
-    { user },
-  );
-  return `Bearer ${rawKey}`;
-};
-
 const createAdminBearer = async () => {
   const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
-  return createBearerFor(superadmin);
+  return (await createBearerToken(superadmin)).authorization;
 };
 
 const createTestInquiry = async () => {
@@ -114,7 +104,7 @@ describe('websocketHandler', () => {
 
   it('authenticate resolves identity as provenance of the credential (/me)', async () => {
     const { entity: user } = await createUser();
-    const authorization = await createBearerFor(user);
+    const { authorization } = await createBearerToken(user);
 
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
@@ -137,7 +127,7 @@ describe('websocketHandler', () => {
   it('rejects a spoof the API does not honor, keeping the previous state', async () => {
     const { entity: user } = await createUser();
     const { entity: target } = await createUser();
-    const authorization = await createBearerFor(user);
+    const { authorization } = await createBearerToken(user);
 
     const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: user.id });
     websocketHandler.open(socket);

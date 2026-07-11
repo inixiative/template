@@ -1,23 +1,13 @@
 // canSubscribe/resolveIdentity dry-run the REAL app: real session auth, real spoof middleware,
 // real permissions. Route auth IS channel auth, end to end.
-import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db';
 import { db } from '@template/db';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createToken, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
-
-// Raw API key whose hash matches a real Token row — the same credential MCP-style callers use.
-const createBearerFor = async (user: User): Promise<string> => {
-  const rawKey = randomBytes(24).toString('hex');
-  await createToken(
-    { keyHash: createHash('sha256').update(rawKey).digest('hex'), keyPrefix: rawKey.slice(0, 16) },
-    { user },
-  );
-  return `Bearer ${rawKey}`;
-};
+import { createBearerToken } from '#tests/utils/createBearerToken';
 
 describe('ws subscribe probe (real app)', () => {
   let superadmin: User;
@@ -27,7 +17,7 @@ describe('ws subscribe probe (real app)', () => {
 
   beforeAll(async () => {
     ({ entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin }));
-    adminBearer = { authorization: await createBearerFor(superadmin) };
+    adminBearer = { authorization: (await createBearerToken(superadmin)).authorization };
 
     const { entity: sourceOrganization } = await createOrganization();
     ({ entity: targetUser } = await createUser());
