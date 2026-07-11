@@ -140,3 +140,14 @@ describe('lensWhere — query-plan execution (count operators)', () => {
     expect(rows.map((r) => r.id)).toEqual([qualified.id]);
   });
 });
+
+describe('lensWhere — open groups and bridges', () => {
+  it('an open group ({ all: [] }) compiles to an empty where and contributes nothing', async () => {
+    const lens: LensNarrowing = {
+      parent: lensFor('User'),
+      root: { picks: ['name'], where: { all: [] } },
+    };
+    const where = { name: 'x' };
+    expect(await lensWhere(lens, where)).toBe(where);
+  });
+});
