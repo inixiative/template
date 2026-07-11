@@ -5,6 +5,7 @@
  * @uses feature:auth
  */
 import { parseChannelKey, WS_CHANNELS } from '@template/shared/ws';
+import { app } from '#/app';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 
 // The connection's credential: the same headers an HTTP request would carry.
@@ -24,30 +25,18 @@ export const sanitizeWSHeaders = (headers: unknown): WSHeaders => {
   return out;
 };
 
-type ProbeApp = { request: (path: string, init?: RequestInit) => Promise<Response> | Response };
-let probeApp: ProbeApp | null = null;
 let operations: Map<string, { method: string; path: string }> | null = null;
-
-// The real app, loaded lazily — probes ARE requests, in tests too.
-const getProbeApp = async (): Promise<ProbeApp> => {
-  if (!probeApp) {
-    const { app } = await import('#/app');
-    probeApp = { request: (path, init) => app.fetch(new Request(`http://internal${path}`, init)) };
-  }
-  return probeApp;
-};
 
 // Identity is provenance of the credential: /me through the API's own auth + spoof middleware.
 export const resolveIdentity = async (headers: WSHeaders): Promise<{ id: string; email: string } | null> => {
   if (!headers.authorization) return null;
-  const app = await getProbeApp();
   const res = await app.request('/api/v1/me', { headers });
   if (!res.ok) return null;
   const body = (await res.json()) as { data?: { id?: string; email?: string } };
   return body.data?.id ? { id: body.data.id, email: body.data.email ?? '' } : null;
 };
 
-const loadOperations = async (app: ProbeApp): Promise<Map<string, { method: string; path: string }>> => {
+const loadOperations = async (): Promise<Map<string, { method: string; path: string }>> => {
   if (operations) return operations;
   const doc = (await (await app.request('/openapi/docs')).json()) as unknown as {
     paths?: Record<string, Record<string, { operationId?: string }>>;
@@ -64,10 +53,9 @@ const loadOperations = async (app: ProbeApp): Promise<Map<string, { method: stri
 // A query channel is authorized by its own route: probe the operation with the connection's
 // credential — 2xx over HTTP means the caller may watch it.
 export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {
-  const app = await getProbeApp();
   const key = parseChannelKey(channel);
   if (!(key._id in WS_CHANNELS)) return false;
-  const op = (await loadOperations(app)).get(key._id);
+  const op = (await loadOperations()).get(key._id);
   if (!op) return false;
 
   let path = op.path;
