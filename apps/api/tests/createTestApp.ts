@@ -3,7 +3,6 @@ import { type Db, db, type UserId } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
-import { setProbeApp } from '#/ws/probe';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
@@ -79,9 +78,6 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
   app.notFound(notFoundHandlerMiddleware);
 
   const fetch = async (request: Request): Promise<Response> => app.fetch(request);
-
-  // WS subscribe probes hit this harness, not the real app.
-  setProbeApp({ request: (path, init) => fetch(new Request(`http://test${path}`, init)) });
 
   return {
     app,

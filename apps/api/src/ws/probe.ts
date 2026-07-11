@@ -28,12 +28,7 @@ type ProbeApp = { request: (path: string, init?: RequestInit) => Promise<Respons
 let probeApp: ProbeApp | null = null;
 let operations: Map<string, { method: string; path: string }> | null = null;
 
-// Tests inject a harness; production lazily uses the real app.
-export const setProbeApp = (app: ProbeApp): void => {
-  probeApp = app;
-  operations = null;
-};
-
+// The real app, loaded lazily — probes ARE requests, in tests too.
 const getProbeApp = async (): Promise<ProbeApp> => {
   if (!probeApp) {
     const { app } = await import('#/app');
