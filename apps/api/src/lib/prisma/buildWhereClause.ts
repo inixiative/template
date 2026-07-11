@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
@@ -265,23 +265,6 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
         conditions.push({ [key]: value });
       }
     }
-  }
-
-  // Root wheres compose here unconditionally; relation-node wheres are
-  // paginate's — lensWhere folds them into every traversal of their relation.
-  const byPath = projectByPath(filterLens);
-  const rootKey = byPath.keys().next().value;
-  const rootVisit = rootKey ? byPath.get(rootKey) : undefined;
-  for (const clause of rootVisit?.whereClauses ?? []) {
-    const plan = toPrisma(clause, { map: lens, mapName: rootVisit!.mapName, model });
-    const step = plan.steps[0];
-    if (plan.steps.length !== 1 || !step || !('where' in step) || Object.keys(step.where).length === 0) {
-      throw makeError({
-        status: 500,
-        message: `Narrowing where at '${rootKey}' does not compile to a plain Prisma filter`,
-      });
-    }
-    conditions.push(step.where);
   }
 
   return {

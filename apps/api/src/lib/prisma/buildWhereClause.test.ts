@@ -473,53 +473,14 @@ describe('buildWhereClause', () => {
     });
   });
 
-  describe('narrowing wheres (root-only composition)', () => {
-    const role = { platformRole: { equals: 'superadmin' } };
-    const verified = { emailVerified: { equals: true } };
-    const named = { name: { equals: 'x' } };
-
-    it('applies the route layer root.where', () => {
-      const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
-        },
-      });
-      expect(result).toEqual({ AND: [role] });
-    });
-
-    it('composes every stacked scopeNarrowing layer (route + children), ANDed', () => {
-      const result = buildWhereClause({
-        filterLens: {
-          parent: {
-            parent: lensFor('User'),
-            root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
-          },
-          root: { where: { field: 'emailVerified', operator: 'equals', value: true } },
-        },
-      });
-      const and = (result as { AND: unknown[] }).AND;
-      expect(and).toHaveLength(2);
-      expect(and).toEqual(expect.arrayContaining([role, verified]));
-    });
-
-    it('applies mapDefaults wheres anchored to the root model', () => {
-      const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: [] },
-          mapDefaults: { prisma: { models: { User: { where: { field: 'name', operator: 'equals', value: 'x' } } } } },
-        },
-      });
-      expect(result).toEqual({ AND: [named] });
-    });
-
-    it('a where declared at a relation visit is not composed here — lensWhere applies it per traversal', () => {
+  describe('narrowing wheres (lensWhere owns them all)', () => {
+    it('composes no narrowing wheres — root and relation wheres are applied by lensWhere in paginate', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
           root: {
             picks: ['name'],
+            where: { field: 'platformRole', operator: 'equals', value: 'superadmin' },
             relations: {
               tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
             },
@@ -527,25 +488,6 @@ describe('buildWhereClause', () => {
         },
       });
       expect(result).toEqual({});
-    });
-
-    it('fails closed (500) on a root where that needs a query plan (count operators)', () => {
-      expect(() =>
-        buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: {
-              picks: ['name'],
-              where: {
-                field: 'tokens',
-                arrayOperator: 'atLeast',
-                count: 2,
-                condition: { field: 'isActive', operator: 'equals', value: true },
-              },
-            },
-          },
-        }),
-      ).toThrow(/does not compile to a plain Prisma filter/);
     });
   });
 
@@ -557,14 +499,14 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({});
     });
 
-    it('a lens where filtering deletedAt at the root passes through untouched', () => {
+    it('a root deletedAt lens where is lensWhere business too — nothing composes here', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
           root: { picks: [], where: { field: 'deletedAt', operator: 'notEquals', value: null } },
         },
       });
-      expect(result).toEqual({ AND: [{ deletedAt: { not: null } }] });
+      expect(result).toEqual({});
     });
 
     it('a lens that picks deletedAt makes it client-filterable — explicit wins over the live scope', () => {

@@ -40,7 +40,8 @@ describe('paginate — lens bindings', () => {
     await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
 
     expect(captured.findManyArgs?.where).toEqual({
-      AND: [{}, { AND: [{ name: { equals: 'aron' } }] }],
+      AND: [{}, {}],
+      name: { equals: 'aron' },
       deletedAt: null,
     });
   });

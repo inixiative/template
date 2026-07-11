@@ -114,7 +114,7 @@ export const paginate = async <
 
   // Lens relation wheres are authorization scope — they apply for superadmin
   // too, mirroring root wheres. Live scope remains superadmin-bypassable.
-  const composed = lensWhere(filterLens, { AND: [baseWhere, searchWhere as Record<string, unknown>] });
+  const composed = await lensWhere(filterLens, { AND: [baseWhere, searchWhere as Record<string, unknown>] });
   const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
 
   if (!superadmin) {
