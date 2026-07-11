@@ -4,8 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { isRelationOperator } from '@template/shared/bracketQuery';
-import { type FieldDef, hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
+import { hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
+import { type NodeScope, walkWhere } from '#/lib/prisma/whereWalker';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 
@@ -28,60 +28,13 @@ const mentionsDeletedAt = (where: unknown): boolean => {
 const liveScope = (model: string): Record<string, unknown> | undefined =>
   hasDeletedAt(model) ? { deletedAt: null } : undefined;
 
-const appendLive = (model: string, node: Record<string, unknown>): Record<string, unknown> => {
+const liveAt: NodeScope = ({ model }, node) => {
   const live = liveScope(model);
-  if (!live || mentionsDeletedAt(node)) return node;
-  return { ...node, ...live };
+  return live && !mentionsDeletedAt(node) ? [live] : [];
 };
 
 export const liveWhere = (model: string, where: Record<string, unknown>): Record<string, unknown> =>
-  appendLive(model, walk(model, where));
-
-const walk = (model: string, node: Record<string, unknown>): Record<string, unknown> => {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(node)) {
-    if (BOOLEAN_KEYS.has(key)) {
-      out[key] = Array.isArray(value)
-        ? value.map((v) => (isPlainObject(v) ? walk(model, v) : v))
-        : isPlainObject(value)
-          ? walk(model, value)
-          : value;
-      continue;
-    }
-    const field = lookupField(model, key);
-    out[key] = field?.kind === 'object' && isPlainObject(value) ? hop(field, value) : value;
-  }
-  return out;
-};
-
-// `every` gets scope by implication — a soft-deleted row must never fail the
-// predicate. Bare `isNot` gets it as a fail-closed `is` sibling — folded
-// inside, a soft-deleted row would pass the negation.
-const hop = (field: FieldDef, value: Record<string, unknown>): Record<string, unknown> => {
-  const target = field.type;
-  if (!Object.keys(value).some(isRelationOperator)) {
-    return field.isList ? value : liveWhere(target, value);
-  }
-  const out: Record<string, unknown> = {};
-  for (const [op, opValue] of Object.entries(value)) {
-    if (!isRelationOperator(op) || !isPlainObject(opValue)) {
-      out[op] = opValue;
-    } else if (op === 'isNot') {
-      out[op] = walk(target, opValue);
-    } else if (op === 'every') {
-      const walked = walk(target, opValue);
-      const live = liveScope(target);
-      out[op] = live && !mentionsDeletedAt(walked) ? { OR: [{ NOT: live }, walked] } : walked;
-    } else {
-      out[op] = liveWhere(target, opValue);
-    }
-  }
-  if (out.isNot !== undefined && out.is === undefined) {
-    const live = liveScope(target);
-    if (live) out.is = live;
-  }
-  return out;
-};
+  walkWhere(model, where, liveAt);
 
 export const liveIncludes = (model: string, tree: Record<string, unknown>): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
@@ -108,8 +61,6 @@ export const liveIncludes = (model: string, tree: Record<string, unknown>): Reco
   return out;
 };
 
-// Parked (Aron, 2026-07-11): walk/hop are a latent generic query-args walker
-// (read-time twin of the cascade's schema walker). On a third traversal
-// use-case, extract to packages/db instead of writing another one. A full
-// db-read extension was considered and parked: superadmin awareness and
+// Parked (Aron, 2026-07-11): a full db-read extension (auto-scope every query
+// at the client layer) was considered and parked: superadmin awareness and
 // revive/tri-state flows conflict with an always-on rewrite.

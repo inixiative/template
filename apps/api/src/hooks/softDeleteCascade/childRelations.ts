@@ -40,5 +40,5 @@ export const childRelations = (model: string): ChildRelation[] => {
 };
 
 // Parked (Aron, 2026-07-11): this is a latent generic schema-graph walker
-// (write-time twin of softDeleteScope's query walker). On a third traversal
+// (write-time twin of whereWalker's query traversal). On a third traversal
 // use-case, extract to packages/db instead of writing another one.

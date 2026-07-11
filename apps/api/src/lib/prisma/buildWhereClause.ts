@@ -267,20 +267,10 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     }
   }
 
-  // Narrowing wheres compose at the root only; one declared on a relation visit
-  // is not applied — fail closed rather than silently widening row scope.
+  // Root wheres compose here unconditionally; relation-node wheres are
+  // paginate's — lensWhere folds them into every traversal of their relation.
   const byPath = projectByPath(filterLens);
   const rootKey = byPath.keys().next().value;
-  const nonRootWheres = [...byPath].filter(([key, visit]) => key !== rootKey && visit.whereClauses.length > 0);
-  if (nonRootWheres.length) {
-    throw makeError({
-      status: 500,
-      message:
-        `Narrowing wheres compose at the root only; declared at: ${nonRootWheres.map(([key]) => key).join(', ')}. ` +
-        `Move the condition into the service's where.`,
-    });
-  }
-
   const rootVisit = rootKey ? byPath.get(rootKey) : undefined;
   for (const clause of rootVisit?.whereClauses ?? []) {
     const plan = toPrisma(clause, { map: lens, mapName: rootVisit!.mapName, model });

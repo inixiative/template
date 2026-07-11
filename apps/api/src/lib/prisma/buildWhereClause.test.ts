@@ -514,20 +514,19 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({ AND: [named] });
     });
 
-    it('fails closed (500) on a where declared at a relation visit — it would not be applied', () => {
-      expect(() =>
-        buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: {
-              picks: ['name'],
-              relations: {
-                tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
-              },
+    it('a where declared at a relation visit is not composed here — lensWhere applies it per traversal', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: {
+            picks: ['name'],
+            relations: {
+              tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
             },
           },
-        }),
-      ).toThrow(/Narrowing wheres compose at the root only/);
+        },
+      });
+      expect(result).toEqual({});
     });
 
     it('fails closed (500) on a root where that needs a query plan (count operators)', () => {

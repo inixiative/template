@@ -12,6 +12,7 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+import { lensWhere } from '#/lib/prisma/lensWhere';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
@@ -111,7 +112,9 @@ export const paginate = async <
     orNullFields,
   });
 
-  const composed = { AND: [baseWhere, searchWhere as Record<string, unknown>] };
+  // Lens relation wheres are authorization scope — they apply for superadmin
+  // too, mirroring root wheres. Live scope remains superadmin-bypassable.
+  const composed = lensWhere(filterLens, { AND: [baseWhere, searchWhere as Record<string, unknown>] });
   const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
 
   if (!superadmin) {
