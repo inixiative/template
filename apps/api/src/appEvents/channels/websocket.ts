@@ -7,17 +7,14 @@ import type { WSHandoff } from '#/appEvents/types';
 import { sendToChannel, sendToUser } from '#/ws/pubsub';
 
 export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> => {
-  for (const handoff of handoffs) {
-    if ('channels' in handoff.target) {
-      for (const channel of handoff.target.channels) {
-        await sendToChannel(channel, handoff.message.data);
-      }
-    }
-
-    if ('userIds' in handoff.target) {
-      for (const userId of handoff.target.userIds) {
-        await sendToUser(userId, handoff.message.data);
-      }
-    }
-  }
+  await Promise.all(
+    handoffs.flatMap((handoff) => [
+      ...('channels' in handoff.target
+        ? handoff.target.channels.map((channel) => sendToChannel(channel, handoff.message.data))
+        : []),
+      ...('userIds' in handoff.target
+        ? handoff.target.userIds.map((userId) => sendToUser(userId, handoff.message.data))
+        : []),
+    ]),
+  );
 };

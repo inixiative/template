@@ -52,37 +52,37 @@ describe('ws subscribe probe', () => {
   });
 
   it('allows a channel whose route the connection could GET', async () => {
-    const ok = await canSubscribe({ token: 't', spoofEmail: null }, WS_CHANNELS.inquiryRead.name(inquiryId));
+    const ok = await canSubscribe({ authorization: 'Bearer t' }, WS_CHANNELS.inquiryRead.name(inquiryId));
     expect(ok).toBe(true);
   });
 
   it('rejects a channel for a resource the route 404s', async () => {
     const channel = WS_CHANNELS.inquiryRead.name('00000000-0000-0000-0000-000000000000');
-    expect(await canSubscribe({ token: 't', spoofEmail: null }, channel)).toBe(false);
+    expect(await canSubscribe({ authorization: 'Bearer t' }, channel)).toBe(false);
   });
 
   it('rejects a channel outside the registry', async () => {
-    expect(await canSubscribe({ token: 't', spoofEmail: null }, 'somethingElse:id:x')).toBe(false);
+    expect(await canSubscribe({ authorization: 'Bearer t' }, 'somethingElse:id:x')).toBe(false);
   });
 
   it('rejects a malformed channel missing the route param', async () => {
-    expect(await canSubscribe({ token: 't', spoofEmail: null }, 'inquiryRead')).toBe(false);
+    expect(await canSubscribe({ authorization: 'Bearer t' }, 'inquiryRead')).toBe(false);
   });
 
   it('resolveIdentity returns the token user as provenance of /me', async () => {
-    const me = await resolveIdentity({ token: 't', spoofEmail: null });
+    const me = await resolveIdentity({ authorization: 'Bearer t' });
     expect(me?.id).toBe(superadmin.id);
   });
 
   it('resolveIdentity honors the spoof header — identity becomes the target', async () => {
-    const me = await resolveIdentity({ token: 't', spoofEmail: targetUser.email });
+    const me = await resolveIdentity({ authorization: 'Bearer t', 'x-spoof-user-email': targetUser.email });
     expect(me?.id).toBe(targetUser.id);
   });
 
   it('a spoofed probe carries the TARGET authority, not the admin', async () => {
     const { entity: outsider } = await createUser();
     const channel = WS_CHANNELS.inquiryRead.name(inquiryId);
-    expect(await canSubscribe({ token: 't', spoofEmail: outsider.email }, channel)).toBe(false);
-    expect(await canSubscribe({ token: 't', spoofEmail: targetUser.email }, channel)).toBe(true);
+    expect(await canSubscribe({ authorization: 'Bearer t', 'x-spoof-user-email': outsider.email }, channel)).toBe(false);
+    expect(await canSubscribe({ authorization: 'Bearer t', 'x-spoof-user-email': targetUser.email }, channel)).toBe(true);
   });
 });

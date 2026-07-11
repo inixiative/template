@@ -9,6 +9,7 @@ import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';
 import { ZodError, type ZodSchema } from 'zod';
 import { type ResponseMetadata, ResponseMetadataSchema } from '#/lib/routeTemplates/responseMetadata';
+import { isAuthProbe } from '#/lib/utils/authProbe';
 import type { AppEnv } from '#/types/appEnv';
 
 type EmptyRecord = Record<never, never>;
@@ -61,7 +62,7 @@ export const makeController = <R extends RouteConfig, T>(
 
     // WS subscribe probe: reaching the controller means every auth middleware passed —
     // answer without running the handler.
-    if (c.req.header('x-auth-probe')) return c.body(null, 204) as unknown as TypedResponse;
+    if (isAuthProbe(c)) return c.body(null, 204) as unknown as TypedResponse;
 
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};

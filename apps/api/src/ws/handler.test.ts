@@ -52,7 +52,7 @@ describe('websocketHandler', () => {
   });
 
   it('subscribe indexes a probe-approved channel and confirms', async () => {
-    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', headers: { authorization: 'Bearer t1' } });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_OK }));
     expect([...(byChannel.get(CHANNEL_OK) ?? [])]).toEqual(['c1']);
@@ -68,7 +68,7 @@ describe('websocketHandler', () => {
   });
 
   it('rejects a subscribe the route denies', async () => {
-    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', headers: { authorization: 'Bearer t1' } });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_DENIED }));
     expect(byChannel.has(CHANNEL_DENIED)).toBe(false);
@@ -76,7 +76,7 @@ describe('websocketHandler', () => {
   });
 
   it('unsubscribe removes the channel and confirms', async () => {
-    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', token: 't1' });
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'u1', headers: { authorization: 'Bearer t1' } });
     websocketHandler.open(socket);
     await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: CHANNEL_OK }));
     await websocketHandler.message(socket, JSON.stringify({ action: 'unsubscribe', channel: CHANNEL_OK }));
@@ -95,18 +95,18 @@ describe('websocketHandler', () => {
   it('authenticate resolves identity as provenance of the token (/me)', async () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', token: VALID_TOKEN }));
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization: `Bearer ${VALID_TOKEN}` } }));
     expect(socket.data.userId).toBe('id-self@x.com');
-    expect(socket.data.token).toBe(VALID_TOKEN);
+    expect(socket.data.headers.authorization).toBe(`Bearer ${VALID_TOKEN}`);
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-self@x.com' });
   });
 
   it('authenticate with a rejected token resolves to a null identity', async () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', token: 'not-a-token' }));
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization: 'Bearer not-a-token' } }));
     expect(socket.data.userId).toBeNull();
-    expect(socket.data.token).toBeNull();
+    expect(socket.data.headers).toEqual({});
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
   });
 
@@ -115,19 +115,19 @@ describe('websocketHandler', () => {
     websocketHandler.open(socket);
     await websocketHandler.message(
       socket,
-      JSON.stringify({ action: 'spoof', token: VALID_TOKEN, email: 'target@x.com' }),
+      JSON.stringify({ action: 'authenticate', headers: { authorization: `Bearer ${VALID_TOKEN}`, 'x-spoof-user-email': 'target@x.com' } }),
     );
     expect(socket.data.userId).toBe('id-target@x.com');
-    expect(socket.data.spoofEmail).toBe('target@x.com');
+    expect(socket.data.headers['x-spoof-user-email']).toBe('target@x.com');
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-target@x.com' });
   });
 
   it('rejects a spoof the API does not honor, keeping the previous state', async () => {
-    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'id-self@x.com', token: VALID_TOKEN });
+    const { socket, sent } = createTestSocket({ connectionId: 'c1', userId: 'id-self@x.com', headers: { authorization: `Bearer ${VALID_TOKEN}` } });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'spoof', token: VALID_TOKEN, email: UNSPOOFABLE }));
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization: `Bearer ${VALID_TOKEN}`, 'x-spoof-user-email': UNSPOOFABLE } }));
     expect(socket.data.userId).toBe('id-self@x.com');
-    expect(socket.data.spoofEmail).toBeNull();
+    expect(socket.data.headers['x-spoof-user-email']).toBeUndefined();
     expect(lastFrame(sent)).toEqual({ type: 'spoofRejected' });
   });
 
@@ -135,13 +135,12 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({
       connectionId: 'c1',
       userId: 'id-target@x.com',
-      token: VALID_TOKEN,
-      spoofEmail: 'target@x.com',
+      headers: { authorization: `Bearer ${VALID_TOKEN}`, 'x-spoof-user-email': 'target@x.com' },
     });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'unspoof', token: VALID_TOKEN }));
+    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization: `Bearer ${VALID_TOKEN}` } }));
     expect(socket.data.userId).toBe('id-self@x.com');
-    expect(socket.data.spoofEmail).toBeNull();
+    expect(socket.data.headers['x-spoof-user-email']).toBeUndefined();
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: 'id-self@x.com' });
   });
 

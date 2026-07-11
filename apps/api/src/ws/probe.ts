@@ -5,36 +5,48 @@
  * @uses feature:auth
  */
 import { parseChannelKey, WS_CHANNELS } from '@template/shared/ws';
-import type { WSData } from '#/ws/types';
+import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 
-// Injected at boot — a direct app import would drag the route graph into every ws unit test.
+// The connection's credential: the same headers an HTTP request would carry.
+export type WSHeaders = Record<string, string>;
+
+// Only credential headers cross from the socket into internal requests — a client must never
+// smuggle x-auth-probe or anything else.
+const ALLOWED_HEADERS = new Set(['authorization', 'x-spoof-user-email']);
+
+export const sanitizeWSHeaders = (headers: unknown): WSHeaders => {
+  if (typeof headers !== 'object' || headers === null) return {};
+  const out: WSHeaders = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const name = key.toLowerCase();
+    if (ALLOWED_HEADERS.has(name) && typeof value === 'string') out[name] = value;
+  }
+  return out;
+};
+
 type ProbeApp = { request: (path: string, init?: RequestInit) => Promise<Response> | Response };
 let probeApp: ProbeApp | null = null;
 let operations: Map<string, { method: string; path: string }> | null = null;
 
+// Tests inject a harness; production lazily uses the real app.
 export const setProbeApp = (app: ProbeApp): void => {
   probeApp = app;
   operations = null;
 };
 
-const getProbeApp = (): ProbeApp => {
-  if (!probeApp) throw new Error('WS probe app not set — call setProbeApp at boot');
+const getProbeApp = async (): Promise<ProbeApp> => {
+  if (!probeApp) {
+    const { app } = await import('#/app');
+    probeApp = { request: (path, init) => app.fetch(new Request(`http://internal${path}`, init)) };
+  }
   return probeApp;
 };
 
-export type WSCredential = Pick<WSData, 'token' | 'spoofEmail'>;
-
-const credentialHeaders = (credential: WSCredential): Record<string, string> => {
-  const headers: Record<string, string> = {};
-  if (credential.token) headers.authorization = `Bearer ${credential.token}`;
-  if (credential.spoofEmail) headers['x-spoof-user-email'] = credential.spoofEmail;
-  return headers;
-};
-
 // Identity is provenance of the credential: /me through the API's own auth + spoof middleware.
-export const resolveIdentity = async (credential: WSCredential): Promise<{ id: string; email: string } | null> => {
-  if (!credential.token) return null;
-  const res = await getProbeApp().request('/api/v1/me', { headers: credentialHeaders(credential) });
+export const resolveIdentity = async (headers: WSHeaders): Promise<{ id: string; email: string } | null> => {
+  if (!headers.authorization) return null;
+  const app = await getProbeApp();
+  const res = await app.request('/api/v1/me', { headers });
   if (!res.ok) return null;
   const body = (await res.json()) as { data?: { id?: string; email?: string } };
   return body.data?.id ? { id: body.data.id, email: body.data.email ?? '' } : null;
@@ -56,8 +68,8 @@ const loadOperations = async (app: ProbeApp): Promise<Map<string, { method: stri
 
 // A query channel is authorized by its own route: probe the operation with the connection's
 // credential — 2xx over HTTP means the caller may watch it.
-export const canSubscribe = async (credential: WSCredential, channel: string): Promise<boolean> => {
-  const app = getProbeApp();
+export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {
+  const app = await getProbeApp();
   const key = parseChannelKey(channel);
   if (!(key._id in WS_CHANNELS)) return false;
   const op = (await loadOperations(app)).get(key._id);
@@ -66,13 +78,15 @@ export const canSubscribe = async (credential: WSCredential, channel: string): P
   let path = op.path;
   for (const [field, value] of Object.entries(key.path ?? {})) {
     const filled = encodeURIComponent(String(value));
-    path = path.replace(`{${field}}`, filled).replace(`:${field}`, filled);
+    const next = path.replace(`{${field}}`, filled).replace(`:${field}`, filled);
+    if (next === path) return false; // surplus segment — not a param of this route
+    path = next;
   }
   if (path.includes('{') || path.includes('/:')) return false;
 
   const res = await app.request(path, {
     method: op.method,
-    headers: { ...credentialHeaders(credential), 'x-auth-probe': '1' },
+    headers: { ...headers, [AUTH_PROBE_HEADER]: AUTH_PROBE_SECRET },
   });
   return res.ok;
 };

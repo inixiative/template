@@ -72,9 +72,14 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
         pongTimer = setTimeout(() => socket.reconnect(), PONG_TIMEOUT_MS);
       }, HEARTBEAT_MS);
     },
-    authenticate: (token) => sendIdentity({ action: 'authenticate', token }),
-    spoof: (token, email) => sendIdentity({ action: 'spoof', token, email }),
-    unspoof: (token) => sendIdentity({ action: 'unspoof', token }),
+    // Credentials ride as the same headers an HTTP request carries; spoofing is just a header.
+    authenticate: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
+    spoof: (token, email) =>
+      sendIdentity({
+        action: 'authenticate',
+        headers: { authorization: `Bearer ${token}`, 'x-spoof-user-email': email },
+      }),
+    unspoof: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
     logout: () => sendIdentity(null),
     subscribe: (channel) => {
       const refs = channels.get(channel) ?? 0;
