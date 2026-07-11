@@ -8,7 +8,7 @@ import { WS_CHANNELS } from '@template/shared/ws';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { inquiryRouter } from '#/modules/inquiry';
 import { meRouter } from '#/modules/me';
-import { canSubscribe, resolveIdentity, setProbeApp } from '#/ws/probe';
+import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createTestApp } from '#tests/createTestApp';
 
 describe('ws subscribe probe', () => {
@@ -30,7 +30,6 @@ describe('ws subscribe probe', () => {
       ],
     });
     harness.app.doc31('/openapi/docs', { openapi: '3.1.0', info: { title: 'test', version: '0' } });
-    setProbeApp({ request: (path, init) => harness.fetch(new Request(`http://test${path}`, init)) });
     db = harness.db;
 
     const { entity: sourceOrganization } = await createOrganization();
