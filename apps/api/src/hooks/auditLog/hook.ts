@@ -2,8 +2,9 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import { DbAction, db, HookTiming, isAuditEnabled, Prisma, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { castArray, compact } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
-import { buildPreviousById, isManyAction, toArray } from '#/hooks/shared/hookRows';
+import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
 const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
   previous?.deletedAt == null && record?.deletedAt != null;
@@ -109,7 +110,7 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
 
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
-    const results = toArray(result) as (Record<string, unknown> & { id: string })[];
+    const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
     const previousById = buildPreviousById(previous);
 
     for (const record of results) {
