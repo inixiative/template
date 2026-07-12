@@ -18,6 +18,19 @@ ENDPOINT="${STORAGE_ENDPOINT:-http://localhost:9000}"
 KEY="${STORAGE_ACCESS_KEY_ID:-minioadmin}"
 SECRET="${STORAGE_SECRET_ACCESS_KEY:-minioadmin}"
 
+# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
+# (matches the resolver in scripts/worktree/create.sh). Without this, the
+# readiness probe below fails with command-not-found and misreports the
+# endpoint as unreachable.
+if command -v docker >/dev/null 2>&1; then
+  DOCKER="docker"
+elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
+  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
+else
+  echo "  MinIO: docker binary not found — skipping bucket provisioning." >&2
+  exit 0
+fi
+
 # Inside a container, localhost means the container — rewrite to host.docker.internal
 # so we reach the host-published minio port (works on Docker Desktop + Linux via
 # the --add-host gateway below).
@@ -26,7 +39,7 @@ SCHEME="${HOST_ENDPOINT%%://*}"
 HOSTPORT="${HOST_ENDPOINT#*://}"
 
 mc() {
-  docker run --rm --add-host=host.docker.internal:host-gateway \
+  "$DOCKER" run --rm --add-host=host.docker.internal:host-gateway \
     -e MC_HOST_local="${SCHEME}://${KEY}:${SECRET}@${HOSTPORT}" \
     minio/mc:latest "$@"
 }

@@ -30,6 +30,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
+# (a minimal `bun run` PATH in particular misses it), so fall back to the
+# app-bundle path. DB/Redis/MinIO steps below route through "$DOCKER"; if it
+# can't be resolved the existing `if "$DOCKER" ps` guards skip gracefully.
+DOCKER=""
+if command -v docker >/dev/null 2>&1; then
+  DOCKER="docker"
+elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
+  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
+fi
+
 # Portable in-place sed (BSD vs GNU)
 sedi() {
   if sed --version >/dev/null 2>&1; then sed -i "$@"; else sed -i '' "$@"; fi
@@ -301,11 +312,11 @@ localize_app_envs test "$DB_TEST"
 # 6. Create Postgres databases
 # ---------------------------------------------------------------------------
 echo -e "${BLUE}Creating Postgres databases on $PG_CONTAINER...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
   for DB in "$DB_LOCAL" "$DB_TEST"; do
-    docker exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB}'" \
+    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB}'" \
       | grep -q 1 \
-      || docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE \"${DB}\""
+      || "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE \"${DB}\""
   done
   echo -e "${GREEN}Created: $DB_LOCAL, $DB_TEST${NC}"
 else
@@ -346,8 +357,8 @@ echo -e "${BLUE}Pushing Prisma schema to local + test DBs...${NC}"
 # 9. Smoke-test DB connectivity (confirms the slot's local DB is reachable)
 # ---------------------------------------------------------------------------
 echo -e "${BLUE}Verifying DB connectivity...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-  DB_PING="$(docker exec "$PG_CONTAINER" psql -U postgres -d "$DB_LOCAL" -tAc "SELECT 1;" 2>/dev/null || true)"
+if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+  DB_PING="$("$DOCKER" exec "$PG_CONTAINER" psql -U postgres -d "$DB_LOCAL" -tAc "SELECT 1;" 2>/dev/null || true)"
   if [ "$DB_PING" = "1" ]; then
     echo -e "${GREEN}DB reachable: $DB_LOCAL${NC}"
   else
