@@ -8,7 +8,6 @@ import { claimLane, db, laneKey } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
-import { uuidv7 } from 'uuidv7';
 import type { JobPayloads } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
@@ -47,7 +46,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   // return unrun, like the queue still holding them. To test one, call the
   // handler directly.
   if (isTest) {
-    const jobId = id ?? uuidv7();
+    const jobId = id ?? Bun.randomUUIDv7();
     if (jobOptions.delay !== undefined) {
       log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
       return { jobId, name: handlerName };
@@ -62,7 +61,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
-  const jobId = jobOptions.jobId ?? uuidv7();
+  const jobId = jobOptions.jobId ?? Bun.randomUUIDv7();
 
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {

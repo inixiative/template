@@ -8,7 +8,6 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { uuidv7 } from 'uuidv7';
 import { adminAuthProviderRouter, authProviderRouter } from '#/modules/authProvider';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
@@ -406,7 +405,7 @@ describe('AuthProvider Endpoints', () => {
     });
 
     it('returns 404 for non-existent provider', async () => {
-      const response = await userFetch(del(`/api/v1/authProvider/${uuidv7()}`));
+      const response = await userFetch(del(`/api/v1/authProvider/${Bun.randomUUIDv7()}`));
       expect(response.status).toBe(404);
     });
   });
