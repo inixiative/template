@@ -20,6 +20,7 @@ const createLogObserveAdapter = (): ObserveAdapter => ({
 const createDbObserveAdapter = (): ObserveAdapter => ({
   record: async (event) => {
     await enqueueJob('recordAppEvent', {
+      id: event.id,
       name: event.name,
       actor: event.actor,
       data: event.data,

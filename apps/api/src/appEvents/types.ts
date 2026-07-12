@@ -15,10 +15,10 @@ export type AppEventActor = {
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
+  id: string;
   name: string;
   actor: AppEventActor;
   data: T;
-  timestamp: string;
 };
 
 export type EmailHandoff = {

@@ -9,17 +9,21 @@ import type { AppEventActor, ObserveData } from '#/appEvents/types';
 import { makeJob } from '#/jobs/makeJob';
 
 export type RecordAppEventPayload = {
+  id: string;
   name: string;
   actor: AppEventActor;
   data: ObserveData;
 };
 
 export const recordAppEvent = makeJob<RecordAppEventPayload>(async (ctx, payload) => {
-  const { name, actor, data } = payload;
+  const { id, name, actor, data } = payload;
   const { db } = ctx;
 
-  await db.appEvent.create({
-    data: {
+  await db.appEvent.upsert({
+    where: { id },
+    update: {},
+    create: {
+      id,
       name,
       actorUserId: actor.actorUserId,
       actorSpoofUserId: actor.actorSpoofUserId,

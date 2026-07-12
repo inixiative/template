@@ -4,6 +4,7 @@ import type { AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
 
 const createEvent = (name: string, data: Record<string, unknown>): AppEventPayload => ({
+  id: Bun.randomUUIDv7(),
   name,
   actor: {
     actorUserId: 'user-1',
@@ -15,7 +16,6 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
     sourceInquiryId: null,
   },
   data,
-  timestamp: new Date().toISOString(),
 });
 
 describe('makeAppEvent', () => {
