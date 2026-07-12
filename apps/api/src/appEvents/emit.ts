@@ -2,15 +2,13 @@
  * @atlas
  * @kind entrypoint
  * @partOf primitive:appEvents
- * @uses infrastructure:prisma, infrastructure:observability
+ * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
-import { log } from '@template/shared/logger';
 import type { AppEventPayloads } from '#/appEvents/handlers';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { AppEventPayload } from '#/appEvents/types';
-import { observeRegistry } from '#/lib/observe';
 
 export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   name: K,
@@ -25,20 +23,12 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
     timestamp: new Date().toISOString(),
   };
 
-  const run = async () => {
-    try {
-      await observeRegistry.broadcast((adapter) => adapter.record(event));
-    } catch (err) {
-      log.error(`appEvent observe failed: ${name}`, err);
-    }
-
-    const handler = appEventHandlers[name];
-    if (handler) await handler(event);
-  };
+  const handler = appEventHandlers[name];
+  if (!handler) return;
 
   if (db.isInTxn()) {
-    db.onCommit(run);
+    db.onCommit(() => handler(event));
   } else {
-    await run();
+    await handler(event);
   }
 };

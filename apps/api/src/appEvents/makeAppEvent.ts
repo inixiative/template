@@ -8,6 +8,7 @@
 import { deliverEmailHandoffs } from '#/appEvents/channels/email';
 import { deliverWSHandoffs } from '#/appEvents/channels/websocket';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
+import { observeRegistry } from '#/lib/observe';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 
@@ -25,7 +26,7 @@ const throwIfFailures = (errors: unknown[]): void => {
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<void>[] = [];
+    const tasks: Promise<unknown>[] = [observeRegistry.broadcast((adapter) => adapter.record(event))];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the

@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { AppEventPayload } from '#/appEvents/types';
+import { observeRegistry } from '#/lib/observe';
 
 const createEvent = (name: string, data: Record<string, unknown>): AppEventPayload => ({
   name,
@@ -18,8 +19,44 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
 });
 
 describe('makeAppEvent', () => {
+  const observed: AppEventPayload[] = [];
+  beforeAll(() => {
+    observeRegistry.register('test-recorder', {
+      record: async (event) => {
+        observed.push(event);
+      },
+    });
+  });
+  afterAll(() => observeRegistry.unregister('test-recorder'));
+  afterEach(() => {
+    observed.length = 0;
+  });
+
   it('returns a handler function', () => {
     expect(typeof makeAppEvent({})).toBe('function');
+  });
+
+  describe('observe', () => {
+    it('broadcasts the full envelope for every handled event', async () => {
+      const handler = makeAppEvent<{ foo: string }>({});
+
+      await handler(createEvent('test', { foo: 'bar' }));
+
+      expect(observed).toHaveLength(1);
+      expect(observed[0].name).toBe('test');
+      expect(observed[0].data).toEqual({ foo: 'bar' });
+      expect(observed[0].actor.actorUserId).toBe('user-1');
+    });
+
+    it('broadcasts alongside other channels', async () => {
+      const handler = makeAppEvent<{ foo: string }>({
+        email: () => [{ template: 'test', data: {} }],
+      });
+
+      await handler(createEvent('test', { foo: 'bar' }));
+
+      expect(observed).toHaveLength(1);
+    });
   });
 
   describe('email', () => {
