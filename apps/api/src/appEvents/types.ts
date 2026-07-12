@@ -36,8 +36,6 @@ export type WSHandoff = {
   message: { data: Record<string, unknown> };
 };
 
-export type ObserveData = Record<string, unknown>;
-
 export type ObserveAdapter = {
   record: (event: AppEventPayload) => Promise<void>;
 };

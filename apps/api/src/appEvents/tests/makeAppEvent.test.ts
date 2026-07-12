@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
@@ -28,8 +29,9 @@ describe('makeAppEvent', () => {
     });
   });
   afterAll(() => observeRegistry.unregister('test-recorder'));
-  afterEach(() => {
+  afterEach(async () => {
     observed.length = 0;
+    await db.appEvent.deleteMany({ where: { name: 'test' } });
   });
 
   it('returns a handler function', () => {
@@ -56,6 +58,19 @@ describe('makeAppEvent', () => {
       await handler(createEvent('test', { foo: 'bar' }));
 
       expect(observed).toHaveLength(1);
+    });
+
+    it('upserts the AppEvent row keyed by the envelope id', async () => {
+      const event = createEvent('test', { foo: 'db' });
+
+      await makeAppEvent({})(event);
+      await makeAppEvent({})(event);
+
+      const rows = await db.appEvent.findMany({ where: { name: 'test' } });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(event.id);
+      expect(rows[0].data).toEqual({ foo: 'db' });
+      expect(rows[0].actorUserId).toBe('user-1');
     });
   });
 

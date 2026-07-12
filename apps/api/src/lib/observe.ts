@@ -2,13 +2,13 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:observability, primitive:adapter
- * @uses primitive:appEvents, primitive:jobs
+ * @uses primitive:appEvents, infrastructure:prisma
  */
 
+import { db } from '@template/db';
 import { makeBroadcastRegistry } from '@template/shared/adapter';
 import { log } from '@template/shared/logger';
 import type { ObserveAdapter } from '#/appEvents/types';
-import { enqueueJob } from '#/jobs/enqueue';
 
 const createLogObserveAdapter = (): ObserveAdapter => ({
   record: (event) => {
@@ -19,11 +19,23 @@ const createLogObserveAdapter = (): ObserveAdapter => ({
 
 const createDbObserveAdapter = (): ObserveAdapter => ({
   record: async (event) => {
-    await enqueueJob('recordAppEvent', {
-      id: event.id,
-      name: event.name,
-      actor: event.actor,
-      data: event.data,
+    const { actorUserId, actorSpoofUserId, actorTokenId, actorJobName, ipAddress, userAgent, sourceInquiryId } =
+      event.actor;
+    await db.appEvent.upsert({
+      where: { id: event.id },
+      update: {},
+      create: {
+        id: event.id,
+        name: event.name,
+        actorUserId,
+        actorSpoofUserId,
+        actorTokenId,
+        actorJobName,
+        ipAddress,
+        userAgent,
+        sourceInquiryId,
+        data: event.data as object,
+      },
     });
   },
 });
