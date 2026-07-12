@@ -26,22 +26,7 @@ const throwIfFailures = (errors: unknown[]): void => {
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<void>[] = [];
-
-    // Wrap each channel in an async IIFE so a synchronous throw from the
-    // user-supplied selector (handler.observe(data) etc.) becomes a Promise
-    // rejection captured by Promise.allSettled below — otherwise it would
-    // bubble before sibling channels enqueue, breaking channel isolation.
-    if (handler.observe) {
-      tasks.push(
-        (async () => {
-          const observeData = handler.observe!(data);
-          if (observeData) {
-            await observeRegistry.broadcast((adapter) => adapter.record(event, observeData));
-          }
-        })(),
-      );
-    }
+    const tasks: Promise<unknown>[] = [observeRegistry.broadcast((adapter) => adapter.record(event))];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the

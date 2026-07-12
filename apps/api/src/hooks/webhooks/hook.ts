@@ -12,7 +12,9 @@ import {
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
+import { castArray, compact } from 'lodash-es';
 import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
+import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -41,9 +43,6 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
     });
   });
 };
-
-const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
 
 const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): WebhookAction => {
   if (dbAction === DbAction.upsert) {
@@ -125,14 +124,8 @@ export const registerWebhookHook = () => {
 
       if (isManyAction(dbAction)) {
         const { result, previous } = options as HookOptions & { action: ManyAction };
-        const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-        const previouses = (previous ?? []) as Record<string, unknown>[];
-
-        // Build a map of previous records by id for efficient lookup
-        const previousById = new Map<string, Record<string, unknown>>();
-        for (const prev of previouses) {
-          if (prev.id) previousById.set(prev.id as string, prev);
-        }
+        const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+        const previousById = buildPreviousById(previous);
 
         for (const resultData of results) {
           const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));

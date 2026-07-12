@@ -2,7 +2,9 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import { DbAction, db, HookTiming, isAuditEnabled, Prisma, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { castArray, compact } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
 const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
   previous?.deletedAt == null && record?.deletedAt != null;
@@ -24,9 +26,6 @@ const dbActionToAuditAction = (
   if (dbAction === DbAction.deleteMany) return AuditAction.delete;
   return AuditAction.delete;
 };
-
-const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
 
 const isDeleteAction = (action: DbAction): action is DbAction.delete | DbAction.deleteMany =>
   action === DbAction.delete || action === DbAction.deleteMany;
@@ -111,9 +110,8 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
 
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
-    const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-    const previouses = (previous ?? []) as Record<string, unknown>[];
-    const previousById = new Map(previouses.map((p) => [p.id as string, p]));
+    const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+    const previousById = buildPreviousById(previous);
 
     for (const record of results) {
       const prev = previousById.get(record.id);

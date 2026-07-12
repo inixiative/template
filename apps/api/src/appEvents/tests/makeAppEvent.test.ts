@@ -1,9 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
-import type { AppEventPayload, ObserveData } from '#/appEvents/types';
+import type { AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
 
 const createEvent = (name: string, data: Record<string, unknown>): AppEventPayload => ({
+  id: Bun.randomUUIDv7(),
   name,
   actor: {
     actorUserId: 'user-1',
@@ -15,24 +17,21 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
     sourceInquiryId: null,
   },
   data,
-  timestamp: new Date().toISOString(),
 });
 
 describe('makeAppEvent', () => {
-  // A real recording observe adapter — lets us assert that makeAppEvent dispatches
-  // selector output through the real registry (broadcast → adapter.record), rather
-  // than spying on the selector. Registered alongside the default 'db' adapter.
-  const observed: Array<{ event: AppEventPayload; data: ObserveData }> = [];
+  const observed: AppEventPayload[] = [];
   beforeAll(() => {
     observeRegistry.register('test-recorder', {
-      record: async (event, data) => {
-        observed.push({ event, data });
+      record: async (event) => {
+        observed.push(event);
       },
     });
   });
   afterAll(() => observeRegistry.unregister('test-recorder'));
-  afterEach(() => {
+  afterEach(async () => {
     observed.length = 0;
+    await db.appEvent.deleteMany({ where: { name: 'test' } });
   });
 
   it('returns a handler function', () => {
@@ -40,22 +39,38 @@ describe('makeAppEvent', () => {
   });
 
   describe('observe', () => {
-    it('dispatches the selector output through the observe registry', async () => {
-      const handler = makeAppEvent<{ foo: string }>({ observe: (data) => ({ tag: data.foo }) });
+    it('broadcasts the full envelope for every handled event', async () => {
+      const handler = makeAppEvent<{ foo: string }>({});
 
       await handler(createEvent('test', { foo: 'bar' }));
 
       expect(observed).toHaveLength(1);
-      expect(observed[0].data).toEqual({ tag: 'bar' });
-      expect(observed[0].event.name).toBe('test');
+      expect(observed[0].name).toBe('test');
+      expect(observed[0].data).toEqual({ foo: 'bar' });
+      expect(observed[0].actor.actorUserId).toBe('user-1');
     });
 
-    it('skips dispatch when the selector returns null', async () => {
-      const handler = makeAppEvent({ observe: () => null });
+    it('broadcasts alongside other channels', async () => {
+      const handler = makeAppEvent<{ foo: string }>({
+        email: () => [{ template: 'test', data: {} }],
+      });
 
-      await handler(createEvent('test', {}));
+      await handler(createEvent('test', { foo: 'bar' }));
 
-      expect(observed).toHaveLength(0);
+      expect(observed).toHaveLength(1);
+    });
+
+    it('upserts the AppEvent row keyed by the envelope id', async () => {
+      const event = createEvent('test', { foo: 'db' });
+
+      await makeAppEvent({})(event);
+      await makeAppEvent({})(event);
+
+      const rows = await db.appEvent.findMany({ where: { name: 'test' } });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(event.id);
+      expect(rows[0].data).toEqual({ foo: 'db' });
+      expect(rows[0].actorUserId).toBe('user-1');
     });
   });
 
@@ -122,8 +137,8 @@ describe('makeAppEvent', () => {
     it('one channel failing does not prevent others from running, but still rejects', async () => {
       let cbRan = false;
       const handler = makeAppEvent({
-        observe: () => {
-          throw new Error('observe boom');
+        email: () => {
+          throw new Error('email boom');
         },
         cb: [
           async () => {
@@ -132,7 +147,7 @@ describe('makeAppEvent', () => {
         ],
       });
 
-      await expect(handler(createEvent('test', {}))).rejects.toThrow('observe boom');
+      await expect(handler(createEvent('test', {}))).rejects.toThrow('email boom');
       expect(cbRan).toBe(true);
     });
 

@@ -15,10 +15,10 @@ export type AppEventActor = {
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
+  id: string;
   name: string;
   actor: AppEventActor;
   data: T;
-  timestamp: string;
 };
 
 export type EmailHandoff = {
@@ -36,16 +36,13 @@ export type WSHandoff = {
   message: { data: Record<string, unknown> };
 };
 
-export type ObserveData = Record<string, unknown>;
-
 export type ObserveAdapter = {
-  record: (event: AppEventPayload, data: ObserveData) => Promise<void>;
+  record: (event: AppEventPayload) => Promise<void>;
 };
 
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
-  observe?: (data: T) => ObserveData | null;
 
   cb?: Array<(data: T) => Promise<void> | void>;
 };

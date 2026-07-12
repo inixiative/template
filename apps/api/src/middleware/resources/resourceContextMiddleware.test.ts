@@ -8,7 +8,6 @@ import {
   type User,
 } from '@template/db';
 import { cleanupTouchedTables, createCronJob, createOrganization, createUser } from '@template/db/test';
-import { uuidv7 } from 'uuidv7';
 import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
@@ -107,7 +106,7 @@ describe('resourceContextMiddleware', () => {
   });
 
   it('returns 404 when the uuid is well-formed but no row matches', async () => {
-    const response = await fetch(get(`/api/v1/organization/${uuidv7()}`));
+    const response = await fetch(get(`/api/v1/organization/${Bun.randomUUIDv7()}`));
     expect(response.status).toBe(404);
   });
 
