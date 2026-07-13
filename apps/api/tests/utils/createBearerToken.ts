@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { createToken } from '@template/db/test';
 
 // A real Token row plus its raw key — the credential external callers (MCP, integrations)

@@ -28,42 +28,42 @@ describe('liveWhere', () => {
   });
 
   it('a deletedAt under a relation key does not count as a root mention', () => {
-    expect(liveWhere('Token', { user: { deletedAt: null } })).toEqual({
+    expect(liveWhere('Contact', { user: { deletedAt: null } })).toEqual({
       user: { deletedAt: null },
       deletedAt: null,
     });
   });
 
   it('scopes a to-many `some` hop and the root', () => {
-    expect(liveWhere('User', { tokens: { some: { name: 'x' } } })).toEqual({
-      tokens: { some: { name: 'x', deletedAt: null } },
+    expect(liveWhere('User', { contacts: { some: { name: 'x' } } })).toEqual({
+      contacts: { some: { name: 'x', deletedAt: null } },
       deletedAt: null,
     });
   });
 
   it('scopes inside `none` — deleted rows cannot satisfy the predicate', () => {
-    expect(liveWhere('User', { tokens: { none: { name: 'x' } } })).toEqual({
-      tokens: { none: { name: 'x', deletedAt: null } },
+    expect(liveWhere('User', { contacts: { none: { name: 'x' } } })).toEqual({
+      contacts: { none: { name: 'x', deletedAt: null } },
       deletedAt: null,
     });
   });
 
   it('`every` gets scope by implication: deleted rows never fail it', () => {
-    expect(liveWhere('User', { tokens: { every: { name: 'x' } } })).toEqual({
-      tokens: { every: { OR: [{ NOT: LIVE }, { name: 'x' }] } },
+    expect(liveWhere('User', { contacts: { every: { name: 'x' } } })).toEqual({
+      contacts: { every: { OR: [{ NOT: LIVE }, { name: 'x' }] } },
       deletedAt: null,
     });
   });
 
   it('bare `isNot` gets a fail-closed `is` sibling', () => {
-    expect(liveWhere('Token', { user: { isNot: { name: 'x' } } })).toEqual({
+    expect(liveWhere('Contact', { user: { isNot: { name: 'x' } } })).toEqual({
       user: { isNot: { name: 'x' }, is: LIVE },
       deletedAt: null,
     });
   });
 
   it('bare to-one shorthand scopes the target node', () => {
-    expect(liveWhere('Token', { user: { name: 'x' } })).toEqual({
+    expect(liveWhere('Contact', { user: { name: 'x' } })).toEqual({
       user: { name: 'x', deletedAt: null },
       deletedAt: null,
     });
@@ -77,15 +77,15 @@ describe('liveWhere', () => {
   });
 
   it('an explicit deletedAt at a hop wins at that node only', () => {
-    expect(liveWhere('User', { tokens: { some: { deletedAt: { not: null } } } })).toEqual({
-      tokens: { some: { deletedAt: { not: null } } },
+    expect(liveWhere('User', { contacts: { some: { deletedAt: { not: null } } } })).toEqual({
+      contacts: { some: { deletedAt: { not: null } } },
       deletedAt: null,
     });
   });
 
   it('boolean combinators stay on the same model', () => {
-    expect(liveWhere('User', { OR: [{ tokens: { some: { name: 'x' } } }, { name: 'y' }] })).toEqual({
-      OR: [{ tokens: { some: { name: 'x', deletedAt: null } } }, { name: 'y' }],
+    expect(liveWhere('User', { OR: [{ contacts: { some: { name: 'x' } } }, { name: 'y' }] })).toEqual({
+      OR: [{ contacts: { some: { name: 'x', deletedAt: null } } }, { name: 'y' }],
       deletedAt: null,
     });
   });
@@ -101,33 +101,33 @@ describe('liveWhere', () => {
 
 describe('liveIncludes', () => {
   it('a bare to-many include grows a live-scope where; to-one and column-less stay bare', () => {
-    expect(liveIncludes('User', { tokens: true, sessions: true })).toEqual({
-      tokens: { where: LIVE },
+    expect(liveIncludes('User', { contacts: true, sessions: true })).toEqual({
+      contacts: { where: LIVE },
       sessions: true,
     });
   });
 
   it('an existing include where is walked and scoped', () => {
-    expect(liveIncludes('User', { tokens: { where: { isActive: true } } })).toEqual({
-      tokens: { where: { isActive: true, deletedAt: null } },
+    expect(liveIncludes('User', { contacts: { where: { isActive: true } } })).toEqual({
+      contacts: { where: { isActive: true, deletedAt: null } },
     });
   });
 
   it('an explicit deletedAt on a level wins', () => {
-    expect(liveIncludes('User', { tokens: { where: { deletedAt: { not: null } } } })).toEqual({
-      tokens: { where: { deletedAt: { not: null } } },
+    expect(liveIncludes('User', { contacts: { where: { deletedAt: { not: null } } } })).toEqual({
+      contacts: { where: { deletedAt: { not: null } } },
     });
   });
 
   it('recurses through nested include trees', () => {
-    expect(liveIncludes('User', { tokens: { include: { user: true } } })).toEqual({
-      tokens: { where: LIVE, include: { user: true } },
+    expect(liveIncludes('User', { contacts: { include: { user: true } } })).toEqual({
+      contacts: { where: LIVE, include: { user: true } },
     });
   });
 
   it('non-relation entries pass through', () => {
-    expect(liveIncludes('User', { _count: { select: { tokens: true } } })).toEqual({
-      _count: { select: { tokens: true } },
+    expect(liveIncludes('User', { _count: { select: { contacts: true } } })).toEqual({
+      _count: { select: { contacts: true } },
     });
   });
 });
