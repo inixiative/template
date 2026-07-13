@@ -7,6 +7,8 @@ const baseAuditLog = {
   actorUserId: null,
   actorSpoofUserId: null,
   actorTokenId: null,
+  actorTokenName: null,
+  actorTokenKeyPrefix: null,
   actorJobName: null,
   integrationId: null,
   ipAddress: null,

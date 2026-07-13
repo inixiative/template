@@ -208,7 +208,51 @@ describe('auditLog hook', () => {
     });
 
     expect(log?.actorTokenId).toBe(token.id);
+    expect(log?.actorTokenName).toBe(token.name);
+    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
     expect(log?.actorUserId).toBe(tokenOwner.id);
+  });
+
+  it('keeps the token snapshot after the acting token is deleted', async () => {
+    const { entity: tokenOwner } = await createUser();
+    const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const mockToken: TokenWithRelations = {
+      ...token,
+      user: tokenOwner,
+      organization: null,
+      organizationUser: null,
+      space: null,
+      spaceUser: null,
+    };
+    const ts = Date.now();
+
+    const { fetch } = createTestApp({
+      mockUser: tokenOwner,
+      mockToken,
+      mount: [
+        (app) => {
+          app.use('*', auditActorMiddleware);
+          app.post('/test/user', async (c) => {
+            const user = await db.user.create({ data: { email: `audit-token-deleted-${ts}@example.com` } });
+            return c.json({ id: user.id });
+          });
+        },
+      ],
+    });
+
+    const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
+    const { id } = await res.json<{ id: string }>();
+
+    await db.token.delete({ where: { id: token.id } });
+
+    const log = await db.auditLog.findFirst({
+      where: { subjectUserId: id, action: AuditAction.create },
+      orderBy: { id: 'desc' },
+    });
+
+    expect(log?.actorTokenId).toBeNull();
+    expect(log?.actorTokenName).toBe(token.name);
+    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
   });
 
   it('records actorJobName when set in context', async () => {

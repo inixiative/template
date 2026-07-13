@@ -85,6 +85,8 @@ const buildAuditEntry = (
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,
+    actorTokenName: actor?.actorTokenName ?? null,
+    actorTokenKeyPrefix: actor?.actorTokenKeyPrefix ?? null,
     actorJobName: actor?.actorJobName ?? null,
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
