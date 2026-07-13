@@ -92,6 +92,19 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
     ],
   },
 
+  Integration: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
   TagAttachment: {
     axes: [
       {
@@ -259,6 +272,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           EmailTemplate: ['subjectEmailTemplateId'],
           EmailComponent: ['subjectEmailComponentId'],
           CustomerRef: ['subjectCustomerRefId'],
+          Integration: ['subjectIntegrationId'],
         },
       },
     ],

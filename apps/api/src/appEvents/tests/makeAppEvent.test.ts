@@ -15,6 +15,7 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
     ipAddress: '127.0.0.1',
     userAgent: 'test',
     sourceInquiryId: null,
+    integrationId: null,
   },
   data,
 });

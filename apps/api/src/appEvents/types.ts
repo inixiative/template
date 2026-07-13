@@ -12,6 +12,7 @@ export type AppEventActor = {
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
+  integrationId: string | null;
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {

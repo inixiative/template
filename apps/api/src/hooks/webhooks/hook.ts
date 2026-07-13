@@ -66,8 +66,8 @@ const processSingleRecord = (
     return [];
   }
 
-  const origin = auditActorContext.getScope()?.originIntegration ?? null;
-  const targets = origin ? subscriptions.filter((sub) => sub.integration !== origin) : subscriptions;
+  const origin = auditActorContext.getScope()?.integrationId ?? null;
+  const targets = origin ? subscriptions.filter((sub) => sub.integrationId !== origin) : subscriptions;
   if (targets.length === 0) return [];
 
   const payload: WebhookPayload = {

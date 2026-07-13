@@ -19,8 +19,16 @@ const createLogObserveAdapter = (): ObserveAdapter => ({
 
 const createDbObserveAdapter = (): ObserveAdapter => ({
   record: async (event) => {
-    const { actorUserId, actorSpoofUserId, actorTokenId, actorJobName, ipAddress, userAgent, sourceInquiryId } =
-      event.actor;
+    const {
+      actorUserId,
+      actorSpoofUserId,
+      actorTokenId,
+      actorJobName,
+      ipAddress,
+      userAgent,
+      sourceInquiryId,
+      integrationId,
+    } = event.actor;
     await db.appEvent.upsert({
       where: { id: event.id },
       update: {},
@@ -34,6 +42,7 @@ const createDbObserveAdapter = (): ObserveAdapter => ({
         ipAddress,
         userAgent,
         sourceInquiryId,
+        integrationId,
         data: event.data as object,
       },
     });
