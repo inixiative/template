@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+type SpecialOwner = 'default' | 'admin' | 'platform' | 'public' | 'url';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -64,6 +64,63 @@ export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string |
 };
 
 export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>> = {
+  File: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: { User: ['userId'], Organization: ['organizationId'], Space: ['spaceId'] },
+      },
+    ],
+  },
+
+  Folder: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: { User: ['userId'], Organization: ['organizationId'], Space: ['spaceId'] },
+      },
+    ],
+  },
+
+  FilePermission: {
+    axes: [
+      {
+        field: 'targetModel',
+        fkMap: { File: ['fileId'], Folder: ['folderId'] },
+      },
+      {
+        field: 'granteeModel',
+        fkMap: {
+          public: [],
+          User: ['granteeUserId'],
+          Organization: ['granteeOrganizationId'],
+          Space: ['granteeSpaceId'],
+          OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
+          SpaceUser: ['granteeSpaceId', 'granteeUserId'],
+          CustomerRef: ['granteeCustomerRefId'],
+        },
+      },
+    ],
+  },
+
+  ResourceBinding: {
+    axes: [
+      {
+        field: 'sourceModel',
+        fkMap: { File: ['fileId'], url: [] },
+      },
+      {
+        field: 'resourceModel',
+        fkMap: {
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+          User: ['userId'],
+          CustomerRef: ['customerRefId'],
+        },
+      },
+    ],
+  },
+
   Token: {
     axes: [
       {

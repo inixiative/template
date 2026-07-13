@@ -49,6 +49,11 @@ model User {
 
   emailTemplates  EmailTemplate[]
   emailComponents EmailComponent[]
+
+  ownedFiles       File[]            @relation("FileOwnerUser")
+  ownedFolders     Folder[]          @relation("FolderOwnerUser")
+  fileGrants       FilePermission[]  @relation("FilePermissionGranteeUser")
+  resourceBindings ResourceBinding[] @relation("ResourceBindingUser")
 }
 
 enum PlatformRole {
