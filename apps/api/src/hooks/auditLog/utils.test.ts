@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData, redactChangeDiff } from '#/hooks/auditLog/utils';
+import { redactChangeDiff } from '@template/db';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
   describe('processAuditData', () => {

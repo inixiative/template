@@ -2,10 +2,11 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
   db,
-  filterIgnoredFields,
+  filterFields,
   HookTiming,
   isFalsePolymorphismRef,
   registerDbHook,
+  WEBHOOK_DROP_FIELDS,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
@@ -74,8 +75,8 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterIgnoredFields(model, resultData),
-    previousData: previousData ? filterIgnoredFields(model, previousData) : undefined,
+    data: filterFields(model, resultData, WEBHOOK_DROP_FIELDS),
+    previousData: previousData ? filterFields(model, previousData, WEBHOOK_DROP_FIELDS) : undefined,
     timestamp: new Date().toISOString(),
   };
 

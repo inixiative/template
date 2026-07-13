@@ -1,9 +1,18 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, db, HookTiming, isAuditEnabled, Prisma, redactSensitiveFields, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  HookTiming,
+  isAuditEnabled,
+  Prisma,
+  redactChangeDiff,
+  redactSensitiveFields,
+  registerDbHook,
+} from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { castArray, compact } from 'lodash-es';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit, redactChangeDiff } from '#/hooks/auditLog/utils';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
 const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
