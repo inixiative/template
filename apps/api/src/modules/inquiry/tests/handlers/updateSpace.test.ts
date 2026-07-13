@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, Space, SpaceUser } from '@template/db';
+import type { Organization, Space, SpaceUser } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meCreateTokenRoute } from '#/modules/me/routes/meCreateToken';

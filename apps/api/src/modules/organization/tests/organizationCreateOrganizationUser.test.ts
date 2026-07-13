@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono, type z } from '@hono/zod-openapi';
-import type { Organization, OrganizationUser, User } from '@template/db';
+import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
 import { validateActor } from '#/middleware/validations/validateActor';
 import { organizationCreateOrganizationUserController } from '#/modules/organization/controllers/organizationCreateOrganizationUser';

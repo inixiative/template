@@ -1,12 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import {
-  type CronJob,
-  CronJobScalarSchema,
-  type Organization,
-  OrganizationScalarSchema,
-  type User,
-} from '@template/db';
+import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
+import type { CronJob, Organization, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createCronJob, createOrganization, createUser } from '@template/db/test';
 import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';

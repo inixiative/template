@@ -5,7 +5,6 @@
  * @uses none
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Integration } from '@template/db/generated/client/enums';
 
 export type AuditActor = {
   actorUserId: string | null;
@@ -15,7 +14,7 @@ export type AuditActor = {
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
-  originIntegration: Integration | null;
+  integrationId: string | null;
 };
 
 export const nullAuditActor: AuditActor = {
@@ -26,7 +25,7 @@ export const nullAuditActor: AuditActor = {
   ipAddress: null,
   userAgent: null,
   sourceInquiryId: null,
-  originIntegration: null,
+  integrationId: null,
 };
 
 const store = new AsyncLocalStorage<AuditActor>();

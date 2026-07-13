@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { castArray } from 'lodash-es';
 import { hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
 import { type NodeScope, walkWhere } from '#/lib/prisma/whereWalker';
 
@@ -19,7 +20,7 @@ const mentionsDeletedAt = (where: unknown): boolean => {
   return Object.entries(where).some(([key, value]) => {
     if (key === 'deletedAt') return true;
     if (!BOOLEAN_KEYS.has(key)) return false;
-    return (Array.isArray(value) ? value : [value]).some(mentionsDeletedAt);
+    return castArray(value).some(mentionsDeletedAt);
   });
 };
 

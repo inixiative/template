@@ -6,6 +6,7 @@ export * from './customerRefFactory';
 export * from './emailComponentFactory';
 export * from './emailTemplateFactory';
 export * from './inquiryFactory';
+export * from './integrationFactory';
 export * from './organizationFactory';
 export * from './organizationUserFactory';
 export * from './sessionFactory';

@@ -74,13 +74,13 @@ describe('paginate — soft-delete scope', () => {
 
     await paginate(makeContext(userLens), makeDelegate(captured), {
       include: {
-        tokens: { where: { isActive: true }, include: { user: true } },
+        contacts: { where: { isActive: true }, include: { user: true } },
         sessions: true,
       },
     });
 
     expect(captured.findManyArgs?.include).toEqual({
-      tokens: { where: { isActive: true, deletedAt: null }, include: { user: true } },
+      contacts: { where: { isActive: true, deletedAt: null }, include: { user: true } },
       sessions: true,
     });
   });

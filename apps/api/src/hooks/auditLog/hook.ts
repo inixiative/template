@@ -80,7 +80,7 @@ const buildAuditEntry = (
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
     sourceInquiryId: actor?.sourceInquiryId ?? null,
-    originIntegration: actor?.originIntegration ?? null,
+    integrationId: actor?.integrationId ?? null,
     ...(withContextFkFields ? buildContextFkFields(model, record) : {}),
     ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
   };

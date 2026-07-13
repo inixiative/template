@@ -29,6 +29,7 @@ model User {
   tokens                 Token[]
   cronJobsCreated        CronJob[]
   webhookSubscriptions   WebhookSubscription[]
+  integrations           Integration[]
   contacts               Contact[]
   tagAttachments         TagAttachment[]
   tags                   Tag[]
