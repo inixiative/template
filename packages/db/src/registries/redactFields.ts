@@ -23,10 +23,14 @@ export const HOOK_REDACT_FIELDS: Record<string, string[]> = mergeEncryptedFields
 
 export const getRedactFields = (model: string): string[] => HOOK_REDACT_FIELDS[model] ?? [];
 
+// The placeholder a redacted value is replaced with. Shared so the audit hook can mask a changed
+// sensitive field's before/after to the same token the snapshots use.
+export const REDACTED = '[REDACTED]';
+
 export const redactSensitiveFields = <T extends Record<string, unknown>>(
   model: string,
   data: T,
-  redactValue = '[REDACTED]',
+  redactValue: unknown = REDACTED,
 ): T => {
   const result = { ...data };
   for (const field of getRedactFields(model)) {

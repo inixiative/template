@@ -3,7 +3,7 @@
  * @kind utils
  * @uses infrastructure:prisma
  */
-import { filterIgnoredFields, getPolymorphismConfig, redactSensitiveFields } from '@template/db';
+import { filterIgnoredFields, getPolymorphismConfig, getRedactFields, REDACTED, redactSensitiveFields } from '@template/db';
 import { isEqual } from 'lodash-es';
 
 const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
@@ -52,9 +52,31 @@ export const buildSubjectFkFields = (model: string, record: Record<string, unkno
   return subjectFields;
 };
 
-export const processAuditData = (model: string, data: Record<string, unknown>): Record<string, unknown> => {
-  const filtered = filterIgnoredFields(model, data);
-  return redactSensitiveFields(model, filtered as Record<string, unknown>);
+// Drops ignored (noop) keys only — no redaction. buildAuditEntry diffs on this so a change touching
+// only a sensitive field is still detected; redacting first masks both sides to the same token and
+// the change vanishes under the empty-diff guard.
+export const filterForAudit = (model: string, data: Record<string, unknown>): Record<string, unknown> =>
+  filterIgnoredFields(model, data) as Record<string, unknown>;
+
+// Filtered + redacted snapshot (before/after JSON) — also used by the email-versioning hook.
+export const processAuditData = (model: string, data: Record<string, unknown>): Record<string, unknown> =>
+  redactSensitiveFields(model, filterForAudit(model, data));
+
+// Masks the before/after of any sensitive field that changed. The diff is computed on unredacted
+// data, so a redacted key is present here; masking both sides to the same token records that the
+// field changed without storing either value.
+export const redactChangeDiff = (
+  model: string,
+  changes: Record<string, { before: unknown; after: unknown }>,
+): Record<string, { before: unknown; after: unknown }> => {
+  const sensitive = getRedactFields(model);
+  if (!sensitive.length) return changes;
+  const sensitiveSet = new Set(sensitive);
+  return Object.fromEntries(
+    Object.entries(changes).map(([key, delta]) =>
+      sensitiveSet.has(key) ? [key, { before: REDACTED, after: REDACTED }] : [key, delta],
+    ),
+  );
 };
 
 export const computeDiff = (

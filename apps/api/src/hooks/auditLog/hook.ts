@@ -1,9 +1,9 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, db, HookTiming, isAuditEnabled, Prisma, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, isAuditEnabled, Prisma, redactSensitiveFields, registerDbHook } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { castArray, compact } from 'lodash-es';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit, redactChangeDiff } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
 const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
@@ -51,21 +51,28 @@ const buildAuditEntry = (
 ): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.getScope();
 
-  const processedAfter = action !== AuditAction.delete ? processAuditData(model, record) : undefined;
-  const processedBefore = previous ? processAuditData(model, previous) : undefined;
+  // Filter noop fields, then diff on the UNREDACTED result so a change to a sensitive field is still
+  // detected — redacting first would mask both sides to the same token and the change would vanish
+  // under the empty-diff guard. Redact the stored snapshots and the changed values afterward.
+  const filteredAfter = action !== AuditAction.delete ? filterForAudit(model, record) : undefined;
+  const filteredBefore = previous ? filterForAudit(model, previous) : undefined;
   const changes =
-    action === AuditAction.update && processedBefore && processedAfter
-      ? computeDiff(processedBefore, processedAfter)
+    action === AuditAction.update && filteredBefore && filteredAfter
+      ? computeDiff(filteredBefore, filteredAfter)
       : undefined;
 
   if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
+
+  const processedAfter = filteredAfter ? redactSensitiveFields(model, filteredAfter) : undefined;
+  const processedBefore = filteredBefore ? redactSensitiveFields(model, filteredBefore) : undefined;
+  const processedChanges = changes ? redactChangeDiff(model, changes) : undefined;
 
   return {
     action,
     subjectModel: model,
     before: (processedBefore as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-    changes: (changes as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+    changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,

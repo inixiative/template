@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData, redactChangeDiff } from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
   describe('processAuditData', () => {
@@ -38,6 +38,26 @@ describe('auditLog/utils', () => {
       expect(before).not.toHaveProperty('position');
       expect(after).not.toHaveProperty('position');
       expect(computeDiff(before, after)).toEqual({});
+    });
+  });
+
+  // The audit diff is computed on unredacted data, so a changed sensitive field IS in the diff;
+  // redactChangeDiff then masks both sides so the row records THAT it changed without the value.
+  // This is what keeps a sensitive-only change from vanishing under the empty-diff guard.
+  describe('redactChangeDiff', () => {
+    it('masks both sides of a changed sensitive field, leaving other changes intact', () => {
+      const changes = {
+        password: { before: 'old', after: 'new' },
+        providerId: { before: 'email', after: 'oauth' },
+      };
+      const masked = redactChangeDiff('Account', changes);
+      expect(masked.password).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+      expect(masked.providerId).toEqual({ before: 'email', after: 'oauth' });
+    });
+
+    it('returns the diff untouched for a model with no sensitive fields', () => {
+      const changes = { name: { before: 'A', after: 'B' } };
+      expect(redactChangeDiff('Organization', changes)).toBe(changes);
     });
   });
 
