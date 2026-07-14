@@ -7,6 +7,7 @@
 import { db } from '@template/db';
 import type { EmailComponent } from '@template/db/generated/client/client';
 import type { OwnerScope } from '@template/email/render/types';
+import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -75,6 +76,7 @@ const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<Em
   // Validate at the unit boundary — a component can be saved on a path that didn't run the
   // template-level check.
   await validateComponentMjml(input.mjml);
+  validateBlocks(input.mjml);
   assertValidConditions(input.mjml);
 
   const where = {

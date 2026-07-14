@@ -13,6 +13,7 @@ import { lookupCascade } from '@template/email/render/lookupCascade';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
+import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -54,6 +55,7 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   await validateMjml(input.mjml);
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
   // Subjects are interpolated too, so they carry conditionals and need the same floor.
+  validateBlocks(input.mjml);
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject, { isSubject: true });
 
