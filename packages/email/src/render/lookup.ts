@@ -42,7 +42,7 @@ export const lookupAtSpace = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -75,7 +75,7 @@ export const lookupAtOrg = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -104,7 +104,7 @@ export const lookupAtDefault = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -133,7 +133,7 @@ export const lookupAtAdmin = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -162,7 +162,7 @@ export const lookupAtSpaceUser = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -192,7 +192,7 @@ export const lookupAtOrgUser = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
@@ -222,7 +222,7 @@ export const lookupAtUser = async (
       : Promise.resolve(null),
   ]);
 
-  const components: Record<string, EmailComponent> = {};
+  const components: Record<string, EmailComponent> = Object.create(null);
   for (const c of comps) components[c.slug] = c;
 
   return { template, components };
