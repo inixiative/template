@@ -4,8 +4,8 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
 import type { EmailComponent } from '@template/db/generated/client/client';
+import { saveScopedRow } from '@template/email/render/saveScopedRow';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
@@ -79,25 +79,5 @@ const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<Em
   validateBlocks(input.mjml);
   assertValidConditions(input.mjml);
 
-  const where = {
-    slug: input.slug,
-    locale: input.locale,
-    ownerModel: ctx.ownerModel,
-    organizationId: ctx.organizationId ?? null,
-    spaceId: ctx.spaceId ?? null,
-  };
-
-  const data = {
-    ...input,
-    ownerModel: ctx.ownerModel,
-    organizationId: ctx.organizationId ?? null,
-    spaceId: ctx.spaceId ?? null,
-  };
-
-  const existing = await db.emailComponent.findFirst({ where });
-
-  if (existing) {
-    return db.emailComponent.update({ where: { id: existing.id }, data });
-  }
-  return db.emailComponent.create({ data });
+  return saveScopedRow('emailComponent', input, ctx);
 };
