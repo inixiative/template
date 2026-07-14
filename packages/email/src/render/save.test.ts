@@ -88,6 +88,32 @@ describe('saveEmailTemplate', () => {
     expect(result.components[0].mjml).toBe('<mj-text>Header</mj-text>');
   });
 
+  it('rejects a component whose body is a full MJML document, not a fragment', async () => {
+    await expect(
+      saveEmailTemplate({
+        slug: 'doc-component',
+        name: 'Doc Component',
+        subject: 'Hello',
+        kind: 'system',
+        mjml: mjml('{{#component:whole}}<mjml><mj-body><mj-text>Nope</mj-text></mj-body></mjml>{{/component:whole}}'),
+        ownerModel: 'default',
+      }),
+    ).rejects.toThrow(MjmlValidationError);
+  });
+
+  it('rejects a component whose body is not valid MJML in any fragment context', async () => {
+    await expect(
+      saveEmailTemplate({
+        slug: 'bad-frag',
+        name: 'Bad Fragment',
+        subject: 'Hello',
+        kind: 'system',
+        mjml: mjml('{{#component:broken}}<mj-not-a-real-tag>x</mj-not-a-real-tag>{{/component:broken}}'),
+        ownerModel: 'default',
+      }),
+    ).rejects.toThrow();
+  });
+
   it('collapses repeated identical inline bodies to one component', async () => {
     const result = await saveEmailTemplate({
       slug: 'dup-header',
