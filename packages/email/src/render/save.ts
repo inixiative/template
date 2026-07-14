@@ -7,13 +7,14 @@
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
+import { collectSlugsFromNodes, decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
-import { mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { resolveVariants } from '@template/email/render/resolveVariants';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
+import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -55,8 +56,9 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   await validateMjml(input.mjml);
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
   // Subjects are interpolated too, so they carry conditionals and need the same floor.
+  validateBlocks(input.mjml);
   assertValidConditions(input.mjml);
-  if (input.subject) assertValidConditions(input.subject);
+  if (input.subject) assertValidConditions(input.subject, { isSubject: true });
 
   const ctx: OwnerScope = {
     ownerModel: input.ownerModel,
@@ -65,23 +67,38 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
     locale: input.locale ?? 'en',
   };
 
-  // 1. Parse template MJML for component refs (sync, outside tx)
-  const { map, mjml: indexedMjml, refs: templateRefs } = mapRefs(input.mjml);
-  const baseSlugs = Object.keys(map);
+  // Parse the payload ONCE (grammar validation + stray-tag scan over the largest strings in the
+  // system), then collect slugs and decompose off that same tree.
+  const nodes = parseBlocks(input.mjml);
 
-  // 2. Lookup + resolve + save in transaction
+  // Every referenced component slug, so we can diff each inlined body against the cascade.
+  const slugs = collectSlugsFromNodes(nodes);
+
   return db.txn(
     async () => {
-      const existing = await lookupCascade(baseSlugs, ctx);
-      const resolved = resolveVariants(map, indexedMjml, templateRefs, existing, ctx);
+      // The cascade body per slug (tenant → parent → platform) is the diff baseline: an inlined
+      // body equal to it is a noop/inherit; a divergence (or an unknown slug) is a write at this tenant.
+      const existing = await lookupCascade(slugs, ctx);
+      // decompose collapses identical duplicate slugs to one write and throws DivergentDuplicateSlugError
+      // on the same slug carrying two different bodies, so `writes` is already unique per slug.
+      const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
-      const finalTemplate = { ...input, ...resolved.template, locale: ctx.locale } as EmailTemplate;
-      const finalComponents = resolved.components as EmailComponent[];
+      const finalComponents = writes.map((write) => ({
+        slug: write.slug,
+        locale: ctx.locale,
+        mjml: write.mjml,
+        componentRefs: [...new Set(write.refs)],
+      })) as EmailComponent[];
 
-      // Cycle check before writes. mapRefs guarantees the intra-save graph
-      // is a tree (text-nested → can't self-reference); this defends against
-      // cross-save cycles where this save's new edge closes a loop with
-      // edges already in the DB.
+      const finalTemplate = {
+        ...input,
+        mjml,
+        componentRefs: [...new Set(refs)],
+        locale: ctx.locale,
+      } as EmailTemplate;
+
+      // Cycle check before writes: defends against a cross-save cycle where this save's new edge
+      // closes a loop with edges already in the DB (the intra-save graph is a tree by construction).
       for (const component of finalComponents) {
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
@@ -92,10 +109,10 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
       // Non-system kinds are subject to unsubscribe compliance: the composed body (template +
       // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.
       if (template.kind && template.kind !== 'system') {
-        const composed = await expand(template.mjml, template.componentRefs ?? [], ctx);
-        if (!withoutConditionals(composed).includes('{{recipient.unsubscribeUrl}}')) {
+        const composed = await expand(template.mjml, ctx);
+        if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {
           throw new Error(
-            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{recipient.unsubscribeUrl}}.`,
+            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{system.unsubscribeUrl}}.`,
           );
         }
       }

@@ -4,34 +4,28 @@
  * @partOf feature:email
  * @uses none
  */
-import { evaluateConditions, type RuleErrorSink } from '@template/email/render/evaluateConditions';
-import { escape as escapeHtml, get, isNil } from 'lodash-es';
+import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
 
-export enum VariablePrefix {
+export enum Lens {
   sender = 'sender',
   recipient = 'recipient',
   data = 'data',
+  system = 'system',
 }
-
-const VARIABLE_PATTERN = /\{\{(sender|recipient|data)\.([a-zA-Z0-9_.-]+)\}\}/g;
-
-const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
-const hasUnsafeSegment = (path: string): boolean =>
-  path.split('.').some((segment) => UNSAFE_PATH_SEGMENTS.has(segment));
 
 export type Variables = {
   sender?: Record<string, unknown>;
   recipient?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  system?: Record<string, unknown>;
 };
 
-export const interpolate = (template: string, variables: Variables, onError?: RuleErrorSink): string => {
-  const evaluated = evaluateConditions(template, variables, onError);
+export const toScope = (variables: Variables): Scope => ({
+  sender: variables.sender,
+  recipient: variables.recipient,
+  data: variables.data,
+  system: variables.system,
+});
 
-  return evaluated.replace(VARIABLE_PATTERN, (match, prefix, path) => {
-    if (hasUnsafeSegment(path)) return match;
-    const value = get(variables[prefix as keyof Variables], path);
-    if (isNil(value) || typeof value === 'function') return match;
-    return escapeHtml(String(value));
-  });
-};
+export const interpolate = (template: string, variables: Variables, onError?: RuleErrorSink): string =>
+  settle(template, toScope(variables), { substitute: true }, onError);

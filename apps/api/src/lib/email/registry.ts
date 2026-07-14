@@ -5,54 +5,95 @@
  * @uses infrastructure:prisma
  */
 import type { Condition, LensNarrowing } from '@inixiative/json-rules';
-import type { Inquiry, User } from '@template/db/generated/client/client';
 import { lensFor } from '@template/db/lens';
-import type { Sender } from '#/lib/email/sender';
 
-const eq = (field: string, value: unknown): Condition => ({ field, operator: 'equals', value }) as unknown as Condition;
+// A bind name → a path into the resolution context available when it resolves.
+// entity binds read `{ data }` (the handoff); sender reads `{ entity }`;
+// recipients read `{ entity, sender }`; data reads `{ entity, handoff }`.
+export type BindSources = Record<string, string>;
 
-type Row = Record<string, unknown>;
+// The subject-model query. `narrowing.root.where` carries `{ bind }` tokens; `bindings`
+// declares where each token's value comes from. Declarative + serializable — no closures.
+export type EntitySpec = { narrowing: LensNarrowing; bindings: BindSources };
 
-export type EmailEntry<E = Row> = {
-  entity: (data: Record<string, unknown>) => LensNarrowing;
-  sender: (entity: E) => Sender;
-  recipients: (entity: E, sender: Sender) => LensNarrowing;
-  cc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  bcc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  data?: (entity: E, handoff: Record<string, unknown>) => Record<string, unknown>;
+// Which sender identity to construct; id fields are bound from the resolved entity.
+export type SenderSpec =
+  | { type: 'platform' }
+  | { type: 'admin' }
+  | { type: 'User'; bindings: { userId: string } }
+  | { type: 'Organization'; bindings: { organizationId: string } }
+  | { type: 'Space'; bindings: { spaceId: string; organizationId: string } }
+  | { type: 'OrganizationUser'; bindings: { userId: string; organizationId: string } }
+  | { type: 'SpaceUser'; bindings: { userId: string; spaceId: string; organizationId: string } };
+
+// Recipients are always User-rooted. `picks`/`relations` are the static interpolation surface
+// (known at save time); `where` carries `{ bind }` tokens filled from `bindings`.
+export type RecipientSpec = {
+  picks: string[];
+  relations?: Record<string, { picks: string[] }>;
+  where: Condition;
+  bindings: BindSources;
 };
 
-const defineEntry = <E>(entry: EmailEntry<E>): EmailEntry => entry as EmailEntry;
+export type EmailEntry = {
+  entity: EntitySpec;
+  sender: SenderSpec;
+  recipients: RecipientSpec;
+  cc?: RecipientSpec;
+  bcc?: RecipientSpec;
+  data?: BindSources;
+};
 
-const userById = (id: unknown): LensNarrowing => ({
+// Assemble a User-rooted recipient narrowing from the static surface + a resolved where.
+export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
   parent: lensFor('User'),
-  root: { where: eq('id', id), picks: ['id', 'name', 'email'] },
+  root: {
+    where,
+    picks: spec.picks,
+    ...(spec.relations ? { relations: spec.relations } : {}),
+  },
+});
+
+const eqBind = (field: string, bind: string): Condition => ({ field, operator: 'equals', bind }) as unknown as Condition;
+
+const userEntity = (path: string): EntitySpec => ({
+  narrowing: { parent: lensFor('User'), root: { where: eqBind('id', 'userId'), picks: ['id', 'name', 'email'] } },
+  bindings: { userId: path },
+});
+
+const userRecipient = (path: string): RecipientSpec => ({
+  picks: ['id', 'name', 'email'],
+  where: eqBind('id', 'recipientId'),
+  bindings: { recipientId: path },
 });
 
 export const registry: Record<string, EmailEntry> = {
-  'inquiry-invite-organization-user': defineEntry<Inquiry & { sourceOrganizationId: string }>({
-    entity: (data) => ({
-      parent: lensFor('Inquiry'),
-      root: {
-        where: eq('id', data.inquiryId),
-        picks: ['id', 'content', 'sourceOrganization'],
-        relations: { sourceOrganization: { picks: ['name'] } },
+  'inquiry-invite-organization-user': {
+    entity: {
+      narrowing: {
+        parent: lensFor('Inquiry'),
+        root: {
+          where: eqBind('id', 'inquiryId'),
+          picks: ['id', 'content', 'sourceOrganization'],
+          relations: { sourceOrganization: { picks: ['name'] } },
+        },
       },
-    }),
-    sender: (inquiry) => ({ type: 'Organization', organizationId: inquiry.sourceOrganizationId }),
-    recipients: (inquiry) => userById(inquiry.targetUserId),
-  }),
+      bindings: { inquiryId: 'data.inquiryId' },
+    },
+    sender: { type: 'Organization', bindings: { organizationId: 'entity.sourceOrganizationId' } },
+    recipients: userRecipient('entity.targetUserId'),
+  },
 
-  welcome: defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-  }),
+  welcome: {
+    entity: userEntity('data.userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('entity.id'),
+  },
 
-  'email-verification': defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-    data: (_user, handoff) => ({ verificationUrl: handoff.verificationUrl }),
-  }),
+  'email-verification': {
+    entity: userEntity('data.userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('entity.id'),
+    data: { verificationUrl: 'handoff.verificationUrl' },
+  },
 };

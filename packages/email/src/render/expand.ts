@@ -6,31 +6,24 @@
  */
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
+import { renderBlocks } from '@template/email/render/renderBlocks';
 import type { OwnerScope } from '@template/email/render/types';
 
-export const expand = async (mjml: string, componentRefs: string[], ctx: OwnerScope): Promise<string> => {
-  if (!componentRefs.length) return mjml;
+export const expand = async (mjml: string, ctx: OwnerScope): Promise<string> => {
+  const cache = new Map<string, Promise<string>>();
 
-  // Batch fetch all referenced components
-  const components = await lookupCascade(componentRefs, ctx);
+  const load = (slug: string): Promise<string> => {
+    const cached = cache.get(slug);
+    if (cached) return cached;
 
-  // Replace each component block
-  let result = mjml;
-  for (const slug of componentRefs) {
-    const component = components[slug];
-    if (!component) throw new EmailRenderError(slug, 'component_missing');
+    const pending = lookupCascade([slug], ctx).then((components) => {
+      const component = components[slug];
+      if (!component) throw new EmailRenderError(slug, 'component_missing');
+      return component.mjml;
+    });
+    cache.set(slug, pending);
+    return pending;
+  };
 
-    // Recursively expand nested refs
-    const expanded = await expand(component.mjml, component.componentRefs, ctx);
-
-    // Replace {{#component:slug}}...{{/component:slug}} with expanded MJML
-    result = replaceBlock(result, slug, expanded);
-  }
-
-  return result;
-};
-
-const replaceBlock = (mjml: string, slug: string, content: string): string => {
-  const pattern = new RegExp(`\\{\\{#component:${slug}\\}\\}[\\s\\S]*?\\{\\{\\/component:${slug}\\}\\}`, 'g');
-  return mjml.replace(pattern, content);
+  return renderBlocks(mjml, load);
 };

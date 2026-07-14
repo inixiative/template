@@ -5,11 +5,22 @@ export {
   composeTemplate,
   parentOwner,
 } from './compose';
+export {
+  type ComponentWrite,
+  collectSlugs,
+  collectSlugsFromNodes,
+  type DecomposeResult,
+  DivergentDuplicateSlugError,
+  decompose,
+  decomposeNodes,
+  type ResolveCascade,
+  serialize,
+} from './decompose';
 export { type EmailErrorType, EmailRenderError } from './errors';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';
-export { type MappedComponent, type MapResult, mapRefs, type RefMap } from './extractRefs';
-export { interpolate, VariablePrefix, type Variables } from './interpolate';
+export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
+export { interpolate, Lens, type Variables } from './interpolate';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
