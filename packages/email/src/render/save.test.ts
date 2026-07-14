@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
+import { DivergentDuplicateSlugError } from '@template/email/render/decompose';
 import { saveEmailTemplate } from '@template/email/render/save';
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 
@@ -130,22 +131,21 @@ describe('saveEmailTemplate', () => {
     expect(result.template.componentRefs).toEqual(['header']);
   });
 
-  it('does not variant-fork: a slug is one component, last inline body wins', async () => {
-    // Under the cascade-diff model there is no slug:idx variant. Two different inline bodies for the
-    // same slug in one payload collapse to a single component row (no `header-1`).
-    const result = await saveEmailTemplate({
-      slug: 'no-variants',
-      name: 'No Variants',
-      subject: 'Hello',
-      kind: 'system',
-      mjml: mjml(
-        '{{#component:header}}<mj-text>Version A</mj-text>{{/component:header}}{{#component:header}}<mj-text>Version B</mj-text>{{/component:header}}',
-      ),
-      ownerModel: 'default',
-    });
-
-    expect(result.components.map((c) => c.slug)).toEqual(['header']);
-    expect(result.components[0].mjml).toBe('<mj-text>Version B</mj-text>');
+  it('rejects a divergent duplicate slug: two different inline bodies for one slug in one payload', async () => {
+    // Under the cascade-diff model there is no slug:idx variant, and we refuse to silently last-wins
+    // two divergent bodies for the same slug — the payload is ambiguous about what `header` should be.
+    await expect(
+      saveEmailTemplate({
+        slug: 'no-variants',
+        name: 'No Variants',
+        subject: 'Hello',
+        kind: 'system',
+        mjml: mjml(
+          '{{#component:header}}<mj-text>Version A</mj-text>{{/component:header}}{{#component:header}}<mj-text>Version B</mj-text>{{/component:header}}',
+        ),
+        ownerModel: 'default',
+      }),
+    ).rejects.toThrow(DivergentDuplicateSlugError);
   });
 
   it('an inline body equal to the cascade is a noop (inherits, no write)', async () => {

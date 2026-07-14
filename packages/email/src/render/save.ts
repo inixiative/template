@@ -7,9 +7,10 @@
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
-import { type ComponentWrite, collectSlugs, decompose } from '@template/email/render/decompose';
+import { collectSlugsFromNodes, decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
@@ -66,20 +67,23 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
     locale: input.locale ?? 'en',
   };
 
+  // Parse the payload ONCE (grammar validation + stray-tag scan over the largest strings in the
+  // system), then collect slugs and decompose off that same tree.
+  const nodes = parseBlocks(input.mjml);
+
   // Every referenced component slug, so we can diff each inlined body against the cascade.
-  const slugs = collectSlugs(input.mjml);
+  const slugs = collectSlugsFromNodes(nodes);
 
   return db.txn(
     async () => {
       // The cascade body per slug (tenant → parent → platform) is the diff baseline: an inlined
       // body equal to it is a noop/inherit; a divergence (or an unknown slug) is a write at this tenant.
       const existing = await lookupCascade(slugs, ctx);
-      const { mjml, refs, writes } = decompose(input.mjml, (slug) => existing[slug]?.mjml);
+      // decompose collapses identical duplicate slugs to one write and throws DivergentDuplicateSlugError
+      // on the same slug carrying two different bodies, so `writes` is already unique per slug.
+      const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
-      // A slug defines one component (no variant-indexing) — collapse repeats, keeping child-first order.
-      const bySlug = new Map<string, ComponentWrite>();
-      for (const write of writes) bySlug.set(write.slug, write);
-      const finalComponents = [...bySlug.values()].map((write) => ({
+      const finalComponents = writes.map((write) => ({
         slug: write.slug,
         locale: ctx.locale,
         mjml: write.mjml,
