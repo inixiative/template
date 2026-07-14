@@ -77,6 +77,22 @@ describe('validateBlocks', () => {
     ).toBe('duplicate_slot');
   });
 
+  it('lets an unclosed ref outrank a duplicate slot inside it (reason precedence matches Zealot)', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks('{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{#slot:bar}}'),
+      ),
+    ).toBe('unclosed_open');
+  });
+
+  it('lets a mismatched close outrank a duplicate slot inside the same ref', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks('{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{/slot:x}}'),
+      ),
+    ).toBe('mismatched_close');
+  });
+
   it('allows the same override slot name in two different refs', () => {
     expect(() =>
       validateBlocks(

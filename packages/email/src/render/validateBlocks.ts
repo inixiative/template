@@ -58,7 +58,13 @@ const assertNoStrayTagShapes = (input: string): void => {
   );
 };
 
-type Frame = { kind: 'component' | 'slot'; name: string; isDefault: boolean; overrideSlots: Set<string> };
+type Frame = {
+  kind: 'component' | 'slot';
+  name: string;
+  isDefault: boolean;
+  overrideSlots: Set<string>;
+  duplicateSlot?: string;
+};
 
 export const validateBlocks = (input: string): void => {
   assertNoStrayTagShapes(input);
@@ -93,18 +99,22 @@ export const validateBlocks = (input: string): void => {
         `Mismatched close tag: expected {{/${top.kind}:${top.name}}} but found ${tag}`,
       );
     }
+
+    // Surface a duplicate override only once the component ref closes — an earlier structural error
+    // inside the ref (mismatched/stray close, unclosed nested block) takes precedence, as in Zealot.
+    if (top.kind === 'component' && top.duplicateSlot !== undefined) {
+      throw new BlockValidationError(
+        'duplicate_slot',
+        `Duplicate override slot "${top.duplicateSlot}" on component ref "${top.name}" — a ref may fill each named slot at most once.`,
+      );
+    }
     stack.pop();
 
     if (top.kind === 'slot' && !top.isDefault) {
       const parent = stack.at(-1);
-      if (parent?.kind === 'component') {
-        if (parent.overrideSlots.has(top.name)) {
-          throw new BlockValidationError(
-            'duplicate_slot',
-            `Duplicate override slot "${top.name}" on component ref "${parent.name}" — a ref may fill each named slot at most once.`,
-          );
-        }
-        parent.overrideSlots.add(top.name);
+      if (parent?.kind === 'component' && parent.duplicateSlot === undefined) {
+        if (parent.overrideSlots.has(top.name)) parent.duplicateSlot = top.name;
+        else parent.overrideSlots.add(top.name);
       }
     }
   }
