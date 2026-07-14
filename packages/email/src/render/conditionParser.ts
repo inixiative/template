@@ -334,3 +334,31 @@ export const parseEachBlock = (content: string, openIdx: number): EachBlock | nu
     end: bodyEnd,
   };
 };
+
+export const isStructurallyBalanced = (text: string): boolean => {
+  const stack: Kind[] = [];
+  let i = 0;
+
+  while (true) {
+    const token = nextStructuralToken(text, i);
+    if (!token) return stack.length === 0;
+
+    if (!token.isClose) {
+      stack.push(token.kind);
+      if (token.kind === 'if') {
+        const marker = readRuleMarker(text, token.index, IF);
+        i = marker ? marker.next : token.index + IF.length;
+      } else {
+        const marker = readEachMarker(text, token.index);
+        if (!marker) return false;
+        i = marker.next;
+      }
+      continue;
+    }
+
+    const top = stack.at(-1);
+    if (top !== token.kind) return false;
+    stack.pop();
+    i = token.index + (token.kind === 'if' ? END.length : END_EACH.length);
+  }
+};

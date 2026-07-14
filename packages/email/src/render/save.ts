@@ -6,8 +6,8 @@
  */
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
-import { type ComponentWrite, collectSlugs, decompose } from '@template/email/render/decompose';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
+import { type ComponentWrite, collectSlugs, decompose } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { saveComponents } from '@template/email/render/saveComponents';
@@ -55,7 +55,7 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
   // Subjects are interpolated too, so they carry conditionals and need the same floor.
   assertValidConditions(input.mjml);
-  if (input.subject) assertValidConditions(input.subject);
+  if (input.subject) assertValidConditions(input.subject, { isSubject: true });
 
   const ctx: OwnerScope = {
     ownerModel: input.ownerModel,
