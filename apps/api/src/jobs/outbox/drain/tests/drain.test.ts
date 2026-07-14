@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, laneKey, redisNamespace, watchLane } from '@template/db';
+import { claimLane, getJobSupersededBy, laneKey, redisNamespace, watchLane } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import {
   flushOutbox,
@@ -11,6 +11,7 @@ import {
   tripIfFull,
 } from '#/jobs/outbox';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
+import { flushQueue } from '#/jobs/outbox/mutex';
 import { queue } from '#/jobs/queue';
 import { JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -183,6 +184,49 @@ describe('jobs overflow buffer (spill + drain)', () => {
     expect((await ctx.queue.getJob('keep-id'))?.id).toBe('keep-id');
   });
 
+  it('drops a buffered row displaced by a newer direct claim — no re-enqueue, no counter-tombstone', async () => {
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    const lane = laneKey('recordAppEvent', 'lane-displaced');
+    await spillToOutbox({
+      handlerName: 'recordAppEvent',
+      jobId: 'older',
+      dedupeKey: 'lane-displaced',
+      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'lane-displaced' },
+      options: {},
+    });
+    await claimLane(lane, 'older'); // the spill-time claim
+    await claimLane(lane, 'newer'); // a direct enqueue (cron / bypass) usurps while the row is buffered
+
+    await runDrainOutboxPass();
+
+    // the displaced row is deleted without re-adding — re-claiming would tombstone 'newer' right back
+    expect(await ctx.db.jobOutbox.count()).toBe(0);
+    expect(await ctx.queue.getJob('older')).toBeUndefined();
+    expect(await ctx.queue.redis.get(lane)).toBe('newer');
+    expect(await getJobSupersededBy('newer')).toBeNull();
+  });
+
+  it('keeps the spill-time baton when re-enqueue fails (self-claim is not rolled back)', async () => {
+    poison.add('poisonHandler');
+    await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+    const lane = laneKey('poisonHandler', 'lane-poison');
+    await spillToOutbox({
+      handlerName: 'poisonHandler',
+      jobId: 'p-lane',
+      dedupeKey: 'lane-poison',
+      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'lane-poison' },
+      options: {},
+    });
+    await claimLane(lane, 'p-lane'); // the spill-time claim
+
+    await runDrainOutboxPass();
+
+    const rows = await ctx.db.jobOutbox.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].attempts).toBe(1);
+    expect(await ctx.queue.redis.get(lane)).toBe('p-lane');
+  });
+
   it('supersede lanes are handler-scoped — usurping one lane leaves another handler untouched', async () => {
     const laneA = laneKey('handlerA', 'shared');
     const laneB = laneKey('handlerB', 'shared');
@@ -298,5 +342,22 @@ describe('jobs overflow buffer (spill + drain)', () => {
     };
 
     await expect(spillToOutbox(collide)).rejects.toThrow();
+  });
+
+  it('rejects spills accepted mid-drain when the shutdown flush gives up (no hung awaits)', async () => {
+    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '100';
+    process.env.JOBS_OUTBOX_FLUSH_LINGER_MS = '60000';
+    let straggler: Promise<unknown> | null = null;
+    const run = spyOn(flushQueue, 'run').mockImplementation((async () => {
+      straggler ??= spillToOutbox(fanRow('mid-drain')).catch((e) => e); // lands while flushOutbox is draining
+      throw new Error('db down');
+    }) as never);
+
+    const buffered = spillToOutbox(fanRow('buffered')).catch((e) => e);
+    await expect(flushOutbox()).rejects.toThrow('db down');
+    run.mockRestore();
+
+    expect(String(await buffered)).toContain('db down');
+    expect(String(await straggler!)).toContain('gave up');
   });
 });
