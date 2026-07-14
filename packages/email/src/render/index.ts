@@ -19,6 +19,7 @@ export {
 export { type EmailErrorType, EmailRenderError } from './errors';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';
+export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
 export { interpolate, Lens, type Variables } from './interpolate';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
