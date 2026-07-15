@@ -1,77 +1,44 @@
 import { describe, expect, it } from 'bun:test';
-import { filterIgnoredFields, getIgnoreFields, HOOK_IGNORE_FIELDS } from '@template/db/registries';
+import { filterFields, NOOP_FIELDS, unionRegistries, WEBHOOK_DROP_FIELDS } from '@template/db/registries';
 
-describe('ignoreFields', () => {
-  describe('HOOK_IGNORE_FIELDS', () => {
-    it('has _global field with updatedAt', () => {
-      expect(HOOK_IGNORE_FIELDS._global).toContain('updatedAt');
-    });
+describe('NOOP_FIELDS', () => {
+  it('includes global updatedAt and high-frequency tracking columns', () => {
+    expect(NOOP_FIELDS._global).toContain('updatedAt');
+    expect(NOOP_FIELDS.User).toContain('lastLoginAt');
+    expect(NOOP_FIELDS.Token).toContain('lastUsedAt');
   });
 
-  describe('getIgnoreFields', () => {
-    it('returns global fields for unknown model', () => {
-      const fields = getIgnoreFields('UnknownModel');
-      expect(fields).toContain('updatedAt');
-    });
-
-    it('includes model-specific fields in addition to global fields', () => {
-      const fields = getIgnoreFields('User');
-      expect(fields).toContain('updatedAt');
-      expect(fields).toContain('lastLoginAt');
-    });
-
-    it('includes Token-specific fields', () => {
-      const fields = getIgnoreFields('Token');
-      expect(fields).toContain('updatedAt');
-      expect(fields).toContain('lastUsedAt');
-    });
-
-    it('auto-injects encrypted columns for AuthProvider from encryption registry', () => {
-      const fields = getIgnoreFields('AuthProvider');
-      expect(fields).toContain('encryptedSecrets');
-      expect(fields).toContain('encryptedSecretsMetadata');
-      expect(fields).toContain('encryptedSecretsKeyVersion');
-    });
-
-    it('auto-injects ordered-list position field for Contact from orderedList registry', () => {
-      const fields = getIgnoreFields('Contact');
-      expect(fields).toContain('position');
-    });
+  it('folds in ordered-list position fields (Contact)', () => {
+    expect(NOOP_FIELDS.Contact).toContain('position');
   });
 
-  describe('filterIgnoredFields', () => {
-    it('removes global updatedAt from all models', () => {
-      const data = { id: '1', name: 'test', updatedAt: new Date() };
-      const result = filterIgnoredFields('Organization', data);
-      expect(result).not.toHaveProperty('updatedAt');
-      expect(result).toHaveProperty('id', '1');
-      expect(result).toHaveProperty('name', 'test');
-    });
+  it('does NOT include encrypted columns — those belong to REDACT_FIELDS', () => {
+    expect(NOOP_FIELDS.AuthProvider ?? []).not.toContain('encryptedSecrets');
+  });
+});
 
-    it('removes model-specific fields for User', () => {
-      const data = { id: '1', email: 'test@example.com', updatedAt: new Date(), lastLoginAt: new Date() };
-      const result = filterIgnoredFields('User', data);
-      expect(result).not.toHaveProperty('updatedAt');
-      expect(result).not.toHaveProperty('lastLoginAt');
-      expect(result).toHaveProperty('id', '1');
-      expect(result).toHaveProperty('email', 'test@example.com');
-    });
+describe('unionRegistries', () => {
+  it('merges and de-duplicates fields per model', () => {
+    const merged = unionRegistries({ A: ['x', 'y'] }, { A: ['y', 'z'], B: ['q'] });
+    expect(new Set(merged.A)).toEqual(new Set(['x', 'y', 'z']));
+    expect(merged.B).toEqual(['q']);
+  });
+});
 
-    it('removes lastUsedAt for Token', () => {
-      const data = { id: '1', name: 'my-token', updatedAt: new Date(), lastUsedAt: new Date() };
-      const result = filterIgnoredFields('Token', data);
-      expect(result).not.toHaveProperty('updatedAt');
-      expect(result).not.toHaveProperty('lastUsedAt');
-      expect(result).toHaveProperty('name', 'my-token');
-    });
+describe('filterFields', () => {
+  it('drops the registry _global + model fields and keeps the rest', () => {
+    const data = { id: '1', name: 'test', updatedAt: new Date(), lastLoginAt: new Date() };
+    const result = filterFields('User', data, NOOP_FIELDS);
+    expect(result).not.toHaveProperty('updatedAt');
+    expect(result).not.toHaveProperty('lastLoginAt');
+    expect(result).toMatchObject({ id: '1', name: 'test' });
+  });
 
-    it('preserves other fields for unknown model', () => {
-      const data = { id: '1', status: 'active', createdAt: new Date(), updatedAt: new Date() };
-      const result = filterIgnoredFields('SomeModel', data);
-      expect(result).toHaveProperty('id', '1');
-      expect(result).toHaveProperty('status', 'active');
-      expect(result).toHaveProperty('createdAt');
-      expect(result).not.toHaveProperty('updatedAt');
-    });
+  it('with WEBHOOK_DROP_FIELDS also drops sensitive columns', () => {
+    const data = { id: '1', keyHash: 'h', name: 'tok', updatedAt: new Date() };
+    const result = filterFields('Token', data, WEBHOOK_DROP_FIELDS);
+    expect(result).not.toHaveProperty('keyHash');
+    expect(result).not.toHaveProperty('updatedAt');
+    expect(result).toMatchObject({ id: '1', name: 'tok' });
   });
 });

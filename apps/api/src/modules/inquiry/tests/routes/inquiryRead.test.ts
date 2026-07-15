@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db';
+import type { Inquiry, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -8,7 +8,6 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { uuidv7 } from 'uuidv7';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -97,7 +96,7 @@ describe('GET /api/v1/inquiry/:id', () => {
   });
 
   it('returns 404 for unknown id', async () => {
-    const response = await fetch(get(`/api/v1/inquiry/${uuidv7()}`));
+    const response = await fetch(get(`/api/v1/inquiry/${Bun.randomUUIDv7()}`));
     expect(response.status).toBe(404);
   });
 });

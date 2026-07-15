@@ -5,8 +5,8 @@
  * @uses primitive:websockets
  * @constructs appEventHandler
  */
-import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
-import { deliverWSHandoffs } from '#/appEvents/bridges/websocket';
+import { deliverEmailHandoffs } from '#/appEvents/channels/email';
+import { deliverWSHandoffs } from '#/appEvents/channels/websocket';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
 
@@ -20,33 +20,18 @@ const throwIfFailures = (errors: unknown[]): void => {
     throw error instanceof Error ? error : new Error(String(error));
   }
 
-  throw new AggregateError(errors, `${errors.length} app event bridge failures`);
+  throw new AggregateError(errors, `${errors.length} app event channel failures`);
 };
 
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<void>[] = [];
-
-    // Wrap each bridge in an async IIFE so a synchronous throw from the
-    // user-supplied selector (handler.observe(data) etc.) becomes a Promise
-    // rejection captured by Promise.allSettled below — otherwise it would
-    // bubble before sibling bridges enqueue, breaking bridge isolation.
-    if (handler.observe) {
-      tasks.push(
-        (async () => {
-          const observeData = handler.observe!(data);
-          if (observeData) {
-            await observeRegistry.broadcast((adapter) => adapter.record(event, observeData));
-          }
-        })(),
-      );
-    }
+    const tasks: Promise<unknown>[] = [observeRegistry.broadcast((adapter) => adapter.record(event))];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the
     // sibling emails for this event. A synchronous throw from the selector is
-    // captured as a single rejection so it can't bubble before sibling bridges
+    // captured as a single rejection so it can't bubble before sibling channels
     // enqueue.
     if (handler.email) {
       try {

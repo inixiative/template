@@ -35,7 +35,7 @@ export default defineConfig({
     { include: '**/factories/**', kind: 'factory' },
     { include: ['**/client.ts', '**/*.client.ts', '**/client/**', '**/clients/**'], kind: 'client' },
     { include: ['**/registries/**', '**/registry.ts'], kind: 'registry' },
-    { include: '**/bridges/**', kind: 'bridge' },
+    { include: '**/channels/**', kind: 'channel' },
     { include: '**/defs/**', kind: 'definition' },
     { include: '**/*Error.ts', kind: 'error' },
     { include: '**/generate*.ts', kind: 'generator' },

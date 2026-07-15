@@ -21,7 +21,6 @@ import type {
 } from '@template/db/test/factoryTypes';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
-import { uuidv7 } from 'uuidv7';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
   if (obj === null || obj === undefined) {
@@ -60,7 +59,7 @@ const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
   // uuidv7 (not faker's v4) — matches the schema's `dbgenerated("uuidv7()")`
   // default, so factory-created rows share the same id format as production
   // rows. The middleware enforces v7 when addressing rows by `:id`.
-  if (fieldNames.has('id')) injected.id = uuidv7();
+  if (fieldNames.has('id')) injected.id = Bun.randomUUIDv7();
   if (fieldNames.has('createdAt')) injected.createdAt = new Date();
   if (fieldNames.has('updatedAt')) injected.updatedAt = new Date();
   if (fieldNames.has('deletedAt')) injected.deletedAt = null;

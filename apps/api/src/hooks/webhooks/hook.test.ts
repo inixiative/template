@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { Integration, WebhookModel } from '@template/db/generated/client/enums';
+import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
-import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
+import { cleanupTouchedTables, createIntegration, createUser, createWebhookSubscription } from '@template/db/test';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 
@@ -134,6 +134,7 @@ describe('webhook hook', () => {
 describe('webhook hook — origin suppression', () => {
   let enqueueSpy: ReturnType<typeof spyOn>;
   let writeUserId: string;
+  let sfIntegrationId: string;
   let sfSub: { id: string };
   let hsSub: { id: string };
   let plainSub: { id: string };
@@ -146,12 +147,22 @@ describe('webhook hook — origin suppression', () => {
     const { entity: user, context } = await createUser();
     writeUserId = user.id;
 
+    const { entity: sfIntegration } = await createIntegration(
+      { ownerModel: IntegrationOwnerModel.User, userId: user.id, name: 'Salesforce' },
+      context,
+    );
+    const { entity: hsIntegration } = await createIntegration(
+      { ownerModel: IntegrationOwnerModel.User, userId: user.id, name: 'HubSpot' },
+      context,
+    );
+    sfIntegrationId = sfIntegration.id;
+
     const { entity: sf } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-sf', integration: Integration.salesforce },
+      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-sf', integrationId: sfIntegration.id },
       context,
     );
     const { entity: hs } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-hs', integration: Integration.hubspot },
+      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-hs', integrationId: hsIntegration.id },
       context,
     );
     const { entity: plain } = await createWebhookSubscription(
@@ -173,7 +184,7 @@ describe('webhook hook — origin suppression', () => {
   it('skips the subscription whose integration is the write origin, delivers to the rest', async () => {
     enqueueSpy.mockClear();
 
-    await auditActorContext.scope({ ...nullAuditActor, originIntegration: Integration.salesforce }, async () => {
+    await auditActorContext.scope({ ...nullAuditActor, integrationId: sfIntegrationId }, async () => {
       await db.user.update({ where: { id: writeUserId }, data: { name: 'Origin SF' } });
     });
 

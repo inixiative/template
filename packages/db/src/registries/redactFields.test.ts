@@ -1,90 +1,82 @@
 import { describe, expect, it } from 'bun:test';
-import { getRedactFields, HOOK_REDACT_FIELDS, redactSensitiveFields } from '@template/db/registries';
+import {
+  getRedactFields,
+  REDACT_FIELDS,
+  redactChangeDiff,
+  redactPayload,
+  redactSensitiveFields,
+  SENSITIVE_KEYS,
+  WEBHOOK_DROP_FIELDS,
+} from '@template/db/registries';
 
-describe('redactFields', () => {
-  describe('HOOK_REDACT_FIELDS', () => {
-    it('defines sensitive fields for Account', () => {
-      expect(HOOK_REDACT_FIELDS.Account).toContain('password');
-    });
-
-    it('defines sensitive fields for Token', () => {
-      expect(HOOK_REDACT_FIELDS.Token).toContain('keyHash');
-    });
-
-    it('auto-injects encrypted columns for AuthProvider from encryption registry', () => {
-      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecrets');
-      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsMetadata');
-      expect(HOOK_REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsKeyVersion');
-    });
+describe('REDACT_FIELDS', () => {
+  it('includes plaintext-sensitive columns', () => {
+    expect(REDACT_FIELDS.Account).toContain('password');
+    expect(REDACT_FIELDS.Token).toContain('keyHash');
   });
 
-  describe('getRedactFields', () => {
-    it('returns empty array for unknown model', () => {
-      expect(getRedactFields('UnknownModel')).toEqual([]);
-    });
+  it('folds in encrypted columns from the encryption registry', () => {
+    expect(REDACT_FIELDS.AuthProvider).toContain('encryptedSecrets');
+    expect(REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsMetadata');
+    expect(REDACT_FIELDS.AuthProvider).toContain('encryptedSecretsKeyVersion');
+  });
+});
 
-    it('returns sensitive fields for Account', () => {
-      expect(getRedactFields('Account')).toContain('password');
-    });
+describe('WEBHOOK_DROP_FIELDS (NOOP ∪ REDACT)', () => {
+  it('drops both noop noise and sensitive columns', () => {
+    expect(WEBHOOK_DROP_FIELDS._global).toContain('updatedAt');
+    expect(WEBHOOK_DROP_FIELDS.Token).toEqual(expect.arrayContaining(['lastUsedAt', 'keyHash']));
+  });
+});
 
-    it('returns sensitive fields for Token', () => {
-      expect(getRedactFields('Token')).toContain('keyHash');
-    });
+describe('SENSITIVE_KEYS', () => {
+  it('is the flat set of every redacted field name across models', () => {
+    expect(SENSITIVE_KEYS.has('password')).toBe(true);
+    expect(SENSITIVE_KEYS.has('keyHash')).toBe(true);
+    expect(SENSITIVE_KEYS.has('encryptedSecrets')).toBe(true);
+  });
+});
+
+describe('getRedactFields', () => {
+  it('returns [] for a model with no sensitive fields', () => {
+    expect(getRedactFields('UnknownModel')).toEqual([]);
+  });
+});
+
+describe('redactSensitiveFields', () => {
+  it('masks Account password, keeps the rest', () => {
+    const result = redactSensitiveFields('Account', { id: '1', password: 'secret', providerId: 'google' });
+    expect(result.password).toBe('[REDACTED]');
+    expect(result.providerId).toBe('google');
   });
 
-  describe('redactSensitiveFields', () => {
-    it('replaces sensitive Account fields with [REDACTED]', () => {
-      const data = { id: '1', accountId: 'acc-1', password: 'super-secret', providerId: 'google' };
-      const result = redactSensitiveFields('Account', data);
-      expect(result.password).toBe('[REDACTED]');
-      expect(result.id).toBe('1');
-      expect(result.providerId).toBe('google');
-    });
+  it('masks AuthProvider encrypted columns', () => {
+    const result = redactSensitiveFields('AuthProvider', { id: '1', encryptedSecrets: 'cipher' });
+    expect(result.encryptedSecrets).toBe('[REDACTED]');
+  });
 
-    it('replaces Token keyHash with [REDACTED]', () => {
-      const data = { id: '1', name: 'my-token', keyHash: 'hash123', keyPrefix: 'tok_' };
-      const result = redactSensitiveFields('Token', data);
-      expect(result.keyHash).toBe('[REDACTED]');
-      expect(result.name).toBe('my-token');
-      expect(result.keyPrefix).toBe('tok_');
-    });
+  it('leaves a non-sensitive model untouched', () => {
+    const data = { id: '1', slug: 'x' };
+    expect(redactSensitiveFields('Organization', data)).toEqual(data);
+  });
+});
 
-    it('redacts AuthProvider encrypted columns via auto-inject', () => {
-      const data: Record<string, unknown> = {
-        id: '1',
-        encryptedSecrets: 'cipher',
-        encryptedSecretsMetadata: { iv: 'a', authTag: 'b' },
-        encryptedSecretsKeyVersion: 1,
-      };
-      const result = redactSensitiveFields('AuthProvider', data);
-      expect(result.encryptedSecrets).toBe('[REDACTED]');
-      expect(result.encryptedSecretsMetadata).toBe('[REDACTED]');
-      expect(result.encryptedSecretsKeyVersion).toBe('[REDACTED]');
-    });
+describe('redactChangeDiff', () => {
+  it('masks both sides of a sensitive change but keeps the key (records THAT it changed)', () => {
+    const changes = { keyHash: { before: 'a', after: 'b' }, name: { before: 'x', after: 'y' } };
+    const result = redactChangeDiff('Token', changes);
+    expect(result.keyHash).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+    expect(result.name).toEqual({ before: 'x', after: 'y' });
+  });
+});
 
-    it('uses custom redact value when provided', () => {
-      const data = { id: '1', password: 'secret' };
-      const result = redactSensitiveFields('Account', data, '***');
-      expect(result.password).toBe('***');
-    });
-
-    it('does not modify data for models with no sensitive fields', () => {
-      const data = { id: '1', name: 'test-org', slug: 'test' };
-      const result = redactSensitiveFields('Organization', data);
-      expect(result).toEqual(data);
-    });
-
-    it('does not modify fields not in the redact list', () => {
-      const data = { id: '1', password: 'secret', email: 'user@example.com' };
-      const result = redactSensitiveFields('Account', data);
-      expect(result.email).toBe('user@example.com');
-      expect(result.id).toBe('1');
-    });
-
-    it('handles data without sensitive fields gracefully', () => {
-      const data = { id: '1', accountId: 'acc-1', providerId: 'google' };
-      const result = redactSensitiveFields('Account', data);
-      expect(result).toEqual(data);
-    });
+describe('redactPayload', () => {
+  it('recursively masks sensitive keys anywhere in a payload', () => {
+    const payload = { userId: '1', account: { password: 'secret', email: 'a@b.c' }, items: [{ keyHash: 'h' }] };
+    const result = redactPayload(payload);
+    expect(result.account.password).toBe('[REDACTED]');
+    expect(result.account.email).toBe('a@b.c');
+    expect(result.items[0].keyHash).toBe('[REDACTED]');
+    expect(result.userId).toBe('1');
   });
 });

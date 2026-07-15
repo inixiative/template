@@ -5,7 +5,7 @@
  * @uses none
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { CommunicationKind } from '@template/db';
+import type { CommunicationKind } from '@template/db/generated/client/client';
 
 // A signed capability over the exact (user, contact, kind) intersection — the only thing the link
 // can do is unsubscribe that one contact from that one kind. Stateless: re-derived, never stored.

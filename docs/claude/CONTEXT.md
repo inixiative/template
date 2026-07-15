@@ -482,9 +482,11 @@ const accessor = pathParts[3] as AccessorName;
 // Supports alternate lookups: ?lookup=slug
 const lookup = c.req.query('lookup') || 'id';
 
-// Finds resources via the db delegate for that accessor
+// Finds resources via the db delegate for that accessor.
+// Models with a deletedAt column get `deletedAt: null` appended unless the
+// caller is a superadmin — soft-deleted rows 404 for everyone else.
 const resources = await db[accessor].findMany({
-  where: { [lookup]: id },
+  where: { [lookup]: id, ...softDeleteFilter },
   ...resourceContextArgs[accessor],  // Custom inclusions
 });
 
@@ -503,6 +505,15 @@ c.set('resourceType', accessor);
 | 0 results | 404 Resource not found |
 | 1 result | Sets resource context |
 | >1 results | 409 Multiple resources found |
+
+### Soft-Delete Invisibility
+
+If the resolved model has a `deletedAt` column (detected via the generated prismaMap through
+`lookupField`), the middleware appends `deletedAt: null` to the lookup unless the caller is a
+superadmin. Deleted means deleted for everyone except superadmins — soft-deleted resources 404
+uniformly, with no per-controller `deletedAt` checks. Revival flows go through create-path
+upserts on unique keys, never load-the-deleted-row-by-id. Models without `deletedAt` are
+unaffected.
 
 ### Lookup Parameter
 

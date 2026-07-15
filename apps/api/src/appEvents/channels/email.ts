@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind handler, bridge
+ * @kind handler, channel
  * @partOf primitive:appEvents
  * @uses primitive:jobs
  */
@@ -18,7 +18,7 @@ export const deliverEmailHandoffs = async (event: AppEventPayload, handoffs: Ema
         { id: plannerJobId(event.name, handoff.template, event.data) },
       );
 
-      log.info(`Email bridge: ${event.name} → ${handoff.template} job=${job.jobId}`);
+      log.info(`Email channel: ${event.name} → ${handoff.template} job=${job.jobId}`);
     }),
   );
 };

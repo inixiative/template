@@ -8,8 +8,7 @@ import { claimLane, db, laneKey } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
-import { uuidv7 } from 'uuidv7';
-import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
+import type { JobPayloads } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
@@ -26,6 +25,12 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   payload: JobPayloads[K],
   options?: EnqueueOptions,
 ) => {
+  // Lazy-load the handler registry to break the eval-time import cycle: handlers import enqueueJob
+  // (jobs re-enqueue jobs), and the registry imports every handler — a static import here closes the
+  // loop and TDZ-throws whenever a single handler module is loaded before `handlers/index.ts`. The
+  // registry is only needed at call time, so importing it here (module-cached) is the single-site fix.
+  const { isValidHandlerName, jobHandlers } = await import('#/jobs/handlers');
+
   if (!isValidHandlerName(handlerName)) {
     throw new Error(`Unknown job handler: ${handlerName}`);
   }
@@ -36,8 +41,16 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
   // happen for real, errors propagate, no queue infrastructure involved.
+  // Delayed jobs are the exception: they're scheduled for a future moment, so
+  // running them at enqueue time would execute wrong-time semantics — they
+  // return unrun, like the queue still holding them. To test one, call the
+  // handler directly.
   if (isTest) {
-    const jobId = id ?? uuidv7();
+    const jobId = id ?? Bun.randomUUIDv7();
+    if (jobOptions.delay !== undefined) {
+      log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
+      return { jobId, name: handlerName };
+    }
     const ctx: WorkerContext = {
       db,
       queue,
@@ -48,7 +61,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
-  const jobId = jobOptions.jobId ?? uuidv7();
+  const jobId = jobOptions.jobId ?? Bun.randomUUIDv7();
 
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {

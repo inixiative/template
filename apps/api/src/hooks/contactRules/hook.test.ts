@@ -2,7 +2,6 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
-import { uuidv7 } from 'uuidv7';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -276,7 +275,7 @@ describe('contactRules hook — position auto-assign', () => {
 
   it('clamps explicit position above MAX+1 on upsert.create', async () => {
     const { entity: user } = await createUser();
-    const fakeId = uuidv7();
+    const fakeId = Bun.randomUUIDv7();
     const upserted = await db.contact.upsert({
       where: { id: fakeId },
       create: {

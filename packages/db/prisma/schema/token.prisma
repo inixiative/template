@@ -3,10 +3,9 @@
 // ============================================================================
 
 model Token {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   name      String
   keyHash   String @unique
@@ -24,6 +23,8 @@ model Token {
   organizationUser   OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
   space              Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser          SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  integrationId      String?           @db.VarChar(36)
+  integration        Integration?      @relation(fields: [integrationId], references: [id], onDelete: SetNull)
   auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
@@ -47,6 +48,7 @@ model Token {
   @@index([userId])
   @@index([organizationId])
   @@index([spaceId])
+  @@index([integrationId])
 }
 
 enum TokenOwnerModel {

@@ -18,6 +18,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
+# (a minimal `bun run` PATH in particular misses it), so fall back to the
+# app-bundle path. DB/Redis/MinIO steps below route through "$DOCKER"; if it
+# can't be resolved the existing `if "$DOCKER" ps` guards skip gracefully.
+DOCKER=""
+if command -v docker >/dev/null 2>&1; then
+  DOCKER="docker"
+elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
+  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
+fi
+
 NAME="${1:-}"
 
 if [ -z "$NAME" ]; then
@@ -60,10 +71,10 @@ else
   DB_TEST="${PROJECT_NAME}_test_wt_${SLOT}"
 
   # --- 2. Drop Postgres databases -------------------------------------------
-  if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
     echo -e "${BLUE}Dropping databases: $DB_LOCAL, $DB_TEST...${NC}"
-    docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\";" >/dev/null
-    docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_TEST}\";"  >/dev/null
+    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\";" >/dev/null
+    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_TEST}\";"  >/dev/null
     echo -e "${GREEN}Databases dropped${NC}"
   else
     echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB drop.${NC}"
@@ -71,7 +82,7 @@ else
 
   # --- 2b. Remove MinIO buckets ---------------------------------------------
   MINIO_CONTAINER="${PROJECT_NAME}_minio"
-  if docker ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
+  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
     STORAGE_BUCKET_SYSTEM="${PROJECT_NAME}-system-wt-${SLOT}"
     STORAGE_BUCKET_USER="${PROJECT_NAME}-user-wt-${SLOT}"
     STORAGE_BUCKET_SYSTEM_TEST="${PROJECT_NAME}-system-test-wt-${SLOT}"
@@ -80,7 +91,7 @@ else
     echo -e "${BLUE}Removing MinIO buckets for slot ${SLOT}...${NC}"
     for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
                    "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-      docker run --rm --network "${PROJECT_NAME}_default" \
+      "$DOCKER" run --rm --network "${PROJECT_NAME}_default" \
         -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
         minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
     done
@@ -88,9 +99,9 @@ else
   fi
 
   # --- 3. Flush Redis logical DB --------------------------------------------
-  if docker ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
+  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
     echo -e "${BLUE}Flushing Redis DB ${SLOT}...${NC}"
-    docker exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null \
+    "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null \
       && echo -e "${GREEN}Redis DB ${SLOT} flushed${NC}" \
       || echo -e "${YELLOW}Warning: Could not flush Redis DB${NC}"
   fi

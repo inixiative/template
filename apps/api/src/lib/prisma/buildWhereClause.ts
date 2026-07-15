@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
@@ -14,11 +14,12 @@ import {
   isRelationOperator,
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
-import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
+import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
+import { validatePathNotation } from '#/lib/prisma/pathNotation';
 import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
 import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
@@ -26,7 +27,7 @@ type BuildWhereOptions = {
   filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
-  // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
+  // Superadmin: skips the picks whitelist (coercion + op validation still apply).
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
@@ -197,7 +198,7 @@ const validateAndTransformSearchFields = (
             model,
             currentPath,
             depth + 1,
-          );
+          ) as BracketQueryValue;
         }
       }
       result[key] = relationValue;
@@ -224,7 +225,6 @@ const validateAndTransformSearchFields = (
       continue;
     }
 
-    // No relation/field operators → deeper nesting (e.g. `{ user: { name: 'x' } }`).
     result[key] = validateAndTransformSearchFields(
       value,
       searchableFields,
@@ -232,7 +232,7 @@ const validateAndTransformSearchFields = (
       model,
       currentPath,
       depth + 1,
-    );
+    ) as BracketQueryValue;
   }
 
   return result;
@@ -245,15 +245,13 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  // Global search — broad: each searchable field contributes a clause based on its
-  // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
   if (search && searchableFields.length) {
     const searchConditions = searchableFields.flatMap((field) => {
       const def = lookupField(model, stripRelationOperators(field));
-      const clause = def && buildSearchClause(def, search);
+      const clause = def && fieldSearchOperator(def, search);
       if (!clause) return [];
-      if (!validatePathNotation(field)) throw new Error(`Invalid searchable field: ${field}`);
-      return [buildNestedPath(field, clause)];
+      if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
+      return [buildSearchPath(model, field, clause)];
     });
     if (searchConditions.length) conditions.push({ OR: searchConditions });
   }
@@ -267,17 +265,6 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
         conditions.push({ [key]: value });
       }
     }
-  }
-
-  // Row scope: the composed where for the root model. projectByPath walks the whole
-  // narrowing chain (route filterLens + every stacked scopeNarrowing layer), folding in
-  // mapDefaults + filter-first `all`-negation, and exposes the root visit's `whereClauses`.
-  // Each is toPrisma'd and ANDed into `conditions`.
-  const byPath = projectByPath(filterLens) as Map<string, { whereClauses: Condition[] }>;
-  const rootKey = byPath.keys().next().value;
-  for (const clause of (rootKey ? byPath.get(rootKey)?.whereClauses : undefined) ?? []) {
-    const step = toPrisma(clause, { map: lens, mapName: lens.mapName, model }).steps[0];
-    if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
   }
 
   return {
