@@ -1,12 +1,13 @@
-import { getRuntimeDataModel, isModelName, type ModelName, toModelName } from '@template/db';
+import { isModelName, type ModelName, toModelName } from '@template/db';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 type SearchableEntry = string | { [relation: string]: SearchableEntry | SearchableEntry[] };
 type SearchableInput = { [model: string]: SearchableEntry[] };
 
 const getField = (modelName: ModelName, fieldName: string) => {
-  const model = getRuntimeDataModel().models[modelName];
+  const model = prismaMap.models[modelName];
   if (!model) throw new Error(`searchable: unknown model '${modelName}'`);
-  const field = model.fields.find((f) => f.name === fieldName);
+  const field = (model.fields as Record<string, { kind: string; type: string }>)[fieldName];
   if (!field) throw new Error(`searchable: '${fieldName}' does not exist on '${modelName}'`);
   return field;
 };

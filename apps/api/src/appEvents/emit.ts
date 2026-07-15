@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:appEvents
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import type { AppEventPayloads } from '#/appEvents/handlers';
@@ -11,10 +17,10 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   const actor = auditActorContext.getScope() ?? nullAuditActor;
 
   const event: AppEventPayload = {
+    id: Bun.randomUUIDv7(),
     name,
     actor,
     data: data as Record<string, unknown>,
-    timestamp: new Date().toISOString(),
   };
 
   const handler = appEventHandlers[name];

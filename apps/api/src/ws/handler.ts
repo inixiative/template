@@ -1,9 +1,16 @@
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:websockets
+ * @uses none
+ */
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
 import type { Server } from 'bun';
-import { authenticateToken, resolveSpoofTarget } from '#/ws/auth';
+import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
+import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
@@ -30,6 +37,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
   const data: WSData = {
     connectionId: crypto.randomUUID(),
     userId: null,
+    headers: {},
     channels: new Set(),
     connectedAt: now,
     lastPing: now,
@@ -55,29 +63,31 @@ const parseFrame = (raw: string | Buffer): WSMessage | null => {
 
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
-    case 'authenticate':
-    case 'unspoof': {
-      const userId = await authenticateToken(msg.token);
-      setIdentity(ws, userId);
-      send(ws, { type: 'identity', userId });
-      return;
-    }
-    case 'spoof': {
-      const userId = await resolveSpoofTarget(msg.token, msg.email);
-      if (!userId) {
+    case 'authenticate': {
+      const headers = sanitizeWSHeaders(msg.headers);
+      const me = await resolveIdentity(headers);
+      // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
+      const spoofEmail = headers['x-spoof-user-email'];
+      if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
         send(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, userId);
-      send(ws, { type: 'identity', userId });
+      setIdentity(ws, me?.id ?? null);
+      ws.data.headers = me ? headers : {};
+      send(ws, { type: 'identity', userId: me?.id ?? null });
       return;
     }
     case 'logout': {
       setIdentity(ws, null);
+      ws.data.headers = {};
       send(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
+      if (!(await canSubscribe(ws.data.headers, msg.channel))) {
+        send(ws, { type: 'subscribeRejected', channel: msg.channel });
+        return;
+      }
       subscribeToChannel(ws, msg.channel);
       send(ws, { type: 'subscribed', channel: msg.channel });
       return;
@@ -95,6 +105,24 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   }
 };
 
+// Backpressure: a socket flooding frames grows the per-connection queue without bound (each
+// dispatch awaits I/O). Cap pending dispatches and overall frame rate; abusers are closed.
+const MAX_PENDING_FRAMES = 32;
+const FRAME_LIMIT = 120;
+const FRAME_WINDOW_MS = 10_000;
+const frameWindows = new WeakMap<WSSocket, { start: number; count: number }>();
+
+const overFrameLimit = (ws: WSSocket): boolean => {
+  const now = Date.now();
+  const window = frameWindows.get(ws);
+  if (!window || now - window.start > FRAME_WINDOW_MS) {
+    frameWindows.set(ws, { start: now, count: 1 });
+    return false;
+  }
+  window.count++;
+  return window.count > FRAME_LIMIT;
+};
+
 export const websocketHandler = {
   open(ws: WSSocket) {
     addConnection(ws);
@@ -104,10 +132,19 @@ export const websocketHandler = {
     removeConnection(ws);
   },
   // Returns the dispatch promise (Bun ignores it; tests await it). Per-connection
-  // serializedQueue keeps async identity actions from interleaving.
+  // serializedQueue keeps async identity actions from interleaving; the catch is the ws
+  // error boundary — a failed dispatch stays scoped to its connection.
   message(ws: WSSocket, raw: string | Buffer) {
+    if (overFrameLimit(ws)) {
+      ws.close(1008, 'rate limit exceeded');
+      return;
+    }
+    if (ws.data.queue.size() >= MAX_PENDING_FRAMES) return;
     const msg = parseFrame(raw);
     if (!msg) return;
-    return ws.data.queue.run(() => dispatch(ws, msg));
+    return ws.data.queue.run(() => dispatch(ws, msg)).catch((err) => {
+      log.error(`ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`, LogScope.ws);
+      send(ws, { type: 'error', action: msg.action });
+    });
   },
 };

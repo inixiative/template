@@ -1,9 +1,19 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses primitive:routeTemplates
+ */
+import { type LensNarrowing, lensRequiredBindings, type RuleValue, resolveLensBindings } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { orderablePaths } from '@template/db/lens/orderablePaths';
+import { rootLens } from '@template/db/lens';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
+import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+import { lensWhere } from '#/lib/prisma/lensWhere';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 type PaginationQuery = {
@@ -24,6 +34,7 @@ type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: 
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
+  bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
   include?: FindManyInclude<T>;
@@ -59,26 +70,64 @@ export const paginate = async <
 ): Promise<PaginatedResult<TItem>> => {
   const query = getValidatedQuery(c);
   const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
-  const { orderBy: callerOrderByOption, orNullFields, ...findManyOptions } = (options ?? {}) as PaginateOptions<T>;
+  const {
+    orderBy: callerOrderByOption,
+    orNullFields,
+    bindings,
+    ...findManyOptions
+  } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
   const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
 
-  const filterLens = c.get('filterLens');
-  if (!filterLens) {
-    throw new Error('paginate: route must declare a filterLens (readRoute({ filterLens: … })).');
+  const declaredLens = c.get('filterLens');
+  if (!declaredLens) {
+    throw makeError({
+      status: 500,
+      message: 'paginate: route must declare a filterLens (readRoute({ filterLens: … })).',
+    });
   }
-  const skipFieldValidation = isSuperadmin(c);
+  const required = lensRequiredBindings(declaredLens);
+  const missing = [...required].filter((name) => bindings?.[name] === undefined);
+  if (missing.length) {
+    throw makeError({
+      status: 500,
+      message: `paginate: lens requires bindings not provided: ${missing.join(', ')}`,
+    });
+  }
+  const filterLens = required.size
+    ? (resolveLensBindings(declaredLens, bindings ?? {}) as LensNarrowing)
+    : declaredLens;
+  // Superadmin bypasses both the searchable-fields whitelist and the injected
+  // `deletedAt: null` live scope.
+  const superadmin = isSuperadmin(c);
 
-  const searchWhere = buildWhereClause({ filterLens, search, searchFields, skipFieldValidation, orNullFields });
-
+  const model = rootLens(filterLens).model;
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
-  const where = { AND: [baseWhere, searchWhere] } as FindManyWhere<T>;
+  const searchWhere = buildWhereClause({
+    filterLens,
+    search,
+    searchFields,
+    skipFieldValidation: superadmin,
+    orNullFields,
+  });
+
+  // Lens relation wheres are authorization scope — they apply for superadmin
+  // too, mirroring root wheres. Live scope remains superadmin-bypassable.
+  const composed = await lensWhere(filterLens, { AND: [baseWhere, searchWhere as Record<string, unknown>] });
+  const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
+
+  if (!superadmin) {
+    const trees = findManyOptions as Record<string, unknown>;
+    for (const key of ['include', 'select'] as const) {
+      const tree = trees[key];
+      if (tree && typeof tree === 'object') trees[key] = liveIncludes(model, tree as Record<string, unknown>);
+    }
+  }
 
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
     clientOrderBy: rawOrderBy,
-    orderableFields: skipFieldValidation ? undefined : orderablePaths(filterLens),
   });
 
   const paginatedArgs = {

@@ -1,4 +1,10 @@
+/**
+ * @atlas
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { db } from '@template/db/client';
+import { prismaMap } from '@template/db/generated/prismaMap';
 import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
@@ -11,11 +17,10 @@ import type {
   ModelName,
   ModelOf,
   Serialized,
+  WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
-import { getRuntimeDataModel } from '@template/db/utils/runtimeDataModel';
-import { uuidv7 } from 'uuidv7';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
   if (obj === null || obj === undefined) {
@@ -45,17 +50,16 @@ const serializeEntity = <T>(obj: T): Serialized<T> => {
 };
 
 const autoInjectDbFields = (modelName: ModelName): Record<string, unknown> => {
-  const dataModel = getRuntimeDataModel();
-  const model = dataModel.models[modelName];
+  const model = prismaMap.models[modelName];
   if (!model) return {};
 
-  const fieldNames = new Set(model.fields.map((f) => f.name));
+  const fieldNames = new Set(Object.keys(model.fields));
   const injected: Record<string, unknown> = {};
 
   // uuidv7 (not faker's v4) — matches the schema's `dbgenerated("uuidv7()")`
   // default, so factory-created rows share the same id format as production
   // rows. The middleware enforces v7 when addressing rows by `:id`.
-  if (fieldNames.has('id')) injected.id = uuidv7();
+  if (fieldNames.has('id')) injected.id = Bun.randomUUIDv7();
   if (fieldNames.has('createdAt')) injected.createdAt = new Date();
   if (fieldNames.has('updatedAt')) injected.updatedAt = new Date();
   if (fieldNames.has('deletedAt')) injected.deletedAt = null;
@@ -91,6 +95,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
     persist: boolean,
     overrides?: O,
     context?: BuildContext,
+    upsertWhere?: WhereUniqueOf<K>,
   ): Promise<BuildResult<K, O>> => {
     const ctx: BuildContext = context ?? {};
 
@@ -181,8 +186,11 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       }
     }
 
+    const delegate = db[toAccessor(modelName)] as unknown as RuntimeDelegate;
     const entity: ModelOf<K> = persist
-      ? ((await (db[toAccessor(modelName)] as unknown as RuntimeDelegate).create({ data: merged })) as ModelOf<K>)
+      ? upsertWhere
+        ? ((await delegate.upsert({ where: upsertWhere, create: merged, update: {} })) as ModelOf<K>)
+        : ((await delegate.create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
     // Add non-enumerable __serialize() method to convert Date fields to ISO strings
@@ -206,5 +214,6 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
   return {
     build: (overrides, context) => generate(false, overrides, context),
     create: (overrides, context) => generate(true, overrides, context) as Promise<BuildResult<K>>,
+    upsert: (where, overrides, context) => generate(true, overrides, context, where) as Promise<BuildResult<K>>,
   };
 };

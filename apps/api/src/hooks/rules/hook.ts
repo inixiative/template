@@ -9,10 +9,12 @@ import {
 } from '@template/db';
 import { getRule } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
+import { makeError } from '#/lib/errors';
 
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);
-  if (result !== true) throw new Error(typeof result === 'string' ? result : `Validation failed on ${model}`);
+  if (result !== true)
+    throw makeError({ status: 422, message: typeof result === 'string' ? result : `Validation failed on ${model}` });
 };
 
 const processCreateArgs = (args: unknown, model: ModelName): void => {

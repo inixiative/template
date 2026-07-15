@@ -1,4 +1,14 @@
-import { BRACKET_SYMBOL_SEGMENT, castBracketSymbol } from '@template/shared/bracketQuery';
+/**
+ * @atlas
+ * @kind utils
+ * @uses primitive:shared
+ */
+import {
+  BRACKET_NUMBER_SEGMENT,
+  BRACKET_SYMBOL_SEGMENT,
+  castBracketNumber,
+  castBracketSymbol,
+} from '@template/shared/bracketQuery';
 
 export type BracketQueryPrimitive = string | number | boolean | null;
 export type BracketQueryValue = BracketQueryPrimitive | BracketQueryPrimitive[] | BracketQueryRecord;
@@ -17,10 +27,12 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     const rawKeys = key.match(/[^[\]]+/g);
     if (!rawKeys || rawKeys.length < 2) continue;
 
-    // A trailing `[:]` marks the leaf value as a symbol (null/true/false) rather
-    // than a literal string; drop the marker and cast the value.
-    const isSymbol = rawKeys[rawKeys.length - 1] === BRACKET_SYMBOL_SEGMENT;
-    const keys = isSymbol ? rawKeys.slice(0, -1) : rawKeys;
+    // A trailing marker segment types the leaf value: `[:]` = symbol (null/boolean),
+    // `[$]` = number. Drop the marker from the key path and cast the value below.
+    const lastSegment = rawKeys[rawKeys.length - 1];
+    const marker =
+      lastSegment === BRACKET_SYMBOL_SEGMENT ? 'symbol' : lastSegment === BRACKET_NUMBER_SEGMENT ? 'number' : undefined;
+    const keys = marker ? rawKeys.slice(0, -1) : rawKeys;
     if (keys.length < 1) continue;
 
     let current: BracketQueryRecord = result;
@@ -32,11 +44,17 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
       current = current[keys[i]] as BracketQueryRecord;
     }
 
-    const decoded = decodeURIComponent(value.replace(/\+/g, ' ')).trim();
-    // Cast `[:]`-marked tokens to symbols; unknown tokens fall back to the literal
-    // string (allowlist, no eval). `=== undefined` so the valid null symbol survives.
-    const symbol = isSymbol ? castBracketSymbol(decoded) : undefined;
-    const decodedValue: BracketQueryPrimitive = symbol !== undefined ? symbol : decoded;
+    // URLSearchParams already percent-decodes and converts `+` -> ' ' per the
+    // WHATWG URL Standard; a second decodeURIComponent would throw on any literal
+    // `%` in the value ("50%off") and re-space literal `+` ("a+b@x.com").
+    const decoded = value.trim();
+    // Cast marked tokens through the allowlist (no eval); a marker whose value
+    // doesn't cast is malformed — skip the leaf rather than silently storing the
+    // raw string. `=== undefined` so the valid null symbol survives.
+    const cast =
+      marker === 'symbol' ? castBracketSymbol(decoded) : marker === 'number' ? castBracketNumber(decoded) : undefined;
+    if (marker && cast === undefined) continue;
+    const decodedValue: BracketQueryPrimitive = cast !== undefined ? cast : decoded;
     const leafKey = keys[keys.length - 1];
     const existingValue = current[leafKey];
 

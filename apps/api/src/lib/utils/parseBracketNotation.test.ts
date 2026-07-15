@@ -86,6 +86,11 @@ describe('parseBracketNotation', () => {
     });
   });
 
+  it('does not double-decode: literal % survives and encoded + stays a plus', () => {
+    expect(parseBracketNotation('?filters[promo]=50%25off')).toEqual({ filters: { promo: '50%off' } });
+    expect(parseBracketNotation('?filters[email]=a%2Bb%40x.com')).toEqual({ filters: { email: 'a+b@x.com' } });
+  });
+
   it('ignores non-bracket params', () => {
     const url = '?page=1&filters[status]=active&limit=10';
     const result = parseBracketNotation(url);
@@ -149,11 +154,59 @@ describe('parseBracketNotation — symbol values ([:] marker)', () => {
     expect(parseBracketNotation('?searchFields[a][equals]=true').searchFields).toEqual({ a: { equals: 'true' } });
   });
 
-  it('falls back to the literal string for non-allowlisted [:] tokens (no eval)', () => {
-    expect(parseBracketNotation('?searchFields[a][equals][:]=bogus').searchFields).toEqual({ a: { equals: 'bogus' } });
+  it('skips a [:] marker whose value is not a valid symbol (no eval, no raw-string fallback)', () => {
+    // `[:]` marks a symbol (null/true/false); a non-symbol value is malformed and
+    // the leaf is dropped rather than silently stored as a raw string. The
+    // intermediate parent object is still created before the skip.
+    expect(parseBracketNotation('?searchFields[a][equals][:]=bogus').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[name][:]=dragon').searchFields).toEqual({});
+    expect(parseBracketNotation('?searchFields[name][:]=dragon&searchFields[email]=a@b.com').searchFields).toEqual({
+      email: 'a@b.com',
+    });
   });
 
   it('supports a bare [:] symbol value', () => {
     expect(parseBracketNotation('?searchFields[a][:]=null').searchFields).toEqual({ a: null });
+  });
+
+  it('casts lenient boolean spellings (0/1/t/f)', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][:]=1').searchFields).toEqual({ a: { equals: true } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=0').searchFields).toEqual({ a: { equals: false } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=t').searchFields).toEqual({ a: { equals: true } });
+    expect(parseBracketNotation('?searchFields[a][equals][:]=f').searchFields).toEqual({ a: { equals: false } });
+  });
+});
+
+describe('parseBracketNotation — number values ([$] marker)', () => {
+  it('casts [$]-marked tokens to numbers', () => {
+    expect(parseBracketNotation('?searchFields[age][gte][$]=18').searchFields).toEqual({ age: { gte: 18 } });
+    expect(parseBracketNotation('?searchFields[score][equals][$]=-2.5').searchFields).toEqual({
+      score: { equals: -2.5 },
+    });
+  });
+
+  it('keeps plain (un-marked) numeric values as strings', () => {
+    expect(parseBracketNotation('?searchFields[age][gte]=18').searchFields).toEqual({ age: { gte: '18' } });
+  });
+
+  it('collects repeated [$]-marked params into a number array', () => {
+    expect(parseBracketNotation('?searchFields[score][in][$]=1&searchFields[score][in][$]=2').searchFields).toEqual({
+      score: { in: [1, 2] },
+    });
+  });
+
+  it('accumulates mixed-typed items at the same leaf', () => {
+    const url = '?searchFields[a][in][$]=1&searchFields[a][in]=x&searchFields[a][in][:]=null';
+    expect(parseBracketNotation(url).searchFields).toEqual({ a: { in: [1, 'x', null] } });
+  });
+
+  it('skips a [$] marker whose value is not a finite number', () => {
+    expect(parseBracketNotation('?searchFields[a][equals][$]=abc').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[a][equals][$]=Infinity').searchFields).toEqual({ a: {} });
+    expect(parseBracketNotation('?searchFields[a][equals][$]=').searchFields).toEqual({ a: {} });
+  });
+
+  it('supports a bare [$] number value', () => {
+    expect(parseBracketNotation('?searchFields[a][$]=7').searchFields).toEqual({ a: 7 });
   });
 });

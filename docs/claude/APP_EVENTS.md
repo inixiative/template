@@ -38,7 +38,7 @@ Every SaaS follows the same painful progression:
 
 4. **The eventual migration.** Everyone ends up with: an event bus that decouples business logic from side effects, adapter registries per delivery channel, and background jobs for anything that talks to external services.
 
-This system skips straight to step 4. Business logic emits events. Everything else is a bridge.
+This system skips straight to step 4. Business logic emits events. Everything else is a channel.
 
 ---
 
@@ -52,14 +52,14 @@ emit.ts (auto-enriches actor from auditActorContext)
   ▼
 appEventHandlers[name](event)  ← centralized map, like jobHandlers
   ▼
-makeAppEvent handler (Promise.allSettled across bridges)
-  ├─ observe  → enqueueJob('recordAppEvent')  → AppEvent table
+makeAppEvent handler (Promise.allSettled across channels)
+  ├─ observe  → observeRegistry.broadcast     → log line + AppEvent upsert
   ├─ email    → enqueueJob('sendEmail')        → Resend/Console
   ├─ websocket → sendToChannel(channelKey(key))  → Redis pub/sub → FE invalidateQueries
   └─ cb       → raw callbacks
 ```
 
-Nothing synchronous hits external services in the request path. Observe and email go through BullMQ jobs. WebSocket is Redis pub/sub (milliseconds). The API response is unblocked.
+Nothing synchronous hits external services in the request path. Email goes through BullMQ jobs. WebSocket is Redis pub/sub (milliseconds). Observe writes the AppEvent row directly (best-effort upsert on the envelope id — one local DB write, not an external service).
 
 The `websocket` reach returns `WSEvent[]` — a refetch-only contract: it names the **query** to invalidate (`{ category:'query', action:'refetch', key:{ _id, path } }`), never raw data. The FE refetches through the real authorized route, so there's no data leak. See **[WEBSOCKETS.md](./WEBSOCKETS.md)** for the full realtime layer (channelKey, the FE pipe, heartbeat/reconnect, horizontal scaling).
 
@@ -129,12 +129,11 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
 type AppEventHandlerDefinition<T> = {
   email?: (data: T) => EmailHandoff[] | null;     // enqueues sendEmail job
   websocket?: (data: T) => WSEvent[] | null;       // refetch a query (channel = channelKey(key))
-  observe?: (data: T) => ObserveData | null;        // enqueues recordAppEvent job
   cb?: Array<(data: T) => Promise<void> | void>;    // raw callbacks
 };
 ```
 
-Each bridge runs in parallel via `Promise.allSettled`. One bridge failing doesn't affect others.
+Each channel runs in parallel via `Promise.allSettled`. One channel failing doesn't affect others. Observe is not declared — every handler broadcasts the full envelope to the observe registry as an implicit always-on channel.
 
 ---
 
@@ -143,7 +142,7 @@ Each bridge runs in parallel via `Promise.allSettled`. One bridge failing doesn'
 ```
 Handler returns EmailHandoff[]
   ↓
-Email bridge → enqueueJob('sendEmail', handoff)
+Email channel → enqueueJob('sendEmail', handoff)
   ↓
 sendEmail job (BullMQ worker):
   1. resolveTargets(to/cc/bcc)  → email addresses
@@ -195,17 +194,9 @@ Seeded templates: `email-verification`, `org-invitation`, `welcome`.
 
 ## Observe Pipeline
 
-Every event handler can define what data to persist:
+Observe is implicit and always on: every handled event broadcasts its full envelope `{id, name, actor, data}` through the observe `BroadcastRegistry`. There is no per-handler opt-in and no curation — adapters record the whole event. The `id` is a uuidv7 stamped at emit; it encodes emit time and keys the persisted row.
 
-```typescript
-observe: (inquiry) => ({
-  inquiryId: inquiry.id,
-  type: inquiry.type,
-  targetUserId: inquiry.targetUserId,
-})
-```
-
-This goes through the observe `BroadcastRegistry` → currently the DB adapter enqueues a `recordAppEvent` job → writes to `AppEvent` table. Future: register Segment, Datadog adapters alongside DB.
+Registered adapters: `log` (structured line) and `db` (direct `AppEvent` upsert on the envelope id — idempotent, best-effort, not a retry substrate). Additional destinations (Segment, Datadog, a data-lake shipper) register as adapters; additional observations are additional events.
 
 ---
 
@@ -256,7 +247,7 @@ The `inquiry.sent` and `inquiry.resolved` handlers in `appEvents/handlers/inquir
 ```
 apps/api/src/
 ├── appEvents/
-│   ├── bridges/
+│   ├── channels/
 │   │   └── email.ts           handoff → enqueueJob (glue)   [websocket is inlined in makeAppEvent]
 │   ├── handlers/
 │   │   ├── index.ts           AppEventPayloads + AppEventName + appEventHandlers
@@ -268,15 +259,14 @@ apps/api/src/
 │   │       └── userVerificationRequested.ts
 │   ├── emit.ts                emitAppEvent<K>(name, data, options?)
 │   ├── makeAppEvent.ts        returns AppEventHandlerFn
-│   ├── types.ts               EmailHandoff, WSEvent, ObserveData, etc.
+│   ├── types.ts               EmailHandoff, WSEvent, ObserveAdapter, etc.
 │   └── index.ts               re-exports emitAppEvent + types
 ├── lib/
 │   ├── email.ts               emailRegistry + emailVerifier + resolveFromAddress
-│   ├── observe.ts             observeRegistry + DB adapter
+│   ├── observe.ts             observeRegistry + log/db adapters
 │   └── resolveTargets.ts      EmailTarget[] → ResolvedRecipient[]
 └── jobs/handlers/
-    ├── sendEmail.ts           resolve → verify → compose → render → send
-    └── recordAppEvent.ts      write to AppEvent table
+    └── sendEmail.ts           resolve → verify → compose → render → send
 ```
 
 ---
@@ -288,9 +278,9 @@ apps/api/src/
 | Sender resolution | Stub | Always platform default. Future: cascade Space → Org → User |
 | Template locale | Stub | Hardcoded `en`. Future: recipient preference |
 | Email client selection | Stub | First registered adapter. Future: per-tenant BYOE |
-| SMS bridge | Not started | Add to AppEventHandlerDefinition when needed |
-| Chat bridge (Slack/Teams/Discord) | Not started | Same pattern as email |
-| Notify bridge (in-app) | Not started | Redis-backed, WebSocket push |
+| SMS channel | Not started | Add to AppEventHandlerDefinition when needed |
+| Chat channel (Slack/Teams/Discord) | Not started | Same pattern as email |
+| Notify channel (in-app) | Not started | Redis-backed, WebSocket push |
 | Unsubscribe | Not started | CommunicationCategory exists, need preference model + endpoint |
 | Workflow primitives | Not started | Delay, digest, skip via BullMQ job chains |
 | Email delivery tracking | Not started | Provider webhooks → app events |
@@ -301,7 +291,10 @@ See `tickets/FEAT-012-notifications.md` for full roadmap.
 
 ## WebSockets
 
-Located in `apps/api/src/ws/`. Redis pub/sub for multi-instance support.
+Backend in `apps/api/src/ws/`, Redis pub/sub for multi-instance support. The
+socket is a **query-refetch** channel — it never carries domain data, only
+"this query is stale, refetch it." See [WEBSOCKETS.md](WEBSOCKETS.md) for the
+full contract; this is the realtime layer behind an app event's `websocket` reach.
 
 ### Connection
 
@@ -309,25 +302,27 @@ Located in `apps/api/src/ws/`. Redis pub/sub for multi-instance support.
 ws://localhost:8000?token=<bearer_token>
 ```
 
-### Client Messages
+### Channels
+
+Channels are exact-match keys derived from a query's identity via `channelKey({ _id, path })`
+(`@template/shared/ws`) — e.g. `adminBotRead:id:b1`. List surfaces collapse onto one
+channel because `channelKey` drops query params. Identity is set by message
+(`authenticate` / `spoof` / `unspoof` / `logout`), gated by a verified token.
+
+Server → client events are the `WSEvent` discriminated union, e.g.:
 
 ```typescript
-{ "action": "subscribe", "channel": "org:abc123" }
-{ "action": "unsubscribe", "channel": "org:abc123" }
-{ "action": "ping" }
-{ "action": "disconnect" }
-```
-
-### Server Messages
-
-```typescript
-{ "type": "connected", "connectionId": "...", "userId": "..." }
-{ "type": "subscribed", "channel": "org:abc123" }
-{ "type": "pong", "timestamp": 1234567890 }
+{ "category": "query", "action": "refetch", "key": { "_id": "adminBotRead", "path": { "id": "b1" } } }
 ```
 
 ### Frontend
 
-- `useWebSocket` hook (currently named `useAppEvents` — rename pending)
-- `useEventRefetch` — match events to TanStack Query invalidation rules
-- Auto-connect session hook — not yet wired into app layouts
+The hook is **`useApiWebsocket()`** (`packages/ui/src/hooks/useApiWebsocket.ts`) —
+mounted once at each app root (`__root.tsx`) and connecting on load. It is wired
+in all three apps. The refetch model:
+
+- `packages/ui/src/lib/ws/createApiWebsocket.ts` — channel refcount Map + heartbeat.
+- `packages/ui/src/lib/ws/dispatch.ts` — `query.refetch` → `invalidateQueries([event.key])`.
+- The **client slice** (`packages/ui/src/store/slices/client.ts`) pipes mounted live
+  queries to channel subscriptions (gated by `LIVE_QUERIES`); `setClient` wires the
+  query-cache subscriber and recovers missed invalidations on reconnect.

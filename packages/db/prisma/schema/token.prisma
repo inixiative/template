@@ -3,32 +3,33 @@
 // ============================================================================
 
 model Token {
-  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   name      String
-  keyHash   String   @unique
+  keyHash   String @unique
   keyPrefix String
 
   // Polymorphic ownership
   ownerModel     TokenOwnerModel
-  userId         String?          @db.VarChar(36)
-  organizationId String?          @db.VarChar(36)
-  spaceId        String?          @db.VarChar(36)
+  userId         String?         @db.VarChar(36)
+  organizationId String?         @db.VarChar(36)
+  spaceId        String?         @db.VarChar(36)
 
   // Relations
-  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
-  space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
-  spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
-  auditLogsAsActor   AuditLog[] @relation("AuditLogActorToken")
-  auditLogsAsSubject AuditLog[] @relation("AuditLogSubjectToken")
+  user               User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser   OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space              Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser          SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  integrationId      String?           @db.VarChar(36)
+  integration        Integration?      @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
+  auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
   // Permissions (for org-owned tokens)
-  role         Role @default(member)
+  role         Role  @default(member)
   entitlements Json?
 
   // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)
@@ -40,13 +41,14 @@ model Token {
   lastUsedAt DateTime?
   isActive   Boolean   @default(true)
 
-  @@index([userId])
-  @@index([organizationId])
-  @@index([spaceId])
-
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([integrationId])
 }
 
 enum TokenOwnerModel {

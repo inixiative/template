@@ -1,4 +1,10 @@
-import type { FlexibleRef } from '@template/db';
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
+import type { FlexibleRef } from '@template/db/registries/falsePolymorphism';
 
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],

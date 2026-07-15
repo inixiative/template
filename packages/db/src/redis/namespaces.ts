@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @partOf primitive:caching, primitive:jobs, primitive:websockets, feature:auth, primitive:shared, infrastructure:redis, infrastructure:prisma
+ * @uses none
+ */
 export const redisNamespace = {
   bull: 'bull',
   cache: 'cache',
@@ -7,6 +12,7 @@ export const redisNamespace = {
   session: 'session',
   limit: 'limit',
   lock: 'lock',
+  lane: 'lane',
   // flag: 'flag',
 } as const;
 

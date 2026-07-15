@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { toast as sonnerToast } from 'sonner';
 
 type ToastPromiseInput<TData> = Promise<TData> | (() => Promise<TData>);

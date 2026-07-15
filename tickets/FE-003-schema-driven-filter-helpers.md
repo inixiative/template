@@ -1,10 +1,19 @@
 # FE-003: Schema-Driven Filter Helpers
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress — core shipped (schema-derived helpers built; optional filter-builder UI remains)
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-04-03
-**Updated**: 2026-04-03
+**Updated**: 2026-06-13
+
+> **Built (verified 2026-06-13):** the schema-derived helper layer is done —
+> `getQueryMetadata.ts` (`getQueryMetadataByOperation`) reads per-operation
+> searchable/orderable fields + enum filters from the generated query metadata;
+> `makeDataConfig(operationId)` turns that into a `DataConfig`; `useDataFilters` +
+> `buildFilterQuery` + the `Table` primitive consume it. Backend capability is
+> exposed in the OpenAPI spec (lens-driven filter/order). **Remaining:** the
+> optional filter-builder UI component — overlaps INFRA-002's `FieldSelector`;
+> decide whether to fold it there or keep here.
 
 ---
 

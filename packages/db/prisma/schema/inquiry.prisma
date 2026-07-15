@@ -3,9 +3,9 @@
 // ============================================================================
 
 model Inquiry {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   sentAt    DateTime?
   expiresAt DateTime?
@@ -18,9 +18,9 @@ model Inquiry {
 
   // Source (who creates/sends) - fake polymorphism
   sourceModel          InquiryResourceModel
-  sourceUserId         String?       @db.VarChar(36)
-  sourceOrganizationId String?       @db.VarChar(36)
-  sourceSpaceId        String?       @db.VarChar(36)
+  sourceUserId         String?              @db.VarChar(36)
+  sourceOrganizationId String?              @db.VarChar(36)
+  sourceSpaceId        String?              @db.VarChar(36)
 
   sourceUser         User?         @relation("InquirySource", fields: [sourceUserId], references: [id], onDelete: Cascade)
   sourceOrganization Organization? @relation("InquirySource", fields: [sourceOrganizationId], references: [id], onDelete: Cascade)
@@ -28,15 +28,19 @@ model Inquiry {
 
   // Target (who receives/resolves) - fake polymorphism
   targetModel          InquiryResourceModel
-  targetUserId         String?       @db.VarChar(36)
-  targetOrganizationId String?       @db.VarChar(36)
-  targetSpaceId        String?       @db.VarChar(36)
+  targetUserId         String?              @db.VarChar(36)
+  targetOrganizationId String?              @db.VarChar(36)
+  targetSpaceId        String?              @db.VarChar(36)
 
   targetUser         User?         @relation("InquiryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetOrganization Organization? @relation("InquiryTarget", fields: [targetOrganizationId], references: [id], onDelete: Cascade)
   targetSpace        Space?        @relation("InquiryTarget", fields: [targetSpaceId], references: [id], onDelete: Cascade)
   auditLogsAsSubject AuditLog[]    @relation("AuditLogSubjectInquiry")
   auditLogsAsSource  AuditLog[]    @relation("AuditLogSourceInquiry")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
 
   @@index([sourceModel])
   @@index([sourceUserId])
@@ -48,10 +52,6 @@ model Inquiry {
   @@index([targetSpaceId])
   @@index([type, status])
   @@index([expiresAt])
-
-  // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-  // ==========================================================================
 }
 
 enum InquiryType {

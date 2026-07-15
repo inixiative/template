@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:lifecycle
+ * @uses primitive:shared
+ */
 import { LogScope, log } from '@template/shared/logger';
 
 type ShutdownHandler = () => Promise<void> | void;
@@ -46,4 +52,8 @@ export const initGracefulShutdown = (
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+};
+
+export const isShutdownInProgress = (): boolean => {
+  return isShuttingDown;
 };

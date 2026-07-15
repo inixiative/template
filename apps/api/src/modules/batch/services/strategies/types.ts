@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type, service
+ * @partOf primitive:batch
+ * @uses none
+ */
 import type { Context, Hono } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:authz, primitive:requestContext
+ * @uses infrastructure:prisma, primitive:authz
+ */
 import type { UserWithRelations } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';
 import { isSuperadmin } from '@template/permissions';
@@ -18,7 +24,8 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
 
   const permix = c.get('permix');
   permix.setUserId(user.id as UserId);
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
+  // Set both ways: a superadmin spoofing a normal user must not retain the flag.
+  permix.setSuperadmin(isSuperadmin(user));
   await setupUserPermissions(c);
   await setupOrgPermissions(c);
   await setupSpacePermissions(c);

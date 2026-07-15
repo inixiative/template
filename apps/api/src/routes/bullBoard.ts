@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @uses primitive:jobs, primitive:shared, feature:auth
+ */
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { HonoAdapter } from '@bull-board/hono';
@@ -28,17 +33,18 @@ const createBullBoardRouter = (): OpenAPIHono<AppEnv> => {
 
   serverAdapter.setBasePath('/bullBoard');
 
-  const router = serverAdapter.registerPlugin() as unknown as OpenAPIHono<AppEnv>;
+  const pluginRouter = serverAdapter.registerPlugin() as unknown as OpenAPIHono<AppEnv>;
 
-  // Add auth for non-local (we know credentials exist if we're here and not local)
-  if (!isLocal) {
-    router.use(
-      '*',
-      basicAuthMiddleware(process.env.BULL_BOARD_USERNAME!, process.env.BULL_BOARD_PASSWORD!, 'BullBoard'),
-    );
-  }
+  if (isLocal) return pluginRouter;
 
-  return router;
+  const guarded = new OpenAPIHono<AppEnv>();
+  guarded.use(
+    '*',
+    basicAuthMiddleware(process.env.BULL_BOARD_USERNAME!, process.env.BULL_BOARD_PASSWORD!, 'BullBoard'),
+  );
+  guarded.route('/', pluginRouter);
+
+  return guarded;
 };
 
 export const bullBoardRouter = createBullBoardRouter();

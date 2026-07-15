@@ -1,8 +1,8 @@
-import { generateKeyPairSync, randomBytes } from 'crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes } from 'crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
-import { execAsync } from '../utils/exec';
+import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
 import {
@@ -225,21 +225,32 @@ export const setupInfisical = async (
     // Step 7: Ensure webhook signing keypair (RSA-SHA256 per sendWebhook.ts)
     for (const step of infisicalWebhookSigningSteps) {
       if (!stagingEnabled && step.environment === 'staging') continue;
-      if (await isComplete('infisical', step.action)) continue;
-
-      let hasKeypair = false;
+      let hasValidKey = false;
       try {
         const existing = await getSecretAsync('WEBHOOK_SIGNING_PRIVATE_KEY', {
           projectId,
           environment: step.environment,
           path: '/api',
         });
-        hasKeypair = Boolean(existing && existing.includes('PRIVATE KEY'));
+        const existingPublic = await getSecretAsync('WEBHOOK_SIGNING_PUBLIC_KEY', {
+          projectId,
+          environment: step.environment,
+          path: '/api',
+        });
+        // Must be a usable RSA key (sendWebhook.ts signs with RSA-SHA256) AND the stored public key
+        // must match it; a missing, malformed, wrong-type (e.g. ed25519), or mismatched-pair key
+        // self-heals even if marked complete (a valid-but-mismatched pair breaks every receiver).
+        const privateObj = createPrivateKey(existing);
+        const derivedPublic = createPublicKey(privateObj).export({ type: 'spki', format: 'pem' });
+        const storedPublic = createPublicKey(existingPublic).export({ type: 'spki', format: 'pem' });
+        hasValidKey = !!existing && privateObj.asymmetricKeyType === 'rsa' && derivedPublic === storedPublic;
       } catch {
-        // Missing secret expected on first run.
+        // Missing, non-RSA, or mismatched-pair key — regenerate.
       }
 
-      if (!hasKeypair) {
+      if (hasValidKey && (await isComplete('infisical', step.action))) continue;
+
+      if (!hasValidKey) {
         const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
         const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
         const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
@@ -339,12 +350,12 @@ export const getSecretAsync = async (
   },
 ): Promise<string> => {
   const realFn = async (): Promise<string> => {
-    let cmd = `infisical secrets get ${key}`;
-    if (options?.projectId) cmd += ` --projectId="${options.projectId}"`;
-    if (options?.environment) cmd += ` --env="${options.environment}"`;
-    if (options?.path) cmd += ` --path="${options.path}"`;
-    cmd += ' --plain';
-    const { stdout } = await execAsync(cmd);
+    const args = ['secrets', 'get', key];
+    if (options?.projectId) args.push(`--projectId=${options.projectId}`);
+    if (options?.environment) args.push(`--env=${options.environment}`);
+    if (options?.path) args.push(`--path=${options.path}`);
+    args.push('--plain');
+    const { stdout } = await execFileAsync('infisical', args);
     return stdout.trim();
   };
 
@@ -365,9 +376,14 @@ export const setSecretAsync = async (
   path: string = '/',
 ): Promise<void> => {
   const realFn = async (): Promise<void> => {
-    await execAsync(
-      `infisical secrets set --projectId="${projectId}" --env="${environment}" --path="${path}" "${key}=${value}"`,
-    );
+    await execFileAsync('infisical', [
+      'secrets',
+      'set',
+      `--projectId=${projectId}`,
+      `--env=${environment}`,
+      `--path=${path}`,
+      `${key}=${value}`,
+    ]);
   };
 
   if (process.env.NODE_ENV === 'test') {

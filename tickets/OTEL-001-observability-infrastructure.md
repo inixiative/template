@@ -1,6 +1,6 @@
 # OTEL-001: Observability Infrastructure
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: Hernan
 **Priority**: High
 **Created**: 2026-02-06

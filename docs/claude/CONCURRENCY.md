@@ -1,14 +1,17 @@
 # Concurrency
 
-Mechanisms for coordinating async operations. Three different concerns, three different tools.
+Mechanisms for coordinating async operations. Different concerns, different tools.
 
 | Concern | Tool | Scope |
 |---|---|---|
 | Cap parallelism (don't open 1000 DB connections at once) | `getConcurrency` + `ConcurrencyType` | in-process |
+| Run a batch with a concurrency cap, get ordered results | `resolveAll` | in-process |
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
+| Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
+| Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
 
-Combine when needed: a per-bot Redis lock + a per-bot serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes." See `apps/golem-shamash/src/lib/botSession.ts` for the wire-up.
+Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
 
 ---
 
@@ -29,10 +32,10 @@ await queue.run(async () => updateB());  // doesn't start until updateA settles
 
 You have multiple async callsites that all mutate the same shared resource (in-memory map, encrypted DB blob, log file, etc.) and they fire concurrently. Without serialization, two read-modify-write cycles interleave and one clobbers the other.
 
-Real example — Baileys' Postgres-backed auth adapter (`packages/baileys/src/authState.ts`):
+Illustrative example — an encrypted-blob auth adapter where two writers share one record:
 - `keys.set` and `creds.update` both rewrite the entire encrypted blob
 - Both fire during normal operation (key rotation, session updates)
-- Without the queue, in-memory `stored` would be read+modified by overlapping writes and silently lose data on persist
+- Without the queue, an in-memory `stored` value would be read+modified by overlapping writes and silently lose data on persist
 
 ### When NOT to use
 
@@ -87,6 +90,23 @@ Use when you'd otherwise blow through a connection pool or rate limit.
 
 ---
 
+## Bounded Batch (`resolveAll`)
+
+`@template/shared/utils/resolveAll`. `Promise.all` with an optional concurrency cap. Takes an array of thunks (`() => Promise<T>`) rather than promises, so it controls *when* each starts. Results come back in input order regardless of completion order.
+
+```ts
+import { resolveAll, getConcurrency, ConcurrencyType } from '@template/shared/utils';
+
+const results = await resolveAll(
+  ids.map((id) => () => fetchRecord(id)),
+  getConcurrency([ConcurrencyType.db]),
+);
+```
+
+No cap (or cap ≥ length) → degrades to a plain `Promise.all`. `getConcurrency` is the natural source of the cap. Pass thunks, not already-started promises — `resolveAll([p1, p2])` would run everything immediately and defeat the limit.
+
+---
+
 ## Distributed Lock (`createLock`)
 
 `@template/db`. Single-node Redis lock with heartbeat. See [REDIS.md](./REDIS.md#distributed-locks) for the full API and footguns.
@@ -112,7 +132,48 @@ Use when multiple processes can race for the same resource (multiple golem insta
 
 ---
 
+## Supersede Lanes (`claimLane` / `watchLane`)
+
+`packages/db/src/lanes/lanes.ts` (exported from `@template/db`). A Redis baton scoped to `(handlerName, dedupeKey)`: the newest claimant wins, and an in-flight older job learns it's been usurped and bows out. Cross-process, the inverse of a lock — a lock keeps the *first* holder and rejects late-comers; a lane hands the baton to the *latest* and evicts the incumbent.
+
+```ts
+import { claimLane, watchLane, laneKey } from '@template/db';
+
+const lane = laneKey(handlerName, dedupeKey);
+await claimLane(lane, jobId);                 // take the baton (last claim wins)
+const stop = watchLane(lane, jobId, () => {   // bow out once a newer job claims it
+  abortThisJob();
+});
+try {
+  /* work */
+} finally {
+  stop();
+}
+```
+
+`claimLane` writes `jobId` with a TTL (`LANE_TTL_SEC`). `watchLane` polls (`LANE_POLL_MS`, via `heartbeat`) and fires `onUsurped` only when a *different* holder appears — an expired/absent key counts as still held, so a momentary Redis blip doesn't false-trigger. Use for "only the most recent enqueue for this key should finish" (debounced/superseding jobs); see [JOBS.md](./JOBS.md) for the supersede pattern this backs.
+
+---
+
+## Recurring Beat (`heartbeat`)
+
+`@template/shared/utils/heartbeat`. A self-managing timer that runs `beat` every `intervalMs`, scheduling the next tick only *after* the previous settles — a slow async beat never overlaps itself. Returns `stop()`; no trailing beat fires after stop. Rejections route to `onError` instead of becoming unhandled. In-process.
+
+```ts
+import { heartbeat } from '@template/shared/utils';
+
+const stop = heartbeat(async () => {
+  await refreshLease();
+}, 10_000, { onError: (err) => log.error('beat failed', err) });
+// later
+stop();
+```
+
+This is the primitive under both `createLock` (lease renewal) and `watchLane` (usurp polling). Reach for it directly when you need a non-overlapping recurring task you can cleanly stop — prefer it over a bare `setInterval`, which fires regardless of whether the prior async run finished.
+
+---
+
 ## Cross-references
 
 - [REDIS.md](./REDIS.md) — `createLock` details, namespace conventions
-- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (a different kind of "only one of these should run" mechanism)
+- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`)

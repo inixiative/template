@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type, client
+ * @partOf feature:email
+ * @uses none
+ */
 export type VerificationStatus = 'deliverable' | 'undeliverable' | 'risky' | 'unknown';
 
 export type VerificationResult = {

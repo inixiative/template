@@ -17,14 +17,18 @@ model AppEvent {
   userAgent        String?
   sourceInquiryId  String? @db.VarChar(36)
 
+  integrationId String?      @db.VarChar(36)
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
   // Domain payload
   data Json @default("{}")
-
-  @@index([name])
-  @@index([actorUserId])
-  @@index([createdAt])
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
+
+  @@index([name])
+  @@index([actorUserId])
+  @@index([integrationId])
+  @@index([createdAt])
 }

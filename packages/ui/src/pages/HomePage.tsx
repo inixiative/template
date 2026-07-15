@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { buttonVariants } from '@template/ui/components/primitives/Button';
 import { useAppStore } from '@template/ui/store';
 

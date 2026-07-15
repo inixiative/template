@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:email
+ * @uses none
+ */
 import type { EmailVerifier, VerificationResult } from '@template/email/client/verification/types';
 
 export const createNoopVerifier = (): EmailVerifier => {

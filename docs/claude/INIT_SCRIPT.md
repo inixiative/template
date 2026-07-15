@@ -1275,7 +1275,9 @@ async function generateAndPushSecrets(config: Config) {
   };
 
   function generateWebhookKeys() {
-    const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519', {
+    // RSA-2048 PEM — must match sendWebhook.ts's crypto.createSign('RSA-SHA256').
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
       publicKeyEncoding: { type: 'spki', format: 'pem' }
     });

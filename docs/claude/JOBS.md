@@ -18,6 +18,13 @@
   - [Singleton Job](#singleton-job)
   - [Superseding Job](#superseding-job)
 - [Enqueuing Jobs](#enqueuing-jobs)
+- [Overflow Buffer](#overflow-buffer)
+  - [Spill Routing](#spill-routing)
+  - [Accumulator](#accumulator)
+  - [Drain Loop](#drain-loop)
+  - [Overflow Flag](#overflow-flag)
+  - [Queue Depth Probe](#queue-depth-probe)
+  - [Configuration](#overflow-configuration)
 - [Cron Jobs](#cron-jobs)
   - [Cron Patterns (UTC)](#cron-patterns-utc)
   - [CronJob Model](#cronjob-model)
@@ -43,8 +50,18 @@ jobs/
 ├── handlers/
 │   ├── index.ts        # Registry of all handlers
 │   └── sendWebhook.ts  # Individual handler
+├── outbox/             # Durable overflow buffer (see Overflow Buffer)
+│   ├── drain/          # Per-worker drain loop + pass
+│   ├── accumulator.ts  # Batched outbox writes (spillToOutbox/flushOutbox)
+│   ├── config.ts       # Caps, linger, TTLs (env-overridable)
+│   ├── flag.ts         # Redis overflow flag (set-once + TTL/heartbeat)
+│   ├── mutex.ts        # Serialized queue shared by flush + drain
+│   ├── queueDepth.ts   # Cached waiting+active depth probe
+│   └── types.ts        # OutboxRow + shouldSpill
 ├── enqueue.ts          # enqueueJob function
+├── makeJob.ts          # Job wrapper constructors
 ├── queue.ts            # BullMQ queue setup
+├── registerCronJobs.ts # Cron registration on worker startup
 ├── types.ts            # Type definitions
 └── worker.ts           # Worker entry point
 ```
@@ -59,11 +76,11 @@ jobs/
 
 ### Job IDs
 
-| Scenario | ID Source |
-|----------|-----------|
-| Ad-hoc job (no dedupeKey) | BullMQ auto-generates |
-| Superseding job | Uses `dedupeKey` as `jobId` (prevents duplicates) |
-| Cron job | Uses `cronJob.jobId` from DB (idempotency key) |
+| Scenario | jobId | `id` (job data) |
+|----------|-------|-----------------|
+| Ad-hoc / superseding | `jobOptions.jobId ?? uuidv7()` | the logical `id` is data-only (the singleton-lock identity) — never the jobId |
+| Superseding | (as above) | supersession is by `dedupeKey` → a per-lane claim (`claimLane`/`watchLane`, last-wins), not the jobId |
+| Cron | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id` — the singleton-lock identity |
 
 Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
 
@@ -222,9 +239,9 @@ export const syncData = makeSupersedingJob(
 ```
 
 How it works:
-1. New job enqueued → signals all matching jobs via `job:superseded:{jobId}` Redis key
-2. Running jobs poll for supersede flag every 500ms
-3. Superseded jobs abort via `ctx.signal` and exit gracefully
+1. Enqueue/drain claims the lane: `claimLane(job:lane:{handler}:{dedupeKey}, jobId)` (last claim wins)
+2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
+3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
 ---
 
@@ -245,8 +262,75 @@ await enqueueJob('myJob', payload, {
   delay: 5000,        // Delay in ms
   priority: 1,        // Lower = higher priority
   attempts: 3,        // Retry attempts
+  type: 'adhoc',      // 'cron' | 'cronTrigger' | 'adhoc' (default adhoc)
+  bypass: false,      // skip the overflow buffer — latency-critical jobs go straight to BullMQ
 });
 ```
+
+When overflow is active, an `adhoc` enqueue returns `{ jobId, name, outboxed: true }` (spilled to the buffer) instead of adding to BullMQ directly. See [Overflow Buffer](#overflow-buffer).
+
+In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved.
+
+---
+
+## Overflow Buffer
+
+A durable buffer in front of BullMQ. When queue depth crosses a cap, an overflow flag flips and `adhoc` enqueues spill to the `JobOutbox` DB table instead of Redis; a per-worker drain loop meters them back in as room frees up. Source: `apps/api/src/jobs/outbox/`.
+
+`JobOutbox` rows persist the full re-enqueue intent: `handlerName`, a unique `jobId` (idempotent re-enqueue), `dedupeKey` (superseding lane; null for plain fan-out), `data` (`JobData`), `options` (`JobOptions`), and a drain-local `attempts` counter (distinct from `options.attempts`). The `id` is a time-ordered uuidv7, so `orderBy: { id: 'asc' }` is FIFO drain order.
+
+### Spill Routing
+
+`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `tripIfFull()` flips the flag if that add crossed the cap (fresh, uncached probe to avoid overshoot on a ramp).
+
+### Accumulator
+
+`spillToOutbox` routes every spill (fan-out and superseding) through an in-memory accumulator that batches DB writes:
+
+- Flush triggers: size (`flushMaxRows`, default 1000) flushes inline; otherwise a `flushLinger` timer (default 200ms) arms for the partial tail.
+- Within a batch, superseding lanes (`handlerName`+`dedupeKey`) collapse to the latest row (`dedupeLatestPerLane`); null-`dedupeKey` rows are all kept.
+- One txn per flush: plain rows via `createManyAndReturn({ skipDuplicates })`, superseding lanes via `upsert` (last-writer-wins, no silent drop).
+- Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop a job.
+- `flushOutbox()` is the shutdown drain: called after intake stops, it persists every buffered row with retry (`SHUTDOWN_FLUSH_RETRIES`) and surfaces failures loudly.
+
+### Drain Loop
+
+`startOutboxDrainLoop()` / `stopOutboxDrainLoop()` run a per-worker, in-process `setInterval` every ~15s (not a queued cron). Each tick (`runDrainOutboxPass`) runs under a Redis lock (`createLock`, `service: 'outbox-drain'`) so only one worker drains at a time, and the NX acquire skips a tick whose predecessor is still running.
+
+A pass:
+1. Computes room (`maxQueueDepth − queueDepth`); if room > 0, fetches up to `room` non-quarantined rows oldest-first (FIFO) and re-enqueues them, re-claiming the supersede lane first when `dedupeKey` is set.
+2. Deletes drained rows; increments `attempts` on rows that failed re-enqueue.
+3. After `MAX_DRAIN_ATTEMPTS` (5) re-enqueue failures a row is quarantined (skipped) so a poison row at the head can't starve newer rows.
+4. Clears the flag only when depth drops below low-water AND no admittable backlog remains (else a fresh enqueue would jump the buffered FIFO); quarantined rows are reset to `attempts: 0` at clear time.
+
+The whole pass runs inside `withOverflowRenew` so a long pass can't let the flag's TTL lapse mid-tick.
+
+### Overflow Flag
+
+A single global Redis key (value = epoch ms when overflow began):
+
+- Set-once via `NX` so re-trips keep the original start time (used by the stuck-overflow alert).
+- Carries a TTL the drain renews each tick (`renewOverflow` / `withOverflowRenew` heartbeat) — survives between ticks, self-clears if the drain dies.
+- `warnIfOverflowStuck` logs when overflow has persisted past `overflowStuckMs` (drain not keeping up with arrivals).
+
+### Queue Depth Probe
+
+`queueDepth()` counts `waiting + active` (NOT `delayed` — scheduled cron repeats are a standing floor, not pressure), cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain).
+
+All `JobOutbox` writes — accumulator flushes AND the drain — run through one shared serialized queue (`flushQueue` / `runOnOutboxQueue`, via `createSerializedQueue`), so a flush and a drain can never touch the table concurrently.
+
+### Overflow Configuration
+
+Read lazily (overridable per process / in tests), not frozen at import:
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `JOBS_MAX_QUEUE_DEPTH` | `10000` | Depth cap that trips overflow |
+| (derived) | `0.8 × cap` | Low-water mark for clearing |
+| `JOBS_OUTBOX_FLUSH_MAX_ROWS` | `1000` | Accumulator size-flush threshold |
+| `JOBS_OUTBOX_FLUSH_LINGER_MS` | `200` | Accumulator partial-batch linger |
+| `JOBS_OVERFLOW_TTL_MS` | `60000` | Flag TTL (drain heartbeats it) |
+| `JOBS_OVERFLOW_STUCK_MS` | `300000` | Age before stuck-overflow warning |
 
 ---
 
@@ -302,6 +386,8 @@ POST   /api/admin/cronJob/:id/trigger  # Run immediately
 | `cron` | Scheduled by BullMQ repeater |
 | `cronTrigger` | Manually triggered cron |
 | `adhoc` | One-off job |
+
+`type` gates overflow routing: only `adhoc` jobs ever spill to the buffer; `cron`/`cronTrigger` always go direct to BullMQ. See [Overflow Buffer](#overflow-buffer).
 
 ---
 

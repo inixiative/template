@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:cronJob, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { deleteRoute } from '#/lib/routeTemplates/delete';
 import { Modules } from '#/modules/modules';
 

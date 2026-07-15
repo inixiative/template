@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const emailTemplateFactory = createFactory('EmailTemplate', {
@@ -5,7 +11,7 @@ const emailTemplateFactory = createFactory('EmailTemplate', {
     slug: `template-${getNextSeq()}`,
     name: `Template ${getNextSeq()}`,
     locale: 'en',
-    category: 'system' as const,
+    kind: 'system' as const,
     subject: 'Test Subject',
     mjml: '<mjml><mj-body><mj-text>Default</mj-text></mj-body></mjml>',
     ownerModel: 'default' as const,

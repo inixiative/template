@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind route
+ * @uses feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:users, feature:webhooks, primitive:batch
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
@@ -10,6 +15,7 @@ import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
 import { inquiryRouter } from '#/modules/inquiry';
+import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -19,6 +25,7 @@ import { tokenRouter } from '#/modules/token';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
 import { internalRouter } from '#/routes/internal';
+import { unsubscribeRouter } from '#/routes/unsubscribe';
 import type { AppEnv } from '#/types/appEnv';
 
 export const apiRouter = new OpenAPIHono<AppEnv>();
@@ -35,6 +42,9 @@ apiRouter.route('/internal', internalRouter);
 // Auth routes (better-auth handles its own auth, returns early)
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
+// One-click unsubscribe — public (no session/token); authorized by its own signed link.
+apiRouter.route('/unsubscribe', unsubscribeRouter);
+
 // Token first so an Authorization header always wins over a session cookie when
 // both are present (e.g. SDK xhr from a browser). Spoof runs last so it applies
 // regardless of which auth path resolved the user.
@@ -50,6 +60,7 @@ apiRouter.route('/admin', adminRouter);
 apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/contact', contactRouter);
+apiRouter.route('/v1/integration', integrationRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);

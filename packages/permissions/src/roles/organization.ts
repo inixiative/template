@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:authz
+ * @uses feature:tenancy
+ */
 import type { OrganizationId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Entitlements, PermissionEntry } from '@template/permissions/client';
@@ -12,7 +18,7 @@ export const organizationRoles = {
 export const getOrgPermissions = (role: Role, orgId: OrganizationId, entitlements?: Entitlements): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
-    resource: 'organization',
+    resource: 'db:organization',
     id: orgId,
     actions: { ...baseActions, ...entitlements },
   };

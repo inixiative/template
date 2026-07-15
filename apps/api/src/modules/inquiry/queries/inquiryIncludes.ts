@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:inquiry
+ * @uses feature:auditLogs
+ */
 import type { Prisma } from '@template/db';
 import { includeAuditLogResponse } from '#/modules/admin/auditLog/schemas/auditLogResponseSchema';
 

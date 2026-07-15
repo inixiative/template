@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:email, integration:resend
+ * @uses primitive:shared
+ */
 import { join } from 'node:path';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { VCR } from '@template/shared/vcr';
@@ -42,6 +48,7 @@ const toResendPayload = (options: SendEmailOptions) => ({
   html: options.html,
   replyTo: options.replyTo,
   tags: options.tags?.map((name) => ({ name, value: 'true' })),
+  headers: options.headers,
 });
 
 class ResendEmailClient implements EmailClient {

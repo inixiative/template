@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ * @uses primitive:routeTemplates
+ */
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserReadRoute } from '#/modules/spaceUser/routes/spaceUserRead';

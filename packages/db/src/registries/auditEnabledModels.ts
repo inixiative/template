@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { AuditSubjectModel } from '@template/db/generated/client/enums';
 
 export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
@@ -11,6 +17,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.CustomerRef,
   AuditSubjectModel.EmailTemplate,
   AuditSubjectModel.EmailComponent,
+  AuditSubjectModel.Integration,
   // Token, Account, Session excluded — ephemeral auth state, hard-deleted on redact.
 ];
 

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:authz
+ * @uses none
+ */
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole, Role } from '@template/db/generated/client/enums';
 import type { Action, Entitlements } from '@template/permissions/client';

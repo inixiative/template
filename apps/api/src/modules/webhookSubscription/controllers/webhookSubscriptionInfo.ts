@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:webhooks
+ * @uses primitive:routeTemplates
+ */
 import { webhookOwnerAllowedModels } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { webhookSubscriptionInfoRoute } from '#/modules/webhookSubscription/routes/webhookSubscriptionInfo';

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:tenancy
+ * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
+ */
 import type { OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { greaterRole } from '@template/permissions';

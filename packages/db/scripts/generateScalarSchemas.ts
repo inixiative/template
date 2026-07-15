@@ -1,6 +1,11 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getRuntimeDataModel } from '../src/utils/runtimeDataModel';
+import { prismaMap } from '@template/db/generated/prismaMap';
 
 const inputDir = join(import.meta.dir, '../src/generated/zod/schemas/variants/input');
 const pureDir = join(import.meta.dir, '../src/generated/zod/schemas/variants/pure');
@@ -16,17 +21,16 @@ const inputModelSet = new Set(inputModelNames);
 const pureModelSet = new Set(pureModelNames);
 const modelNames = [...new Set([...inputModelNames, ...pureModelNames])].sort();
 
-// Get relation fields for each model from Prisma's runtimeDataModel
-const dataModel = getRuntimeDataModel();
+// Relation fields per model, from the generated prismaMap (single source of truth).
 const modelRelations: Record<string, string[]> = {};
 
 for (const modelName of modelNames) {
-  const model = dataModel.models[modelName];
-  if (model) {
-    modelRelations[modelName] = model.fields.filter((f) => f.kind === 'object').map((f) => f.name);
-  } else {
-    modelRelations[modelName] = [];
-  }
+  const model = prismaMap.models[modelName as keyof typeof prismaMap.models];
+  modelRelations[modelName] = model
+    ? Object.entries(model.fields)
+        .filter(([, field]) => (field as { kind: string }).kind === 'object')
+        .map(([name]) => name)
+    : [];
 }
 
 const inputImports = inputModelNames

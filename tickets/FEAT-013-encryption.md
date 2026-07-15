@@ -4,7 +4,20 @@
 **Assignee**: TBD
 **Priority**: High
 **Created**: 2026-03-02
-**Updated**: 2026-03-02
+**Updated**: 2026-06-09
+
+---
+
+## Current State (2026-06-09)
+
+Built: AES-256-GCM service (`packages/db/src/lib/encryption/`) with random IV, AAD binding, and
+key-version support; unit-tested (round-trip, tamper-detect, AAD). Coverage is **1 of 23 models**
+(`authProvider.secrets`) — by design for now, not a gap.
+
+The `rotateEncryptionKeys` job is real and enqueued on worker start, but **meaningful rotation is
+blocked on CICD** — rolling a new key version is a CD/ops operation, and with one model at version 1
+rotation is effectively a no-op until then. So the missing rotation integration test is **deferred,
+not owed**: it lands with the CD pipeline that makes rotation exercisable end to end.
 
 ---
 
@@ -174,7 +187,7 @@ This is not hypothetical — secrets manager accidents happen. The escrow system
 ## Related Tickets
 
 - [INFRA-001: Init Script](./INFRA-001-init-script.md) — should auto-generate initial encryption keys
-- [FEAT-005: Audit Logs](./FEAT-005-audit-logs.md) — audit encryption key access/rotation events
+- [FEAT-005: Audit Logs](./archived/FEAT-005-audit-logs.md) — audit encryption key access/rotation events
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) — uses encrypted secrets
 
 ---

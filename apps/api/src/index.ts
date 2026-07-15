@@ -4,6 +4,7 @@ import { LogScope, log } from '@template/shared/logger';
 import { app } from '#/app';
 import { initializeOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
+import { flushOutbox } from '#/jobs/outbox';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
 
@@ -44,6 +45,11 @@ onShutdown(async () => {
 onShutdown(async () => {
   // 2. Drain WebSocket connections
   await drainConnections();
+});
+
+onShutdown(async () => {
+  // 2.5 Persist any buffered overflow spills before Redis/DB close (API handlers can spill too)
+  await flushOutbox();
 });
 
 onShutdown(async () => {

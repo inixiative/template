@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:inquiry
+ * @uses none
+ */
 import type { z } from 'zod';
 
 const RESOLUTION_METADATA_KEYS = new Set(['explanation']);

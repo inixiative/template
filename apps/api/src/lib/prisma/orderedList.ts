@@ -1,6 +1,12 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { db, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { lookupField } from '#/lib/prisma/fieldMetadata';
+import { hasDeletedAt } from '#/lib/prisma/fieldMetadata';
 
 type Where = Record<string, unknown>;
 type Row = Record<string, unknown>;
@@ -14,8 +20,6 @@ const table = (model: string) => {
 
 const col = (name: string) => Prisma.raw(`"${name}"`);
 
-const hasSoftDelete = (model: string): boolean => lookupField(model, 'deletedAt') !== undefined;
-
 // liveOnly=true:  deletedAt IS NULL AND position > 0  (normal live scope)
 // liveOnly=false: scope columns only (no deletedAt / position filter)
 const scopeWhere = (model: string, scope: Where, field: string, liveOnly = true): Prisma.Sql => {
@@ -26,7 +30,7 @@ const scopeWhere = (model: string, scope: Where, field: string, liveOnly = true)
   }
 
   if (liveOnly) {
-    if (hasSoftDelete(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
+    if (hasDeletedAt(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
     parts.push(Prisma.sql`${col(field)} > 0`);
   }
 
@@ -40,7 +44,7 @@ const liveOnlyWhere = (model: string, scope: Where): Prisma.Sql => {
   for (const [k, v] of Object.entries(scope)) {
     parts.push(v === null ? Prisma.sql`${col(k)} IS NULL` : Prisma.sql`${col(k)} = ${v}`);
   }
-  if (hasSoftDelete(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
+  if (hasDeletedAt(model)) parts.push(Prisma.sql`"deletedAt" IS NULL`);
   return Prisma.join(parts, ' AND ');
 };
 

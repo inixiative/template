@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { type InstagramValue, parseInstagramUrl } from '@template/shared/contact/parsers/instagram';
 import { z } from 'zod';

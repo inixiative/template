@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 export type AuditActor = {
@@ -8,6 +14,7 @@ export type AuditActor = {
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
+  integrationId: string | null;
 };
 
 export const nullAuditActor: AuditActor = {
@@ -18,6 +25,7 @@ export const nullAuditActor: AuditActor = {
   ipAddress: null,
   userAgent: null,
   sourceInquiryId: null,
+  integrationId: null,
 };
 
 const store = new AsyncLocalStorage<AuditActor>();

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:users
+ * @uses infrastructure:prisma, primitive:appEvents
+ */
 import type { User } from '@template/db/generated/client/client';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';

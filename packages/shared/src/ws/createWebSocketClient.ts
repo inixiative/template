@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf primitive:shared, primitive:websockets
+ * @uses none
+ */
 // Generic browser WebSocket client — transport only. Owns the socket lifecycle
 // (connect, auto-reconnect), queues sends until open, and forwards parsed inbound
 // frames to a single onMessage callback. Knows nothing about the API protocol.
@@ -59,8 +65,10 @@ export const createWebSocketClient = ({
   };
 
   // Drop the current socket but keep auto-reconnect — used to recover a half-open connection.
+  // An already-closed socket can't fire onclose again, so connect directly.
   const reconnect = (): void => {
-    ws?.close();
+    if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
+    else connect();
   };
 
   const send = (data: unknown): void => {

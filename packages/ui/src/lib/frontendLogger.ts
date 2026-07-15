@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind adapter
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
 type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';

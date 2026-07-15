@@ -1,8 +1,14 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf feature:email
+ * @uses infrastructure:prisma
+ */
 import { db } from '@template/db';
 import type { EmailTemplate } from '@template/db/generated/client/client';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
-export const saveTemplate = async (input: EmailTemplate, ctx: SaveContext): Promise<EmailTemplate> => {
+export const saveTemplate = async (input: EmailTemplate, ctx: OwnerScope): Promise<EmailTemplate> => {
   const where = {
     slug: input.slug,
     locale: input.locale,

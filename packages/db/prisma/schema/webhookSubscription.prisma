@@ -3,18 +3,20 @@
 // ============================================================================
 
 model WebhookSubscription {
-  id        String           @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  model     WebhookModel
-  url       String
-  isActive  Boolean          @default(true)
+  id            String       @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  model         WebhookModel
+  url           String
+  isActive      Boolean      @default(true)
+  integrationId String?      @db.VarChar(36)
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
 
   // Owner (fake polymorphism: User, Organization, or Space)
   ownerModel     WebhookOwnerModel
-  userId         String?       @db.VarChar(36)
-  organizationId String?       @db.VarChar(36)
-  spaceId        String?       @db.VarChar(36)
+  userId         String?           @db.VarChar(36)
+  organizationId String?           @db.VarChar(36)
+  spaceId        String?           @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -23,19 +25,20 @@ model WebhookSubscription {
   // Relations
   webhookEvents WebhookEvent[]
 
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
   // Per-owner uniqueness — partial uniques (see Contact for rationale). Plain
   // single-FK uniques are NULL-distinct so they don't actually prevent
   // duplicates when the FK isn't populated. Each partial doubles as a lookup
   // index for that owner column.
-  @@unique([userId, model, url],         where: { userId:         { not: null } })
+  @@unique([userId, model, url], where: { userId: { not: null } })
   @@unique([organizationId, model, url], where: { organizationId: { not: null } })
-  @@unique([spaceId, model, url],        where: { spaceId:        { not: null } })
+  @@unique([spaceId, model, url], where: { spaceId: { not: null } })
   @@index([ownerModel])
   @@index([model])
-
-  // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-  // ==========================================================================
+  @@index([integrationId])
 }
 
 enum WebhookModel {

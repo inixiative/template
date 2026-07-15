@@ -8,14 +8,15 @@ model Organization {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  name      String
-  slug      String   @unique
+  name String
+  slug String @unique
 
   // Relations
   organizationUsers    OrganizationUser[]
   spaceUsers           SpaceUser[]
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
+  integrations         Integration[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
   tags                 Tag[]
@@ -27,8 +28,9 @@ model Organization {
   spaces               Space[]
   providerRefs         CustomerRef[]         @relation("providerRefs")
   authProviders        AuthProvider[]
-  auditLogsAsContext   AuditLog[] @relation("AuditLogContextOrganization")
-  auditLogsAsSubject   AuditLog[] @relation("AuditLogSubjectOrganization")
+  auditLogsAsContext   AuditLog[]            @relation("AuditLogContextOrganization")
+  auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectOrganization")
+  communicationsSent   CommunicationLog[]    @relation("CommunicationSenderOrganization")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

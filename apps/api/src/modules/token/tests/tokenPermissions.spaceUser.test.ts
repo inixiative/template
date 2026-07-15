@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
+import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createOrganization,

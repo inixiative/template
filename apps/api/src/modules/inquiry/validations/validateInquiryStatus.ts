@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind validator
+ * @partOf feature:inquiry
+ * @uses none
+ */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
@@ -29,7 +35,7 @@ export const validateInquiryIsResolvable = (inquiry: Inquiry): void => {
 };
 
 // expiresAt is in the past
-const validateInquiryNotExpired = (inquiry: Inquiry): void => {
+export const validateInquiryNotExpired = (inquiry: Inquiry): void => {
   if (inquiry.expiresAt && inquiry.expiresAt < new Date())
     throw makeError({ status: 410, message: 'Inquiry has expired' });
 };

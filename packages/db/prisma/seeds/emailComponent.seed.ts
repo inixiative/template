@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:seed
+ * @uses none
+ */
 import type { EmailComponent } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
@@ -35,32 +41,8 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
         '<mj-section padding="20px 0">',
         '  <mj-column>',
         '    <mj-text align="center" font-size="12px" color="#6b7280">',
-        '      {{sender.platformName}} &mdash; {{sender.address}}',
+        '      {{sender.platformName}}',
         '    </mj-text>',
-        '  </mj-column>',
-        '</mj-section>',
-      ].join('\n'),
-    },
-    {
-      id: '01936d42-ec00-7000-8000-000000000003',
-      slug: 'system-button',
-      locale: 'en',
-      ownerModel: 'default',
-      inheritToSpaces: true,
-      componentRefs: [],
-      mjml: [
-        '<mj-section padding="10px 0">',
-        '  <mj-column>',
-        '    <mj-button',
-        '      href="{{data.buttonUrl}}"',
-        '      background-color="#2563eb"',
-        '      color="#ffffff"',
-        '      font-size="16px"',
-        '      border-radius="6px"',
-        '      inner-padding="12px 24px"',
-        '    >',
-        '      {{data.buttonText}}',
-        '    </mj-button>',
         '  </mj-column>',
         '</mj-section>',
       ].join('\n'),

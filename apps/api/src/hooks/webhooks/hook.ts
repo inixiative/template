@@ -2,16 +2,20 @@ import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
   db,
-  filterIgnoredFields,
+  filterFields,
   HookTiming,
   isFalsePolymorphismRef,
   registerDbHook,
+  WEBHOOK_DROP_FIELDS,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
+import { castArray, compact } from 'lodash-es';
 import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
+import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -36,12 +40,10 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
       action: payload.action,
       resourceId: payload.resourceId,
       data: payload.data,
+      timestamp: payload.timestamp,
     });
   });
 };
-
-const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
 
 const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): WebhookAction => {
   if (dbAction === DbAction.upsert) {
@@ -65,16 +67,20 @@ const processSingleRecord = (
     return [];
   }
 
+  const origin = auditActorContext.getScope()?.integrationId ?? null;
+  const targets = origin ? subscriptions.filter((sub) => sub.integrationId !== origin) : subscriptions;
+  if (targets.length === 0) return [];
+
   const payload: WebhookPayload = {
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterIgnoredFields(model, resultData),
-    previousData: previousData ? filterIgnoredFields(model, previousData) : undefined,
+    data: filterFields(model, resultData, WEBHOOK_DROP_FIELDS),
+    previousData: previousData ? filterFields(model, previousData, WEBHOOK_DROP_FIELDS) : undefined,
     timestamp: new Date().toISOString(),
   };
 
-  return getWebhookCallbacks(subscriptions, payload);
+  return getWebhookCallbacks(targets, payload);
 };
 
 export const registerWebhookHook = () => {
@@ -119,14 +125,8 @@ export const registerWebhookHook = () => {
 
       if (isManyAction(dbAction)) {
         const { result, previous } = options as HookOptions & { action: ManyAction };
-        const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-        const previouses = (previous ?? []) as Record<string, unknown>[];
-
-        // Build a map of previous records by id for efficient lookup
-        const previousById = new Map<string, Record<string, unknown>>();
-        for (const prev of previouses) {
-          if (prev.id) previousById.set(prev.id as string, prev);
-        }
+        const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+        const previousById = buildPreviousById(previous);
 
         for (const resultData of results) {
           const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import { LINKEDIN_CLASSIFIERS } from '@template/shared/contact/constants/linkedin';
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { type LinkedinValue, parseLinkedinUrl } from '@template/shared/contact/parsers';

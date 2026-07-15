@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf primitive:caching, superadmin
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';

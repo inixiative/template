@@ -1,6 +1,12 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:email
+ * @uses none
+ */
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import type { RefMap } from '@template/email/render/extractRefs';
-import type { SaveContext } from '@template/email/render/types';
+import type { OwnerScope } from '@template/email/render/types';
 
 export type ResolveResult = {
   template: Partial<EmailTemplate>;
@@ -12,7 +18,7 @@ export const resolveVariants = (
   templateMjml: string,
   templateRefs: string[],
   existing: Record<string, EmailComponent | undefined>,
-  ctx: SaveContext,
+  ctx: OwnerScope,
 ): ResolveResult => {
   const slugMap: Record<string, string> = {};
   const rawComponents: { slug: string; mjml: string; refs: string[] }[] = [];

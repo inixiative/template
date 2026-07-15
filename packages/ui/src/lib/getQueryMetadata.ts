@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import openApiSpec from '@template/sdk/openapi.gen.json';
 
 export type EnumFilter = {
@@ -37,7 +43,9 @@ const isJsonLeaf = (schema: Schema): boolean => {
 // Enum leaves carry a bare `{ enum: [...] }` arm (the clean narrowed set); fall back to
 // the operator arm's `in.items.enum` / `equals.enum` (stripping equals' trailing null).
 const enumValuesOf = (leaf: Schema): string[] | undefined => {
-  const arms: Schema[] = Array.isArray(leaf.anyOf) ? leaf.anyOf.map(resolveRef) : [leaf];
+  // Not a castArray: the array branch resolves refs, the fallback is the leaf itself.
+  const fallback: Schema[] = [leaf];
+  const arms: Schema[] = Array.isArray(leaf.anyOf) ? leaf.anyOf.map(resolveRef) : fallback;
   const bareEnum = arms.find((a) => Array.isArray(a?.enum));
   if (bareEnum) return bareEnum.enum;
   const op = arms.find((a) => a?.properties);

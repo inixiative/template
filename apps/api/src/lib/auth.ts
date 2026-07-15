@@ -1,8 +1,13 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:auth
+ * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
+ */
 import { db, getRedisClient, redisNamespace } from '@template/db';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
-import { uuidv7 } from 'uuidv7';
 import { emitAppEvent } from '#/appEvents/emit';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
@@ -55,7 +60,7 @@ export const auth = betterAuth({
 
   advanced: {
     database: {
-      generateId: uuidv7,
+      generateId: () => Bun.randomUUIDv7(),
     },
   },
 

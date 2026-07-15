@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind utils
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 export type FieldDef = {
@@ -16,6 +22,12 @@ export type FieldDef = {
 const MAP = prismaMap.models as Record<string, { fields: Record<string, FieldDef> }>;
 
 const getField = (modelName: string, fieldName: string): FieldDef | undefined => MAP[modelName]?.fields?.[fieldName];
+
+export const modelFields = (modelName: string): Record<string, FieldDef> | undefined => MAP[modelName]?.fields;
+
+export const modelNames = (): string[] => Object.keys(MAP);
+
+export const hasDeletedAt = (modelName: string): boolean => getField(modelName, 'deletedAt') !== undefined;
 
 export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
   const segments = path.split('.');

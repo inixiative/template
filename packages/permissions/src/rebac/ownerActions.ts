@@ -1,4 +1,10 @@
-import type { ActionRule, ModelPermission } from '@template/permissions/rebac/types';
+/**
+ * @atlas
+ * @kind factory
+ * @partOf primitive:authz
+ * @uses none
+ */
+import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 
 // Spreadable rebac action block for owner-polymorphic models. The model has
 // nullable FKs to one or more owner relations (default: user / organization /
@@ -15,7 +21,7 @@ import type { ActionRule, ModelPermission } from '@template/permissions/rebac/ty
 //   contact: { actions: { ...ownerActions(), customAction: { ... } } }
 export const ownerActions = (
   rels: readonly string[] = ['user', 'organization', 'space'],
-): ModelPermission['actions'] => {
+): ResourcePermission['actions'] => {
   const fanout = (action: string): ActionRule => ({
     any: rels.map((rel) => ({ rel, action })),
   });

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseTiktokUrl, type TiktokValue } from '@template/shared/contact/parsers/tiktok';
 import { z } from 'zod';

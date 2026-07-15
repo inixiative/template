@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf primitive:shared
+ * @uses none
+ */
 // Resolve a version string by fetching a URL. Used as the VCR version
 // callback for third-party APIs that ship neither SDK nor CLI we can
 // version-stamp directly. Caller picks the URL — typically:

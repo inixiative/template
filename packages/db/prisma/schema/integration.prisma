@@ -1,0 +1,44 @@
+// ============================================================================
+// INTEGRATION - A configured connection to an external system
+// ============================================================================
+
+model Integration {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  name String
+
+  // Owner (fake polymorphism: User, Organization, or Space)
+  ownerModel     IntegrationOwnerModel
+  userId         String?               @db.VarChar(36)
+  organizationId String?               @db.VarChar(36)
+  spaceId        String?               @db.VarChar(36)
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  // Attribution — rows that originated from or reference this integration
+  tokens               Token[]
+  webhookSubscriptions WebhookSubscription[]
+  appEvents            AppEvent[]
+  auditLogsAsOrigin    AuditLog[]            @relation("AuditLogOriginIntegration")
+  auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectIntegration")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([userId, name], where: { userId: { not: null } })
+  @@unique([organizationId, name], where: { organizationId: { not: null } })
+  @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@index([ownerModel])
+}
+
+enum IntegrationOwnerModel {
+  User
+  Organization
+  Space
+}

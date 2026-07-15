@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db';
+import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createUser, createWebhookSubscription } from '@template/db/test';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { createTestApp } from '#tests/createTestApp';
@@ -106,6 +106,18 @@ describe('WebhookSubscription CRUD', () => {
       expect(response.status).toBe(200);
       expect(data.isActive).toBe(true);
       expect(data.url).toBe('https://new-url.com/webhook');
+    });
+
+    it('rejects a private/internal URL (SSRF guard)', async () => {
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        isActive: true,
+      });
+
+      const response = await fetch(patch(`/api/v1/webhookSubscription/${sub.id}`, { url: 'https://10.0.0.1/hook' }));
+
+      expect(response.status).toBe(400);
     });
 
     it('keeps inactive when explicitly set', async () => {

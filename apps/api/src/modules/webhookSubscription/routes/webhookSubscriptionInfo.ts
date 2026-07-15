@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:webhooks
+ * @uses primitive:routeTemplates
+ */
 import { z } from '@hono/zod-openapi';
 import { WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
 import { readRoute } from '#/lib/routeTemplates';
@@ -17,5 +23,6 @@ export const webhookSubscriptionInfoRoute = readRoute({
   action: 'info',
   skipId: true,
   responseSchema,
-  description: 'Returns webhook public key and available models. Public endpoint.',
+  description:
+    'Returns webhook public key and available models. Signed payloads include an ISO-8601 `timestamp` field; receivers should reject deliveries older than a few minutes to prevent replay. Public endpoint.',
 });

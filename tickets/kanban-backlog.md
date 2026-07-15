@@ -9,6 +9,7 @@ config:
 kanban
   Backlog
     FEAT-017-audit-log-hardening-lineage-and-explorer
+    FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
     INFRA-006-tenant-isolation-test-matrix
@@ -30,11 +31,12 @@ kanban
     COMM-002-email-validation
     AUTH-003-saml-sso
     INFRA-009-adapter-primitives
-    INFRA-009-audit-logs-cold-storage
+    INFRA-020-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
+    COMM-009-component-slots-passthrough-children
 ```
 
 ## Tickets
@@ -47,6 +49,9 @@ kanban
 - [FEAT-010: Addresses](./FEAT-010-addresses.md) - Address validation, geocoding, international formats
 - [FEAT-012: Notifications](./FEAT-012-notifications.md) - Novu integration, app-events completion, notification center
 - [COMM-002: Email Validation](./COMM-002-email-validation.md) - Email verification API (Bouncer/Emailable) for deliverability
+
+**Communications:**
+- [COMM-009: Component Slots](./COMM-009-component-slots-passthrough-children.md) - `{{slot:name}}` passthrough children for wrapper components (not registered/cascading subcomponents); from ZLT-3139
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
@@ -63,11 +68,12 @@ kanban
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
-- [INFRA-009: Audit Log Cold Storage](./INFRA-009-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
+- [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
+- [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
 
 **Security & Encryption:**
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
@@ -115,11 +121,11 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 27
+- **Total Backlog Items**: 28
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
-- **Communication**: 2
+- **Communication**: 3
 - **Infrastructure**: 8
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
@@ -142,4 +148,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-04-02_
+_Last Updated: 2026-06-29_

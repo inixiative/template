@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:users
+ * @uses infrastructure:prisma, primitive:caching
+ */
 import type { Db, UserWithRelations } from '@template/db';
 import { cache, cacheKey, upsertCache } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
@@ -12,7 +18,7 @@ export const findUserByEmail = async (db: Db, email: string): Promise<User | nul
 
 export const findUserWithRelations = async (db: Db, userId: string): Promise<UserWithRelations | null> => {
   return cache<UserWithRelations | null>(
-    cacheKey('User', userId, ['Relations']),
+    cacheKey('User', userId, ['relations']),
     async () => {
       const user = await db.user.findUnique({
         where: { id: userId },

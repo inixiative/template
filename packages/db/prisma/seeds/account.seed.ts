@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind seed
+ * @partOf infrastructure:seed
+ * @uses none
+ */
 import { hashSync } from 'bcryptjs';
 import type { Account } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';

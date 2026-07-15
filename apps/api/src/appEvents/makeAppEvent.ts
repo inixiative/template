@@ -1,8 +1,14 @@
-import { channelKey } from '@template/shared/ws';
-import { deliverEmailHandoffs } from '#/appEvents/bridges/email';
+/**
+ * @atlas
+ * @kind constructor
+ * @partOf primitive:appEvents
+ * @uses primitive:websockets
+ * @constructs appEventHandler
+ */
+import { deliverEmailHandoffs } from '#/appEvents/channels/email';
+import { deliverWSHandoffs } from '#/appEvents/channels/websocket';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
-import { sendToChannel } from '#/ws/pubsub';
 
 export type AppEventHandlerFn = (event: AppEventPayload) => Promise<void>;
 
@@ -14,33 +20,18 @@ const throwIfFailures = (errors: unknown[]): void => {
     throw error instanceof Error ? error : new Error(String(error));
   }
 
-  throw new AggregateError(errors, `${errors.length} app event bridge failures`);
+  throw new AggregateError(errors, `${errors.length} app event channel failures`);
 };
 
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<void>[] = [];
-
-    // Wrap each bridge in an async IIFE so a synchronous throw from the
-    // user-supplied selector (handler.observe(data) etc.) becomes a Promise
-    // rejection captured by Promise.allSettled below — otherwise it would
-    // bubble before sibling bridges enqueue, breaking bridge isolation.
-    if (handler.observe) {
-      tasks.push(
-        (async () => {
-          const observeData = handler.observe!(data);
-          if (observeData) {
-            await observeRegistry.broadcast((adapter) => adapter.record(event, observeData));
-          }
-        })(),
-      );
-    }
+    const tasks: Promise<unknown>[] = [observeRegistry.broadcast((adapter) => adapter.record(event))];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the
     // sibling emails for this event. A synchronous throw from the selector is
-    // captured as a single rejection so it can't bubble before sibling bridges
+    // captured as a single rejection so it can't bubble before sibling channels
     // enqueue.
     if (handler.email) {
       try {
@@ -52,8 +43,12 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     }
 
     if (handler.websocket) {
-      const events = handler.websocket(data) ?? [];
-      for (const e of events) sendToChannel(channelKey(e.key), e);
+      try {
+        const handoffs = handler.websocket(data) ?? [];
+        for (const h of handoffs) tasks.push(deliverWSHandoffs([h]));
+      } catch (err) {
+        tasks.push(Promise.reject(err));
+      }
     }
 
     if (handler.cb) {

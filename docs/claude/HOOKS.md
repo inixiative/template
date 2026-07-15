@@ -199,10 +199,9 @@ Automatic webhook delivery on database mutations.
 ### Enabling Webhooks for a Model
 
 ```typescript
-// hooks/webhooks/constants/enabledModels.ts
+// packages/db/src/registries/webhook/enabledModels.ts
 export const webhookEnabledModels: WebhookModel[] = [
-  WebhookModel.User,
-  WebhookModel.Organization,
+  WebhookModel.CustomerRef,
 ];
 ```
 
@@ -269,9 +268,9 @@ Use cases:
 Child models can trigger parent webhooks:
 
 ```typescript
-// hooks/webhooks/constants/relatedModels.ts
-export const webhookRelatedModels: Record<string, string> = {
-  OrganizationUser: 'Organization',  // OrgUser changes → Org webhook
+// packages/db/src/registries/webhook/relatedModels.ts
+export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
+  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
 };
 ```
 
@@ -279,7 +278,7 @@ export const webhookRelatedModels: Record<string, string> = {
 
 ## Cache Invalidation
 
-Automatic cache clearing on mutations via `CACHE_REFERENCE`.
+Automatic cache clearing on mutations via `cacheReference`.
 
 **Note**: Cache invalidation shares the same no-op detection logic as webhooks (`isNoOpUpdate`). If only ignored fields changed (see [Ignored Fields](#ignored-fields)), cache clearing is skipped.
 
@@ -287,13 +286,13 @@ Automatic cache clearing on mutations via `CACHE_REFERENCE`.
 
 ```typescript
 // hooks/cache/constants/cacheReference.ts
-export const CACHE_REFERENCE: CacheReference = {
+export const cacheReference: CacheReference = {
   User: (r) => [
     cacheKey('User', r.id),
-    cacheKey('User', r.email, 'email'),
+    cacheKey('User', r.email, ['email']),
   ],
   Token: (r) => [
-    cacheKey('Token', r.keyHash, 'keyHash'),
+    cacheKey('Token', r.keyHash, ['keyHash']),
   ],
 };
 ```
@@ -304,7 +303,7 @@ On mutation, all matching cache keys are deleted.
 
 ```typescript
 // Delete all sessions for a user
-cacheKey('Session', userId, 'userId', [], true)  // → cache:Session:userId:abc:*
+cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 ```
 
 ---

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
@@ -6,7 +12,7 @@ import type * as React from 'react';
 
 export type Column<T> = {
   key: string;
-  label: string;
+  label: React.ReactNode;
   render?: (item: T) => React.ReactNode;
 };
 

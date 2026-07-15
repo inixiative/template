@@ -1,5 +1,12 @@
+/**
+ * @atlas
+ * @kind query
+ * @partOf infrastructure:prisma
+ * @uses primitive:shared
+ */
+import { dialect } from '@template/db/lens';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
-import { dialect } from '#/lib/prisma/dialect';
+import { makeError } from '#/lib/errors';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const JSON_VALUE_OPERATORS = new Set<string>(JSON_FIELD_OPERATORS);
@@ -9,7 +16,7 @@ const JSON_VALUE_OPERATORS = new Set<string>(JSON_FIELD_OPERATORS);
 const toSegments = (value: BracketQueryValue): string[] => {
   if (Array.isArray(value)) return value.map(String);
   if (typeof value === 'string') return value.split('.').filter(Boolean);
-  throw new Error('json filter `path` must be a string or string[]');
+  throw makeError({ status: 400, message: 'json filter `path` must be a string or string[]' });
 };
 
 // Translate a JsonFilter request object into a Prisma JSON where value.
@@ -22,9 +29,10 @@ export const buildJsonWhere = (input: BracketQueryRecord, fieldPath: string): Re
       continue;
     }
     if (!JSON_VALUE_OPERATORS.has(op)) {
-      throw new Error(
-        `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
-      );
+      throw makeError({
+        status: 400,
+        message: `Operator '${op}' is not valid for json field '${fieldPath}'. Valid: path, ${JSON_FIELD_OPERATORS.join(', ')}.`,
+      });
     }
     // null on a json field → is-null, matched per provider (dialect.jsonNull).
     out[op] = value === null ? dialect.jsonNull : value;

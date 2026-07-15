@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf primitive:authz
+ * @uses none
+ */
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
@@ -28,7 +34,7 @@ const withOpenApiRef = actionRuleBase as z.ZodType & {
 const actionRuleSchema: z.ZodType = withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
 
 export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly string[]) => {
-  const schemaActions = Object.keys(rebacSchema[model]?.actions ?? {});
+  const schemaActions = Object.keys(rebacSchema.permissions[`db:${model}`]?.actions ?? {});
   const allowed = pick ? schemaActions.filter((a) => pick.includes(a)) : schemaActions;
   if (allowed.length === 0) return z.never().nullable().optional();
   return z

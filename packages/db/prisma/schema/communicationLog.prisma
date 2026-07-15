@@ -1,0 +1,61 @@
+model CommunicationLog {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sendKey String               @db.VarChar(255)
+  channel CommunicationChannel
+  kind    CommunicationKind?
+  status  CommunicationStatus  @default(queued)
+
+  emailTemplateId String?        @db.VarChar(36)
+  emailTemplate   EmailTemplate? @relation(fields: [emailTemplateId], references: [id], onDelete: SetNull)
+
+  emailTemplateAuditLogId String?   @db.VarChar(36)
+  emailTemplateAuditLog   AuditLog? @relation("CommunicationEmailTemplateAuditLog", fields: [emailTemplateAuditLogId], references: [id], onDelete: SetNull)
+
+  senderType           SenderType
+  senderUserId         String?       @db.VarChar(36)
+  senderOrganizationId String?       @db.VarChar(36)
+  senderSpaceId        String?       @db.VarChar(36)
+  senderUser           User?         @relation("CommunicationSenderUser", fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderOrganization   Organization? @relation("CommunicationSenderOrganization", fields: [senderOrganizationId], references: [id], onDelete: SetNull)
+  senderSpace          Space?        @relation("CommunicationSenderSpace", fields: [senderSpaceId], references: [id], onDelete: SetNull)
+
+  recipientUserId    String?  @db.VarChar(36)
+  recipientUser      User?    @relation("CommunicationRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientContactId String?  @db.VarChar(36)
+  recipientContact   Contact? @relation(fields: [recipientContactId], references: [id], onDelete: SetNull)
+  address            String
+
+  idempotencyKey    String    @unique
+  providerMessageId String?
+  error             String?
+  sentAt            DateTime?
+
+  @@index([sendKey])
+  @@index([emailTemplateId])
+  @@index([emailTemplateAuditLogId])
+  @@index([senderUserId])
+  @@index([senderOrganizationId])
+  @@index([senderSpaceId])
+  @@index([recipientUserId])
+  @@index([recipientContactId])
+  @@index([status])
+}
+
+enum CommunicationChannel {
+  email
+  sms
+  push
+  inApp
+}
+
+enum CommunicationStatus {
+  queued
+  sending
+  sent
+  failed
+  suppressed
+  undeliverable
+}

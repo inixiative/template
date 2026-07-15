@@ -1,8 +1,9 @@
-import type { EmailTarget, ResolvedRecipient } from '@template/email/targeting';
-import type { WSEvent } from '@template/shared/ws';
-
-export type { EmailTarget, ResolvedRecipient };
-
+/**
+ * @atlas
+ * @kind type
+ * @partOf primitive:appEvents
+ * @uses feature:email, primitive:shared
+ */
 export type AppEventActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
@@ -11,42 +12,38 @@ export type AppEventActor = {
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
+  integrationId: string | null;
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
+  id: string;
   name: string;
   actor: AppEventActor;
   data: T;
-  timestamp: string;
-};
-
-export type EmailSenderContext = {
-  ownerModel: 'default' | 'Organization' | 'Space' | 'User';
-  organizationId?: string;
-  spaceId?: string;
-  userId?: string;
 };
 
 export type EmailHandoff = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
   template: string;
   data: Record<string, unknown>;
-  sender?: EmailSenderContext;
-  tags?: string[];
 };
 
-export type ObserveData = Record<string, unknown>;
+// Generic websocket envelope: target a set of channels OR a set of users, with an
+// arbitrary message payload. A declarative query-refetch (WSEvent) is just one kind
+// of `message.data` — the producer computes the channel(s) (e.g. channelKey(queryKey))
+// and wraps the event. Broader than refetch-only: also serves user-targeted pushes,
+// presence, toasts, etc.
+export type WSHandoff = {
+  target: { channels: string[] } | { userIds: string[] };
+  message: { data: Record<string, unknown> };
+};
 
 export type ObserveAdapter = {
-  record: (event: AppEventPayload, data: ObserveData) => Promise<void>;
+  record: (event: AppEventPayload) => Promise<void>;
 };
 
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
-  websocket?: (data: T) => WSEvent[] | null;
-  observe?: (data: T) => ObserveData | null;
+  websocket?: (data: T) => WSHandoff[] | null;
 
   cb?: Array<(data: T) => Promise<void> | void>;
 };

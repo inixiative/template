@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind route
+ * @partOf feature:auth
+ * @uses primitive:routeTemplates
+ */
 import { readRoute } from '#/lib/routeTemplates';
 import { PlatformProviderSchema } from '#/modules/authProvider/schemas/authProviderSchemas';
 import { Modules } from '#/modules/modules';

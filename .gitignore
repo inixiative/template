@@ -153,6 +153,9 @@ CLAUDE.local.md
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 
+# bun run worktree:create checkouts (per-machine; never commit worktree trees)
+.worktrees/
+
 # Template internal config (for template development only)
 project.config.template-internal.ts
 
@@ -187,3 +190,6 @@ packages/sdk/src/client/index.ts
 
 # Init script scratch files
 scripts/init/test-*.ts
+
+# Atlas-generated code map (regenerate with: bunx atlas generate)
+MAP.md

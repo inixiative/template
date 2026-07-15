@@ -1,12 +1,14 @@
 # FEAT-018: `@inixiative/transitions` — declarative transition guard + affordance layer
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress (library COMPLETE; only the inquiry consumer migration remains)
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-06-08
-**Updated**: 2026-06-08
+**Updated**: 2026-06-27
 
 ---
+
+_Updated 2026-06-27: `@inixiative/transitions` (v0.0.2, not yet published) is built out with its full surface — `check`/`checkPath`, `describe`, `merge` (`applyMerge` + `isSerializableMerge`), `serializable` (`isSerializable`), `validate` (`validateTransition`), `registry` (`checkTransition`/`available`/`eligible`), and injected `rebac` (`makeRebacAuthorize`/`createRebac`, `RebacSchema`), each with tests. Depends only on `@inixiative/json-rules`. **Remaining:** adopt for the first consumer — the template's inquiry status lifecycle (the package is not yet a template dependency and no inquiry-status migration has landed). Not Started → In Progress because the kernel/registry/validator/merge work is done; the consumer migration is the open item._
 
 ## Overview
 
@@ -46,7 +48,11 @@ type Transition = {
 
 - `from`/`to` share a shape; the asymmetry (current vs resulting record) is load-bearing —
   make it loud in types/docs.
-- `merge` lives on `to` (it produces the resulting state). Default `spread`.
+- `merge` lives on `to`. It is a **check-time projection** — the strategy for combining
+  `before` (`record`) + `after` (`changes`) into the candidate record that `to.predicate` is
+  evaluated against. Default `spread`. It is **not** an executed writer: the kernel never
+  persists, so `merge` only computes data-to-check. Keep this loud in naming — reading `merge`
+  as "how the record mutates" reintroduces the first-match confusion (see Clarifications).
 
 ### Merge strategies (Mongo-flavored, serializable)
 Hybrid: a raw callback is allowed for code callers; serialized/customer configs must use a
@@ -64,12 +70,59 @@ given transition can be persisted/tenant-configured.
 
 ```ts
 check(t, record, changes) =>
-  t.from.predicate(record) && t.to.predicate(applyMerge(t.to.merge, record, changes))
-  → { ok: boolean; reason?: 'no-from' | 'no-to' }
+  // evaluates from(current) + to(merged) [+ optional edge permission];
+  // collects ALL failures, never short-circuits
+  → { ok: boolean; failures: Failure[] }   // Failure = { side: 'from' | 'to' | 'permission'; reason }
 ```
 
-Return a **reason**, not a bare bool, so callers can surface "can't reach `connected` from
-`disconnected`".
+Return the **full failure set**, not a bare bool or a single reason, so callers can surface
+*every* blocker at once ("can't reach `connected`: from-state isn't `disconnected` AND you lack
+`pair`"). The kernel is **pure + framework-free** — it *returns* the aggregate, it never throws.
+Throwing (and mapping `failures` onto an app's error vocabulary) is a thin consumer-side `assert`
+adapter, because the package's only dependency is `@inixiative/json-rules` and it must not import
+an app error type (`HTTPException`). See Clarifications for the existential (`any`) action semantics
+and the throw boundary.
+
+## Clarifications (2026-06-08 — design review)
+
+Resolutions from a design pass. Where these conflict with the inline spec above, these win.
+
+1. **Action semantics are existential (`any`), not first-match.** `check`, `available`, and
+   `eligible` are the *same* disjunction over an action's paths:
+   - `available(record)` = `∃ path. from(record)`
+   - `check(record, changes)` = `permission ∧ (∃ path. from(record) ∧ to(merge(record, changes)))`
+   - `eligible()` = `toPrisma(Any[...froms])` → `{ OR: [...] }`
+   First-match was the odd one out — it implied winner-selection, which only matters to an
+   *executor*, and this primitive doesn't execute. "All-match" (`∀`) would be wrong the other way
+   (too strict). The correction makes all three ops one uniform fold, which is the tell it's right.
+
+2. **Overlapping paths are legal — a feature, not a footgun.** Since the kernel never executes a
+   merge, two overlapping paths with different merges merely compute different *candidate*
+   next-states to validate their own `to` against; nothing is persisted, so there is no winner to
+   tiebreak and no order-dependence. The authoring validator therefore does **not** enforce path
+   disjointness. (The only place "which next-state is canonical" could resurface is a *separate*
+   function that returns a merged result for an executor — that belongs to the hooks pipeline and
+   owns its own resolution. Out of scope here.)
+
+3. **`merge` is a check-time projection, not a writer.** Strategy for folding `before` (`record`)
+   + `after` (`changes`) into the record `to.predicate` runs against; default `spread`. Stateless
+   guard ⇒ `merge` only produces data-to-check. Naming must keep this loud; "how the record mutates"
+   is the wrong mental model and reintroduces first-match thinking.
+
+4. **`check` collects ALL failures and never throws.** It evaluates `from`, `to`, and `permission`
+   without short-circuiting and returns `{ ok, failures }` (path-keyed for multi-path actions), so an
+   affordance answers "you can't approve because you lack `resolve` **and** the status isn't pending"
+   in one round-trip instead of one blocker per retry. The kernel is pure (only dep:
+   `@inixiative/json-rules`) and cannot import `HTTPException`/an app error — the same
+   dependency-direction rule that keeps `authorize` injected. A thin consumer `assert` adapter maps
+   `failures` to the app's vocabulary (e.g. zealot: one *aggregated* throw, `403` permission / `409`
+   state) so controllers keep throw-and-let-the-boundary-handle. "Throw all errors" = one aggregated
+   throw at the call site, not the kernel reaching for a framework error.
+
+5. **`eligible()` is a `from`-only over-approximation of `check()`.** It unions only the `from`
+   predicates (a bulk query has no proposed change to test `to` against), so a record in `eligible()`
+   may still fail `check()` when the actual change satisfies no path's `to`. Read it as "currently in
+   a state *from which* this action can start," not "guaranteed passable."
 
 ## Duality (why it earns a package)
 
@@ -99,8 +152,10 @@ hang those — both are already on the roadmap, so the object isn't speculative.
 - `available(model, record, { actor, authorize })` → action names with **any** path whose
   `from.predicate(record)` is true **and** `authorize(action.permission, record, actor)` passes
   → drives action-button enablement, API affordances, "what can I do".
-- `check(model, action, record, changes)` → **first** path whose `from` matches the current
-  record AND `to` matches the merged next-state (that path's `merge` applies).
+- `check(model, action, record, changes)` → **existential (`any`) over paths**: passes iff the
+  action permission holds AND **some** path satisfies `from(current) ∧ to(merged)`. Not first-match,
+  not all-match. Paths may overlap (a feature — multiple legal routes to one affordance). Returns
+  the aggregated `{ ok, failures }`; see Clarifications.
 - `eligible(model, action)` → `toPrisma(Any[...paths.map(p => p.from.predicate)])` — one OR'd
   `where` for bulk "who can take this action" (verified: `toPrisma(Any) → { OR: [...] }`).
 
@@ -146,7 +201,8 @@ must never import Prisma. Build only when the first relation-referencing transit
 ## Tasks
 
 - [ ] Package skeleton `@inixiative/transitions`, depends on `@inixiative/json-rules`
-- [ ] Kernel `check()` (from/to predicate eval + merge application) returning `{ ok, reason }`
+- [ ] Kernel `check()` (from/to/permission eval + merge projection) returning `{ ok, failures }`
+      — collects ALL failures, no short-circuit, pure (never throws)
 - [ ] Merge: raw cb + keyword strategies (`spread`, `deepMerge`, `append`, `appendUnique`) +
       `isSerializable(transition)`
 - [ ] Registry: `Map<model, transitions>`, `available(model, record)`, `eligible(model, name)`
@@ -290,7 +346,8 @@ multi-step sagas — anything that must *do*, not *gate*.
 
 ## Open questions
 
-- First-match vs all-match across an action's paths (leaning first-match).
+- ~~First-match vs all-match across an action's paths.~~ **Decided: existential `any`** (see
+  Clarifications). Overlap is legal; the authoring validator does *not* enforce path disjointness.
 - Does `available()` report near-miss reasons (for "why can't I")?
 - Per-request context-scope: zealot's dedicated `mergeNarrowingWheres` merge **vs** a second
   narrowing layer underneath the lens chain (`{ parent: redactLens(lensFor(model)), root: { where } }`).

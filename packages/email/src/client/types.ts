@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind type, client
+ * @partOf feature:email
+ * @uses none
+ */
 export type SendEmailOptions = {
   to: string | string[];
   cc?: string | string[];
@@ -8,6 +14,7 @@ export type SendEmailOptions = {
   replyTo?: string;
   tags?: string[];
   metadata?: Record<string, string>;
+  headers?: Record<string, string>;
 };
 
 export type SendEmailResult = {

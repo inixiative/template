@@ -27,7 +27,7 @@
   - [Status utilities (`validations/validateInquiryStatus.ts`)](#status-utilities-validationsvalidateinquirystatusts)
   - [Create route permission pattern](#create-route-permission-pattern)
 - [Frontend](#frontend)
-  - [Constants and utilities (`packages/ui/src/lib/inquiryQueryKeys.ts`)](#constants-and-utilities-packagesuisrclibinquiryquerykeysts)
+  - [Constants and utilities (`packages/ui/src/lib/inquiries/queryKeys.ts`)](#constants-and-utilities-packagesuisrclibinquiriesquerykeysts)
   - [Query key invalidation maps](#query-key-invalidation-maps)
   - [`useInquiryPermission`](#useinquirypermission)
   - [UI Components](#ui-components)
@@ -357,7 +357,7 @@ This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high
 
 ## Frontend
 
-### Constants and utilities (`packages/ui/src/lib/inquiryQueryKeys.ts`)
+### Constants and utilities (`packages/ui/src/lib/inquiries/queryKeys.ts`)
 
 ```typescript
 // Backend terminal statuses — does NOT include expiry

@@ -22,7 +22,7 @@ describe('saveEmailTemplate', () => {
       slug: 'simple',
       name: 'Simple Template',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('<mj-text>Hello</mj-text>'),
       ownerModel: 'default',
     });
@@ -32,12 +32,51 @@ describe('saveEmailTemplate', () => {
     expect(result.components).toEqual([]);
   });
 
+  it('rejects a non-system template with no unsubscribe link', async () => {
+    await expect(
+      saveEmailTemplate({
+        slug: 'promo-nolink',
+        name: 'Promo',
+        subject: 'News',
+        kind: 'marketing',
+        mjml: mjml('<mj-text>News</mj-text>'),
+        ownerModel: 'default',
+      }),
+    ).rejects.toThrow(/unsubscribe/i);
+  });
+
+  it('accepts a non-system template with an unconditional unsubscribe link', async () => {
+    const result = await saveEmailTemplate({
+      slug: 'promo-link',
+      name: 'Promo',
+      subject: 'News',
+      kind: 'marketing',
+      mjml: mjml('<mj-text>News</mj-text><mj-text>{{recipient.unsubscribeUrl}}</mj-text>'),
+      ownerModel: 'default',
+    });
+    expect(result.template.slug).toBe('promo-link');
+  });
+
+  it('rejects a non-system template whose only unsubscribe link is inside a conditional', async () => {
+    const rule = '{"field":"recipient.role","operator":"equals","value":"admin"}';
+    await expect(
+      saveEmailTemplate({
+        slug: 'promo-condlink',
+        name: 'Promo',
+        subject: 'News',
+        kind: 'marketing',
+        mjml: mjml(`<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{recipient.unsubscribeUrl}}</mj-text>{{/if}}`),
+        ownerModel: 'default',
+      }),
+    ).rejects.toThrow(/unconditional/i);
+  });
+
   it('saves template and extracts components', async () => {
     const result = await saveEmailTemplate({
       slug: 'with-header',
       name: 'With Header',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:header}}<mj-text>Header</mj-text>{{/component:header}}<mj-text>Body</mj-text>'),
       ownerModel: 'default',
     });
@@ -53,7 +92,7 @@ describe('saveEmailTemplate', () => {
       slug: 'dup-header',
       name: 'Dup Header',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml(
         '{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}{{#component:header}}<mj-text>Same</mj-text>{{/component:header}}',
       ),
@@ -69,7 +108,7 @@ describe('saveEmailTemplate', () => {
       slug: 'variants',
       name: 'Variants',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml(
         '{{#component:header}}<mj-text>Version A</mj-text>{{/component:header}}{{#component:header}}<mj-text>Version B</mj-text>{{/component:header}}',
       ),
@@ -92,7 +131,7 @@ describe('saveEmailTemplate', () => {
       slug: 'use-existing',
       name: 'Use Existing',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:footer}}<mj-text>Existing Footer</mj-text>{{/component:footer}}'),
       ownerModel: 'default',
     });
@@ -112,7 +151,7 @@ describe('saveEmailTemplate', () => {
       slug: 'new-cta',
       name: 'New CTA',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:cta}}<mj-button href="#">New CTA</mj-button>{{/component:cta}}'),
       ownerModel: 'default',
     });
@@ -134,7 +173,7 @@ describe('saveEmailTemplate', () => {
       slug: 'org-template',
       name: 'Org Template',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:shared}}<mj-text>Default Content</mj-text>{{/component:shared}}'),
       ownerModel: 'Organization',
       organizationId: org.id,
@@ -149,7 +188,7 @@ describe('saveEmailTemplate', () => {
       slug: 'nested',
       name: 'Nested',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml(
         '{{#component:outer}}<mj-text>Outer {{#component:inner}}<mj-text>Inner</mj-text>{{/component:inner}}</mj-text>{{/component:outer}}',
       ),
@@ -168,7 +207,7 @@ describe('saveEmailTemplate', () => {
       slug: 'admin-only',
       name: 'Admin Only',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('<mj-text>Admin</mj-text>'),
       ownerModel: 'admin',
     });
@@ -192,7 +231,7 @@ describe('saveEmailTemplate', () => {
       slug: 'space-template',
       name: 'Space Template',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:space-header}}<mj-text>Space Header</mj-text>{{/component:space-header}}'),
       ownerModel: 'Space',
       organizationId: org.id,
@@ -219,7 +258,7 @@ describe('saveEmailTemplate', () => {
       slug: 'space-uses-org',
       name: 'Space Uses Org',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:org-shared}}<mj-text>Org Shared</mj-text>{{/component:org-shared}}'),
       ownerModel: 'Space',
       organizationId: org.id,
@@ -245,7 +284,7 @@ describe('saveEmailTemplate', () => {
       slug: 'space-no-inherit',
       name: 'Space No Inherit',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:org-private}}<mj-text>Org Private</mj-text>{{/component:org-private}}'),
       ownerModel: 'Space',
       organizationId: org.id,
@@ -271,7 +310,7 @@ describe('saveEmailTemplate', () => {
       slug: 'space-uses-default',
       name: 'Space Uses Default',
       subject: 'Hello',
-      category: 'system',
+      kind: 'system',
       mjml: mjml('{{#component:default-footer}}<mj-text>Default Footer</mj-text>{{/component:default-footer}}'),
       ownerModel: 'Space',
       organizationId: org.id,
@@ -289,7 +328,7 @@ describe('saveEmailTemplate', () => {
         slug: 'invalid',
         name: 'Invalid',
         subject: 'Hello',
-        category: 'system',
+        kind: 'system',
         mjml: '<mjml><mj-body><mj-invalid-tag>Bad</mj-invalid-tag></mj-body></mjml>',
         ownerModel: 'default',
       }),
@@ -302,7 +341,7 @@ describe('saveEmailTemplate', () => {
         slug: 'invalid2',
         name: 'Invalid2',
         subject: 'Hello',
-        category: 'system',
+        kind: 'system',
         mjml: '<mjml><mj-body><mj-unknown>Bad</mj-unknown></mj-body></mjml>',
         ownerModel: 'default',
       });

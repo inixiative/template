@@ -162,7 +162,7 @@ Modern, type-safe, permission-aware React architecture with TanStack Router, Zus
 │ └─ BetterAuth Client                       │
 ├─────────────────────────────────────────────┤
 │ Shared Packages                             │
-│ ├─ @template/shared (SDK, types)           │
+│ ├─ @template/sdk (generated client, types) │
 │ └─ @template/ui (components, hooks, state) │
 └─────────────────────────────────────────────┘
 ```
@@ -171,9 +171,7 @@ Modern, type-safe, permission-aware React architecture with TanStack Router, Zus
 
 **See:** [ZUSTAND.md](./ZUSTAND.md) for complete documentation
 
-Apps compose Zustand slices from `@template/ui/store`:
-- **Web/Admin:** 6 slices (auth, tenant, permissions, navigation, ui, client)
-- **Superadmin:** 5 slices (auth, permissions, navigation, ui, client - no tenant)
+**One shared store, composed once and reused by all apps.** Web, admin, and superadmin all import the same `useAppStore` from `@template/ui/store` — there is no per-app store. The store composes **6 slices** (auth, tenant, permissions, navigation, ui, client). Superadmin differs not by dropping a slice but by being user-context-first: it never forces tenant behavior (see §9 of the root AI entrypoint).
 
 **Key slices:**
 - **auth** - User, session, organizations, spaces, spoof
@@ -271,7 +269,7 @@ export const createAuthGuards = (getStore: () => AuthStore) => ({
       });
     }
   },
-  requireGuest: (context?) => {
+  requirePublic: (context?) => {
     const isAuthenticated = getStore().auth.isAuthenticated;
     if (isAuthenticated) {
       throw redirect({
@@ -289,7 +287,7 @@ export const createAuthGuards = (getStore: () => AuthStore) => ({
 import { createAuthGuards } from '@template/ui/guards';
 import { useAppStore } from '@template/ui/store';
 
-export const { requireAuth, requireGuest } = createAuthGuards(() => useAppStore.getState());
+export const { requireAuth, requirePublic } = createAuthGuards(() => useAppStore.getState());
 ```
 
 **Usage in Routes:**
@@ -303,7 +301,7 @@ export const Route = createFileRoute('/_authenticated')({
 
 // apps/web/app/routes/login.tsx
 export const Route = createFileRoute('/login')({
-  beforeLoad: (ctx) => requireGuest(ctx), // Redirect if already logged in
+  beforeLoad: (ctx) => requirePublic(ctx), // Redirect if already logged in
   component: LoginPage,
 });
 ```
@@ -386,15 +384,15 @@ const [contextType, contextId] = getContextParams(context);
 
 ## API Client Usage
 
-**Location:** `packages/shared/src/lib/apiQuery.ts`, `apiMutation.ts`
+**Location:** `packages/ui/src/lib/apiQuery.ts`, `apiMutation.ts`
 
-New wrapper functions for type-safe API calls with TanStack Query.
+Wrapper functions for type-safe API calls with TanStack Query. They wrap operations from the generated `@template/sdk`.
 
 ### apiQuery (For Queries)
 
 ```typescript
 import { apiQuery } from '@template/ui/lib';
-import { organizationRead, organizationReadQueryKey } from '@template/shared';
+import { organizationRead, organizationReadQueryKey } from '@template/sdk';
 import { useQuery } from '@tanstack/react-query';
 
 const { data, isLoading } = useQuery({
@@ -410,7 +408,7 @@ const org = data;  // Organization type
 
 ```typescript
 import { apiMutation } from '@template/ui/lib';
-import { organizationCreate } from '@template/shared';
+import { organizationCreate } from '@template/sdk';
 import { useMutation } from '@tanstack/react-query';
 
 const mutation = useMutation({
@@ -434,7 +432,7 @@ await mutation.mutateAsync({ name: 'New Org' });
 
 ```typescript
 // OLD (deprecated)
-import { apiFetch } from '@template/shared';
+import { apiFetch } from '@template/sdk';
 const result = await apiFetch(organizationRead)({ path: { id } });
 const org = result.data?.data;
 
@@ -1071,20 +1069,21 @@ packages/ui/src/components/
 - ✅ `components/settings/CreateTokenModal.tsx`
 - ❌ `components/modals/CreateTokenModal.tsx`
 
-#### OpenAPI Client
+#### Generated SDK
 
-API client is auto-generated from OpenAPI spec:
+The API client is a standalone package, `@template/sdk`, auto-generated from the OpenAPI spec by hey-api (`@hey-api/openapi-ts`). It emits `sdk.gen.ts` (operations), `types.gen.ts`, `schemas.gen.ts`, and TanStack Query helpers (`@tanstack/react-query.gen.ts`), all re-exported from `@template/sdk`.
 
 ```bash
-cd packages/ui
-bun run generate:sdk  # Generates apiClient/ from openapi.gen.json
+bun run --cwd packages/sdk generate:sdk  # regenerate from openapi.gen.json
+# or refresh spec + regenerate in one step:
+bash scripts/generate-sdk.sh
 ```
 
-**Location:** `packages/ui/src/apiClient/`
+**Location:** `packages/sdk/src/`
 
 **Usage:**
 ```typescript
-import { organizationReadMany } from '@template/ui/apiClient';
+import { organizationReadMany } from '@template/sdk';
 import { apiQuery } from '@template/ui/lib';
 
 const { data } = useQuery({
@@ -1093,7 +1092,7 @@ const { data } = useQuery({
 });
 ```
 
-See AUTH.md for complete API integration patterns.
+It lives outside `@template/ui` so non-UI consumers (workers, future apps) can call apps/api without importing a UI package. See AUTH.md for complete API integration patterns.
 
 ### Settings Components
 
@@ -1218,10 +1217,9 @@ export const OrganizationsPage = () => {
   const { data: response } = useQuery(meReadManyOrganizationsOptions());
   const organizations = response?.data || [];
 
-  const deleteMutation = useOptimisticListMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: (vars) => organizationsDeleteMutation({ path: { id: vars.id } }),
-    queryKey: meReadManyOrganizationsQueryKey(),
-    operation: 'delete',
+    targets: [createOptimisticListTarget({ queryKey: meReadManyOrganizationsQueryKey(), operation: 'delete' })],
   });
 
   return (
@@ -1736,10 +1734,9 @@ const editBtn = usePermission({
 **For Lists:**
 
 ```typescript
-const deleteMutation = useOptimisticListMutation({
+const deleteMutation = useOptimisticMutation({
   mutationFn: (vars) => api.delete(vars.id),
-  queryKey: ['organizations'],
-  operation: 'delete', // 'create' | 'update' | 'delete'
+  targets: [createOptimisticListTarget({ queryKey: ['organizations'], operation: 'delete' })], // 'create' | 'update' | 'delete'
 });
 
 deleteMutation.mutate(org);
@@ -2106,10 +2103,9 @@ const editBtn = usePermission({ permissions, model: 'organization', record: org,
 ### 4. Optimistic Mutations
 
 ```typescript
-const deleteMutation = useOptimisticListMutation({
+const deleteMutation = useOptimisticMutation({
   mutationFn: (vars) => api.delete(vars.id),
-  queryKey: ['organizations'],
-  operation: 'delete',
+  targets: [createOptimisticListTarget({ queryKey: ['organizations'], operation: 'delete' })],
 });
 
 deleteMutation.mutate(org);  // Optimistically updates UI, rolls back on error
@@ -2384,7 +2380,7 @@ Test coverage:
 | **Multi-tenant** | ✅ Yes | ✅ Yes | ❌ No |
 | **Navigation** | Consumer actions | Operator actions | Platform mgmt |
 | **Nav Config** | `apps/web/app/config/nav.ts` | `apps/admin/app/config/nav.ts` | Hardcoded |
-| **Store Name** | `AppStore` | `AdminStore` | `SuperadminStore` |
+| **Store** | shared `useAppStore` (`@template/ui/store`) | shared `useAppStore` | shared `useAppStore` (user-context first) |
 
 **Web (Consumer):**
 - Browse organizations
@@ -2406,10 +2402,9 @@ Test coverage:
 ## Key Files Reference
 
 ### Store & State
-- `/packages/shared/src/store/slices/auth.ts`
-- `/packages/shared/src/store/slices/permissions.ts`
-- `/packages/shared/src/store/slices/tenant.ts`
-- `/apps/{app}/app/store/index.ts`
+- `/packages/ui/src/store/index.ts` — composes the shared `useAppStore` (all apps)
+- `/packages/ui/src/store/slices/{auth,client,navigation,permissions,tenant,ui}.ts`
+- `/packages/ui/src/store/types/index.ts` — `AppStore` intersection
 
 ### Auth
 - `/packages/shared/src/lib/createAuthClient.ts`

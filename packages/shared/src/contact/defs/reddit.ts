@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant, definition
+ * @partOf primitive:shared
+ * @uses none
+ */
 import type { ContactTypeDef } from '@template/shared/contact/defs/base';
 import { parseRedditUrl, type RedditValue } from '@template/shared/contact/parsers/reddit';
 import { z } from 'zod';

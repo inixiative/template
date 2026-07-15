@@ -11,6 +11,12 @@ const writeCassette = (dir: string, name: string, body: unknown): string => {
   return path;
 };
 
+// node's EventEmitter.listeners() is typed `Function[]`, which isn't assignable to
+// emitFromCassette's stricter EmitterLike — the narrowing is sound (listeners are
+// invoked with a single payload), so cast at the boundary.
+const asEmitter = (ev: EventEmitter): Parameters<typeof emitFromCassette>[0] =>
+  ev as unknown as Parameters<typeof emitFromCassette>[0];
+
 describe('emitFromCassette', () => {
   it('calls sync listeners with cassette body', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cassette-'));
@@ -21,7 +27,7 @@ describe('emitFromCassette', () => {
       received.push(payload);
     });
 
-    await emitFromCassette(ev, 'messages.upsert', path);
+    await emitFromCassette(asEmitter(ev), 'messages.upsert', path);
 
     expect(received).toEqual([{ messages: [{ id: 'a' }], type: 'notify' }]);
   });
@@ -36,7 +42,7 @@ describe('emitFromCassette', () => {
       settled = true;
     });
 
-    await emitFromCassette(ev, 'e', path);
+    await emitFromCassette(asEmitter(ev), 'e', path);
 
     expect(settled).toBe(true);
   });
@@ -49,7 +55,7 @@ describe('emitFromCassette', () => {
     ev.on('e', () => calls.push(1));
     ev.on('e', () => calls.push(2));
 
-    await emitFromCassette(ev, 'e', path);
+    await emitFromCassette(asEmitter(ev), 'e', path);
 
     expect(calls.sort()).toEqual([1, 2]);
   });
@@ -59,6 +65,6 @@ describe('emitFromCassette', () => {
     const path = writeCassette(dir, 'msg', { x: 1 });
     const ev = new EventEmitter();
 
-    await expect(emitFromCassette(ev, 'unsubscribed', path)).resolves.toBeUndefined();
+    await expect(emitFromCassette(asEmitter(ev), 'unsubscribed', path)).resolves.toBeUndefined();
   });
 });

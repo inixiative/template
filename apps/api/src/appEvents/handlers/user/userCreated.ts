@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:appEvents
+ * @uses none
+ */
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type UserCreatedPayload = {
@@ -8,10 +14,8 @@ export type UserCreatedPayload = {
 export const userCreated = makeAppEvent<UserCreatedPayload>({
   email: (data) => [
     {
-      to: [{ userIds: [data.userId] }],
       template: 'welcome',
-      data: { isGuest: data.isGuest },
+      data: { userId: data.userId, isGuest: data.isGuest },
     },
   ],
-  observe: (data) => ({ userId: data.userId, isGuest: data.isGuest }),
 });

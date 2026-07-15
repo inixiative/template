@@ -1,6 +1,6 @@
 # COMM-002: Email Validation Service
 
-**Status**: 🆕 Not Started
+**Status**: 🚧 In Progress
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-03-20

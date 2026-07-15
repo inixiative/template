@@ -36,7 +36,7 @@
 - Use `describe`, `it`, `expect` from `bun:test`
 
 ## API Documentation
-- OpenAPI docs available at `/docs` using Scalar UI
+- OpenAPI 3.1 spec served as JSON at `/openapi/docs` (via `app.doc31`)
 - Use request schema templates from `src/app/core/requestSchemas`
 - Always include proper types and documentation
 

@@ -1,30 +1,42 @@
-import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
+/**
+ * @atlas
+ * @kind registry
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { omit } from 'lodash-es';
 
-const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
-  _global: ['updatedAt'],
-  User: ['lastLoginAt'],
-  Token: ['lastUsedAt'],
-};
+export type FieldRegistry = Record<string, string[]>;
 
-const buildHookIgnoreFields = (): Record<string, string[]> => {
-  const merged: Record<string, string[]> = { ...HOOK_IGNORE_FIELDS_BASE };
-  const composed = [getEncryptedFieldsByModel(), getOrderedListFieldsByModel()];
-  for (const source of composed) {
-    for (const [model, fields] of Object.entries(source)) {
-      merged[model] = [...(merged[model] ?? []), ...fields];
+export const unionRegistries = (...registries: FieldRegistry[]): FieldRegistry => {
+  const merged: FieldRegistry = {};
+  for (const registry of registries) {
+    for (const [model, fields] of Object.entries(registry)) {
+      merged[model] = [...new Set([...(merged[model] ?? []), ...fields])];
     }
   }
   return merged;
 };
 
-export const HOOK_IGNORE_FIELDS: Record<string, string[]> = buildHookIgnoreFields();
+const NOOP_FIELDS_BASE: FieldRegistry = {
+  _global: ['updatedAt'],
+  User: ['lastLoginAt'],
+  Token: ['lastUsedAt'],
+  // Live "broken refs" projection for the index list — maintained by the versioning hook, not
+  // versioned content (the snapshot's componentVersions is the record). Ignored so updating it
+  // neither snapshots nor re-triggers the hook.
+  EmailTemplate: ['degradedComponentRefs'],
+  EmailComponent: ['degradedComponentRefs'],
+};
 
-export const getIgnoreFields = (model: string): string[] => [
-  ...(HOOK_IGNORE_FIELDS._global ?? []),
-  ...(HOOK_IGNORE_FIELDS[model] ?? []),
-];
+// Semantically-meaningless change fields: a mutation touching only these is not worth recording or
+// firing. Ordered-list position columns fold in; sensitive columns do NOT (those are REDACT_FIELDS —
+// audit masks them, webhook drops them via WEBHOOK_DROP_FIELDS).
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS_BASE, getOrderedListFieldsByModel());
 
-export const filterIgnoredFields = <T extends Record<string, unknown>>(model: string, data: T): Partial<T> =>
-  omit(data, getIgnoreFields(model)) as Partial<T>;
+export const filterFields = <T extends Record<string, unknown>>(
+  model: string,
+  data: T,
+  registry: FieldRegistry,
+): Partial<T> => omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;

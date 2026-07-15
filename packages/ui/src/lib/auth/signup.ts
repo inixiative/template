@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { setToken } from '@template/ui/lib/auth/token';
 import type { AuthMethod, EmailAuthMethod, OAuthAuthMethod, SamlAuthMethod } from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';

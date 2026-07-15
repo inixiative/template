@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import type { InquiryType } from '@template/ui/lib/inquiries/queryKeys';
 import type { ComponentType } from 'react';

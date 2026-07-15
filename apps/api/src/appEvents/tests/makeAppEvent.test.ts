@@ -1,8 +1,11 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { AppEventPayload } from '#/appEvents/types';
+import { observeRegistry } from '#/lib/observe';
 
 const createEvent = (name: string, data: Record<string, unknown>): AppEventPayload => ({
+  id: Bun.randomUUIDv7(),
   name,
   actor: {
     actorUserId: 'user-1',
@@ -12,102 +15,155 @@ const createEvent = (name: string, data: Record<string, unknown>): AppEventPaylo
     ipAddress: '127.0.0.1',
     userAgent: 'test',
     sourceInquiryId: null,
+    integrationId: null,
   },
   data,
-  timestamp: new Date().toISOString(),
 });
 
 describe('makeAppEvent', () => {
+  const observed: AppEventPayload[] = [];
+  beforeAll(() => {
+    observeRegistry.register('test-recorder', {
+      record: async (event) => {
+        observed.push(event);
+      },
+    });
+  });
+  afterAll(() => observeRegistry.unregister('test-recorder'));
+  afterEach(async () => {
+    observed.length = 0;
+    await db.appEvent.deleteMany({ where: { name: 'test' } });
+  });
+
   it('returns a handler function', () => {
-    const handler = makeAppEvent({});
-    expect(typeof handler).toBe('function');
+    expect(typeof makeAppEvent({})).toBe('function');
   });
 
   describe('observe', () => {
-    it('calls observe callback with event data', async () => {
-      const observeFn = mock(() => ({ observed: true }));
-      const handler = makeAppEvent({ observe: observeFn });
+    it('broadcasts the full envelope for every handled event', async () => {
+      const handler = makeAppEvent<{ foo: string }>({});
 
       await handler(createEvent('test', { foo: 'bar' }));
 
-      expect(observeFn).toHaveBeenCalledWith({ foo: 'bar' });
+      expect(observed).toHaveLength(1);
+      expect(observed[0].name).toBe('test');
+      expect(observed[0].data).toEqual({ foo: 'bar' });
+      expect(observed[0].actor.actorUserId).toBe('user-1');
     });
 
-    it('skips observe when callback returns null', async () => {
-      const handler = makeAppEvent({ observe: () => null });
-      await handler(createEvent('test', {}));
+    it('broadcasts alongside other channels', async () => {
+      const handler = makeAppEvent<{ foo: string }>({
+        email: () => [{ template: 'test', data: {} }],
+      });
+
+      await handler(createEvent('test', { foo: 'bar' }));
+
+      expect(observed).toHaveLength(1);
+    });
+
+    it('upserts the AppEvent row keyed by the envelope id', async () => {
+      const event = createEvent('test', { foo: 'db' });
+
+      await makeAppEvent({})(event);
+      await makeAppEvent({})(event);
+
+      const rows = await db.appEvent.findMany({ where: { name: 'test' } });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(event.id);
+      expect(rows[0].data).toEqual({ foo: 'db' });
+      expect(rows[0].actorUserId).toBe('user-1');
+    });
+
+    it('redacts sensitive keys anywhere in the persisted payload', async () => {
+      const event = createEvent('test', { userId: 'u1', keyHash: 'super-secret', nested: { password: 'p' } });
+
+      await makeAppEvent({})(event);
+
+      const rows = await db.appEvent.findMany({ where: { name: 'test' } });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].data).toEqual({ userId: 'u1', keyHash: '[REDACTED]', nested: { password: '[REDACTED]' } });
     });
   });
 
   describe('email', () => {
-    it('calls email callback with event data', async () => {
-      const emailFn = mock(() => [{ to: [{ userIds: ['user-1'] }], template: 'test', data: {} }]);
+    it('invokes the email selector with the event data', async () => {
+      let received: unknown;
+      const handler = makeAppEvent({
+        email: (data) => {
+          received = data;
+          return [{ template: 'test', data: {} }];
+        },
+      });
 
-      const handler = makeAppEvent({ email: emailFn });
       await handler(createEvent('test', { key: 'val' }));
 
-      expect(emailFn).toHaveBeenCalledWith({ key: 'val' });
+      expect(received).toEqual({ key: 'val' });
     });
 
-    it('skips when callback returns null', async () => {
-      const handler = makeAppEvent({ email: () => null });
-      await handler(createEvent('test', {}));
-    });
+    it('skips when the selector returns null', async () => {
+      let calls = 0;
+      const handler = makeAppEvent({
+        email: () => {
+          calls += 1;
+          return null;
+        },
+      });
 
-    it('skips when callback returns empty array', async () => {
-      const handler = makeAppEvent({ email: () => [] });
       await handler(createEvent('test', {}));
+
+      expect(calls).toBe(1);
     });
   });
 
   describe('websocket', () => {
-    it('calls websocket callback with event data', async () => {
-      const wsFn = mock(() => [{ category: 'query' as const, action: 'refetch' as const, key: { _id: 'userRead' } }]);
+    it('invokes the websocket selector with the event data', async () => {
+      let received: unknown;
+      const handler = makeAppEvent({
+        websocket: (data) => {
+          received = data;
+          return [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }];
+        },
+      });
 
-      const handler = makeAppEvent({ websocket: wsFn });
       await handler(createEvent('test', { key: 'val' }));
 
-      expect(wsFn).toHaveBeenCalledWith({ key: 'val' });
-    });
-
-    it('skips when callback returns null', async () => {
-      const handler = makeAppEvent({ websocket: () => null });
-      await handler(createEvent('test', {}));
+      expect(received).toEqual({ key: 'val' });
     });
   });
 
   describe('cb', () => {
-    it('calls all callbacks with event data', async () => {
-      const cb1 = mock(async () => {});
-      const cb2 = mock(async () => {});
+    it('calls all callbacks with the event data', async () => {
+      const seen: unknown[] = [];
+      const handler = makeAppEvent({
+        cb: [async (data) => void seen.push(data), async (data) => void seen.push(data)],
+      });
 
-      const handler = makeAppEvent({ cb: [cb1, cb2] });
       await handler(createEvent('test', { x: 1 }));
 
-      expect(cb1).toHaveBeenCalledWith({ x: 1 });
-      expect(cb2).toHaveBeenCalledWith({ x: 1 });
+      expect(seen).toEqual([{ x: 1 }, { x: 1 }]);
     });
   });
 
-  describe('bridge isolation', () => {
-    it('one bridge failing does not prevent others from running, but still rejects', async () => {
-      const cbSuccess = mock(async () => {});
-
+  describe('channel isolation', () => {
+    it('one channel failing does not prevent others from running, but still rejects', async () => {
+      let cbRan = false;
       const handler = makeAppEvent({
-        observe: () => {
-          throw new Error('observe boom');
+        email: () => {
+          throw new Error('email boom');
         },
-        cb: [cbSuccess],
+        cb: [
+          async () => {
+            cbRan = true;
+          },
+        ],
       });
 
-      await expect(handler(createEvent('test', {}))).rejects.toThrow('observe boom');
-
-      expect(cbSuccess).toHaveBeenCalled();
+      await expect(handler(createEvent('test', {}))).rejects.toThrow('email boom');
+      expect(cbRan).toBe(true);
     });
 
-    it('waits for sibling bridges before rejecting', async () => {
+    it('waits for sibling channels before rejecting', async () => {
       const callOrder: string[] = [];
-
       const handler = makeAppEvent({
         cb: [
           async () => {
@@ -126,9 +182,8 @@ describe('makeAppEvent', () => {
   });
 
   describe('empty handler', () => {
-    it('completes without error when no bridges defined', async () => {
-      const handler = makeAppEvent({});
-      await handler(createEvent('test', {}));
+    it('completes without error when no channels defined', async () => {
+      await makeAppEvent({})(createEvent('test', {}));
     });
   });
 });

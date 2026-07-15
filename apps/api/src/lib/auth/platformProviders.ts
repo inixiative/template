@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:auth
+ * @uses none
+ */
 export interface PlatformProvider {
   type: 'oauth' | 'saml';
   provider: string;

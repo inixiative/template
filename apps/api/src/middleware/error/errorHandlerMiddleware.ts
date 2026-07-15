@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind middleware
+ * @partOf primitive:errors
+ * @uses infrastructure:prisma, primitive:shared, infrastructure:observability, primitive:routeTemplates
+ */
 import { Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
@@ -37,12 +43,12 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
   }
 
   if (err instanceof HTTPException) {
+    if (err instanceof AppError) err.requestId = c.get('requestId');
     if (err.status >= 500) {
       errorReporter.captureException(err, {
         extra: { statusCode: err.status, path: c.req.path, method: c.req.method },
       });
       if (isTest) log.error('Error in handler:', err);
-      if (err instanceof AppError) err.requestId = c.get('requestId');
     }
     return err.getResponse();
   }

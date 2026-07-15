@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';

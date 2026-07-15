@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind constant
+ * @partOf primitive:routeTemplates
+ * @uses none
+ */
 import { type RouteConfig, z } from '@hono/zod-openapi';
 
 const errorDescriptions: { code: string; description: string }[] = [
@@ -18,7 +24,7 @@ const errorDescriptions: { code: string; description: string }[] = [
   { code: '504', description: 'Gateway Timeout' },
 ];
 
-const errorSchema = z
+export const errorSchema = z
   .object({
     error: z.string(),
     message: z.string(),

@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind schema
+ * @partOf feature:auditLogs, superadmin
+ * @uses none
+ */
 import {
   AuditLogScalarSchema,
   OrganizationScalarSchema,
@@ -17,7 +23,7 @@ export const includeAuditLogResponse = {
   contextSpace: true,
 } as const satisfies Prisma.AuditLogInclude;
 
-export const auditLogResponseSchema = AuditLogScalarSchema.extend({
+export const auditLogResponseSchema = AuditLogScalarSchema.omit({ componentVersions: true }).extend({
   actorUser: UserScalarSchema.nullable(),
   actorSpoofUser: UserScalarSchema.nullable(),
   actorToken: auditActorTokenSchema.nullable(),

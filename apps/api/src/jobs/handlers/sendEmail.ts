@@ -1,97 +1,145 @@
-import { composeTemplate, interpolate, type Variables } from '@template/email/render';
-import type { EmailTarget } from '@template/email/targeting';
+/**
+ * @atlas
+ * @kind handler
+ * @partOf primitive:jobs
+ * @uses feature:email
+ */
+import type { LensNarrowing } from '@inixiative/json-rules';
+import { db } from '@template/db';
+import { fetchLens } from '@template/db/hydrate';
+import { prune } from '@template/db/lens';
 import { log } from '@template/shared/logger';
-import mjml2html from 'mjml';
+import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
-import { emailRegistry, emailVerifier, resolveFromAddress } from '#/lib/email';
-import { resolveTargets, resolveTargetsToAddresses } from '#/lib/resolveTargets';
+import { emailRegistry } from '#/lib/email';
+import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
+import { registry } from '#/lib/email/registry';
+import type { Sender } from '#/lib/email/sender';
 
 export type SendEmailPayload = {
-  to: EmailTarget[];
-  cc?: EmailTarget[];
-  bcc?: EmailTarget[];
+  eventName: string;
   template: string;
   data: Record<string, unknown>;
-  tags: string[];
 };
 
-const senderVars = (): Record<string, unknown> => ({
-  platformName: process.env.PLATFORM_NAME ?? 'Template',
-  address: process.env.PLATFORM_ADDRESS ?? '',
-});
+type Recipient = { id: string; name: string; email: string };
 
-const verifyAddresses = async (addresses: string[]): Promise<string[]> => {
-  const verified: string[] = [];
-
-  for (const address of addresses) {
-    const result = await emailVerifier.verify(address);
-
-    if (result.status === 'undeliverable') {
-      log.info(`Skipping undeliverable: ${address} (${result.reason})`);
-      continue;
-    }
-
-    if (result.isDisposable) {
-      log.info(`Skipping disposable: ${address}`);
-      continue;
-    }
-
-    if (result.status === 'risky') {
-      log.info(`Sending to risky: ${address} (${result.reason})`);
-    }
-
-    verified.push(address);
+const senderColumns = (sender: Sender) => {
+  switch (sender.type) {
+    case 'User':
+      return { senderType: sender.type, senderUserId: sender.userId, senderOrganizationId: null, senderSpaceId: null };
+    case 'Organization':
+      return {
+        senderType: sender.type,
+        senderUserId: null,
+        senderOrganizationId: sender.organizationId,
+        senderSpaceId: null,
+      };
+    case 'Space':
+      return { senderType: sender.type, senderUserId: null, senderOrganizationId: null, senderSpaceId: sender.spaceId };
+    case 'OrganizationUser':
+      return {
+        senderType: sender.type,
+        senderUserId: sender.userId,
+        senderOrganizationId: sender.organizationId,
+        senderSpaceId: null,
+      };
+    case 'SpaceUser':
+      return {
+        senderType: sender.type,
+        senderUserId: sender.userId,
+        senderOrganizationId: null,
+        senderSpaceId: sender.spaceId,
+      };
+    default:
+      return { senderType: sender.type, senderUserId: null, senderOrganizationId: null, senderSpaceId: null };
   }
-
-  return verified;
 };
 
 export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
-  const { to, cc, bcc, template, data, tags } = payload;
+  const { eventName, template, data } = payload;
 
-  const [recipients, ccAddresses, bccAddresses, from] = await Promise.all([
-    resolveTargets(to),
-    cc?.length ? resolveTargetsToAddresses(cc) : undefined,
-    bcc?.length ? resolveTargetsToAddresses(bcc) : undefined,
-    resolveFromAddress(),
-  ]);
-
-  if (!recipients.length) return;
-
-  const verified = await verifyAddresses(recipients.map((r) => r.to));
-  const validRecipients = recipients.filter((r) => verified.includes(r.to));
-
-  if (!validRecipients.length) return;
-
-  const adapterName = emailRegistry.names()[0];
-  if (!adapterName) {
-    log.info(`No email adapter registered — skipping send (template=${template})`);
+  const entry = registry[template];
+  if (!entry) {
+    log.info(`No email registry entry — skipping (template=${template})`);
     return;
   }
-  // Stub: always uses first registered adapter. Future: resolve per-tenant via sender context.
-  const client = emailRegistry.getOrDefault(undefined, adapterName);
 
-  // Stub: always default templates, en locale. Future: resolve from sender.ownerModel + locale.
-  const composed = await composeTemplate(template, { ownerModel: 'default', locale: 'en' });
-  const senderData = senderVars();
+  const entityLens = entry.entity(data);
+  const [entity] = await fetchLens(db, entityLens);
+  if (!entity) return;
 
-  const rendered = await Promise.all(
-    validRecipients.map(async (recipient) => {
-      const variables: Variables = {
-        sender: senderData,
-        recipient: { name: recipient.name, email: recipient.to },
-        data,
-      };
+  if (!emailRegistry.names().length) {
+    log.info(`No email adapter registered — skipping (template=${template})`);
+    return;
+  }
 
-      const mjml = interpolate(composed.mjml, variables);
-      const subject = interpolate(composed.subject, variables);
-      const { html } = await mjml2html(mjml, { validationLevel: 'skip' });
+  const dataVars = entry.data ? entry.data(entity, data) : (prune(entity, entityLens) as Record<string, unknown>);
 
-      return { to: recipient.to, cc: ccAddresses, bcc: bccAddresses, from, subject, html, tags };
-    }),
-  );
+  const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
+    const rows = await fetchLens(db, lens);
+    if (!rows.length) return undefined;
+    return (prune(rows, lens) as Array<{ email: string }>).map((r) => r.email);
+  };
 
-  await client.sendBatch(rendered);
+  const sender = entry.sender(entity);
+  const recipientLens = entry.recipients(entity, sender);
+  const sendKey = plannerJobId(eventName, template, data);
 
-  log.info(`Email sent: template=${template} recipients=${rendered.length}`);
+  const users = await fetchLens(db, recipientLens);
+  const plan = users.map((user) => {
+    const recipient = prune(user, recipientLens) as Recipient;
+    return { user, recipient, idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars) };
+  });
+  if (!plan.length) {
+    log.info(`Email fanned out: template=${template} jobs=0`);
+    return;
+  }
+
+  const contactRows = await db.contact.findMany({
+    where: { userId: { in: plan.map((p) => p.recipient.id) }, type: 'email', deletedAt: null },
+    orderBy: { position: 'asc' },
+    select: { id: true, userId: true },
+  });
+  const contactByUser = new Map<string, string>();
+  for (const c of contactRows) if (c.userId && !contactByUser.has(c.userId)) contactByUser.set(c.userId, c.id);
+
+  const created = await db.communicationLog.createManyAndReturn({
+    data: plan.map((p) => ({
+      channel: 'email' as const,
+      sendKey,
+      idempotencyKey: p.idempotencyKey,
+      address: p.recipient.email,
+      recipientUserId: p.recipient.id,
+      recipientContactId: contactByUser.get(p.recipient.id) ?? null,
+      ...senderColumns(sender),
+    })),
+    skipDuplicates: true,
+    select: { id: true, idempotencyKey: true },
+  });
+  const logByKey = new Map(created.map((l) => [l.idempotencyKey, l.id]));
+  const missing = plan.filter((p) => !logByKey.has(p.idempotencyKey)).map((p) => p.idempotencyKey);
+  if (missing.length) {
+    const existing = await db.communicationLog.findMany({
+      where: { idempotencyKey: { in: missing } },
+      select: { id: true, idempotencyKey: true },
+    });
+    for (const l of existing) logByKey.set(l.idempotencyKey, l.id);
+  }
+
+  let fanned = 0;
+  for (const { user, recipient, idempotencyKey } of plan) {
+    const communicationLogId = logByKey.get(idempotencyKey);
+    if (!communicationLogId) continue;
+    const cc = entry.cc ? await emailsOf(entry.cc(user, sender)) : undefined;
+    const bcc = entry.bcc ? await emailsOf(entry.bcc(user, sender)) : undefined;
+    await enqueueJob(
+      'deliverEmail',
+      { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
+      { id: idempotencyKey },
+    );
+    fanned += 1;
+  }
+
+  log.info(`Email fanned out: template=${template} jobs=${fanned}`);
 });

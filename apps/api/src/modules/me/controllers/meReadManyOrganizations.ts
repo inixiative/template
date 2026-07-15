@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind controller
+ * @partOf feature:users
+ * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
+ */
 import type { Prisma } from '@template/db';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
@@ -12,9 +18,11 @@ export const meReadManyOrganizationsController = makeController(meReadManyOrgani
   const db = c.get('db');
 
   const { data: orgs, pagination } = await paginate<typeof db.organization, OrgWithUsers>(c, db.organization, {
+    // Live-row scope on the membership itself (caller where subtrees are outside
+    // paginate's injected scope) — a soft-deleted organizationUser must not keep
+    // the org visible.
     where: {
-      deletedAt: null,
-      organizationUsers: { some: { userId: user.id } },
+      organizationUsers: { some: { userId: user.id, deletedAt: null } },
     },
     include: { organizationUsers: { where: { userId: user.id } } },
   });

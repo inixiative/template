@@ -1,3 +1,7 @@
+/**
+ * @atlas
+ * @kind route
+ */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { isTest } from '@template/shared/utils';
 import { testRouter } from '#/modules/test';

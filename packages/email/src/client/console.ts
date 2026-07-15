@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind client
+ * @partOf feature:email
+ * @uses primitive:shared
+ */
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { LogScope, log } from '@template/shared/logger';
 

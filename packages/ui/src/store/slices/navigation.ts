@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind store
+ * @partOf primitive:ui
+ * @uses none
+ */
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 import type { NavigationSlice } from '@template/ui/store/types/navigation';

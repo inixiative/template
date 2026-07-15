@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
+import type { Inquiry, Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -224,7 +224,7 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('returns only non-draft inquiries received by this space', async () => {
+  it('returns only non-draft/canceled inquiries received by this space', async () => {
     const { entity: sender } = await createUser();
 
     const { entity: mine } = await createInquiry({
@@ -249,6 +249,16 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
 
     await createInquiry({
       type: InquiryType.transferSpace,
+      status: InquiryStatus.canceled,
+      sourceModel: InquiryResourceModel.User,
+      sourceUserId: sender.id,
+      targetModel: InquiryResourceModel.Space,
+      targetSpaceId: space.id,
+      content: { spaceId: space.id },
+    });
+
+    await createInquiry({
+      type: InquiryType.transferSpace,
       status: InquiryStatus.sent,
       sourceModel: InquiryResourceModel.User,
       sourceUserId: sender.id,
@@ -263,6 +273,6 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
     expect(data.every((i) => i.targetSpaceId === space.id)).toBe(true);
-    expect(data.every((i) => i.status !== InquiryStatus.draft)).toBe(true);
+    expect(data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled)).toBe(true);
   });
 });

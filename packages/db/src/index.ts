@@ -22,6 +22,8 @@ export * from './generated/zod/schemas';
 export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
+// Supersede lanes (last-claim-wins coordination batons)
+export { claimLane, laneKey, watchLane } from './lanes';
 // Distributed lock
 export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities
@@ -79,9 +81,9 @@ export {
   toAccessor,
   toModelName,
 } from './utils/modelNames';
-export type { RuntimeDataModel, RuntimeField, RuntimeModel } from './utils/runtimeDataModel';
-// Runtime schema introspection (Prisma 7)
-export { getModelRelations, getRuntimeDataModel } from './utils/runtimeDataModel';
+// Relation introspection, derived from the generated prismaMap (single source of truth)
+export { getModelRelations } from './utils/prismaMapRelations';
+export { revive } from './utils/revive';
 
 // Hook shared utilities (ignore fields, redact fields)
 

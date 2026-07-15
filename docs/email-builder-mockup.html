@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zealot — Email Builder (design mockup)</title>
+<style>
+  :root {
+    --canvas:#eef1f4; --panel:#ffffff; --panel-2:#f7f9fb;
+    --border:#dce1e7; --border-strong:#c4ccd4; --subtle:#eef2f6;
+    --ink:#182430; --muted:#5c6b7a; --faint:#8b98a5;
+    --accent:#0f766e; --accent-ink:#0b5a54; --accent-tint:#dff0ee;
+    --sender:#be185d;    --sender-bg:#fce7f0;   --sender-bd:#f4c2d7;
+    --recipient:#1d4ed8; --recipient-bg:#e7effc;--recipient-bd:#c1d4f6;
+    --data:#6d28d9;      --data-bg:#f1eafd;     --data-bd:#dcccf7;
+    --system:#475569;    --system-bg:#eaeef2;   --system-bd:#cfd8e0;
+    --theme:#0e7490;     --theme-bg:#e0f2f7;    --theme-bd:#b4dfe9;
+    --good:#15803d; --good-bg:#e6f4ea;
+    --warn:#b45309; --warn-bg:#fbf0dd;
+    --bad:#b91c1c;  --bad-bg:#fbe7e7;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --r:6px; --shadow:0 1px 2px rgba(24,36,48,.06), 0 2px 8px rgba(24,36,48,.05);
+    --pop:0 10px 34px rgba(24,36,48,.22);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { font-family:var(--font); color:var(--ink); background:var(--canvas); font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  .scroll-x { width:100%; height:100vh; overflow:auto; }
+  .shell { min-width:1320px; height:100vh; display:grid;
+    grid-template-rows:54px 1fr 26px;
+    grid-template-columns:296px minmax(460px,1fr) 476px;
+    grid-template-areas:"top top top" "rail editor inspect" "status status status"; background:var(--canvas); }
+
+  .eyebrow { font-size:10.5px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--faint); }
+  .num { font-variant-numeric:tabular-nums; }
+  h1,h2,h3 { margin:0; font-weight:650; text-wrap:balance; }
+
+  /* top bar */
+  .top { grid-area:top; display:flex; align-items:center; gap:13px; padding:0 15px; background:var(--panel); border-bottom:1px solid var(--border); }
+  .brandmark { display:flex; align-items:center; gap:9px; padding-right:13px; border-right:1px solid var(--border); }
+  .logo { width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,var(--accent),#14b8a6); display:grid; place-items:center; color:#fff; font-weight:800; font-size:12px; }
+  .brandmark b { font-size:13px; } .brandmark span { color:var(--faint); font-size:12px; }
+  .tpl-identity { display:flex; align-items:center; gap:9px; min-width:0; }
+  .tpl-identity .name { font-size:14px; font-weight:650; white-space:nowrap; }
+  .tpl-identity .slug { font-family:var(--mono); font-size:11.5px; color:var(--muted); background:var(--subtle); padding:1px 6px; border-radius:4px; }
+  .top-spacer { flex:1; }
+  .top-actions { display:flex; align-items:center; gap:7px; }
+  .iconbtn { width:30px; height:30px; border:1px solid var(--border-strong); background:var(--panel); border-radius:var(--r); cursor:pointer; color:var(--muted); font-size:14px; display:grid; place-items:center; }
+  .iconbtn:hover { background:var(--panel-2); color:var(--ink); }
+  .autosave { font-size:11px; color:var(--good); display:inline-flex; gap:5px; align-items:center; }
+
+  .chip { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px; border-radius:11px; font-size:11.5px; font-weight:600; border:1px solid transparent; white-space:nowrap; }
+  .chip .dot { width:6px; height:6px; border-radius:50%; }
+  .chip.owner-platform { background:var(--system-bg); color:var(--system); border-color:var(--system-bd); }
+  .chip.owner-brand { background:var(--accent-tint); color:var(--accent-ink); border-color:#b6ddd8; }
+  .chip.type-system { background:var(--recipient-bg); color:var(--recipient); border-color:var(--recipient-bd); }
+  .chip.type-custom { background:var(--data-bg); color:var(--data); border-color:var(--data-bd); }
+  .chip.cat { background:var(--panel-2); color:var(--muted); border-color:var(--border); }
+  .chip.subject { background:var(--data-bg); color:var(--data); border-color:var(--data-bd); font-family:var(--mono); }
+  .chip.warn { background:var(--warn-bg); color:var(--warn); border-color:#eccf9c; }
+
+  .btn { height:30px; padding:0 12px; border-radius:var(--r); border:1px solid var(--border-strong); background:var(--panel); color:var(--ink); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn:hover { background:var(--panel-2); }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; } .btn.primary:hover { background:var(--accent-ink); }
+  .btn.ghost { border-color:transparent; background:transparent; color:var(--muted); } .btn.ghost:hover { background:var(--subtle); color:var(--ink); }
+  .btn.sm { height:24px; padding:0 8px; font-size:11.5px; }
+  .btn:focus-visible, a:focus-visible, [role=tab]:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .panel { background:var(--panel); display:flex; flex-direction:column; min-height:0; }
+
+  /* left rail */
+  .rail { grid-area:rail; border-right:1px solid var(--border); }
+  .rail-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--panel-2); }
+  .rail-tabs [role=tab] { flex:1; text-align:center; padding:9px 4px; font-size:11.5px; font-weight:650; color:var(--muted); background:transparent; border:0; border-bottom:2px solid transparent; cursor:pointer; }
+  .rail-tabs [role=tab][aria-selected=true] { color:var(--accent-ink); border-bottom-color:var(--accent); background:var(--panel); }
+  .rail-body { flex:1; overflow:auto; }
+  .rail-toolbar { display:flex; align-items:center; gap:8px; padding:9px 11px; position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--border); z-index:2; }
+  .search { flex:1; height:28px; border:1px solid var(--border-strong); border-radius:var(--r); padding:0 9px; font:inherit; font-size:12px; background:var(--panel-2); color:var(--ink); }
+  .search::placeholder { color:var(--faint); }
+
+  .group-head { display:flex; align-items:center; gap:8px; padding:9px 11px 5px; }
+  .group-head .eyebrow { flex:1; }
+  .toggle { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); cursor:pointer; user-select:none; }
+  .switch { width:26px; height:15px; border-radius:8px; background:var(--border-strong); position:relative; transition:background .15s; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#fff; transition:transform .15s; }
+  .toggle input { position:absolute; opacity:0; width:0; height:0; }
+  .toggle input:checked + .switch { background:var(--accent); }
+  .toggle input:checked + .switch::after { transform:translateX(11px); }
+
+  .card-row { display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--subtle); background:transparent; padding:9px 11px; cursor:pointer; }
+  .card-row:hover { background:var(--panel-2); }
+  .card-row.active { background:var(--accent-tint); box-shadow:inset 3px 0 0 var(--accent); }
+  .card-row .title { display:flex; align-items:center; gap:7px; }
+  .card-row .title .name { font-size:12.5px; font-weight:650; }
+  .card-row .meta { display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap; }
+  .mini { font-size:10.5px; font-weight:600; padding:1px 6px; border-radius:9px; border:1px solid var(--border); color:var(--muted); background:var(--panel-2); }
+  .mini.plat { color:var(--system); background:var(--system-bg); border-color:var(--system-bd); }
+  .mini.brand { color:var(--accent-ink); background:var(--accent-tint); border-color:#b6ddd8; }
+  .mini.deg { color:var(--warn); background:var(--warn-bg); border-color:#eccf9c; }
+  .mini.data { color:var(--data); background:var(--data-bg); border-color:var(--data-bd); }
+  .row-actions { display:flex; gap:5px; margin-top:8px; }
+  .hidden-row { opacity:.55; } .hidden-row .name::after { content:" · hidden"; color:var(--faint); font-weight:500; font-size:11px; }
+
+  .comp { border-bottom:1px solid var(--subtle); padding:9px 11px; }
+  .comp.draggable { cursor:grab; } .comp.draggable:hover { background:var(--panel-2); }
+  .comp.editing { background:var(--accent-tint); box-shadow:inset 3px 0 0 var(--accent); }
+  .comp.blocked { opacity:.72; background:repeating-linear-gradient(45deg,transparent,transparent 7px,rgba(185,28,28,.04) 7px,rgba(185,28,28,.04) 14px); cursor:not-allowed; }
+  .comp .title { display:flex; align-items:center; gap:7px; }
+  .comp .title .name { font-family:var(--mono); font-size:12px; font-weight:600; }
+  .grip { color:var(--faint); font-size:13px; }
+  .lens-row { display:flex; align-items:center; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .lens-tag { font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; font-family:var(--mono); }
+  .lens-tag.sender { color:var(--sender); background:var(--sender-bg); }
+  .lens-tag.recipient { color:var(--recipient); background:var(--recipient-bg); }
+  .lens-tag.data { color:var(--data); background:var(--data-bg); }
+  .lens-tag.system { color:var(--system); background:var(--system-bg); }
+  .lens-tag.theme { color:var(--theme); background:var(--theme-bg); }
+  .slotline { margin-top:7px; font-size:11px; color:var(--muted); } .slotline b { color:var(--ink); }
+  .block-note { margin-top:6px; font-size:10.5px; color:var(--bad); display:flex; gap:5px; }
+
+  /* blocks grid */
+  .blocks-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:11px; }
+  .block { border:1px solid var(--border); border-radius:var(--r); padding:11px 8px; text-align:center; cursor:grab; background:var(--panel); }
+  .block:hover { border-color:var(--accent); background:var(--panel-2); }
+  .block .ic { font-size:17px; color:var(--muted); } .block .lb { font-size:11px; margin-top:5px; font-weight:600; }
+  .assets { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; padding:0 11px 11px; }
+  .asset { aspect-ratio:1; border-radius:5px; border:1px solid var(--border); background:linear-gradient(135deg,#e7effc,#f1eafd); cursor:pointer; display:grid; place-items:center; color:var(--faint); font-size:16px; }
+  .asset:hover { outline:2px solid var(--accent); }
+
+  /* editor */
+  .editor { grid-area:editor; border-right:1px solid var(--border); position:relative; }
+  .doc-tabs { display:flex; align-items:center; gap:2px; padding:6px 8px 0; background:var(--panel-2); border-bottom:1px solid var(--border); }
+  .doc-tab { display:flex; align-items:center; gap:7px; padding:7px 12px; font-size:12px; font-weight:600; color:var(--muted); background:transparent; border:1px solid transparent; border-bottom:0; border-radius:6px 6px 0 0; cursor:pointer; }
+  .doc-tab[aria-selected=true] { color:var(--ink); background:var(--panel); border-color:var(--border); position:relative; top:1px; }
+  .doc-tab .kind { font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; padding:1px 5px; border-radius:8px; }
+  .doc-tab .kind.tpl { background:var(--recipient-bg); color:var(--recipient); }
+  .doc-tab .kind.cmp { background:var(--data-bg); color:var(--data); }
+  .editor-strip { display:flex; align-items:center; gap:8px; padding:7px 11px; border-bottom:1px solid var(--border); background:var(--panel); }
+  .editor-strip .eyebrow { flex:0 0 auto; }
+  .seg { display:inline-flex; background:var(--subtle); border:1px solid var(--border); border-radius:var(--r); padding:2px; gap:2px; }
+  .seg button { border:0; background:transparent; font:inherit; font-size:11.5px; font-weight:600; color:var(--muted); padding:3px 9px; border-radius:4px; cursor:pointer; }
+  .seg button[aria-selected=true] { background:var(--panel); color:var(--ink); box-shadow:var(--shadow); }
+
+  .legend { display:flex; align-items:center; gap:12px; padding:7px 11px; border-bottom:1px solid var(--border); background:var(--panel-2); flex-wrap:wrap; }
+  .legend .li { display:inline-flex; align-items:center; gap:6px; font-size:10.5px; color:var(--muted); }
+  .legend .sw { width:10px; height:10px; border-radius:3px; }
+
+  .codewrap { flex:1; position:relative; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .code { flex:1; overflow:auto; background:#0f1720; color:#d7e0ea; font-family:var(--mono); font-size:12.5px; line-height:1.7; padding:12px 0; }
+  .code .ln { display:grid; grid-template-columns:38px 1fr; }
+  .code .g { color:#5c6b7a; text-align:right; padding-right:14px; user-select:none; }
+  .code .c { white-space:pre-wrap; padding-right:16px; }
+  .tok { padding:0 3px; border-radius:3px; font-weight:600; }
+  .tok.sender { color:#f7a8cf; background:rgba(190,24,93,.22); }
+  .tok.recipient { color:#a8c4f7; background:rgba(29,78,216,.24); }
+  .tok.data { color:#cbb2f7; background:rgba(109,40,217,.26); }
+  .tok.system { color:#b9c6d4; background:rgba(71,85,105,.30); }
+  .tok.theme { color:#8fd6e6; background:rgba(14,116,144,.26); }
+  .tok.comp { color:#7fe0d5; background:rgba(15,118,110,.22); }
+  .tok.slot { color:#ffd9a1; background:rgba(180,83,9,.24); }
+  .tok.cond { color:#8fe3a5; background:rgba(21,128,61,.22); }
+  .tag { color:#7d94a8; } .attrk { color:#c9a26b; }
+  .cmt { color:#5c6b7a; font-style:italic; }
+  .fillwrap { background:rgba(180,83,9,.08); border-left:2px solid rgba(180,83,9,.5); }
+  .cursor { display:inline-block; width:2px; height:15px; background:#7fe0d5; vertical-align:-3px; animation:blink 1s steps(2) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+
+  /* lens picker popover */
+  .popover { position:absolute; top:150px; right:26px; width:288px; background:var(--panel); border:1px solid var(--border-strong); border-radius:9px; box-shadow:var(--pop); z-index:30; overflow:hidden; }
+  .pop-head { padding:9px 11px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:7px; }
+  .pop-head b { font-size:12px; } .pop-head .x { margin-left:auto; color:var(--faint); cursor:pointer; }
+  .pop-lenses { display:flex; gap:5px; padding:9px 11px; border-bottom:1px solid var(--subtle); flex-wrap:wrap; }
+  .lenschip { font-size:11px; font-weight:600; font-family:var(--mono); padding:3px 8px; border-radius:13px; border:1px solid var(--border); background:var(--panel-2); color:var(--muted); cursor:pointer; }
+  .lenschip.recipient[aria-pressed=true] { color:#fff; background:var(--recipient); border-color:var(--recipient); }
+  .lenschip.sender { color:var(--sender); } .lenschip.data { color:var(--data); } .lenschip.system { color:var(--system); } .lenschip.theme { color:var(--theme); }
+  .pop-search { margin:9px 11px; height:28px; width:calc(100% - 22px); border:1px solid var(--border-strong); border-radius:var(--r); padding:0 8px; font:inherit; font-size:12px; }
+  .pop-fields { max-height:174px; overflow:auto; }
+  .pop-field { display:flex; align-items:center; gap:8px; padding:6px 11px; cursor:pointer; }
+  .pop-field:hover { background:var(--recipient-bg); }
+  .pop-field code { font-family:var(--mono); font-size:11.5px; flex:1; }
+  .pop-field .ty { font-size:10px; color:var(--faint); font-family:var(--mono); }
+  .pop-foot { padding:8px 11px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); background:var(--panel-2); }
+  .pop-foot code { color:var(--recipient); font-family:var(--mono); }
+
+  /* structure */
+  .structure { border-top:1px solid var(--border); background:var(--panel); height:172px; overflow:auto; flex:0 0 auto; }
+  .tree { padding:9px 13px; font-family:var(--mono); font-size:11.5px; }
+  .tnode { padding:1px 0; } .tnode .kw { color:var(--accent-ink); font-weight:600; } .tnode .lbl { color:var(--muted); }
+  .attr { color:var(--data); }
+  .tnote { font-family:var(--font); font-size:11px; color:var(--muted); background:var(--data-bg); border:1px dashed var(--data-bd); border-radius:5px; padding:6px 8px; margin:6px 0 6px 16px; }
+  .tnote b { color:var(--data); }
+
+  /* right / inspector */
+  .inspect { grid-area:inspect; display:flex; flex-direction:column; min-height:0; background:var(--panel); }
+  .subjline { padding:9px 12px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:7px; background:var(--panel); }
+  .field-inline { display:grid; grid-template-columns:74px 1fr; align-items:center; gap:8px; }
+  .field-inline label { font-size:10.5px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); }
+  .field-inline .inp { height:28px; border:1px solid var(--border-strong); border-radius:var(--r); padding:0 8px; font:inherit; font-size:12.5px; display:flex; align-items:center; gap:4px; overflow:hidden; white-space:nowrap; }
+
+  .preview-bar { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--border); background:var(--panel-2); }
+  .sampledata { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:7px 12px; border-bottom:1px solid var(--border); }
+  .sd-chip { font-size:11px; border:1px solid var(--border); border-radius:13px; padding:2px 9px; color:var(--muted); background:var(--panel-2); display:inline-flex; gap:6px; align-items:center; cursor:pointer; }
+  .sd-chip b { color:var(--ink); }
+  .preview { height:288px; overflow:auto; background:#e9ecf0; padding:16px; }
+  .email { max-width:376px; margin:0 auto; background:#fff; border-radius:10px; box-shadow:0 8px 26px rgba(24,36,48,.16); overflow:hidden; font-family:'Helvetica Neue',Arial,sans-serif; }
+  .email .top-strip { padding:12px 22px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f0f2f5; }
+  .email .top-strip .lg { display:flex; align-items:center; gap:8px; font-weight:800; color:#0f766e; font-size:15px; }
+  .email .top-strip .lg .d { width:20px; height:20px; border-radius:5px; background:linear-gradient(135deg,#0f766e,#14b8a6); }
+  .email .top-strip .nav { font-size:11px; color:#8b98a5; }
+  .email .hero { padding:24px 22px 8px; }
+  .email .hero h2 { font-size:19px; color:#182430; margin:0 0 4px; }
+  .email .hero p { font-size:13px; color:#5c6b7a; margin:0; }
+  .card { margin:16px 22px; border:1px solid #e6eaef; border-radius:10px; overflow:hidden; }
+  .card .ch { background:#f5f8f8; padding:9px 15px; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#0f766e; border-bottom:1px solid #e6eaef; }
+  .card .cb { padding:15px; }
+  .card .cb h3 { margin:0 0 8px; font-size:15px; color:#182430; }
+  .msum { display:flex; gap:10px; align-items:center; }
+  .msum .reward { margin-left:auto; text-align:right; }
+  .msum .reward .n { font-size:22px; font-weight:800; color:#0f766e; } .msum .reward .l { font-size:10px; color:#8b98a5; text-transform:uppercase; letter-spacing:.05em; }
+  .msum .meta { font-size:11.5px; color:#5c6b7a; }
+  .card .cf { padding:11px 15px; border-top:1px solid #f0f2f5; font-size:11.5px; }
+  .card .cf a { color:#0f766e; text-decoration:none; font-weight:600; }
+  .cta-wrap { text-align:center; padding:4px 22px 8px; }
+  .cta { display:inline-block; background:#0f766e; color:#fff; padding:11px 22px; border-radius:8px; font-size:13px; font-weight:700; text-decoration:none; }
+  .qbr { margin:6px 22px 0; padding:12px 14px; background:#e7effc; border-radius:8px; font-size:12px; color:#1d4ed8; display:flex; gap:8px; align-items:center; }
+  .cond-badge { font-size:9px; font-weight:700; background:#1d4ed8; color:#fff; padding:1px 5px; border-radius:4px; }
+  .email .foot { padding:16px 22px; border-top:1px solid #eef2f6; color:#98a4b0; font-size:10.5px; text-align:center; line-height:1.6; }
+  .email .foot a { color:#8b98a5; }
+  .hl { background:#fff3c9; border-radius:2px; padding:0 2px; box-shadow:0 0 0 1px #f2e2a0; }
+
+  .insp-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--panel-2); }
+  .insp-tabs [role=tab] { flex:1; padding:9px 4px; font-size:11.5px; font-weight:650; color:var(--muted); background:transparent; border:0; border-bottom:2px solid transparent; cursor:pointer; }
+  .insp-tabs [role=tab][aria-selected=true] { color:var(--accent-ink); border-bottom-color:var(--accent); background:var(--panel); }
+  .insp-body { flex:1; overflow:auto; padding:12px; }
+  .pane { display:none; } .pane.active { display:block; }
+
+  .lensgrp { border:1px solid var(--border); border-radius:var(--r); margin-bottom:9px; overflow:hidden; }
+  .lensgrp > summary { list-style:none; cursor:pointer; padding:8px 10px; display:flex; align-items:center; gap:8px; font-weight:650; font-size:12px; }
+  .lensgrp > summary::-webkit-details-marker { display:none; }
+  .lensgrp .badge { font-family:var(--mono); font-size:11px; padding:1px 7px; border-radius:4px; }
+  .lensgrp.sender { border-left:3px solid var(--sender); } .lensgrp.sender .badge { color:var(--sender); background:var(--sender-bg); }
+  .lensgrp.recipient { border-left:3px solid var(--recipient); } .lensgrp.recipient .badge { color:var(--recipient); background:var(--recipient-bg); }
+  .lensgrp.data { border-left:3px solid var(--data); } .lensgrp.data .badge { color:var(--data); background:var(--data-bg); }
+  .lensgrp.system { border-left:3px solid var(--system); } .lensgrp.system .badge { color:var(--system); background:var(--system-bg); }
+  .lensgrp.theme { border-left:3px solid var(--theme); } .lensgrp.theme .badge { color:var(--theme); background:var(--theme-bg); }
+  .lensgrp .src { margin-left:auto; font-size:10.5px; color:var(--faint); font-weight:500; }
+  .fieldlist { border-top:1px solid var(--subtle); }
+  .field { display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--subtle); }
+  .field:last-child { border-bottom:0; }
+  .field code { font-family:var(--mono); font-size:11.5px; flex:1; }
+  .field .ty { font-size:10px; color:var(--faint); font-family:var(--mono); }
+  .field .ins { opacity:0; } .field:hover { background:var(--panel-2); } .field:hover .ins { opacity:1; }
+
+  .cb-field { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+  .cb-field label { font-size:10.5px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); }
+  select, .inp2 { height:30px; border:1px solid var(--border-strong); border-radius:var(--r); background:var(--panel); font:inherit; font-size:12.5px; padding:0 8px; color:var(--ink); width:100%; }
+  .cb-preview { margin-top:10px; background:#0f1720; color:#d7e0ea; border-radius:var(--r); padding:9px 11px; font-family:var(--mono); font-size:11.5px; line-height:1.6; overflow-x:auto; }
+
+  .prop { display:grid; grid-template-columns:118px 1fr; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--subtle); }
+  .prop label { font-size:11.5px; color:var(--muted); font-weight:600; }
+  .prop .locked { font-family:var(--mono); font-size:11.5px; color:var(--muted); background:var(--subtle); padding:3px 7px; border-radius:4px; display:inline-flex; gap:6px; align-items:center; justify-self:start; }
+
+  /* theme / style pane */
+  .sec-label { font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin:2px 0 8px; display:flex; align-items:center; gap:7px; }
+  .sec-label .badge { font-family:var(--mono); font-size:10px; padding:1px 6px; border-radius:4px; color:var(--theme); background:var(--theme-bg); }
+  .token { display:flex; align-items:center; gap:9px; padding:7px 0; border-bottom:1px solid var(--subtle); }
+  .token .sw { width:22px; height:22px; border-radius:5px; border:1px solid var(--border-strong); }
+  .token code { font-family:var(--mono); font-size:11.5px; color:var(--theme); flex:1; }
+  .token .val { font-size:11.5px; color:var(--muted); font-family:var(--mono); }
+  .styctrl { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  .styctrl .f { display:flex; flex-direction:column; gap:3px; } .styctrl label { font-size:10px; color:var(--faint); font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+  .sel-el { border:1px solid var(--recipient-bd); background:var(--recipient-bg); border-radius:var(--r); padding:7px 9px; font-size:11.5px; color:var(--recipient); margin-bottom:10px; font-family:var(--mono); }
+
+  .hint { font-size:11px; color:var(--muted); background:var(--panel-2); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:5px; padding:8px 10px; margin:2px 0 12px; }
+  .hint b { color:var(--ink); }
+
+  .status { grid-area:status; display:flex; align-items:center; gap:16px; padding:0 14px; background:#0f1720; color:#9fb0be; font-size:11px; font-family:var(--mono); }
+  .status .s { display:inline-flex; align-items:center; gap:6px; }
+  .status .ok { color:#5ad1a6; } .status .warnc { color:#e8b667; } .status .spacer { flex:1; }
+  @media (prefers-reduced-motion: reduce) { *{transition:none!important; animation:none!important;} }
+</style>
+</head>
+<body>
+<div class="scroll-x">
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <header class="top">
+    <div class="brandmark"><div class="logo">Z</div><b>Zealot</b><span>Email Builder</span></div>
+    <div class="tpl-identity">
+      <span class="name">Mission completed</span>
+      <span class="slug">mission-completed</span>
+      <span class="chip owner-platform"><span class="dot" style="background:var(--system)"></span>Platform</span>
+      <span class="chip type-system">System event</span>
+      <span class="chip subject">subject: Mission</span>
+      <span class="chip cat">promotional</span>
+      <span class="chip warn" title="1 referenced component no longer resolves">⚠ 1 degraded</span>
+    </div>
+    <div class="top-spacer"></div>
+    <div class="top-actions">
+      <span class="autosave">● saved 2s ago</span>
+      <button class="iconbtn" title="Undo">↶</button>
+      <button class="iconbtn" title="Redo">↷</button>
+      <button class="btn ghost">Version history</button>
+      <button class="btn">✉ Send test</button>
+      <button class="btn primary">Save</button>
+    </div>
+  </header>
+
+  <!-- LEFT RAIL -->
+  <aside class="rail panel">
+    <div class="rail-tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-rail="templates">Templates</button>
+      <button role="tab" aria-selected="false" data-rail="components">Components</button>
+      <button role="tab" aria-selected="false" data-rail="blocks">Blocks</button>
+    </div>
+
+    <!-- Templates -->
+    <div class="rail-body" data-railpane="templates">
+      <div class="rail-toolbar"><input class="search" placeholder="Search templates…" /><button class="btn primary sm">+ New</button></div>
+      <div class="group-head"><span class="eyebrow">Platform · default</span>
+        <label class="toggle"><input type="checkbox" id="showHidden"><span class="switch"></span>Show hidden</label></div>
+      <div class="card-row active" role="button" tabindex="0">
+        <div class="title"><span class="name">Mission completed</span></div>
+        <div class="meta"><span class="mini plat">platform</span><span class="mini">system event</span><span class="mini data">Mission</span><span class="mini deg">degraded</span></div>
+        <div class="row-actions"><button class="btn sm">Fork to brand</button><button class="btn ghost sm">Hide</button></div>
+      </div>
+      <div class="card-row" role="button" tabindex="0"><div class="title"><span class="name">Inquiry received</span></div>
+        <div class="meta"><span class="mini plat">platform</span><span class="mini">system event</span><span class="mini data">Inquiry</span></div></div>
+      <div class="card-row" role="button" tabindex="0"><div class="title"><span class="name">OTP verification</span></div>
+        <div class="meta"><span class="mini plat">platform</span><span class="mini">system event</span></div></div>
+      <div class="card-row hidden-row hidden-tpl" role="button" tabindex="0" hidden><div class="title"><span class="name">Weekly digest</span></div>
+        <div class="meta"><span class="mini plat">platform</span><span class="mini">system event</span></div>
+        <div class="row-actions"><button class="btn ghost sm">Unhide</button></div></div>
+      <div class="group-head"><span class="eyebrow">Brand · Acme Corp</span></div>
+      <div class="card-row" role="button" tabindex="0"><div class="title"><span class="name">Q3 case-study invite</span></div>
+        <div class="meta"><span class="mini brand">brand</span><span class="mini data">custom · FanUser</span></div>
+        <div class="row-actions"><button class="btn sm">Fork</button><button class="btn ghost sm">Duplicate</button></div></div>
+      <div class="card-row" role="button" tabindex="0"><div class="title"><span class="name">Mission completed</span></div>
+        <div class="meta"><span class="mini brand">brand fork</span><span class="mini">shadows platform</span></div>
+        <div class="row-actions"><button class="btn ghost sm">Compare to platform</button></div></div>
+    </div>
+
+    <!-- Components -->
+    <div class="rail-body" data-railpane="components" hidden>
+      <div class="rail-toolbar"><input class="search" placeholder="Search components…" /><button class="btn primary sm">+ New</button></div>
+      <div class="hint">Drag to insert a <code>{{#component:slug}}</code> ref. Click a name to edit its definition in the editor. Only components whose lenses are a <b>subset</b> of this template's are enabled.</div>
+      <div class="group-head"><span class="eyebrow">Platform · default</span></div>
+      <div class="comp draggable">
+        <div class="title"><span class="grip">⠿</span><span class="name">brand-theme</span><span class="mini plat" style="margin-left:auto">platform</span></div>
+        <div class="lens-row"><span class="lens-tag theme">theme.*</span></div>
+        <div class="slotline">styling component — emits <code>&lt;mj-attributes&gt;</code> + <code>&lt;mj-style&gt;</code></div>
+      </div>
+      <div class="comp draggable">
+        <div class="title"><span class="grip">⠿</span><span class="name">default-header</span><span class="mini plat" style="margin-left:auto">platform</span></div>
+        <div class="lens-row"><span class="lens-tag sender">sender.brandName</span></div>
+        <div class="slotline">subject-agnostic · usable anywhere</div>
+      </div>
+      <div class="comp draggable editing">
+        <div class="title"><span class="grip">⠿</span><span class="name">cta-card</span><span class="mini plat" style="margin-left:auto">platform</span></div>
+        <div class="lens-row"><span class="lens-tag recipient">recipient.firstName</span></div>
+        <div class="slotline"><b>slots:</b> <code>header</code> · <code>body</code> · <code>footer</code> <span style="color:var(--good)">· 1 default child</span></div>
+        <div class="row-actions" style="margin-top:8px"><button class="btn sm">Customize for brand</button><button class="btn ghost sm" title="Superadmin only — edits the platform component everywhere" style="color:var(--system)">Edit component ↗ <span style="font-size:9px;background:var(--system-bg);padding:0 4px;border-radius:6px">superadmin</span></button></div>
+      </div>
+      <div class="comp draggable">
+        <div class="title"><span class="grip">⠿</span><span class="name">mission-summary</span><span class="mini plat" style="margin-left:auto">platform</span></div>
+        <div class="lens-row"><span class="lens-tag data">data.mission.title</span><span class="lens-tag data">data.mission.reward</span></div>
+        <div class="slotline">requires subject <b style="color:var(--data)">Mission</b> ✓</div>
+      </div>
+      <div class="comp blocked">
+        <div class="title"><span class="grip">⠿</span><span class="name">inquiry-detail</span><span class="mini plat" style="margin-left:auto">platform</span></div>
+        <div class="lens-row"><span class="lens-tag data">data.inquiry.question</span></div>
+        <div class="block-note">✕ requires subject <b>Inquiry</b> — this template's subject is <b>Mission</b></div>
+      </div>
+      <div class="group-head"><span class="eyebrow">Brand · Acme Corp</span></div>
+      <div class="comp draggable">
+        <div class="title"><span class="grip">⠿</span><span class="name">acme-footer</span><span class="mini brand" style="margin-left:auto">brand</span></div>
+        <div class="lens-row"><span class="lens-tag recipient">recipient.unsubscribeUrl</span><span class="lens-tag system">system.year</span><span class="lens-tag theme">theme.mutedColor</span></div>
+        <div class="slotline">subject-agnostic · brand-owned</div>
+      </div>
+    </div>
+
+    <!-- Blocks -->
+    <div class="rail-body" data-railpane="blocks" hidden>
+      <div class="group-head"><span class="eyebrow">MJML blocks — drag into the canvas</span></div>
+      <div class="blocks-grid">
+        <div class="block"><div class="ic">▭</div><div class="lb">Section</div></div>
+        <div class="block"><div class="ic">▤</div><div class="lb">Columns</div></div>
+        <div class="block"><div class="ic">¶</div><div class="lb">Text</div></div>
+        <div class="block"><div class="ic">▬</div><div class="lb">Button</div></div>
+        <div class="block"><div class="ic">🖼</div><div class="lb">Image</div></div>
+        <div class="block"><div class="ic">─</div><div class="lb">Divider</div></div>
+        <div class="block"><div class="ic">↕</div><div class="lb">Spacer</div></div>
+        <div class="block"><div class="ic">◎</div><div class="lb">Social</div></div>
+      </div>
+      <div class="group-head"><span class="eyebrow">Assets · Acme Corp</span><button class="btn ghost sm" style="margin-left:auto">Upload</button></div>
+      <div class="assets"><div class="asset">🏷</div><div class="asset">🖼</div><div class="asset">📷</div><div class="asset">＋</div></div>
+    </div>
+  </aside>
+
+  <!-- CENTER: EDITOR -->
+  <main class="editor panel">
+    <div class="doc-tabs">
+      <button class="doc-tab" aria-selected="true"><span class="kind tpl">tpl</span> mission-completed</button>
+      <button class="doc-tab" aria-selected="false"><span class="kind cmp">cmp</span> cta-card ✎</button>
+      <span style="flex:1"></span>
+    </div>
+    <div class="editor-strip">
+      <span class="eyebrow">MJML source</span>
+      <div class="seg" role="tablist">
+        <button role="tab" aria-selected="true" data-ed="mjml">Source</button>
+        <button role="tab" aria-selected="false" data-ed="structure">Structure</button>
+      </div>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm">+ Block</button>
+      <button class="btn ghost sm">+ Component</button>
+      <button class="btn ghost sm" style="color:var(--recipient);font-weight:700">+ Variable</button>
+      <button class="btn ghost sm">+ Condition</button>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span class="li"><span class="sw" style="background:var(--sender)"></span>sender</span>
+      <span class="li"><span class="sw" style="background:var(--recipient)"></span>recipient</span>
+      <span class="li"><span class="sw" style="background:var(--data)"></span>data / subject</span>
+      <span class="li"><span class="sw" style="background:var(--system)"></span>system</span>
+      <span class="li"><span class="sw" style="background:var(--theme)"></span>theme</span>
+      <span class="li"><span class="sw" style="background:var(--accent)"></span>component</span>
+      <span class="li"><span class="sw" style="background:#b45309"></span>slot override / :default</span>
+    </div>
+
+    <div class="codewrap">
+      <div class="code" data-edpane="mjml">
+<div class="ln"><span class="g">1</span><span class="c"><span class="tag">&lt;mjml&gt;</span></span></div>
+<div class="ln"><span class="g">2</span><span class="c">  <span class="tok comp">{{#component:brand-theme}}{{/component:brand-theme}}</span> <span class="cmt">&lt;!-- global mj-style + mj-attributes --&gt;</span></span></div>
+<div class="ln"><span class="g">3</span><span class="c">  <span class="tag">&lt;mj-body</span> <span class="attrk">background-color=</span>"<span class="tok theme">{{theme.pageBg}}</span>"<span class="tag">&gt;</span></span></div>
+<div class="ln"><span class="g">4</span><span class="c">    <span class="tok comp">{{#component:default-header}}{{/component:default-header}}</span></span></div>
+<div class="ln"><span class="g">5</span><span class="c">    <span class="tag">&lt;mj-section&gt;&lt;mj-column&gt;&lt;mj-text</span> <span class="attrk">font-size=</span>"19px"<span class="tag">&gt;</span></span></div>
+<div class="ln"><span class="g">6</span><span class="c">      Nice work, <span class="tok recipient">{{recipient.firstName}}</span> 🎉</span></div>
+<div class="ln"><span class="g">7</span><span class="c">    <span class="tag">&lt;/mj-text&gt;&lt;/mj-column&gt;&lt;/mj-section&gt;</span></span></div>
+<div class="ln"><span class="g">8</span><span class="c"></span></div>
+<div class="ln"><span class="g">9</span><span class="c">    <span class="cmt">&lt;!-- cta-card wraps children; override its named slots --&gt;</span></span></div>
+<div class="ln fillwrap"><span class="g">10</span><span class="c">    <span class="tok comp">{{#component:cta-card}}</span></span></div>
+<div class="ln fillwrap"><span class="g">11</span><span class="c">      <span class="tok slot">{{#slot:header}}</span>Mission complete<span class="tok slot">{{/slot:header}}</span></span></div>
+<div class="ln fillwrap"><span class="g">12</span><span class="c">      <span class="tok slot">{{#slot:body}}</span><span class="tok comp">{{#component:mission-summary}}{{/component:mission-summary}}</span><span class="tok slot">{{/slot:body}}</span></span></div>
+<div class="ln fillwrap"><span class="g">13</span><span class="c">      <span class="cmt">&lt;!-- footer omitted → cta-card's {{#slot:footer:default}} renders --&gt;</span></span></div>
+<div class="ln fillwrap"><span class="g">14</span><span class="c">    <span class="tok comp">{{/component:cta-card}}</span></span></div>
+<div class="ln"><span class="g">15</span><span class="c"></span></div>
+<div class="ln"><span class="g">16</span><span class="c">    <span class="tag">&lt;mj-button</span> <span class="attrk">background-color=</span>"<span class="tok theme">{{theme.primaryColor}}</span>"<span class="tag">&gt;</span></span></div>
+<div class="ln"><span class="g">17</span><span class="c">      View your rewards<span class="cursor"></span></span></div>
+<div class="ln"><span class="g">18</span><span class="c">    <span class="tag">&lt;/mj-button&gt;</span></span></div>
+<div class="ln"><span class="g">19</span><span class="c">    <span class="tok cond">{{#if rule=recipient.plan == "enterprise"}}</span></span></div>
+<div class="ln"><span class="g">20</span><span class="c">      <span class="tag">&lt;mj-button&gt;</span>Book your QBR<span class="tag">&lt;/mj-button&gt;</span></span></div>
+<div class="ln"><span class="g">21</span><span class="c">    <span class="tok cond">{{/if}}</span></span></div>
+<div class="ln"><span class="g">22</span><span class="c">    <span class="tok comp">{{#component:acme-footer}}{{/component:acme-footer}}</span></span></div>
+<div class="ln"><span class="g">23</span><span class="c">  <span class="tag">&lt;/mj-body&gt;</span></span></div>
+<div class="ln"><span class="g">24</span><span class="c"><span class="tag">&lt;/mjml&gt;</span></span></div>
+      </div>
+
+      <div class="code" data-edpane="structure" hidden style="background:var(--panel);color:var(--ink);padding:0">
+        <div class="tree">
+          <div class="sec-label" style="margin:0 0 8px">Decomposition — <span style="color:var(--warn);text-transform:none;letter-spacing:0;font-weight:600">target behavior (post-ZLT-3271; inverts today's extractRefs)</span></div>
+          <div class="tnode"><span class="kw">template</span> <span class="lbl">mission-completed · subject=Mission</span></div>
+          <div class="tnode" style="padding-left:16px">├─ <span class="kw">ref</span> brand-theme <span class="lbl">(styling)</span></div>
+          <div class="tnode" style="padding-left:16px">├─ <span class="kw">ref</span> default-header</div>
+          <div class="tnode" style="padding-left:16px">├─ <span class="kw">ref</span> cta-card <span class="lbl">(wrapper: header, body, footer)</span></div>
+          <div class="tnode" style="padding-left:38px">│&nbsp;&nbsp;└─ fill:body → <span class="kw">ref</span> mission-summary</div>
+          <div class="tnote">⚑ <b>Dependency attribution:</b> mission-summary is in cta-card's <b>fill</b>, so it's a child of the <b>template</b>, not cta-card. No <code>cta-card → mission-summary</code> edge — excluded from cta-card's <code>componentRefs</code>, cascade, cycle-check, version back-prop. (ZLT-3271)</div>
+          <div class="tnode" style="padding-left:16px">├─ <span class="kw">if</span> recipient.plan == "enterprise"</div>
+          <div class="tnode" style="padding-left:16px">└─ <span class="kw">ref</span> acme-footer</div>
+          <div class="tnode" style="margin-top:8px;color:var(--muted)">componentRefs(template) = <span class="attr">[brand-theme, default-header, cta-card, mission-summary, acme-footer]</span></div>
+          <div class="tnode" style="color:var(--muted)">componentRefs(cta-card) = <span class="attr">[ ]</span> — slots hold no refs</div>
+        </div>
+      </div>
+
+      <!-- LENS PICKER POPOVER (open, mid-insertion) -->
+      <div class="popover" role="dialog" aria-label="Insert variable">
+        <div class="pop-head"><b>Insert variable</b><span class="x">✕</span></div>
+        <div class="pop-lenses">
+          <span class="eyebrow" style="width:100%;margin-bottom:2px">1 · pick a lens</span>
+          <button class="lenschip sender">sender</button>
+          <button class="lenschip recipient" aria-pressed="true">recipient</button>
+          <button class="lenschip data">data</button>
+          <button class="lenschip system">system</button>
+          <button class="lenschip theme">theme</button>
+        </div>
+        <input class="pop-search" placeholder="2 · filter fields…" value="first" />
+        <div class="pop-fields">
+          <div class="pop-field" style="background:var(--recipient-bg)"><code>recipient.firstName</code><span class="ty">string</span><button class="btn ghost sm">insert</button></div>
+          <div class="pop-field"><code>recipient.lastName</code><span class="ty">string</span></div>
+          <div class="pop-field"><code>recipient.email</code><span class="ty">string</span></div>
+          <div class="pop-field"><code>recipient.plan</code><span class="ty">enum</span></div>
+        </div>
+        <div class="pop-foot">Inserts <code>{{recipient.firstName}}</code> at cursor · HTML-escaped at render</div>
+      </div>
+    </div>
+
+    <div class="structure">
+      <div class="tree" style="padding-top:8px">
+        <div class="sec-label" style="margin:0 0 6px">Save = cascade diff <span style="color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0">— FE sends hydrated payload; BE diffs (slug, owner)</span></div>
+        <div class="tnode">brand=Acme › default · per component: <span class="kw">noop</span> if == cascade · <span class="kw">shadow</span> (same slug) / <span class="kw">fork</span> (new slug) if diverged</div>
+        <div class="tnode" style="color:var(--muted)"><code>:default</code> slots = component-owned · un-marked overrides → template row · overrides in a slot re-parent to the caller</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT: SUBJECT + PREVIEW + INSPECTOR -->
+  <aside class="inspect">
+    <div class="subjline">
+      <div class="field-inline"><label>Subject</label>
+        <div class="inp">You earned <span class="hl">$50</span> — nice work, <span class="hl">{{recipient.firstName}}</span> 🎉</div></div>
+      <div class="field-inline"><label>Preheader</label>
+        <div class="inp" style="color:var(--muted)">Your <span class="hl">{{data.mission.title}}</span> reward is on the way</div></div>
+    </div>
+
+    <div class="preview-bar">
+      <span class="eyebrow">Live preview</span><span style="flex:1"></span>
+      <div class="seg"><button aria-selected="true">Desktop</button><button aria-selected="false">Mobile</button></div>
+      <button class="iconbtn sm" title="Dark mode preview" style="width:26px;height:26px">🌙</button>
+    </div>
+    <div class="sampledata">
+      <span class="eyebrow" style="width:100%;margin-bottom:2px">Sample data — resolves the 3 lenses for preview</span>
+      <span class="sd-chip"><span class="lens-tag data" style="padding:0 3px">data</span> <b>Mission:</b> “Q3 Case Study” ▾</span>
+      <span class="sd-chip"><span class="lens-tag recipient" style="padding:0 3px">recip</span> <b>Jane Doe</b> · enterprise ▾</span>
+      <span class="sd-chip"><span class="lens-tag sender" style="padding:0 3px">sender</span> <b>Acme Corp</b> ▾</span>
+    </div>
+
+    <div class="preview">
+      <div class="email">
+        <div class="top-strip"><div class="lg"><span class="d"></span> Acme Corp</div><div class="nav">Rewards · Help</div></div>
+        <div class="hero"><h2>Nice work, <span class="hl">Jane</span> 🎉</h2><p>You just completed a mission and earned a reward.</p></div>
+        <div class="card">
+          <div class="ch">Mission complete</div>
+          <div class="cb">
+            <div class="msum">
+              <div><h3><span class="hl">Q3 Case Study</span></h3><div class="meta">Completed <span class="hl">Jul 3, 2026</span></div></div>
+              <div class="reward"><div class="n"><span class="hl">$50</span></div><div class="l">reward</div></div>
+            </div>
+          </div>
+          <div class="cf">↳ <a href="#">View reward details</a> <span style="color:#98a4b0">· default footer child</span></div>
+        </div>
+        <div class="cta-wrap"><a class="cta">View your rewards</a></div>
+        <div class="qbr"><span class="cond-badge">IF enterprise</span> As an enterprise advocate, <a href="#" style="color:#1d4ed8;font-weight:700">book your QBR</a>.</div>
+        <div class="foot">© <span class="hl">2026</span> <span class="hl">Acme Corp</span> · 500 Market St, SF CA<br><a href="#">Unsubscribe</a> · <a href="#">Manage preferences</a></div>
+      </div>
+    </div>
+
+    <div class="insp-tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-insp="vars">Variables</button>
+      <button role="tab" aria-selected="false" data-insp="cond">Conditions</button>
+      <button role="tab" aria-selected="false" data-insp="style">Style</button>
+      <button role="tab" aria-selected="false" data-insp="set">Settings</button>
+    </div>
+
+    <div class="insp-body">
+      <!-- VARIABLES -->
+      <div class="pane active" data-insppane="vars">
+        <div class="hint">Every token names a lens. Click a field to insert <code>{{lens.field}}</code>. Lists come from the rules-builder lens (<code>createLens</code>).</div>
+        <details class="lensgrp sender"><summary><span class="badge">sender</span> Sender <span class="src">from event / brand</span></summary>
+          <div class="fieldlist">
+            <div class="field"><code>sender.brandName</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>sender.email</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+          </div></details>
+        <details class="lensgrp recipient" open><summary><span class="badge">recipient</span> Recipient <span class="src">resolved at send</span></summary>
+          <div class="fieldlist">
+            <div class="field"><code>recipient.firstName</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>recipient.plan</code><span class="ty">enum</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>recipient.unsubscribeUrl</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+          </div></details>
+        <details class="lensgrp data" open><summary><span class="badge">data</span> Subject: Mission <span class="src">fixed by registry</span></summary>
+          <div class="fieldlist">
+            <div class="field"><code>data.mission.title</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>data.mission.reward</code><span class="ty">money</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>data.mission.completedAt</code><span class="ty">datetime</span><button class="btn ghost sm ins">insert</button></div>
+          </div></details>
+        <details class="lensgrp system"><summary><span class="badge">system</span> System <span class="src">reserved · resolver</span></summary>
+          <div class="fieldlist">
+            <div class="field"><code>system.now</code><span class="ty">datetime</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>system.year</code><span class="ty">int</span><button class="btn ghost sm ins">insert</button></div>
+          </div></details>
+        <details class="lensgrp theme"><summary><span class="badge">theme</span> Theme <span class="src">reserved · brand tokens</span></summary>
+          <div class="fieldlist">
+            <div class="field"><code>theme.primaryColor</code><span class="ty">color</span><button class="btn ghost sm ins">insert</button></div>
+            <div class="field"><code>theme.fontFamily</code><span class="ty">string</span><button class="btn ghost sm ins">insert</button></div>
+          </div></details>
+      </div>
+
+      <!-- CONDITIONS -->
+      <div class="pane" data-insppane="cond">
+        <div class="hint">Same lens-first picker. Build a rule → insert a <code>{{#if rule=…}}…{{/if}}</code> block. Rule JSON is evaluated by <code>@inixiative/json-rules</code>.</div>
+        <div class="cb-field"><label>Lens</label><select><option>recipient</option><option>sender</option><option>data (Mission)</option><option>system</option></select></div>
+        <div class="cb-field"><label>Field</label><select><option>recipient.plan</option><option>recipient.firstName</option></select></div>
+        <div class="cb-field"><label>Operator</label><select><option>equals</option><option>not equals</option><option>in</option><option>is set</option></select></div>
+        <div class="cb-field"><label>Value</label><input class="inp2" value="enterprise" /></div>
+        <div class="cb-preview">{{#if rule=<span class="tok recipient" style="background:rgba(29,78,216,.24)">{"==":[{"var":"recipient.plan"},"enterprise"]}</span>}}<br>&nbsp;&nbsp;…<br>{{/if}}</div>
+        <button class="btn primary sm" style="margin-top:10px">Insert block at cursor</button>
+      </div>
+
+      <!-- STYLE -->
+      <div class="pane" data-insppane="style">
+        <div class="sec-label">Theme tokens <span class="badge">theme lens</span></div>
+        <div class="hint">Brand-overridable tokens (reserved <code>theme</code> lens). The <code>brand-theme</code> component emits <code>&lt;mj-attributes&gt;</code>/<code>&lt;mj-style&gt;</code> from these — global styling, defined once, reused across every template.</div>
+        <div class="token"><span class="sw" style="background:#0f766e"></span><code>theme.primaryColor</code><span class="val">#0F766E</span></div>
+        <div class="token"><span class="sw" style="background:#182430"></span><code>theme.textColor</code><span class="val">#182430</span></div>
+        <div class="token"><span class="sw" style="background:#f7f9fb"></span><code>theme.pageBg</code><span class="val">#F7F9FB</span></div>
+        <div class="token"><span class="sw" style="background:linear-gradient(90deg,#182430 60%,transparent 60%)"></span><code>theme.fontFamily</code><span class="val">Helvetica</span></div>
+        <div class="token" style="border-bottom:0"><span class="sw" style="border-radius:9px;background:#e6eaef"></span><code>theme.radius</code><span class="val">10px</span></div>
+
+        <div class="sec-label" style="margin-top:16px">Selected element</div>
+        <div class="sel-el">&lt;mj-button&gt; · line 16</div>
+        <div class="styctrl">
+          <div class="f"><label>Background</label><div class="inp2" style="display:flex;align-items:center;gap:6px"><span class="sw" style="width:14px;height:14px;border-radius:3px;background:#0f766e"></span>{{theme.primaryColor}}</div></div>
+          <div class="f"><label>Text color</label><div class="inp2">#ffffff</div></div>
+          <div class="f"><label>Padding</label><input class="inp2" value="11px 22px" /></div>
+          <div class="f"><label>Border radius</label><div class="inp2">{{theme.radius}}</div></div>
+          <div class="f"><label>Font size</label><input class="inp2" value="13px" /></div>
+          <div class="f"><label>mj-class</label><input class="inp2" value="btn-primary" /></div>
+        </div>
+        <div class="hint" style="margin-top:12px">Per-element edits write inline MJML attributes (or an <code>mj-class</code> defined in <code>brand-theme</code>) — <b>not</b> a new component. Reserve components for shared/global styling.</div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="pane" data-insppane="set">
+        <div class="prop"><label>Name</label><input class="inp2" value="Mission completed" style="height:28px" /></div>
+        <div class="prop"><label>Slug</label><span class="locked">🔒 mission-completed</span></div>
+        <div class="prop"><label>Owner</label><span class="chip owner-platform" style="justify-self:start"><span class="dot" style="background:var(--system)"></span>Platform · default</span></div>
+        <div class="prop"><label>Template type</label><span class="chip type-system" style="justify-self:start">System event</span></div>
+        <div class="prop"><label>Subject lens</label><span class="locked">🔒 Mission · from registry</span></div>
+        <div class="prop"><label>Category</label><select style="height:28px"><option>promotional</option><option>system</option></select></div>
+        <div class="prop"><label>Locale</label><select style="height:28px"><option>en</option><option>es</option><option>fr</option></select></div>
+        <div class="prop" style="border-bottom:0"><label>On error</label><select style="height:28px"><option>fail</option><option>degrade</option><option>fallback</option></select></div>
+        <div class="hint" style="margin-top:12px">For a <b>custom</b> email the Subject lens is an editable dropdown (brand-scoped allowlist). For a <b>system event</b> it's locked to the registry mapping.</div>
+      </div>
+    </div>
+  </aside>
+
+  <footer class="status">
+    <span class="s ok">● saved</span>
+    <span class="s">owner: brand=Acme › default</span>
+    <span class="s">refs: <span class="num">5</span></span>
+    <span class="s warnc">⚠ degraded: <span class="num">1</span></span>
+    <span class="spacer"></span>
+    <span class="s">lenses: sender · recipient · data:Mission · system · theme</span>
+    <span class="s">json-rules 2.14.0 · mjml 5</span>
+  </footer>
+
+</div>
+</div>
+
+<script>
+  const wire = (sel, attr, paneSel) => document.querySelectorAll(sel).forEach(t => t.addEventListener('click', () => {
+    t.parentElement.querySelectorAll('[role=tab],[data-'+attr+']').forEach(x => x.matches('[role=tab]') && x.setAttribute('aria-selected','false'));
+    t.setAttribute('aria-selected','true');
+    document.querySelectorAll(paneSel).forEach(p => { const on = p.dataset[Object.keys(p.dataset)[0]] === t.dataset[attr]; p.hidden = p.classList.contains('pane') ? p.hidden : !on; if (p.classList.contains('pane')) p.classList.toggle('active', on); });
+  }));
+  document.querySelectorAll('.rail-tabs [role=tab]').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.rail-tabs [role=tab]').forEach(x=>x.setAttribute('aria-selected','false')); t.setAttribute('aria-selected','true');
+    document.querySelectorAll('[data-railpane]').forEach(p=>p.hidden = p.dataset.railpane!==t.dataset.rail);
+  }));
+  document.querySelectorAll('.editor-strip .seg [data-ed]').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.editor-strip .seg [data-ed]').forEach(x=>x.setAttribute('aria-selected','false')); t.setAttribute('aria-selected','true');
+    document.querySelectorAll('[data-edpane]').forEach(p=>p.hidden = p.dataset.edpane!==t.dataset.ed);
+  }));
+  document.querySelectorAll('.insp-tabs [role=tab]').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.insp-tabs [role=tab]').forEach(x=>x.setAttribute('aria-selected','false')); t.setAttribute('aria-selected','true');
+    document.querySelectorAll('[data-insppane]').forEach(p=>p.classList.toggle('active', p.dataset.insppane===t.dataset.insp));
+  }));
+  document.querySelectorAll('.doc-tabs .doc-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.doc-tabs .doc-tab').forEach(x=>x.setAttribute('aria-selected','false')); t.setAttribute('aria-selected','true');
+  }));
+  const sh = document.getElementById('showHidden');
+  sh && sh.addEventListener('change', e => document.querySelectorAll('.hidden-tpl').forEach(r => r.hidden = !e.target.checked));
+  document.querySelectorAll('.popover .x').forEach(x => x.addEventListener('click', () => x.closest('.popover').style.display='none'));
+</script>
+</body>
+</html>

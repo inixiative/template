@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind factory
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { faker } from '@faker-js/faker';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { createFactory, getNextSeq } from '@template/db/test/factory';
@@ -10,6 +16,7 @@ const userFactory = createFactory('User', {
     displayName: null,
     image: faker.image.avatar(),
     platformRole: PlatformRole.user,
+    lastLoginAt: null,
   }),
 });
 

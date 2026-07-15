@@ -2,6 +2,8 @@ export { cn } from './cn';
 export { ConcurrencyType, concurrencyLimits, getConcurrency } from './concurrency';
 export { containsAny } from './containsAny';
 export { type Environment, isLocal, isPR, isProd, isStaging, isTest } from './env';
+export { heartbeat } from './heartbeat';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export { resolveAll } from './resolveAll';
 export { createSerializedQueue, type SerializedQueue } from './serializedQueue';
+export { stableHash } from './stableHash';

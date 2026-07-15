@@ -20,7 +20,7 @@ Allowlist of folder names a module under `apps/api/src/modules/<moduleName>/` ma
 
 - **`routes/`** — route definitions built with the request-template factories (`createRoute`, `readRoute`, `updateRoute`, `deleteRoute`, `actionRoute`).
 - **`controllers/`** — request handlers built via `makeController(route, handler)`.
-- **`schemas/`** — Zod request/response schemas. Typically derived from `getSchema('<Model>JSON')`; only hand-written for fields that don't exist on the Prisma model.
+- **`schemas/`** — Zod request/response schemas. Typically derived from the generated `<Model>ScalarSchema` (from `@template/db`, e.g. `TokenScalarSchema.omit({ ... })`); only hand-written for fields that don't exist on the Prisma model.
 - **`services/`** — business logic + DB access. Anything not directly returning a response.
 - **`tests/`** — integration tests for this module's endpoints.
 

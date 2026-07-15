@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { claimLane, laneKey } from '@template/db';
 import { makeSupersedingJob, type SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import type { WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -12,7 +13,7 @@ describe('makeSupersedingJob', () => {
 
   afterEach(async () => {
     const redis = ctx.queue.redis;
-    const keys = await redis.keys('job:superseded:*');
+    const keys = await redis.keys('lane:*');
     if (keys.length > 0) {
       await redis.del(...keys);
     }
@@ -32,8 +33,6 @@ describe('makeSupersedingJob', () => {
   });
 
   test('should abort when superseded during execution', async () => {
-    const redis = ctx.queue.redis;
-    const jobId = ctx.job.id;
     let handlerStarted = false;
     let handlerFinished = false;
 
@@ -49,7 +48,7 @@ describe('makeSupersedingJob', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(handlerStarted).toBe(true);
 
-    await redis.set(`job:superseded:${jobId}`, '1', 'EX', 300);
+    await claimLane(laneKey(ctx.job.name, 'test-1'), 'newer');
 
     const startTime = Date.now();
     await handlerPromise;
@@ -75,8 +74,6 @@ describe('makeSupersedingJob', () => {
   });
 
   test('should abort signal when superseded', async () => {
-    const redis = ctx.queue.redis;
-    const jobId = ctx.job.id;
     let signalAborted = false;
 
     const innerHandler = mock(async (handlerCtx: WorkerContext, _payload: { value: number }) => {
@@ -90,27 +87,11 @@ describe('makeSupersedingJob', () => {
     const handlerPromise = handler(ctx, { value: 1 });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
-    await redis.set(`job:superseded:${jobId}`, '1', 'EX', 300);
+    await claimLane(laneKey(ctx.job.name, 'test-1'), 'newer');
 
     await handlerPromise;
 
     expect(signalAborted).toBe(true);
-  });
-
-  test('should clean up Redis key after completion', async () => {
-    const redis = ctx.queue.redis;
-    const jobId = ctx.job.id;
-    const supersededKey = `job:superseded:${jobId}`;
-
-    await redis.set(supersededKey, '1', 'EX', 300);
-
-    const innerHandler = mock(async () => {});
-    const handler = makeSupersedingJob(innerHandler, () => 'test-key');
-
-    await handler(ctx, {});
-
-    const keyExists = await redis.get(supersededKey);
-    expect(keyExists).toBeNull();
   });
 
   test('should attach dedupeKeyFn to handler', () => {

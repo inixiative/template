@@ -1,3 +1,9 @@
+/**
+ * @atlas
+ * @kind component
+ * @partOf primitive:ui
+ * @uses primitive:sdk
+ */
 import type { HydratedRecord } from '@template/db';
 import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';

@@ -1,30 +1,23 @@
-import { db, redisNamespace } from '@template/db';
+/**
+ * @atlas
+ * @kind entrypoint
+ * @partOf primitive:jobs
+ * @uses infrastructure:redis
+ */
+import { claimLane, db, laneKey } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
-import { uuidv7 } from 'uuidv7';
-import { isValidHandlerName, type JobPayloads, jobHandlers } from '#/jobs/handlers';
+import type { JobPayloads } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
+import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
-import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
+import { type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type EnqueueOptions = JobOptions & {
   type?: (typeof JobType)[keyof typeof JobType];
   id?: string;
-};
-
-export const signalSupersededJobs = async (dedupeKey: string): Promise<void> => {
-  const redis = queue.redis;
-  const jobs = await queue.getJobs(['active', 'waiting', 'delayed', 'paused']);
-
-  for (const job of jobs) {
-    if (!job.id) continue;
-    const jobData = job.data as JobData;
-    if (jobData.dedupeKey === dedupeKey) {
-      await redis.set(`${redisNamespace.job}:superseded:${job.id}`, '1', 'EX', 300);
-      log.info(`Signaled job ${job.id} to abort (superseded)`);
-    }
-  }
+  bypass?: boolean; // skip the overflow buffer — latency-critical jobs go straight to BullMQ
 };
 
 export const enqueueJob = async <K extends keyof JobPayloads>(
@@ -32,18 +25,32 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   payload: JobPayloads[K],
   options?: EnqueueOptions,
 ) => {
+  // Lazy-load the handler registry to break the eval-time import cycle: handlers import enqueueJob
+  // (jobs re-enqueue jobs), and the registry imports every handler — a static import here closes the
+  // loop and TDZ-throws whenever a single handler module is loaded before `handlers/index.ts`. The
+  // registry is only needed at call time, so importing it here (module-cached) is the single-site fix.
+  const { isValidHandlerName, jobHandlers } = await import('#/jobs/handlers');
+
   if (!isValidHandlerName(handlerName)) {
     throw new Error(`Unknown job handler: ${handlerName}`);
   }
 
-  const { type = JobType.adhoc, id, ...jobOptions } = options || {};
+  const { type = JobType.adhoc, id, bypass = false, ...jobOptions } = options || {};
 
   const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
   // happen for real, errors propagate, no queue infrastructure involved.
+  // Delayed jobs are the exception: they're scheduled for a future moment, so
+  // running them at enqueue time would execute wrong-time semantics — they
+  // return unrun, like the queue still holding them. To test one, call the
+  // handler directly.
   if (isTest) {
-    const jobId = id ?? uuidv7();
+    const jobId = id ?? Bun.randomUUIDv7();
+    if (jobOptions.delay !== undefined) {
+      log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
+      return { jobId, name: handlerName };
+    }
     const ctx: WorkerContext = {
       db,
       queue,
@@ -54,13 +61,25 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
+  const jobId = jobOptions.jobId ?? Bun.randomUUIDv7();
 
-  if (dedupeKey) await signalSupersededJobs(dedupeKey);
+  const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
+  if (shouldSpill(type, bypass, overflowing)) {
+    await spillToOutbox({
+      handlerName,
+      jobId,
+      dedupeKey: dedupeKey ?? null,
+      data: { type, id, payload, dedupeKey },
+      options: jobOptions,
+    });
+    log.info(`Spilled job ${handlerName} to outbox (${jobId})`);
+    return { jobId, name: handlerName, outboxed: true as const };
+  }
 
-  // No jobId from dedupeKey — BullMQ would dedupe and drop the new payload; abort flag handles the prior job.
-  const job = await queue.add(handlerName, { type, id, payload, dedupeKey }, jobOptions);
+  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
+  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  if (type === JobType.adhoc) await tripIfFull();
 
-  log.info(`Enqueued job ${handlerName} (${job.id})`);
-
-  return { jobId: job.id, name: job.name };
+  log.info(`Enqueued job ${handlerName} (${jobId})`);
+  return { jobId, name: handlerName };
 };
