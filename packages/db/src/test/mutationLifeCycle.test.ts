@@ -5,6 +5,7 @@ import {
   type HookOptions,
   HookTiming,
   registerDbHook,
+  unregisterDbHook,
 } from '@template/db/extensions/mutationLifeCycle';
 
 describe('mutationLifeCycle', () => {
@@ -106,6 +107,54 @@ describe('mutationLifeCycle', () => {
       expect(() => {
         registerDbHook('test-hook-empty', 'User', HookTiming.before, [], async () => {});
       }).toThrow('Hook registration requires at least one action');
+    });
+
+    it('unregisters a hook by name without touching other registrations', async () => {
+      const removed = mock(() => Promise.resolve());
+      const kept = mock(() => Promise.resolve());
+
+      registerDbHook('test-hook-removed', ['User', 'Session'], HookTiming.before, [DbAction.create], removed);
+      registerDbHook('test-hook-kept', 'User', HookTiming.before, [DbAction.create], kept);
+      unregisterDbHook('test-hook-removed');
+
+      await executeHooks(HookTiming.before, {
+        model: 'User',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+      await executeHooks(HookTiming.before, {
+        model: 'Session',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+
+      expect(removed).not.toHaveBeenCalled();
+      expect(kept).toHaveBeenCalledTimes(1);
+    });
+
+    it('frees the name for re-registration after unregistering', async () => {
+      const first = mock(() => Promise.resolve());
+      const second = mock(() => Promise.resolve());
+
+      registerDbHook('test-hook-reused', 'User', HookTiming.before, [DbAction.create], first);
+      unregisterDbHook('test-hook-reused');
+      registerDbHook('test-hook-reused', 'User', HookTiming.before, [DbAction.create], second);
+
+      await executeHooks(HookTiming.before, {
+        model: 'User',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores unregistering a name that was never registered', () => {
+      expect(() => unregisterDbHook('test-hook-never-registered')).not.toThrow();
     });
 
     it('allows after hooks on all Many operations', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
+import { withEnv } from '@template/shared/utils';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {
@@ -173,17 +174,12 @@ describe('interpolate', () => {
       expect(errors).toHaveLength(1);
     });
 
-    it('surfaces a malformed rule inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-      const prev = process.env.EMAIL_INLINE_RENDER_ERRORS;
-      process.env.EMAIL_INLINE_RENDER_ERRORS = 'true';
-      try {
+    it('surfaces a malformed rule inline when EMAIL_INLINE_RENDER_ERRORS is set', async () => {
+      await withEnv({ EMAIL_INLINE_RENDER_ERRORS: 'true' }, () => {
         const result = interpolate('{{#if rule={invalid json}}}Content{{/if}}', { recipient: {} });
         expect(result).toContain('<!-- RULE ERROR:');
         expect(result).toContain('Content');
-      } finally {
-        if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
-        else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
-      }
+      });
     });
   });
 });

@@ -61,6 +61,11 @@ const registeredHooks: {
 
 const hookRegistry = new Set<string>();
 
+const hookRegistrations = new Map<
+  string,
+  { targets: string[]; timing: HookTiming; actions: DbAction[]; hook: HookFunction }
+>();
+
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
   model: string | string[] | '*',
@@ -78,6 +83,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 
   hookRegistry.add(name);
+  hookRegistrations.set(name, { targets: castArray(model), timing, actions, hook: hook as HookFunction });
 
   for (const target of castArray(model)) {
     registeredHooks[target] ??= {
@@ -90,6 +96,24 @@ export const registerDbHook = <T = Record<string, unknown>>(
       registeredHooks[target][timing][action]!.push(hook as HookFunction);
     }
   }
+};
+
+export const unregisterDbHook = (name: string) => {
+  const registration = hookRegistrations.get(name);
+  if (!registration) return;
+
+  for (const target of registration.targets) {
+    const timingHooks = registeredHooks[target]?.[registration.timing];
+    if (!timingHooks) continue;
+
+    for (const action of registration.actions) {
+      const hooks = timingHooks[action];
+      if (hooks) timingHooks[action] = hooks.filter((hook) => hook !== registration.hook);
+    }
+  }
+
+  hookRegistry.delete(name);
+  hookRegistrations.delete(name);
 };
 
 // Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
@@ -108,6 +132,7 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
 
 export const clearHookRegistry = () => {
   hookRegistry.clear();
+  hookRegistrations.clear();
   for (const model of Object.keys(registeredHooks)) {
     delete registeredHooks[model];
   }

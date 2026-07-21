@@ -39,7 +39,9 @@ export const getRedisClient = (): Redis => {
 export const getRedisPub = (): Redis => getRedisClient();
 
 export const getRedisSub = (): Redis => {
-  if (!__subscriber) __subscriber = createRedisConnection(LogScope.ws);
+  // A subscribed connection can only run subscriber commands, so the subscriber is always
+  // its own connection — in tests a duplicate() of the shared mock (same broker, separate mode).
+  if (!__subscriber) __subscriber = isTest ? getRedisClient().duplicate() : createRedisConnection(LogScope.ws);
   return __subscriber;
 };
 
