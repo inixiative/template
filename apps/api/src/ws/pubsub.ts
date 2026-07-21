@@ -34,6 +34,9 @@ const deliverLocal = ({ type, target, event }: PubSubMessage): void => {
   }
 };
 
+// Socket-holding processes (the API server) call this at boot to receive cross-instance
+// fan-out. Publishers (including the job worker, which holds no sockets) don't need it —
+// publish always goes through Redis.
 export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
 
@@ -62,14 +65,8 @@ export const initWebSocketPubSub = async (): Promise<void> => {
 };
 
 const publish = async (message: PubSubMessage): Promise<void> => {
-  if (!pubsubEnabled) {
-    deliverLocal(message);
-    return;
-  }
-
   try {
-    const pub = getRedisPub();
-    await pub.publish(WS_CHANNEL, JSON.stringify(message));
+    await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
   } catch (err) {
     log.error('Failed to publish to Redis:', err);
     deliverLocal(message);
