@@ -2,31 +2,28 @@
  * @atlas
  * @kind middleware
  * @partOf infrastructure:redis
- * @uses primitive:errors
+ * @uses primitive:errors, primitive:requestContext
  */
 import { getRedisClient, redisNamespace } from '@template/db';
 import type { Context, Next } from 'hono';
 
 import { clientIp } from '#/lib/clientIp';
 import { makeError } from '#/lib/errors';
+import { incrementFixedWindows } from '#/middleware/rateLimit/incrementFixedWindows';
 import type { AppEnv } from '#/types/appEnv';
 
-const DEFAULT_RATE_LIMIT = 10; // requests per second
+const DEFAULT_RATE_LIMIT_PER_SECOND = 10;
 
 export const apiRateLimit = async (c: Context<AppEnv>, next: Next) => {
-  const redis = getRedisClient();
   const token = c.get('token');
 
-  const limit = token?.rateLimitPerSecond ?? DEFAULT_RATE_LIMIT;
+  const limit = token?.rateLimitPerSecond ?? DEFAULT_RATE_LIMIT_PER_SECOND;
   const identifier = token ? `token:${token.id}` : `ip:${clientIp(c)}`;
   const redisKey = `${redisNamespace.limit}:api:${identifier}`;
 
-  const count = await redis.incr(redisKey);
-  if (count === 1) await redis.expire(redisKey, 1); // 1 second window
+  const [window] = await incrementFixedWindows(getRedisClient(), [{ key: redisKey, windowMs: 1_000 }]);
 
-  if (count > limit) {
-    throw makeError({ status: 429, message: 'Rate limit exceeded' });
-  }
+  if (window && window.count > limit) throw makeError({ status: 429, message: 'Rate limit exceeded' });
 
   await next();
 };
@@ -39,18 +36,13 @@ type RateLimitConfig = {
 
 export const rateLimit = (config: RateLimitConfig) => {
   const { windowMs, max, key } = config;
-  const windowSec = Math.ceil(windowMs / 1000);
 
   return async (c: Context<AppEnv>, next: Next) => {
-    const redis = getRedisClient();
     const redisKey = `${redisNamespace.limit}:${key}:${clientIp(c)}`;
 
-    const count = await redis.incr(redisKey);
-    if (count === 1) await redis.expire(redisKey, windowSec);
+    const [window] = await incrementFixedWindows(getRedisClient(), [{ key: redisKey, windowMs }]);
 
-    if (count > max) {
-      throw makeError({ status: 429, message: 'Rate limit exceeded' });
-    }
+    if (window && window.count > max) throw makeError({ status: 429, message: 'Rate limit exceeded' });
 
     await next();
   };
