@@ -6,6 +6,7 @@
  */
 import type { Db } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
+import { assertNoResultNarrowing } from '@template/db/extensions/assertNoResultNarrowing';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
@@ -62,6 +63,7 @@ export const mutationLifeCycleExtension = () => {
         async create({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
           return timed(model, operation, async () => {
             await executeHooks(HookTiming.before, hookOptions);
@@ -82,6 +84,7 @@ export const mutationLifeCycleExtension = () => {
         async createManyAndReturn({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
           return timed(model, operation, async () => {
             await executeHooks(HookTiming.before, hookOptions);
@@ -95,6 +98,7 @@ export const mutationLifeCycleExtension = () => {
         async update({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
           return timed(model, operation, async () => {
@@ -117,6 +121,7 @@ export const mutationLifeCycleExtension = () => {
         async updateManyAndReturn({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
           return timed(model, operation, async () => {
@@ -132,6 +137,7 @@ export const mutationLifeCycleExtension = () => {
         async upsert({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
           return timed(model, operation, async () => {
@@ -147,6 +153,7 @@ export const mutationLifeCycleExtension = () => {
         async delete({ model, operation, args, query }) {
           if (!getDb().isInTxn()) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
+          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
           return timed(model, operation, async () => {
