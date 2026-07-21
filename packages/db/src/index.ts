@@ -12,6 +12,7 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
+  unregisterDbHook,
 } from './extensions/mutationLifeCycle';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';

@@ -19,6 +19,7 @@ export {
   executeHooks,
   HookTiming,
   registerDbHook,
+  unregisterDbHook,
 } from '@template/db/extensions/hookRegistry';
 
 const SLOW_MUTATION_THRESHOLD = 5000;
