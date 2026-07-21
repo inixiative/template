@@ -51,6 +51,9 @@ export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+// Prisma error narrowing
+export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
+export { isWriteConflictError } from './utils/isWriteConflictError';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,

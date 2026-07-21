@@ -4,7 +4,7 @@
  * @partOf primitive:errors
  * @uses infrastructure:prisma, primitive:shared, infrastructure:observability, primitive:routeTemplates
  */
-import { Prisma } from '@template/db';
+import { isUniqueConstraintError, Prisma } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
@@ -34,12 +34,13 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return makeError({ status: 400, message: 'Invalid query parameters' }).getResponse();
   }
 
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    if (err.code === 'P2002') {
-      const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
-      return makeError({ status: 409, message: `Resource already exists: ${target}` }).getResponse();
-    }
-    if (err.code === 'P2025') return makeError({ status: 404, message: 'Resource not found' }).getResponse();
+  if (isUniqueConstraintError(err)) {
+    const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
+    return makeError({ status: 409, message: `Resource already exists: ${target}` }).getResponse();
+  }
+
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+    return makeError({ status: 404, message: 'Resource not found' }).getResponse();
   }
 
   if (err instanceof HTTPException) {
