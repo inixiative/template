@@ -51,8 +51,7 @@ const depth1Hits = (objText: string): { key: string; offset: number }[] => {
 const scanFile = (file: string, src: string): Violation[] => {
   const violations: Violation[] = [];
   WRITE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = WRITE.exec(src))) {
+  for (let m = WRITE.exec(src); m !== null; m = WRITE.exec(src)) {
     const method = m[1];
     let i = m.index + m[0].length;
     while (i < src.length && /\s/.test(src[i])) i++;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { withEnv } from '@template/shared/utils';
 import { interpolate } from '@template/email/render/interpolate';
+import { withEnv } from '@template/shared/utils';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {

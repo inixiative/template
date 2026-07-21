@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { withEnv } from '@template/shared/utils';
 import { evaluateConditions } from '@template/email/render/evaluateConditions';
+import { withEnv } from '@template/shared/utils';
 
 const rule = (field: string, operator: string, value: unknown) => JSON.stringify({ field, operator, value });
 

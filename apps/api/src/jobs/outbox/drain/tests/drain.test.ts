@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { claimLane, laneKey, redisNamespace, watchLane } from '@template/db';
-import { setEnvOverride } from '@template/shared/utils';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
+import { setEnvOverride } from '@template/shared/utils';
 import {
   flushOutbox,
   isOverflowing,
