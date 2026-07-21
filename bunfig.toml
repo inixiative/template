@@ -3,4 +3,4 @@
 # `bun run test` cd's into each workspace and uses that workspace's bunfig.
 
 [test]
-preload = ["./scripts/testRedirect.ts"]
+preload = ["./scripts/testRedirect.ts", "./scripts/testEnvOverrides.ts"]

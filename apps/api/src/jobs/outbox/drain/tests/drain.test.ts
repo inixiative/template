@@ -1,5 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { claimLane, laneKey, redisNamespace, watchLane } from '@template/db';
+import { setEnvOverride } from '@template/shared/utils';
 import { cleanupTouchedTables } from '@template/db/test';
 import {
   flushOutbox,
@@ -53,7 +54,6 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   beforeAll(() => {
     ctx = createTestWorker();
-    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // size-trip every spill → deterministic commit
 
     const add = spyOn(queue, 'add').mockImplementation((async (
       name: string,
@@ -79,19 +79,18 @@ describe('jobs overflow buffer (spill + drain)', () => {
     };
   });
 
+  // Overrides reset after every test via the global backstop; re-assert the suite default per test.
+  beforeEach(() => setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '1')); // size-trip every spill → deterministic commit
+
   afterEach(async () => {
     queued.clear();
     poison.clear();
-    delete process.env.JOBS_MAX_QUEUE_DEPTH;
-    delete process.env.JOBS_OUTBOX_FLUSH_LINGER_MS;
-    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '1'; // re-assert the suite default
     await ctx.db.jobOutbox.deleteMany({});
     await ctx.queue.redis.flushdb(); // clears the flag
   });
 
   afterAll(async () => {
     restoreQueueSpies();
-    delete process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS;
     await cleanupTouchedTables(ctx.db);
     await ctx.queue.redis.flushdb();
   });
@@ -126,7 +125,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('superseding spills within one batch collapse to the latest', async () => {
-    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '3'; // hold all three; flush on the 3rd (size trip)
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '3'); // hold all three; flush on the 3rd (size trip)
     const supRow = (n: number): OutboxRow => ({
       handlerName: 'cleanStaleData',
       jobId: `b-${n}`,
@@ -143,7 +142,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('tripIfFull sets the flag once depth reaches the cap', async () => {
-    process.env.JOBS_MAX_QUEUE_DEPTH = '2';
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '2');
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
 
@@ -154,7 +153,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('drain tops up only to the cap, leaving the rest buffered', async () => {
-    process.env.JOBS_MAX_QUEUE_DEPTH = '3';
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
     expect(await ctx.db.jobOutbox.count()).toBe(5);
@@ -228,7 +227,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('skips a quarantined row (attempts >= cap) so it cannot block newer rows', async () => {
-    process.env.JOBS_MAX_QUEUE_DEPTH = '3';
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} }); // hold depth at low-water so the flag-clear branch doesn't reset
     await ctx.db.jobOutbox.create({
@@ -274,8 +273,8 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('flushOutbox persists rows still buffered at shutdown', async () => {
-    process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '100'; // no size trip — rows linger in the accumulator
-    process.env.JOBS_OUTBOX_FLUSH_LINGER_MS = '60000'; // no linger flush inside the test window
+    setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100'); // no size trip — rows linger in the accumulator
+    setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000'); // no linger flush inside the test window
     const spills = [spillToOutbox(fanRow('sd1')), spillToOutbox(fanRow('sd2'))];
 
     await flushOutbox();

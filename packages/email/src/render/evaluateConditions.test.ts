@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { withEnv } from '@template/shared/utils';
 import { evaluateConditions } from '@template/email/render/evaluateConditions';
 
 const rule = (field: string, operator: string, value: unknown) => JSON.stringify({ field, operator, value });
@@ -77,17 +78,12 @@ describe('evaluateConditions — render-error reporting', () => {
     expect(errors).toEqual([]);
   });
 
-  it('emits the offending block inline only when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-    const prev = process.env.EMAIL_INLINE_RENDER_ERRORS;
-    process.env.EMAIL_INLINE_RENDER_ERRORS = 'true';
-    try {
+  it('emits the offending block inline only when EMAIL_INLINE_RENDER_ERRORS is set', async () => {
+    await withEnv({ EMAIL_INLINE_RENDER_ERRORS: 'true' }, () => {
       const out = evaluateConditions(broken, {});
       expect(out).toContain('RULE ERROR');
       expect(out).toContain('A');
-    } finally {
-      if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
-      else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
-    }
+    });
   });
 });
 
