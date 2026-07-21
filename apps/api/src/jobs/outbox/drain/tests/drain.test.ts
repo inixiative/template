@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { claimLane, laneKey, redisNamespace, watchLane } from '@template/db';
 import { setEnvOverride } from '@template/shared/utils';
-import { cleanupTouchedTables } from '@template/db/test';
+import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import {
   flushOutbox,
   isOverflowing,
@@ -230,16 +230,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} }); // hold depth at low-water so the flag-clear branch doesn't reset
-    await ctx.db.jobOutbox.create({
-      data: {
-        handlerName: 'sendWebhook',
-        jobId: 'quarantined',
-        dedupeKey: null,
-        data: { type: JobType.adhoc, payload: {} },
-        options: {},
-        attempts: 5,
-      },
-    });
+    await createJobOutbox({ jobId: 'quarantined', data: { type: JobType.adhoc, payload: {} }, attempts: 5 });
     await spillToOutbox(fanRow('fresh'));
 
     await runDrainOutboxPass();
@@ -253,16 +244,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('resets quarantined rows and clears the flag on full recovery', async () => {
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
-    await ctx.db.jobOutbox.create({
-      data: {
-        handlerName: 'sendWebhook',
-        jobId: 'q-only',
-        dedupeKey: null,
-        data: { type: JobType.adhoc, payload: {} },
-        options: {},
-        attempts: 5,
-      },
-    });
+    await createJobOutbox({ jobId: 'q-only', data: { type: JobType.adhoc, payload: {} }, attempts: 5 });
 
     await runDrainOutboxPass();
 
@@ -284,9 +266,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   });
 
   it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
-    await ctx.db.jobOutbox.create({
-      data: { handlerName: 'cleanStaleData', jobId: 'taken', dedupeKey: 'pre', data: {}, options: {} },
-    });
+    await createJobOutbox({ handlerName: 'cleanStaleData', jobId: 'taken', dedupeKey: 'pre' });
     // Keyed upsert tries to INSERT a row whose @unique jobId already exists → the commit throws.
     const collide: OutboxRow = {
       handlerName: 'cleanStaleData',
