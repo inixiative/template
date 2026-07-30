@@ -267,6 +267,16 @@ describe('buildWhereClause', () => {
         AND: [{ platformRole: { in: ['superadmin'] } }],
       });
     });
+
+    it('pulls a NULL member out of `in` and ORs it back (Prisma rejects NULL inside in)', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { platformRole: { in: ['superadmin', null] } },
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }],
+      });
+    });
   });
 
   describe('searchFields — operator validation per kind', () => {
