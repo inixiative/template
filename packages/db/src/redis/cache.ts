@@ -8,21 +8,12 @@ import { redisNamespace } from '@template/db/redis/namespaces';
 import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
 import { compact, isNil } from 'lodash-es';
+import superjson from 'superjson';
 
 const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
 const NEGATIVE_TTL = 60; // 1 minute for null/undefined results
 
 type Identifier = string | Record<string, string>;
-
-// ISO 8601 date regex for reviver
-const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-
-const dateReviver = (_key: string, value: unknown): unknown => {
-  if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
-    return new Date(value);
-  }
-  return value;
-};
 
 // The domain is a model or accessor name; normalize it to the accessor so a write
 // keyed 'User' and a clear keyed 'user' agree (Redis is case-sensitive). Tags are
@@ -70,7 +61,12 @@ export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = 
   // Try to get from cache
   try {
     const cached = await redis.get(key);
-    if (cached !== null) return JSON.parse(cached, dateReviver) as T;
+    // superjson round-trips Date/BigInt/Map/Set; entries written before superjson (plain JSON)
+    // deserialize to undefined and fall through to recompute.
+    if (cached !== null) {
+      const value = superjson.parse<T>(cached);
+      if (value !== undefined) return value;
+    }
   } catch (error) {
     log.error(`Cache read error for key ${key}:`, error);
     // Redis down - fall through to compute without cache
@@ -86,7 +82,7 @@ export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = 
     // Cache the result (fire-and-forget on error)
     // Use short TTL for null/undefined to allow quick discovery of newly created records
     const effectiveTtl = isNil(value) ? NEGATIVE_TTL : ttl;
-    redis.setex(key, effectiveTtl, JSON.stringify(value)).catch((error) => {
+    redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
       log.error(`Cache write error for key ${key}:`, error);
     });
 
@@ -112,7 +108,7 @@ export const upsertCache = async <T>(
   try {
     const redis = getRedisClient();
     if (!force && (await redis.exists(key))) return false;
-    await redis.setex(key, ttl, JSON.stringify(value));
+    await redis.setex(key, ttl, superjson.stringify(value));
     return true;
   } catch {
     return false;
