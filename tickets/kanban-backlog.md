@@ -12,6 +12,7 @@ kanban
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
+    API-003-cursor-pagination-mode
     INFRA-006-tenant-isolation-test-matrix
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
@@ -88,6 +89,7 @@ kanban
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
+- [API-003: Cursor Pagination Mode](./API-003-cursor-pagination-mode.md) - Opt-in keyset pagination (signed opaque tokens, no count, write-stable) for feeds/logs/exports; offset stays default
 
 **Documentation & API Discovery:**
 - [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
@@ -121,7 +123,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 28
+- **Total Backlog Items**: 29
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -132,7 +134,7 @@ kanban
 - **AI Developer Experience**: 2
 - **Frontend Architecture**: 2
 - **Documentation & Discovery**: 2
-- **API Reliability**: 1
+- **API Reliability**: 2
 
 ## Notes
 
@@ -148,4 +150,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-06-29_
+_Last Updated: 2026-07-30_
