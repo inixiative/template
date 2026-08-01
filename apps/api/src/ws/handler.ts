@@ -7,6 +7,7 @@
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
 import type { Server } from 'bun';
+import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
@@ -19,14 +20,15 @@ type WSServer = Server<WSData>;
 
 // Periodic stale-connection sweep. Started explicitly from server startup (not a
 // module-load side effect, so importing the handler in tests doesn't spin a timer).
-let staleSweep: ReturnType<typeof setInterval> | null = null;
-export const startStaleSweep = (): void => {
-  if (staleSweep) return;
-  staleSweep = setInterval(() => {
+const staleSweep = makeUnrefInterval({
+  intervalMs: 60_000,
+  tick: () => {
     const cleaned = cleanupStaleConnections();
     if (cleaned > 0) log.info(`Cleaned up ${cleaned} stale WebSocket connections`, LogScope.ws);
-  }, 60_000);
-};
+  },
+});
+export const startStaleSweep = staleSweep.start;
+export const stopStaleSweep = staleSweep.stop;
 
 // Promote an HTTP request to a WebSocket. Anonymous by default — identity is set
 // later by the authenticate message, never at the handshake. server.upgrade
@@ -142,9 +144,14 @@ export const websocketHandler = {
     if (ws.data.queue.size() >= MAX_PENDING_FRAMES) return;
     const msg = parseFrame(raw);
     if (!msg) return;
-    return ws.data.queue.run(() => dispatch(ws, msg)).catch((err) => {
-      log.error(`ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`, LogScope.ws);
-      send(ws, { type: 'error', action: msg.action });
-    });
+    return ws.data.queue
+      .run(() => dispatch(ws, msg))
+      .catch((err) => {
+        log.error(
+          `ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`,
+          LogScope.ws,
+        );
+        send(ws, { type: 'error', action: msg.action });
+      });
   },
 };
