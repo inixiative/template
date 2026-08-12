@@ -689,8 +689,9 @@ are opt-out (default on); `marketing` is opt-in. Every `User` gets an email `Con
 - `List-Unsubscribe` + `List-Unsubscribe-Post` headers (RFC 8058 one-click) point at a public,
   **POST-only** endpoint (`apps/api/src/routes/unsubscribe.ts`, mounted pre-auth). POST-only so a GET
   prefetch (scanners, Safe Links, hover previews) can never unsubscribe anyone.
-- Non-`system` templates **must** contain an *unconditional* `{{recipient.unsubscribeUrl}}`, enforced at
-  save (`saveEmailTemplate` — checks the composed body with conditional blocks stripped).
+- Non-`system` templates **must** contain an *unconditional* `{{system.unsubscribeUrl}}`, enforced at
+  save (`saveEmailTemplate` — checks the composed body with conditional blocks stripped). The URL is a
+  platform-injected `system`-lens value (set per-kind in `settleTemplate`), not recipient data.
 - Rich preference management (toggle all kinds) is the **authenticated in-app** surface, rebac-governed —
   not the link. The emailed link is deliberately the narrow one-click only.
 

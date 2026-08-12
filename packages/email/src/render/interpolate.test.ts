@@ -24,6 +24,23 @@ describe('interpolate', () => {
       expect(result).toBe('Your code is 123456');
     });
 
+    it('substitutes system lens values', () => {
+      const result = interpolate('Manage your prefs: {{system.preferencesUrl}}', {
+        system: { preferencesUrl: 'https://app.example.com/prefs' },
+      });
+      expect(result).toBe('Manage your prefs: https://app.example.com/prefs');
+    });
+
+    it('resolves all four lenses together', () => {
+      const result = interpolate('{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.appName}}]', {
+        sender: { name: 'Acme' },
+        recipient: { name: 'Jo' },
+        data: { code: '42' },
+        system: { appName: 'Tmpl' },
+      });
+      expect(result).toBe('Acme→Jo:42 [Tmpl]');
+    });
+
     it('keeps placeholder if value not found', () => {
       const result = interpolate('Hello {{recipient.name}}', {});
       expect(result).toBe('Hello {{recipient.name}}');

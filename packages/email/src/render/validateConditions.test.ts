@@ -69,3 +69,71 @@ describe('validateConditions', () => {
     expect(issues.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('validateConditions — {{#each}} blocks', () => {
+  it('returns no issues for a valid loop over a reserved root', () => {
+    expect(validateConditions('{{#each data.items as=item index=i}}{{item.name}}{{/each}}')).toEqual([]);
+  });
+
+  it('returns no issues for a nested loop rooted at the enclosing as=', () => {
+    const tpl = '{{#each data.brands as=brand}}{{#each brand.missions as=mission}}{{mission.name}}{{/each}}{{/each}}';
+    expect(validateConditions(tpl)).toEqual([]);
+  });
+
+  it('flags a missing as= attribute', () => {
+    const issues = validateConditions('{{#each data.items}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes('missing as='))).toBe(true);
+  });
+
+  it('flags an as= that collides with a reserved word', () => {
+    const issues = validateConditions('{{#each data.items as=data}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes('collides with a reserved word'))).toBe(true);
+  });
+
+  it('flags an as= that collides with an enclosing binding', () => {
+    const tpl = '{{#each data.items as=item}}{{#each item.kids as=item}}x{{/each}}{{/each}}';
+    expect(validateConditions(tpl).some((x) => x.message.includes('collides with an enclosing'))).toBe(true);
+  });
+
+  it('flags an index= that collides with this block own as=', () => {
+    const issues = validateConditions('{{#each data.items as=item index=item}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes("collides with this block's own as="))).toBe(true);
+  });
+
+  it('flags an each-path root that is neither a reserved root nor an enclosing binding', () => {
+    const issues = validateConditions('{{#each stuff.items as=item}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes('must be a reserved root'))).toBe(true);
+  });
+
+  it('flags an unterminated {{#each}} block', () => {
+    const issues = validateConditions('{{#each data.items as=item}}x');
+    expect(issues.some((x) => x.message.includes('unterminated {{#each}}'))).toBe(true);
+  });
+
+  it('flags invalid filter JSON', () => {
+    const issues = validateConditions('{{#each data.items as=item filter={not json}}}x{{/each}}');
+    expect(issues.some((x) => x.message.includes('invalid filter JSON'))).toBe(true);
+  });
+
+  it('flags a structurally invalid filter rule', () => {
+    const bad = rule({ field: 'item.active' }); // missing operator
+    const issues = validateConditions(`{{#each data.items as=item filter=${bad}}}x{{/each}}`);
+    expect(issues.length).toBeGreaterThan(0);
+  });
+
+  it('validates {{#if}} rules against the loop element scope', () => {
+    const bad = rule({ field: 'item.vip' }); // missing operator
+    const issues = validateConditions(`{{#each data.items as=item}}{{#if rule=${bad}}}x{{/if}}{{/each}}`);
+    expect(issues.length).toBeGreaterThan(0);
+  });
+
+  it('bans {{#each}} in a subject line but still allows conditionals', () => {
+    expect(
+      validateConditions('{{#each data.items as=item}}x{{/each}}', { isSubject: true }).some((x) =>
+        x.message.includes('not allowed in the subject line'),
+      ),
+    ).toBe(true);
+    const ok = rule({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    expect(validateConditions(`{{#if rule=${ok}}}A{{/if}}`, { isSubject: true })).toEqual([]);
+  });
+});

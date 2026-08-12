@@ -14,6 +14,7 @@ import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry } from '#/lib/email';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
 import { registry } from '#/lib/email/registry';
+import { resolveData, resolveEntity, resolveRecipients, resolveSenderIdentity } from '#/lib/email/resolveEntry';
 import type { Sender } from '#/lib/email/sender';
 
 export type SendEmailPayload = {
@@ -65,7 +66,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return;
   }
 
-  const entityLens = entry.entity(data);
+  const entityLens = resolveEntity(entry, data);
   const [entity] = await fetchLens(db, entityLens);
   if (!entity) return;
 
@@ -74,7 +75,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return;
   }
 
-  const dataVars = entry.data ? entry.data(entity, data) : (prune(entity, entityLens) as Record<string, unknown>);
+  const entityRow = entity as Record<string, unknown>;
+  const dataVars = resolveData(entry, entityRow, data) ?? (prune(entity, entityLens) as Record<string, unknown>);
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(db, lens);
@@ -82,13 +84,13 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return (prune(rows, lens) as Array<{ email: string }>).map((r) => r.email);
   };
 
-  const sender = entry.sender(entity);
-  const recipientLens = entry.recipients(entity, sender);
+  const sender = resolveSenderIdentity(entry.sender, entityRow);
+  const lens = resolveRecipients(entry.recipients, entityRow, sender);
   const sendKey = plannerJobId(eventName, template, data);
 
-  const users = await fetchLens(db, recipientLens);
+  const users = await fetchLens(db, lens);
   const plan = users.map((user) => {
-    const recipient = prune(user, recipientLens) as Recipient;
+    const recipient = prune(user, lens) as Recipient;
     return { user, recipient, idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars) };
   });
   if (!plan.length) {
@@ -131,8 +133,9 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   for (const { user, recipient, idempotencyKey } of plan) {
     const communicationLogId = logByKey.get(idempotencyKey);
     if (!communicationLogId) continue;
-    const cc = entry.cc ? await emailsOf(entry.cc(user, sender)) : undefined;
-    const bcc = entry.bcc ? await emailsOf(entry.bcc(user, sender)) : undefined;
+    const userRow = user as Record<string, unknown>;
+    const cc = entry.cc ? await emailsOf(resolveRecipients(entry.cc, userRow, sender)) : undefined;
+    const bcc = entry.bcc ? await emailsOf(resolveRecipients(entry.bcc, userRow, sender)) : undefined;
     await enqueueJob(
       'deliverEmail',
       { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
