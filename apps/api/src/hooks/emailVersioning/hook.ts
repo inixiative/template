@@ -115,19 +115,26 @@ export const registerEmailVersioningHook = (): void => {
     DbAction.updateManyAndReturn,
   ];
 
-  registerDbHook('emailVersioning', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (!isEmailModel(options.model)) return;
-    const model = options.model;
-    const visited = new Set<string>();
+  registerDbHook(
+    'emailVersioning',
+    '*',
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      if (!isEmailModel(options.model)) return;
+      const model = options.model;
+      const visited = new Set<string>();
 
-    for (const change of extractChanges(options)) {
-      if (isSoftDelete(change)) {
+      for (const change of extractChanges(options)) {
+        if (isSoftDelete(change)) {
+          await walkUp(change.record.slug, visited);
+          continue;
+        }
+        if (!wroteSnapshot(model, change)) continue;
+        await snapshotChildVersions(model, change.record);
         await walkUp(change.record.slug, visited);
-        continue;
       }
-      if (!wroteSnapshot(model, change)) continue;
-      await snapshotChildVersions(model, change.record);
-      await walkUp(change.record.slug, visited);
-    }
-  }, [auditActorStore]);
+    },
+    [auditActorStore],
+  );
 };

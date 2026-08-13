@@ -12,6 +12,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { registerTestTracker } from '@template/db/test/testTracker';
+import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
@@ -386,5 +387,45 @@ describe('auditLog hook', () => {
 
     const after = await db.auditLog.count();
     expect(after).toBe(before);
+  });
+
+  // saveEmailTemplate is the deterministic case in this repo where async-local storage does not
+  // survive into the mutation extension's continuation, so it is what pins the actor across that
+  // hop: before the bridge the hook read a null actor here and attributed every row to nobody.
+  describe('actor attribution across a frame that loses async-local storage', () => {
+    const emailTemplate = (slug: string) => ({
+      slug,
+      name: slug,
+      subject: 'Hi',
+      kind: 'system' as const,
+      mjml: `<mjml><mj-body><mj-section><mj-column>{{#component:${slug}-greeting}}<mj-text>Hello</mj-text>{{/component:${slug}-greeting}}</mj-column></mj-section></mj-body></mjml>`,
+      ownerModel: 'default' as const,
+    });
+
+    const auditRowsFor = (templateId: string, componentId: string) =>
+      db.auditLog.findMany({
+        where: { OR: [{ subjectEmailTemplateId: templateId }, { subjectEmailComponentId: componentId }] },
+      });
+
+    it('records the actor set at the caller on every row the save writes', async () => {
+      const { template, components } = await auditActorContext.scope(
+        { ...nullAuditActor, actorJobName: 'bridgedActor' },
+        () => saveEmailTemplate(emailTemplate(`actor-bridged-${Date.now()}`)),
+      );
+
+      const logs = await auditRowsFor(template.id, components[0]!.id);
+
+      expect(logs.length).toBeGreaterThan(0);
+      expect(logs.every((log) => log.actorJobName === 'bridgedActor')).toBe(true);
+    });
+
+    it('leaves the actor null when the caller set none', async () => {
+      const { template, components } = await saveEmailTemplate(emailTemplate(`actor-absent-${Date.now()}`));
+
+      const logs = await auditRowsFor(template.id, components[0]!.id);
+
+      expect(logs.length).toBeGreaterThan(0);
+      expect(logs.every((log) => log.actorJobName === null)).toBe(true);
+    });
   });
 });

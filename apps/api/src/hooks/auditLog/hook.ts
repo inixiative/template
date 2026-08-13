@@ -160,13 +160,20 @@ export const registerAuditLogHook = () => {
     DbAction.deleteMany,
   ];
 
-  registerDbHook('auditLog', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (options.model === 'AuditLog') return;
-    if (!isAuditEnabled(options.model)) return;
+  registerDbHook(
+    'auditLog',
+    '*',
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      if (options.model === 'AuditLog') return;
+      if (!isAuditEnabled(options.model)) return;
 
-    const entries = buildEntries(options.model as AuditSubjectModel, options);
-    if (entries.length === 0) return;
+      const entries = buildEntries(options.model as AuditSubjectModel, options);
+      if (entries.length === 0) return;
 
-    await db.auditLog.createManyAndReturn({ data: entries });
-  }, [auditActorStore]);
+      await db.auditLog.createManyAndReturn({ data: entries });
+    },
+    [auditActorStore],
+  );
 };

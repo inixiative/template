@@ -116,8 +116,7 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
 
 // Read in the caller frame at db.txn() open, where storage is still reliable. Values are carried by
 // reference, so a hook mutating one is mutating the caller's object.
-export const captureBridgedContext = (): BridgedContext =>
-  [...bridgedStores].map((store) => [store, store.getStore()]);
+export const captureBridgedContext = (): BridgedContext => [...bridgedStores].map((store) => [store, store.getStore()]);
 
 export const runInBridgedContext = <TResult>(bridgedContext: BridgedContext, fn: () => TResult): TResult => {
   const enter = (index: number): TResult => {
