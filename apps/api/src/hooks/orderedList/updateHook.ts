@@ -4,11 +4,11 @@ import { applyOrderedListUpdate } from '#/lib/prisma/orderedList';
 
 export const registerOrderedListUpdateHook = () => {
   registerDbHook('orderedList:update', '*', HookTiming.before, [DbAction.update], async (options) => {
-    const { args, previous, model, db: hookDb } = options as HookOptions & { action: SingleAction };
+    const { args, previous, model } = options as HookOptions & { action: SingleAction };
     if (!previous) return;
     const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     if (!data) return;
-    const affected = await applyOrderedListUpdate(hookDb, model, data, previous as Record<string, unknown>);
-    queueOrderedListCacheInvalidation(hookDb, model, affected);
+    const affected = await applyOrderedListUpdate(model, data, previous as Record<string, unknown>);
+    queueOrderedListCacheInvalidation(model, affected);
   });
 };

@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import type { AfterCommitFn, HookDb, TransactionState } from '@template/db/clientTypes';
+import type { AfterCommitFn, TransactionState } from '@template/db/clientTypes';
 import { type ConcurrencyType, getConcurrency } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
 
@@ -15,7 +15,6 @@ import { castArray } from 'lodash-es';
 // async-local storage surviving a Prisma-internal continuation.
 const pendingRegistrations = new Map<string, TransactionState>();
 const transactionStates = new Map<string, TransactionState>();
-const hookDbHandles = new WeakMap<TransactionState, HookDb>();
 
 export const openTransactionRegistration = (transactionState: TransactionState): string => {
   const registrationToken = crypto.randomUUID();
@@ -57,27 +56,4 @@ export const pushAfterCommit = (
     concurrency: getConcurrency(typeList),
     types: typeList,
   });
-};
-
-// Resolves the transaction client per property access rather than capturing it: a scope reuses one
-// TransactionState across sequential db.txn() calls, so a captured client goes stale on the second.
-export const hookDbFor = (transactionState: TransactionState): HookDb => {
-  const existing = hookDbHandles.get(transactionState);
-  if (existing) return existing;
-
-  const handle = new Proxy({} as object, {
-    get(_, property) {
-      if (property === 'onCommit') {
-        return (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) =>
-          pushAfterCommit(transactionState, callbacks, types);
-      }
-      const transactionClient = transactionState.txn;
-      if (!transactionClient) throw new Error('Hook db handle used after its transaction ended');
-      const value = Reflect.get(transactionClient as object, property);
-      return typeof value === 'function' ? value.bind(transactionClient) : value;
-    },
-  }) as HookDb;
-
-  hookDbHandles.set(transactionState, handle);
-  return handle;
 };

@@ -15,6 +15,7 @@ import {
 } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { captureTransactionContext, withTransactionContext } from '@template/db/lib/transactionContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, resolveAll } from '@template/shared/utils';
@@ -27,6 +28,7 @@ const newTransactionState = (scopeId: string | null, scopeContext: ScopeContext 
   scopeId,
   scopeContext,
   afterCommitBatches: [],
+  contextSnapshots: [],
 });
 
 let __raw: Db | null = null;
@@ -65,6 +67,9 @@ const dbMethods = {
     if (existing?.txn) return fn();
 
     const transactionState = existing ?? newTransactionState(crypto.randomUUID(), null);
+    // Taken here, in the caller frame, because this is the last point at which async-local storage
+    // is reliable — inside Prisma's extension continuations it is not. See lib/transactionContext.ts.
+    transactionState.contextSnapshots = captureTransactionContext();
 
     const run = async () => {
       try {
@@ -186,6 +191,13 @@ const dbMethods = {
     );
   },
 };
+
+// The bridge back into the caller's context from inside a Prisma extension continuation, where
+// async-local storage has not survived. Re-enters the transaction state first — so the ambient db
+// proxy resolves to the executing transaction for the whole callee subtree — then each registered
+// provider's captured context nested inside it.
+export const runInTransactionContext = <T>(transactionState: TransactionState, fn: () => T): T =>
+  store.run(transactionState, () => withTransactionContext(transactionState.contextSnapshots, fn));
 
 export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {

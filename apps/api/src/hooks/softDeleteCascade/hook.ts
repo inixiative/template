@@ -22,7 +22,7 @@ export const registerSoftDeleteCascadeHook = () => {
     modelNames().filter(hasDeletedAt),
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
-    async ({ model, action, args, result, previous, db: hookDb }: HookOptions) => {
+    async ({ model, action, args, result, previous }: HookOptions) => {
       const data = (action === DbAction.upsert ? (args as { update?: Row }).update : (args as { data?: Row }).data) as
         | Row
         | undefined;
@@ -34,9 +34,9 @@ export const registerSoftDeleteCascadeHook = () => {
       for (const row of results) {
         const prior = previousById.get(row.id);
         if (data.deletedAt === null) {
-          if (prior?.deletedAt != null) await reviveChildren(hookDb, model, row, prior.deletedAt);
+          if (prior?.deletedAt != null) await reviveChildren(model, row, prior.deletedAt);
         } else if (row.deletedAt != null && (!prior || prior.deletedAt == null)) {
-          await tombstoneChildren(hookDb, model, row);
+          await tombstoneChildren(model, row);
         }
       }
     },

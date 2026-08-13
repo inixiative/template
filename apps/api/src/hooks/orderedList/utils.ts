@@ -3,7 +3,7 @@
  * @kind utils
  * @uses infrastructure:prisma, infrastructure:redis, primitive:caching, primitive:shared
  */
-import { clearKey, type HookDb, type Prisma } from '@template/db';
+import { clearKey, db, type Prisma } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
@@ -22,11 +22,7 @@ export const extractRows = (args: unknown): Record<string, unknown>[] => {
 // originating row. We compensate here: queue a cache invalidation per affected
 // row on commit, using the same fetchCacheKeys / clearKey primitives the
 // cache hook uses.
-export const queueOrderedListCacheInvalidation = (
-  hookDb: HookDb,
-  model: string,
-  rows: Record<string, unknown>[],
-): void => {
+export const queueOrderedListCacheInvalidation = (model: string, rows: Record<string, unknown>[]): void => {
   if (rows.length === 0) return;
 
   const keys = new Set<string>();
@@ -38,5 +34,5 @@ export const queueOrderedListCacheInvalidation = (
   const clearKeys = [...keys].map((key) => async () => {
     await clearKey(key);
   });
-  hookDb.onCommit(clearKeys, ConcurrencyType.redis);
+  db.onCommit(clearKeys, ConcurrencyType.redis);
 };

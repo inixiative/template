@@ -5,6 +5,7 @@
  * @uses primitive:shared
  */
 import type { PrismaClient } from '@template/db/generated/client/client';
+import type { TransactionContextSnapshot } from '@template/db/lib/transactionContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
 
@@ -36,14 +37,13 @@ export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: 
 
 // transactionId is Prisma's interactive-transaction id, learned through the registration handshake
 // in db.txn(); it is the key the mutation extension matches an executing write against.
+// contextSnapshots are the registered providers' captures, taken in the caller frame at db.txn()
+// open and re-entered around hook invocation — see lib/transactionContext.ts.
 export type TransactionState = {
   txn: Db | null;
   transactionId: string | null;
   scopeId: string | null;
   scopeContext: ScopeContext | null;
   afterCommitBatches: CommitBatch[];
+  contextSnapshots: TransactionContextSnapshot[];
 };
-
-// What hooks run against: the executing transaction client, plus an onCommit bound to that
-// transaction's state rather than to ambient storage.
-export type HookDb = PrismaClient & Pick<DbMethods, 'onCommit'>;

@@ -8,15 +8,15 @@ export const registerOrderedListCreateHook = () => {
     '*',
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
-    async ({ args, model, db: hookDb }) => {
+    async ({ args, model }) => {
       const rows = extractRows(args);
       const affected =
         rows.length > 1
-          ? await applyOrderedListBatchCreate(hookDb, model, rows)
+          ? await applyOrderedListBatchCreate(model, rows)
           : rows.length === 1
-            ? await applyOrderedListCreate(hookDb, model, rows[0]!)
+            ? await applyOrderedListCreate(model, rows[0]!)
             : [];
-      queueOrderedListCacheInvalidation(hookDb, model, affected);
+      queueOrderedListCacheInvalidation(model, affected);
     },
   );
 };

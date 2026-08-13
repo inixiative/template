@@ -1,6 +1,6 @@
 // Database client with scope/transaction methods
 export { db } from './client';
-export type { Db, HookDb } from './clientTypes';
+export type { Db } from './clientTypes';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -24,6 +24,13 @@ export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 export { fetchOne, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
 export { claimLane, laneKey, watchLane } from './lanes';
+// Transaction context providers — carry caller-frame context into hook frames, where Prisma's
+// extension continuations have lost async-local storage
+export {
+  clearTransactionContextProviders,
+  registerTransactionContextProvider,
+  type TransactionContextProvider,
+} from './lib/transactionContext';
 // Distributed lock
 export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities

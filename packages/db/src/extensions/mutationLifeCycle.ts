@@ -4,12 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { Db, HookDb, TransactionState } from '@template/db/clientTypes';
+import type { Db, TransactionState } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
 import {
   claimTransactionRegistration,
-  hookDbFor,
   pendingRegistrationToken,
   transactionStateFor,
 } from '@template/db/extensions/transactionRegistry';
@@ -32,8 +31,22 @@ const SLOW_MUTATION_THRESHOLD = 5000;
 // Lazy import to avoid circular dependency at module load time
 const getDb = (): Db => require('@template/db/client').db;
 
-const runtimeDelegate = (client: Db | HookDb, model: Prisma.ModelName): RuntimeDelegate =>
+// Hooks run on a Prisma continuation where the caller's async-local storage has not survived.
+// Re-entering the caller's context around them is what lets every hook keep using the ambient db
+// proxy and its own ambient context (the audit actor, and anything else registered as a transaction
+// context provider) rather than taking either as a parameter. See lib/transactionContext.ts.
+const runHooks = (transactionState: TransactionState, timing: HookTiming, hookOptions: HookOptions): Promise<void> =>
+  require('@template/db/client').runInTransactionContext(transactionState, () => executeHooks(timing, hookOptions));
+
+const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
+
+// Pre-image reads happen in the extension frame, which holds the transaction client directly and
+// so needs no bridge back into the caller's context.
+const transactionClient = (transactionState: TransactionState): Db => {
+  if (!transactionState.txn) throw new Error('Transaction state has no client - its transaction has already ended');
+  return transactionState.txn;
+};
 
 // Re-issue through db.txn so the write + hooks share the txn's connection atomically.
 const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown): Promise<unknown> =>
@@ -70,11 +83,17 @@ const resolveTransactionState = (
 };
 
 export const mutationLifeCycleExtension = () => {
-  const fetchExistingRecord = (hookDb: HookDb, model: Prisma.ModelName, where: Record<string, unknown>) =>
-    runtimeDelegate(hookDb, model).findUnique({ where });
+  const fetchExistingRecord = (
+    transactionState: TransactionState,
+    model: Prisma.ModelName,
+    where: Record<string, unknown>,
+  ) => runtimeDelegate(transactionClient(transactionState), model).findUnique({ where });
 
-  const fetchExistingRecords = (hookDb: HookDb, model: Prisma.ModelName, where: Record<string, unknown>) =>
-    runtimeDelegate(hookDb, model).findMany({ where });
+  const fetchExistingRecords = (
+    transactionState: TransactionState,
+    model: Prisma.ModelName,
+    where: Record<string, unknown>,
+  ) => runtimeDelegate(transactionClient(transactionState), model).findMany({ where });
 
   const timed = async <T>(model: Prisma.ModelName, operation: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
@@ -108,13 +127,12 @@ export const mutationLifeCycleExtension = () => {
           const transactionState = resolveTransactionState(model, operation, params);
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.create, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
           return timed(model, operation, async () => {
-            await executeHooks(HookTiming.before, hookOptions);
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -131,13 +149,12 @@ export const mutationLifeCycleExtension = () => {
           const transactionState = resolveTransactionState(model, operation, params);
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
           return timed(model, operation, async () => {
-            await executeHooks(HookTiming.before, hookOptions);
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -148,14 +165,13 @@ export const mutationLifeCycleExtension = () => {
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.update, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(hookDb, model, where)) ?? undefined;
-            await executeHooks(HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -173,14 +189,13 @@ export const mutationLifeCycleExtension = () => {
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = await fetchExistingRecords(hookDb, model, where);
-            await executeHooks(HookTiming.before, hookOptions);
+            hookOptions.previous = await fetchExistingRecords(transactionState, model, where);
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -191,14 +206,13 @@ export const mutationLifeCycleExtension = () => {
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(hookDb, model, where)) ?? undefined;
-            await executeHooks(HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -209,14 +223,13 @@ export const mutationLifeCycleExtension = () => {
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(hookDb, model, where)) ?? undefined;
-            await executeHooks(HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -227,15 +240,14 @@ export const mutationLifeCycleExtension = () => {
           if (!transactionState) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
-          const hookDb = hookDbFor(transactionState);
-          const hookOptions: HookOptions = { model, operation, action: DbAction.deleteMany, args, db: hookDb };
+          const hookOptions: HookOptions = { model, operation, action: DbAction.deleteMany, args };
           return timed(model, operation, async () => {
-            const previous = await fetchExistingRecords(hookDb, model, where);
+            const previous = await fetchExistingRecords(transactionState, model, where);
             hookOptions.previous = previous;
-            await executeHooks(HookTiming.before, hookOptions);
+            await runHooks(transactionState, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = previous; // deleteMany returns count, so use previous as result for hooks
-            await executeHooks(HookTiming.after, hookOptions);
+            await runHooks(transactionState, HookTiming.after, hookOptions);
             return result;
           });
         },

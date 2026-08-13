@@ -1,5 +1,5 @@
 import type { HookOptions } from '@template/db';
-import { DbAction, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { CronJob } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
 import { queue } from '#/jobs/queue';
@@ -34,7 +34,7 @@ export const registerCronJobSyncHook = () => {
     async (options: HookOptions) => {
       const prev = (options.previous ?? null) as CronJob | null;
       const curr = options.action === DbAction.delete ? null : ((options.result ?? null) as CronJob | null);
-      options.db.onCommit([syncToBullMQ(prev, curr)], ConcurrencyType.queue);
+      db.onCommit([syncToBullMQ(prev, curr)], ConcurrencyType.queue);
     },
   );
 };

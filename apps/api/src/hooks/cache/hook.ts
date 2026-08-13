@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { clearKey, DbAction, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import { clearKey, DbAction, db, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
@@ -28,7 +28,7 @@ export const registerClearCacheHook = () => {
   ];
 
   registerDbHook('clearCache', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    const { model, action, db: hookDb } = options;
+    const { model, action } = options;
     const keys = new Set<string>();
     const collect = (record: Record<string, unknown>) => {
       for (const key of fetchCacheKeys(model as Prisma.ModelName, record)) keys.add(key);
@@ -73,6 +73,6 @@ export const registerClearCacheHook = () => {
       await clearKey(key);
     });
 
-    hookDb.onCommit(clearKeys, ConcurrencyType.redis);
+    db.onCommit(clearKeys, ConcurrencyType.redis);
   });
 };

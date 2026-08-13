@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, feature:email
  */
 
-import { DbAction, type HookDb, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 import { castArray, isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
@@ -18,8 +18,8 @@ type EmailModel = Extract<AuditSubjectModel, 'EmailTemplate' | 'EmailComponent'>
 // augments, and executeHooks runs model hooks before global hooks. (The audit hook is '*' too.)
 const isEmailModel = (model: string): model is EmailModel => model === 'EmailTemplate' || model === 'EmailComponent';
 
-const findLatestSnapshot = (hookDb: HookDb, model: EmailModel, id: string) =>
-  hookDb.auditLog.findFirst({
+const findLatestSnapshot = (model: EmailModel, id: string) =>
+  db.auditLog.findFirst({
     where: model === 'EmailTemplate' ? { subjectEmailTemplateId: id } : { subjectEmailComponentId: id },
     orderBy: { id: 'desc' },
   });
@@ -54,7 +54,6 @@ const degradedFrom = (versions: Record<string, string | null>): string[] =>
     .sort();
 
 const syncDegradedRefs = async (
-  hookDb: HookDb,
   model: EmailModel,
   record: VersionedRecord,
   versions: Record<string, string | null>,
@@ -62,28 +61,28 @@ const syncDegradedRefs = async (
   const degraded = degradedFrom(versions);
   if (isEqual([...record.degradedComponentRefs].sort(), degraded)) return;
   if (model === 'EmailTemplate') {
-    await hookDb.emailTemplate.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
+    await db.emailTemplate.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
   } else {
-    await hookDb.emailComponent.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
+    await db.emailComponent.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
   }
 };
 
-const snapshotChildVersions = async (hookDb: HookDb, model: EmailModel, record: VersionedRecord): Promise<void> => {
-  const latest = await findLatestSnapshot(hookDb, model, record.id);
+const snapshotChildVersions = async (model: EmailModel, record: VersionedRecord): Promise<void> => {
+  const latest = await findLatestSnapshot(model, record.id);
   if (!latest) return;
-  const versions = await resolveComponentVersions(hookDb, record);
+  const versions = await resolveComponentVersions(record);
   if (isEqual(latest.componentVersions, versions)) return;
-  await hookDb.auditLog.update({
+  await db.auditLog.update({
     where: { id: latest.id },
     data: { componentVersions: versions as Prisma.InputJsonValue },
   });
-  await syncDegradedRefs(hookDb, model, record, versions);
+  await syncDegradedRefs(model, record, versions);
 };
 
-const walkUp = async (hookDb: HookDb, slug: string, visited: Set<string>): Promise<void> => {
+const walkUp = async (slug: string, visited: Set<string>): Promise<void> => {
   const [componentAncestors, templateAncestors] = await Promise.all([
-    hookDb.emailComponent.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
-    hookDb.emailTemplate.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
+    db.emailComponent.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
+    db.emailTemplate.findMany({ where: { componentRefs: { has: slug }, deletedAt: null } }),
   ]);
 
   const ancestors: { model: EmailModel; record: VersionedRecord }[] = [
@@ -96,13 +95,13 @@ const walkUp = async (hookDb: HookDb, slug: string, visited: Set<string>): Promi
     if (visited.has(key)) continue;
     visited.add(key);
 
-    const newVersions = await resolveComponentVersions(hookDb, record);
-    const latest = await findLatestSnapshot(hookDb, model, record.id);
+    const newVersions = await resolveComponentVersions(record);
+    const latest = await findLatestSnapshot(model, record.id);
     if (isEqual(latest?.componentVersions ?? {}, newVersions)) continue;
 
-    await createVersionBumpSnapshot(hookDb, model, record, newVersions);
-    await syncDegradedRefs(hookDb, model, record, newVersions);
-    if (model === 'EmailComponent') await walkUp(hookDb, record.slug, visited);
+    await createVersionBumpSnapshot(model, record, newVersions);
+    await syncDegradedRefs(model, record, newVersions);
+    if (model === 'EmailComponent') await walkUp(record.slug, visited);
   }
 };
 
@@ -118,17 +117,16 @@ export const registerEmailVersioningHook = (): void => {
   registerDbHook('emailVersioning', '*', HookTiming.after, actions, async (options: HookOptions) => {
     if (!isEmailModel(options.model)) return;
     const model = options.model;
-    const hookDb = options.db;
     const visited = new Set<string>();
 
     for (const change of extractChanges(options)) {
       if (isSoftDelete(change)) {
-        await walkUp(hookDb, change.record.slug, visited);
+        await walkUp(change.record.slug, visited);
         continue;
       }
       if (!wroteSnapshot(model, change)) continue;
-      await snapshotChildVersions(hookDb, model, change.record);
-      await walkUp(hookDb, change.record.slug, visited);
+      await snapshotChildVersions(model, change.record);
+      await walkUp(change.record.slug, visited);
     }
   });
 };

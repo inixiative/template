@@ -1,5 +1,10 @@
 import '#/config/env';
 import { db } from '@template/db';
+import { registerTransactionContextProviders } from '#/lib/transactionContext';
+
+// Mirrors the api and worker entrypoints: tests register hooks individually, so the providers have
+// to be wired here or hook frames run without the caller's audit actor.
+registerTransactionContextProviders();
 
 const truncateAll = async () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;

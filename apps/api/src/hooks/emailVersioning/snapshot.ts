@@ -4,13 +4,12 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { type HookDb, Prisma } from '@template/db';
+import { db, Prisma } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { buildContextFkFields, buildSubjectFkFields, processAuditData } from '#/hooks/auditLog/utils';
 
 export const createVersionBumpSnapshot = async (
-  hookDb: HookDb,
   model: AuditSubjectModel,
   record: Record<string, unknown>,
   componentVersions: Record<string, string | null>,
@@ -37,6 +36,6 @@ export const createVersionBumpSnapshot = async (
     ...buildSubjectFkFields(model, record),
   };
 
-  const [created] = await hookDb.auditLog.createManyAndReturn({ data: [entry] });
+  const [created] = await db.auditLog.createManyAndReturn({ data: [entry] });
   return created.id;
 };

@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type HookDb, orderedListRegistry, Prisma } from '@template/db';
+import { db, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { hasDeletedAt } from '#/lib/prisma/fieldMetadata';
 
@@ -50,77 +50,63 @@ const liveOnlyWhere = (model: string, scope: Where): Prisma.Sql => {
 
 // --- Raw SQL operations (bypass mutation lifecycle) ---
 
-export const nextSortOrderRaw = async (hookDb: HookDb, model: string, scope: Where, field: string): Promise<number> => {
+export const nextSortOrderRaw = async (model: string, scope: Where, field: string): Promise<number> => {
   const where = scopeWhere(model, scope, field);
-  const result = await hookDb.$queryRaw<{ next: bigint }[]>(
+  const result = await db.$queryRaw<{ next: bigint }[]>(
     Prisma.sql`SELECT COALESCE(MAX(${col(field)}), 0) + 1 AS "next" FROM ${table(model)} WHERE ${where}`,
   );
   return Number(result[0]?.next ?? 1);
 };
 
-export const minSortOrderRaw = async (hookDb: HookDb, model: string, scope: Where, field: string): Promise<number> => {
+export const minSortOrderRaw = async (model: string, scope: Where, field: string): Promise<number> => {
   const where = scopeWhere(model, scope, field, false);
-  const result = await hookDb.$queryRaw<{ next: bigint }[]>(
+  const result = await db.$queryRaw<{ next: bigint }[]>(
     Prisma.sql`SELECT COALESCE(MIN(${col(field)}), 0) - 1 AS "next" FROM ${table(model)} WHERE ${where} AND ${col(field)} < 0`,
   );
   return Number(result[0]?.next ?? -1);
 };
 
-const shiftUp = async (
-  hookDb: HookDb,
-  model: string,
-  scope: Where,
-  field: string,
-  predicate: Prisma.Sql,
-): Promise<Row[]> => {
+const shiftUp = async (model: string, scope: Where, field: string, predicate: Prisma.Sql): Promise<Row[]> => {
   const where = scopeWhere(model, scope, field);
-  return hookDb.$queryRaw<Row[]>(
+  return db.$queryRaw<Row[]>(
     Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${col(field)} + 1 WHERE ${where} AND ${predicate} RETURNING *`,
   );
 };
 
-const shiftDown = async (
-  hookDb: HookDb,
-  model: string,
-  scope: Where,
-  field: string,
-  predicate: Prisma.Sql,
-): Promise<Row[]> => {
+const shiftDown = async (model: string, scope: Where, field: string, predicate: Prisma.Sql): Promise<Row[]> => {
   const where = scopeWhere(model, scope, field);
-  return hookDb.$queryRaw<Row[]>(
+  return db.$queryRaw<Row[]>(
     Prisma.sql`UPDATE ${table(model)} SET ${col(field)} = ${col(field)} - 1 WHERE ${where} AND ${predicate} RETURNING *`,
   );
 };
 
 export const insertAtRaw = async (
-  hookDb: HookDb,
   model: string,
   scope: Where,
   position: number,
   field: string,
 ): Promise<{ position: number; affected: Row[] }> => {
-  const max = await nextSortOrderRaw(hookDb, model, scope, field);
+  const max = await nextSortOrderRaw(model, scope, field);
   const clamped = Math.max(1, Math.min(position, max));
-  const affected = await shiftUp(hookDb, model, scope, field, Prisma.sql`${col(field)} >= ${clamped}`);
+  const affected = await shiftUp(model, scope, field, Prisma.sql`${col(field)} >= ${clamped}`);
   return { position: clamped, affected };
 };
 
 export const compactAfterRemove = async (
-  hookDb: HookDb,
   model: string,
   scope: Where,
   removedPosition: number,
   field: string,
-): Promise<Row[]> => shiftDown(hookDb, model, scope, field, Prisma.sql`${col(field)} > ${removedPosition}`);
+): Promise<Row[]> => shiftDown(model, scope, field, Prisma.sql`${col(field)} > ${removedPosition}`);
 
 // Renumbers all live rows regardless of current position value.
 // Used after bulk increment/decrement that may push positions to ≤0.
-export const reDensifyLive = async (hookDb: HookDb, model: string, scope: Where, field: string): Promise<Row[]> => {
+export const reDensifyLive = async (model: string, scope: Where, field: string): Promise<Row[]> => {
   const t = table(model);
   const f = col(field);
   const where = liveOnlyWhere(model, scope);
 
-  return hookDb.$queryRaw<Row[]>(Prisma.sql`
+  return db.$queryRaw<Row[]>(Prisma.sql`
     WITH numbered AS (
       SELECT "id", ROW_NUMBER() OVER (ORDER BY ${f} ASC, "id" ASC) AS new_order
       FROM ${t}
@@ -168,7 +154,7 @@ const normalizeInputScope = (row: Record<string, unknown>, scopeFields: string[]
 
 const configForModel = (model: string) => orderedListRegistry[model];
 
-export const applyOrderedListCreate = async (hookDb: HookDb, model: string, row: Row): Promise<Row[]> => {
+export const applyOrderedListCreate = async (model: string, row: Row): Promise<Row[]> => {
   const config = configForModel(model);
   if (!config) return [];
 
@@ -177,9 +163,9 @@ export const applyOrderedListCreate = async (hookDb: HookDb, model: string, row:
     normalizeInputScope(row, scopeFields);
     const scope = buildScope(row, scopeFields);
     if (row[field] == null) {
-      row[field] = await nextSortOrderRaw(hookDb, model, scope, field);
+      row[field] = await nextSortOrderRaw(model, scope, field);
     } else {
-      const result = await insertAtRaw(hookDb, model, scope, row[field] as number, field);
+      const result = await insertAtRaw(model, scope, row[field] as number, field);
       row[field] = result.position;
       affected.push(...result.affected);
     }
@@ -196,7 +182,7 @@ export const applyOrderedListCreate = async (hookDb: HookDb, model: string, row:
 // Cost per scope: 1 SELECT (MAX) + 1 UPDATE (VALUES list). Independent of
 // batch size. JS simulation is O(batch²) for the virtual-row shifts, fine
 // for any realistic batch.
-export const applyOrderedListBatchCreate = async (hookDb: HookDb, model: string, rows: Row[]): Promise<Row[]> => {
+export const applyOrderedListBatchCreate = async (model: string, rows: Row[]): Promise<Row[]> => {
   const config = configForModel(model);
   if (!config) return [];
 
@@ -222,21 +208,15 @@ export const applyOrderedListBatchCreate = async (hookDb: HookDb, model: string,
     }
 
     for (const { scope, rows: scopedRows } of byScope.values()) {
-      affected.push(...(await placeBatchInScope(hookDb, model, scope, field, scopedRows)));
+      affected.push(...(await placeBatchInScope(model, scope, field, scopedRows)));
     }
   }
   return affected;
 };
 
-const placeBatchInScope = async (
-  hookDb: HookDb,
-  model: string,
-  scope: Where,
-  field: string,
-  batchRows: Row[],
-): Promise<Row[]> => {
+const placeBatchInScope = async (model: string, scope: Where, field: string, batchRows: Row[]): Promise<Row[]> => {
   // 1. Read current DB max once.
-  const dbMax = (await nextSortOrderRaw(hookDb, model, scope, field)) - 1;
+  const dbMax = (await nextSortOrderRaw(model, scope, field)) - 1;
 
   // 2. Simulate placement: track each virtual row's running position as
   //    later fixed-position rows bump earlier ones up. The bump scan is
@@ -284,7 +264,7 @@ const placeBatchInScope = async (
       const t = table(model);
       const f = col(field);
       const scopeSQL = scopeWhere(model, scope, field, true);
-      const affected = await hookDb.$queryRaw<Row[]>(Prisma.sql`
+      const affected = await db.$queryRaw<Row[]>(Prisma.sql`
         UPDATE ${t} SET ${f} = c.new_pos
         FROM (VALUES ${Prisma.join(updates, ', ')}) AS c(old_pos, new_pos)
         WHERE ${scopeSQL} AND ${f} = c.old_pos
@@ -310,12 +290,7 @@ const placeBatchInScope = async (
 // that `query(args)` — which runs on a separate Prisma connection — can UPDATE
 // the target without a row-lock deadlock. data[field] is set to the clamped
 // destination; Prisma writes it.
-export const applyOrderedListUpdate = async (
-  hookDb: HookDb,
-  model: string,
-  data: Row,
-  previous: Row,
-): Promise<Row[]> => {
+export const applyOrderedListUpdate = async (model: string, data: Row, previous: Row): Promise<Row[]> => {
   const config = configForModel(model);
   if (!config) return [];
 
@@ -330,8 +305,8 @@ export const applyOrderedListUpdate = async (
     if (wasLive && isSoftDeleting) {
       const oldPos = previous[field] as number;
       if (typeof oldPos === 'number' && oldPos > 0) {
-        data[field] = await minSortOrderRaw(hookDb, model, scope, field);
-        affected.push(...(await compactAfterRemove(hookDb, model, scope, oldPos, field)));
+        data[field] = await minSortOrderRaw(model, scope, field);
+        affected.push(...(await compactAfterRemove(model, scope, oldPos, field)));
       }
       continue;
     }
@@ -339,7 +314,7 @@ export const applyOrderedListUpdate = async (
     const wasDeleted = previous.deletedAt != null;
     const isRestoring = data.deletedAt === null;
     if (wasDeleted && isRestoring) {
-      data[field] = await nextSortOrderRaw(hookDb, model, scope, field);
+      data[field] = await nextSortOrderRaw(model, scope, field);
       continue;
     }
 
@@ -347,7 +322,7 @@ export const applyOrderedListUpdate = async (
       const newPos = data[field] as number;
       const oldPos = previous[field] as number;
       if (typeof newPos === 'number' && typeof oldPos === 'number' && oldPos > 0) {
-        const max = await nextSortOrderRaw(hookDb, model, scope, field);
+        const max = await nextSortOrderRaw(model, scope, field);
         // max = MAX+1 (the next insert slot). For a move the list doesn't grow,
         // so valid positions are [1, MAX] = [1, max - 1].
         const clamped = Math.max(1, Math.min(newPos, max - 1));
@@ -358,7 +333,6 @@ export const applyOrderedListUpdate = async (
         if (clamped < oldPos) {
           affected.push(
             ...(await shiftUp(
-              hookDb,
               model,
               scope,
               field,
@@ -368,7 +342,6 @@ export const applyOrderedListUpdate = async (
         } else if (clamped > oldPos) {
           affected.push(
             ...(await shiftDown(
-              hookDb,
               model,
               scope,
               field,
@@ -389,11 +362,7 @@ export const applyOrderedListUpdate = async (
 // rows are physically gone, so a single reDensifyLive per scope ROW_NUMBERs
 // the survivors into [1..N] — one query per scope regardless of how many
 // rows were deleted.
-export const applyOrderedListHardDelete = async (
-  hookDb: HookDb,
-  model: string,
-  previousRows: Row[],
-): Promise<Row[]> => {
+export const applyOrderedListHardDelete = async (model: string, previousRows: Row[]): Promise<Row[]> => {
   const config = configForModel(model);
   if (!config) return [];
 
@@ -405,7 +374,7 @@ export const applyOrderedListHardDelete = async (
       const key = JSON.stringify(scope);
       if (seen.has(key)) continue;
       seen.add(key);
-      affected.push(...(await reDensifyLive(hookDb, model, scope, field)));
+      affected.push(...(await reDensifyLive(model, scope, field)));
     }
   }
   return affected;
@@ -431,13 +400,7 @@ const groupIdsByScope = (rows: Row[], scopeFields: string[]): Map<string, { scop
 // Bulk-assign distinct negatives in a single statement per scope. ROW_NUMBER
 // over the deleted-id set, anchored to current MIN(negatives) (0 if none),
 // produces a contiguous descending sequence below the lowest existing slot.
-const bulkAssignNegatives = async (
-  hookDb: HookDb,
-  model: string,
-  scope: Where,
-  field: string,
-  ids: string[],
-): Promise<Row[]> => {
+const bulkAssignNegatives = async (model: string, scope: Where, field: string, ids: string[]): Promise<Row[]> => {
   if (ids.length === 0) return [];
   const t = table(model);
   const f = col(field);
@@ -447,7 +410,7 @@ const bulkAssignNegatives = async (
     ', ',
   );
 
-  return hookDb.$queryRaw<Row[]>(Prisma.sql`
+  return db.$queryRaw<Row[]>(Prisma.sql`
     WITH base AS (
       SELECT COALESCE(MIN(${f}), 0) AS min_val
       FROM ${t}
@@ -467,13 +430,7 @@ const bulkAssignNegatives = async (
 // Bulk-append restored rows to the end of the live list in one statement per
 // scope. Anchored to current MAX(live positives), then ROW_NUMBER assigns
 // MAX+1, MAX+2, … in id order.
-const bulkAssignAppend = async (
-  hookDb: HookDb,
-  model: string,
-  scope: Where,
-  field: string,
-  ids: string[],
-): Promise<Row[]> => {
+const bulkAssignAppend = async (model: string, scope: Where, field: string, ids: string[]): Promise<Row[]> => {
   if (ids.length === 0) return [];
   const t = table(model);
   const f = col(field);
@@ -483,7 +440,7 @@ const bulkAssignAppend = async (
     ', ',
   );
 
-  return hookDb.$queryRaw<Row[]>(Prisma.sql`
+  return db.$queryRaw<Row[]>(Prisma.sql`
     WITH base AS (
       SELECT COALESCE(MAX(${f}), 0) AS max_val
       FROM ${t}
@@ -509,7 +466,6 @@ const bulkAssignAppend = async (
 // Restore: bulk-assign sequential positive positions (append to end of each
 //   scope's live list).
 export const applyOrderedListBulkDeletedAtChange = async (
-  hookDb: HookDb,
   model: string,
   data: Row,
   previousRows: Row[],
@@ -536,31 +492,26 @@ export const applyOrderedListBulkDeletedAtChange = async (
 
     if (isSoftDeleting) {
       for (const { scope } of grouped.values()) {
-        affected.push(...(await reDensifyLive(hookDb, model, scope, field)));
+        affected.push(...(await reDensifyLive(model, scope, field)));
       }
       for (const { scope, ids } of grouped.values()) {
-        affected.push(...(await bulkAssignNegatives(hookDb, model, scope, field, ids)));
+        affected.push(...(await bulkAssignNegatives(model, scope, field, ids)));
       }
     } else {
       for (const { scope, ids } of grouped.values()) {
-        affected.push(...(await bulkAssignAppend(hookDb, model, scope, field, ids)));
+        affected.push(...(await bulkAssignAppend(model, scope, field, ids)));
       }
     }
   }
   return affected;
 };
 
-export const applyOrderedListUpsert = async (
-  hookDb: HookDb,
-  model: string,
-  args: Row,
-  previous: Row | undefined,
-): Promise<Row[]> => {
+export const applyOrderedListUpsert = async (model: string, args: Row, previous: Row | undefined): Promise<Row[]> => {
   const create = args.create as Row | undefined;
   const update = args.update as Row | undefined;
 
-  if (!previous && create) return applyOrderedListCreate(hookDb, model, create);
-  if (previous && update) return applyOrderedListUpdate(hookDb, model, update, previous);
+  if (!previous && create) return applyOrderedListCreate(model, create);
+  if (previous && update) return applyOrderedListUpdate(model, update, previous);
   return [];
 };
 

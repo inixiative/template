@@ -1,6 +1,7 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
+  db,
   filterFields,
   HookTiming,
   isFalsePolymorphismRef,
@@ -94,7 +95,7 @@ export const registerWebhookHook = () => {
   ];
 
   registerDbHook('webhookDelivery', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    const { model, action: dbAction, db: hookDb } = options;
+    const { model, action: dbAction } = options;
 
     const relatedRefs = webhookRelatedModels[model];
     const webhookTargets: string[] = relatedRefs?.length
@@ -107,7 +108,7 @@ export const registerWebhookHook = () => {
     let allCallbacks: (() => Promise<void>)[] = [];
 
     // Prefetch all subscriptions for enabled models in one query, then group.
-    const allSubscriptions = await hookDb.webhookSubscription.findMany({
+    const allSubscriptions = await db.webhookSubscription.findMany({
       where: { model: { in: enabledTargets as WebhookModel[] }, isActive: true },
     });
     const subscriptionsByModel = new Map<string, WebhookSubscription[]>();
@@ -159,6 +160,6 @@ export const registerWebhookHook = () => {
 
     if (allCallbacks.length === 0) return;
 
-    hookDb.onCommit(allCallbacks, ConcurrencyType.queue);
+    db.onCommit(allCallbacks, ConcurrencyType.queue);
   });
 };

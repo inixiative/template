@@ -1,6 +1,6 @@
 import {
   DbAction,
-  type HookDb,
+  db,
   type HookOptions,
   HookTiming,
   PolymorphismRegistry,
@@ -54,14 +54,14 @@ const validateRowAgainstCategory = (row: TagRow, category: CategoryOwner | undef
 
 // Batch-fetch every referenced TagCategory in one findMany, then validate
 // rows against the in-memory map. Avoids N+1 on createManyAndReturn.
-const validateRowsBatch = async (hookDb: HookDb, rows: TagRow[]): Promise<void> => {
+const validateRowsBatch = async (rows: TagRow[]): Promise<void> => {
   const ids = [...new Set(rows.map((r) => r.tagCategoryId).filter((id): id is string => typeof id === 'string'))];
   if (ids.length === 0) {
     // Each row will throw its own "not found" via the single-row path.
     for (const row of rows) validateRowAgainstCategory(row, undefined);
     return;
   }
-  const categories = await hookDb.tagCategory.findMany({
+  const categories = await db.tagCategory.findMany({
     where: { id: { in: ids } },
     select: { id: true, ownerModel: true, ...ownerSelect },
   });
@@ -71,8 +71,8 @@ const validateRowsBatch = async (hookDb: HookDb, rows: TagRow[]): Promise<void> 
   }
 };
 
-const validateOwnerMatchesCategory = async (hookDb: HookDb, row: TagRow): Promise<void> => {
-  const category = await hookDb.tagCategory.findUnique({
+const validateOwnerMatchesCategory = async (row: TagRow): Promise<void> => {
+  const category = await db.tagCategory.findUnique({
     where: { id: row.tagCategoryId as string },
     select: { ownerModel: true, ...ownerSelect },
   });
@@ -92,24 +92,24 @@ export const registerTagOwnerCategoryHook = () => {
     'Tag',
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
-    async ({ args, db: hookDb }) => {
+    async ({ args }) => {
       const rows = extractCreateRows(args);
       if (rows.length === 0) return;
-      await validateRowsBatch(hookDb, rows);
+      await validateRowsBatch(rows);
     },
   );
 
   registerDbHook('tagOwnerCategory:upsert', 'Tag', HookTiming.before, [DbAction.upsert], async (options) => {
-    const { args, previous, db: hookDb } = options as HookOptions & { action: SingleAction };
+    const { args, previous } = options as HookOptions & { action: SingleAction };
     if (!args || typeof args !== 'object') return;
     const a = args as Record<string, unknown>;
     const create = a.create as TagRow | undefined;
     const update = a.update as TagRow | undefined;
-    if (create) await validateOwnerMatchesCategory(hookDb, create);
+    if (create) await validateOwnerMatchesCategory(create);
     if (update) {
       const prev = previous as TagRow | undefined;
       const merged: TagRow = { ...(prev ?? {}), ...update };
-      await validateOwnerMatchesCategory(hookDb, merged);
+      await validateOwnerMatchesCategory(merged);
     }
   });
 
@@ -119,14 +119,14 @@ export const registerTagOwnerCategoryHook = () => {
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn],
     async (options) => {
-      const { args, previous, db: hookDb } = options as HookOptions & { action: SingleAction };
+      const { args, previous } = options as HookOptions & { action: SingleAction };
       if (!args || typeof args !== 'object') return;
       const a = args as Record<string, unknown>;
       const data = a.data as TagRow | undefined;
       if (!data) return;
       const prev = previous as TagRow | undefined;
       const merged: TagRow = { ...(prev ?? {}), ...data };
-      await validateOwnerMatchesCategory(hookDb, merged);
+      await validateOwnerMatchesCategory(merged);
     },
   );
 };

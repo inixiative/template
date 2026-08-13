@@ -60,9 +60,9 @@ describe('managed transactions', () => {
       const email = nextEmail('reissued');
       let hookSawTransaction = false;
 
-      registerDbHook('reissued-hook', 'User', HookTiming.after, [DbAction.create], async ({ db: hookDb, result }) => {
-        hookSawTransaction = db.isInTxn() || hookDb !== undefined;
-        await hookDb.session.findMany({ where: { userId: (result as { id: string }).id } });
+      registerDbHook('reissued-hook', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
+        hookSawTransaction = db.isInTxn();
+        await db.session.findMany({ where: { userId: (result as { id: string }).id } });
       });
 
       const user = await db.user.create({ data: { email, name: 'Reissued' } });
@@ -92,21 +92,15 @@ describe('managed transactions', () => {
       const firstEmail = nextEmail('atomic-first');
       const secondEmail = nextEmail('atomic-second');
 
-      registerDbHook(
-        'atomic-side-effect',
-        'User',
-        HookTiming.after,
-        [DbAction.create],
-        async ({ db: hookDb, result }) => {
-          await hookDb.session.create({
-            data: {
-              userId: (result as { id: string }).id,
-              token: `atomic-${getNextSeq()}-${Date.now()}`,
-              expiresAt: new Date(Date.now() + 60_000),
-            },
-          });
-        },
-      );
+      registerDbHook('atomic-side-effect', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
+        await db.session.create({
+          data: {
+            userId: (result as { id: string }).id,
+            token: `atomic-${getNextSeq()}-${Date.now()}`,
+            expiresAt: new Date(Date.now() + 60_000),
+          },
+        });
+      });
 
       await expect(
         db.txn(async () => {
@@ -124,8 +118,8 @@ describe('managed transactions', () => {
     it('writes the hook side effect on the same transaction as the mutation', async () => {
       const email = nextEmail('atomic-committed');
 
-      registerDbHook('atomic-visible', 'User', HookTiming.after, [DbAction.create], async ({ db: hookDb, result }) => {
-        await hookDb.session.create({
+      registerDbHook('atomic-visible', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
+        await db.session.create({
           data: {
             userId: (result as { id: string }).id,
             token: `visible-${getNextSeq()}-${Date.now()}`,
@@ -145,8 +139,8 @@ describe('managed transactions', () => {
       const callback = mock(() => {});
       let firedBeforeCommit = false;
 
-      registerDbHook('oncommit-hook', 'User', HookTiming.after, [DbAction.create], async ({ db: hookDb }) => {
-        hookDb.onCommit(callback);
+      registerDbHook('oncommit-hook', 'User', HookTiming.after, [DbAction.create], async () => {
+        db.onCommit(callback);
       });
 
       await db.txn(async () => {
@@ -161,8 +155,8 @@ describe('managed transactions', () => {
     it('does not fire when the transaction rolls back', async () => {
       const callback = mock(() => {});
 
-      registerDbHook('oncommit-rollback-hook', 'User', HookTiming.after, [DbAction.create], async ({ db: hookDb }) => {
-        hookDb.onCommit(callback);
+      registerDbHook('oncommit-rollback-hook', 'User', HookTiming.after, [DbAction.create], async () => {
+        db.onCommit(callback);
       });
 
       await expect(
