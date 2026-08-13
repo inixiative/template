@@ -123,7 +123,7 @@ ACTOR on audit rows:   componentRows=1 [null]  templateRows=1 [null]
 
 Silently, with the suite green — on `main` and equally under a client-threading fix, which cannot
 reach an ambient context it does not carry. The audit actor now rides the bridge, declared by the three hooks that read it,, and
-`hooks/auditLog/transactionContext.test.ts` pins it on that exact path. That test fails when the
+`hooks/auditLog/hook.test.ts` pins it on that exact path. That test fails when the
 registration line is removed and passes with it, verified both ways.
 
 The webhook origin/echo-suppression read rides the same provider. Its existing coverage exercises a
@@ -138,8 +138,8 @@ path where storage survives, so it is not an independent pin; the actor test cov
 - [x] `registerDbHook` takes declared stores; the registry unions and bridges them
 - [x] `test/managedTransactions.test.ts` — unmanaged-transaction repro, reissue path, batch rollback
       atomicity, onCommit timing, and a pin test on `__internalParams.transaction`
-- [x] `test/transactionContext.test.ts` — bridge delivery, multiple captures, empty capture
-- [x] `hooks/auditLog/transactionContext.test.ts` — actor survives the lost-storage path
+- [x] `test/transactionContext.test.ts` — bridge delivery, same-object identity, unentered store
+- [x] `hooks/auditLog/hook.test.ts` — actor attribution survives the lost-storage path
 
 ## Definition of Done
 
