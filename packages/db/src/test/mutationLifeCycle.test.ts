@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
+import { db } from '@template/db';
 import {
   DbAction,
   executeHooks,
@@ -19,6 +20,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: { data: { email: 'test@example.com' } },
+        db,
       };
 
       await executeHooks(HookTiming.before, options);
@@ -37,6 +39,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       await executeHooks(HookTiming.before, {
@@ -44,6 +47,7 @@ describe('mutationLifeCycle', () => {
         operation: 'update',
         action: DbAction.update,
         args: {},
+        db,
       });
 
       expect(hookFn).toHaveBeenCalledTimes(2);
@@ -59,6 +63,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       await executeHooks(HookTiming.before, {
@@ -66,6 +71,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(hookFn).toHaveBeenCalledTimes(2);
@@ -77,7 +83,7 @@ describe('mutationLifeCycle', () => {
       registerDbHook('test-hook-array', ['User', 'Session'], HookTiming.before, [DbAction.create], hookFn);
 
       for (const model of ['User', 'Session', 'Account']) {
-        await executeHooks(HookTiming.before, { model, operation: 'create', action: DbAction.create, args: {} });
+        await executeHooks(HookTiming.before, { model, operation: 'create', action: DbAction.create, args: {}, db });
       }
 
       // Fires for each listed model, not for the unlisted one.
@@ -96,6 +102,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(hookFn1).toHaveBeenCalledTimes(1);
@@ -162,6 +169,7 @@ describe('mutationLifeCycle', () => {
         operation: 'update',
         action: DbAction.update,
         args: {},
+        db,
       });
 
       expect(callOrder).toEqual(['model', 'global']);
@@ -177,6 +185,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(hookFn).not.toHaveBeenCalled();
@@ -192,6 +201,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(hookFn).not.toHaveBeenCalled();
@@ -207,6 +217,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(hookFn).not.toHaveBeenCalled();
@@ -222,6 +233,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: { data: { email: 'test@example.com' } },
+        db,
         result: { id: 'user-123', email: 'test@example.com' },
       };
 
@@ -247,6 +259,7 @@ describe('mutationLifeCycle', () => {
         operation: 'create',
         action: DbAction.create,
         args: {},
+        db,
       });
 
       expect(callOrder).toEqual([1, 2]);
@@ -263,6 +276,7 @@ describe('mutationLifeCycle', () => {
           operation: 'create',
           action: DbAction.create,
           args: {},
+          db,
         }),
       ).rejects.toThrow('Hook error');
     });
@@ -274,6 +288,7 @@ describe('mutationLifeCycle', () => {
           operation: 'create',
           action: DbAction.create,
           args: {},
+          db,
         }),
       ).resolves.toBeUndefined();
     });

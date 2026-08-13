@@ -1,4 +1,4 @@
-import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
+import { DbAction, HookTiming, registerDbHook } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { castArray } from 'lodash-es';
 
@@ -10,9 +10,9 @@ export const registerUserEmailContactHook = () => {
     'User',
     HookTiming.after,
     [DbAction.create, DbAction.createManyAndReturn],
-    async ({ result }) => {
+    async ({ result, db: hookDb }) => {
       for (const user of castArray(result) as CreatedUser[]) {
-        await db.contact.upsert({
+        await hookDb.contact.upsert({
           where: {
             userId_type_valueKey: { userId: user.id, type: ContactType.email, valueKey: user.email.toLowerCase() },
           },

@@ -1,6 +1,6 @@
 // Database client with scope/transaction methods
 export { db } from './client';
-export type { Db } from './clientTypes';
+export type { Db, HookDb } from './clientTypes';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,

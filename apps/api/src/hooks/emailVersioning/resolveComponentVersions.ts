@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, feature:email
  */
-import { db } from '@template/db';
+import type { HookDb } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { lookupCascade, type OwnerScope } from '@template/email/render';
 
@@ -30,15 +30,18 @@ const ownerScopeOf = (record: VersionedRecord): OwnerScope => ({
   locale: record.locale,
 });
 
-export const resolveComponentVersions = async (record: VersionedRecord): Promise<Record<string, string | null>> => {
+export const resolveComponentVersions = async (
+  hookDb: HookDb,
+  record: VersionedRecord,
+): Promise<Record<string, string | null>> => {
   const refs = [...new Set(record.componentRefs ?? [])];
   if (!refs.length) return {};
 
-  const children = await lookupCascade(refs, ownerScopeOf(record));
+  const children = await lookupCascade(refs, ownerScopeOf(record), hookDb);
   const componentIds = refs.map((slug) => children[slug]?.id).filter((id): id is string => Boolean(id));
 
   const snapshots = componentIds.length
-    ? await db.auditLog.findMany({
+    ? await hookDb.auditLog.findMany({
         where: { subjectEmailComponentId: { in: componentIds } },
         orderBy: { id: 'desc' },
         distinct: ['subjectEmailComponentId'],

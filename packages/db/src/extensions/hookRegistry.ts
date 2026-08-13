@@ -5,6 +5,7 @@
  * @uses none
  */
 
+import type { HookDb } from '@template/db/clientTypes';
 import { LogScope, log } from '@template/shared/logger';
 import { castArray } from 'lodash-es';
 
@@ -26,10 +27,13 @@ export enum HookTiming {
 export type SingleAction = DbAction.create | DbAction.update | DbAction.delete | DbAction.upsert;
 export type ManyAction = DbAction.createManyAndReturn | DbAction.updateManyAndReturn | DbAction.deleteMany;
 
+// db is bound to the transaction the triggering write is executing on — hooks must use it rather
+// than the ambient client, which resolves through storage this frame cannot rely on.
 type HookOptionsBase = {
   model: string;
   operation: string;
   args: unknown;
+  db: HookDb;
 };
 
 // T is the model's record shape. Defaults to Record<string, unknown> for

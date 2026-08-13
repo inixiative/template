@@ -10,11 +10,11 @@ export const registerOrderedListDeleteHook = () => {
     HookTiming.after,
     [DbAction.delete, DbAction.deleteMany],
     async (options) => {
-      const { previous, model } = options as HookOptions;
+      const { previous, model, db: hookDb } = options as HookOptions;
       if (!previous) return;
       const rows = castArray(previous);
-      const affected = await applyOrderedListHardDelete(model, rows as Record<string, unknown>[]);
-      queueOrderedListCacheInvalidation(model, affected);
+      const affected = await applyOrderedListHardDelete(hookDb, model, rows as Record<string, unknown>[]);
+      queueOrderedListCacheInvalidation(hookDb, model, affected);
     },
   );
 };

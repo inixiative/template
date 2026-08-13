@@ -45,13 +45,18 @@ export const registerOrderedListUpdateManyHook = () => {
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async (options) => {
-      const { args, previous, model } = options as HookOptions & { action: ManyAction };
+      const { args, previous, model, db: hookDb } = options as HookOptions & { action: ManyAction };
       const data = (args as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       if (!data || !previous || !Array.isArray(previous)) return;
       if (data.deletedAt === undefined) return;
 
-      const affected = await applyOrderedListBulkDeletedAtChange(model, data, previous as Record<string, unknown>[]);
-      queueOrderedListCacheInvalidation(model, affected);
+      const affected = await applyOrderedListBulkDeletedAtChange(
+        hookDb,
+        model,
+        data,
+        previous as Record<string, unknown>[],
+      );
+      queueOrderedListCacheInvalidation(hookDb, model, affected);
     },
   );
 };

@@ -1,7 +1,6 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
   DbAction,
-  db,
   HookTiming,
   isAuditEnabled,
   Prisma,
@@ -167,6 +166,6 @@ export const registerAuditLogHook = () => {
     const entries = buildEntries(options.model as AuditSubjectModel, options);
     if (entries.length === 0) return;
 
-    await db.auditLog.createManyAndReturn({ data: entries });
+    await options.db.auditLog.createManyAndReturn({ data: entries });
   });
 };

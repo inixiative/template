@@ -31,3 +31,19 @@ export type DbMethods = {
 };
 
 export type Db = PrismaClient & DbMethods;
+
+export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
+
+// transactionId is Prisma's interactive-transaction id, learned through the registration handshake
+// in db.txn(); it is the key the mutation extension matches an executing write against.
+export type TransactionState = {
+  txn: Db | null;
+  transactionId: string | null;
+  scopeId: string | null;
+  scopeContext: ScopeContext | null;
+  afterCommitBatches: CommitBatch[];
+};
+
+// What hooks run against: the executing transaction client, plus an onCommit bound to that
+// transaction's state rather than to ambient storage.
+export type HookDb = PrismaClient & Pick<DbMethods, 'onCommit'>;

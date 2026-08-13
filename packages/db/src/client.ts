@@ -6,25 +6,28 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';
+import type { AfterCommitFn, Db, ScopeContext, TransactionState } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
+import {
+  closeTransactionRegistration,
+  openTransactionRegistration,
+  pushAfterCommit,
+} from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
-import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
-import { castArray } from 'lodash-es';
+import { type ConcurrencyType, resolveAll } from '@template/shared/utils';
 
-type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
+const store = new AsyncLocalStorage<TransactionState>();
 
-type StoreData = {
-  txn: Db | null;
-  scopeId: string | null;
-  scopeContext: ScopeContext | null;
-  afterCommitBatches: CommitBatch[];
-};
-
-const store = new AsyncLocalStorage<StoreData>();
+const newTransactionState = (scopeId: string | null, scopeContext: ScopeContext | null): TransactionState => ({
+  txn: null,
+  transactionId: null,
+  scopeId,
+  scopeContext,
+  afterCommitBatches: [],
+});
 
 let __raw: Db | null = null;
 
@@ -54,27 +57,34 @@ const dbMethods = {
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();
-    return store.run(
-      { txn: null, scopeId: scopeId ?? null, scopeContext: context ?? null, afterCommitBatches: [] },
-      fn,
-    );
+    return store.run(newTransactionState(scopeId ?? null, context ?? null), fn);
   },
 
   txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {
     const existing = store.getStore();
     if (existing?.txn) return fn();
 
-    const s = existing ?? { txn: null, scopeId: crypto.randomUUID(), scopeContext: null, afterCommitBatches: [] };
+    const transactionState = existing ?? newTransactionState(crypto.randomUUID(), null);
 
     const run = async () => {
       try {
         const result = await db.raw.$transaction(
-          async (t) => {
-            s.txn = t as Db;
+          async (transactionClient) => {
+            transactionState.txn = transactionClient as Db;
+            const registrationToken = openTransactionRegistration(transactionState);
             try {
+              // Tells the mutation extension which Prisma transaction id belongs to this state; a
+              // write it cannot match to a registration is a transaction db.txn() did not open.
+              await (transactionClient as Db).session.findFirst({ where: { id: registrationToken } });
+              if (!transactionState.transactionId) {
+                throw new Error(
+                  'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
+                );
+              }
               return await fn();
             } finally {
-              s.txn = null;
+              closeTransactionRegistration(registrationToken, transactionState);
+              transactionState.txn = null;
             }
           },
           options?.timeout ? { timeout: options.timeout } : undefined,
@@ -86,8 +96,8 @@ const dbMethods = {
         // them. Nested mutations register their own onCommit batches against
         // the same scope state, but their own run() snapshots and drains
         // those before this loop continues — so we don't need a while loop.
-        const batches = s.afterCommitBatches;
-        s.afterCommitBatches = [];
+        const batches = transactionState.afterCommitBatches;
+        transactionState.afterCommitBatches = [];
         const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
         if (totalCallbacks > 0) {
           const start = performance.now();
@@ -103,7 +113,7 @@ const dbMethods = {
             );
           }
           const duration = performance.now() - start;
-          const slowThreshold = s.scopeContext === 'worker' ? 30000 : 5000;
+          const slowThreshold = transactionState.scopeContext === 'worker' ? 30000 : 5000;
           if (duration > slowThreshold) {
             const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
             log.warn(
@@ -115,19 +125,17 @@ const dbMethods = {
         return result;
       } finally {
         // Always clear callbacks (prevents stale callbacks on failed txn)
-        s.afterCommitBatches = [];
+        transactionState.afterCommitBatches = [];
       }
     };
 
-    return existing ? run() : store.run(s, run);
+    return existing ? run() : store.run(transactionState, run);
   },
 
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
-    const s = store.getStore();
-    if (!s?.txn) throw new Error('db.onCommit() requires db.txn()');
-    const fns = castArray(callbacks);
-    const typeArray = types ? castArray(types) : undefined;
-    s.afterCommitBatches.push({ fns, concurrency: getConcurrency(typeArray), types: typeArray });
+    const transactionState = store.getStore();
+    if (!transactionState?.txn) throw new Error('db.onCommit() requires db.txn()');
+    pushAfterCommit(transactionState, callbacks, types);
   },
 
   parallel: async <T>(
@@ -135,14 +143,13 @@ const dbMethods = {
     options?: { concurrency?: number; resolution?: 'all' | 'allSettled' },
   ): Promise<T[] | PromiseSettledResult<T>[]> => {
     if (dbMethods.isInTxn()) {
-      throw new Error('db.parallel() cannot run inside a transaction — each branch runs in its own scope/txn, which would break the outer transaction atomicity');
+      throw new Error(
+        'db.parallel() cannot run inside a transaction — each branch runs in its own scope/txn, which would break the outer transaction atomicity',
+      );
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(
-        { txn: null, scopeId: crypto.randomUUID(), scopeContext: parent?.scopeContext ?? null, afterCommitBatches: [] },
-        thunk,
-      );
+      store.run(newTransactionState(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
