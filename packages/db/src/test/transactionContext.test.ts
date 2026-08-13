@@ -1,13 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import {
-  clearHookRegistry,
-  DbAction,
-  db,
-  HookTiming,
-  registerDbHook,
-  registerTransactionContextProvider,
-} from '@template/db';
+import { clearHookRegistry, DbAction, db, HookTiming, registerCaptureContext, registerDbHook } from '@template/db';
 import { getNextSeq } from '@template/db/test/factory';
 import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
 
@@ -16,20 +9,17 @@ const nextEmail = (label: string) => `${label}-${getNextSeq()}-${Date.now()}@tes
 const callerStore = new AsyncLocalStorage<string>();
 const secondCallerStore = new AsyncLocalStorage<string>();
 
-registerTransactionContextProvider({
-  name: 'testCallerStore',
-  capture: () => callerStore.getStore() ?? null,
-  restore: <TResult>(value: string | null, fn: () => TResult): TResult => (value ? callerStore.run(value, fn) : fn()),
+registerCaptureContext(() => {
+  const value = callerStore.getStore();
+  return value ? (fn) => callerStore.run(value, fn) : (fn) => fn();
 });
 
-registerTransactionContextProvider({
-  name: 'testSecondCallerStore',
-  capture: () => secondCallerStore.getStore() ?? null,
-  restore: <TResult>(value: string | null, fn: () => TResult): TResult =>
-    value ? secondCallerStore.run(value, fn) : fn(),
+registerCaptureContext(() => {
+  const value = secondCallerStore.getStore();
+  return value ? (fn) => secondCallerStore.run(value, fn) : (fn) => fn();
 });
 
-describe('transaction context providers', () => {
+describe('transaction context captures', () => {
   beforeEach(() => {
     clearHookRegistry();
     registerTestTracker();
@@ -57,7 +47,7 @@ describe('transaction context providers', () => {
     expect(observedInHook).toBe('captured-at-open');
   });
 
-  it('restores every registered provider around the same hook', async () => {
+  it('restores every registered capture around the same hook', async () => {
     const observed: (string | null)[] = [];
 
     registerDbHook('context-bridge-multi', 'User', HookTiming.after, [DbAction.create], async () => {
@@ -77,7 +67,7 @@ describe('transaction context providers', () => {
     expect(observed).toEqual(['first', 'second']);
   });
 
-  it('runs hooks with the transaction intact when a provider captured nothing', async () => {
+  it('runs hooks with the transaction intact when a capture saw nothing', async () => {
     let hookRan = false;
 
     registerDbHook('context-bridge-empty', 'User', HookTiming.after, [DbAction.create], async () => {
@@ -89,15 +79,5 @@ describe('transaction context providers', () => {
     await db.txn(() => db.user.create({ data: { email: nextEmail('empty'), name: 'Empty' } }));
 
     expect(hookRan).toBe(true);
-  });
-
-  it('rejects a provider registered under a name already in use', () => {
-    expect(() =>
-      registerTransactionContextProvider({
-        name: 'testCallerStore',
-        capture: () => null,
-        restore: <TResult>(_snapshot: null, fn: () => TResult): TResult => fn(),
-      }),
-    ).toThrow("Transaction context provider 'testCallerStore' is already registered");
   });
 });

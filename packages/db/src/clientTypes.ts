@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import type { PrismaClient } from '@template/db/generated/client/client';
-import type { TransactionContextSnapshot } from '@template/db/lib/transactionContext';
+import type { RestoreContext } from '@template/db/lib/transactionContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
 
@@ -50,5 +50,5 @@ export type OpenTransaction = {
   client: Db;
   prismaTransactionId: string | null;
   afterCommitBatches: CommitBatch[];
-  contextSnapshots: TransactionContextSnapshot[];
+  restoreContext: RestoreContext;
 };

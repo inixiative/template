@@ -11,7 +11,7 @@ import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLife
 import { closeTransactionRegistration, openTransactionRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { captureTransactionContext, withTransactionContext } from '@template/db/lib/transactionContext';
+import { captureTransactionContext } from '@template/db/lib/transactionContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
@@ -62,7 +62,7 @@ const dbMethods = {
 
     const scope = existing ?? newScope(crypto.randomUUID(), null);
     // The caller frame is the last point at which async-local storage is reliable.
-    const contextSnapshots = captureTransactionContext();
+    const restoreContext = captureTransactionContext();
 
     const run = async () => {
       const { result, openTransaction } = await db.raw.$transaction(
@@ -72,7 +72,7 @@ const dbMethods = {
             client: transactionClient as Db,
             prismaTransactionId: null,
             afterCommitBatches: [],
-            contextSnapshots,
+            restoreContext,
           };
           scope.openTransaction = openTransaction;
           const registrationToken = openTransactionRegistration(openTransaction);
@@ -191,7 +191,7 @@ const dbMethods = {
 // Re-enters the caller's scope first, so the ambient db proxy resolves to the executing transaction
 // for the whole callee subtree, then each provider's captured context inside it.
 export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn: () => T): T =>
-  store.run(openTransaction.scope, () => withTransactionContext(openTransaction.contextSnapshots, fn));
+  store.run(openTransaction.scope, () => openTransaction.restoreContext(fn));
 
 export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {
