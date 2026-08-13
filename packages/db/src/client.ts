@@ -8,17 +8,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, ScopeContext, TransactionState } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
-import {
-  closeTransactionRegistration,
-  openTransactionRegistration,
-  pushAfterCommit,
-} from '@template/db/extensions/transactionRegistry';
+import { closeTransactionRegistration, openTransactionRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { captureTransactionContext, withTransactionContext } from '@template/db/lib/transactionContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
-import { type ConcurrencyType, resolveAll } from '@template/shared/utils';
+import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
+import { castArray } from 'lodash-es';
 
 const store = new AsyncLocalStorage<TransactionState>();
 
@@ -139,7 +136,13 @@ const dbMethods = {
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
     const transactionState = store.getStore();
     if (!transactionState?.txn) throw new Error('db.onCommit() requires db.txn()');
-    pushAfterCommit(transactionState, callbacks, types);
+    const callbackList = castArray(callbacks);
+    const typeList = types ? castArray(types) : undefined;
+    transactionState.afterCommitBatches.push({
+      fns: callbackList,
+      concurrency: getConcurrency(typeList),
+      types: typeList,
+    });
   },
 
   parallel: async <T>(

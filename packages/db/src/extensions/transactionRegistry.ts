@@ -2,11 +2,10 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
- * @uses primitive:shared
+ * @uses none
  */
-import type { AfterCommitFn, TransactionState } from '@template/db/clientTypes';
-import { type ConcurrencyType, getConcurrency } from '@template/shared/utils';
-import { castArray } from 'lodash-es';
+import type { Db, TransactionState } from '@template/db/clientTypes';
+import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
 
 // Prisma never hands the caller the id of the interactive transaction it just opened, but every
 // query interceptor is told which transaction its op is executing on. db.txn() therefore opens a
@@ -22,38 +21,50 @@ export const openTransactionRegistration = (transactionState: TransactionState):
   return registrationToken;
 };
 
-export const pendingRegistrationToken = (args: unknown): string | undefined => {
-  const identifier = (args as { where?: { id?: unknown } } | undefined)?.where?.id;
-  return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
-};
-
-export const claimTransactionRegistration = (registrationToken: string, prismaTransactionId: string): void => {
-  const transactionState = pendingRegistrations.get(registrationToken);
-  if (!transactionState) return;
-  pendingRegistrations.delete(registrationToken);
-  transactionState.prismaTransactionId = prismaTransactionId;
-  itxToTransactionState.set(prismaTransactionId, transactionState);
-};
-
 export const closeTransactionRegistration = (registrationToken: string, transactionState: TransactionState): void => {
   pendingRegistrations.delete(registrationToken);
   if (transactionState.prismaTransactionId) itxToTransactionState.delete(transactionState.prismaTransactionId);
   transactionState.prismaTransactionId = null;
 };
 
-export const transactionStateFor = (prismaTransactionId: string): TransactionState | undefined =>
-  itxToTransactionState.get(prismaTransactionId);
+const registrationTokenFrom = (args: unknown): string | undefined => {
+  const identifier = (args as { where?: { id?: unknown } } | undefined)?.where?.id;
+  return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
+};
 
-export const pushAfterCommit = (
-  transactionState: TransactionState,
-  callbacks: AfterCommitFn | AfterCommitFn[],
-  types?: ConcurrencyType | ConcurrencyType[],
-): void => {
-  const callbackList = castArray(callbacks);
-  const typeList = types ? castArray(types) : undefined;
-  transactionState.afterCommitBatches.push({
-    fns: callbackList,
-    concurrency: getConcurrency(typeList),
-    types: typeList,
-  });
+// Runs on every findFirst, so the token lookup is the cheap first gate.
+export const claimPendingRegistration = (params: { args: unknown }): void => {
+  const registrationToken = registrationTokenFrom(params.args);
+  if (!registrationToken) return;
+
+  const prismaTransaction = readPrismaTransaction(params);
+  if (prismaTransaction?.kind !== 'itx') return;
+
+  const transactionState = pendingRegistrations.get(registrationToken);
+  if (!transactionState) return;
+
+  pendingRegistrations.delete(registrationToken);
+  transactionState.prismaTransactionId = String(prismaTransaction.id);
+  itxToTransactionState.set(transactionState.prismaTransactionId, transactionState);
+};
+
+export const resolveTransactionState = (model: string, operation: string, params: unknown): TransactionState | null => {
+  const prismaTransaction = readPrismaTransaction(params);
+  if (!prismaTransaction) return null;
+
+  if (prismaTransaction.kind === 'itx') {
+    const transactionState = itxToTransactionState.get(String(prismaTransaction.id));
+    if (transactionState) return transactionState;
+  }
+
+  throw new Error(
+    `${model}.${operation} ran inside a transaction that db.txn() did not open. ` +
+      'Hooked mutations must go through db.txn() — inside a raw $transaction their hooks and ' +
+      'onCommit callbacks have no transaction to bind to.',
+  );
+};
+
+export const transactionClient = (transactionState: TransactionState): Db => {
+  if (!transactionState.txn) throw new Error('Transaction state has no client - its transaction has already ended');
+  return transactionState.txn;
 };

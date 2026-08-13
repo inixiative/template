@@ -8,9 +8,9 @@ import type { Db, TransactionState } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
 import {
-  claimTransactionRegistration,
-  pendingRegistrationToken,
-  transactionStateFor,
+  claimPendingRegistration,
+  resolveTransactionState,
+  transactionClient,
 } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
@@ -40,44 +40,11 @@ const runHooks = (transactionState: TransactionState, timing: HookTiming, hookOp
 const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
 
-const transactionClient = (transactionState: TransactionState): Db => {
-  if (!transactionState.txn) throw new Error('Transaction state has no client - its transaction has already ended');
-  return transactionState.txn;
-};
-
 // Re-issue through db.txn so the write + hooks share the txn's connection atomically.
 const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown): Promise<unknown> =>
   getDb().txn(() =>
     (runtimeDelegate(getDb(), model) as unknown as Record<string, (a: unknown) => Promise<unknown>>)[operation](args),
   );
-
-type PrismaTransaction = { kind: string; id: string | number };
-
-// Prisma's public extension params do not say which transaction an op is executing on;
-// __internalParams does, and unlike async-local storage it survives the interceptor's continuation.
-// Pinned by managedTransactions.test.ts.
-export const readPrismaTransaction = (params: unknown): PrismaTransaction | undefined =>
-  (params as { __internalParams?: { transaction?: PrismaTransaction } }).__internalParams?.transaction;
-
-const resolveTransactionState = (
-  model: Prisma.ModelName,
-  operation: string,
-  params: unknown,
-): TransactionState | null => {
-  const prismaTransaction = readPrismaTransaction(params);
-  if (!prismaTransaction) return null;
-
-  if (prismaTransaction.kind === 'itx') {
-    const transactionState = transactionStateFor(String(prismaTransaction.id));
-    if (transactionState) return transactionState;
-  }
-
-  throw new Error(
-    `${model}.${operation} ran inside a transaction that db.txn() did not open. ` +
-      'Hooked mutations must go through db.txn() — inside a raw $transaction their hooks and ' +
-      'onCommit callbacks have no transaction to bind to.',
-  );
-};
 
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = (
@@ -109,13 +76,7 @@ export const mutationLifeCycleExtension = () => {
     query: {
       $allModels: {
         async findFirst(params) {
-          const registrationToken = pendingRegistrationToken(params.args);
-          if (registrationToken) {
-            const prismaTransaction = readPrismaTransaction(params);
-            if (prismaTransaction?.kind === 'itx') {
-              claimTransactionRegistration(registrationToken, String(prismaTransaction.id));
-            }
-          }
+          claimPendingRegistration(params);
           return params.query(params.args);
         },
 
