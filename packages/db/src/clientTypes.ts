@@ -35,13 +35,20 @@ export type Db = PrismaClient & DbMethods;
 
 export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
-// prismaTransactionId is learned through the registration handshake in db.txn(); it is the key the
-// mutation extension matches an executing write against.
-export type TransactionState = {
-  txn: Db | null;
-  prismaTransactionId: string | null;
+// What the async-local store holds. db.scope and db.parallel create one with no transaction; db.txn
+// attaches an OpenTransaction for the life of that transaction and detaches it after.
+export type Scope = {
   scopeId: string | null;
   scopeContext: ScopeContext | null;
+  openTransaction: OpenTransaction | null;
+};
+
+// prismaTransactionId is learned through the registration handshake in db.txn(); it is the key the
+// mutation extension matches an executing write against.
+export type OpenTransaction = {
+  scope: Scope;
+  client: Db;
+  prismaTransactionId: string | null;
   afterCommitBatches: CommitBatch[];
   contextSnapshots: TransactionContextSnapshot[];
 };

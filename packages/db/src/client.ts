@@ -6,7 +6,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { AfterCommitFn, Db, ScopeContext, TransactionState } from '@template/db/clientTypes';
+import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
 import { closeTransactionRegistration, openTransactionRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
@@ -17,15 +17,12 @@ import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
 
-const store = new AsyncLocalStorage<TransactionState>();
+const store = new AsyncLocalStorage<Scope>();
 
-const newTransactionState = (scopeId: string | null, scopeContext: ScopeContext | null): TransactionState => ({
-  txn: null,
-  prismaTransactionId: null,
+const newScope = (scopeId: string | null, scopeContext: ScopeContext | null): Scope => ({
   scopeId,
   scopeContext,
-  afterCommitBatches: [],
-  contextSnapshots: [],
+  openTransaction: null,
 });
 
 let __raw: Db | null = null;
@@ -56,89 +53,86 @@ const dbMethods = {
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();
-    return store.run(newTransactionState(scopeId ?? null, context ?? null), fn);
+    return store.run(newScope(scopeId ?? null, context ?? null), fn);
   },
 
   txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {
     const existing = store.getStore();
-    if (existing?.txn) return fn();
+    if (existing?.openTransaction) return fn();
 
-    const transactionState = existing ?? newTransactionState(crypto.randomUUID(), null);
+    const scope = existing ?? newScope(crypto.randomUUID(), null);
     // The caller frame is the last point at which async-local storage is reliable.
-    transactionState.contextSnapshots = captureTransactionContext();
+    const contextSnapshots = captureTransactionContext();
 
     const run = async () => {
-      try {
-        const result = await db.raw.$transaction(
-          async (transactionClient) => {
-            transactionState.txn = transactionClient as Db;
-            const registrationToken = openTransactionRegistration(transactionState);
-            try {
-              // Tells the mutation extension which Prisma transaction id belongs to this state; a
-              // write it cannot match to a registration is a transaction db.txn() did not open.
-              await (transactionClient as Db).session.findFirst({ where: { id: registrationToken } });
-              if (!transactionState.prismaTransactionId) {
-                throw new Error(
-                  'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
-                );
-              }
-              return await fn();
-            } finally {
-              closeTransactionRegistration(registrationToken, transactionState);
-              transactionState.txn = null;
+      const { result, openTransaction } = await db.raw.$transaction(
+        async (transactionClient) => {
+          const openTransaction: OpenTransaction = {
+            scope,
+            client: transactionClient as Db,
+            prismaTransactionId: null,
+            afterCommitBatches: [],
+            contextSnapshots,
+          };
+          scope.openTransaction = openTransaction;
+          const registrationToken = openTransactionRegistration(openTransaction);
+          try {
+            // Tells the mutation extension which Prisma transaction id belongs to this transaction;
+            // a write it cannot match to a registration is one db.txn() did not open.
+            await openTransaction.client.session.findFirst({ where: { id: registrationToken } });
+            if (!openTransaction.prismaTransactionId) {
+              throw new Error(
+                'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
+              );
             }
-          },
-          options?.timeout ? { timeout: options.timeout } : undefined,
-        );
-
-        // Drain afterCommit callbacks. Snapshot + reset the queue before
-        // iteration so nested db.txn calls (e.g. mutations from inside an
-        // onCommit handler) don't see the parent's pending batches and re-run
-        // them. Nested mutations register their own onCommit batches against
-        // the same scope state, but their own run() snapshots and drains
-        // those before this loop continues — so we don't need a while loop.
-        const batches = transactionState.afterCommitBatches;
-        transactionState.afterCommitBatches = [];
-        const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
-        if (totalCallbacks > 0) {
-          const start = performance.now();
-          for (const batch of batches) {
-            const results = await db.parallel(
-              batch.fns.map((fn) => () => Promise.resolve(fn())),
-              { concurrency: batch.concurrency, resolution: 'allSettled' },
-            );
-
-            throwIfFailures(
-              'db.onCommit() callback failed',
-              results.filter((result) => result.status === 'rejected').map((result) => result.reason),
-            );
+            return { result: await fn(), openTransaction };
+          } finally {
+            closeTransactionRegistration(registrationToken, openTransaction);
+            scope.openTransaction = null;
           }
-          const duration = performance.now() - start;
-          const slowThreshold = transactionState.scopeContext === 'worker' ? 30000 : 5000;
-          if (duration > slowThreshold) {
-            const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
-            log.warn(
-              `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
-              LogScope.db,
-            );
-          }
+        },
+        options?.timeout ? { timeout: options.timeout } : undefined,
+      );
+
+      // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
+      // onCommit handler) drains its own and a rollback discards these with the object.
+      const batches = openTransaction.afterCommitBatches;
+      const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
+      if (totalCallbacks > 0) {
+        const start = performance.now();
+        for (const batch of batches) {
+          const results = await db.parallel(
+            batch.fns.map((fn) => () => Promise.resolve(fn())),
+            { concurrency: batch.concurrency, resolution: 'allSettled' },
+          );
+
+          throwIfFailures(
+            'db.onCommit() callback failed',
+            results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+          );
         }
-        return result;
-      } finally {
-        // Always clear callbacks (prevents stale callbacks on failed txn)
-        transactionState.afterCommitBatches = [];
+        const duration = performance.now() - start;
+        const slowThreshold = scope.scopeContext === 'worker' ? 30000 : 5000;
+        if (duration > slowThreshold) {
+          const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
+          log.warn(
+            `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
+            LogScope.db,
+          );
+        }
       }
+      return result;
     };
 
-    return existing ? run() : store.run(transactionState, run);
+    return existing ? run() : store.run(scope, run);
   },
 
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
-    const transactionState = store.getStore();
-    if (!transactionState?.txn) throw new Error('db.onCommit() requires db.txn()');
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.onCommit() requires db.txn()');
     const callbackList = castArray(callbacks);
     const typeList = types ? castArray(types) : undefined;
-    transactionState.afterCommitBatches.push({
+    openTransaction.afterCommitBatches.push({
       fns: callbackList,
       concurrency: getConcurrency(typeList),
       types: typeList,
@@ -156,7 +150,7 @@ const dbMethods = {
     }
     const parent = store.getStore();
     const inOwnScope = (thunk: () => Promise<T>) =>
-      store.run(newTransactionState(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
+      store.run(newScope(crypto.randomUUID(), parent?.scopeContext ?? null), thunk);
     if (options?.resolution === 'allSettled') {
       return resolveAll(
         thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
@@ -179,7 +173,7 @@ const dbMethods = {
 
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
 
-  isInTxn: (): boolean => !!store.getStore()?.txn,
+  isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
   findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>): Promise<T[]> => {
@@ -194,14 +188,14 @@ const dbMethods = {
   },
 };
 
-// Re-enters the transaction state first, so the ambient db proxy resolves to the executing
-// transaction for the whole callee subtree, then each provider's captured context inside it.
-export const runInTransactionContext = <T>(transactionState: TransactionState, fn: () => T): T =>
-  store.run(transactionState, () => withTransactionContext(transactionState.contextSnapshots, fn));
+// Re-enters the caller's scope first, so the ambient db proxy resolves to the executing transaction
+// for the whole callee subtree, then each provider's captured context inside it.
+export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn: () => T): T =>
+  store.run(openTransaction.scope, () => withTransactionContext(openTransaction.contextSnapshots, fn));
 
 export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {
     if (prop in dbMethods) return (dbMethods as Record<string, unknown>)[prop];
-    return ((store.getStore()?.txn ?? db.raw) as unknown as Record<string, unknown>)[prop];
+    return ((store.getStore()?.openTransaction?.client ?? db.raw) as unknown as Record<string, unknown>)[prop];
   },
 });

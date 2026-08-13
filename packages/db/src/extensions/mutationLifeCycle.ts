@@ -4,14 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { Db, TransactionState } from '@template/db/clientTypes';
+import type { Db, OpenTransaction } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
-import {
-  claimPendingRegistration,
-  resolveTransactionState,
-  transactionClient,
-} from '@template/db/extensions/transactionRegistry';
+import { claimPendingRegistration, getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
@@ -34,8 +30,8 @@ const getDb = (): Db => require('@template/db/client').db;
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
 // they get the caller's context re-entered around them rather than passed in. See
 // lib/transactionContext.ts.
-const runHooks = (transactionState: TransactionState, timing: HookTiming, hookOptions: HookOptions): Promise<void> =>
-  require('@template/db/client').runInTransactionContext(transactionState, () => executeHooks(timing, hookOptions));
+const runHooks = (openTransaction: OpenTransaction, timing: HookTiming, hookOptions: HookOptions): Promise<void> =>
+  require('@template/db/client').runInTransactionContext(openTransaction, () => executeHooks(timing, hookOptions));
 
 const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
@@ -48,16 +44,16 @@ const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown)
 
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = (
-    transactionState: TransactionState,
+    openTransaction: OpenTransaction,
     model: Prisma.ModelName,
     where: Record<string, unknown>,
-  ) => runtimeDelegate(transactionClient(transactionState), model).findUnique({ where });
+  ) => runtimeDelegate(openTransaction.client, model).findUnique({ where });
 
   const fetchExistingRecords = (
-    transactionState: TransactionState,
+    openTransaction: OpenTransaction,
     model: Prisma.ModelName,
     where: Record<string, unknown>,
-  ) => runtimeDelegate(transactionClient(transactionState), model).findMany({ where });
+  ) => runtimeDelegate(openTransaction.client, model).findMany({ where });
 
   const timed = async <T>(model: Prisma.ModelName, operation: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
@@ -82,15 +78,15 @@ export const mutationLifeCycleExtension = () => {
 
         async create(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
           return timed(model, operation, async () => {
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -104,32 +100,32 @@ export const mutationLifeCycleExtension = () => {
 
         async createManyAndReturn(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
           return timed(model, operation, async () => {
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
 
         async update(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(openTransaction, model, where)) ?? undefined;
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
@@ -143,69 +139,69 @@ export const mutationLifeCycleExtension = () => {
 
         async updateManyAndReturn(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = await fetchExistingRecords(transactionState, model, where);
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            hookOptions.previous = await fetchExistingRecords(openTransaction, model, where);
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
 
         async upsert(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(openTransaction, model, where)) ?? undefined;
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
 
         async delete(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
           return timed(model, operation, async () => {
-            hookOptions.previous = (await fetchExistingRecord(transactionState, model, where)) ?? undefined;
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            hookOptions.previous = (await fetchExistingRecord(openTransaction, model, where)) ?? undefined;
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = result;
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
 
         async deleteMany(params) {
           const { model, operation, args, query } = params;
-          const transactionState = resolveTransactionState(model, operation, params);
-          if (!transactionState) return reissueInTxn(model, operation, args);
+          const openTransaction = getCurrentTransaction(model, operation, params);
+          if (!openTransaction) return reissueInTxn(model, operation, args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.deleteMany, args };
           return timed(model, operation, async () => {
-            const previous = await fetchExistingRecords(transactionState, model, where);
+            const previous = await fetchExistingRecords(openTransaction, model, where);
             hookOptions.previous = previous;
-            await runHooks(transactionState, HookTiming.before, hookOptions);
+            await runHooks(openTransaction, HookTiming.before, hookOptions);
             const result = await query(args);
             hookOptions.result = previous; // deleteMany returns count, so use previous as result for hooks
-            await runHooks(transactionState, HookTiming.after, hookOptions);
+            await runHooks(openTransaction, HookTiming.after, hookOptions);
             return result;
           });
         },
