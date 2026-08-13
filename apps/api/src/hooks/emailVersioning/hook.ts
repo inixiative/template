@@ -7,6 +7,7 @@
 
 import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
+import { auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
 import { resolveComponentVersions, type VersionedRecord } from '#/hooks/emailVersioning/resolveComponentVersions';
@@ -128,5 +129,5 @@ export const registerEmailVersioningHook = (): void => {
       await snapshotChildVersions(model, change.record);
       await walkUp(change.record.slug, visited);
     }
-  });
+  }, [auditActorStore]);
 };

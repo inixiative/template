@@ -82,25 +82,28 @@ array form. It is decided by Prisma at request time and is unaffected by continu
    client parameter, no signature churn, and the repair covers everything a hook transitively
    calls rather than only what someone remembered to thread.
 
-   `lib/transactionContext.ts` owns the carrier — one registered closure per context:
+   A hook that reads an ambient context declares its store at registration, as a trailing argument
+   to `registerDbHook`:
 
    ```ts
-   type RestoreContext = <TResult>(fn: () => TResult) => TResult;
-   type CaptureContext = () => RestoreContext;   // runs in the caller frame at db.txn() open
+   registerDbHook('auditLog', '*', HookTiming.after, actions, async (options) => {
+     const actor = auditActorContext.getScope();
+     ...
+   }, [auditActorStore]);
    ```
 
-   The captures compose once, at open, into the single `restoreContext` on the `OpenTransaction`;
-   the hook boundary is `store.run(scope, () => openTransaction.restoreContext(fn))`.
+   The hook registry unions every declared store. `db.txn` snapshots that set at open into
+   `[store, value]` pairs — same object, no copy — onto the `OpenTransaction`, and the hook boundary
+   nests one `store.run(value, fn)` per pair, skipping any the caller had not entered. If no hook
+   declares anything the capture is a no-op.
 
-   Contract: capture happens at `db.txn()` open, so context entered after the transaction is
-   already open is not visible to hooks on the lost-storage path. Restoring is additive — a provider
-   that captured nothing calls `fn()` rather than entering an empty context. Set context at the
-   request, job, or scope boundary, which is where every provider here already sets it.
+   Contract: values are read at `db.txn()` open, so context entered after the transaction is already
+   open is not visible to hooks on the lost-storage path. Set it at the request, job, or scope
+   boundary. Values carry by reference, so `auditActorContext.extend()` from inside a hook mutates
+   the caller's object exactly as it would without a transaction.
 
-   The one capture that exists is registered in `transactionContext.ts` itself. `client.ts` imports
-   that module to capture, and `db.txn` is defined in `client.ts`, so reaching `db.txn` has
-   necessarily executed the registration — there is no boot step to wire and no ordering to get
-   wrong. `registerCaptureContext` stays exported for a future app-owned context.
+   The Scope store stays outside the bridge: it is the vehicle, not cargo — its value is the
+   `OpenTransaction`'s own backref, and capture-at-open runs before the scope is installed.
 
 Caller-frame ALS is untouched: the `db` proxy, `isInTxn()`, `scope`, `parallel`, and `onCommit`'s
 ambient path (still throws outside `db.txn`) all behave as before. Pre-image reads
@@ -119,7 +122,7 @@ ACTOR on audit rows:   componentRows=1 [null]  templateRows=1 [null]
 ```
 
 Silently, with the suite green — on `main` and equally under a client-threading fix, which cannot
-reach an ambient context it does not carry. The audit actor now rides the bridge, and
+reach an ambient context it does not carry. The audit actor now rides the bridge, declared by the three hooks that read it,, and
 `hooks/auditLog/transactionContext.test.ts` pins it on that exact path. That test fails when the
 registration line is removed and passes with it, verified both ways.
 
@@ -131,9 +134,8 @@ path where storage survives, so it is not an independent pin; the actor test cov
 - [x] `readPrismaTransaction` + `resolveTransactionState` in `extensions/mutationLifeCycle.ts`
 - [x] `extensions/transactionRegistry.ts` — registration handshake, `transactionStateFor`
 - [x] `db.txn` registers and deregisters; `TransactionState` moved to `clientTypes.ts`
-- [x] `lib/transactionContext.ts` — CaptureContext/RestoreContext, composition, registration
 - [x] `runInTransactionContext` on the client; composed around every `executeHooks` call
-- [x] the audit-actor capture registered by the registry, guaranteed by the import graph
+- [x] `registerDbHook` takes declared stores; the registry unions and bridges them
 - [x] `test/managedTransactions.test.ts` — unmanaged-transaction repro, reissue path, batch rollback
       atomicity, onCommit timing, and a pin test on `__internalParams.transaction`
 - [x] `test/transactionContext.test.ts` — bridge delivery, multiple captures, empty capture
@@ -143,7 +145,7 @@ path where storage survives, so it is not an independent pin; the actor test cov
 
 - [x] The unmanaged-transaction repro fails on `main` and passes here
 - [x] The audit-actor pin fails without the provider and passes with it
-- [x] `packages/db` 265 pass, `packages/email` 89 pass, `packages/permissions` 81 pass
+- [x] `packages/db` 267 pass, `packages/email` 89 pass, `packages/permissions` 81 pass
 - [x] `apps/api` 920 pass / 3 fail — the 3 are `s3 storage adapter`, identical on `main`
 - [x] `typecheck` green for `db`, `email`, `permissions`, `api`
 

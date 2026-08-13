@@ -5,6 +5,8 @@
  * @uses none
  */
 
+import type { AsyncLocalStorage } from 'node:async_hooks';
+import type { BridgedContext } from '@template/db/clientTypes';
 import { LogScope, log } from '@template/shared/logger';
 import { castArray } from 'lodash-es';
 
@@ -61,12 +63,17 @@ const registeredHooks: {
 
 const hookRegistry = new Set<string>();
 
+// Hooks run on a Prisma continuation where the caller's async-local storage has not survived. A hook
+// that reads an ambient context declares its store here and db.txn carries the value across.
+const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
+
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
   model: string | string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
+  bridges: AsyncLocalStorage<unknown>[] = [],
 ) => {
   if (hookRegistry.has(name)) {
     log.warn(`Hook '${name}' already registered - skipping duplicate`, LogScope.hook);
@@ -78,6 +85,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 
   hookRegistry.add(name);
+  for (const store of bridges) bridgedStores.add(store);
 
   for (const target of castArray(model)) {
     registeredHooks[target] ??= {
@@ -106,8 +114,24 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
   }
 };
 
+// Read in the caller frame at db.txn() open, where storage is still reliable. Values are carried by
+// reference, so a hook mutating one is mutating the caller's object.
+export const captureBridgedContext = (): BridgedContext =>
+  [...bridgedStores].map((store) => [store, store.getStore()]);
+
+export const runInBridgedContext = <TResult>(bridgedContext: BridgedContext, fn: () => TResult): TResult => {
+  const enter = (index: number): TResult => {
+    if (index === bridgedContext.length) return fn();
+    const [store, value] = bridgedContext[index]!;
+    // A store the caller had not entered must stay unentered, not entered with undefined.
+    return value === undefined ? enter(index + 1) : store.run(value, () => enter(index + 1));
+  };
+  return enter(0);
+};
+
 export const clearHookRegistry = () => {
   hookRegistry.clear();
+  bridgedStores.clear();
   for (const model of Object.keys(registeredHooks)) {
     delete registeredHooks[model];
   }

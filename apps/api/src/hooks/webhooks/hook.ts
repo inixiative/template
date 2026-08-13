@@ -11,7 +11,7 @@ import {
   webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray, compact } from 'lodash-es';
 import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
@@ -161,5 +161,5 @@ export const registerWebhookHook = () => {
     if (allCallbacks.length === 0) return;
 
     db.onCommit(allCallbacks, ConcurrencyType.queue);
-  });
+  }, [auditActorStore]);
 };

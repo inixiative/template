@@ -28,13 +28,13 @@ export const nullAuditActor: AuditActor = {
   integrationId: null,
 };
 
-const store = new AsyncLocalStorage<AuditActor>();
+export const auditActorStore = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
-  scope: <T>(actor: AuditActor, fn: () => T): T => store.run(actor, fn),
-  getScope: (): AuditActor | null => store.getStore() ?? null,
+  scope: <T>(actor: AuditActor, fn: () => T): T => auditActorStore.run(actor, fn),
+  getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,
   extend: (partial: Partial<AuditActor>): void => {
-    const current = store.getStore();
+    const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);
   },
 };

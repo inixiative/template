@@ -10,7 +10,7 @@ import {
   registerDbHook,
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, compact } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
@@ -168,5 +168,5 @@ export const registerAuditLogHook = () => {
     if (entries.length === 0) return;
 
     await db.auditLog.createManyAndReturn({ data: entries });
-  });
+  }, [auditActorStore]);
 };
