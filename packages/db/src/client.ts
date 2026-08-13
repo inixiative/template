@@ -67,8 +67,7 @@ const dbMethods = {
     if (existing?.txn) return fn();
 
     const transactionState = existing ?? newTransactionState(crypto.randomUUID(), null);
-    // Taken here, in the caller frame, because this is the last point at which async-local storage
-    // is reliable — inside Prisma's extension continuations it is not. See lib/transactionContext.ts.
+    // The caller frame is the last point at which async-local storage is reliable.
     transactionState.contextSnapshots = captureTransactionContext();
 
     const run = async () => {
@@ -192,10 +191,8 @@ const dbMethods = {
   },
 };
 
-// The bridge back into the caller's context from inside a Prisma extension continuation, where
-// async-local storage has not survived. Re-enters the transaction state first — so the ambient db
-// proxy resolves to the executing transaction for the whole callee subtree — then each registered
-// provider's captured context nested inside it.
+// Re-enters the transaction state first, so the ambient db proxy resolves to the executing
+// transaction for the whole callee subtree, then each provider's captured context inside it.
 export const runInTransactionContext = <T>(transactionState: TransactionState, fn: () => T): T =>
   store.run(transactionState, () => withTransactionContext(transactionState.contextSnapshots, fn));
 

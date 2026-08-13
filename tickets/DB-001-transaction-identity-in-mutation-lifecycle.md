@@ -97,6 +97,11 @@ array form. It is decided by Prisma at request time and is unaffected by continu
    that captured nothing calls `fn()` rather than entering an empty context. Set context at the
    request, job, or scope boundary, which is where every provider here already sets it.
 
+   The one provider that exists is seeded in `transactionContext.ts` itself. `client.ts` imports
+   that module to capture, and `db.txn` is defined in `client.ts`, so reaching `db.txn` has
+   necessarily executed the registration — there is no boot step to wire and no ordering to get
+   wrong. `registerTransactionContextProvider` stays exported for a future app-owned context.
+
 Caller-frame ALS is untouched: the `db` proxy, `isInTxn()`, `scope`, `parallel`, and `onCommit`'s
 ambient path (still throws outside `db.txn`) all behave as before. Pre-image reads
 (`fetchExistingRecord`/`fetchExistingRecords`) run in the extension frame, which holds the
@@ -114,10 +119,9 @@ ACTOR on audit rows:   componentRows=1 [null]  templateRows=1 [null]
 ```
 
 Silently, with the suite green — on `main` and equally under a client-threading fix, which cannot
-reach an ambient context it does not carry. `apps/api` now registers `auditActorContextProvider` at
-every process boot (api, worker, test preload) and
-`hooks/auditLog/transactionContext.test.ts` pins it on that exact path. That test fails without the
-provider registered and passes with it.
+reach an ambient context it does not carry. `auditActorContextProvider` now rides the bridge, and
+`hooks/auditLog/transactionContext.test.ts` pins it on that exact path. That test fails when the
+registration line is removed and passes with it, verified both ways.
 
 The webhook origin/echo-suppression read rides the same provider. Its existing coverage exercises a
 path where storage survives, so it is not an independent pin; the actor test covers the mechanism.
@@ -129,7 +133,7 @@ path where storage survives, so it is not an independent pin; the actor test cov
 - [x] `db.txn` registers and deregisters; `TransactionState` moved to `clientTypes.ts`
 - [x] `lib/transactionContext.ts` — provider interface, capture/restore, registration
 - [x] `runInTransactionContext` on the client; composed around every `executeHooks` call
-- [x] `auditActorContextProvider` registered by `apps/api` at every boot path
+- [x] `auditActorContextProvider` seeded by the registry, guaranteed by the import graph
 - [x] `test/managedTransactions.test.ts` — unmanaged-transaction repro, reissue path, batch rollback
       atomicity, onCommit timing, and a pin test on `__internalParams.transaction`
 - [x] `test/transactionContext.test.ts` — bridge delivery, multi-provider, empty capture, duplicate
@@ -140,7 +144,7 @@ path where storage survives, so it is not an independent pin; the actor test cov
 
 - [x] The unmanaged-transaction repro fails on `main` and passes here
 - [x] The audit-actor pin fails without the provider and passes with it
-- [x] `packages/db` 268 pass, `packages/email` 89 pass, `packages/permissions` 81 pass
+- [x] `packages/db` 266 pass, `packages/email` 89 pass, `packages/permissions` 81 pass
 - [x] `apps/api` 920 pass / 3 fail — the 3 are `s3 storage adapter`, identical on `main`
 - [x] `typecheck` green for `db`, `email`, `permissions`, `api`
 

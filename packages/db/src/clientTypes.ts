@@ -37,8 +37,6 @@ export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: 
 
 // transactionId is Prisma's interactive-transaction id, learned through the registration handshake
 // in db.txn(); it is the key the mutation extension matches an executing write against.
-// contextSnapshots are the registered providers' captures, taken in the caller frame at db.txn()
-// open and re-entered around hook invocation — see lib/transactionContext.ts.
 export type TransactionState = {
   txn: Db | null;
   transactionId: string | null;

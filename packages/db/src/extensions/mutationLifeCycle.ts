@@ -31,18 +31,15 @@ const SLOW_MUTATION_THRESHOLD = 5000;
 // Lazy import to avoid circular dependency at module load time
 const getDb = (): Db => require('@template/db/client').db;
 
-// Hooks run on a Prisma continuation where the caller's async-local storage has not survived.
-// Re-entering the caller's context around them is what lets every hook keep using the ambient db
-// proxy and its own ambient context (the audit actor, and anything else registered as a transaction
-// context provider) rather than taking either as a parameter. See lib/transactionContext.ts.
+// Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
+// they get the caller's context re-entered around them rather than passed in. See
+// lib/transactionContext.ts.
 const runHooks = (transactionState: TransactionState, timing: HookTiming, hookOptions: HookOptions): Promise<void> =>
   require('@template/db/client').runInTransactionContext(transactionState, () => executeHooks(timing, hookOptions));
 
 const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
 
-// Pre-image reads happen in the extension frame, which holds the transaction client directly and
-// so needs no bridge back into the caller's context.
 const transactionClient = (transactionState: TransactionState): Db => {
   if (!transactionState.txn) throw new Error('Transaction state has no client - its transaction has already ended');
   return transactionState.txn;
@@ -58,7 +55,7 @@ type ExecutingTransaction = { kind: string; id: string | number };
 
 // Prisma's public extension params do not say which transaction an op is executing on;
 // __internalParams does, and unlike async-local storage it survives the interceptor's continuation.
-// Pinned by transactionIdentity.test.ts.
+// Pinned by managedTransactions.test.ts.
 export const readExecutingTransaction = (params: unknown): ExecutingTransaction | undefined =>
   (params as { __internalParams?: { transaction?: ExecutingTransaction } }).__internalParams?.transaction;
 

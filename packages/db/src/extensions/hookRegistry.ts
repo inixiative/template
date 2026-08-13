@@ -26,8 +26,6 @@ export enum HookTiming {
 export type SingleAction = DbAction.create | DbAction.update | DbAction.delete | DbAction.upsert;
 export type ManyAction = DbAction.createManyAndReturn | DbAction.updateManyAndReturn | DbAction.deleteMany;
 
-// Hooks take no client: the mutation extension re-enters the caller's transaction context around
-// every hook invocation, so the ambient db proxy already resolves to the executing transaction.
 type HookOptionsBase = {
   model: string;
   operation: string;

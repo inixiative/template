@@ -6,14 +6,10 @@ import { initializeOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { flushOutbox } from '#/jobs/outbox';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
-import { registerTransactionContextProviders } from '#/lib/transactionContext';
 import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
 
 // Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
 await initializeOpenTelemetry();
-
-// Carry caller-frame context (audit actor) into hook frames; must precede any hooked mutation
-registerTransactionContextProviders();
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();

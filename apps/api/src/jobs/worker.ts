@@ -19,10 +19,6 @@ import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import type { WorkerContext } from '#/jobs/types';
 import { onShutdown } from '#/lib/shutdown';
-import { registerTransactionContextProviders } from '#/lib/transactionContext';
-
-// Carry caller-frame context (audit actor) into hook frames; must precede any hooked mutation
-registerTransactionContextProviders();
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();
