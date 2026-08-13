@@ -24,7 +24,7 @@ const store = new AsyncLocalStorage<TransactionState>();
 
 const newTransactionState = (scopeId: string | null, scopeContext: ScopeContext | null): TransactionState => ({
   txn: null,
-  transactionId: null,
+  prismaTransactionId: null,
   scopeId,
   scopeContext,
   afterCommitBatches: [],
@@ -80,7 +80,7 @@ const dbMethods = {
               // Tells the mutation extension which Prisma transaction id belongs to this state; a
               // write it cannot match to a registration is a transaction db.txn() did not open.
               await (transactionClient as Db).session.findFirst({ where: { id: registrationToken } });
-              if (!transactionState.transactionId) {
+              if (!transactionState.prismaTransactionId) {
                 throw new Error(
                   'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
                 );

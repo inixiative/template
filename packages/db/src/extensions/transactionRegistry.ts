@@ -14,7 +14,7 @@ import { castArray } from 'lodash-es';
 // two together — the only link between the caller frame and the extension that does not depend on
 // async-local storage surviving a Prisma-internal continuation.
 const pendingRegistrations = new Map<string, TransactionState>();
-const transactionStates = new Map<string, TransactionState>();
+const transactionStatesByPrismaId = new Map<string, TransactionState>();
 
 export const openTransactionRegistration = (transactionState: TransactionState): string => {
   const registrationToken = crypto.randomUUID();
@@ -27,22 +27,22 @@ export const pendingRegistrationToken = (args: unknown): string | undefined => {
   return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
 };
 
-export const claimTransactionRegistration = (registrationToken: string, transactionId: string): void => {
+export const claimTransactionRegistration = (registrationToken: string, prismaTransactionId: string): void => {
   const transactionState = pendingRegistrations.get(registrationToken);
   if (!transactionState) return;
   pendingRegistrations.delete(registrationToken);
-  transactionState.transactionId = transactionId;
-  transactionStates.set(transactionId, transactionState);
+  transactionState.prismaTransactionId = prismaTransactionId;
+  transactionStatesByPrismaId.set(prismaTransactionId, transactionState);
 };
 
 export const closeTransactionRegistration = (registrationToken: string, transactionState: TransactionState): void => {
   pendingRegistrations.delete(registrationToken);
-  if (transactionState.transactionId) transactionStates.delete(transactionState.transactionId);
-  transactionState.transactionId = null;
+  if (transactionState.prismaTransactionId) transactionStatesByPrismaId.delete(transactionState.prismaTransactionId);
+  transactionState.prismaTransactionId = null;
 };
 
-export const transactionStateFor = (transactionId: string): TransactionState | undefined =>
-  transactionStates.get(transactionId);
+export const transactionStateFor = (prismaTransactionId: string): TransactionState | undefined =>
+  transactionStatesByPrismaId.get(prismaTransactionId);
 
 export const pushAfterCommit = (
   transactionState: TransactionState,

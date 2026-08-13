@@ -51,24 +51,24 @@ const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown)
     (runtimeDelegate(getDb(), model) as unknown as Record<string, (a: unknown) => Promise<unknown>>)[operation](args),
   );
 
-type ExecutingTransaction = { kind: string; id: string | number };
+type PrismaTransaction = { kind: string; id: string | number };
 
 // Prisma's public extension params do not say which transaction an op is executing on;
 // __internalParams does, and unlike async-local storage it survives the interceptor's continuation.
 // Pinned by managedTransactions.test.ts.
-export const readExecutingTransaction = (params: unknown): ExecutingTransaction | undefined =>
-  (params as { __internalParams?: { transaction?: ExecutingTransaction } }).__internalParams?.transaction;
+export const readPrismaTransaction = (params: unknown): PrismaTransaction | undefined =>
+  (params as { __internalParams?: { transaction?: PrismaTransaction } }).__internalParams?.transaction;
 
 const resolveTransactionState = (
   model: Prisma.ModelName,
   operation: string,
   params: unknown,
 ): TransactionState | null => {
-  const executingTransaction = readExecutingTransaction(params);
-  if (!executingTransaction) return null;
+  const prismaTransaction = readPrismaTransaction(params);
+  if (!prismaTransaction) return null;
 
-  if (executingTransaction.kind === 'itx') {
-    const transactionState = transactionStateFor(String(executingTransaction.id));
+  if (prismaTransaction.kind === 'itx') {
+    const transactionState = transactionStateFor(String(prismaTransaction.id));
     if (transactionState) return transactionState;
   }
 
@@ -111,9 +111,9 @@ export const mutationLifeCycleExtension = () => {
         async findFirst(params) {
           const registrationToken = pendingRegistrationToken(params.args);
           if (registrationToken) {
-            const executingTransaction = readExecutingTransaction(params);
-            if (executingTransaction?.kind === 'itx') {
-              claimTransactionRegistration(registrationToken, String(executingTransaction.id));
+            const prismaTransaction = readPrismaTransaction(params);
+            if (prismaTransaction?.kind === 'itx') {
+              claimTransactionRegistration(registrationToken, String(prismaTransaction.id));
             }
           }
           return params.query(params.args);

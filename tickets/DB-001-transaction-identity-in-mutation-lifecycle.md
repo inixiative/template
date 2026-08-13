@@ -62,7 +62,7 @@ array form. It is decided by Prisma at request time and is unaffected by continu
 
 ## The fix
 
-1. **Truthful predicate.** `readExecutingTransaction(params)` replaces all seven `isInTxn()` reads.
+1. **Truthful predicate.** `readPrismaTransaction(params)` replaces all seven `isInTxn()` reads.
    No transaction → `reissueInTxn` as before (safe: there is no outer transaction to betray).
    Registered `itx` → run hooks against it. Unregistered `itx`, or `batch` → **throw**. A hooked
    mutation inside a transaction `db.txn()` did not open now fails loudly instead of committing
@@ -128,7 +128,7 @@ path where storage survives, so it is not an independent pin; the actor test cov
 
 ## Tasks
 
-- [x] `readExecutingTransaction` + `resolveTransactionState` in `extensions/mutationLifeCycle.ts`
+- [x] `readPrismaTransaction` + `resolveTransactionState` in `extensions/mutationLifeCycle.ts`
 - [x] `extensions/transactionRegistry.ts` — registration handshake, `transactionStateFor`
 - [x] `db.txn` registers and deregisters; `TransactionState` moved to `clientTypes.ts`
 - [x] `lib/transactionContext.ts` — provider interface, capture/restore, registration
