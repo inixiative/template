@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { AuditAction } from '@template/db/generated/client/enums';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
+import { auditActorContext, auditActorStore, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createCronJob,
@@ -426,6 +426,49 @@ describe('auditLog hook', () => {
 
       expect(logs.length).toBeGreaterThan(0);
       expect(logs.every((log) => log.actorJobName === null)).toBe(true);
+    });
+
+    // An unwrapped write reissues through db.txn from inside the extension, so the bridge captures
+    // whatever is alive in THAT frame — not the caller's. The loss itself can't be summoned on
+    // demand for a bare path, but exit() produces the identical observable state (getStore() →
+    // undefined at the reissue frame) deterministically.
+    const actorLogFor = (userId: string) =>
+      db.auditLog.findFirst({ where: { subjectUserId: userId, action: AuditAction.create } });
+
+    it('records the actor for an unwrapped write whose storage is alive at the reissue frame', async () => {
+      let userId = '';
+      await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'reissuedActor' }, async () => {
+        const user = await db.user.create({ data: { email: `actor-reissue-${Date.now()}@example.com` } });
+        userId = user.id;
+      });
+
+      expect((await actorLogFor(userId))?.actorJobName).toBe('reissuedActor');
+    });
+
+    it('loses the actor for an unwrapped write whose storage is gone by the write', async () => {
+      let userId = '';
+      await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lostActor' }, () =>
+        auditActorStore.exit(async () => {
+          const user = await db.user.create({ data: { email: `actor-lost-${Date.now()}@example.com` } });
+          userId = user.id;
+        }),
+      );
+
+      expect((await actorLogFor(userId))?.actorJobName).toBeNull();
+    });
+
+    it('keeps the actor across the same severed frame when the caller wraps in db.txn', async () => {
+      let userId = '';
+      await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'rescuedActor' }, () =>
+        db.txn(() =>
+          auditActorStore.exit(async () => {
+            const user = await db.user.create({ data: { email: `actor-rescued-${Date.now()}@example.com` } });
+            userId = user.id;
+          }),
+        ),
+      );
+
+      expect((await actorLogFor(userId))?.actorJobName).toBe('rescuedActor');
     });
   });
 });
