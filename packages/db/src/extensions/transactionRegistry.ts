@@ -15,6 +15,11 @@ import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction
 const pendingRegistrations = new Map<string, OpenTransaction>();
 const itxToOpenTransaction = new Map<string, OpenTransaction>();
 
+// The read db.txn() issues to surface its transaction id here. Ports point this at any model whose
+// unique field is string-typed — the token must miss, never throw (an Int PK rejects a UUID string
+// with a validation error instead of returning null).
+export const registrationProbe = { model: 'session', field: 'id' } as const;
+
 export const openTransactionRegistration = (openTransaction: OpenTransaction): string => {
   const registrationToken = crypto.randomUUID();
   pendingRegistrations.set(registrationToken, openTransaction);
@@ -28,7 +33,7 @@ export const closeTransactionRegistration = (registrationToken: string, openTran
 };
 
 const registrationTokenFrom = (args: unknown): string | undefined => {
-  const identifier = (args as { where?: { id?: unknown } } | undefined)?.where?.id;
+  const identifier = (args as { where?: Record<string, unknown> } | undefined)?.where?.[registrationProbe.field];
   return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
 };
 

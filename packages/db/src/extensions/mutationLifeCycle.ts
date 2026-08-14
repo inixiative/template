@@ -29,14 +29,18 @@ const getDb = (): Db => require('@template/db/client').db;
 
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
 // they get the caller's context re-entered around them rather than passed in. See
-// lib/transactionContext.ts.
+// runInBridgedContext in extensions/hookRegistry.ts.
 const runHooks = (openTransaction: OpenTransaction, timing: HookTiming, hookOptions: HookOptions): Promise<void> =>
   require('@template/db/client').runInTransactionContext(openTransaction, () => executeHooks(timing, hookOptions));
 
 const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
 
-// Re-issue through db.txn so the write + hooks share the txn's connection atomically.
+// Re-issue through db.txn so the write + hooks share the txn's connection atomically. Two things a
+// bare hooked mutation pays for arriving here: the txn open (plus its registration probe read) is
+// per-mutation cost, and the bridged context is captured in THIS frame — a continuation where the
+// caller's async-local storage may already be gone. Ambient attribution (audit actor etc.) is only
+// guaranteed under db.txn(); wrap where the actor matters.
 const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown): Promise<unknown> =>
   getDb().txn(() =>
     (runtimeDelegate(getDb(), model) as unknown as Record<string, (a: unknown) => Promise<unknown>>)[operation](args),

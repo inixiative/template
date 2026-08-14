@@ -9,7 +9,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
 import { captureBridgedContext, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
-import { closeTransactionRegistration, openTransactionRegistration } from '@template/db/extensions/transactionRegistry';
+import {
+  closeTransactionRegistration,
+  openTransactionRegistration,
+  registrationProbe,
+} from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { ModelName } from '@template/db/utils/modelNames';
@@ -79,7 +83,9 @@ const dbMethods = {
           try {
             // Tells the mutation extension which Prisma transaction id belongs to this transaction;
             // a write it cannot match to a registration is one db.txn() did not open.
-            await openTransaction.client.session.findFirst({ where: { id: registrationToken } });
+            await openTransaction.client[registrationProbe.model].findFirst({
+              where: { [registrationProbe.field]: registrationToken },
+            });
             if (!openTransaction.prismaTransactionId) {
               throw new Error(
                 'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
