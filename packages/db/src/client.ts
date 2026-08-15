@@ -7,7 +7,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
-import { captureBridgedContext, runInBridgedContext } from '@template/db/extensions/hookRegistry';
+import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
+import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
 import {
   closeTransactionRegistration,
@@ -16,7 +17,7 @@ import {
 } from '@template/db/extensions/transactionRegistry';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import type { ModelName } from '@template/db/utils/modelNames';
+import { type ModelName, toModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
@@ -57,8 +58,7 @@ const dbMethods = {
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();
-    // Await inside the store: a callback returning a lazy thenable (Prisma delegates) only starts
-    // executing when awaited, which would otherwise happen after the scope has exited.
+    // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
     return store.run(newScope(scopeId ?? null, context ?? null), async () => await fn());
   },
 
@@ -201,11 +201,8 @@ const dbMethods = {
 export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn: () => T): T =>
   store.run(openTransaction.scope, () => runInBridgedContext(openTransaction.bridgedContext, fn));
 
-// The ops the mutation extension runs hooks for. A bare call on a model delegate opens its db.txn
-// HERE, in the caller's frame — upstream of the Prisma continuation where async-local storage does
-// not reliably survive — so the bridged context is captured while it is still alive. Mutations on
-// db.raw skip this and pass through the extension untouched: raw opts out of the whole life cycle
-// (no txn, no hooks) — seeds and emergencies.
+// A bare hooked mutation opens its db.txn here, in the caller's frame, where async-local storage
+// is still reliable; db.raw skips the whole life cycle.
 const HOOKED_MUTATION_OPS = new Set([
   'create',
   'createManyAndReturn',
@@ -223,19 +220,25 @@ const bareDelegate = (model: string | symbol): unknown => {
   if (cached) return cached;
 
   const target = (db.raw as unknown as Record<string | symbol, unknown>)[model];
-  if (!target || typeof target !== 'object') return target;
+  const modelName = typeof model === 'string' ? toModelName(model) : undefined;
+  if (!target || typeof target !== 'object' || !modelName) return target;
 
   const delegate = new Proxy(target as Record<string, unknown>, {
     get(t, op) {
       const member = t[op as string];
       if (typeof member !== 'function' || !HOOKED_MUTATION_OPS.has(op as string)) return member;
-      return (args: unknown) =>
-        dbMethods.txn(() => {
+      return async (args: unknown) => {
+        if (!hasHooksFor(modelName)) {
+          assertNoNestedWrites(modelName, args);
+          return (member as (a: unknown) => Promise<unknown>).call(t, args);
+        }
+        return dbMethods.txn(() => {
           const live = (db as unknown as Record<string | symbol, Record<string, (a: unknown) => Promise<unknown>>>)[
             model
           ];
           return live[op as string]!(args);
         });
+      };
     },
   });
   bareDelegates.set(model, delegate);

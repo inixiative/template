@@ -1,9 +1,9 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
+  AUDIT_ENABLED_MODELS,
   DbAction,
   db,
   HookTiming,
-  isAuditEnabled,
   Prisma,
   redactChangeDiff,
   redactSensitiveFields,
@@ -162,13 +162,10 @@ export const registerAuditLogHook = () => {
 
   registerDbHook(
     'auditLog',
-    '*',
+    AUDIT_ENABLED_MODELS,
     HookTiming.after,
     actions,
     async (options: HookOptions) => {
-      if (options.model === 'AuditLog') return;
-      if (!isAuditEnabled(options.model)) return;
-
       const entries = buildEntries(options.model as AuditSubjectModel, options);
       if (entries.length === 0) return;
 

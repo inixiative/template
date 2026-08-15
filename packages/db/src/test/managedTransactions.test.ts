@@ -85,6 +85,42 @@ describe('managed transactions', () => {
 
       expect(await db.user.findUnique({ where: { email } })).toBeNull();
     });
+
+    it('goes straight through for a hookless model, keeping the nested-write guard', async () => {
+      clearHookRegistry();
+
+      await expect(
+        db.user.create({
+          data: {
+            email: nextEmail('hookless-nested'),
+            name: 'Hookless Nested',
+            sessions: { create: [{ token: `hookless-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }] },
+          },
+        }),
+      ).rejects.toThrow('skips Session hooks');
+
+      const email = nextEmail('hookless-plain');
+      const user = await db.user.create({ data: { email, name: 'Hookless Plain' } });
+      expect(user.email).toBe(email);
+
+      registerTestTracker();
+      await db.user.deleteMany({ where: { id: user.id } });
+    });
+
+    it('lets db.raw nest writes — the raw opt-out covers the guard too', async () => {
+      const user = await db.raw.user.create({
+        data: {
+          email: nextEmail('raw-nested'),
+          name: 'Raw Nested',
+          sessions: { create: [{ token: `raw-nested-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }] },
+        },
+      });
+
+      expect(await db.session.findFirst({ where: { userId: user.id } })).not.toBeNull();
+
+      await db.session.deleteMany({ where: { userId: user.id } });
+      await db.user.deleteMany({ where: { id: user.id } });
+    });
   });
 
   describe('batch rollback atomicity', () => {

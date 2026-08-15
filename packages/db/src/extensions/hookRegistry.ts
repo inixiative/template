@@ -105,6 +105,8 @@ export const registerDbHook = <T = Record<string, unknown>>(
 // follow auditLog) relies on registration order, which per-model re-registration can silently break.
 // TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
 // check over the declared orderings.
+export const hasHooksFor = (model: string): boolean => '*' in registeredHooks || model in registeredHooks;
+
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];

@@ -117,21 +117,6 @@ describe('bridged hook context', () => {
     expect(observedInHook).toBeUndefined();
   });
 
-  // The capture frame for a bare mutation is the CALL SITE: the db proxy wraps hooked mutation ops
-  // so their db.txn opens before Prisma is entered (probe data: storage survives every app frame on
-  // the lossy path and dies only in the extension continuation). Reads pass through untouched.
-  // Reverting the proxy to plain delegate forwarding fails this — shallow-path actor tests would not.
-  it('wraps bare mutation ops at the proxy and passes reads through', () => {
-    const bare = db.user;
-    const raw = db.raw.user;
-
-    expect(bare.findFirst).toBe(raw.findFirst);
-    expect(bare.count).toBe(raw.count);
-    expect(bare.create).not.toBe(raw.create);
-    expect(bare.update).not.toBe(raw.update);
-    expect(bare.delete).not.toBe(raw.delete);
-  });
-
   // Whether an undeclared store still happens to be visible is a property of the frame and not
   // something to rely on in either direction; what is guaranteed is that capturing nothing is inert.
   it('runs hooks with the transaction intact when no hook declares a store', async () => {

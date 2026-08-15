@@ -31,8 +31,7 @@ export const nullAuditActor: AuditActor = {
 export const auditActorStore = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
-  // Await inside the store: a callback returning a lazy thenable (Prisma delegates) only starts
-  // executing when awaited, which would otherwise happen after the actor context has exited.
+  // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
   scope: <T>(actor: AuditActor, fn: () => T | Promise<T>): Promise<T> =>
     auditActorStore.run(actor, async () => await fn()),
   getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,

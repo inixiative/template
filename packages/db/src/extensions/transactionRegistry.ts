@@ -15,9 +15,7 @@ import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction
 const pendingRegistrations = new Map<string, OpenTransaction>();
 const itxToOpenTransaction = new Map<string, OpenTransaction>();
 
-// The read db.txn() issues to surface its transaction id here. Ports point this at any model whose
-// unique field is string-typed — the token must miss, never throw (an Int PK rejects a UUID string
-// with a validation error instead of returning null).
+// Ports point this at any model whose unique field is string-typed — the token must miss, never throw.
 export const registrationProbe = { model: 'session', field: 'id' } as const;
 
 export const openTransactionRegistration = (openTransaction: OpenTransaction): string => {
@@ -53,9 +51,7 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
   itxToOpenTransaction.set(openTransaction.prismaTransactionId, openTransaction);
 };
 
-// Null means no transaction at all: the mutation arrived directly on db.raw, which opts out of the
-// whole life cycle (no txn, no hooks) — seeds and emergencies. db.* can never produce this; its
-// proxy opens a db.txn for bare mutations at the call site.
+// Null = no transaction: the mutation came in on db.raw, which opts out of the life cycle.
 export const getCurrentTransaction = (model: string, operation: string, params: unknown): OpenTransaction | null => {
   const prismaTransaction = readPrismaTransaction(params);
   if (!prismaTransaction) return null;
