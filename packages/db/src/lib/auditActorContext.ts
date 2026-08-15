@@ -28,13 +28,15 @@ export const nullAuditActor: AuditActor = {
   integrationId: null,
 };
 
-const store = new AsyncLocalStorage<AuditActor>();
+export const auditActorStore = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
-  scope: <T>(actor: AuditActor, fn: () => T): T => store.run(actor, fn),
-  getScope: (): AuditActor | null => store.getStore() ?? null,
+  // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
+  scope: <T>(actor: AuditActor, fn: () => T | Promise<T>): Promise<T> =>
+    auditActorStore.run(actor, async () => await fn()),
+  getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,
   extend: (partial: Partial<AuditActor>): void => {
-    const current = store.getStore();
+    const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);
   },
 };

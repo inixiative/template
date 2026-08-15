@@ -17,9 +17,9 @@ describe('db.parallel', () => {
   });
 
   it('rejects on the first failing branch by default', async () => {
-    await expect(
-      db.parallel([async () => 'ok', async () => Promise.reject(new Error('boom'))]),
-    ).rejects.toThrow('boom');
+    await expect(db.parallel([async () => 'ok', async () => Promise.reject(new Error('boom'))])).rejects.toThrow(
+      'boom',
+    );
   });
 
   it('captures per-branch failures with resolution allSettled', async () => {

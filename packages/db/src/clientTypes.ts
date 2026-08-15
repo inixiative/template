@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
+import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
 import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
@@ -31,3 +32,26 @@ export type DbMethods = {
 };
 
 export type Db = PrismaClient & DbMethods;
+
+// Async-local stores a hook declared it needs, paired with the value read at db.txn() open.
+export type BridgedContext = [AsyncLocalStorage<unknown>, unknown][];
+
+export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
+
+// What the async-local store holds. db.scope and db.parallel create one with no transaction; db.txn
+// attaches an OpenTransaction for the life of that transaction and detaches it after.
+export type Scope = {
+  scopeId: string | null;
+  scopeContext: ScopeContext | null;
+  openTransaction: OpenTransaction | null;
+};
+
+// prismaTransactionId is learned through the registration handshake in db.txn(); it is the key the
+// mutation extension matches an executing write against.
+export type OpenTransaction = {
+  scope: Scope;
+  client: Db;
+  prismaTransactionId: string | null;
+  afterCommitBatches: CommitBatch[];
+  bridgedContext: BridgedContext;
+};

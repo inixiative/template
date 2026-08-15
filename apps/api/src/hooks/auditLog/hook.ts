@@ -1,16 +1,16 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
+  AUDIT_ENABLED_MODELS,
   DbAction,
   db,
   HookTiming,
-  isAuditEnabled,
   Prisma,
   redactChangeDiff,
   redactSensitiveFields,
   registerDbHook,
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, compact } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
@@ -160,13 +160,17 @@ export const registerAuditLogHook = () => {
     DbAction.deleteMany,
   ];
 
-  registerDbHook('auditLog', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (options.model === 'AuditLog') return;
-    if (!isAuditEnabled(options.model)) return;
+  registerDbHook(
+    'auditLog',
+    AUDIT_ENABLED_MODELS,
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      const entries = buildEntries(options.model as AuditSubjectModel, options);
+      if (entries.length === 0) return;
 
-    const entries = buildEntries(options.model as AuditSubjectModel, options);
-    if (entries.length === 0) return;
-
-    await db.auditLog.createManyAndReturn({ data: entries });
-  });
+      await db.auditLog.createManyAndReturn({ data: entries });
+    },
+    [auditActorStore],
+  );
 };
