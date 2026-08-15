@@ -53,6 +53,9 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
   itxToOpenTransaction.set(openTransaction.prismaTransactionId, openTransaction);
 };
 
+// Null means no transaction at all: the mutation arrived directly on db.raw, which opts out of the
+// whole life cycle (no txn, no hooks) — seeds and emergencies. db.* can never produce this; its
+// proxy opens a db.txn for bare mutations at the call site.
 export const getCurrentTransaction = (model: string, operation: string, params: unknown): OpenTransaction | null => {
   const prismaTransaction = readPrismaTransaction(params);
   if (!prismaTransaction) return null;

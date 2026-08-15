@@ -428,14 +428,14 @@ describe('auditLog hook', () => {
       expect(logs.every((log) => log.actorJobName === null)).toBe(true);
     });
 
-    // An unwrapped write reissues through db.txn from inside the extension, so the bridge captures
-    // whatever is alive in THAT frame — not the caller's. The loss itself can't be summoned on
-    // demand for a bare path, but exit() produces the identical observable state (getStore() →
-    // undefined at the reissue frame) deterministically.
+    // An unwrapped write through db.* opens its transaction at the call site — the proxy wraps
+    // hooked mutation ops in db.txn from the caller's frame, upstream of the Prisma continuation
+    // where storage is lost — so the bridge captures whatever is alive where the caller stood.
+    // exit() models a caller with genuinely nothing entered; only that yields a null actor.
     const actorLogFor = (userId: string) =>
       db.auditLog.findFirst({ where: { subjectUserId: userId, action: AuditAction.create } });
 
-    it('records the actor for an unwrapped write whose storage is alive at the reissue frame', async () => {
+    it('records the actor for an unwrapped write — the txn opens in the caller frame', async () => {
       let userId = '';
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'reissuedActor' }, async () => {
         const user = await db.user.create({ data: { email: `actor-reissue-${Date.now()}@example.com` } });
@@ -455,7 +455,7 @@ describe('auditLog hook', () => {
       expect((await actorLogFor(user.id))?.actorJobName).toBe('lazyActor');
     });
 
-    it('loses the actor for an unwrapped write whose storage is gone by the write', async () => {
+    it('leaves the actor null for an unwrapped write when nothing is alive at the call site', async () => {
       let userId = '';
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lostActor' }, () =>
         auditActorStore.exit(async () => {
@@ -479,6 +479,12 @@ describe('auditLog hook', () => {
       );
 
       expect((await actorLogFor(userId))?.actorJobName).toBe('rescuedActor');
+    });
+
+    it('runs a db.raw write with no life cycle at all — no transaction, no hooks, no audit row', async () => {
+      const user = await db.raw.user.create({ data: { email: `actor-raw-${Date.now()}@example.com` } });
+
+      expect(await actorLogFor(user.id)).toBeNull();
     });
   });
 });

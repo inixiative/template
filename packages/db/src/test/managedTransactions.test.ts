@@ -56,7 +56,7 @@ describe('managed transactions', () => {
   });
 
   describe('mutations with no transaction', () => {
-    it('runs the write and its hooks atomically through the reissued transaction', async () => {
+    it('runs the write and its hooks atomically through the txn the proxy opens at the call site', async () => {
       const email = nextEmail('reissued');
       let hookSawTransaction = false;
 

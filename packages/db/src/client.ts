@@ -201,9 +201,52 @@ const dbMethods = {
 export const runInTransactionContext = <T>(openTransaction: OpenTransaction, fn: () => T): T =>
   store.run(openTransaction.scope, () => runInBridgedContext(openTransaction.bridgedContext, fn));
 
+// The ops the mutation extension runs hooks for. A bare call on a model delegate opens its db.txn
+// HERE, in the caller's frame — upstream of the Prisma continuation where async-local storage does
+// not reliably survive — so the bridged context is captured while it is still alive. Mutations on
+// db.raw skip this and pass through the extension untouched: raw opts out of the whole life cycle
+// (no txn, no hooks) — seeds and emergencies.
+const HOOKED_MUTATION_OPS = new Set([
+  'create',
+  'createManyAndReturn',
+  'update',
+  'updateManyAndReturn',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
+
+const bareDelegates = new Map<string | symbol, unknown>();
+
+const bareDelegate = (model: string | symbol): unknown => {
+  const cached = bareDelegates.get(model);
+  if (cached) return cached;
+
+  const target = (db.raw as unknown as Record<string | symbol, unknown>)[model];
+  if (!target || typeof target !== 'object') return target;
+
+  const delegate = new Proxy(target as Record<string, unknown>, {
+    get(t, op) {
+      const member = t[op as string];
+      if (typeof member !== 'function' || !HOOKED_MUTATION_OPS.has(op as string)) return member;
+      return (args: unknown) =>
+        dbMethods.txn(() => {
+          const live = (db as unknown as Record<string | symbol, Record<string, (a: unknown) => Promise<unknown>>>)[
+            model
+          ];
+          return live[op as string]!(args);
+        });
+    },
+  });
+  bareDelegates.set(model, delegate);
+  return delegate;
+};
+
 export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {
     if (prop in dbMethods) return (dbMethods as Record<string, unknown>)[prop];
-    return ((store.getStore()?.openTransaction?.client ?? db.raw) as unknown as Record<string, unknown>)[prop];
+    const openTransaction = store.getStore()?.openTransaction;
+    if (openTransaction) return (openTransaction.client as unknown as Record<string, unknown>)[prop];
+    return bareDelegate(prop);
   },
 });

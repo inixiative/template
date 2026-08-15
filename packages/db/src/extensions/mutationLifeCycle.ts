@@ -24,9 +24,6 @@ export {
 
 const SLOW_MUTATION_THRESHOLD = 5000;
 
-// Lazy import to avoid circular dependency at module load time
-const getDb = (): Db => require('@template/db/client').db;
-
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
 // they get the caller's context re-entered around them rather than passed in. See
 // runInBridgedContext in extensions/hookRegistry.ts.
@@ -35,16 +32,6 @@ const runHooks = (openTransaction: OpenTransaction, timing: HookTiming, hookOpti
 
 const runtimeDelegate = (client: Db, model: Prisma.ModelName): RuntimeDelegate =>
   client[toAccessor(model)] as unknown as RuntimeDelegate;
-
-// Re-issue through db.txn so the write + hooks share the txn's connection atomically. Two things a
-// bare hooked mutation pays for arriving here: the txn open (plus its registration probe read) is
-// per-mutation cost, and the bridged context is captured in THIS frame — a continuation where the
-// caller's async-local storage may already be gone. Ambient attribution (audit actor etc.) is only
-// guaranteed under db.txn(); wrap where the actor matters.
-const reissueInTxn = (model: Prisma.ModelName, operation: string, args: unknown): Promise<unknown> =>
-  getDb().txn(() =>
-    (runtimeDelegate(getDb(), model) as unknown as Record<string, (a: unknown) => Promise<unknown>>)[operation](args),
-  );
 
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = (
@@ -83,7 +70,7 @@ export const mutationLifeCycleExtension = () => {
         async create(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
           return timed(model, operation, async () => {
@@ -105,7 +92,7 @@ export const mutationLifeCycleExtension = () => {
         async createManyAndReturn(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
           return timed(model, operation, async () => {
@@ -120,7 +107,7 @@ export const mutationLifeCycleExtension = () => {
         async update(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
@@ -144,7 +131,7 @@ export const mutationLifeCycleExtension = () => {
         async updateManyAndReturn(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
@@ -161,7 +148,7 @@ export const mutationLifeCycleExtension = () => {
         async upsert(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
@@ -178,7 +165,7 @@ export const mutationLifeCycleExtension = () => {
         async delete(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
@@ -195,7 +182,7 @@ export const mutationLifeCycleExtension = () => {
         async deleteMany(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
-          if (!openTransaction) return reissueInTxn(model, operation, args);
+          if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.deleteMany, args };
