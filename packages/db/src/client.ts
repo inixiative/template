@@ -57,7 +57,9 @@ const dbMethods = {
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();
-    return store.run(newScope(scopeId ?? null, context ?? null), fn);
+    // Await inside the store: a callback returning a lazy thenable (Prisma delegates) only starts
+    // executing when awaited, which would otherwise happen after the scope has exited.
+    return store.run(newScope(scopeId ?? null, context ?? null), async () => await fn());
   },
 
   txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {

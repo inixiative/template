@@ -445,6 +445,16 @@ describe('auditLog hook', () => {
       expect((await actorLogFor(userId))?.actorJobName).toBe('reissuedActor');
     });
 
+    // Prisma delegates are lazy thenables — without scope() awaiting inside the store, a callback
+    // that returns the write un-awaited would execute it after the actor context has exited.
+    it('records the actor when the scope callback returns the write un-awaited', async () => {
+      const user = await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lazyActor' }, () =>
+        db.user.create({ data: { email: `actor-lazy-${Date.now()}@example.com` } }),
+      );
+
+      expect((await actorLogFor(user.id))?.actorJobName).toBe('lazyActor');
+    });
+
     it('loses the actor for an unwrapped write whose storage is gone by the write', async () => {
       let userId = '';
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lostActor' }, () =>
