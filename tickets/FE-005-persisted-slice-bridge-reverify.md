@@ -27,7 +27,7 @@ Downstream (Zealot advocate-portal, the multi-brand identity work) the session/u
 ### The three phases
 
 1. **persist** — on every state change, `persist` writes a `partialize`d snapshot (only the durable fields) to `createJSONStorage`. One object, typed, versioned.
-2. **rehydrate** — on boot, `persist` synchronously loads the snapshot so the first render has data (no flicker, no context-less first request). The rehydrated value is marked **unverified**.
+2. **rehydrate** — on boot, `persist` synchronously loads the snapshot so the first render has data (no flicker, no context-less first request). The rehydrated value is marked **unverified**. If the snapshot's context disagrees with what the request names at boot, it is **discarded instead of painted** (see *Early escape* below).
 3. **reverify** — immediately fire the authoritative API read; on resolve, overwrite the slice and mark **verified**. The API always wins. A cache/API mismatch corrects silently; the cache is never authoritative.
 
 ```ts
@@ -89,18 +89,44 @@ export const useAppStore = create<AppStore>()(
         storage: createJSONStorage(() => localStorage),
         version: 1,
         // ONLY the durable cache fields — never isVerified/source/actions.
-        partialize: (s) => ({ session: { data: s.session.data } }),
-        // rehydrated data is a cache, not truth: land it as unverified.
-        merge: (persisted, current) => ({
-          ...current,
-          session: { ...current.session, data: (persisted as any)?.session?.data ?? null, isVerified: false, source: 'cache' },
-        }),
+        // contextTag rides along so rehydrate can detect a wrong-context snapshot.
+        partialize: (s) => ({ session: { data: s.session.data, contextTag: s.session.contextTag } }),
+        // rehydrated data is a cache, not truth: land it unverified — OR discard it
+        // early if it belongs to a different context than this request names (see below).
+        merge: (persisted, current) => {
+          const cached = (persisted as any)?.session ?? {};
+          const hint = syncContextHint();                 // from URL/host/query — no round trip
+          const mismatch = hint != null && cached.contextTag != null && hint !== cached.contextTag;
+          if (mismatch) return current;                   // early escape: start empty, reverify fills
+          return {
+            ...current,
+            session: {
+              ...current.session,
+              data: cached.data ?? null,
+              contextTag: cached.contextTag ?? null,
+              isVerified: false,
+              source: cached.data ? 'cache' : 'empty',
+            },
+          };
+        },
       },
     ),
     { name: 'AppStore' },
   ),
 );
 ```
+
+### Early escape on context mismatch — kills the *other* flicker
+
+The cache-bridge kills the blank→data flicker. It introduces the opposite one: if the persisted snapshot belongs to a **different context** than the current request declares (another brand / tenant / user), painting from it flashes the wrong context's content, and reverify then swaps it — a wrong→right flicker that's worse than a blank→right one, because the user briefly sees plausible-but-wrong data.
+
+So rehydration is **guarded**. Persist a `contextTag` beside the data (the brand label/uuid the snapshot was resolved *for*). In `merge`, compare it against the context the request can name **synchronously at boot** — URL host / subdomain / query, the sources that don't need a round trip:
+
+- **Mismatch** (hint present and disagrees with `contextTag`) → **escape early**: return empty, don't paint. Reverify populates the right context. No wrong-context flash.
+- **No hint** (can't tell synchronously) → paint the cache best-effort; reverify still corrects.
+- **Match** → paint the cache, unverified, as normal.
+
+This is the first-class generalization of the URL-guard the Zealot hub slice already hand-rolls ("only rehydrate if the URL still names it"). In the template it lives in the bridge, not in each slice. `syncContextHint()` is supplied per app/slice — for brand identity it's the same synchronous `BrandSource` resolvers (URL/host/query) used elsewhere, so the boot guard and the runtime resolver share one vocabulary.
 
 ### Reverify — the query owns confirmation
 
@@ -143,6 +169,7 @@ Because the persisted copy is written from whatever the last session saw, and fo
 
 - [ ] `Verified<T>` type + `createSessionSlice` (or a generic `makeVerifiedSlice<T>(name, set)` if a second consumer appears)
 - [ ] `persist` middleware wired into the store with `partialize` (durable fields only) + `merge` (land as `isVerified:false`, `source:'cache'`)
+- [ ] Persist a `contextTag`; `merge` early-escapes to empty on context mismatch via a `syncContextHint()` (URL/host/query), preventing wrong-context flash
 - [ ] `version` + a `migrate` stub so the cache shape can evolve without a poisoned rehydrate
 
 ### 2. Reverify
@@ -164,6 +191,7 @@ Because the persisted copy is written from whatever the last session saw, and fo
 
 - [ ] `persist`-wrapped store with a `partialize`d single-object cache (no scattered keys)
 - [ ] Rehydrated state lands unverified and is overwritten by the API on reverify
+- [ ] Context-mismatch early escape works: a snapshot from another context is discarded at boot, not painted
 - [ ] `isVerified` gate exists and is documented for correctness-bearing reads
 - [ ] Selector hooks + `getState` accessor exported
 - [ ] `docs/claude/ZUSTAND.md` updated
