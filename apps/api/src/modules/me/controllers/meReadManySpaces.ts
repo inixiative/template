@@ -21,9 +21,12 @@ export const meReadManySpacesController = makeController(meReadManySpacesRoute, 
   const db = c.get('db');
 
   const { data: spaces, pagination } = await paginate<typeof db.space, SpaceWithUsers>(c, db.space, {
+    // The membership filter needs its own live-row scope: paginate injects
+    // `deletedAt: null` into the lens visits and the include tree, but caller
+    // where subtrees are the caller's own — without it a soft-deleted spaceUser
+    // would match `some` while the include filters it out.
     where: {
-      deletedAt: null,
-      spaceUsers: { some: { userId: user.id } },
+      spaceUsers: { some: { userId: user.id, deletedAt: null } },
     },
     include: {
       organization: true,

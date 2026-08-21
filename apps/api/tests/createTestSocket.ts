@@ -28,6 +28,7 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
     data: {
       connectionId: data?.connectionId ?? `conn-${++seq}`,
       userId: data?.userId ?? null,
+      headers: data?.headers ?? {},
       channels: data?.channels ?? new Set<string>(),
       connectedAt: data?.connectedAt ?? now,
       lastPing: data?.lastPing ?? now,

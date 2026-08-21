@@ -8,6 +8,7 @@ import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
@@ -24,6 +25,7 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRulesHook();
+  registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailContactHook();
   registerWebhookHook();

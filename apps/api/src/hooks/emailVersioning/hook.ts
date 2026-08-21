@@ -4,6 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, feature:email
  */
+
 import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 import { castArray, isEqual } from 'lodash-es';

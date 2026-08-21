@@ -9,8 +9,10 @@ config:
 kanban
   Backlog
     FEAT-017-audit-log-hardening-lineage-and-explorer
+    FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
     API-001-idempotency-and-safe-retries
+    API-003-cursor-pagination-mode
     INFRA-006-tenant-isolation-test-matrix
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
@@ -35,6 +37,7 @@ kanban
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
+    FE-006-conditional-form-v2
     COMM-009-component-slots-passthrough-children
 ```
 
@@ -72,6 +75,7 @@ kanban
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
+- [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
 
 **Security & Encryption:**
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
@@ -86,6 +90,7 @@ kanban
 **API Reliability:**
 - [API-001: Idempotency and Safe Retries](./API-001-idempotency-and-safe-retries.md) - Prevent duplicate side effects on retried writes
 - API-002: Admin Ad-Hoc Filtering - Make admin list routes exempt from requiring `searchableFields`; allow arbitrary field filtering for internal/superadmin use
+- [API-003: Cursor Pagination Mode](./API-003-cursor-pagination-mode.md) - Opt-in keyset pagination (signed opaque tokens, no count, write-stable) for feeds/logs/exports; offset stays default
 
 **Documentation & API Discovery:**
 - [DOC-001: Scalar API Docs UI](./DOC-001-scalar-api-docs-ui.md) - Interactive API docs via Scalar, mounted on existing OpenAPI spec
@@ -94,6 +99,7 @@ kanban
 **Frontend Architecture:**
 - [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
 - [FE-002: Editor Slice Pattern](./FE-002-editor-slice-pattern.md) - `makeEditorSlice` factory for standardized form/model editing state
+- [FE-006: Conditional Form v2](./FE-006-conditional-form-v2.md) - Rewrite of inixiative/conditional-form on json-rules + rules-builder; the home for generic FE in-memory filtering
 
 ---
 
@@ -119,7 +125,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 28
+- **Total Backlog Items**: 30
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -128,9 +134,9 @@ kanban
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
-- **Frontend Architecture**: 2
+- **Frontend Architecture**: 3
 - **Documentation & Discovery**: 2
-- **API Reliability**: 1
+- **API Reliability**: 2
 
 ## Notes
 
@@ -146,4 +152,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-06-29_
+_Last Updated: 2026-08-21_

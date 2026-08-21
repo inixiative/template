@@ -2,22 +2,37 @@
  * @atlas
  * @kind middleware
  * @partOf feature:auth
- * @uses primitive:appEvents
+ * @uses primitive:appEvents, feature:integrations
  */
 
-import { Integration } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
 
-const isIntegration = (value: string | undefined): value is Integration =>
-  !!value && (Object.values(Integration) as string[]).includes(value);
+const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
+  const boundIntegrationId = c.get('token')?.integrationId ?? null;
+  if (boundIntegrationId) return boundIntegrationId;
+
+  const asserted = c.req.header('x-integration-id');
+  if (!asserted) return null;
+
+  const owned = await findOwnedIntegration(asserted, {
+    userId: c.get('user')?.id ?? null,
+    organizationIds: (c.get('organizations') ?? []).map((o) => o.id),
+    spaceIds: (c.get('spaces') ?? []).map((s) => s.id),
+  });
+  if (owned) return owned.id;
+
+  log.warn('x-integration-id not owned by the request principal — ignoring', { assertedIntegrationId: asserted });
+  return null;
+};
 
 export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const user = c.get('user');
   const spoofedBy = c.get('spoofedBy');
   const token = c.get('token');
-  const originHeader = c.req.header('x-origin-integration');
 
   const actor = {
     actorUserId: user?.id ?? null,
@@ -27,7 +42,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     ipAddress: (c.req.header('x-forwarded-for') ?? '').split(',')[0].trim() || c.req.header('x-real-ip') || null,
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
-    originIntegration: isIntegration(originHeader) ? originHeader : null,
+    integrationId: await resolveOriginIntegrationId(c),
   };
 
   return auditActorContext.scope(actor, () => next());

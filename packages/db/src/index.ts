@@ -83,6 +83,7 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+export { revive } from './utils/revive';
 
 // Hook shared utilities (ignore fields, redact fields)
 

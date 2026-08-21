@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import type { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';

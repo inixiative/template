@@ -110,7 +110,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('superseding spills across flushes collapse to the latest (upsert)', async () => {
     const supRow = (n: number): OutboxRow => ({
-      handlerName: 'recordAppEvent',
+      handlerName: 'cleanStaleData',
       jobId: `sup-${n}`,
       dedupeKey: 'lane-1',
       data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-1' },
@@ -128,7 +128,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   it('superseding spills within one batch collapse to the latest', async () => {
     process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS = '3'; // hold all three; flush on the 3rd (size trip)
     const supRow = (n: number): OutboxRow => ({
-      handlerName: 'recordAppEvent',
+      handlerName: 'cleanStaleData',
       jobId: `b-${n}`,
       dedupeKey: 'lane-batch',
       data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-batch' },
@@ -286,11 +286,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
     await ctx.db.jobOutbox.create({
-      data: { handlerName: 'recordAppEvent', jobId: 'taken', dedupeKey: 'pre', data: {}, options: {} },
+      data: { handlerName: 'cleanStaleData', jobId: 'taken', dedupeKey: 'pre', data: {}, options: {} },
     });
     // Keyed upsert tries to INSERT a row whose @unique jobId already exists → the commit throws.
     const collide: OutboxRow = {
-      handlerName: 'recordAppEvent',
+      handlerName: 'cleanStaleData',
       jobId: 'taken',
       dedupeKey: 'fresh-lane',
       data: { type: JobType.adhoc, payload: {}, dedupeKey: 'fresh-lane' },

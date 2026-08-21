@@ -4,11 +4,22 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { omit } from 'lodash-es';
 
-const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
+export type FieldRegistry = Record<string, string[]>;
+
+export const unionRegistries = (...registries: FieldRegistry[]): FieldRegistry => {
+  const merged: FieldRegistry = {};
+  for (const registry of registries) {
+    for (const [model, fields] of Object.entries(registry)) {
+      merged[model] = [...new Set([...(merged[model] ?? []), ...fields])];
+    }
+  }
+  return merged;
+};
+
+const NOOP_FIELDS_BASE: FieldRegistry = {
   _global: ['updatedAt'],
   User: ['lastLoginAt'],
   Token: ['lastUsedAt'],
@@ -19,23 +30,13 @@ const HOOK_IGNORE_FIELDS_BASE: Record<string, string[]> = {
   EmailComponent: ['degradedComponentRefs'],
 };
 
-const buildHookIgnoreFields = (): Record<string, string[]> => {
-  const merged: Record<string, string[]> = { ...HOOK_IGNORE_FIELDS_BASE };
-  const composed = [getEncryptedFieldsByModel(), getOrderedListFieldsByModel()];
-  for (const source of composed) {
-    for (const [model, fields] of Object.entries(source)) {
-      merged[model] = [...(merged[model] ?? []), ...fields];
-    }
-  }
-  return merged;
-};
+// Semantically-meaningless change fields: a mutation touching only these is not worth recording or
+// firing. Ordered-list position columns fold in; sensitive columns do NOT (those are REDACT_FIELDS —
+// audit masks them, webhook drops them via WEBHOOK_DROP_FIELDS).
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS_BASE, getOrderedListFieldsByModel());
 
-export const HOOK_IGNORE_FIELDS: Record<string, string[]> = buildHookIgnoreFields();
-
-export const getIgnoreFields = (model: string): string[] => [
-  ...(HOOK_IGNORE_FIELDS._global ?? []),
-  ...(HOOK_IGNORE_FIELDS[model] ?? []),
-];
-
-export const filterIgnoredFields = <T extends Record<string, unknown>>(model: string, data: T): Partial<T> =>
-  omit(data, getIgnoreFields(model)) as Partial<T>;
+export const filterFields = <T extends Record<string, unknown>>(
+  model: string,
+  data: T,
+  registry: FieldRegistry,
+): Partial<T> => omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;

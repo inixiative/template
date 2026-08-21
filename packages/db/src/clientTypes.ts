@@ -17,6 +17,13 @@ export type DbMethods = {
   scope: <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext) => Promise<T>;
   txn: <T>(fn: () => Promise<T>, options?: { timeout?: number }) => Promise<T>;
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) => void;
+  parallel: {
+    <T>(thunks: Array<() => Promise<T>>, options?: { concurrency?: number; resolution?: 'all' }): Promise<T[]>;
+    <T>(
+      thunks: Array<() => Promise<T>>,
+      options: { concurrency?: number; resolution: 'allSettled' },
+    ): Promise<PromiseSettledResult<T>[]>;
+  };
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;

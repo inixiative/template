@@ -24,7 +24,8 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
 
   const permix = c.get('permix');
   permix.setUserId(user.id as UserId);
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
+  // Set both ways: a superadmin spoofing a normal user must not retain the flag.
+  permix.setSuperadmin(isSuperadmin(user));
   await setupUserPermissions(c);
   await setupOrgPermissions(c);
   await setupSpacePermissions(c);

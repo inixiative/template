@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
 import { cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import type { WorkerContext } from '#/jobs/types';

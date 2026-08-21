@@ -92,21 +92,14 @@ const dbMethods = {
         if (totalCallbacks > 0) {
           const start = performance.now();
           for (const batch of batches) {
-            const results = await resolveAll(
-              batch.fns.map((fn) => async () => {
-                try {
-                  await fn();
-                  return null;
-                } catch (error) {
-                  return error;
-                }
-              }),
-              batch.concurrency,
+            const results = await db.parallel(
+              batch.fns.map((fn) => () => Promise.resolve(fn())),
+              { concurrency: batch.concurrency, resolution: 'allSettled' },
             );
 
             throwIfFailures(
               'db.onCommit() callback failed',
-              results.filter((result) => result !== null),
+              results.filter((result) => result.status === 'rejected').map((result) => result.reason),
             );
           }
           const duration = performance.now() - start;
@@ -135,6 +128,37 @@ const dbMethods = {
     const fns = castArray(callbacks);
     const typeArray = types ? castArray(types) : undefined;
     s.afterCommitBatches.push({ fns, concurrency: getConcurrency(typeArray), types: typeArray });
+  },
+
+  parallel: async <T>(
+    thunks: Array<() => Promise<T>>,
+    options?: { concurrency?: number; resolution?: 'all' | 'allSettled' },
+  ): Promise<T[] | PromiseSettledResult<T>[]> => {
+    if (dbMethods.isInTxn()) {
+      throw new Error('db.parallel() cannot run inside a transaction — each branch runs in its own scope/txn, which would break the outer transaction atomicity');
+    }
+    const parent = store.getStore();
+    const inOwnScope = (thunk: () => Promise<T>) =>
+      store.run(
+        { txn: null, scopeId: crypto.randomUUID(), scopeContext: parent?.scopeContext ?? null, afterCommitBatches: [] },
+        thunk,
+      );
+    if (options?.resolution === 'allSettled') {
+      return resolveAll(
+        thunks.map((thunk) => async (): Promise<PromiseSettledResult<T>> => {
+          try {
+            return { status: 'fulfilled', value: await inOwnScope(thunk) };
+          } catch (reason) {
+            return { status: 'rejected', reason };
+          }
+        }),
+        options.concurrency,
+      );
+    }
+    return resolveAll(
+      thunks.map((thunk) => () => inOwnScope(thunk)),
+      options?.concurrency,
+    );
   },
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
