@@ -14,7 +14,7 @@ A new major version of [`inixiative/conditional-form`](https://github.com/inixia
 
 ## Boundary ruling (2026-08-21, Aron — from Zealot UE-4174)
 
-- **Bracket query stays a pure proxy to Prisma.** Grouping/combinators in the query string use Prisma's own vocabulary (reserved `[AND][i]` indexed nodes — see UE-4174). json-rules is a separate system and is never serialized into the query string.
+- **Bracket query stays a pure proxy to Prisma.** Grouping/combinators in the query string use Prisma's own vocabulary (reserved `[AND][i]`/`[OR][i]` indexed nodes, nestable like Prisma's where — see UE-4174). json-rules is a separate system and is never serialized into the query string.
 - **Generic FE in-memory evaluation belongs here, on json-rules** — not in a second bracket-shape evaluator. [FE-004](./FE-004-in-memory-filter-evaluator.md)'s `applyFilters` sketch (full bracket-operator-parity evaluator over `FilterState`) should be re-judged against this project before being built.
 - **Hand-rolled per-surface FE filters are a sanctioned stopgap** until this lands (e.g. Zealot's references-kanban fuzzy note-search, `referencesFilterMatch`).
 
