@@ -37,6 +37,7 @@ kanban
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
+    FE-006-conditional-form-v2
     COMM-009-component-slots-passthrough-children
 ```
 
@@ -98,6 +99,7 @@ kanban
 **Frontend Architecture:**
 - [FE-001: TanStack Start Migration (SEO)](./FE-001-web-tanstack-start-evaluation.md) - Migrate `apps/web` to Start with clean runtime boundaries
 - [FE-002: Editor Slice Pattern](./FE-002-editor-slice-pattern.md) - `makeEditorSlice` factory for standardized form/model editing state
+- [FE-006: Conditional Form v2](./FE-006-conditional-form-v2.md) - Rewrite of inixiative/conditional-form on json-rules + rules-builder; the home for generic FE in-memory filtering
 
 ---
 
@@ -123,7 +125,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 29
+- **Total Backlog Items**: 30
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -132,7 +134,7 @@ kanban
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 1
 - **AI Developer Experience**: 2
-- **Frontend Architecture**: 2
+- **Frontend Architecture**: 3
 - **Documentation & Discovery**: 2
 - **API Reliability**: 2
 
@@ -150,4 +152,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-07-30_
+_Last Updated: 2026-08-21_
