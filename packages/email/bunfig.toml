@@ -1,0 +1,4 @@
+# bun test --cwd packages/email loads this bunfig (not the root one), so the env-override
+# seam preload is wired here explicitly.
+[test]
+preload = ["../../scripts/testEnvOverrides.ts"]

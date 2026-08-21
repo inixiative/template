@@ -1,5 +1,11 @@
 import '#/config/env';
+import { afterEach } from 'bun:test';
 import { db } from '@template/db';
+import { resetEnvOverrides } from '@template/shared/utils';
+
+// Global backstop: clear any env overrides a test registered (setEnvOverride / withEnv)
+// so nothing leaks into the next file in the single-process worker.
+afterEach(resetEnvOverrides);
 
 const truncateAll = async () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;

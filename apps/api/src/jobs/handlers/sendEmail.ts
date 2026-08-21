@@ -115,7 +115,6 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
       ...senderColumns(sender),
     })),
     skipDuplicates: true,
-    select: { id: true, idempotencyKey: true },
   });
   const logByKey = new Map(created.map((l) => [l.idempotencyKey, l.id]));
   const missing = plan.filter((p) => !logByKey.has(p.idempotencyKey)).map((p) => p.idempotencyKey);

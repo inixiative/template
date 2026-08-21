@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
-import { isTest } from '@template/shared/utils';
+import { isTest, wrapEnvWithOverrides } from '@template/shared/utils';
 import { z } from 'zod';
 
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
@@ -84,4 +84,5 @@ declare global {
 const parsed = isTest
   ? baseEnvSchema.partial().parse(preprocessEnv(process.env))
   : envSchema.parse(preprocessEnv(process.env));
-process.env = parsed as unknown as NodeJS.ProcessEnv;
+// In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
+process.env = (isTest ? wrapEnvWithOverrides(parsed) : parsed) as unknown as NodeJS.ProcessEnv;

@@ -12,6 +12,7 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
+  unregisterDbHook,
 } from './extensions/mutationLifeCycle';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
@@ -67,6 +68,9 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+// Prisma error narrowing
+export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
+export { isWriteConflictError } from './utils/isWriteConflictError';
 // Model name utilities
 export {
   type AccessorName,

@@ -1,37 +1,31 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { validateEncryptionVersions } from '@template/db/lib/encryption/validation';
 import { cleanupTouchedTables, createAuthProvider, registerTestTracker } from '@template/db/test';
+import { setEnvOverride } from '@template/shared/utils';
 
 describe('validateEncryptionVersions', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');
   const testKey2Base64 = Buffer.from('abcdefghijklmnopqrstuvwxyz123456', 'utf8').toString('base64');
 
-  let originalEnv: NodeJS.ProcessEnv;
-
   beforeAll(() => {
     registerTestTracker();
-    originalEnv = { ...process.env };
   });
 
   beforeEach(() => {
-    process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '1';
-    process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT = testKey1Base64;
-    delete process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS;
+    setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');
+    setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT', testKey1Base64);
+    setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', undefined);
   });
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
-    process.env = originalEnv;
-  });
-
   describe('env var validation', () => {
     it('requires previous key when version > 1', async () => {
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '2';
-      delete process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '2');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', undefined);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(false);
@@ -55,7 +49,7 @@ describe('validateEncryptionVersions', () => {
     it('detects version downgrade (env < DB max)', async () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 2 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '1';
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');
       const result = await validateEncryptionVersions(db);
 
       expect(result.valid).toBe(false);
@@ -66,8 +60,8 @@ describe('validateEncryptionVersions', () => {
     it('detects version jump too large', async () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 1 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '3';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '3');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(false);
@@ -79,8 +73,8 @@ describe('validateEncryptionVersions', () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 1 });
       await createAuthProvider({ encryptedSecretsKeyVersion: 2 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '3';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '3');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(false);
@@ -93,8 +87,8 @@ describe('validateEncryptionVersions', () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 2 });
       await createAuthProvider({ encryptedSecretsKeyVersion: 3 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '3';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '3');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(false);
@@ -104,8 +98,8 @@ describe('validateEncryptionVersions', () => {
     it('allows version increment by 1', async () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 1 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '2';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '2');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(true);
@@ -115,8 +109,8 @@ describe('validateEncryptionVersions', () => {
       await createAuthProvider({ encryptedSecretsKeyVersion: 1 });
       await createAuthProvider({ encryptedSecretsKeyVersion: 2 });
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '2';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '2');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const result = await validateEncryptionVersions(db);
       expect(result.valid).toBe(true);

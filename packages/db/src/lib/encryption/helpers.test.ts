@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
+import { setEnvOverride } from '@template/shared/utils';
 
 describe('encryption helpers', () => {
   const testKey1Base64 = Buffer.from('12345678901234567890123456789012', 'utf8').toString('base64');
@@ -7,16 +8,9 @@ describe('encryption helpers', () => {
 
   const mockRecord = { id: 'test-id-123', organizationId: 'org-456', secrets: {} };
 
-  let originalEnv: NodeJS.ProcessEnv;
-
   beforeEach(() => {
-    originalEnv = { ...process.env };
-    process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '1';
-    process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT = testKey1Base64;
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
+    setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');
+    setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT', testKey1Base64);
   });
 
   describe('encryptField', () => {
@@ -42,8 +36,8 @@ describe('encryption helpers', () => {
     });
 
     it('includes current version in result', async () => {
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '2';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '2');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const record = { ...mockRecord, secrets: { value: 'test' } };
       const result = await encryptField('authProvider', 'secrets', record);
@@ -69,17 +63,17 @@ describe('encryption helpers', () => {
     });
 
     it('decrypts data encrypted with previous key', async () => {
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '1';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT = testKey2Base64;
-      delete process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '1');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT', testKey2Base64);
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', undefined);
 
       const originalData = { value: 'old-data' };
       const encryptRecord = { ...mockRecord, secrets: originalData };
       const encrypted = await encryptField('authProvider', 'secrets', encryptRecord);
 
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION = '2';
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT = testKey1Base64;
-      process.env.AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS = testKey2Base64;
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION', '2');
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT', testKey1Base64);
+      setEnvOverride('AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS', testKey2Base64);
 
       const record = {
         ...mockRecord,
