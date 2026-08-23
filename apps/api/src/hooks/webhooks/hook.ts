@@ -5,6 +5,7 @@ import {
   filterFields,
   HookTiming,
   isFalsePolymorphismRef,
+  isNoOpUpdate,
   registerDbHook,
   WEBHOOK_DROP_FIELDS,
   webhookEnabledModels,
@@ -13,7 +14,6 @@ import {
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -62,7 +62,7 @@ const processSingleRecord = (
   resultData: Record<string, unknown> & { id: string },
   previousData?: Record<string, unknown>,
 ) => {
-  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData)) {
+  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData, WEBHOOK_DROP_FIELDS)) {
     return [];
   }
 
