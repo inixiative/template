@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { filterFields, isNoOpUpdate, NOOP_FIELDS, unionRegistries, WEBHOOK_DROP_FIELDS } from '@template/db/registries';
+import { filterFields, isNoOpUpdate, NOOP_FIELDS, unionRegistries, WEBHOOK_NOOP_FIELDS } from '@template/db/registries';
 
 describe('NOOP_FIELDS', () => {
   it('includes global updatedAt and high-frequency tracking columns', () => {
@@ -34,9 +34,9 @@ describe('filterFields', () => {
     expect(result).toMatchObject({ id: '1', name: 'test' });
   });
 
-  it('with WEBHOOK_DROP_FIELDS also drops sensitive columns', () => {
+  it('with WEBHOOK_NOOP_FIELDS also drops sensitive columns', () => {
     const data = { id: '1', keyHash: 'h', name: 'tok', updatedAt: new Date() };
-    const result = filterFields('Token', data, WEBHOOK_DROP_FIELDS);
+    const result = filterFields('Token', data, WEBHOOK_NOOP_FIELDS);
     expect(result).not.toHaveProperty('keyHash');
     expect(result).not.toHaveProperty('updatedAt');
     expect(result).toMatchObject({ id: '1', name: 'tok' });
@@ -78,9 +78,9 @@ describe('isNoOpUpdate', () => {
     expect(isNoOpUpdate('Token', current, previous, NOOP_FIELDS)).toBe(false);
   });
 
-  it('treats a sensitive-only change as a no-op under WEBHOOK_DROP_FIELDS', () => {
+  it('treats a sensitive-only change as a no-op under WEBHOOK_NOOP_FIELDS', () => {
     const previous = { id: '123', keyHash: 'old-hash', updatedAt: new Date('2024-01-01') };
     const current = { id: '123', keyHash: 'new-hash', updatedAt: new Date('2024-01-02') };
-    expect(isNoOpUpdate('Token', current, previous, WEBHOOK_DROP_FIELDS)).toBe(true);
+    expect(isNoOpUpdate('Token', current, previous, WEBHOOK_NOOP_FIELDS)).toBe(true);
   });
 });

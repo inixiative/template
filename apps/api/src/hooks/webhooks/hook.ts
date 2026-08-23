@@ -7,7 +7,7 @@ import {
   isFalsePolymorphismRef,
   isNoOpUpdate,
   registerDbHook,
-  WEBHOOK_DROP_FIELDS,
+  WEBHOOK_NOOP_FIELDS,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
@@ -62,7 +62,7 @@ const processSingleRecord = (
   resultData: Record<string, unknown> & { id: string },
   previousData?: Record<string, unknown>,
 ) => {
-  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData, WEBHOOK_DROP_FIELDS)) {
+  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)) {
     return [];
   }
 
@@ -74,8 +74,8 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterFields(model, resultData, WEBHOOK_DROP_FIELDS),
-    previousData: previousData ? filterFields(model, previousData, WEBHOOK_DROP_FIELDS) : undefined,
+    data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
+    previousData: previousData ? filterFields(model, previousData, WEBHOOK_NOOP_FIELDS) : undefined,
     timestamp: new Date().toISOString(),
   };
 

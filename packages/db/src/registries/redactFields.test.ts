@@ -6,7 +6,7 @@ import {
   redactPayload,
   redactSensitiveFields,
   SENSITIVE_KEYS,
-  WEBHOOK_DROP_FIELDS,
+  WEBHOOK_NOOP_FIELDS,
 } from '@template/db/registries';
 
 describe('REDACT_FIELDS', () => {
@@ -22,10 +22,10 @@ describe('REDACT_FIELDS', () => {
   });
 });
 
-describe('WEBHOOK_DROP_FIELDS (NOOP ∪ REDACT)', () => {
+describe('WEBHOOK_NOOP_FIELDS (NOOP ∪ REDACT)', () => {
   it('drops both noop noise and sensitive columns', () => {
-    expect(WEBHOOK_DROP_FIELDS._global).toContain('updatedAt');
-    expect(WEBHOOK_DROP_FIELDS.Token).toEqual(expect.arrayContaining(['lastUsedAt', 'keyHash']));
+    expect(WEBHOOK_NOOP_FIELDS._global).toContain('updatedAt');
+    expect(WEBHOOK_NOOP_FIELDS.Token).toEqual(expect.arrayContaining(['lastUsedAt', 'keyHash']));
   });
 });
 
