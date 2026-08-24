@@ -4,7 +4,7 @@
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-06-29
-**Updated**: 2026-07-03
+**Updated**: 2026-07-13
 
 ---
 
@@ -84,6 +84,21 @@ Editing a component at a **parent tenancy** is not reachable from template editi
 
 - COMM-001 (email system), COMM-006 (versioning — depth-aware block matching must be reused, not re-forked).
 - Zealot `ZLT-3271` (port target — `@zealot/email`), `ZLT-3272` (builder + lens layer that consumes this).
+
+## Bring-back from Zealot #1698 / #1653 (2026-07-13)
+
+Template is **ahead** on the decomposer itself (PR #74 built `decompose.ts` + the declarative bindings registry). These two are engine capabilities template's save/read path still lacks — they sit *on top of* decompose, not a re-port of it.
+
+### `saveScopedRow` — `onConflict: 'reject' | 'upsert'` + derive `componentRefs` at save (from #1653)
+
+Template's `saveComponents.ts` is **upsert-only** (`findFirst` → update-or-create) and **trusts `input.componentRefs`** rather than deriving them. Port from Zealot `#1653`:
+
+- `onConflict: 'reject'` — a plain insert that lets the DB reject a live-slug collision (→ 409) and **revives a soft-deleted slug**, distinct from the default `'upsert'`.
+- **Derive `componentRefs` from the fragment at save** so nested `{{#component:slug}}` refs persist / expand / cycle-check on the direct component-save path (not only via the template decompose path).
+
+### Cascade-tier read decoration (from #1698, ZLT-3288)
+
+A read-side layer over the hydrated transitive closure: a breadth-first frontier walk that, per referenced slug, classifies the cascade tier as **row provenance** — `inherited` / `shadowed` / `forked` / `dangling` — by *existence per tier* (deliberately **not** a byte compare), using one tenant-tier + one default-tier query per depth (**no N+1**), returning both tiers' stored bodies for revert-preview. The tier vocabulary + bulk walk are generic; only the owner keys differ (Zealot brand/default → template org/space). Depends on nothing new — decorates the existing cascade.
 
 ## Origin
 

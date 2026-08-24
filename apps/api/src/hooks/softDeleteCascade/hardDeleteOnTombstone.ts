@@ -10,5 +10,9 @@
 // not survive a revive and is a hazard while the parent is dead. Never logs,
 // never user data.
 export const HARD_DELETE_ON_TOMBSTONE: Record<string, readonly string[]> = {
-  User: ['Session'],
+  User: ['Session', 'Token', 'WebhookSubscription'],
+  Organization: ['Token', 'WebhookSubscription'],
+  OrganizationUser: ['Token'],
+  Space: ['Token', 'WebhookSubscription'],
+  SpaceUser: ['Token'],
 };

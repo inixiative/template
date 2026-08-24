@@ -22,6 +22,49 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('splits a multi-word search into per-token OR groups that AND together', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        search: 'aron smith',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { email: { contains: 'aron', mode: 'insensitive' } },
+              { name: { contains: 'aron', mode: 'insensitive' } },
+            ],
+          },
+          {
+            OR: [
+              { email: { contains: 'smith', mode: 'insensitive' } },
+              { name: { contains: 'smith', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('collapses extra whitespace and ignores a blank search', () => {
+      expect(
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          search: '   ',
+        }),
+      ).toEqual({});
+      expect(
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          search: '  aron   smith  ',
+        }),
+      ).toEqual({
+        AND: [
+          { OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] },
+          { OR: [{ name: { contains: 'smith', mode: 'insensitive' } }] },
+        ],
+      });
+    });
+
     it('walks a to-one relation path as plain nesting', () => {
       const result = buildWhereClause({
         filterLens: {

@@ -3,6 +3,7 @@
  * @partOf primitive:caching, infrastructure:redis, infrastructure:prisma
  * @uses none
  */
+import { randomUUID } from 'node:crypto';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
@@ -49,51 +50,122 @@ const validateKey = (key: string): void => {
   }
 };
 
-// In-process single-flight: concurrent callers missing the same key co-resolve
-// off one compute (per-process; no distributed lock).
-const __inFlight = new Map<string, Promise<unknown>>();
+const resolveTtl = <T>(value: T, ttl: number | ((value: T) => number)): number => {
+  if (isNil(value)) return NEGATIVE_TTL;
+  return typeof ttl === 'function' ? ttl(value) : ttl;
+};
 
-export const cache = async <T>(key: string, fn: () => Promise<T>, ttl: number = DEFAULT_TTL): Promise<T> => {
-  validateKey(key);
+// Concurrent misses on one key each ran `fn`, so an expensive producer was paid for once per
+// caller — and the lock is in Redis, so the flight is single across instances, not just within
+// one process. The first miss takes a short lock and computes; the rest wait for the value to
+// appear.
+//
+// Every failure mode falls through to computing rather than erroring — a lock we cannot take,
+// a holder that dies, or a producer slower than the wait all degrade to computing ourselves.
+const SINGLE_FLIGHT_LOCK_TTL_SECONDS = 60;
+const SINGLE_FLIGHT_POLL_MS = 50;
+// Longer than the slowest known producer, so a waiter almost never duplicates the work.
+const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
 
-  const redis = getRedisClient();
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Try to get from cache
+type CacheRead<T> = { hit: true; value: T } | { hit: false };
+
+const readCached = async <T>(redis: ReturnType<typeof getRedisClient>, key: string): Promise<CacheRead<T>> => {
   try {
     const cached = await redis.get(key);
     // superjson round-trips Date/BigInt/Map/Set; entries written before superjson (plain JSON)
     // deserialize to undefined and fall through to recompute.
     if (cached !== null) {
       const value = superjson.parse<T>(cached);
-      if (value !== undefined) return value;
+      if (value !== undefined) return { hit: true, value };
     }
   } catch (error) {
     log.error(`Cache read error for key ${key}:`, error);
     // Redis down - fall through to compute without cache
   }
+  return { hit: false };
+};
 
-  // Collapse concurrent misses on the same key onto one in-flight compute.
-  const pending = __inFlight.get(key) as Promise<T> | undefined;
-  if (pending) return pending;
+/**
+ * Get-or-compute-and-set. On cache hit, returns the superjson-parsed value.
+ * On miss, calls `fn`, caches the result, and returns it.
+ * Null/undefined results get a short TTL so newly-created records are
+ * discovered quickly.
+ *
+ * `ttl` may be a number (fixed seconds) or a function `(value) => seconds`
+ * — useful when the TTL is derived from the value itself, e.g. a JWT's `exp`
+ * claim. If the function returns ≤ 0, the value is returned but not cached.
+ *
+ * If `fn` throws, the error propagates and nothing is cached.
+ *
+ * Concurrent misses on the same key run `fn` once — see the single-flight constants above.
+ */
+export const cache = async <T>(
+  key: string,
+  fn: () => Promise<T>,
+  ttl: number | ((value: T) => number) = DEFAULT_TTL,
+): Promise<T> => {
+  validateKey(key);
 
-  const compute = (async (): Promise<T> => {
+  const redis = getRedisClient();
+
+  const cached = await readCached<T>(redis, key);
+  if (cached.hit) return cached.value;
+
+  const lockKey = `${key}:singleflight`;
+  // Ownership token: a producer slower than the lock TTL must not delete the lock a LATER caller
+  // now holds. Without it the release is unconditional and single-flight quietly stops working in
+  // exactly the slow-producer case it exists for.
+  const token = `${process.pid}:${randomUUID()}`;
+  let holdsLock = false;
+  let lockUnavailable = false;
+  try {
+    holdsLock = (await redis.set(lockKey, token, 'EX', SINGLE_FLIGHT_LOCK_TTL_SECONDS, 'NX')) === 'OK';
+  } catch (error) {
+    // Redis is unreachable, so waiting on a key it cannot serve would burn the whole timeout on
+    // failing reads. Compute instead — that is the documented fallback for every failure here.
+    lockUnavailable = true;
+    log.error(`Cache lock error for key ${key}:`, error);
+  }
+
+  if (!holdsLock && !lockUnavailable) {
+    const deadline = Date.now() + SINGLE_FLIGHT_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      await sleep(SINGLE_FLIGHT_POLL_MS);
+      const polled = await readCached<T>(redis, key);
+      if (polled.hit) return polled.value;
+      // The holder let the lock go without a value appearing: it threw, or its ttl resolved to ≤ 0
+      // so it never writes one. Either way no value is coming — stop waiting for it.
+      const stillHeld = await redis.exists(lockKey).catch(() => 0);
+      if (!stillHeld) break;
+    }
+  }
+
+  try {
     const value = await fn();
+    const effectiveTtl = resolveTtl(value, ttl);
 
-    // Cache the result (fire-and-forget on error)
-    // Use short TTL for null/undefined to allow quick discovery of newly created records
-    const effectiveTtl = isNil(value) ? NEGATIVE_TTL : ttl;
-    redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
-      log.error(`Cache write error for key ${key}:`, error);
-    });
+    if (effectiveTtl > 0) {
+      const write = redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
+        log.error(`Cache write error for key ${key}:`, error);
+      });
+      // Awaited only while holding the lock: waiters poll the value key, so releasing before
+      // the write lands would send every one of them off to recompute.
+      if (holdsLock) await write;
+    }
 
     return value;
-  })();
-
-  __inFlight.set(key, compute);
-  try {
-    return await compute;
   } finally {
-    __inFlight.delete(key);
+    if (holdsLock) {
+      // Compare-and-delete: only release a lock still carrying our token, so an expired-and-retaken
+      // lock survives our exit.
+      await redis
+        .eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end", 1, lockKey, token)
+        .catch((error) => {
+          log.error(`Cache lock release error for key ${key}:`, error);
+        });
+    }
   }
 };
 

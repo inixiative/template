@@ -5,16 +5,15 @@ import {
   filterFields,
   HookTiming,
   isFalsePolymorphismRef,
+  isNoOpUpdate,
   registerDbHook,
-  WEBHOOK_DROP_FIELDS,
+  WEBHOOK_NOOP_FIELDS,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { castArray, compact } from 'lodash-es';
-import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -63,7 +62,7 @@ const processSingleRecord = (
   resultData: Record<string, unknown> & { id: string },
   previousData?: Record<string, unknown>,
 ) => {
-  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData)) {
+  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)) {
     return [];
   }
 
@@ -75,8 +74,8 @@ const processSingleRecord = (
     model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
-    data: filterFields(model, resultData, WEBHOOK_DROP_FIELDS),
-    previousData: previousData ? filterFields(model, previousData, WEBHOOK_DROP_FIELDS) : undefined,
+    data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
+    previousData: previousData ? filterFields(model, previousData, WEBHOOK_NOOP_FIELDS) : undefined,
     timestamp: new Date().toISOString(),
   };
 
@@ -125,7 +124,7 @@ export const registerWebhookHook = () => {
 
       if (isManyAction(dbAction)) {
         const { result, previous } = options as HookOptions & { action: ManyAction };
-        const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+        const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
         const previousById = buildPreviousById(previous);
 
         for (const resultData of results) {

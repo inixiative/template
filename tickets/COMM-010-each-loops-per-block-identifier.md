@@ -4,7 +4,7 @@
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-07-08
-**Updated**: 2026-07-08
+**Updated**: 2026-07-13
 
 ---
 
@@ -56,6 +56,32 @@ Errors through the existing `RuleErrorSink` posture (render nothing, report): mi
 - Insert-loop control: wraps the selection in `{{#each <path> as=<name>}}…{{/each}}`; path from the lens picker restricted to array-valued paths; `as=` default proposed from the path's last segment (`data.missions` → `mission`), renameable, collisions rejected inline.
 - Variable picker + rule builder expose every enclosing binding (`<name>.*` typed as the element of its path, plus declared `index=` names) when the caret is inside each-blocks.
 
+## Bring-back from Zealot #1689 / #1655 (2026-07-13)
+
+The Zealot loop build (`#1689`, ZLT-3326, reviewed 2026-07-12) and lens picker (`#1655`, ZLT-3289) surfaced pieces to port here.
+
+### 1. Single-pass `settle()` walker — the structural prerequisite for loops
+
+`interpolate.ts` is two-pass today (`evaluateConditions(...)` → a trailing global `.replace(VARIABLE_PATTERN)`). Zealot `#1689` collapses `{{#if}}` + substitution into one recursive walker (`settle.ts`) that substitutes each text run exactly once at its emit-depth. This is **required** for `{{#each}}`: loop scope bindings must be threaded per-element through a single recursive pass — a flat global regex replace cannot express nested per-element scope. Port the walker as the foundation the rest of this ticket builds on.
+
+**Not a security fix (verified 2026-07-13).** An earlier note flagged the two-pass path as a substitution-injection hole (a `data` value containing `{{recipient.email}}` re-resolving on the second pass). Reproduced against the real module — it does **not** happen: JS `String.replace(globalRegex, cb)` scans the original string once and never re-scans inserted replacement text, so a data-borne token comes out **literally**, unresolved (`{{data.note}} = "{{recipient.email}}"` → output `"{{recipient.email}}"`, no leak). `settle()` is a correctness/loop refactor, not a hardening item — do not prioritize it as a CVE.
+
+### 2. Loop control-flow (the `{{#each}}` body of this ticket)
+
+Port `#1689`'s loop control-flow from `settle.ts` (`as=` binding, optional `index=`, per-element `filter=` json-rules predicate, object-value-leaves-token-visible). **Do NOT port Zealot's desugar-to-absolute-paths step** — that is a workaround for json-rules being binding-free, and template already has real bindings (PR #74's declarative registry). json-rules stays binding-free; the email builder recomposes absolute paths **in its own layer**. Carry the 2026-07-12 locks: explicit bindings everywhere, reserved names = the 2 sources + the derived union, no object display.
+
+### 3. Save-time JSON-opacity WARNING (never a 422)
+
+Port `#1689`'s `collectJsonOpacityWarnings`: walk the FieldMap hop-by-hop and **warn** (never reject) when a `filter=`/`{{#if rule=}}` path descends beneath a `kind:'scalar', type:'Json'` column — where `checkRuleAgainstLens` is structurally blind, so the rule silently never-matches at send. This stays **email-layer** (uses the same path recomposition as #2); it is **not** promoted into `@inixiative/json-rules` (decision 2026-07-13 — json-rules gets no generic tree-walk helper; `walkConditionTree` stays a Zealot email-layer local).
+
+### 4. `{{system.*}}` reserved tokens (from #1655)
+
+`{{system.now}}` / `{{system.year}}` resolved internally at send, own-property-guarded, caller `data`/`recipient`/`sender` cannot override. Fold into the `settle` port (§1). Extends the reserved-prefix set beyond `sender|recipient|data`.
+
+### 5. Email rule lens = compose synthetic ∪ generated, then prune
+
+The `filter=` / rule surface lens should be a **real** `@inixiative/json-rules` lens rooted at a synthetic `EmailRuleContext` (recipient/sender/data), composed by merging the synthetic models into the generated Prisma FieldMap (`lensFor`) then pruning to `maxDepth` — the **same** lens gating the builder field surface, `checkRuleAgainstLens` on save, and runtime `check()`. Do not hand-type a pseudo-lens (materializes the lens-single-source doctrine; models here are template-native, only the technique ports).
+
 ## Scope
 
-`packages/email/src/render/`: `conditionParser.ts`, `evaluateConditions.ts`, `interpolate.ts`, `validateConditions.ts` + tests.
+`packages/email/src/render/`: `conditionParser.ts`, `evaluateConditions.ts`, `interpolate.ts`, `validateConditions.ts` + tests. Plus a new `settle.ts` (§1) and the save-time opacity warning surface (§3).

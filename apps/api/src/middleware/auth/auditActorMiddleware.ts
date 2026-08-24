@@ -8,6 +8,7 @@
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -38,11 +39,15 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     actorUserId: user?.id ?? null,
     actorSpoofUserId: spoofedBy?.id ?? null,
     actorTokenId: token?.id ?? null,
+    actorTokenName: token?.name ?? null,
+    actorTokenKeyPrefix: token?.keyPrefix ?? null,
     actorJobName: null,
     ipAddress: (c.req.header('x-forwarded-for') ?? '').split(',')[0].trim() || c.req.header('x-real-ip') || null,
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
     integrationId: await resolveOriginIntegrationId(c),
+    platformSuperadmin: isSuperadmin(c),
+    bypassSoftDeleteScope: false,
   };
 
   return auditActorContext.scope(actor, () => next());

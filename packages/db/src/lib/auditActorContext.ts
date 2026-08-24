@@ -10,22 +10,30 @@ export type AuditActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
   actorTokenId: string | null;
+  actorTokenName: string | null;
+  actorTokenKeyPrefix: string | null;
   actorJobName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
   integrationId: string | null;
+  platformSuperadmin: boolean;
+  bypassSoftDeleteScope: boolean;
 };
 
 export const nullAuditActor: AuditActor = {
   actorUserId: null,
   actorSpoofUserId: null,
   actorTokenId: null,
+  actorTokenName: null,
+  actorTokenKeyPrefix: null,
   actorJobName: null,
   ipAddress: null,
   userAgent: null,
   sourceInquiryId: null,
   integrationId: null,
+  platformSuperadmin: false,
+  bypassSoftDeleteScope: false,
 };
 
 const store = new AsyncLocalStorage<AuditActor>();
@@ -36,5 +44,9 @@ export const auditActorContext = {
   extend: (partial: Partial<AuditActor>): void => {
     const current = store.getStore();
     if (current) Object.assign(current, partial);
+  },
+  withSoftDeleteBypass: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+    const current = store.getStore() ?? nullAuditActor;
+    return store.run({ ...current, bypassSoftDeleteScope: true }, async (): Promise<Awaited<T>> => await fn());
   },
 };

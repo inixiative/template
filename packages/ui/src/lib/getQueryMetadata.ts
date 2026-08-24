@@ -4,6 +4,8 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
+import { resolveRef } from '@template/sdk/lenses/resolveRef';
 import openApiSpec from '@template/sdk/openapi.gen.json';
 
 export type EnumFilter = {
@@ -25,13 +27,6 @@ const RELATION_KEYS = new Set(['some', 'every', 'none']);
 // A json leaf's keys are exactly the json operators — distinguishes it from a
 // to-one relation (whose keys are field names) without descending into it.
 const JSON_LEAF_KEYS = new Set(['path', 'equals', 'not', 'string_contains', 'string_starts_with', 'string_ends_with']);
-
-const resolveRef = (schema: Schema): Schema => {
-  if (!schema?.$ref) return schema;
-  let resolved: Schema = openApiSpec;
-  for (const part of schema.$ref.replace('#/', '').split('/')) resolved = resolved?.[part];
-  return resolved;
-};
 
 // A scalar/enum leaf is a `bare value | <Type>Filter` union (anyOf). A json leaf is a
 // plain object keyed by json operators. A relation is an object keyed by field names.

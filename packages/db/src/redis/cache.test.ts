@@ -124,6 +124,79 @@ describe('clearKey', () => {
   });
 });
 
+describe('cache single-flight failure modes', () => {
+  it('does not hold the lock after the producer throws, so the next caller can compute', async () => {
+    const key = cacheKey('user', 'throwing');
+    let runs = 0;
+
+    await expect(
+      cache(key, async () => {
+        runs += 1;
+        throw new Error('producer failed');
+      }),
+    ).rejects.toThrow('producer failed');
+
+    // A retained lock would make this wait out the full single-flight timeout.
+    const started = Date.now();
+    const result = await cache(key, async () => {
+      runs += 1;
+      return 'recovered';
+    });
+
+    expect(result).toBe('recovered');
+    expect(runs).toBe(2);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('does not make a waiter sit out the timeout when the holder will never write a value', async () => {
+    const key = cacheKey('user', 'uncacheable');
+    let runs = 0;
+    // A ttl of 0 means "return it, don't cache it" — so nothing ever appears for a waiter to read.
+    const produce = async () => {
+      runs += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return 'uncached';
+    };
+
+    const started = Date.now();
+    const [first, second] = await Promise.all([cache(key, produce, 0), cache(key, produce, 0)]);
+
+    expect(first).toBe('uncached');
+    expect(second).toBe('uncached');
+    // Both had to compute, which is correct; what matters is the second didn't wait out 20s first.
+    expect(runs).toBe(2);
+    expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  it('leaves a lock alone once it has been retaken by someone else', async () => {
+    const key = cacheKey('user', 'stolen');
+    const lockKey = `${key}:singleflight`;
+
+    const produce = async () => {
+      // Stand in for a producer that outran the lock TTL: the lock is gone and a newer caller owns
+      // one under the same name. Releasing unconditionally would delete theirs.
+      await getRedisClient().set(lockKey, 'someone-elses-token');
+      return 'done';
+    };
+
+    await cache(key, produce);
+
+    expect(await getRedisClient().get(lockKey)).toBe('someone-elses-token');
+  });
+
+  it('derives the ttl from the value when given a function', async () => {
+    const key = cacheKey('user', 'ttl-fn');
+    await cache(
+      key,
+      async () => ({ keep: true }),
+      (value) => (value.keep ? 60 : 0),
+    );
+    const ttl = await getRedisClient().ttl(key);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(60);
+  });
+});
+
 describe('upsertCache', () => {
   it('is set-if-absent by default and overwrites under force', async () => {
     const key = cacheKey('user', 'upsert');

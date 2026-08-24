@@ -245,15 +245,21 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  if (search && searchableFields.length) {
-    const searchConditions = searchableFields.flatMap((field) => {
-      const def = lookupField(model, stripRelationOperators(field));
-      const clause = def && fieldSearchOperator(def, search);
-      if (!clause) return [];
-      if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
-      return [buildSearchPath(model, field, clause)];
-    });
-    if (searchConditions.length) conditions.push({ OR: searchConditions });
+  if (search?.trim() && searchableFields.length) {
+    // Split on whitespace so "Phil Smith" matches a row where one field contains "Phil" and another
+    // contains "Smith" — the whole string is rarely in one column. Each token ORs across the fields;
+    // tokens AND together.
+    for (const token of search.trim().split(/\s+/)) {
+      const searchConditions = searchableFields.flatMap((field) => {
+        const def = lookupField(model, stripRelationOperators(field));
+        const clause = def && fieldSearchOperator(def, token);
+        if (!clause) return [];
+        if (!validatePathNotation(field))
+          throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
+        return [buildSearchPath(model, field, clause)];
+      });
+      if (searchConditions.length) conditions.push({ OR: searchConditions });
+    }
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {

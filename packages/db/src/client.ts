@@ -8,8 +8,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, ScopeContext } from '@template/db/clientTypes';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
+import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
@@ -43,7 +45,7 @@ const createClient = (): Db => {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
   const prisma = new PrismaClient({ adapter, log: ['error'], transactionOptions: { timeout: 30_000 } });
   // You would add read replicas here via additional $extends
-  return prisma.$extends(mutationLifeCycleExtension()) as unknown as Db;
+  return prisma.$extends(mutationLifeCycleExtension()).$extends(softDeleteScopeExtension()) as unknown as Db;
 };
 
 const dbMethods = {
@@ -160,6 +162,8 @@ const dbMethods = {
       options?.concurrency,
     );
   },
+
+  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => auditActorContext.withSoftDeleteBypass(fn),
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 

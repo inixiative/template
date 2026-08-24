@@ -11,7 +11,6 @@ import {
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { castArray, compact } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
@@ -85,6 +84,8 @@ const buildAuditEntry = (
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,
+    actorTokenName: actor?.actorTokenName ?? null,
+    actorTokenKeyPrefix: actor?.actorTokenKeyPrefix ?? null,
     actorJobName: actor?.actorJobName ?? null,
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
@@ -126,7 +127,7 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
 
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
-    const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+    const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
     const previousById = buildPreviousById(previous);
 
     for (const record of results) {

@@ -61,7 +61,3 @@ export const liveIncludes = (model: string, tree: Record<string, unknown>): Reco
   }
   return out;
 };
-
-// Parked (Aron, 2026-07-11): a full db-read extension (auto-scope every query
-// at the client layer) was considered and parked: superadmin awareness and
-// revive/tri-state flows conflict with an always-on rewrite.
