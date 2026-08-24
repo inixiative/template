@@ -534,7 +534,17 @@ GET /api/v1/orgs?searchFields[members][every][role]=admin
 GET /api/v1/items?searchFields[comments][none][flagged]=true
 ```
 
-**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`.
+**Clause groups via `AND`** — every path sharing a prefix merges into one object, so a relation carries one group by default. Two filters on the SAME relation therefore need `AND` with indexed children, or the second silently merges into the first and changes its meaning:
+```
+# One group: ONE post must be both published AND pinned
+GET /api/v1/users?searchFields[posts][some][status]=published&searchFields[posts][some][pinned][:]=true
+
+# Two groups: one published post AND a (possibly different) pinned post
+GET /api/v1/users?searchFields[AND][0][posts][some][status]=published&searchFields[AND][1][posts][some][pinned][:]=true
+```
+Indices are required — repeated keys merge, so siblings need them to stay distinct. `AND` names no field, so it does not lengthen the field path a group's leaves resolve against, and the per-field whitelist still applies inside each group. It does count as a level against the max-10 nesting guard. Capped at 25 groups: each is its own relation subquery. `OR` is not wired up yet.
+
+**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`, plus the `AND` combinator above.
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 

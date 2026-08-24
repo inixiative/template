@@ -2368,7 +2368,7 @@ Test coverage:
 - `useInfiniteDataQuery.test.ts` — 8 tests (page location)
 - `useInfiniteScrollTrigger.test.ts` — 4 tests (callback guards)
 - `Pagination.test.ts` — 17 tests (page range, record count)
-- `serializeBracketQuery.test.ts` — 12 tests (bracket notation)
+- `serializeBracketQuery.test.ts` — 19 tests (bracket notation)
 
 ---
 
