@@ -11,6 +11,7 @@ import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
   isBracketSymbol,
+  isCombinator,
   isRelationOperator,
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
@@ -59,6 +60,30 @@ const stripRelationOperators = (path: string): string =>
     .split('.')
     .filter((seg) => !isRelationOperator(seg))
     .join('.');
+
+const MAX_COMBINATOR_CHILDREN = 25;
+
+// `{ '0': …, '1': … }` → ordered array. The wire carries combinator siblings under numeric
+// segments and the parse yields numeric-STRING keys, never a real array, so order comes from
+// the key rather than insertion.
+const indexedChildren = (combinator: string, value: BracketQueryValue | undefined): BracketQueryRecord[] => {
+  const entries = isRecord(value) ? Object.entries(value) : [];
+  if (!entries.length || entries.some(([key, child]) => !/^\d+$/.test(key) || !isRecord(child))) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' requires indexed children, e.g. ${combinator}[0][field]`,
+    });
+  }
+  // Every group is its own relation subquery, so an unbounded list buys unbounded database
+  // work off one URL. Bounded for the same reason the nesting depth is.
+  if (entries.length > MAX_COMBINATOR_CHILDREN) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
+    });
+  }
+  return entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, child]) => child as BracketQueryRecord);
+};
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
@@ -135,6 +160,16 @@ const validateAndTransformSearchFields = (
 
   for (const [key, value] of Object.entries(obj)) {
     if (value === undefined) continue;
+
+    // Combinators group clauses and name no field, so they do NOT extend the path — children
+    // resolve against the same prefix, and the per-leaf whitelist still applies inside each.
+    if (isCombinator(key)) {
+      result[key] = indexedChildren(key, value).map((child) =>
+        validateAndTransformSearchFields(child, searchableFields, skipFieldValidation, model, prefix, depth + 1),
+      ) as unknown as BracketQueryValue;
+      continue;
+    }
+
     const currentPath = prefix ? `${prefix}.${key}` : key;
 
     // Bare scalar — apply field's default operator + coerce.
@@ -250,6 +285,29 @@ const validateAndTransformSearchFields = (
   return result;
 };
 
+// One transformed record → the conditions it contributes. AND's children recurse through here
+// rather than being pushed raw, so a grouped leaf gets the same null-in-`in` split and orNull
+// treatment a top-level leaf gets. AND is associative, so children flatten into the caller's
+// list instead of nesting a second AND inside it.
+const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
+  const out: Record<string, unknown>[] = [];
+
+  for (const [key, value] of Object.entries(record)) {
+    if (isCombinator(key) && Array.isArray(value)) {
+      for (const child of value as unknown as BracketQueryRecord[]) out.push(...toConditions(child, orNullFields));
+      continue;
+    }
+    const { clause, orNull } = splitNullFromInClause(value as BracketQueryValue);
+    if (orNull || orNullFields.includes(key)) {
+      out.push({ OR: [{ [key]: clause }, { [key]: null }] });
+    } else {
+      out.push({ [key]: clause });
+    }
+  }
+
+  return out;
+};
+
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
   const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
   const lens = rootLens(filterLens);
@@ -276,14 +334,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
     const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
-    for (const [key, value] of Object.entries(transformed)) {
-      const { clause, orNull } = splitNullFromInClause(value);
-      if (orNull || orNullFields.includes(key)) {
-        conditions.push({ OR: [{ [key]: clause }, { [key]: null }] });
-      } else {
-        conditions.push({ [key]: clause });
-      }
-    }
+    conditions.push(...toConditions(transformed, orNullFields));
   }
 
   return {

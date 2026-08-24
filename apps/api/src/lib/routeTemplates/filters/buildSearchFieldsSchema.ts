@@ -45,8 +45,12 @@ export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny
   if (!rootKey) return undefined;
   const shape = buildNodeShape(byPath, rootKey);
   if (Object.keys(shape).length === 0) return undefined;
+  // AND is advertised exactly one level deep: its children are plain nodes carrying no AND of
+  // their own. The wire accepts a combinator at any node, but a recursive schema cannot be
+  // serialized into the OpenAPI doc, so the advertised surface is the bounded unroll.
+  const node = z.object(shape).strict();
   return z
-    .object(shape)
+    .object({ ...shape, AND: z.array(node).optional() })
     .strict()
     .optional()
     .openapi({ param: { in: 'query' } });

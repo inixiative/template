@@ -6,6 +6,11 @@
  */
 export const RELATION_OPERATORS = ['some', 'every', 'none', 'is', 'isNot'] as const;
 
+// Prisma's boolean combinators, used as bracket-query segments with INDEXED children
+// (`searchFields[AND][0][…]`) — siblings need indices because the record parse merges
+// repeated keys. Structural like the relation operators: they group, never name a field.
+export const COMBINATOR_OPERATORS = ['AND'] as const;
+
 export const ARRAY_FIELD_OPERATORS = ['in', 'notIn'] as const;
 
 export const SCALAR_FIELD_OPERATORS = [
@@ -34,6 +39,7 @@ export const JSON_FIELD_OPERATORS = [
 ] as const;
 
 export type RelationOperator = (typeof RELATION_OPERATORS)[number];
+export type CombinatorOperator = (typeof COMBINATOR_OPERATORS)[number];
 export type ArrayFieldOperator = (typeof ARRAY_FIELD_OPERATORS)[number];
 export type ScalarFieldOperator = (typeof SCALAR_FIELD_OPERATORS)[number];
 export type FieldOperator = (typeof FIELD_OPERATORS)[number];
@@ -44,3 +50,6 @@ export const isArrayFieldOperator = (op: string): op is ArrayFieldOperator =>
 
 export const isRelationOperator = (op: string): op is RelationOperator =>
   (RELATION_OPERATORS as readonly string[]).includes(op);
+
+export const isCombinator = (op: string): op is CombinatorOperator =>
+  (COMBINATOR_OPERATORS as readonly string[]).includes(op);

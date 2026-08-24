@@ -570,4 +570,99 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({ AND: [{ deletedAt: { not: null } }] });
     });
   });
+  describe('AND combinator (clause groups)', () => {
+    const TOKENS = { parent: lensFor('User'), root: { relations: { tokens: { picks: ['name'] } } } };
+
+    it('emits one independent relation block per indexed child', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: {
+          AND: { 0: { tokens: { some: { name: 'tok-a' } } }, 1: { tokens: { some: { name: 'tok-b' } } } },
+        },
+      });
+      // Two blocks, not one merged `some` — a single row cannot carry both names, so the merged
+      // form matches nothing where the grouped form matches a user holding two tokens.
+      expect(result).toEqual({
+        AND: [
+          { tokens: { some: { name: { contains: 'tok-a', mode: 'insensitive' } } } },
+          { tokens: { some: { name: { contains: 'tok-b', mode: 'insensitive' } } } },
+        ],
+      });
+    });
+
+    it('orders children by index, not by key insertion', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 10: { name: 'ten' }, 2: { name: 'two' } } },
+      });
+      expect(result).toEqual({
+        AND: [{ name: { contains: 'two', mode: 'insensitive' } }, { name: { contains: 'ten', mode: 'insensitive' } }],
+      });
+    });
+
+    it('accepts a combinator nested under a relation, keeping the relation prefix', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { AND: { 0: { name: 'tok-a' }, 1: { name: 'tok-b' } } } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              some: {
+                AND: [
+                  { name: { contains: 'tok-a', mode: 'insensitive' } },
+                  { name: { contains: 'tok-b', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    it('flattens a combinator nested directly inside another (AND is associative)', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 0: { AND: { 0: { name: 'aron' } } } } },
+      });
+      expect(result).toEqual({ AND: [{ name: { contains: 'aron', mode: 'insensitive' } }] });
+    });
+
+    it('still enforces the whitelist inside a child', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: { 0: { nope: 'x' } } },
+        }),
+      ).toThrow();
+    });
+
+    it('400s when children are not indexed', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: { name: 'x' } },
+        }),
+      ).toThrow(/requires indexed children/);
+    });
+
+    it('400s past the group cap rather than issuing unbounded subqueries', () => {
+      const tooMany = Object.fromEntries(Array.from({ length: 26 }, (_, i) => [String(i), { name: `n${i}` }]));
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: tooMany },
+        }),
+      ).toThrow(/at most 25 groups/);
+    });
+
+    it('leaves a query with no combinator untouched', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { name: 'tok-prod' } } },
+      });
+      expect(result).toEqual({ AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }] });
+    });
+  });
 });
