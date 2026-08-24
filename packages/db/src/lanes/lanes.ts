@@ -12,7 +12,7 @@ import { heartbeat } from '@template/shared/utils';
 const LANE_TTL_SEC = 300;
 const SUPERSEDED_TTL_SEC = 7 * 24 * 60 * 60;
 const LANE_POLL_MS = 500;
-const SUPERSEDED_PREFIX = `${redisNamespace.superseded}:`;
+const SUPERSEDED_PREFIX = `${redisNamespace.lane}:superseded:`;
 
 // Full redis key for a supersede lane, scoped to (handlerName, dedupeKey).
 export const laneKey = (handlerName: string, dedupeKey: string): string =>

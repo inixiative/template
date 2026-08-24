@@ -9,7 +9,7 @@ const redis = getRedisClient();
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const wipe = async (): Promise<void> => {
-  const keys = [...(await redis.keys('lane:*')), ...(await redis.keys('superseded:*'))];
+  const keys = await redis.keys('lane:*');
   if (keys.length) await redis.del(...keys);
 };
 
