@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind helper
- * @partOf primitive:ui
+ * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
 import type { WSEvent } from '@template/shared/ws';

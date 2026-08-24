@@ -31,6 +31,7 @@ export const createVersionBumpSnapshot = async (
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
     sourceInquiryId: actor?.sourceInquiryId ?? null,
+    integrationId: actor?.integrationId ?? null,
     ...buildContextFkFields(model, record),
     ...buildSubjectFkFields(model, record),
   };

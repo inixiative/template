@@ -18,7 +18,7 @@ export const organizationRoles = {
 export const getOrgPermissions = (role: Role, orgId: OrganizationId, entitlements?: Entitlements): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
-    resource: 'organization',
+    resource: 'db:organization',
     id: orgId,
     actions: { ...baseActions, ...entitlements },
   };

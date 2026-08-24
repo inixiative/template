@@ -1,3 +1,3 @@
 export { check } from './check';
 export { rebacSchema } from './schema';
-export type { ActionRule, ModelPermission, RebacSchema, RelationCheck, RuleCheck, SelfCheck } from './types';
+export type { ActionRule, RebacSchema, RelationCheck, ResourcePermission, RuleCheck, SelfCheck } from './types';

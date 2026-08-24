@@ -22,7 +22,7 @@ export const getUserPermissions = (
 ): PermissionEntry => {
   const baseActions = userRoles[role].user;
   return {
-    resource: 'user',
+    resource: 'db:user',
     id: userId,
     actions: { ...baseActions, ...entitlements },
   };

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, User } from '@template/db';
+import type { Inquiry, User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createInquiry, createUser } from '@template/db/test';
 import { meRouter } from '#/modules/me';

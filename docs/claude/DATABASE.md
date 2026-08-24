@@ -600,6 +600,19 @@ buildWhereClause({
 // }
 ```
 
+> The explicit `deletedAt: null` above is no longer required — see Soft-delete read scoping below.
+
+### Soft-delete read scoping
+
+A Prisma client extension (`packages/db/src/extensions/softDeleteScopeExtension.ts`) auto-injects `deletedAt: null` into every read (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate`/`groupBy`) and every write `where` (`update`/`delete`/`upsert`), plus nested `include`/`select` trees, for any model that has a `deletedAt` column. You do **not** hand-write `deletedAt: null` — forgetting it can no longer leak soft-deleted rows.
+
+Two bypasses, both off the audit-actor ALS:
+
+- **Superadmin** — a `platformSuperadmin` caller sees soft-deleted rows.
+- **`db.withDeleted(fn)`** — runs `fn` with scoping off (revive, redaction/GDPR, admin "show deleted" reads). Must be `await`ed inside the callback.
+
+Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
+
 ### Path Notation Utilities
 
 Support for dot-notation field access in queries:

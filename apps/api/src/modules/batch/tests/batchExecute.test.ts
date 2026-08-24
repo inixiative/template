@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';

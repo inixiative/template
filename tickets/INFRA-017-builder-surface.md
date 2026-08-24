@@ -85,9 +85,9 @@ Roles, kept distinct: `exposedSurface`/projection = *what to show*;
   `interpolate`), so the surface only has to describe those three roots.
 - Leak invariant to test on every surface artifact: no field/enum value present
   that is omitted on every reachable path; no `where` clause present.
-- `exposedSurface` strips `where` because the client never executes. The
-  server→subtenant handoff (which preserves `where` + per-path narrowing) is
-  `seal` — see INFRA-016. Do not conflate them.
+- `exposedSurface` strips `where` because the client never executes — and the
+  server is the sole executor, so there's no off-server handoff to preserve `where`
+  for. (The old `seal` idea was dropped for that reason — see INFRA-016.)
 
 ## Definition of Done
 
@@ -101,5 +101,5 @@ Roles, kept distinct: `exposedSurface`/projection = *what to show*;
 
 ## Related Tickets
 
-- **Depends on**: INFRA-016 (serialization model + `seal`)
+- **Depends on**: INFRA-016 (serialization model)
 - **Feeds**: INFRA-002 (rules builder), INFRA-018 (lens builder)

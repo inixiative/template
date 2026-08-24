@@ -13,6 +13,8 @@ export {
   registerDbHook,
   type SingleAction,
 } from './extensions/mutationLifeCycle';
+// Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
+export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)
@@ -91,6 +93,7 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+export { revive } from './utils/revive';
 
 // Hook shared utilities (ignore fields, redact fields)
 
