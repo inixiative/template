@@ -12,7 +12,7 @@ import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
-import { addConnection, removeConnection } from '#/ws/registry';
+import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
 
@@ -68,6 +68,8 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
     case 'authenticate': {
       const headers = sanitizeWSHeaders(msg.headers);
       const me = await resolveIdentity(headers);
+      // Socket may have closed during the probe; skip re-indexing a connection already gone from byId.
+      if (!byId.has(ws.data.connectionId)) return;
       // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
       const spoofEmail = headers['x-spoof-user-email'];
       if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
@@ -86,7 +88,9 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
       return;
     }
     case 'subscribe': {
-      if (!(await canSubscribe(ws.data.headers, msg.channel))) {
+      const granted = await canSubscribe(ws.data.headers, msg.channel);
+      if (!byId.has(ws.data.connectionId)) return;
+      if (!granted) {
         send(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }

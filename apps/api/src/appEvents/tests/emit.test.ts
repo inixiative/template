@@ -39,6 +39,8 @@ describe('emitAppEvent', () => {
         userAgent: 'TestAgent/1.0',
         sourceInquiryId: null,
         integrationId: null,
+        platformSuperadmin: false,
+        bypassSoftDeleteScope: false,
       },
       () => emitAppEvent('user.created', { userId: 'test-id', isGuest: true }),
     );
