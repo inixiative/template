@@ -295,20 +295,21 @@ const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =
 // Combinator children recurse through here rather than being pushed raw, so a grouped leaf gets
 // the same null-in-`in` split and orNull treatment a top-level leaf gets.
 //
-// The two combinators part ways on what happens to those children. AND is associative with the
-// caller's AND, so its children flatten into the caller's list. OR is not: flattening its
-// children would turn a union into an intersection, silently, so it contributes exactly one
-// `{ OR: [...] }` condition whose arms are each group's own conditions AND'd together.
+// AND is the ONLY combinator associative with the caller's AND, so it alone flattens into the
+// caller's list. Every other combinator contributes exactly one condition, whose arms are each
+// group's own conditions AND'd together — flattening OR would turn a union into an
+// intersection, silently. Keyed rather than special-cased so a combinator added later lands on
+// the correct side by default.
 const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
 
   for (const [key, value] of Object.entries(record)) {
     if (isCombinator(key) && Array.isArray(value)) {
       const children = value as unknown as BracketQueryRecord[];
-      if (key === 'OR') {
-        out.push({ OR: children.map((child) => allOf(toConditions(child, orNullFields))) });
-      } else {
+      if (key === 'AND') {
         for (const child of children) out.push(...toConditions(child, orNullFields));
+      } else {
+        out.push({ [key]: children.map((child) => allOf(toConditions(child, orNullFields))) });
       }
       continue;
     }
