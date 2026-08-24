@@ -635,7 +635,7 @@ describe('buildWhereClause', () => {
           filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
           searchFields: { AND: { 0: { nope: 'x' } } },
         }),
-      ).toThrow();
+      ).toThrow(/not searchable/);
     });
 
     it('400s when children are not indexed', () => {

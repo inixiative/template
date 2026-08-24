@@ -82,7 +82,7 @@ const indexedChildren = (combinator: string, value: BracketQueryValue | undefine
       message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
     });
   }
-  return entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, child]) => child as BracketQueryRecord);
+  return entries.sort(([a], [b]) => Number(a) - Number(b)).map(([, child]) => child as BracketQueryRecord);
 };
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
@@ -297,7 +297,7 @@ const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Recor
       for (const child of value as unknown as BracketQueryRecord[]) out.push(...toConditions(child, orNullFields));
       continue;
     }
-    const { clause, orNull } = splitNullFromInClause(value as BracketQueryValue);
+    const { clause, orNull } = splitNullFromInClause(value);
     if (orNull || orNullFields.includes(key)) {
       out.push({ OR: [{ [key]: clause }, { [key]: null }] });
     } else {
