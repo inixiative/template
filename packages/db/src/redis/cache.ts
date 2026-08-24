@@ -9,21 +9,12 @@ import { redisNamespace } from '@template/db/redis/namespaces';
 import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
 import { compact, isNil } from 'lodash-es';
+import superjson from 'superjson';
 
 const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
 const NEGATIVE_TTL = 60; // 1 minute for null/undefined results
 
 type Identifier = string | Record<string, string>;
-
-// ISO 8601 date regex for reviver
-const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-
-const dateReviver = (_key: string, value: unknown): unknown => {
-  if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
-    return new Date(value);
-  }
-  return value;
-};
 
 // The domain is a model or accessor name; normalize it to the accessor so a write
 // keyed 'User' and a clear keyed 'user' agree (Redis is case-sensitive). Tags are
@@ -83,7 +74,12 @@ type CacheRead<T> = { hit: true; value: T } | { hit: false };
 const readCached = async <T>(redis: ReturnType<typeof getRedisClient>, key: string): Promise<CacheRead<T>> => {
   try {
     const cached = await redis.get(key);
-    if (cached !== null) return { hit: true, value: JSON.parse(cached, dateReviver) as T };
+    // superjson round-trips Date/BigInt/Map/Set; entries written before superjson (plain JSON)
+    // deserialize to undefined and fall through to recompute.
+    if (cached !== null) {
+      const value = superjson.parse<T>(cached);
+      if (value !== undefined) return { hit: true, value };
+    }
   } catch (error) {
     log.error(`Cache read error for key ${key}:`, error);
     // Redis down - fall through to compute without cache
@@ -92,8 +88,8 @@ const readCached = async <T>(redis: ReturnType<typeof getRedisClient>, key: stri
 };
 
 /**
- * Get-or-compute-and-set. On cache hit, returns the parsed value (with ISO
- * dates revived). On miss, calls `fn`, caches the result, and returns it.
+ * Get-or-compute-and-set. On cache hit, returns the superjson-parsed value.
+ * On miss, calls `fn`, caches the result, and returns it.
  * Null/undefined results get a short TTL so newly-created records are
  * discovered quickly.
  *
@@ -151,7 +147,7 @@ export const cache = async <T>(
     const effectiveTtl = resolveTtl(value, ttl);
 
     if (effectiveTtl > 0) {
-      const write = redis.setex(key, effectiveTtl, JSON.stringify(value)).catch((error) => {
+      const write = redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
         log.error(`Cache write error for key ${key}:`, error);
       });
       // Awaited only while holding the lock: waiters poll the value key, so releasing before
@@ -184,7 +180,7 @@ export const upsertCache = async <T>(
   try {
     const redis = getRedisClient();
     if (!force && (await redis.exists(key))) return false;
-    await redis.setex(key, ttl, JSON.stringify(value));
+    await redis.setex(key, ttl, superjson.stringify(value));
     return true;
   } catch {
     return false;

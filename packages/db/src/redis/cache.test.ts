@@ -56,6 +56,30 @@ describe('cache', () => {
     expect(hit.when.getTime()).toBe(when.getTime());
   });
 
+  it('round-trips Map, Set, and BigInt values (superjson, not plain JSON)', async () => {
+    const key = cacheKey('user', 'rich-types');
+    const value = { map: new Map([['a', 1]]), set: new Set([1, 2, 3]), big: 42n };
+    await cache(key, async () => value);
+    const hit = await cache<typeof value>(key, async () => ({ map: new Map(), set: new Set(), big: 0n }));
+    expect(hit.map).toBeInstanceOf(Map);
+    expect(hit.map.get('a')).toBe(1);
+    expect(hit.set).toBeInstanceOf(Set);
+    expect([...hit.set]).toEqual([1, 2, 3]);
+    expect(hit.big).toBe(42n);
+  });
+
+  it('treats a legacy plain-JSON entry as a miss and recomputes', async () => {
+    const key = cacheKey('user', 'legacy');
+    await getRedisClient().set(key, JSON.stringify({ n: 1 }));
+    let recomputed = false;
+    const hit = await cache(key, async () => {
+      recomputed = true;
+      return { n: 2 };
+    });
+    expect(recomputed).toBe(true);
+    expect(hit).toEqual({ n: 2 });
+  });
+
   it('single-flights concurrent misses on the same key into one compute', async () => {
     const key = cacheKey('user', 'stampede');
     let calls = 0;
