@@ -298,8 +298,8 @@ const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =
 // AND is the ONLY combinator associative with the caller's AND, so it alone flattens into the
 // caller's list. Every other combinator contributes exactly one condition, whose arms are each
 // group's own conditions AND'd together — flattening OR would turn a union into an
-// intersection, silently. Keyed rather than special-cased so a combinator added later lands on
-// the correct side by default.
+// intersection, silently. The check names AND rather than OR so that a combinator added later
+// lands on the correct side by default.
 const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
 
