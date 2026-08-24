@@ -39,6 +39,18 @@ const isPrimitive = (v: BracketQueryValue): v is BracketQueryPrimitive =>
 const isRecord = (v: BracketQueryValue | undefined): v is BracketQueryRecord =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+// Prisma rejects a NULL member inside `in` (a typed `Int | Null` array is invalid). When the bracket
+// query carries one (`[in][:]=null`), pull the NULL out so it can be OR'd back as `{ field: null }` —
+// the only way to match concrete values PLUS NULL in one filter.
+const splitNullFromInClause = (
+  value: BracketQueryValue | undefined,
+): { clause: BracketQueryValue | undefined; orNull: boolean } => {
+  if (!isRecord(value) || !Array.isArray(value.in) || !value.in.includes(null)) {
+    return { clause: value, orNull: false };
+  }
+  return { clause: { ...value, in: value.in.filter((v) => v !== null) }, orNull: true };
+};
+
 // `tokens.some.name` → `tokens.name`. `lookupField` walks Prisma model
 // relations but doesn't know about Prisma's relation operators, so we strip
 // them before calling.
@@ -265,10 +277,11 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
     const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
     for (const [key, value] of Object.entries(transformed)) {
-      if (orNullFields.includes(key)) {
-        conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
+      const { clause, orNull } = splitNullFromInClause(value);
+      if (orNull || orNullFields.includes(key)) {
+        conditions.push({ OR: [{ [key]: clause }, { [key]: null }] });
       } else {
-        conditions.push({ [key]: value });
+        conditions.push({ [key]: clause });
       }
     }
   }
