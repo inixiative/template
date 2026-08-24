@@ -13,10 +13,9 @@ export default defineConfig({
   input,
   output: {
     // Generated code owns this subfolder; clean wipes it on every regen. Hand-written
-    // src/lenses + src/index.ts live beside it in src/ and are never touched.
+    // src/lenses + src/index.ts live beside it in src/ and are never touched. No biome
+    // format/lint post-processing — the repo's biome config ignores **/generated.
     path: './src/generated',
-    format: 'biome',
-    lint: 'biome',
   },
   logs: {
     level: 'warn',

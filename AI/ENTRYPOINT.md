@@ -24,6 +24,7 @@ Canonical instructions for all coding agents in this repository.
 - Do not run git commands unless the user explicitly asks.
 - **NEVER run `git stash` — for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
 - **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
+- **ALL worktree lifecycles go through the repo scripts** — `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach), `bun run worktree:destroy <name>`, `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (ports, `.env.local`/`.env.test`, per-slot databases, dependency install, prisma) — a hand-rolled worktree is a broken half-environment plus orphaned state. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first.
 - **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
 
 ## 0.1. Understand the Why First
@@ -179,7 +180,7 @@ Business logic NEVER calls email, SMS, analytics, or notification services direc
 
 **Why:** Every SaaS starts with direct calls (`sendEmail()` in controllers), accumulates coupling (adding SMS means touching every controller), hits reliability issues (email provider down → API fails), and eventually migrates to an event bus. We skip that migration.
 
-**Pattern:** `emitAppEvent(name, data)` → handler → bridges (email/websocket/observe) → BullMQ jobs → external services. Nothing synchronous hits external services in the request path.
+**Pattern:** `emitAppEvent(name, data)` → handler → bridges (email/websocket/observe) → jobs/pub-sub/adapters → external services. Nothing synchronous hits external services in the request path.
 
 **Key rules:**
 - `emitAppEvent` mirrors `enqueueJob` — typed name, typed payload, centralized map in `appEvents/handlers/index.ts`.
@@ -188,7 +189,7 @@ Business logic NEVER calls email, SMS, analytics, or notification services direc
 - Actor context auto-enriches from `auditActorContext` (AsyncLocalStorage) — never pass actorId manually.
 - Events inside `db.txn()` defer to `onCommit`. Events outside run immediately.
 - Adapter registries use `makeBroadcastRegistry` — `get()` for pick-one, `broadcast()` for fan-out.
-- Observe always goes through a BullMQ job (`recordAppEvent`), never sync DB writes in request path.
+- Observe is implicit and always on: every `makeAppEvent` handler broadcasts the full envelope (`{id, name, actor, data}`) to the observe registry. No per-handler opt-in or curation — the db adapter upserts the `AppEvent` row on the envelope id (idempotent, best-effort, not a retry substrate).
 - Email targeting is declarative (`userIds`, `orgRole`, `spaceRole`, `raw`) — resolution happens in the job worker.
 - Read `docs/claude/APP_EVENTS.md` before modifying the event system.
 

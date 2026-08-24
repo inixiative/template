@@ -22,7 +22,7 @@
     "@inixiative/json-rules": "^2.16.0"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.94.0",
+    "@hey-api/openapi-ts": "^0.97.3",
     "@tanstack/react-query": "^5.90.21",
     "typescript": "^5"
   },

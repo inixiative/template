@@ -30,6 +30,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
+# (a minimal `bun run` PATH in particular misses it), so fall back to the
+# app-bundle path. DB/Redis/MinIO steps below route through "$DOCKER"; if it
+# can't be resolved the existing `if "$DOCKER" ps` guards skip gracefully.
+DOCKER=""
+if command -v docker >/dev/null 2>&1; then
+  DOCKER="docker"
+elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
+  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
+fi
+
 # Portable in-place sed (BSD vs GNU)
 sedi() {
   if sed --version >/dev/null 2>&1; then sed -i "$@"; else sed -i '' "$@"; fi
@@ -301,11 +312,11 @@ localize_app_envs test "$DB_TEST"
 # 6. Create Postgres databases
 # ---------------------------------------------------------------------------
 echo -e "${BLUE}Creating Postgres databases on $PG_CONTAINER...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
   for DB in "$DB_LOCAL" "$DB_TEST"; do
-    docker exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB}'" \
+    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB}'" \
       | grep -q 1 \
-      || docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE \"${DB}\""
+      || "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE \"${DB}\""
   done
   echo -e "${GREEN}Created: $DB_LOCAL, $DB_TEST${NC}"
 else
@@ -324,21 +335,14 @@ echo -e "${BLUE}Provisioning MinIO buckets for slot ${SLOT}...${NC}"
 # 7. Install dependencies in the worktree
 # ---------------------------------------------------------------------------
 # A git worktree is a fresh working dir with NO node_modules. Because .worktrees/
-# lives inside the main repo, bun would otherwise resolve UP to the main checkout's
-# hoisted node_modules — where the @template/* symlinks point at MAIN's packages,
-# not this worktree's. The worktree would then silently run main's code (e.g. a
-# generated Prisma client that predates a migration on this branch). Install here
-# so the worktree owns its own resolution.
+# lives inside the main repo, bun could otherwise resolve UP to the main checkout's
+# node_modules and silently run main's code (e.g. a generated Prisma client that
+# predates a migration on this branch). ALWAYS force a real install into the
+# worktree — never rely on links to (or hoisting from) the main checkout.
 # --ignore-scripts mirrors 'bun run setup' (prepare/husky already ran in main).
-echo -e "${BLUE}Installing dependencies (bun install --ignore-scripts)...${NC}"
-if ! (cd "$WORKTREE_DIR" && bun install --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}"); then
-  echo -e "${RED}Error: bun install failed in $WORKTREE_DIR. Fix the issue, then run 'bun install' there.${NC}"
-  exit 1
-fi
-if [ ! -e "$WORKTREE_DIR/node_modules/@template/db" ]; then
-  echo -e "${RED}Error: bun install did not link node_modules/@template/db in $WORKTREE_DIR.${NC}"
-  echo -e "${RED}Without it the worktree resolves the main repo's packages (stale @template/* / Prisma client).${NC}"
-  echo -e "${RED}Run 'bun install' inside the worktree, then 'bun run db:push:dev'.${NC}"
+echo -e "${BLUE}Installing dependencies (bun install --force --ignore-scripts)...${NC}"
+if ! (cd "$WORKTREE_DIR" && bun install --force --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}"); then
+  echo -e "${RED}Error: bun install --force failed in $WORKTREE_DIR. Fix the issue, then run 'bun install --force' there.${NC}"
   exit 1
 fi
 
@@ -353,8 +357,8 @@ echo -e "${BLUE}Pushing Prisma schema to local + test DBs...${NC}"
 # 9. Smoke-test DB connectivity (confirms the slot's local DB is reachable)
 # ---------------------------------------------------------------------------
 echo -e "${BLUE}Verifying DB connectivity...${NC}"
-if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-  DB_PING="$(docker exec "$PG_CONTAINER" psql -U postgres -d "$DB_LOCAL" -tAc "SELECT 1;" 2>/dev/null || true)"
+if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+  DB_PING="$("$DOCKER" exec "$PG_CONTAINER" psql -U postgres -d "$DB_LOCAL" -tAc "SELECT 1;" 2>/dev/null || true)"
   if [ "$DB_PING" = "1" ]; then
     echo -e "${GREEN}DB reachable: $DB_LOCAL${NC}"
   else
