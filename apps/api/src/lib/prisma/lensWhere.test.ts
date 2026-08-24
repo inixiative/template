@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createContact, createSession, createToken, createUser } from '@template/db/test';
 import { lensWhere } from '#/lib/prisma/lensWhere';
 
 const ACTIVE_TOKENS: LensNarrowing = {
@@ -138,6 +138,41 @@ describe('lensWhere — query-plan execution (count operators)', () => {
       where: { AND: [{ id: { in: [qualified.id, unqualified.id] } }, where] },
     });
     expect(rows.map((r) => r.id)).toEqual([qualified.id]);
+  });
+
+  it('counts only live related rows — a soft-deleted child does not satisfy the count', async () => {
+    const { entity: onlyTombstoned } = await createUser();
+    const { entity: hasLive } = await createUser();
+    const { entity: deadContact } = await createContact({ ownerModel: 'User' }, { user: onlyTombstoned });
+    await db.contact.update({ where: { id: deadContact.id }, data: { deletedAt: new Date() } });
+    await createContact({ ownerModel: 'User' }, { user: hasLive });
+
+    const lens: LensNarrowing = {
+      parent: lensFor('User'),
+      root: { picks: ['name'], where: { field: 'contacts', arrayOperator: 'atLeast', count: 1 } },
+    };
+
+    const where = await lensWhere(lens, {});
+    const rows = await db.user.findMany({
+      where: { AND: [{ id: { in: [onlyTombstoned.id, hasLive.id] } }, where] },
+    });
+    expect(rows.map((r) => r.id)).toEqual([hasLive.id]);
+  });
+
+  it('leaves the count plan unscoped when the related model has no deletedAt column', async () => {
+    const { context } = await createSession();
+    const userId = context.user!.id;
+
+    const lens: LensNarrowing = {
+      parent: lensFor('User'),
+      root: { picks: ['name'], where: { field: 'sessions', arrayOperator: 'atLeast', count: 1 } },
+    };
+
+    const where = await lensWhere(lens, {});
+    const rows = await db.user.findMany({
+      where: { AND: [{ id: { in: [userId] } }, where] },
+    });
+    expect(rows.map((r) => r.id)).toEqual([userId]);
   });
 });
 

@@ -20,7 +20,7 @@ export const getRedactFields = (model: string): string[] => REDACT_FIELDS[model]
 
 // The webhook drop-set: noop noise plus every sensitive column, so a sensitive-only change noops the
 // delivery and a sensitive value is never shipped to a receiver.
-export const WEBHOOK_DROP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS, REDACT_FIELDS);
+export const WEBHOOK_NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS, REDACT_FIELDS);
 
 // Every sensitive field name across all models — used to mask matching keys in an app-event payload,
 // which is an author-built object with no model binding.

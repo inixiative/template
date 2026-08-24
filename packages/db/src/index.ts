@@ -13,6 +13,8 @@ export {
   registerDbHook,
   type SingleAction,
 } from './extensions/mutationLifeCycle';
+// Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
+export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)
@@ -23,7 +25,15 @@ export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
-export { claimLane, laneKey, watchLane } from './lanes';
+export {
+  claimLane,
+  getJobSupersededBy,
+  laneKey,
+  reclaimLane,
+  releaseLane,
+  supersededKey,
+  watchLane,
+} from './lanes';
 // Distributed lock
 export { createLock, type Lock, type LockOptions } from './lock';
 // Redis client and cache utilities

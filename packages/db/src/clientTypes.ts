@@ -25,6 +25,7 @@ export type DbMethods = {
       options: { concurrency?: number; resolution: 'allSettled' },
     ): Promise<PromiseSettledResult<T>[]>;
   };
+  withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;

@@ -15,6 +15,8 @@ export type AuditActor = {
   userAgent: string | null;
   sourceInquiryId: string | null;
   integrationId: string | null;
+  platformSuperadmin: boolean;
+  bypassSoftDeleteScope: boolean;
 };
 
 export const nullAuditActor: AuditActor = {
@@ -26,6 +28,8 @@ export const nullAuditActor: AuditActor = {
   userAgent: null,
   sourceInquiryId: null,
   integrationId: null,
+  platformSuperadmin: false,
+  bypassSoftDeleteScope: false,
 };
 
 export const auditActorStore = new AsyncLocalStorage<AuditActor>();
@@ -38,5 +42,12 @@ export const auditActorContext = {
   extend: (partial: Partial<AuditActor>): void => {
     const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);
+  },
+  withSoftDeleteBypass: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+    const current = auditActorStore.getStore() ?? nullAuditActor;
+    return auditActorStore.run(
+      { ...current, bypassSoftDeleteScope: true },
+      async (): Promise<Awaited<T>> => await fn(),
+    );
   },
 };

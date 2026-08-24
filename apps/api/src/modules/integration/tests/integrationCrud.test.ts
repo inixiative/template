@@ -97,12 +97,18 @@ describe('Integration CRUD', () => {
   });
 
   describe('DELETE /integration/:id', () => {
-    it('deletes own user integration', async () => {
+    it('tombstones own user integration — row survives, read 404s', async () => {
       const integration = await db.integration.create({
         data: { name: 'Doomed', ownerModel: 'User', userId: user.id },
       });
       const response = await fetch(del(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(204);
+
+      const row = await db.integration.findFirst({ where: { id: integration.id, deletedAt: { not: null } } });
+      expect(row).not.toBeNull();
+
+      const readResponse = await fetch(get(`/api/v1/integration/${integration.id}`));
+      expect(readResponse.status).toBe(404);
     });
   });
 
