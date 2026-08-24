@@ -9,7 +9,9 @@ export const RELATION_OPERATORS = ['some', 'every', 'none', 'is', 'isNot'] as co
 // Prisma's boolean combinators, used as bracket-query segments with INDEXED children
 // (`searchFields[AND][0][…]`) — siblings need indices because the record parse merges
 // repeated keys. Structural like the relation operators: they group, never name a field.
-export const COMBINATOR_OPERATORS = ['AND'] as const;
+// Order is not semantic, but the two differ where it counts: AND is associative with the
+// enclosing AND and flattens into it, OR is not and must stay one condition.
+export const COMBINATOR_OPERATORS = ['AND', 'OR'] as const;
 
 export const ARRAY_FIELD_OPERATORS = ['in', 'notIn'] as const;
 

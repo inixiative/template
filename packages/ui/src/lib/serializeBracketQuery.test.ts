@@ -122,4 +122,12 @@ describe('serializeBracketQuery — number values ([$] marker)', () => {
     expect(params.get('searchFields[AND][0][status][in]')).toBe('x');
     expect(params.get('searchFields[AND][1][name][contains]')).toBe('y');
   });
+
+  it('indexes OR the same way — serialization is combinator-agnostic', () => {
+    const params = serializeBracketQuery({
+      searchFields: { AND: [{ OR: [{ status: { in: ['x'] } }, { status: { in: ['y'] } }] }] },
+    });
+    expect(params.get('searchFields[AND][0][OR][0][status][in]')).toBe('x');
+    expect(params.get('searchFields[AND][0][OR][1][status][in]')).toBe('y');
+  });
 });

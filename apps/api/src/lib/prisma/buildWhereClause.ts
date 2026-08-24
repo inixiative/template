@@ -285,16 +285,31 @@ const validateAndTransformSearchFields = (
   return result;
 };
 
-// One transformed record → the conditions it contributes. AND's children recurse through here
-// rather than being pushed raw, so a grouped leaf gets the same null-in-`in` split and orNull
-// treatment a top-level leaf gets. AND is associative, so children flatten into the caller's
-// list instead of nesting a second AND inside it.
+// A group's own conditions AND together. One condition needs no wrapper. An empty group cannot
+// reach here: `indexedChildren` requires every child to be a record, and every key of a record
+// yields a condition.
+const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =>
+  conditions.length === 1 ? (conditions[0] as Record<string, unknown>) : { AND: conditions };
+
+// One transformed record → the conditions it contributes, which the caller ANDs together.
+// Combinator children recurse through here rather than being pushed raw, so a grouped leaf gets
+// the same null-in-`in` split and orNull treatment a top-level leaf gets.
+//
+// The two combinators part ways on what happens to those children. AND is associative with the
+// caller's AND, so its children flatten into the caller's list. OR is not: flattening its
+// children would turn a union into an intersection, silently, so it contributes exactly one
+// `{ OR: [...] }` condition whose arms are each group's own conditions AND'd together.
 const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
 
   for (const [key, value] of Object.entries(record)) {
     if (isCombinator(key) && Array.isArray(value)) {
-      for (const child of value as unknown as BracketQueryRecord[]) out.push(...toConditions(child, orNullFields));
+      const children = value as unknown as BracketQueryRecord[];
+      if (key === 'OR') {
+        out.push({ OR: children.map((child) => allOf(toConditions(child, orNullFields))) });
+      } else {
+        for (const child of children) out.push(...toConditions(child, orNullFields));
+      }
       continue;
     }
     const { clause, orNull } = splitNullFromInClause(value);

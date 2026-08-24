@@ -51,10 +51,18 @@ describe('buildSearchFieldsSchema', () => {
     bad({ AND: [{ notAField: { equals: 'x' } }] });
   });
 
-  it('does NOT advertise a nested AND — the schema is a bounded unroll, the wire is not', () => {
+  it('accepts OR at the root on the same terms', () => {
+    ok({ OR: [{ name: { contains: 'a' } }] });
+    ok({ OR: [{ name: { contains: 'a' } }, { organizationUsers: { some: { role: { equals: 'admin' } } } }] });
+    bad({ OR: [{ notAField: { equals: 'x' } }] });
+  });
+
+  it('does NOT advertise a nested combinator — the schema is a bounded unroll, the wire is not', () => {
     // buildWhereClause accepts a combinator at any node; only the advertised (typed) surface is
     // narrowed, because a recursive schema cannot be serialized into the OpenAPI doc.
     bad({ AND: [{ AND: [{ name: { contains: 'a' } }] }] });
+    bad({ AND: [{ OR: [{ name: { contains: 'a' } }] }] });
+    bad({ OR: [{ AND: [{ name: { contains: 'a' } }] }] });
   });
 
   it('accepts a bare value (no operator) — defaults to the field operator at runtime', () => {

@@ -570,7 +570,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({ AND: [{ deletedAt: { not: null } }] });
     });
   });
-  describe('AND combinator (clause groups)', () => {
+  describe('AND / OR combinators (clause groups)', () => {
     const TOKENS = { parent: lensFor('User'), root: { relations: { tokens: { picks: ['name'] } } } };
 
     it('emits one independent relation block per indexed child', () => {
@@ -663,6 +663,142 @@ describe('buildWhereClause', () => {
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
       expect(result).toEqual({ AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }] });
+    });
+
+    it('keeps OR as one union condition instead of flattening it into the enclosing AND', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { OR: { 0: { name: 'aron' }, 1: { email: 'phil@x.com' } } },
+      });
+      // Flattened, these two would land side by side in the outer AND and the query would
+      // demand BOTH — an intersection where the caller asked for a union.
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'aron', mode: 'insensitive' } },
+              { email: { contains: 'phil@x.com', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('ANDs the leaves inside a single OR arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { OR: { 0: { name: 'aron', email: 'aron@x.com' }, 1: { name: 'phil' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                AND: [
+                  { name: { contains: 'aron', mode: 'insensitive' } },
+                  { email: { contains: 'aron@x.com', mode: 'insensitive' } },
+                ],
+              },
+              { name: { contains: 'phil', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('nests OR inside AND', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          AND: { 0: { email: 'x@y.com' }, 1: { OR: { 0: { name: 'aron' }, 1: { name: 'phil' } } } },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          { email: { contains: 'x@y.com', mode: 'insensitive' } },
+          {
+            OR: [
+              { name: { contains: 'aron', mode: 'insensitive' } },
+              { name: { contains: 'phil', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('flattens an AND nested inside an OR arm into that arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          OR: { 0: { AND: { 0: { name: 'aron' }, 1: { email: 'aron@x.com' } } }, 1: { name: 'phil' } },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                AND: [
+                  { name: { contains: 'aron', mode: 'insensitive' } },
+                  { email: { contains: 'aron@x.com', mode: 'insensitive' } },
+                ],
+              },
+              { name: { contains: 'phil', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('splits a NULL member out of `in` inside an OR arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { OR: { 0: { platformRole: { in: ['superadmin', null] } } } },
+      });
+      // The inner OR is the null-split; the outer one is the arm. Pushed raw the arm would
+      // emit `in: ['superadmin', null]`, which Prisma rejects for a typed array.
+      expect(result).toEqual({
+        AND: [{ OR: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }] }],
+      });
+    });
+
+    it('still enforces the whitelist inside an OR arm', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { OR: { 0: { nope: 'x' } } },
+        }),
+      ).toThrow(/not searchable/);
+    });
+
+    it('names OR in the indexed-children error', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { OR: 'aron' },
+        }),
+      ).toThrow(/'OR' requires indexed children/);
+    });
+
+    it('hands an OR nested under a relation to Prisma as-is', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { OR: { 0: { name: 'tok-a' }, 1: { name: 'tok-b' } } } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              some: {
+                OR: [
+                  { name: { contains: 'tok-a', mode: 'insensitive' } },
+                  { name: { contains: 'tok-b', mode: 'insensitive' } },
+                ],
+              },
+            },
+          },
+        ],
+      });
     });
   });
 });
