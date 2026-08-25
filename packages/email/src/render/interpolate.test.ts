@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
+import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {
@@ -183,6 +184,90 @@ describe('interpolate', () => {
       } finally {
         if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
         else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
+      }
+    });
+  });
+
+  describe('system tokens', () => {
+    const utcYear = String(new Date().getUTCFullYear());
+
+    it('resolves reserved system tokens from the engine clock at send time', () => {
+      const result = interpolate('© {{system.year}} — sent {{system.now}}', {});
+      expect(result).toContain(`© ${utcYear} —`);
+      expect(result).not.toContain('{{system.now}}');
+    });
+
+    it('resolves every token the shared list offers', () => {
+      for (const { name } of SYSTEM_TOKENS) {
+        const token = `{{system.${name}}}`;
+        expect(interpolate(token, {})).not.toContain(token);
+      }
+    });
+
+    it('is not overridable by a caller-supplied system bucket', () => {
+      const result = interpolate('{{system.year}}', { system: { year: 'HACKED' } } as never);
+      expect(result).toBe(utcYear);
+    });
+
+    it('leaves unknown and nested system tokens literal', () => {
+      expect(interpolate('{{system.unknown}} {{system.now.iso}}', {})).toBe('{{system.unknown}} {{system.now.iso}}');
+    });
+
+    it('does not resolve inherited Object.prototype members as system tokens', () => {
+      const template = '{{system.__proto__}}|{{system.toString}}|{{system.constructor}}';
+      expect(interpolate(template, {})).toBe(template);
+    });
+
+    it('formats system.now in the caller-provided locale', () => {
+      const enUS = interpolate('{{system.now}}', {}, undefined, { locale: 'en-US' });
+      const enGB = interpolate('{{system.now}}', {}, undefined, { locale: 'en-GB' });
+      // Same instant, both English: en-US is month-first with a comma, en-GB day-first without one.
+      expect(enUS).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
+      expect(enGB).toMatch(/^\d{1,2} [A-Z][a-z]+ \d{4}$/);
+    });
+
+    it('formats system.now on the UTC calendar day, not the host time zone', () => {
+      const utcToday = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+      expect(interpolate('{{system.now}}', {}, undefined, { locale: 'en-US' })).toBe(utcToday);
+    });
+
+    it('degrades a malformed locale to the runtime default instead of failing the send', () => {
+      const result = interpolate('{{system.now}}', {}, undefined, { locale: 'not_a_locale' });
+      expect(result).not.toContain('{{system.now}}');
+      expect(result).toMatch(/\d{4}/);
+    });
+
+    it('resolves inside a conditional body', () => {
+      const rule = JSON.stringify({ field: 'recipient.plan', operator: 'equals', value: 'pro' });
+      const result = interpolate(`{{#if rule=${rule}}}{{system.year}}{{/if}}`, { recipient: { plan: 'pro' } });
+      expect(result).toBe(utcYear);
+    });
+
+    it('does not resolve a system token carried in a caller value', () => {
+      const result = interpolate('{{data.note}}', { data: { note: '{{system.year}}' } });
+      expect(result).toBe('{{system.year}}');
+    });
+
+    it('reads the clock once per render, so tokens in one email agree with each other', () => {
+      const RealDate = Date;
+      let ticks = 0;
+      // @ts-expect-error — swapping the global clock is the point of the test.
+      globalThis.Date = class extends RealDate {
+        constructor() {
+          super(RealDate.UTC(2026 + ticks++, 11, 31, 23, 59, 59));
+        }
+      };
+      try {
+        const [first, second, year] = interpolate('{{system.now}} / {{system.now}} / {{system.year}}', {}).split(' / ');
+        expect(second).toBe(first as string);
+        expect(year).toBe('2026');
+      } finally {
+        globalThis.Date = RealDate;
       }
     });
   });

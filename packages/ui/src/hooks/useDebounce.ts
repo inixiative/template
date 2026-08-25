@@ -6,6 +6,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/**
+ * Debounce belongs ONLY on inputs that hit the backend — a network search, a fetch-triggering field.
+ * Front-end in-memory filtering of an already-loaded list stays undebounced: just filter. A debounce on a
+ * local filter adds latency for nothing, and the next consumer cargo-cults it.
+ */
 export const useDebounce = <T>(value: T, delay: number = 300): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
