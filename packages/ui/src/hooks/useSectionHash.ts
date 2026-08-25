@@ -4,6 +4,8 @@
  * @partOf primitive:ui
  * @uses none
  */
+
+import { useDebouncedCallback } from '@template/ui/hooks/useDebounce';
 import { resolveSectionTarget } from '@template/ui/lib/resolveSectionTarget';
 import * as React from 'react';
 
@@ -32,7 +34,6 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
 
   // Track intersection ratios for all observed sections.
   const ratioMapRef = React.useRef<Map<string, number>>(new Map());
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const intersectionObserverRef = React.useRef<IntersectionObserver | null>(null);
 
   // Scroll to hash on mount.
@@ -53,6 +54,25 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
     });
   }, [enabled]);
 
+  // Promote the most-visible section once intersection updates settle.
+  const updateActiveSection = useDebouncedCallback(() => {
+    let bestId: string | null = null;
+    let bestRatio = 0;
+    for (const [id, ratio] of ratioMapRef.current) {
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestId = id;
+      }
+    }
+    if (bestId && bestRatio > 0) {
+      setActiveSection(bestId);
+      const newHash = `#${bestId}`;
+      if (window.location.hash !== newHash) {
+        window.history.replaceState(window.history.state, '', newHash);
+      }
+    }
+  }, SCROLL_DEBOUNCE_MS);
+
   // Set up IntersectionObserver + MutationObserver for auto-discovery.
   React.useEffect(() => {
     if (!enabled) return;
@@ -65,24 +85,7 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
         }
       }
 
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        let bestId: string | null = null;
-        let bestRatio = 0;
-        for (const [id, ratio] of ratioMapRef.current) {
-          if (ratio > bestRatio) {
-            bestRatio = ratio;
-            bestId = id;
-          }
-        }
-        if (bestId && bestRatio > 0) {
-          setActiveSection(bestId);
-          const newHash = `#${bestId}`;
-          if (window.location.hash !== newHash) {
-            window.history.replaceState(window.history.state, '', newHash);
-          }
-        }
-      }, SCROLL_DEBOUNCE_MS);
+      updateActiveSection();
     };
 
     const io = new IntersectionObserver(onIntersection, {
@@ -132,13 +135,13 @@ export function useSectionHash(options: UseSectionHashOptions = {}): UseSectionH
     mo.observe(document.body, { childList: true, subtree: true });
 
     return () => {
-      clearTimeout(timerRef.current);
+      updateActiveSection.cancel();
       io.disconnect();
       mo.disconnect();
       intersectionObserverRef.current = null;
       ratioMapRef.current.clear();
     };
-  }, [enabled, threshold]);
+  }, [enabled, threshold, updateActiveSection]);
 
   const scrollToSection = React.useCallback((sectionId: string) => {
     const target = resolveSectionTarget(sectionId);
