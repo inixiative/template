@@ -33,6 +33,20 @@ A **variable** is a leaf whose value source is left to the author. It is written
 }
 ```
 
+What a variable may carry — the **value domain only** (Aron, 2026-08-26: "variable is purely about values"):
+
+```ts
+variable: {
+  default?: RuleValue | DateExpr;                        // what it starts as; absent = open slot
+  options?: (RuleValue | DateExpr)[];                    // what it may be — a curated list (Zealot's WINDOW_CHOICES is one);
+                                                         // for enum/sourced fields it must be a SUBSET of the lens's set
+                                                         // (validateDecoration checks); an unlisted saved value stays shown, untouched
+  range?: { min?: number; max?: number; step?: number }  // bounds on a numeric slot; builder-side gate, the engine doesn't care
+}
+```
+
+Not on the variable, because the fact lives elsewhere: **label** (the leaf's field Decor names the control — `labels.fields` / INFRA-028; the aggregate descriptor names the threshold); **option prose** ("in the last 30 days") — value Decor, `labels.values`; **shape / kind** — the catalog, from the operator; **source** — the lens; **unit / format** (cents → dollars) — field Decor; **required** — no default already means required at save; **name** (one variable in two slots) — no consumer; **when / depends** — ruled out (facet structure, or INFRA-024's cascading sources). Prose for the preview rail, if it comes, is a facet-level `sentence`, not a variable property. 0.26 ships `default` + `options`; `range` stays documented until a card asks.
+
 Rulings the shape encodes:
 
 - **`bind` stays locked.** A `{ bind }` in a facet condition means "the server fills this; the user never sees it" — identity, not a variable. The editable marker is a different word (`variable`) so one token never means both. (No Zealot facet carries one today — the segment lens scopes brand on the lens, not in rules — so there is no worked example; the ruling stands without one.)
