@@ -170,11 +170,11 @@ describe('cache single-flight failure modes', () => {
 
   it('leaves a lock alone once it has been retaken by someone else', async () => {
     const key = cacheKey('user', 'stolen');
-    const lockKey = `${key}:singleflight`;
+    const lockKey = `lock:cache-singleflight:${key}`;
 
     const produce = async () => {
-      // Stand in for a producer that outran the lock TTL: the lock is gone and a newer caller owns
-      // one under the same name. Releasing unconditionally would delete theirs.
+      // Stand in for a producer that outran the lease: the lock is gone and a newer caller owns
+      // one under the same name. createLock's fenced release must not delete theirs.
       await getRedisClient().set(lockKey, 'someone-elses-token');
       return 'done';
     };
@@ -186,7 +186,7 @@ describe('cache single-flight failure modes', () => {
 
   it('holds the lock on a short lease, so a holder that dies mid-compute frees its waiters within seconds', async () => {
     const key = cacheKey('user', 'short-lease');
-    const lockKey = `${key}:singleflight`;
+    const lockKey = `lock:cache-singleflight:${key}`;
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -228,13 +228,37 @@ describe('cache single-flight failure modes', () => {
 
   it('does not make a waiter sit out the full wait behind a lock nobody holds', async () => {
     const key = cacheKey('user', 'orphaned');
-    const lockKey = `${key}:singleflight`;
+    const lockKey = `lock:cache-singleflight:${key}`;
     // Stand in for a dead holder: a lease that will lapse with no value ever written.
     await getRedisClient().set(lockKey, 'dead-holders-token', 'PX', 300);
 
     const started = Date.now();
     expect(await cache(key, async () => 'computed-ourselves')).toBe('computed-ourselves');
     expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it('re-elects a single waiter when the lease lapses, instead of stampeding every waiter', async () => {
+    const key = cacheKey('user', 'stampede-reelect');
+    const lockKey = `lock:cache-singleflight:${key}`;
+    // A dead holder: a short lease that lapses with no value ever written.
+    await getRedisClient().set(lockKey, 'dead-holders-token', 'PX', 200);
+
+    let calls = 0;
+    const produce = async () => {
+      calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return 'recomputed';
+    };
+
+    const results = await Promise.all([
+      cache(key, produce),
+      cache(key, produce),
+      cache(key, produce),
+      cache(key, produce),
+    ]);
+
+    expect(results).toEqual(['recomputed', 'recomputed', 'recomputed', 'recomputed']);
+    expect(calls).toBe(1);
   });
 
   it('derives the ttl from the value when given a function', async () => {
