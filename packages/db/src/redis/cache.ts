@@ -3,7 +3,7 @@
  * @partOf primitive:caching, infrastructure:redis, infrastructure:prisma
  * @uses none
  */
-import { randomUUID } from 'node:crypto';
+import { createLock } from '@template/db/lock/createLock';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
@@ -56,29 +56,22 @@ const resolveTtl = <T>(value: T, ttl: number | ((value: T) => number)): number =
 };
 
 // Concurrent misses on one key each ran `fn`, so an expensive producer was paid for once per
-// caller — and the lock is in Redis, so the flight is single across instances, not just within
-// one process. The first miss takes a short lock and computes; the rest wait for the value to
-// appear.
+// caller. Single-flight is built on `createLock`, the shared Redis mutex: the first miss acquires
+// the lock and computes while the rest poll for the value it will write. Cross-instance, because
+// the lock lives in Redis — not just within one process.
 //
-// Every failure mode falls through to computing rather than erroring — a lock we cannot take,
-// a holder that dies, or a producer slower than the wait all degrade to computing ourselves.
+// createLock holds a short heartbeat-renewed lease, so a holder killed mid-compute (a redeploy)
+// frees its waiters when the lease lapses rather than stranding them for a slowest-producer TTL.
+// When the lease does lapse with no value written, a waiter re-acquires so exactly one recomputes
+// rather than every waiter stampeding the producer at once.
 //
-// The lock is a short lease the holder renews while its producer runs, not a lifetime sized for
-// the slowest producer. A holder killed mid-compute (a redeploy) never runs its release, and
-// every waiter sits behind its lock until the lease lapses — so the lease, not the wait, is what
-// bounds an orphan. A live holder renews well inside the lease; a lapse under an event-loop stall
-// merely lets one waiter compute alongside.
+// Every failure mode falls through to computing rather than erroring — a lock we cannot take, a
+// holder that dies, or a producer slower than the wait all degrade to computing ourselves.
 const SINGLE_FLIGHT_LOCK_TTL_MS = 2_000;
 const SINGLE_FLIGHT_HEARTBEAT_MS = 500;
 const SINGLE_FLIGHT_POLL_MS = 50;
 // Longer than the slowest known producer, so a waiter almost never duplicates the work.
 const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
-
-// Both guarded by the ownership token: an expired-and-retaken lock is neither renewed nor released
-// by the caller that lost it.
-const RENEW_OWN_LOCK =
-  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) end";
-const RELEASE_OWN_LOCK = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -126,15 +119,18 @@ export const cache = async <T>(
   const cached = await readCached<T>(redis, key);
   if (cached.hit) return cached.value;
 
-  const lockKey = `${key}:singleflight`;
-  // Ownership token: a producer slower than the lock TTL must not delete the lock a LATER caller
-  // now holds. Without it the release is unconditional and single-flight quietly stops working in
-  // exactly the slow-producer case it exists for.
-  const token = `${process.pid}:${randomUUID()}`;
+  const lock = createLock({
+    service: 'cache-singleflight',
+    identifier: key,
+    ttlMs: SINGLE_FLIGHT_LOCK_TTL_MS,
+    heartbeatMs: SINGLE_FLIGHT_HEARTBEAT_MS,
+    maxMissed: 1,
+  });
+
   let holdsLock = false;
   let lockUnavailable = false;
   try {
-    holdsLock = (await redis.set(lockKey, token, 'PX', SINGLE_FLIGHT_LOCK_TTL_MS, 'NX')) === 'OK';
+    holdsLock = await lock.acquire();
   } catch (error) {
     // Redis is unreachable, so waiting on a key it cannot serve would burn the whole timeout on
     // failing reads. Compute instead — that is the documented fallback for every failure here.
@@ -148,21 +144,17 @@ export const cache = async <T>(
       await sleep(SINGLE_FLIGHT_POLL_MS);
       const polled = await readCached<T>(redis, key);
       if (polled.hit) return polled.value;
-      // The holder let the lock go without a value appearing: it threw, or its ttl resolved to ≤ 0
-      // so it never writes one. Either way no value is coming — stop waiting for it.
-      const stillHeld = await redis.exists(lockKey).catch(() => 0);
-      if (!stillHeld) break;
+      // The lease lapsed with no value written (the holder died mid-compute, threw, or produced an
+      // uncacheable value): re-acquire so exactly one waiter recomputes and the rest keep polling.
+      try {
+        holdsLock = await lock.acquire();
+      } catch (error) {
+        log.error(`Cache lock error for key ${key}:`, error);
+        break;
+      }
+      if (holdsLock) break;
     }
   }
-
-  const heartbeat = holdsLock
-    ? setInterval(() => {
-        redis.eval(RENEW_OWN_LOCK, 1, lockKey, token, SINGLE_FLIGHT_LOCK_TTL_MS).catch((error) => {
-          log.error(`Cache lock renew error for key ${key}:`, error);
-        });
-      }, SINGLE_FLIGHT_HEARTBEAT_MS)
-    : undefined;
-  heartbeat?.unref();
 
   try {
     const value = await fn();
@@ -179,9 +171,8 @@ export const cache = async <T>(
 
     return value;
   } finally {
-    if (heartbeat) clearInterval(heartbeat);
     if (holdsLock) {
-      await redis.eval(RELEASE_OWN_LOCK, 1, lockKey, token).catch((error) => {
+      await lock.release().catch((error) => {
         log.error(`Cache lock release error for key ${key}:`, error);
       });
     }
