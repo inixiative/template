@@ -184,6 +184,59 @@ describe('cache single-flight failure modes', () => {
     expect(await getRedisClient().get(lockKey)).toBe('someone-elses-token');
   });
 
+  it('holds the lock on a short lease, so a holder that dies mid-compute frees its waiters within seconds', async () => {
+    const key = cacheKey('user', 'short-lease');
+    const lockKey = `${key}:singleflight`;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const inFlight = cache(key, async () => {
+      await gate;
+      return 'done';
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // The lease is what bounds an orphan: a process killed by a redeploy never runs its release,
+    // and every waiter sits behind the lock until it expires.
+    const lease = await getRedisClient().pttl(lockKey);
+    expect(lease).toBeGreaterThan(0);
+    expect(lease).toBeLessThanOrEqual(2_000);
+
+    release();
+    await inFlight;
+  });
+
+  it('keeps the lock alive past its lease while the producer is still running', async () => {
+    const key = cacheKey('user', 'heartbeat');
+    let calls = 0;
+    const slowerThanLease = async () => {
+      calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 2_600));
+      return calls;
+    };
+
+    const first = cache(key, slowerThanLease);
+    // Arrive after the lease would have lapsed without a heartbeat: still single-flighted.
+    await new Promise((resolve) => setTimeout(resolve, 2_300));
+    const second = cache(key, slowerThanLease);
+
+    expect(await Promise.all([first, second])).toEqual([1, 1]);
+    expect(calls).toBe(1);
+  });
+
+  it('does not make a waiter sit out the full wait behind a lock nobody holds', async () => {
+    const key = cacheKey('user', 'orphaned');
+    const lockKey = `${key}:singleflight`;
+    // Stand in for a dead holder: a lease that will lapse with no value ever written.
+    await getRedisClient().set(lockKey, 'dead-holders-token', 'PX', 300);
+
+    const started = Date.now();
+    expect(await cache(key, async () => 'computed-ourselves')).toBe('computed-ourselves');
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it('derives the ttl from the value when given a function', async () => {
     const key = cacheKey('user', 'ttl-fn');
     await cache(

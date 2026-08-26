@@ -62,10 +62,23 @@ const resolveTtl = <T>(value: T, ttl: number | ((value: T) => number)): number =
 //
 // Every failure mode falls through to computing rather than erroring — a lock we cannot take,
 // a holder that dies, or a producer slower than the wait all degrade to computing ourselves.
-const SINGLE_FLIGHT_LOCK_TTL_SECONDS = 60;
+//
+// The lock is a short lease the holder renews while its producer runs, not a lifetime sized for
+// the slowest producer. A holder killed mid-compute (a redeploy) never runs its release, and
+// every waiter sits behind its lock until the lease lapses — so the lease, not the wait, is what
+// bounds an orphan. A live holder renews well inside the lease; a lapse under an event-loop stall
+// merely lets one waiter compute alongside.
+const SINGLE_FLIGHT_LOCK_TTL_MS = 2_000;
+const SINGLE_FLIGHT_HEARTBEAT_MS = 500;
 const SINGLE_FLIGHT_POLL_MS = 50;
 // Longer than the slowest known producer, so a waiter almost never duplicates the work.
 const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
+
+// Both guarded by the ownership token: an expired-and-retaken lock is neither renewed nor released
+// by the caller that lost it.
+const RENEW_OWN_LOCK =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) end";
+const RELEASE_OWN_LOCK = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -121,7 +134,7 @@ export const cache = async <T>(
   let holdsLock = false;
   let lockUnavailable = false;
   try {
-    holdsLock = (await redis.set(lockKey, token, 'EX', SINGLE_FLIGHT_LOCK_TTL_SECONDS, 'NX')) === 'OK';
+    holdsLock = (await redis.set(lockKey, token, 'PX', SINGLE_FLIGHT_LOCK_TTL_MS, 'NX')) === 'OK';
   } catch (error) {
     // Redis is unreachable, so waiting on a key it cannot serve would burn the whole timeout on
     // failing reads. Compute instead — that is the documented fallback for every failure here.
@@ -142,6 +155,15 @@ export const cache = async <T>(
     }
   }
 
+  const heartbeat = holdsLock
+    ? setInterval(() => {
+        redis.eval(RENEW_OWN_LOCK, 1, lockKey, token, SINGLE_FLIGHT_LOCK_TTL_MS).catch((error) => {
+          log.error(`Cache lock renew error for key ${key}:`, error);
+        });
+      }, SINGLE_FLIGHT_HEARTBEAT_MS)
+    : undefined;
+  heartbeat?.unref();
+
   try {
     const value = await fn();
     const effectiveTtl = resolveTtl(value, ttl);
@@ -157,14 +179,11 @@ export const cache = async <T>(
 
     return value;
   } finally {
+    if (heartbeat) clearInterval(heartbeat);
     if (holdsLock) {
-      // Compare-and-delete: only release a lock still carrying our token, so an expired-and-retaken
-      // lock survives our exit.
-      await redis
-        .eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end", 1, lockKey, token)
-        .catch((error) => {
-          log.error(`Cache lock release error for key ${key}:`, error);
-        });
+      await redis.eval(RELEASE_OWN_LOCK, 1, lockKey, token).catch((error) => {
+        log.error(`Cache lock release error for key ${key}:`, error);
+      });
     }
   }
 };
