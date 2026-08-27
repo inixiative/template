@@ -105,4 +105,21 @@ describe('renderBlocks', () => {
     );
     expect(out).toBe('<x></x>');
   });
+
+  it('throws a typed circular_ref on a persisted cycle instead of recursing forever', async () => {
+    await expect(
+      renderBlocks(
+        '{{#component:a}}{{/component:a}}',
+        loaderFrom({ a: '{{#component:b}}{{/component:b}}', b: '{{#component:a}}{{/component:a}}' }),
+      ),
+    ).rejects.toMatchObject({ type: 'circular_ref' });
+  });
+
+  it('does not false-positive a component nested inside its own override slot', async () => {
+    const out = await renderBlocks(
+      '{{#component:card}}{{#slot:body}}{{#component:card}}{{/component:card}}{{/slot:body}}{{/component:card}}',
+      loaderFrom({ card: '<x>{{#slot:body:default}}D{{/slot:body:default}}</x>' }),
+    );
+    expect(out).toBe('<x><x>D</x></x>');
+  });
 });
