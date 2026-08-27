@@ -16,6 +16,7 @@ export {
   type ResolveCascade,
   serialize,
 } from './decompose';
+export { deriveTextFromHtml } from './deriveTextFromHtml';
 export { type EmailErrorType, EmailRenderError } from './errors';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';
@@ -23,6 +24,7 @@ export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
 export { interpolate, Lens, type Variables } from './interpolate';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
+export { sanitizeSubject } from './sanitizeSubject';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
 export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
 export {

@@ -5,7 +5,7 @@
  * @uses feature:email
  */
 import { db } from '@template/db';
-import type { Variables } from '@template/email/render';
+import { deriveTextFromHtml, sanitizeSubject, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
@@ -123,8 +123,9 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
       cc,
       bcc,
       from,
-      subject: settled.subject,
+      subject: sanitizeSubject(settled.subject),
       html,
+      text: deriveTextFromHtml(html),
       headers,
     });
     if (!result.success) throw new Error(`Email provider rejected send (id=${result.id})`);
