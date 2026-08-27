@@ -153,6 +153,23 @@ describe('hydrate + decompose round-trip: decompose(hydrate(row)) → zero write
       },
     ),
   );
+
+  test(
+    'a slot re-exposed inside a nested override round-trips (concentric attribution, zero writes)',
+    roundTrips(
+      '{{#component:a}}{{/component:a}}',
+      resolverFrom({
+        a: '{{#component:b}}{{#slot:heading}}From A{{/slot:heading}}{{/component:b}}',
+        b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
+        c: '<x>{{#slot:body:default}}C default{{/slot:body:default}}</x>',
+      }),
+      {
+        a: '{{#component:b}}{{#slot:heading}}From A{{/slot:heading}}{{/component:b}}',
+        b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
+        c: '<x>{{#slot:body:default}}C default{{/slot:body:default}}</x>',
+      },
+    ),
+  );
 });
 
 describe('hydrate — bare inline content under a ref is not duplicated', () => {

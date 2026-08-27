@@ -72,4 +72,37 @@ describe('renderBlocks', () => {
     );
     expect(out).toBe('<btn>Get started</btn>');
   });
+
+  it('fills a slot re-exposed inside a nested component override', async () => {
+    const out = await renderBlocks(
+      '{{#component:b}}{{#slot:heading}}From A{{/slot:heading}}{{/component:b}}',
+      loaderFrom({
+        b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
+        c: '<x>{{#slot:body:default}}C default{{/slot:body:default}}</x>',
+      }),
+    );
+    expect(out).toBe('<x>From A</x>');
+  });
+
+  it('falls back to the re-exposed default when the caller supplies no fill', async () => {
+    const out = await renderBlocks(
+      '{{#component:b}}{{/component:b}}',
+      loaderFrom({
+        b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
+        c: '<x>{{#slot:body:default}}C default{{/slot:body:default}}</x>',
+      }),
+    );
+    expect(out).toBe('<x>B default</x>');
+  });
+
+  it('blanks a re-exposed slot on an empty fill (holds position)', async () => {
+    const out = await renderBlocks(
+      '{{#component:b}}{{#slot:heading}}{{/slot:heading}}{{/component:b}}',
+      loaderFrom({
+        b: '{{#component:c}}{{#slot:body}}{{#slot:heading:default}}B default{{/slot:heading:default}}{{/slot:body}}{{/component:c}}',
+        c: '<x>{{#slot:body:default}}C default{{/slot:body:default}}</x>',
+      }),
+    );
+    expect(out).toBe('<x></x>');
+  });
 });
