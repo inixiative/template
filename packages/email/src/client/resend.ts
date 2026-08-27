@@ -46,6 +46,7 @@ const toResendPayload = (options: SendEmailOptions) => ({
   from: options.from,
   subject: options.subject,
   html: options.html,
+  text: options.text,
   replyTo: options.replyTo,
   tags: options.tags?.map((name) => ({ name, value: 'true' })),
   headers: options.headers,
