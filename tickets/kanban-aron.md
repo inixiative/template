@@ -21,6 +21,7 @@ kanban
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
+    FEAT-020-custom-fields-eav
     FEAT-004-ai-providers
     FEAT-009-file-management
     FEAT-011-dates-timezones
@@ -76,6 +77,7 @@ kanban
 **Communications:**
 - [COMM-001: Email System](./COMM-001-email-system.md) - Complete email (blocked by rules builder)
 - [FEAT-008: Permissions Builder](./FEAT-008-permissions-builder.md) - Visual permission editor (blocked by rules builder)
+- [FEAT-020: Custom Fields (EAV)](./FEAT-020-custom-fields-eav.md) - the enrichment substrate (definitions / sources / maps / contributions / vocabulary) shipped once, with Zealot's ten lessons written down; INFRA-014 + INFRA-024 build on it
 
 ### 📦 Backlog
 
@@ -101,8 +103,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 17
-- **Todo**: 12
+- **Total Tickets**: 18
+- **Todo**: 13
 - **In Progress**: 6
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
