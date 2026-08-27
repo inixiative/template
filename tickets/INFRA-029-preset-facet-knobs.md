@@ -1,10 +1,10 @@
 # INFRA-029: Preset facets with variables — a named condition the user can still tune
 
-**Status**: 🆕 Not Started — shape settled + adversarially reviewed 2026-08-26 (11-agent pass; amendments folded in below); rules-builder only, no json-rules change
+**Status**: 🚧 In Progress — rules-builder **0.26.0 shipped 2026-08-26** (`4a06d89` main; npm + `v0.26.0` dist tag on inixiative and the userevidence fork; `test/decoration.variables.test.ts`, 16 tests): `Variable`, `presetSeed`, `variableSlots`, `VariableControl` on atomic nodes, ranked preset recognition, aggregate presets, validator rules — mechanics 1–5 below as written. Remaining: Zealot pin bump + decoration move (End state below; needs a ZLT ticket)
 **Assignee**: Aron
 **Priority**: Medium (Zealot carries a side-channel that covers it today; the side-channel is the cost)
 **Created**: 2026-08-26
-**Updated**: 2026-08-26
+**Updated**: 2026-08-26 (0.26.0 shipped)
 
 The preset facet (`Facet.condition`, rules-builder `ed5980c`, 0.24.x) is a named alias for a complete pre-authored `Condition`: pick "Mature", the whole condition drops in as one **atomic** node and a saved node equal to the condition collapses back to the name. That was half the idea. The other half — a preset that still lets the user pick *something* while its identity stays fixed — never landed.
 

@@ -15,7 +15,6 @@ kanban
     INFRA-015-bridge-registry
     INFRA-016-lens-serialization-by-ref
     INFRA-028-lens-prose-decorator
-    INFRA-029-preset-facet-knobs
     INFRA-018-lens-builder
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
@@ -59,7 +58,6 @@ kanban
 - [INFRA-015: Bridge Registry](./INFRA-015-bridge-registry.md) - Save & reuse bridges across lenses
 - [INFRA-014: Source Primitive](./INFRA-014-source-primitive.md) - Formalize sources (hydrated tables) + custom-field tables
 - [INFRA-028: Lens Prose Decorator](./INFRA-028-lens-prose-decorator.md) - Static presentation metadata (labels, icons) on the lens for FE + AI; sibling of INFRA-024's dynamic value axis. Placeholder, shape TBD (ZLT-3633)
-- [INFRA-029: Preset Facets with Knobs](./INFRA-029-preset-facet-knobs.md) - `Facet.condition` presets that still expose declared operator/value pickers; retires Zealot's `presets` side-channel (#1710). Surfaced by ZLT-4222 / #2081
 - [INFRA-013: Source-Map Importer](./INFRA-013-source-map-importer.md) - Non-Prisma schema → FieldMap (in rules-builder)
 - [INFRA-018: Lens Builder](./INFRA-018-lens-builder.md) - Compose lens + narrowings (in rules-builder)
 - [INFRA-019: json-rules target sharp edges](./INFRA-019-json-rules-target-sharp-edges.md) - Backlog of check-only operators / target asymmetry
@@ -83,6 +81,7 @@ kanban
 See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
+- [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.0 shipped (`variable` slots on preset facets); Zealot pin bump + `presets` side-channel (#1710) retirement pending
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
 - [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
 - [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) - exposedSurface ✅ + describeRule ✅; serializable projection deferred
