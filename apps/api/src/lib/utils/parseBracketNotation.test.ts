@@ -210,3 +210,27 @@ describe('parseBracketNotation — number values ([$] marker)', () => {
     expect(parseBracketNotation('?searchFields[a][$]=7').searchFields).toEqual({ a: 7 });
   });
 });
+
+describe('parseBracketNotation — prototype pollution', () => {
+  it('does not write through a __proto__ segment', () => {
+    parseBracketNotation('?searchFields[__proto__][polluted]=YES');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('does not write through constructor/prototype segments', () => {
+    parseBracketNotation('?searchFields[constructor][prototype][polluted]=YES');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('drops the whole entry when a path segment is a prototype key', () => {
+    // The dangerous keys name no real field, so the entire param is skipped — not even the
+    // top-level `searchFields` slot is created for it.
+    expect(parseBracketNotation('?searchFields[__proto__][zzz]=1')).toEqual({});
+  });
+
+  it('still parses a legitimately-named field unaffected', () => {
+    expect(parseBracketNotation('?searchFields[name][equals]=ok').searchFields).toEqual({
+      name: { equals: 'ok' },
+    });
+  });
+});
