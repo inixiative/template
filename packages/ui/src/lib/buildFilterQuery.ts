@@ -4,7 +4,7 @@
  * @partOf primitive:ui
  * @uses primitive:shared
  */
-import type { ArrayFieldOperator, ScalarFieldOperator } from '@template/shared/bracketQuery';
+import { type ArrayFieldOperator, isCombinator, type ScalarFieldOperator } from '@template/shared/bracketQuery';
 import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 import { castArray } from 'lodash-es';
@@ -12,6 +12,12 @@ import { castArray } from 'lodash-es';
 export type FilterState =
   | { operator: ArrayFieldOperator; values: string[] }
   | { operator: ScalarFieldOperator; value: string };
+
+// Prisma's where shape with FilterState leaves: a combinator key (AND/OR) carries an array of
+// nested maps, one clause group per element, serialized as indexed children —
+// `{ AND: [{ 'tokens.some.name': … }] }` → `searchFields[AND][0][tokens][some][name][…]`.
+// Only combinator keys may carry the array-of-maps arm.
+export type FilterMap = { [field: string]: FilterState | FilterState[] | FilterMap[] };
 
 const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
   const [head, ...rest] = path;
@@ -26,11 +32,35 @@ const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<s
   mergePath(next, rest, value);
 };
 
+const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void => {
+  for (const [field, state] of Object.entries(filters)) {
+    if (isCombinator(field)) {
+      const children = (state as FilterMap[]).map((group) => {
+        const child: Record<string, unknown> = {};
+        addFilters(child, group);
+        return child;
+      });
+      // A group whose clauses all carried empty values is no filter — drop it, and drop the
+      // combinator entirely when no group survives (a childless combinator is a 400 server-side).
+      const live = children.filter((child) => Object.keys(child).length > 0);
+      if (live.length > 0) nested[field] = live;
+      continue;
+    }
+    for (const clause of castArray(state as FilterState | FilterState[])) {
+      if ('values' in clause) {
+        if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
+      } else if (clause.value) {
+        mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
+      }
+    }
+  }
+};
+
 export const buildFilterQuery = (
   search: string,
   searchMode: SearchMode,
   searchableFields: string[],
-  filters: Record<string, FilterState | FilterState[]>,
+  filters: FilterMap,
   orderBy: Array<{ field: string; direction: 'asc' | 'desc' }>,
   adminMode = false,
 ): Record<string, unknown> => {
@@ -48,15 +78,7 @@ export const buildFilterQuery = (
     }
   }
 
-  for (const [field, state] of Object.entries(filters)) {
-    for (const clause of castArray(state)) {
-      if ('values' in clause) {
-        if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
-      } else if (clause.value) {
-        mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
-      }
-    }
-  }
+  addFilters(nested, filters);
 
   const bracketPrefix = adminMode ? 'filters' : 'searchFields';
 
