@@ -109,3 +109,59 @@ describe('validateBlocks', () => {
     expect(reasonOf(() => validateBlocks('{{ #component:card}}{{/component:card}}'))).toBe('mismatched_close');
   });
 });
+
+describe('validateBlocks — duplicate exposed slot names in one component body', () => {
+  it('rejects two same-name default slots in one component body', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#component:b}}{{#slot:heading:default}}one{{/slot:heading}}{{#slot:heading:default}}two{{/slot:heading}}{{/component:b}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
+  it('rejects a re-exposed slot colliding with a same-name default in the same body', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#component:b}}{{#slot:heading:default}}own{{/slot:heading}}{{#component:c}}{{#slot:body}}{{#slot:heading:default}}re-exposed{{/slot:heading}}{{/slot:body}}{{/component:c}}{{/component:b}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
+  it('rejects a duplicate exposed name in a raw component body (direct component save shape)', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#slot:heading:default}}own{{/slot:heading}}{{#component:c}}{{#slot:body}}{{#slot:heading:default}}re-exposed{{/slot:heading}}{{/slot:body}}{{/component:c}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
+  it('allows a fill for a child to share a name with the enclosing component own slot', () => {
+    expect(() =>
+      validateBlocks(
+        '{{#component:b}}{{#slot:body:default}}own{{/slot:body}}{{#component:c}}{{#slot:body}}fill{{/slot:body}}{{/component:c}}{{/component:b}}',
+      ),
+    ).not.toThrow();
+  });
+
+  it('allows the same exposed name in two different components', () => {
+    expect(() =>
+      validateBlocks(
+        '{{#component:a}}{{#slot:body:default}}1{{/slot:body}}{{/component:a}}{{#component:b}}{{#slot:body:default}}2{{/slot:body}}{{/component:b}}',
+      ),
+    ).not.toThrow();
+  });
+
+  it('allows one component referenced twice with different fills', () => {
+    expect(() =>
+      validateBlocks(
+        '{{#component:card}}{{#slot:body}}first{{/slot:body}}{{/component:card}}{{#component:card}}{{#slot:body}}second{{/slot:body}}{{/component:card}}',
+      ),
+    ).not.toThrow();
+  });
+});
