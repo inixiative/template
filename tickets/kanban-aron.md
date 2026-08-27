@@ -82,7 +82,7 @@ kanban
 See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
-- [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.0 shipped (`variable` slots on preset facets); Zealot pin bump + `presets` side-channel (#1710) retirement pending
+- [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.1 shipped (`variable` slots on preset facets, builder-shape identity, `FacetCondition`); Zealot pin bump + `presets` side-channel (#1710) retirement pending
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
 - [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
 - [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) - exposedSurface ✅ + describeRule ✅; serializable projection deferred
