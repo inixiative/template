@@ -34,7 +34,13 @@ const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<s
 
 const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void => {
   for (const [field, state] of Object.entries(filters)) {
+    // An absent value is not a filter. Guards `filters.AND = groups?.map(...)` assigning undefined
+    // (the natural spelling when a caller has no groups) and `setFilter(field, null)` semantics.
+    if (state == null) continue;
     if (isCombinator(field)) {
+      // Combinator keys carry an array of clause groups. A non-array here is a malformed map (a
+      // scalar clause under AND/OR); drop it rather than crash — the server 400s the same wire.
+      if (!Array.isArray(state)) continue;
       const children = (state as FilterMap[]).map((group) => {
         const child: Record<string, unknown> = {};
         addFilters(child, group);

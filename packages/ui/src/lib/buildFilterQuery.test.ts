@@ -84,4 +84,27 @@ describe('buildFilterQuery', () => {
       });
     });
   });
+
+  // The FilterMap index signature can't be narrowed to reject a non-array under a combinator key
+  // (an open string index and typed AND/OR keys are mutually exclusive in TS), so addFilters is
+  // the gate. A shared render primitive must never throw on a malformed map — it drops the bad
+  // slot, the same outcome the server reaches by 400ing the equivalent wire.
+  describe('malformed input never throws', () => {
+    it('an absent combinator (undefined) is skipped, not dereferenced', () => {
+      // The reference-board default load: `filters.AND = enrichments?.map(...)` is undefined when
+      // no form-field filter is active, and the key is assigned rather than omitted.
+      const filters = { status: { operator: 'equals', value: 'active' }, AND: undefined } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({ 'searchFields[status][equals]': 'active' });
+    });
+
+    it('a scalar clause under a combinator key is dropped, not mapped over', () => {
+      const filters = { AND: { operator: 'equals', value: 'x' } } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
+    });
+
+    it('a null value is skipped', () => {
+      const filters = { status: null, AND: null } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
+    });
+  });
 });
