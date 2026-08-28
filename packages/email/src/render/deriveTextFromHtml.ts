@@ -5,14 +5,14 @@
  * @uses none
  */
 const TAG_BODY = `[^>"']*(?:"[^"]*"[^>"']*|'[^']*'[^>"']*)*`;
-const DROPPED_SECTIONS = new RegExp(`<(head|style|script)\\b${TAG_BODY}>[\\s\\S]*?</\\1>`, 'gi');
+const DROPPED_SECTIONS = new RegExp(`<(head|style|script)\\b${TAG_BODY}>[\\s\\S]*?</\\1\\s*>`, 'gi');
 const LINE_BREAKS = /<br\s*\/?>/gi;
 const IMAGES = new RegExp(`<img\\b(${TAG_BODY})/?>`, 'gi');
-const BLOCK_CLOSERS = /<\/(p|div|tr|table|h[1-6]|li|ul|ol|section|article|header|footer|blockquote)>/gi;
-const LINKS = new RegExp(`<a\\b(${TAG_BODY})>([\\s\\S]*?)</a>`, 'gi');
-const TAGS = new RegExp(`</?[a-zA-Z]${TAG_BODY}>`, 'g');
-const HREF = /href\s*=\s*["']([^"']*)["']/i;
-const ALT = /alt\s*=\s*["']([^"']*)["']/i;
+const BLOCK_CLOSERS = /<\/(p|div|tr|table|h[1-6]|li|ul|ol|section|article|header|footer|blockquote)\s*>/gi;
+const LINKS = new RegExp(`<a\\b(${TAG_BODY})>([\\s\\S]*?)</a\\s*>`, 'gi');
+const TAGS = new RegExp(`<!--[\\s\\S]*?-->|<!doctype${TAG_BODY}>|</?[a-zA-Z]${TAG_BODY}>`, 'gi');
+const HREF = /(?:^|\s)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i;
+const ALT = /(?:^|\s)alt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i;
 
 const NAMED_ENTITIES: Record<string, string> = {
   nbsp: ' ',
@@ -37,6 +37,11 @@ const fromCodePointSafe = (code: number): string | null => {
   return String.fromCodePoint(code);
 };
 
+const attributeValue = (pattern: RegExp, attributes: string): string => {
+  const match = pattern.exec(attributes);
+  return (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim();
+};
+
 // `&amp;` decodes LAST and named lookup skips it, so double-encoded input (`&amp;#169;`) yields the
 // literal `&#169;` the HTML displays, never a second decode pass.
 const decodeEntities = (text: string): string =>
@@ -49,7 +54,7 @@ const decodeEntities = (text: string): string =>
     .replace(/&amp;/gi, '&');
 
 const renderLink = (attributes: string, label: string): string => {
-  const href = (HREF.exec(attributes)?.[1] ?? '').trim();
+  const href = attributeValue(HREF, attributes);
   const text = label.replace(TAGS, '').replace(/\s+/g, ' ').trim();
   if (!text) return href;
   if (text === href) return text;
@@ -61,13 +66,13 @@ export const deriveTextFromHtml = (html: string): string =>
     html
       .replace(DROPPED_SECTIONS, '')
       .replace(LINE_BREAKS, '\n')
-      .replace(IMAGES, (_match, attributes: string) => ALT.exec(attributes)?.[1] ?? '')
+      .replace(IMAGES, (_match, attributes: string) => attributeValue(ALT, attributes))
       .replace(LINKS, (_match, attributes: string, label: string) => renderLink(attributes, label))
       .replace(BLOCK_CLOSERS, '\n')
       .replace(TAGS, ''),
   )
     .split('\n')
-    .map((line) => line.replace(/[ \t ]+/g, ' ').trim())
+    .map((line) => line.replace(/[ \t ]+/g, ' ').trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
