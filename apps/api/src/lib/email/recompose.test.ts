@@ -59,3 +59,81 @@ describe('recomposeFromSnapshots', () => {
     expect(await recomposeFromSnapshots('missing', loaderFrom({}))).toBeNull();
   });
 });
+
+import { afterAll, afterEach, beforeAll } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
+import { cleanupTouchedTables } from '@template/db/test';
+import { saveEmailTemplate } from '@template/email/render';
+import { registerAuditLogHook } from '#/hooks/auditLog/hook';
+import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
+import { recomposeCommunication } from '#/lib/email/recompose';
+
+const documentMjml = (content: string) =>
+  `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
+
+describe('recomposeCommunication (DB-backed)', () => {
+  beforeAll(() => {
+    registerAuditLogHook();
+    registerEmailVersioningHook();
+  });
+
+  afterAll(async () => {
+    clearHookRegistry();
+    await cleanupTouchedTables(db);
+  });
+
+  afterEach(async () => {
+    await db.communicationLog.deleteMany({});
+    await db.auditLog.deleteMany({});
+    await db.emailTemplate.deleteMany({});
+    await db.emailComponent.deleteMany({});
+  });
+
+  const savedPin = async () => {
+    const { template } = await saveEmailTemplate({
+      slug: 'recompose-sent',
+      name: 'Recompose Sent',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: documentMjml('{{#component:recompose-hero}}<mj-text>Saved</mj-text>{{/component:recompose-hero}}'),
+      ownerModel: 'default',
+    });
+    const pin = await db.auditLog.findFirst({
+      where: { subjectEmailTemplateId: template.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!pin) throw new Error('expected a template snapshot');
+    return { template, pin };
+  };
+
+  const createLog = (data: Record<string, unknown>) =>
+    db.communicationLog.create({
+      data: {
+        sendKey: 'recompose-test',
+        channel: 'email',
+        address: 'fan@example.com',
+        idempotencyKey: crypto.randomUUID(),
+        senderType: 'platform',
+        ...data,
+      },
+    });
+
+  it('returns the recorded settledMjml — the sent truth — not a recompose of the save-time pin', async () => {
+    const { template, pin } = await savedPin();
+    const sent = '<mj-text>What the sender-scoped cascade actually rendered</mj-text>';
+    const log = await createLog({
+      emailTemplateId: template.id,
+      emailTemplateAuditLogId: pin.id,
+      settledMjml: sent,
+    });
+
+    expect(await recomposeCommunication(log.id)).toBe(sent);
+  });
+
+  it('falls back to the pinned snapshot for legacy rows without settledMjml', async () => {
+    const { template, pin } = await savedPin();
+    const log = await createLog({ emailTemplateId: template.id, emailTemplateAuditLogId: pin.id });
+
+    expect(await recomposeCommunication(log.id)).toContain('Saved');
+  });
+});
