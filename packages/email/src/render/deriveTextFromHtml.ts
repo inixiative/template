@@ -8,7 +8,7 @@ const TAG_BODY = `[^>"']*(?:"[^"]*"[^>"']*|'[^']*'[^>"']*)*`;
 const DROPPED_SECTIONS = new RegExp(`<(head|style|script)\\b${TAG_BODY}>[\\s\\S]*?</\\1\\s*>`, 'gi');
 const LINE_BREAKS = /<br\s*\/?>/gi;
 const IMAGES = new RegExp(`<img\\b(${TAG_BODY})/?>`, 'gi');
-const BLOCK_CLOSERS = /<\/(p|div|tr|table|h[1-6]|li|ul|ol|section|article|header|footer|blockquote)\s*>/gi;
+const BLOCK_CLOSERS = /<\/(p|div|tr|td|th|table|h[1-6]|li|ul|ol|section|article|header|footer|blockquote)\s*>/gi;
 const LINKS = new RegExp(`<a\\b(${TAG_BODY})>([\\s\\S]*?)</a\\s*>`, 'gi');
 const TAGS = new RegExp(`<!--[\\s\\S]*?-->|<!doctype${TAG_BODY}>|</?[a-zA-Z]${TAG_BODY}>`, 'gi');
 const HREF = /(?:^|\s)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/i;
@@ -55,7 +55,7 @@ const decodeEntities = (text: string): string =>
 
 const renderLink = (attributes: string, label: string): string => {
   const href = attributeValue(HREF, attributes);
-  const text = label.replace(TAGS, '').replace(/\s+/g, ' ').trim();
+  const text = label.replace(BLOCK_CLOSERS, '\n').replace(TAGS, '').replace(/[ \t]+/g, ' ').trim();
   if (!text) return href;
   if (text === href) return text;
   return href ? `${text} (${href})` : text;
