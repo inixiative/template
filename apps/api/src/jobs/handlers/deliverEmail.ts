@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import { db } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import { deriveTextFromHtml, sanitizeSubject, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
@@ -104,7 +104,12 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
 
   const claimed = await db.communicationLog.updateManyAndReturn({
     where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-    data: { status: 'sending', ...resolved },
+    data: {
+      status: 'sending',
+      ...resolved,
+      settledMjml: settled.mjml,
+      variables: settled.variables as Prisma.InputJsonValue,
+    },
   });
   if (claimed.length === 0) return;
 
