@@ -83,3 +83,11 @@ describe('deriveTextFromHtml — visible layout boundaries', () => {
     expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe('First\nSecond (/x)');
   });
 });
+
+describe('deriveTextFromHtml — link label equal to its target up to entity encoding', () => {
+  it('does not print the URL twice when label and href differ only by encoding', () => {
+    expect(deriveTextFromHtml('<a href="https://x.test/?a=1&b=2">https://x.test/?a=1&amp;b=2</a>')).toBe(
+      'https://x.test/?a=1&b=2',
+    );
+  });
+});
