@@ -24,6 +24,7 @@ export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
 export { interpolate, Lens, type Variables } from './interpolate';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
+export { type LoadComponentBody, renderBlocks } from './renderBlocks';
 export { sanitizeSubject } from './sanitizeSubject';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
 export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
