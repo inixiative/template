@@ -28,6 +28,9 @@ model CommunicationLog {
   recipientContact   Contact? @relation(fields: [recipientContactId], references: [id], onDelete: SetNull)
   address            String
 
+  settledMjml String? @db.Text
+  variables   Json?
+
   idempotencyKey    String    @unique
   providerMessageId String?
   error             String?
