@@ -51,3 +51,25 @@ describe('deriveTextFromHtml — quoted attributes and entity coverage', () => {
     expect(deriveTextFromHtml(html)).toBe('Price © © \u{1F600}');
   });
 });
+
+describe('deriveTextFromHtml — markup that is not an element tag', () => {
+  it('drops HTML comments instead of leaking them into the text', () => {
+    expect(deriveTextFromHtml('<p>Hello</p><!-- internal campaign note -->')).toBe('Hello');
+  });
+
+  it('drops a doctype declaration', () => {
+    expect(deriveTextFromHtml('<!DOCTYPE html><p>Hi</p>')).toBe('Hi');
+  });
+
+  it('drops style content even when the closing tag carries whitespace', () => {
+    expect(deriveTextFromHtml('<style>.cta{color:red}</style ><p>Hi</p>')).toBe('Hi');
+  });
+
+  it('keeps the destination of an unquoted href', () => {
+    expect(deriveTextFromHtml('<a href=https://example.test>read</a>')).toBe('read (https://example.test)');
+  });
+
+  it('extracts href, not a data-href that appears first', () => {
+    expect(deriveTextFromHtml('<a data-href="internal" href="https://x.test">go</a>')).toBe('go (https://x.test)');
+  });
+});
