@@ -34,3 +34,20 @@ describe('deriveTextFromHtml', () => {
     expect(deriveTextFromHtml(html)).toBe('One\n\nTwo');
   });
 });
+
+describe('deriveTextFromHtml — quoted attributes and entity coverage', () => {
+  it('a quoted attribute containing > does not leak tag garbage into the text', () => {
+    const html = '<td title="x > y">Cell</td>';
+    expect(deriveTextFromHtml(html)).toBe('Cell');
+  });
+
+  it('an image contributes its alt text instead of attribute garbage', () => {
+    const html = '<p>Before <img alt="a > b" src="https://cdn.test/i.png"> after</p>';
+    expect(deriveTextFromHtml(html)).toBe('Before a > b after');
+  });
+
+  it('decodes numeric, hex, and common named entities so text matches the rendered HTML', () => {
+    const html = '<p>Price &copy; &#169; &#x1F600;</p>';
+    expect(deriveTextFromHtml(html)).toBe('Price © © \u{1F600}');
+  });
+});

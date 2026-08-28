@@ -4,26 +4,56 @@
  * @partOf feature:email
  * @uses none
  */
-const DROPPED_SECTIONS = /<(head|style|script)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const TAG_BODY = `[^>"']*(?:"[^"]*"[^>"']*|'[^']*'[^>"']*)*`;
+const DROPPED_SECTIONS = new RegExp(`<(head|style|script)\\b${TAG_BODY}>[\\s\\S]*?</\\1>`, 'gi');
 const LINE_BREAKS = /<br\s*\/?>/gi;
+const IMAGES = new RegExp(`<img\\b(${TAG_BODY})/?>`, 'gi');
 const BLOCK_CLOSERS = /<\/(p|div|tr|table|h[1-6]|li|ul|ol|section|article|header|footer|blockquote)>/gi;
-const LINKS = /<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-const TAGS = /<[^>]+>/g;
+const LINKS = new RegExp(`<a\\b(${TAG_BODY})>([\\s\\S]*?)</a>`, 'gi');
+const TAGS = new RegExp(`</?[a-zA-Z]${TAG_BODY}>`, 'g');
+const HREF = /href\s*=\s*["']([^"']*)["']/i;
+const ALT = /alt\s*=\s*["']([^"']*)["']/i;
 
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: ' ',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  hellip: '…',
+  mdash: '—',
+  ndash: '–',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+};
+
+const fromCodePointSafe = (code: number): string | null => {
+  if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return null;
+  return String.fromCodePoint(code);
+};
+
+// `&amp;` decodes LAST and named lookup skips it, so double-encoded input (`&amp;#169;`) yields the
+// literal `&#169;` the HTML displays, never a second decode pass.
 const decodeEntities = (text: string): string =>
   text
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (match, hex: string) => fromCodePointSafe(Number.parseInt(hex, 16)) ?? match)
+    .replace(/&#(\d+);/g, (match, decimal: string) => fromCodePointSafe(Number(decimal)) ?? match)
+    .replace(/&([a-z]+);/gi, (match, name: string) =>
+      name.toLowerCase() === 'amp' ? match : (NAMED_ENTITIES[name.toLowerCase()] ?? match),
+    )
     .replace(/&amp;/gi, '&');
 
-const renderLink = (href: string, label: string): string => {
+const renderLink = (attributes: string, label: string): string => {
+  const href = (HREF.exec(attributes)?.[1] ?? '').trim();
   const text = label.replace(TAGS, '').replace(/\s+/g, ' ').trim();
-  if (!text) return href.trim();
-  if (text === href.trim()) return text;
-  return `${text} (${href.trim()})`;
+  if (!text) return href;
+  if (text === href) return text;
+  return href ? `${text} (${href})` : text;
 };
 
 export const deriveTextFromHtml = (html: string): string =>
@@ -31,12 +61,13 @@ export const deriveTextFromHtml = (html: string): string =>
     html
       .replace(DROPPED_SECTIONS, '')
       .replace(LINE_BREAKS, '\n')
-      .replace(LINKS, (_match, href: string, label: string) => renderLink(href, label))
+      .replace(IMAGES, (_match, attributes: string) => ALT.exec(attributes)?.[1] ?? '')
+      .replace(LINKS, (_match, attributes: string, label: string) => renderLink(attributes, label))
       .replace(BLOCK_CLOSERS, '\n')
       .replace(TAGS, ''),
   )
     .split('\n')
-    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .map((line) => line.replace(/[ \t ]+/g, ' ').trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
