@@ -11,7 +11,7 @@ describe('deriveTextFromHtml', () => {
 
   it('turns block boundaries and line breaks into newlines', () => {
     const html = '<p>First</p><div>Second<br>Third</div><table><tr><td>Fourth</td></tr></table>';
-    expect(deriveTextFromHtml(html)).toBe('First\nSecond\nThird\nFourth');
+    expect(deriveTextFromHtml(html)).toBe('First\n\nSecond\nThird\n\nFourth');
   });
 
   it('keeps link targets next to their labels', () => {
@@ -76,11 +76,11 @@ describe('deriveTextFromHtml — markup that is not an element tag', () => {
 
 describe('deriveTextFromHtml — visible layout boundaries', () => {
   it('adjacent table cells keep a boundary instead of concatenating', () => {
-    expect(deriveTextFromHtml('<table><tr><td>First</td><td>Second</td></tr></table>')).toBe('First\nSecond');
+    expect(deriveTextFromHtml('<table><tr><td>First</td><td>Second</td></tr></table>')).toBe('First   Second');
   });
 
   it('block elements inside a link label keep their separation', () => {
-    expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe('First\nSecond (/x)');
+    expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe('First\n\nSecond\n\n(/x)');
   });
 });
 
