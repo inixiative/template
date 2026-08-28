@@ -36,6 +36,8 @@ model CommunicationLog {
   error             String?
   sentAt            DateTime?
 
+  componentVersions CommunicationComponentVersion[]
+
   @@index([sendKey])
   @@index([emailTemplateId])
   @@index([emailTemplateAuditLogId])
@@ -45,6 +47,26 @@ model CommunicationLog {
   @@index([recipientUserId])
   @@index([recipientContactId])
   @@index([status])
+}
+
+model CommunicationComponentVersion {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  communicationLogId String           @db.VarChar(36)
+  communicationLog   CommunicationLog @relation(fields: [communicationLogId], references: [id], onDelete: Cascade)
+
+  slug String
+
+  emailComponentId String?         @db.VarChar(36)
+  emailComponent   EmailComponent? @relation(fields: [emailComponentId], references: [id], onDelete: SetNull)
+
+  emailComponentAuditLogId String?   @db.VarChar(36)
+  emailComponentAuditLog   AuditLog? @relation("CommunicationComponentVersionAuditLog", fields: [emailComponentAuditLogId], references: [id], onDelete: SetNull)
+
+  @@unique([communicationLogId, slug])
+  @@index([emailComponentId])
+  @@index([emailComponentAuditLogId])
 }
 
 enum CommunicationChannel {
