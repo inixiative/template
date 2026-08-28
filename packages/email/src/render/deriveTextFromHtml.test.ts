@@ -73,3 +73,13 @@ describe('deriveTextFromHtml — markup that is not an element tag', () => {
     expect(deriveTextFromHtml('<a data-href="internal" href="https://x.test">go</a>')).toBe('go (https://x.test)');
   });
 });
+
+describe('deriveTextFromHtml — visible layout boundaries', () => {
+  it('adjacent table cells keep a boundary instead of concatenating', () => {
+    expect(deriveTextFromHtml('<table><tr><td>First</td><td>Second</td></tr></table>')).toBe('First\nSecond');
+  });
+
+  it('block elements inside a link label keep their separation', () => {
+    expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe('First\nSecond (/x)');
+  });
+});
