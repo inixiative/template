@@ -56,6 +56,7 @@ export type SettledTemplate = {
   kind: CommunicationKind;
   emailTemplateId: string;
   emailTemplateAuditLogId: string | null;
+  variables: Variables;
 };
 
 export const settleTemplate = async (
@@ -82,6 +83,7 @@ export const settleTemplate = async (
       kind: composed.kind,
       emailTemplateId: composed.id,
       emailTemplateAuditLogId: composed.emailTemplateAuditLogId,
+      variables: vars,
     };
 
     if (!errors.length) return settled;
