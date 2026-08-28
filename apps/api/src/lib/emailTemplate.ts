@@ -57,6 +57,7 @@ export type SettledTemplate = {
   emailTemplateId: string;
   emailTemplateAuditLogId: string | null;
   variables: Variables;
+  componentResolutions: Record<string, string>;
 };
 
 export const settleTemplate = async (
@@ -83,6 +84,7 @@ export const settleTemplate = async (
       emailTemplateId: composed.id,
       emailTemplateAuditLogId: composed.emailTemplateAuditLogId,
       variables: vars,
+      componentResolutions: composed.componentResolutions,
     };
 
     if (!errors.length) return settled;

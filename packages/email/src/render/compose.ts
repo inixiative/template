@@ -18,6 +18,7 @@ export type ComposeTemplateResult = {
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel; // where the cascade actually resolved (may differ from the requested owner)
   onError: EmailErrorPolicy; // render-error policy for the resolved template
+  componentResolutions: Record<string, string>; // slug → EmailComponent id the cascade resolved during this expand
 };
 
 // The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
@@ -47,7 +48,10 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
-  const mjml = await expand(template.mjml, ctx);
+  const componentResolutions: Record<string, string> = {};
+  const mjml = await expand(template.mjml, ctx, (componentSlug, component) => {
+    componentResolutions[componentSlug] = component.id;
+  });
 
   return {
     id: template.id,
@@ -57,6 +61,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     kind: template.kind,
     ownerModel: template.ownerModel,
     onError: template.onError,
+    componentResolutions,
   };
 };
 

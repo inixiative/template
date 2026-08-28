@@ -102,14 +102,38 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     return;
   }
 
-  const claimed = await db.communicationLog.updateManyAndReturn({
-    where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-    data: {
-      status: 'sending',
-      ...resolved,
-      settledMjml: settled.mjml,
-      variables: settled.variables as Prisma.InputJsonValue,
-    },
+  const claimed = await db.txn(async () => {
+    const rows = await db.communicationLog.updateManyAndReturn({
+      where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
+      data: {
+        status: 'sending',
+        ...resolved,
+        settledMjml: settled.mjml,
+        variables: settled.variables as Prisma.InputJsonValue,
+      },
+    });
+    if (rows.length === 0) return rows;
+
+    await db.communicationComponentVersion.deleteMany({ where: { communicationLogId } });
+    const resolutions = Object.entries(settled.componentResolutions);
+    if (resolutions.length > 0) {
+      const snapshots = await db.auditLog.findMany({
+        where: { subjectEmailComponentId: { in: resolutions.map(([, componentId]) => componentId) } },
+        orderBy: { id: 'desc' },
+        distinct: ['subjectEmailComponentId'],
+        select: { id: true, subjectEmailComponentId: true },
+      });
+      const latestByComponent = new Map(snapshots.map((snapshot) => [snapshot.subjectEmailComponentId, snapshot.id]));
+      await db.communicationComponentVersion.createManyAndReturn({
+        data: resolutions.map(([slug, emailComponentId]) => ({
+          communicationLogId,
+          slug,
+          emailComponentId,
+          emailComponentAuditLogId: latestByComponent.get(emailComponentId) ?? null,
+        })),
+      });
+    }
+    return rows;
   });
   if (claimed.length === 0) return;
 

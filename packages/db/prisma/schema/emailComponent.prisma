@@ -32,6 +32,8 @@ model EmailComponent {
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
 
+  communicationComponentVersions CommunicationComponentVersion[]
+
   // Per-owner uniqueness — partial uniques per ownerModel branch (see Contact
   // for rationale). default/admin have no FK; Organization populates orgId;
   // Space populates spaceId + orgId (caller-supplied; validated by the FP rule, not auto-populated).
