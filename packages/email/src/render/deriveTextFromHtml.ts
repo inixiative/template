@@ -57,7 +57,7 @@ const renderLink = (attributes: string, label: string): string => {
   const href = attributeValue(HREF, attributes);
   const text = label.replace(BLOCK_CLOSERS, '\n').replace(TAGS, '').replace(/[ \t]+/g, ' ').trim();
   if (!text) return href;
-  if (text === href) return text;
+  if (decodeEntities(text) === decodeEntities(href)) return text;
   return href ? `${text} (${href})` : text;
 };
 
