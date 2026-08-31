@@ -42,7 +42,9 @@ export const useDataFilters = (
 
   const setFilter = (field: string, state: FilterState | null) => {
     setFilters((prev) => {
-      if (!state || ('values' in state ? state.values.length === 0 : !state.value)) {
+      // Clearing a filter is `null` (or an empty `in` list); a present scalar value stays even
+      // when it is `false`/`0`/`null`, which are real filters (`null` = match IS NULL).
+      if (!state || ('values' in state && state.values.length === 0)) {
         const { [field]: _removed, ...rest } = prev;
         return rest;
       }
@@ -68,12 +70,12 @@ export const useDataFilters = (
     onFiltersChange?.();
   };
 
-  const { searchMode, searchableFields, adminMode } = config;
+  const { searchableFields } = config;
 
   const filterQuery = useMemo(
-    () => buildFilterQuery(search, searchMode, searchableFields, filters, orderBy, adminMode),
+    () => buildFilterQuery(search, searchableFields, filters, orderBy),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [search, searchMode, searchableFields, filters, orderBy, adminMode],
+    [search, searchableFields, filters, orderBy],
   );
 
   return {

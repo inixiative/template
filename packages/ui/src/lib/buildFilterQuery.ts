@@ -5,7 +5,6 @@
  * @uses primitive:shared
  */
 import { type ArrayFieldOperator, isCombinator, type ScalarFieldOperator } from '@template/shared/bracketQuery';
-import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 // Values carry their real type end to end: serializeBracketQuery marks null/boolean with `[:]`
@@ -94,32 +93,24 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
 
 export const buildFilterQuery = (
   search: string,
-  searchMode: SearchMode,
   searchableFields: string[],
   filters: FilterMap,
   orderBy: Array<{ field: string; direction: 'asc' | 'desc' }>,
-  adminMode = false,
 ): Record<string, unknown> => {
   const query: Record<string, unknown> = {};
 
-  if (search && searchMode === 'combined' && !adminMode && searchableFields.length > 0) {
+  // Free-text search is server-side: the API's `search` param fans the term out across every
+  // searchable field with OR(contains), token by token. The FE just forwards the raw string.
+  if (search && searchableFields.length > 0) {
     query.search = search;
   }
 
   const nested: Record<string, unknown> = {};
 
-  if (search && searchMode === 'field') {
-    for (const field of searchableFields) {
-      nested[field] = { contains: search };
-    }
-  }
-
   addFilters(nested, filters);
 
-  const bracketPrefix = adminMode ? 'filters' : 'searchFields';
-
   if (Object.keys(nested).length > 0) {
-    const params = serializeBracketQuery({ [bracketPrefix]: nested });
+    const params = serializeBracketQuery({ searchFields: nested });
     for (const key of new Set(params.keys())) {
       const allValues = params.getAll(key);
       query[key] = allValues.length === 1 ? allValues[0] : allValues;
