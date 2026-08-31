@@ -126,4 +126,46 @@ describe('buildFilterQuery', () => {
       expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
     });
   });
+
+  // The wire and the server already carry typed values: `[:]` marks a symbol (null/boolean),
+  // `[$]` marks a number, both parsed back to the real type server-side. FilterState carries the
+  // real type so those markers get used — a string-only leaf would force every value to text.
+  // `null` is a value (match IS NULL); `undefined` is the absence of a filter.
+  describe('typed scalar values', () => {
+    it('serializes null via the symbol marker (match IS NULL)', () => {
+      const filters: FilterMap = { tier: { operator: 'equals', value: null } };
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({
+        'searchFields[tier][equals][:]': 'null',
+      });
+    });
+
+    it('serializes false via the symbol marker, not dropped as falsy', () => {
+      const filters: FilterMap = { isActive: { operator: 'equals', value: false } };
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({
+        'searchFields[isActive][equals][:]': 'false',
+      });
+    });
+
+    it('serializes numbers via the number marker, including zero', () => {
+      expect(buildFilterQuery('', 'combined', [], { age: { operator: 'gte', value: 30 } }, [])).toEqual({
+        'searchFields[age][gte][$]': '30',
+      });
+      expect(buildFilterQuery('', 'combined', [], { rank: { operator: 'equals', value: 0 } }, [])).toEqual({
+        'searchFields[rank][equals][$]': '0',
+      });
+    });
+
+    it('carries typed values inside an `in` list', () => {
+      const filters: FilterMap = { tier: { operator: 'in', values: ['gold', null] } };
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({
+        'searchFields[tier][in]': 'gold',
+        'searchFields[tier][in][:]': 'null',
+      });
+    });
+
+    it('undefined is the absence of a filter — the key is dropped', () => {
+      const filters = { tier: { operator: 'equals', value: undefined } } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
+    });
+  });
 });
