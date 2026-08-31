@@ -241,6 +241,20 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     ).rejects.toMatchObject({ status: 422 });
   });
 
+  it('a save that removes the dead reference clears the flag and the edge', async () => {
+    const [{ entity: dead }, { entity: alive }] = await Promise.all([createTag(), createTag()]);
+    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(dead.id)) });
+    await db.tag.update({ where: { id: dead.id }, data: { deletedAt: new Date() } });
+    expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([
+      refKey('Tag', dead.id),
+    ]);
+
+    await db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml(taggedBlock(alive.id)) } });
+
+    expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([]);
+    expect(await edgesOf({ tagId: dead.id })).toEqual([]);
+  });
+
   it('an archived owner keeps its projection maintained, so restoring it is already correct', async () => {
     const { entity: tag } = await createTag();
     const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
