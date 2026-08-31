@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (every multi-tenant app with integrations ends up here; Zealot paid for the map)
 **Created**: 2026-08-27
-**Updated**: 2026-08-27
+**Updated**: 2026-08-31 (performance landmines + Postgres specifics)
 
 ---
 
@@ -116,6 +116,22 @@ CustomFieldDefinition ──┐                        IntegrationSource ──�
 
 ---
 
+## Performance landmines — design for these, don't discover them
+
+Zealot hasn't hit most of these yet only because it doesn't offer the features that trigger them. The template will. Each landmine below names the mitigation that must exist in the design **before** the feature that steps on it ships.
+
+1. **Sorting / paginating a list BY a custom field.** `ORDER BY` an enrichment value is a join + filesort with no covering index, and the cursor paginator has nothing stable to cursor on. Mitigation: sorts and cursors run against the **materialized read table** (`(entityUuid, definitionUuid)` → typed value columns, indexed `(brandUuid, definitionUuid, valueNumber|valueDate|valueText, entityUuid)`), never against contributions. Cursor = `(sortValue, entityUuid)` composite. If the materialized store isn't built yet, custom-field sort is simply **not offered** — a slow unindexed sort is a feature regression wearing a feature's clothes.
+2. **Aggregates across fields** ("advocates per Industry × Region") — EAV's classic weak spot: one self-join per axis on contributions. Mitigation: dashboards and counts read the materialized table (one join per axis on an indexed key), and axis vocabularies come from `EnrichmentVocabulary`, never a `DISTINCT` scan. Anything needing more than two axes gets a reporting query on the materialized table, not a clever contributions join.
+3. **Reconcile fan-out.** A nightly all-dynamic-segments sweep is `segments × users`, and Zealot's per-user rail hydrates **every** enrichment per user for `check()` — the cost compounds as brands add fields. Mitigations, all three: (a) the **set-based rail is primary** — a segment compiles via `toPrisma` to one query per segment (the DB does the fan-out); per-user `check()` is only for event-driven single-user reconcile; (b) hydration is **batch-first** — one `findMany` + pivot for a page of users, never per-user queries (INFRA-014's runtime contract must say this); (c) reconcile is **incremental** — a materialized-value change event reconciles the affected user against the segments whose conditions reference that field (the lens knows which), with the nightly sweep as backstop, not workhorse.
+4. **Materialization write amplification.** Once the bridge exists, every contribution write → recompute → event → webhook fan-out. Mitigations: recompute is per-(entity, field) and reads only that field's contributions; a recompute that doesn't move the materialized value emits **nothing** (the no-op drop is what terminates N-way echo loops — it is a correctness feature that happens to be the perf feature); events coalesce per (entity, field) via `onCommit` + superseding jobs; fan-out is always queued, never inline in the write path.
+
+**Postgres specifics** (the template is already on Postgres — be deliberate about what Zealot inherited implicitly from MySQL):
+- Blobs: `jsonb` for `fieldConfig` / `valueJson` / `valueMeta` — TOASTed out-of-line, so sorting the definitions table never drags a blob through the sort (the errno-1038 class doesn't exist here); GIN-index `valueJson` only if a consumer queries into it.
+- Soft-delete + uniqueness: **partial unique indexes** (`WHERE "deletedAt" IS NULL`) on the map's `(brandUuid, customFieldDefinitionUuid, integrationSourceUuid)` and the identity coordinate — the deleted+live-pair problem the Zealot RFC left open is one line here.
+- Collation: Postgres equality is case- and accent-**sensitive** by default; Zealot's `0900_ai_ci` made label joins and email identity insensitive implicitly. Decide explicitly per column: `citext` (or an ICU nondeterministic collation) for `label`, `fieldKey`, `identityValue`, vocabulary `value`; leave everything else sensitive. json-rules already gates `mode: 'insensitive'` on the provider.
+
+---
+
 ## Proposed template schema (sketch — settle the open decisions first)
 
 ```prisma
@@ -195,6 +211,14 @@ Plus: `originUuid → IntegrationSource` on every bridged model; `packages/db/sr
 - [ ] Facets: per-source container, per-field cards, field selectors, presets with variables (INFRA-029) — the Zealot `segmentDecoration.ts` shape, minus its side-channel
 - [ ] Global search / paginate traverse `enrichments` with the relation wheres (visit-wheres fold)
 
+### Performance (the landmines, as work items)
+- [ ] Materialized read table = the ONLY surface for sort-by-field, cursor pagination, and aggregates; custom-field sort is not offered until it exists
+- [ ] Batch-first hydration helper (page of entities → one fetch → pivot) — the contract INFRA-014 documents; no per-entity enrichment queries anywhere
+- [ ] Set-based reconcile (toPrisma, one query per segment) primary; event-driven incremental reconcile keyed off materialized-value changes + which segments reference the field; nightly sweep as backstop
+- [ ] No-op materialization drop + per-(entity, field) event coalescing (`onCommit` + superseding job); queued fan-out only
+- [ ] Partial unique indexes on soft-deleted uniques; `jsonb` blobs; explicit `citext`/ICU collation on label/key/identity/vocabulary columns
+- [ ] A seeded perf fixture (1 brand × 50 fields × 100k entities × 3 sources) with EXPLAIN assertions on: segment compile, sort-by-field, two-axis aggregate — so regressions fail a test, not production
+
 ### Docs
 - [ ] "When to EAV" rule + the anti-patterns list (guard flags, vendor columns, option blobs, dual maps, read-time-as-bridge) in `docs/`
 
@@ -203,7 +227,7 @@ Plus: `originUuid → IntegrationSource` on every bridged model; `packages/db/sr
 ## Open Questions
 
 - **Where does `valueType` live?** Zealot declares storage type on the map (`IntegrationMap.valueType`, per source) and a display type on the definition; they can disagree. One declaration on the definition, with the pin traversing `integrationMap.customFieldDefinition` (two hops from the row), vs. keeping it on the map (one hop, per-source override possible). Lean: definition — a field has one type; a source that sends something else is a coercion at the boundary, not a second type.
-- **Materialized store in v1?** Contributions + read-time resolution ships first; the materialized row is what bridging and transitions need (FEAT-018). Reserve the schema now or add later with a backfill?
+- **Materialized store in v1?** Contributions + read-time resolution ships first; the materialized row is what bridging and transitions need (FEAT-018) — **and** what landmines 1–3 above hang on (sort, aggregates, incremental reconcile). Reserve the schema now or add later with a backfill?
 - **Vocabulary per source or per field?** Zealot's is keyed `(brand, gate, sourceLabel, fieldLabel)`; the lens groupBy is `(source label, field label)`. Keep the source axis (the picker needs it) — confirm.
 - **Name**: `CustomFieldDefinition` / `Enrichment` are Zealot's words; `FieldDefinition` / `Contribution` are the RFC's. Pick once; the lens paths (`enrichments.value`) become rule text that outlives the rename.
 
