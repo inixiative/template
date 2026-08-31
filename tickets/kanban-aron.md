@@ -16,6 +16,7 @@ kanban
     INFRA-016-lens-serialization-by-ref
     INFRA-028-lens-prose-decorator
     INFRA-018-lens-builder
+    INFRA-030-reference-registry
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
     DEV-004-prisma-map-doc-comment-tags
@@ -62,6 +63,7 @@ kanban
 - [INFRA-028: Lens Prose Decorator](./INFRA-028-lens-prose-decorator.md) - Static presentation metadata (labels, icons) on the lens for FE + AI; sibling of INFRA-024's dynamic value axis. Placeholder, shape TBD (ZLT-3633)
 - [INFRA-013: Source-Map Importer](./INFRA-013-source-map-importer.md) - Non-Prisma schema → FieldMap (in rules-builder)
 - [INFRA-018: Lens Builder](./INFRA-018-lens-builder.md) - Compose lens + narrowings (in rules-builder)
+- [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` + save hook + staleness re-resolve on the referenced side; the lens does the extraction (`ruleReferences`). Zealot #2116 is the first consumer; lands here with the first rule-bearing column
 - [INFRA-019: json-rules target sharp edges](./INFRA-019-json-rules-target-sharp-edges.md) - Backlog of check-only operators / target asymmetry
 
 **Developer Tooling:**
@@ -103,8 +105,8 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 18
-- **Todo**: 13
+- **Total Tickets**: 19
+- **Todo**: 14
 - **In Progress**: 6
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
@@ -128,4 +130,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-08-26_
+_Last Updated: 2026-08-31_
