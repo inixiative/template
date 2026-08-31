@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Contact, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { clearHookRegistry } from '@template/db';
+import type { Contact, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createContact,

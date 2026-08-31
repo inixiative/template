@@ -115,7 +115,8 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = nested.next;
         continue;
       }
-      i += IF.length; // malformed nested open — skip the token, don't char-walk into it
+      const close = content.indexOf('}}', i + IF.length);
+      i = close === -1 ? content.length : close + 2; // malformed nested open — skip past its marker, never char-walk its JSON
       continue;
     }
     if (content.startsWith(END, i)) {
@@ -137,7 +138,8 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = m.next;
         continue;
       }
-      i += ELSE_IF.length; // malformed else-if — skip the token
+      const close = content.indexOf('}}', i + ELSE_IF.length);
+      i = close === -1 ? content.length : close + 2; // malformed else-if — skip past its marker, never char-walk its JSON
       continue;
     }
     if (content.startsWith(ELSE, i)) {

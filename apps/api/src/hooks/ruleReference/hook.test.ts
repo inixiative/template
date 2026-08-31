@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -7,9 +7,11 @@ import {
   createSpace,
   createTag,
 } from '@template/db/test';
+import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceDegradedHook } from '#/hooks/ruleReference/degraded';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -24,14 +26,22 @@ const taggedBlock = (...tagIds: string[]) => {
 };
 
 const inSpaceBlock = (spaceId: string) => {
-  const rule = { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: spaceId };
+  const rule = {
+    field: 'recipient.spaceUsers',
+    arrayOperator: 'any',
+    condition: { field: 'space.id', operator: 'equals', value: spaceId },
+  };
   return `{{#if rule=${JSON.stringify(rule)}}}member{{/if}}`;
 };
 
 const edgesOf = (where: Record<string, unknown>) => db.ruleReference.findMany({ where, orderBy: { createdAt: 'asc' } });
 
+const refKey = (model: string, id: string) => `${model}|${id}`;
+
 describe('ruleReference hook — edges follow every save of a rule-bearing column', () => {
   beforeAll(() => {
+    registerSoftDeleteScoper({ liveWhere, liveIncludes });
+    registerPreventHardDeleteHook();
     registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceDegradedHook();
@@ -39,13 +49,16 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   afterAll(async () => {
     clearHookRegistry();
+    registerSoftDeleteScoper(null);
     await cleanupTouchedTables(db);
   });
 
   afterEach(async () => {
     await db.ruleReference.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await db.withDeleted(async () => {
+      await db.$executeRaw`DELETE FROM "EmailTemplate"`;
+      await db.$executeRaw`DELETE FROM "EmailComponent"`;
+    });
   });
 
   it('a template naming a tag in its body gets one typed edge to that tag', async () => {
@@ -73,6 +86,43 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     const edges = await edgesOf({ emailTemplateId: template.id });
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({ referencedModel: 'Space', spaceId: space.id, tagId: null });
+  });
+
+  it('an undeclared relation path to a referenceable id still registers — the source is the model, not the path', async () => {
+    const { entity: tag } = await createTag();
+    const rule = {
+      field: 'recipient.tags',
+      arrayOperator: 'any',
+      condition: { field: 'id', operator: 'equals', value: tag.id },
+    };
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`),
+    });
+
+    const edges = await edgesOf({ emailTemplateId: template.id });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ referencedModel: 'Tag', tagId: tag.id });
+  });
+
+  it('the FK-column spelling of a reference is refused at save — outside the lens vocabulary', async () => {
+    const { entity: tag } = await createTag();
+    const rule = {
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tagId', operator: 'equals', value: tag.id },
+    };
+
+    await expect(
+      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('a typo path is refused at save instead of silently never matching', async () => {
+    const rule = { field: 'recipient.zzzNope', operator: 'equals', value: 'x' };
+
+    await expect(
+      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it('re-saving the body set-diffs: survivors keep their row, removed edges go, added edges appear', async () => {
@@ -130,29 +180,83 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
   });
 
   it('a rule that reads the row from path is refused: the reference cannot be registered', async () => {
-    const rule = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', path: 'data.tagId' };
+    const rule = {
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'equals', path: 'recipient.id' },
+    };
     const body = `{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`;
 
     await expect(createEmailTemplate({ mjml: mjml(body) })).rejects.toMatchObject({ status: 422 });
   });
 
-  it('soft-deleting a referenced tag flags every owner; restoring it un-flags them', async () => {
+  it('an operator that describes the referenced row without naming it is refused', async () => {
+    const rule = {
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'contains', value: 'abc' },
+    };
+
+    await expect(
+      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('soft-deleting a referenced tag flags every owner with the Model|id key; restoring un-flags', async () => {
     const { entity: tag } = await createTag();
     const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
     const { entity: component } = await createEmailComponent({ mjml: `<mj-text>${taggedBlock(tag.id)}</mj-text>` });
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
     expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([
-      tag.id,
+      refKey('Tag', tag.id),
     ]);
     expect((await db.emailComponent.findUniqueOrThrow({ where: { id: component.id } })).degradedRuleRefs).toEqual([
-      tag.id,
+      refKey('Tag', tag.id),
     ]);
     expect(await edgesOf({ tagId: tag.id })).toHaveLength(2);
 
-    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } });
+    await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
     expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([]);
     expect((await db.emailComponent.findUniqueOrThrow({ where: { id: component.id } })).degradedRuleRefs).toEqual([]);
+  });
+
+  it('an edit that keeps a pre-existing dead reference is allowed; adding a new dead one is not', async () => {
+    const [{ entity: tag }, { entity: other }] = await Promise.all([createTag(), createTag()]);
+    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
+
+    const edited = await db.emailTemplate.update({
+      where: { id: template.id },
+      data: { subject: 'Typo fixed', mjml: mjml(taggedBlock(tag.id)) },
+    });
+    expect(edited.subject).toBe('Typo fixed');
+    expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([
+      refKey('Tag', tag.id),
+    ]);
+
+    await db.tag.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
+    await expect(
+      db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml(taggedBlock(tag.id, other.id)) } }),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('an archived owner keeps its projection maintained, so restoring it is already correct', async () => {
+    const { entity: tag } = await createTag();
+    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+
+    await db.emailTemplate.update({ where: { id: template.id }, data: { deletedAt: new Date() } });
+    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
+
+    await db.withDeleted(async () => {
+      expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([
+        refKey('Tag', tag.id),
+      ]);
+      await db.emailTemplate.update({ where: { id: template.id }, data: { deletedAt: null } });
+    });
+    expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([
+      refKey('Tag', tag.id),
+    ]);
   });
 
   it('a tag write that does not touch deletedAt does not re-resolve owners', async () => {
@@ -164,12 +268,14 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     expect((await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } })).degradedRuleRefs).toEqual([]);
   });
 
-  it('a hard delete of the referenced row cascades its edges', async () => {
+  it('the client refuses a hard delete of a referenced model; the purge path cascades at the DB', async () => {
     const { entity: tag } = await createTag();
     await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
 
-    await db.tag.delete({ where: { id: tag.id } });
+    await expect(db.tag.delete({ where: { id: tag.id } })).rejects.toThrow(/preventHardDelete/);
 
+    await db.$executeRaw`DELETE FROM "TagAttachment" WHERE "tagId" = ${tag.id}`;
+    await db.$executeRaw`DELETE FROM "Tag" WHERE "id" = ${tag.id}`;
     expect(await edgesOf({ tagId: tag.id })).toEqual([]);
   });
 

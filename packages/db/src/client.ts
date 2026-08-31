@@ -193,7 +193,19 @@ const dbMethods = {
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
     const table = prismaMap.models[model]?.dbName ?? model;
-    const conds = keys.map((key) => Prisma.sql`${Prisma.raw(`"${key}"`)} = ${where[key]}`);
+    const conds = keys.map((key) => {
+      const value = where[key];
+      if (value !== null && typeof value === 'object' && 'in' in (value as Record<string, unknown>)) {
+        const list = (value as { in: unknown[] }).in;
+        if (!Array.isArray(list) || !list.length)
+          throw new Error(`db.findForUpdate() requires a non-empty in-list for '${key}'`);
+        return Prisma.sql`${Prisma.raw(`"${key}"`)} IN (${Prisma.join(
+          list.map((item) => Prisma.sql`${item}`),
+          ', ',
+        )})`;
+      }
+      return Prisma.sql`${Prisma.raw(`"${key}"`)} = ${value}`;
+    });
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );
