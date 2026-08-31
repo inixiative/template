@@ -1,0 +1,67 @@
+// ============================================================================
+// RULE REFERENCE - the rows a stored rule names, as edges
+// ============================================================================
+// One row per (owner row → referenced row) edge, recomputed by the ruleReference
+// hook in the same transaction as every save of a rule-bearing column
+// (registry: apps/api/src/hooks/ruleReference/surfaces.ts). Both ends are
+// false-polymorphic (exactly one FK matches each discriminator; config in
+// registries/falsePolymorphism.ts) so either end can be included and a hard
+// delete on either side cascades the edge. Append/delete only: the set-diff
+// hard-deletes edges that left the rule; a row is never mutated.
+//
+// "Who references X" is the referenced FK's index. "Which of my references are
+// gone" is the owner's degradedRuleRefs projection, re-resolved by the
+// ruleReference:degraded hook when a referenced row's deletedAt flips.
+
+model RuleReference {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  ownerModel       RuleReferenceOwnerModel
+  emailTemplateId  String? @db.VarChar(36)
+  emailComponentId String? @db.VarChar(36)
+
+  referencedModel RuleReferenceReferencedModel
+  tagId           String? @db.VarChar(36)
+  organizationId  String? @db.VarChar(36)
+  spaceId         String? @db.VarChar(36)
+
+  emailTemplate  EmailTemplate?  @relation(fields: [emailTemplateId], references: [id], onDelete: Cascade)
+  emailComponent EmailComponent? @relation(fields: [emailComponentId], references: [id], onDelete: Cascade)
+  tag            Tag?            @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space          Space?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  // Edge identity — one partial unique per (owner, referenced) branch pair, the
+  // Contact / EmailTemplate convention for uniqueness under false polymorphism.
+  @@unique([emailTemplateId, tagId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Tag'"), map: "RuleReference_emailTemplate_tag_key")
+  @@unique([emailTemplateId, organizationId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Organization'"), map: "RuleReference_emailTemplate_organization_key")
+  @@unique([emailTemplateId, spaceId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Space'"), map: "RuleReference_emailTemplate_space_key")
+  @@unique([emailComponentId, tagId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Tag'"), map: "RuleReference_emailComponent_tag_key")
+  @@unique([emailComponentId, organizationId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Organization'"), map: "RuleReference_emailComponent_organization_key")
+  @@unique([emailComponentId, spaceId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Space'"), map: "RuleReference_emailComponent_space_key")
+  @@index([emailTemplateId])
+  @@index([emailComponentId])
+  @@index([tagId])
+  @@index([organizationId])
+  @@index([spaceId])
+}
+
+enum RuleReferenceOwnerModel {
+  EmailTemplate
+  EmailComponent
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific rule-bearing models below
+  // ==========================================================================
+}
+
+enum RuleReferenceReferencedModel {
+  Tag
+  Organization
+  Space
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific referenceable models below
+  // ==========================================================================
+}

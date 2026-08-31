@@ -104,3 +104,23 @@ describe('evaluateConditions — non-object rules', () => {
     expect(evaluateConditions(tpl, { recipient: { tier: 'x' } })).toBe('D');
   });
 });
+
+describe('evaluateConditions — stale references', () => {
+  const tagged = JSON.stringify({
+    field: 'recipient.tagAttachments',
+    arrayOperator: 'any',
+    condition: { field: 'tag.id', operator: 'equals', value: 'tag-1' },
+  });
+  const tpl = `{{#if rule=${tagged}}}VIP{{else}}BASE{{/if}}`;
+  const vars = { recipient: { tagAttachments: [{ tag: { id: 'tag-1' } }] } };
+
+  it('a branch whose rule names a stale row is a rule error, never a match', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set(['tag-1']))).toBe('BASE');
+    expect(errors).toEqual(['rule names a missing Tag tag-1']);
+  });
+
+  it('renders normally when the named row is live', () => {
+    expect(evaluateConditions(tpl, vars, undefined, new Set(['tag-other']))).toBe('VIP');
+  });
+});

@@ -16,7 +16,6 @@ kanban
     INFRA-016-lens-serialization-by-ref
     INFRA-028-lens-prose-decorator
     INFRA-018-lens-builder
-    INFRA-030-reference-registry
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
     DEV-004-prisma-map-doc-comment-tags
@@ -36,6 +35,7 @@ kanban
     INFRA-001-init-script
     INFRA-011-railway-buckets
   Review
+    INFRA-030-reference-registry
   Done
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
@@ -63,7 +63,6 @@ kanban
 - [INFRA-028: Lens Prose Decorator](./INFRA-028-lens-prose-decorator.md) - Static presentation metadata (labels, icons) on the lens for FE + AI; sibling of INFRA-024's dynamic value axis. Placeholder, shape TBD (ZLT-3633)
 - [INFRA-013: Source-Map Importer](./INFRA-013-source-map-importer.md) - Non-Prisma schema → FieldMap (in rules-builder)
 - [INFRA-018: Lens Builder](./INFRA-018-lens-builder.md) - Compose lens + narrowings (in rules-builder)
-- [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` + save hook + staleness re-resolve on the referenced side; the lens does the extraction (`ruleReferences`). Zealot #2116 is the first consumer; lands here with the first rule-bearing column
 - [INFRA-019: json-rules target sharp edges](./INFRA-019-json-rules-target-sharp-edges.md) - Backlog of check-only operators / target asymmetry
 
 **Developer Tooling:**
@@ -94,7 +93,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - MinIO local + s3 adapter + bucket provisioning built
 
 ### 👀 Review
-_No tickets currently in review_
+- [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save hook + staleness re-resolve + render gate; email conditionals are the first surface; json-rules 2.20.0 `ruleSourceValues` does the extraction. Zealot #2116 reshapes to it
 
 ### ✅ Done
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)
@@ -106,7 +105,7 @@ _No tickets currently in review_
 ## Quick Stats
 
 - **Total Tickets**: 19
-- **Todo**: 14
+- **Todo**: 13
 - **In Progress**: 6
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
