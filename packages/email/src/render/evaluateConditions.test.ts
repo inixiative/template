@@ -104,3 +104,51 @@ describe('evaluateConditions — non-object rules', () => {
     expect(evaluateConditions(tpl, { recipient: { tier: 'x' } })).toBe('D');
   });
 });
+
+describe('evaluateConditions — stale references', () => {
+  const tagged = JSON.stringify({
+    field: 'recipient.tagAttachments',
+    arrayOperator: 'any',
+    condition: { field: 'tag.id', operator: 'equals', value: 'tag-1' },
+  });
+  const tpl = `{{#if rule=${tagged}}}VIP{{else}}BASE{{/if}}`;
+  const vars = { recipient: { tagAttachments: [{ tag: { id: 'tag-1' } }] } };
+
+  it('a branch whose rule names a stale row is a rule error, never a match', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set(['Tag|tag-1']))).toBe('BASE');
+    expect(errors).toEqual(['rule names a missing Tag tag-1']);
+  });
+
+  it('renders normally when the named row is live', () => {
+    expect(evaluateConditions(tpl, vars, undefined, new Set(['Tag|tag-other']))).toBe('VIP');
+  });
+});
+
+describe('evaluateConditions — unregisterable and unterminated rules', () => {
+  it('a rule that reads its referenced row dynamically is a rule error even with no stale refs', () => {
+    const rule = JSON.stringify({
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'equals', path: 'recipient.id' },
+    });
+    const errors: string[] = [];
+    const out = evaluateConditions(
+      `{{#if rule=${rule}}}X{{else}}Y{{/if}}`,
+      { recipient: { id: 'u1', tagAttachments: [] } },
+      (m) => errors.push(m),
+    );
+    expect(out).toBe('Y');
+    expect(errors).toHaveLength(1);
+  });
+
+  it('an unterminated block is suppressed and reported, never emitted raw', () => {
+    const rule = JSON.stringify({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    const errors: string[] = [];
+    const out = evaluateConditions(`before {{#if rule=${rule}}}secret tail`, { recipient: { tier: 'gold' } }, (m) =>
+      errors.push(m),
+    );
+    expect(out).toBe('before ');
+    expect(errors).toEqual(['unterminated {{#if}} block — the marker and everything after it was suppressed']);
+  });
+});

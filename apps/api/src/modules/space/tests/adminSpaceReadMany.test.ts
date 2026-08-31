@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, Space } from '@template/db/generated/client/client';
 import { db } from '@template/db';
+import type { Organization, Space } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganization, createSpace } from '@template/db/test';
 import { adminSpaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';

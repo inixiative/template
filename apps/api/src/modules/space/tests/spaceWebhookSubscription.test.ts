@@ -1,6 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { Organization, OrganizationUser, Space, SpaceUser, User, WebhookSubscription } from '@template/db/generated/client/client';
 import { db } from '@template/db';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+  WebhookSubscription,
+} from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createOrganizationUser,

@@ -17,6 +17,7 @@ model EmailComponent {
   // Pre-computed component refs (populated on save)
   componentRefs         String[] // Slugs of nested {{component:slug}} references
   degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
+  degradedRuleRefs      String[] @default([]) // `Model|id` keys of rows the mjml's {{#if rule=…}} blocks name that no longer resolve — re-resolved by the ruleReference:degraded hook; a stale rule is never evaluated
 
   // Owner (false polymorphism - default/admin have no FK)
   ownerModel     EmailOwnerModel @default(default)
@@ -31,6 +32,7 @@ model EmailComponent {
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
+  ruleReferences RuleReference[]
 
   // Per-owner uniqueness — partial uniques per ownerModel branch (see Contact
   // for rationale). default/admin have no FK; Organization populates orgId;

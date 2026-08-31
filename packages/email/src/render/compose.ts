@@ -5,6 +5,7 @@
  * @uses none
  */
 import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
+import { collectDegradedRuleRefs } from '@template/email/render/degradedRuleRefs';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
@@ -18,6 +19,7 @@ export type ComposeTemplateResult = {
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel; // where the cascade actually resolved (may differ from the requested owner)
   onError: EmailErrorPolicy; // render-error policy for the resolved template
+  degradedRuleRefs: string[]; // rows the template's and its components' rules name that no longer resolve
 };
 
 // The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
@@ -48,6 +50,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
   const mjml = await expand(template.mjml, template.componentRefs, ctx);
+  const degradedRuleRefs = await collectDegradedRuleRefs(template, ctx);
 
   return {
     id: template.id,
@@ -57,6 +60,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     kind: template.kind,
     ownerModel: template.ownerModel,
     onError: template.onError,
+    degradedRuleRefs,
   };
 };
 

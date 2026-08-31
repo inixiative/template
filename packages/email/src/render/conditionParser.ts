@@ -115,7 +115,8 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = nested.next;
         continue;
       }
-      i += IF.length; // malformed nested open — skip the token, don't char-walk into it
+      const close = content.indexOf('}}', i + IF.length);
+      i = close === -1 ? content.length : close + 2; // malformed nested open — skip past its marker, never char-walk its JSON
       continue;
     }
     if (content.startsWith(END, i)) {
@@ -137,7 +138,8 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = m.next;
         continue;
       }
-      i += ELSE_IF.length; // malformed else-if — skip the token
+      const close = content.indexOf('}}', i + ELSE_IF.length);
+      i = close === -1 ? content.length : close + 2; // malformed else-if — skip past its marker, never char-walk its JSON
       continue;
     }
     if (content.startsWith(ELSE, i)) {
@@ -151,4 +153,24 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
     i++;
   }
   return null; // no matching {{/if}}
+};
+
+export const collectRules = (content: string): Condition[] => {
+  const rules: Condition[] = [];
+  let i = 0;
+  while (i < content.length) {
+    const openIdx = content.indexOf(IF, i);
+    if (openIdx === -1) break;
+    const block = parseIfBlock(content, openIdx);
+    if (!block) {
+      i = openIdx + IF.length;
+      continue;
+    }
+    for (const branch of block.branches) {
+      if (branch.rule !== undefined) rules.push(branch.rule);
+      rules.push(...collectRules(branch.body));
+    }
+    i = block.end;
+  }
+  return rules;
 };

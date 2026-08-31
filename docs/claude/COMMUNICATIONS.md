@@ -589,6 +589,47 @@ lives in the audit log**:
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots.
 
+### Rule References (the rows a rule names)
+
+A `{{#if rule=…}}` block can name a row — "recipient is tagged X", "recipient is in space Y". Those
+edges are persisted so that "who references X" is an index and a stale rule is never evaluated
+(INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
+
+- **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
+  (owner row → referenced row), false-polymorphic on both ends — `ownerModel` + one typed FK per
+  rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
+  referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
+  Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
+- **Extraction is the lens's** (`packages/email/src/rules/`): `emailRuleNarrowing` roots the rule
+  context at `recipient → User` and declares the referenceable sources
+  (`tagAttachments.tag.id`, `organizationUsers.organization.id`, `spaceUsers.space.id`);
+  `ruleSourceValues` (json-rules ≥ 2.20) reports the values a rule names at each source, and a
+  source on a model's id field is a row reference. Nested and dotted spellings are one path; a
+  `path`/`bind` leaf at a source — or an operator that describes the row without naming it
+  (`contains`, `between`) — is `dynamic` and refused at save. The narrowing is `mapDefaults`-shaped:
+  the source answers on **every** path to the model, FK columns duplicating a relation to a
+  referenceable model are derived from `prismaMap` and omitted, and the write hook runs
+  `checkRuleAgainstLens` — an FK spelling or typo path is a 422, never a silently unregistered
+  rule. Adding a referenceable model = a registry entry + an FK column (source and omits derive);
+  adding a rule-bearing column = an entry in `RULE_REFERENCE_SURFACES`.
+- **Write hook** (`apps/api/src/hooks/ruleReference/hook.ts`, after-timing on the surface models):
+  every save that touches `subject`/`mjml` recomputes the owner's edges inside the same
+  transaction — set-diff (survivors keep their row), missing or soft-deleted targets are a 422 at
+  save — validated as a delta: a pre-existing dead reference stays editable and flagged; only a
+  newly added dead one refuses. Referenced rows are locked (`db.findForUpdate`) while the gate
+  reads them. `syncRuleReferences(model, rows)` is the callable a backfill loops over.
+- **Staleness** (`degraded.ts`, after-timing on the referenced models): when a referenced row's
+  `deletedAt` flips either way, every owner over the reverse edges is re-resolved and its
+  `degradedRuleRefs` projection rewritten — an undelete un-flags. At render, `composeTemplate`
+  unions the template's and its expanded components' `degradedRuleRefs`; a branch whose rule names
+  one — or whose references are `dynamic` — is a rule error (never a match), so the template's
+  `onError` policy decides (`fail` / `degrade` / `fallback`). `degradedRuleRefs` holds `Model|id`
+  keys. Client hard deletes are prevented (`preventHardDelete`); the redact path must
+  `reresolveDegraded` the owners before purging — the DB cascade removes the reverse edge.
+- Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
+  resolve through the owner cascade at read time, so an id persisted at save would be wrong the
+  moment an override appears.
+
 ---
 
 ## Messaging (non-email channels)
