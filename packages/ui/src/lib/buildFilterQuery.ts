@@ -4,7 +4,12 @@
  * @partOf primitive:ui
  * @uses primitive:shared
  */
-import { type ArrayFieldOperator, isCombinator, type ScalarFieldOperator } from '@template/shared/bracketQuery';
+import {
+  type ArrayFieldOperator,
+  isArrayFieldOperator,
+  isCombinator,
+  type ScalarFieldOperator,
+} from '@template/shared/bracketQuery';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 // Values carry their real type end to end: serializeBracketQuery marks null/boolean with `[:]`
@@ -12,8 +17,11 @@ import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 // a filter (match IS NULL), not the string "null". Absence of a filter is `undefined`.
 export type FilterValue = string | number | boolean | null;
 
+// One `value` field, mirroring the json-rules engine's `Rule` (the source of truth for this
+// shape): an array for the array operators (`in`/`notIn`), a scalar otherwise. Reads like the
+// rule it becomes — `{ operator: 'equals', value: 'gold' }`, `{ operator: 'in', value: [...] }`.
 export type FilterState =
-  | { operator: ArrayFieldOperator; values: FilterValue[] }
+  | { operator: ArrayFieldOperator; value: FilterValue[] }
   | { operator: ScalarFieldOperator; value: FilterValue };
 
 // Prisma's where shape with FilterState leaves: a combinator key (AND/OR) carries an array of
@@ -30,15 +38,17 @@ const isFilterMap = (value: unknown): value is FilterMap =>
 const isFilterValue = (value: unknown): value is FilterValue =>
   value === null || ['string', 'number', 'boolean'].includes(typeof value);
 
-// A leaf clause needs both halves the right shape, not just present: an operator, plus the value
-// arm its operator kind expects (array ops carry `values`, scalar ops carry `value`). A bare-string
-// `values` is the trap — it has a `.length`, so it clears the empty check, and the operator then
-// serializes the raw string as the filter: a wrong query that looks like a working one. A scalar
-// `value` of `undefined` fails here — that is how absence-of-filter drops out.
-const isFilterState = (value: unknown): value is FilterState =>
-  isFilterMap(value) &&
-  typeof (value as { operator?: unknown }).operator === 'string' &&
-  (Array.isArray((value as { values?: unknown }).values) || isFilterValue((value as { value?: unknown }).value));
+// A leaf clause is an operator plus a `value` shaped to match it: an array for `in`/`notIn`, a
+// scalar for everything else — the same value/operator pairing json-rules' `Rule` enforces. A
+// missing value (`undefined`), a scalar under `in`, or an array under a scalar op all fail here,
+// which is how absence-of-filter and mismatched shapes drop out. `null`/`false`/`0` pass — they
+// are real filters.
+const isFilterState = (value: unknown): value is FilterState => {
+  if (!isFilterMap(value)) return false;
+  const { operator, value: leaf } = value as { operator?: unknown; value?: unknown };
+  if (typeof operator !== 'string') return false;
+  return isArrayFieldOperator(operator) ? Array.isArray(leaf) : isFilterValue(leaf);
+};
 
 const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
   const [head, ...rest] = path;
@@ -78,12 +88,12 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
     const clauses: unknown[] = Array.isArray(state) ? state : [state];
     for (const raw of clauses) {
       if (!isFilterState(raw)) continue;
-      const clause = raw as { operator: string; values?: FilterValue[]; value?: FilterValue };
-      // isFilterState already rejected an undefined scalar value, so a present value emits even
-      // when it is `null`/`false`/`0` — those are filters, and the serializer's `[:]`/`[$]`
-      // markers carry them. Only the array arm's emptiness (`[]` = no filter) still gates.
-      if (Array.isArray(clause.values)) {
-        if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
+      const clause = raw as { operator: string; value: FilterValue | FilterValue[] };
+      // isFilterState already rejected an undefined value, so a present value emits even when it
+      // is `null`/`false`/`0` — those are filters, and the serializer's `[:]`/`[$]` markers carry
+      // them. An empty array (`in: []`) is the one "no filter" case that still gates.
+      if (Array.isArray(clause.value)) {
+        if (clause.value.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
       } else {
         mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
       }

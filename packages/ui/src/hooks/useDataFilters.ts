@@ -44,7 +44,7 @@ export const useDataFilters = (
     setFilters((prev) => {
       // Clearing a filter is `null` (or an empty `in` list); a present scalar value stays even
       // when it is `false`/`0`/`null`, which are real filters (`null` = match IS NULL).
-      if (!state || ('values' in state && state.values.length === 0)) {
+      if (!state || (Array.isArray(state.value) && state.value.length === 0)) {
         const { [field]: _removed, ...rest } = prev;
         return rest;
       }

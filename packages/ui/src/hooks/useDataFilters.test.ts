@@ -60,18 +60,18 @@ describe('buildQuery — search', () => {
 
 describe('buildQuery — enum filters', () => {
   it('in operator: emits array of values', () => {
-    const result = q('', [], { status: { operator: 'in', values: ['sent', 'approved'] } });
+    const result = q('', [], { status: { operator: 'in', value: ['sent', 'approved'] } });
     expect(result['searchFields[status][in]']).toEqual(['sent', 'approved']);
   });
 
   it('notIn operator: emits array of values', () => {
-    const result = q('', [], { status: { operator: 'notIn', values: ['draft', 'canceled'] } });
+    const result = q('', [], { status: { operator: 'notIn', value: ['draft', 'canceled'] } });
     expect(result['searchFields[status][notIn]']).toEqual(['draft', 'canceled']);
   });
 
   it('in with single value: emits string not array', () => {
     // URLSearchParams with one value → getAll returns [value] → length 1 → string
-    const result = q('', [], { status: { operator: 'in', values: ['sent'] } });
+    const result = q('', [], { status: { operator: 'in', value: ['sent'] } });
     expect(result['searchFields[status][in]']).toBe('sent');
   });
 
@@ -86,14 +86,14 @@ describe('buildQuery — enum filters', () => {
   });
 
   it('empty values: field not emitted', () => {
-    const result = q('', [], { status: { operator: 'in', values: [] } });
+    const result = q('', [], { status: { operator: 'in', value: [] } });
     expect(Object.keys(result).every((k) => !k.startsWith('searchFields'))).toBe(true);
   });
 
   it('multiple filters coexist as separate keys', () => {
     const result = q('', [], {
-      status: { operator: 'in', values: ['sent'] },
-      type: { operator: 'notIn', values: ['cancelMembership'] },
+      status: { operator: 'in', value: ['sent'] },
+      type: { operator: 'notIn', value: ['cancelMembership'] },
     });
     expect(result['searchFields[status][in]']).toBe('sent');
     expect(result['searchFields[type][notIn]']).toBe('cancelMembership');
@@ -134,7 +134,7 @@ describe('buildQuery — scalar comparison filters', () => {
   });
 
   it('array in operator still works alongside the merge path', () => {
-    const result = q('', [], { status: { operator: 'in', values: ['sent', 'approved'] } });
+    const result = q('', [], { status: { operator: 'in', value: ['sent', 'approved'] } });
     expect(result['searchFields[status][in]']).toEqual(['sent', 'approved']);
   });
 
@@ -161,7 +161,7 @@ describe('buildQuery — relation field filters', () => {
 
   it('relation with in operator', () => {
     const result = q('', [], {
-      'sourceOrganization.id': { operator: 'in', values: ['org-1', 'org-2'] },
+      'sourceOrganization.id': { operator: 'in', value: ['org-1', 'org-2'] },
     });
     expect(result['searchFields[sourceOrganization][id][in]']).toEqual(['org-1', 'org-2']);
   });
@@ -210,7 +210,7 @@ describe('buildQuery — combined', () => {
     const result = buildQuery(
       'acme',
       ['name'],
-      { status: { operator: 'in', values: ['sent', 'approved'] } },
+      { status: { operator: 'in', value: ['sent', 'approved'] } },
       [{ field: 'createdAt', direction: 'desc' }],
       2,
       25,

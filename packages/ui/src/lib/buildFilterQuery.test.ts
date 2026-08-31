@@ -3,7 +3,7 @@ import { buildFilterQuery, type FilterMap } from '@template/ui/lib/buildFilterQu
 
 describe('buildFilterQuery', () => {
   it('serializes plain field filters into bracket keys', () => {
-    const query = buildFilterQuery('', [], { status: { operator: 'in', values: ['active'] } }, []);
+    const query = buildFilterQuery('', [], { status: { operator: 'in', value: ['active'] } }, []);
     expect(query).toEqual({ 'searchFields[status][in]': 'active' });
   });
 
@@ -37,7 +37,7 @@ describe('buildFilterQuery', () => {
       const filters: FilterMap = {
         AND: [
           {
-            'enrichments.some.value': { operator: 'in', values: ['EMEA'] },
+            'enrichments.some.value': { operator: 'in', value: ['EMEA'] },
             'enrichments.some.fieldKey': { operator: 'equals', value: 'businessUnit' },
           },
         ],
@@ -51,13 +51,13 @@ describe('buildFilterQuery', () => {
 
     it('drops empty groups and re-indexes the rest; drops the combinator when all groups are empty', () => {
       const withOneLive: FilterMap = {
-        AND: [{ status: { operator: 'in', values: [] } }, { status: { operator: 'equals', value: 'a' } }],
+        AND: [{ status: { operator: 'in', value: [] } }, { status: { operator: 'equals', value: 'a' } }],
       };
       expect(buildFilterQuery('', [], withOneLive, [])).toEqual({
         'searchFields[AND][0][status][equals]': 'a',
       });
 
-      const allEmpty: FilterMap = { AND: [{ status: { operator: 'in', values: [] } }] };
+      const allEmpty: FilterMap = { AND: [{ status: { operator: 'in', value: [] } }] };
       expect(buildFilterQuery('', [], allEmpty, [])).toEqual({});
     });
 
@@ -107,10 +107,15 @@ describe('buildFilterQuery', () => {
       expect(buildFilterQuery('', [], filters, [])).toEqual({});
     });
 
-    it('a bare-string `values` is dropped, not serialized character by character', () => {
-      // The trap: a string has `.length`, so it clears the empty check, and the operator then
-      // gets the raw string — a wrong query that looks like a working one. `values` must be an array.
-      const filters = { name: { operator: 'in', values: 'abc' } } as unknown as FilterMap;
+    it('a scalar value under an array operator is dropped (in/notIn require an array)', () => {
+      // The value shape must match the operator, like the engine's Rule: `in` takes an array. A
+      // bare scalar would otherwise serialize as `in: 'abc'`, a wrong query the server 400s.
+      const filters = { name: { operator: 'in', value: 'abc' } } as unknown as FilterMap;
+      expect(buildFilterQuery('', [], filters, [])).toEqual({});
+    });
+
+    it('an array value under a scalar operator is dropped (equals takes a scalar)', () => {
+      const filters = { name: { operator: 'equals', value: ['a', 'b'] } } as unknown as FilterMap;
       expect(buildFilterQuery('', [], filters, [])).toEqual({});
     });
 
@@ -156,7 +161,7 @@ describe('buildFilterQuery', () => {
     });
 
     it('carries typed values inside an `in` list', () => {
-      const filters: FilterMap = { tier: { operator: 'in', values: ['gold', null] } };
+      const filters: FilterMap = { tier: { operator: 'in', value: ['gold', null] } };
       expect(buildFilterQuery('', [], filters, [])).toEqual({
         'searchFields[tier][in]': 'gold',
         'searchFields[tier][in][:]': 'null',
