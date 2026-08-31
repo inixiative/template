@@ -1,4 +1,4 @@
-export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing } from './emailRuleLens';
+export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing, REFERENCEABLE_MODELS } from './emailRuleLens';
 export {
   contentRuleReferences,
   type RuleRowReference,
@@ -6,3 +6,4 @@ export {
   referenceKey,
   ruleReferences,
 } from './ruleReferences';
+export { contentVocabularyIssues, ruleVocabularyIssues } from './validateRuleVocabulary';

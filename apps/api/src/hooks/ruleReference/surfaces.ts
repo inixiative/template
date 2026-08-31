@@ -31,9 +31,7 @@ const axisKey = (axis: Axis, value: string): string => {
   return key;
 };
 
-export const OWNER_MODELS: ModelName[] = axisModels('ownerModel');
 export const REFERENCED_MODELS: ModelName[] = axisModels('referencedModel');
 
 export const ownerKey = (model: string): string => axisKey('ownerModel', model);
 export const referencedKey = (model: string): string => axisKey('referencedModel', model);
-export const ownerRelation = (model: string): string => ownerKey(model).replace(/Id$/, '');

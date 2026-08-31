@@ -1,6 +1,6 @@
 # INFRA-030: Reference registry — the rows a rule names, as edges
 
-**Status**: 👀 Review — built on this branch: `RuleReference` (false-polymorphic both ends), write hook, staleness hook, render gate, json-rules 2.20.0 `ruleSourceValues`
+**Status**: 👀 Review — built on this branch, then hardened by a 4-agent adversarial pass (races fenced, vocabulary gated, projection keyed); json-rules 2.20.0 `ruleSourceValues` shipped with its own fix round
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-08-31
@@ -58,16 +58,19 @@ keyed by `projectByPath`'s `path` + `field` with the source's model — the call
 dotted path (the #9/#10 shape, rejected for exactly that). Nested and dotted relation spellings are
 one path; quantifier- and operator-blind (`none` / `notIn` name their values as much as `any` /
 `in`) except no-value operators; a windowing `filter` is walked at its anchor; an aggregate's own
-threshold is not a source value; `path` / `bind` / `variable` report `dynamic`. This registry is the
-named first consumer that API was waiting for.
+threshold is not a source value; `path` / `bind`, non-enumerating operator shapes (substring,
+pattern, range, window) and unknown operators report `dynamic` — the fail-closed flag. This
+registry is the named first consumer that API was waiting for.
 
-`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User` and
-declares the referenceable sources (`tagAttachments.tag.id`, `organizationUsers.organization.id`,
-`spaceUsers.space.id`); `ruleReferences(rule)` keeps the sources on a model's id field
+`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`. The
+narrowing is `mapDefaults`-shaped: a source on each referenceable model's `id` (`Tag`,
+`Organization`, `Space` — derived from the `PolymorphismRegistry` axis) answers on every path to
+the model, and every FK column duplicating a relation to a referenceable model is derived from
+`prismaMap` and omitted from the vocabulary. `ruleReferences(rule)` keeps the id-field sources
 (`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
 block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
-a source in the narrowing + an FK column + a registry entry; adding a rule-bearing column = an entry
-in `RULE_REFERENCE_SURFACES`.
+a `RuleReference` FK column + a registry entry (source and omits derive); adding a rule-bearing
+column = an entry in `RULE_REFERENCE_SURFACES`.
 
 ### Write hook — edges in the save's transaction
 
@@ -93,12 +96,61 @@ evaluated.
 
 ### Tests
 
-`apps/api/src/hooks/ruleReference/hook.test.ts` (13, DB-backed): typed edges per surface and per
+`apps/api/src/hooks/ruleReference/hook.test.ts` (19, DB-backed, full prod hook set — scoper, preventHardDelete, rules): typed edges per surface and per
 referenced model, subject as a surface, set-diff keeps survivors, non-rule writes don't churn, clear,
 components, 422 on missing / soft-deleted / dynamic, soft-delete flags every owner and restore
 un-flags, unrelated target writes don't re-resolve, hard delete cascades, the registry refuses a
 contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and the stale-reference
 cases in `evaluateConditions.test.ts`. json-rules: `test/lens.ruleSourceValues.test.ts` (10).
+
+## Adversarial round (same day, 4 agents, live-DB probes)
+
+Every confirmed finding was fixed in-branch and pinned by a test:
+
+- **The extraction surface was a strict subset of the evaluation surface** — FK-column spellings
+  (`tagId`, `organizationId`), undeclared relations (`recipient.tags`), and deep paths all
+  evaluated at render while registering zero edges: the vacuous-`none` failure this primitive
+  exists to kill. Closed structurally, not by whitelist: the narrowing is now `mapDefaults` —
+  a source on each referenceable model's `id` answers **wherever the model appears** (json-rules
+  2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and every FK column that duplicates a
+  relation to a referenceable model is derived from `prismaMap` and omitted from the vocabulary.
+  The write hook now runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path
+  is a 422, and any relation path to a referenceable id is a registered edge.
+- **Races, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`): the save gate
+  locks the referenced rows before reading liveness (a save can no longer commit an edge to a row
+  a concurrent transaction is deleting), and `reresolveDegraded` locks the owners before
+  computing (two concurrent target deletes no longer lose an update to `degradedRuleRefs`).
+  Opposite lock orders can deadlock under contention; Postgres aborts one transaction loudly.
+- **The gate validates the delta, not the document**: a pre-existing dead reference no longer
+  freezes its owner — edits that keep it are allowed and the projection stays truthful; only a
+  *newly added* dead reference is a 422. Archived owners keep their projection maintained
+  (`db.withDeleted` for the maintenance write), so restore needs no repair pass.
+- **`degradedRuleRefs` holds `Model|id` keys** (`referenceKey`), the same key discipline as the
+  edges, and defaults to `[]` at the DB (raw reads see NULL otherwise).
+- **Render**: rules evaluate over the **nested** `{ sender, recipient, data }` object (dotted
+  to-one paths resolve; the one-level flattening could not); a `dynamic` rule is a rule error
+  unconditionally, not only when something is already stale; an unterminated `{{#if}}` is
+  reported and suppressed instead of shipping raw rule JSON in the email body; a malformed
+  nested marker can no longer let a `{{/if}}` inside a JSON string bisect the outer block.
+- **Hard delete**: the client path is *prevented* (`preventHardDelete`); the purge/redact path
+  cascades edges at the DB (real Postgres FKs) but must call `reresolveDegraded` on the owners
+  before purging — the cascade removes the reverse edge that would otherwise find them.
+
+Known limitations, deliberately not papered over:
+
+- **Two lenses own the two halves.** The per-template `recipientLens` (what data the recipient
+  object carries) and `emailRuleNarrowing` (what rules may say) are declared independently. A
+  rule at a declared source whose recipient data lacks the relation throws at render and fails
+  **closed** through `onError` (DLQ under `fail`) — safe but noisy. The real fix is deriving one
+  from the other; that is INFRA-017/018's authored lens.
+- **A dotted path crossing a to-many** (`recipient.spaceUsers.space.id`) registers its edge but
+  never matches under `check` (lodash `get` does not traverse arrays). `checkRuleAgainstLens`
+  deliberately accepts the spelling today, so refusing it is a json-rules semantics decision
+  (INFRA-019 target sharp edges) — author membership rules as relation nodes; the canonical
+  spelling is gated, documented, and what every test uses.
+- `sender.*` / `data.*` rules are authorable and structurally unregisterable (Json boundary):
+  an id named through the opaque payload gets no edge, no gate, no staleness. Inherent to
+  opaque payloads; say it in authoring docs.
 
 ## Rulings (Aron, 2026-08-31, on Zealot #2116)
 

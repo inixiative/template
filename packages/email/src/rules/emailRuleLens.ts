@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { createLens, type FieldMap, type Lens, type LensNarrowing, validateNarrowing } from '@inixiative/json-rules';
+import { getModelRelations, getPolymorphismConfig, type ModelName, modelNames } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
 export const EMAIL_RULE_CONTEXT = 'EmailRuleContext';
@@ -29,19 +30,34 @@ export const emailRuleLens: Lens = createLens({
   model: EMAIL_RULE_CONTEXT,
 });
 
+const referencedAxis = getPolymorphismConfig('RuleReference')?.axes.find((axis) => axis.field === 'referencedModel');
+
+export const REFERENCEABLE_MODELS = Object.keys(referencedAxis?.fkMap ?? {}) as ModelName[];
+
+const referenceable = new Set<string>(REFERENCEABLE_MODELS);
+
+type ModelDefaults = { sources?: Record<string, true>; omits?: string[] };
+
+const modelDefaults = (): Record<string, ModelDefaults> => {
+  const models: Record<string, ModelDefaults> = {};
+  for (const model of REFERENCEABLE_MODELS) models[model] = { sources: { id: true } };
+  for (const model of modelNames) {
+    const ownFields = (prismaMap.models as Record<string, { fields: Record<string, unknown> }>)[model]?.fields ?? {};
+    const fkColumns = getModelRelations(model)
+      .filter((relation) => referenceable.has(relation.targetModel) && relation.foreignKey)
+      .flatMap((relation) =>
+        typeof relation.foreignKey === 'string' ? [relation.foreignKey] : Object.values(relation.foreignKey ?? {}),
+      )
+      .filter((column): column is string => typeof column === 'string' && column in ownFields);
+    if (!fkColumns.length) continue;
+    models[model] = { ...models[model], omits: [...new Set(fkColumns)] };
+  }
+  return models;
+};
+
 export const emailRuleNarrowing: LensNarrowing = {
   parent: emailRuleLens,
-  root: {
-    relations: {
-      recipient: {
-        relations: {
-          tagAttachments: { relations: { tag: { sources: { id: true } } } },
-          organizationUsers: { relations: { organization: { sources: { id: true } } } },
-          spaceUsers: { relations: { space: { sources: { id: true } } } },
-        },
-      },
-    },
-  },
+  mapDefaults: { prisma: { models: modelDefaults() } },
 };
 
 validateNarrowing(emailRuleNarrowing);

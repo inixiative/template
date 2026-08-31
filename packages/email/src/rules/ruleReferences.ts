@@ -23,7 +23,19 @@ const isRowIdSource = (model: string, field: string): boolean =>
 
 export const referenceKey = (reference: RuleRowReference): string => `${reference.model}|${reference.id}`;
 
+const memo = new Map<string, RuleRowReferences>();
+
 export const ruleReferences = (rule: Condition): RuleRowReferences => {
+  const memoKey = JSON.stringify(rule);
+  const cached = memo.get(memoKey);
+  if (cached) return cached;
+  const computed = computeRuleReferences(rule);
+  if (memo.size >= 1024) memo.clear();
+  memo.set(memoKey, computed);
+  return computed;
+};
+
+const computeRuleReferences = (rule: Condition): RuleRowReferences => {
   const references: RuleRowReference[] = [];
   let dynamic = false;
   for (const source of ruleSourceValues(emailRuleNarrowing, rule)) {
