@@ -7,7 +7,6 @@
 import { type ArrayFieldOperator, isCombinator, type ScalarFieldOperator } from '@template/shared/bracketQuery';
 import type { SearchMode } from '@template/ui/lib/makeDataConfig';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
-import { castArray } from 'lodash-es';
 
 export type FilterState =
   | { operator: ArrayFieldOperator; values: string[] }
@@ -16,8 +15,21 @@ export type FilterState =
 // Prisma's where shape with FilterState leaves: a combinator key (AND/OR) carries an array of
 // nested maps, one clause group per element, serialized as indexed children —
 // `{ AND: [{ 'tokens.some.name': … }] }` → `searchFields[AND][0][tokens][some][name][…]`.
-// Only combinator keys may carry the array-of-maps arm.
+// Only a combinator key may carry that array-of-maps arm; every other key is a dot-path to a leaf.
 export type FilterMap = { [field: string]: FilterState | FilterState[] | FilterMap[] };
+
+// A clause group is a plain object. null, an array, or a scalar names no group.
+const isFilterMap = (value: unknown): value is FilterMap =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// A leaf clause needs both halves the right shape, not just present: an operator, plus the value
+// arm its operator kind expects (array ops carry `values`, scalar ops carry `value`). A bare-string
+// `values` is the trap — it has a `.length`, so it clears the empty check, and the operator then
+// serializes the raw string as the filter: a wrong query that looks like a working one.
+const isFilterState = (value: unknown): value is FilterState =>
+  isFilterMap(value) &&
+  typeof (value as { operator?: unknown }).operator === 'string' &&
+  (Array.isArray((value as { values?: unknown }).values) || typeof (value as { value?: unknown }).value === 'string');
 
 const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
   const [head, ...rest] = path;
@@ -41,10 +53,11 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
       // Combinator keys carry an array of clause groups. A non-array here is a malformed map (a
       // scalar clause under AND/OR); drop it rather than crash — the server 400s the same wire.
       if (!Array.isArray(state)) continue;
-      const children = (state as FilterMap[]).map((group) => {
+      const children = (state as unknown[]).flatMap((group) => {
+        if (!isFilterMap(group)) return [];
         const child: Record<string, unknown> = {};
         addFilters(child, group);
-        return child;
+        return [child];
       });
       // A group whose clauses all carried empty values is no filter — drop it, and drop the
       // combinator entirely when no group survives (a childless combinator is a 400 server-side).
@@ -52,7 +65,10 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
       if (live.length > 0) nested[field] = live;
       continue;
     }
-    for (const clause of castArray(state as FilterState | FilterState[])) {
+    // A field may carry several operator clauses (e.g. gte + lte for a range); each is folded in.
+    const clauses: unknown[] = Array.isArray(state) ? state : [state];
+    for (const clause of clauses) {
+      if (!isFilterState(clause)) continue;
       if ('values' in clause) {
         if (clause.values.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.values });
       } else if (clause.value) {

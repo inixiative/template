@@ -106,5 +106,24 @@ describe('buildFilterQuery', () => {
       const filters = { status: null, AND: null } as unknown as FilterMap;
       expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
     });
+
+    it('a bare-string `values` is dropped, not serialized character by character', () => {
+      // The trap: a string has `.length`, so it clears the empty check, and the operator then
+      // gets the raw string — a wrong query that looks like a working one. `values` must be an array.
+      const filters = { name: { operator: 'in', values: 'abc' } } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
+    });
+
+    it('a non-map group under a combinator key is dropped, not recursed into', () => {
+      const filters = { AND: ['nope', null, { status: { operator: 'equals', value: 'a' } }] } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({
+        'searchFields[AND][0][status][equals]': 'a',
+      });
+    });
+
+    it('a group-array under a plain field key is dropped, not treated as clauses', () => {
+      const filters = { tokens: [{ name: { operator: 'contains', value: 'x' } }] } as unknown as FilterMap;
+      expect(buildFilterQuery('', 'combined', [], filters, [])).toEqual({});
+    });
   });
 });
