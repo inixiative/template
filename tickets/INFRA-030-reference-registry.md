@@ -1,25 +1,25 @@
 # INFRA-030: Reference registry — the rows a rule names, as edges
 
-**Status**: 🆕 Not Started — design settled 2026-08-31; code lands with the first template surface (below)
+**Status**: 👀 Review — built on this branch: `RuleReference` (false-polymorphic both ends), write hook, staleness hook, render gate, json-rules 2.20.0 `ruleSourceValues`
 **Assignee**: Aron
-**Priority**: Medium (Zealot is the first consumer and carries the shape today; the template gets the primitive so email rules don't grow a second one)
+**Priority**: Medium
 **Created**: 2026-08-31
 **Updated**: 2026-08-31
 
 > Zealot hit this as ZLT-4441 / #2116 (write-only edge table + DB hook, reviewed 2026-08-31 with the
 > rulings below) after the ZLT-4331 review proved per-surface tree scanning doesn't scale: a delete
 > guard covered two referencing surfaces and missed two more, and a `none` rule over a deleted target
-> is vacuously true for the whole tenant. This ticket is the template's version — same primitive,
-> Postgres-shaped, false-polymorphic on both ends — and the ruling that email's `componentRefs` does
-> **not** ride it.
+> is vacuously true for the whole tenant. This is the template's version — same primitive,
+> Postgres-shaped — with email conditionals as the first surface, and the ruling that email's
+> `componentRefs` does **not** ride it.
 
 ---
 
 ## Problem
 
-A stored rule (`Groups.conditions`, `BrandMissions.autoApprovalConditions`, a future
-`EmailTemplate.conditions`) can name another row: "members of segment X", "tagged Y". Nothing
-records that edge, so three questions are each answered by scanning every rule-bearing column:
+A stored rule (`{{#if rule=…}}` in an email body, `Groups.conditions` in Zealot) can name another
+row: "recipient is tagged X", "members of segment Y". Nothing recorded that edge, so three questions
+were each answered by scanning every rule-bearing column:
 
 - **Delete gate** — "who references X?" before X is soft-deleted. Per-surface scans miss surfaces
   added later, by construction.
@@ -35,105 +35,70 @@ GIN index, derived on save, `degradedComponentRefs` as the broken-refs projectio
 edge is homogeneous (component → component) and Postgres arrays index. Rules reference rows across
 models, and a Json column's contents aren't indexable — so the edges become rows.
 
-## Shape
+## What shipped
 
-### The table — false polymorphism on both axes
+### `RuleReference` — false polymorphism on both axes
 
-```prisma
-model RuleReference {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
+`packages/db/prisma/schema/ruleReference.prisma`. `ownerModel` + `emailTemplateId` /
+`emailComponentId`; `referencedModel` + `tagId` / `organizationId` / `spaceId`; both axes in
+`PolymorphismRegistry`, so the `rules` hook enforces exactly-one-FK and the type fields are
+immutable. Real relations on both ends, `onDelete: Cascade`. Edge identity is one partial unique per
+(owner, referenced) branch pair — the Contact / EmailTemplate convention. No `updatedAt` /
+`deletedAt`: append/delete only, a row is never mutated. Tenant scoping is derived through the
+owner, never denormalized onto the edge.
 
-  ownerModel            RuleReferenceOwnerModel
-  ownerEmailTemplateId  String? @db.VarChar(36)
-  ownerEmailTemplate    EmailTemplate? @relation(fields: [ownerEmailTemplateId], references: [id], onDelete: Cascade)
+Not a bare `(model, id)` string pair (Zealot #2116's first cut). Typed relations are what the
+consumers need: `include` on either end, relation-scoped `deletedAt` joins, and a hard delete on
+either side removing the edge at the DB.
 
-  referencedModel       RuleReferenceReferencedModel
-  referencedTagId       String? @db.VarChar(36)
-  referencedTag         Tag? @relation(fields: [referencedTagId], references: [id], onDelete: Cascade)
+### Extraction is the lens's — `ruleSourceValues` (json-rules 2.20.0)
 
-  @@unique([ownerModel, ownerEmailTemplateId, referencedModel, referencedTagId])
-  @@index([referencedModel, referencedTagId])
-}
-```
+`ruleSourceValues(lens, rule)` reports the values a rule compares at each source the lens declares,
+keyed by `projectByPath`'s `path` + `field` with the source's model — the caller never spells a
+dotted path (the #9/#10 shape, rejected for exactly that). Nested and dotted relation spellings are
+one path; quantifier- and operator-blind (`none` / `notIn` name their values as much as `any` /
+`in`) except no-value operators; a windowing `filter` is walked at its anchor; an aggregate's own
+threshold is not a source value; `path` / `bind` / `variable` report `dynamic`. This registry is the
+named first consumer that API was waiting for.
 
-One discriminator + one typed nullable FK per model on **each** end — `AuditLog.subjectModel`'s
-pattern, registered in `PolymorphismRegistry` as two axes so the `rules` hook enforces exactly-one-FK
-and the type fields are immutable. The FK columns above are illustrative (the first template
-surface names the real ones); adding a surface or a referenceable model = registry entry + column,
-the cost AuditLog already pays.
+`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User` and
+declares the referenceable sources (`tagAttachments.tag.id`, `organizationUsers.organization.id`,
+`spaceUsers.space.id`); `ruleReferences(rule)` keeps the sources on a model's id field
+(`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
+block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
+a source in the narrowing + an FK column + a registry entry; adding a rule-bearing column = an entry
+in `RULE_REFERENCE_SURFACES`.
 
-Not a bare `(model, id)` string pair. Typed relations are what the consumers need: `include` on
-either end, `where: { referencedTag: { deletedAt: null } }` instead of a hand-joined `deletedAt`, and
-`onDelete: Cascade` on the referenced FK so a **hard** delete through any path removes the edges at
-the DB — hard-delete orphans become impossible rather than detected.
+### Write hook — edges in the save's transaction
 
-No `updatedAt` / `deletedAt`. Edges are append/delete: the set-diff hard-deletes edges that left
-the tree, a row is never mutated, and an edge has no lifecycle of its own. Tenant scoping is derived
-through the owner relation, never denormalized onto the edge (a nullable `organizationId` on the edge
-is a fail-open: an owner with none never matches a scoped reverse query).
+`apps/api/src/hooks/ruleReference/hook.ts`, after-timing on the surface models (never `'*'`),
+because the edges need the created row's id and the stored body. Key-presence skip (a write that
+does not touch `subject` / `mjml` returns before any query); set-diff per owner (survivors keep
+their row, removed edges are deleted, added edges `createManyAndReturn`ed); missing or soft-deleted
+targets and `dynamic` references are a 422 at save. `syncRuleReferences(model, rows)` is the
+callable a backfill loops over.
 
-### Surfaces — a registry, and the lens does the extraction
+### Staleness — on the referenced side, re-resolved
 
-```ts
-export const ruleReferenceSurfaces: Partial<Record<ModelName, { column: string }>> = {
-  EmailTemplate: { column: 'conditions' },
-};
-```
+`degraded.ts`, after-timing on the referenced models, in `softDeleteCascade`'s shape: when a
+target's `deletedAt` flips either way, every live owner over the reverse edges is re-resolved and
+its `degradedRuleRefs` projection rewritten (`degradedComponentRefs` is the precedent). Re-resolve
+rather than set-once, so an undelete un-flags. Hard delete of a target is the FK cascade.
 
-One entry per rule-bearing column. The hook registration reads this table, so a new surface's
-writes grow edges with no further wiring — a write path added later can't forget it, the same reason
-validation is a hook and not a call in each service.
+At render, `composeTemplate` unions the template's and its expanded components'
+`degradedRuleRefs`; `interpolate({ staleRefs })` hands them to `evaluateConditions`, where a branch
+whose rule names one is a rule error, never a match — the template's `onError` policy
+(`fail` / `degrade` / `fallback`) decides, the same path a throwing rule takes. A stale rule is never
+evaluated.
 
-Which rows a rule names is a **lens** fact, not a per-surface extractor: a leaf that compares a
-relation target's primary key against a literal (`equals` / `in`), reached through the owner's
-declared relations, names that row — `{ field: 'tags.id', operator: 'in', value: [a, b] }` on an
-`EmailTemplate` rule is two `Tag` edges. `path` / `bind` leaves are dynamic and yield no edge; gates
-treat "dynamic" as unknown and fail closed. This is `ruleReferences(lens, rule) → { model, id }[]`
-in json-rules' lens module — introspection lives in the lens, the core stays an evaluator
-(inixiative/json-rules#9), and this registry is the named first consumer that API was waiting for.
-The template's `lensFor(ownerModel)` (prismaMap) is the lens; no path is spelled anywhere. Until the
-lens API ships, Zealot carries the projection caller-side over `foldConditionTree` behind a one-line
-seam (`packages/shared/src/rules/segments/referencedFieldValues.ts`) — port that seam, not a walker.
+### Tests
 
-### The hook — edges in the same transaction as the save
-
-After-timing on `create` / `update` / `upsert` / `createManyAndReturn` / `updateManyAndReturn`,
-registered on the surface models (never `'*'`). After, because the edges need the created row's id
-and the *stored* tree — before-hooks normalize the payload, `result` is the truthful source.
-
-- Skip by key presence: a write whose payload lacks the rule column returns before any query. A
-  `DbNull` clear has the key, so it recomputes to empty and the edges go.
-- Set-diff per owner: load existing edges for the written owners in one query, keep the survivors,
-  `deleteMany` the removed, `createManyAndReturn` the added.
-- The per-owner recompute is a callable, `syncRuleReferences(model, rows)`, so a backfill is a loop
-  over it — not a re-save of every row to trip the hook.
-
-Owner soft-delete does not touch edges: a revived owner still holds the references, and every reader
-joins the owner's `deletedAt` (the softDeleteScoper's `liveWhere` does this for free through the
-relation).
-
-### Staleness — on the referenced side, re-resolved, deletedAt-aware
-
-The backstop behind the delete gate, for the row that is gone anyway. Hard delete is the FK cascade;
-nothing to detect. Soft-delete and restore are the `softDeleteCascade` hook's shape: after-timing on
-every referenceable model, fire when `deletedAt` flips in either direction, find edges by that
-model's FK, **re-resolve every owner** — recompute "which of my edges point at a live row" and write
-the owner's projection (`degradedComponentRefs` is the email precedent; segments in Zealot already
-carry `reconcilePausedAt` / `Reason` / `Detail`). Re-resolve rather than set-once so an undelete
-un-flags. Propagation is transitive over the reverse edges (a rule over a frozen segment is frozen),
-skipping soft-deleted owners.
-
-A stale rule is never evaluated. Each consumer defines its fail-closed behavior (Zealot ZLT-4444:
-segment freezes membership as-is and flags; auto-approve falls through to manual review; match
-filters stop matching). Frozen-and-visible beats recomputed-and-wrong.
-
-### The save gate reads the registry
-
-Exists, live, same-tenant, no self-reference, and **cycle = graph reachability** over persisted
-edges plus the in-flight tree, inside the transaction — `validateNoCycle`'s DFS with the edge table
-in place of `lookupCascade`. Never a depth cap. Once this reads the registry, every per-surface
-`xReferencing(id)` scanner is deleted, not kept beside it.
+`apps/api/src/hooks/ruleReference/hook.test.ts` (13, DB-backed): typed edges per surface and per
+referenced model, subject as a surface, set-diff keeps survivors, non-rule writes don't churn, clear,
+components, 422 on missing / soft-deleted / dynamic, soft-delete flags every owner and restore
+un-flags, unrelated target writes don't re-resolve, hard delete cascades, the registry refuses a
+contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and the stale-reference
+cases in `evaluateConditions.test.ts`. json-rules: `test/lens.ruleSourceValues.test.ts` (10).
 
 ## Rulings (Aron, 2026-08-31, on Zealot #2116)
 
@@ -143,39 +108,33 @@ in place of `lookupCascade`. Never a depth cap. Once this reads the registry, ev
    staleness trigger, never on the edge.
 4. Legacy rows outside the id'd rule system (Zealot's ~10.8k `workflowJSON.autoApproveConfig`)
    are not backfilled; the one scanner protecting them survives with a KNOWN-BROKEN block on it.
-   Things built on the rule system with real ids are what this protects.
-5. Email `componentRefs` stays as it is. A component reference is resolved by **slug through the
+5. Email `componentRefs` stays as it is. A component reference resolves by **slug through the
    owner cascade** at read time — an org adding an override `header` changes what every template in
    that org resolves without touching either row. An id edge persisted at save would be wrong the
-   moment the cascade changes; the slug-keyed reverse lookup (`componentRefs: { has: slug }`) is the
-   correct index for that reference. Only id-addressed references ride this table.
+   moment the cascade changes. Only id-addressed references ride this table.
 
-## First consumers
+## Zealot follow-through
 
-- **Zealot** — segments (`Groups.conditions`), mission auto-approval, reference-request match
-  filters, signup rules, smart folders. #2116 reshapes to the rulings above; ZLT-4444 is the
-  staleness half.
-- **Template** — the first rule-bearing column that names rows. Today there is none:
-  `Contact.permissionRules` is a rebac override that names relations, not rows, and email has no
-  conditions column until the lens builder lands (INFRA-017 / INFRA-018). The table, registry
-  entries, hook and staleness hook land in the same commit as that surface; nothing here is built
-  ahead of it because the typed FK columns are the surface.
-- **json-rules** — `ruleReferences(lens, rule)` in the lens module, built against Zealot's
-  registry as the named consumer.
+#2116 reshapes to the rulings (typed FKs, `brandUuid` dropped, `referencedModel` from
+`ruleSourceValues` over the segment lens, `syncRuleReferences` callable, staleness hook on Groups
+writing `reconcilePausedAt`); ZLT-4444 is the consumer side (segment freeze, auto-approve → manual,
+match filters stop). Cycle check on save reads the registry (persisted + in-flight, in the txn) and
+retires `segmentsReferencing`.
 
 ## Not in scope
 
-Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331; membership stays
-row-based and ordering is topo layers). Depth caps. A `referencesX` boolean on the owner. Migrating
-email component references onto the table (ruling 5).
+Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
+`referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
+Transitive propagation over reverse edges (nothing in the template references a rule-bearing row
+from a rule yet; the walk is `emailVersioning`'s when it's needed). Tenancy of a reference (a
+Space-owned template naming another org's tag) — the lens narrowing's `where` scope owns that
+(INFRA-017 / INFRA-018).
 
 ## Related
 
 - **INFRA-016** / **INFRA-017** / **INFRA-018** — serialized lenses, builder surface, lens builder;
-  the email conditions column that becomes the first template surface arrives with them.
+  the authored email lens replaces `emailRuleLens.ts`'s hand-declared narrowing when it lands.
 - **DB-001** — `db.txn` identity; the hook relies on running inside the caller's transaction.
 - `apps/api/src/hooks/emailVersioning/hook.ts`, `packages/email/src/render/validateNoCycle.ts` —
   the reverse-walk and cycle-check precedents this generalizes.
-- Zealot **ZLT-4441** / #2116 (table + hook, write-only), **ZLT-4444** (staleness), **ZLT-4331**
-  (the review that produced this), `apps/api/src/hooks/ruleReference/` there.
-- inixiative/json-rules#9 — the ruling that extraction is a lens concern with a named consumer.
+- Zealot **ZLT-4441** / #2116, **ZLT-4444**, **ZLT-4331**; inixiative/json-rules#9 and 2.20.0.

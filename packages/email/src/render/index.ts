@@ -5,6 +5,7 @@ export {
   composeTemplate,
   parentOwner,
 } from './compose';
+export { collectDegradedRuleRefs } from './degradedRuleRefs';
 export { type EmailErrorType, EmailRenderError } from './errors';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand } from './expand';

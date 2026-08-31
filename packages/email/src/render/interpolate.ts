@@ -71,6 +71,9 @@ export type InterpolateOptions = {
    * composed at, so a translated template's dates match its copy; `undefined` falls back to the runtime
    * default locale. */
   locale?: string;
+  /** Rows the composed template's rules name that no longer resolve (`degradedRuleRefs`, template + expanded
+   * components). A branch whose rule names one is a render error, never a match. */
+  staleRefs?: ReadonlySet<string>;
 };
 
 /**
@@ -93,7 +96,7 @@ export const interpolate = (
   onError?: RuleErrorSink,
   options: InterpolateOptions = {},
 ): string => {
-  const evaluated = evaluateConditions(resolveSystemTokens(template, options), variables, onError);
+  const evaluated = evaluateConditions(resolveSystemTokens(template, options), variables, onError, options.staleRefs);
 
   return evaluated.replace(VARIABLE_PATTERN, (match, prefix, path) => {
     if (hasUnsafeSegment(path)) return match;
