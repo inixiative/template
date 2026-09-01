@@ -42,7 +42,7 @@
 | `@prisma/adapter-pg` | Postgres driver | Native pg adapter for Prisma |
 | `pg` | Postgres client | Connection pooling |
 | `prisma-zod-generator` | Zod schemas | Generates Zod from Prisma models |
-| `@inixiative/prisma-map` (`^0.1.0`) | Runtime model map | Generates `prismaMap.gen.ts` (packages/db); replaces hand-maintained runtime data model |
+| `@inixiative/prisma-map` (`^0.2.0`) | Runtime model map | Generates `prismaMap.gen.ts` (packages/db); replaces hand-maintained runtime data model |
 
 ---
 

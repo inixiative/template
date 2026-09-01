@@ -191,7 +191,7 @@
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
-        "@inixiative/prisma-map": "^0.1.0",
+        "@inixiative/prisma-map": "^0.2.0",
         "@types/bcryptjs": "^3.0.0",
         "@types/ioredis-mock": "^8.2.7",
         "@types/lodash-es": "^4.17.12",
@@ -631,7 +631,7 @@
 
     "@inixiative/permissions": ["@inixiative/permissions@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^2.10.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-owHklfNmaBfkW0mUQITlaHeLj01rkOU72Xu1xCO1QvqQnhzaJzvaKiOSk29lHUONv67dvKFFPs33WNW8a4h0aw=="],
 
-    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.1.0", "", {}, "sha512-wb/Pc5q6SQvb3LrKR2Hz/SuYFnd9biyojnpd962bndq/Zjf1kUH8PdKxjQ0b532fm9Fw8SiDwRmsg/rY3KLjuw=="],
+    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.2.0", "", {}, "sha512-8zXkKog5zQ4Chu/oJLzbDjY66FvPaf7f0ttuo4WBjtnXblnKdDkXvoqx0XDYlXvWllTCLxE0g9G/39N450PzYA=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 
