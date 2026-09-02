@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@inixiative/json-rules": "^2.20.0"
+    "@inixiative/json-rules": "^2.21.0"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.97.3",
