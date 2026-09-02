@@ -4,12 +4,15 @@
  * @partOf feature:email
  * @uses none
  */
+import type { EmailComponent } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { renderBlocks } from '@template/email/render/renderBlocks';
 import type { OwnerScope } from '@template/email/render/types';
 
-export const expand = async (mjml: string, ctx: OwnerScope): Promise<string> => {
+export type OnComponentResolve = (slug: string, component: EmailComponent) => void;
+
+export const expand = async (mjml: string, ctx: OwnerScope, onResolve?: OnComponentResolve): Promise<string> => {
   const cache = new Map<string, Promise<string>>();
 
   const load = (slug: string): Promise<string> => {
@@ -19,6 +22,7 @@ export const expand = async (mjml: string, ctx: OwnerScope): Promise<string> => 
     const pending = lookupCascade([slug], ctx).then((components) => {
       const component = components[slug];
       if (!component) throw new EmailRenderError(slug, 'component_missing');
+      onResolve?.(slug, component);
       return component.mjml;
     });
     cache.set(slug, pending);

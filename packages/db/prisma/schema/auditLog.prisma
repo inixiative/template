@@ -78,7 +78,8 @@ model AuditLog {
 
   componentVersions Json?
 
-  communicationLogs CommunicationLog[] @relation("CommunicationEmailTemplateAuditLog")
+  communicationLogs              CommunicationLog[]              @relation("CommunicationEmailTemplateAuditLog")
+  communicationComponentVersions CommunicationComponentVersion[] @relation("CommunicationComponentVersionAuditLog")
 
   @@index([actorUserId])
   @@index([actorSpoofUserId])
