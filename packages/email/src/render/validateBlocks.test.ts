@@ -141,6 +141,24 @@ describe('validateBlocks — duplicate exposed slot names in one component body'
     ).toBe('duplicate_slot');
   });
 
+  it('allows a same-name slot nested inside another slot default (shadowed, not duplicated)', () => {
+    expect(() =>
+      validateBlocks(
+        '{{#component:b}}{{#slot:heading:default}}outer {{#slot:heading:default}}inner{{/slot:heading}}{{/slot:heading}}{{/component:b}}',
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects same-name slots reachable through two different unfilled defaults', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#component:b}}{{#slot:left:default}}{{#slot:x:default}}1{{/slot:x}}{{/slot:left}}{{#slot:right:default}}{{#slot:x:default}}2{{/slot:x}}{{/slot:right}}{{/component:b}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
   it('allows a fill for a child to share a name with the enclosing component own slot', () => {
     expect(() =>
       validateBlocks(

@@ -43,6 +43,30 @@ describe('renderBlocks', () => {
     expect(out).toBe('<x></x>');
   });
 
+  it('fills a default slot nested inside another default slot of the same body', async () => {
+    const out = await renderBlocks(
+      '{{#component:card}}{{#slot:inner}}FILL{{/slot:inner}}{{/component:card}}',
+      loaderFrom({
+        card: '{{#slot:outer:default}}[{{#slot:inner:default}}D{{/slot:inner:default}}]{{/slot:outer:default}}',
+      }),
+    );
+    expect(out).toBe('[FILL]');
+  });
+
+  it('lets an enclosing slot consume the fill, leaving a shadowed same-name descendant unreached', async () => {
+    const card =
+      '{{#slot:heading:default}}outer [{{#slot:heading:default}}inner{{/slot:heading:default}}]{{/slot:heading:default}}';
+
+    const filled = await renderBlocks(
+      '{{#component:card}}{{#slot:heading}}FILL{{/slot:heading}}{{/component:card}}',
+      loaderFrom({ card }),
+    );
+    const unfilled = await renderBlocks('{{#component:card}}{{/component:card}}', loaderFrom({ card }));
+
+    expect(filled).toBe('FILL');
+    expect(unfilled).toBe('outer [inner]');
+  });
+
   it('recurses into a component nested inside a default', async () => {
     const out = await renderBlocks(
       '{{#component:card}}{{/component:card}}',

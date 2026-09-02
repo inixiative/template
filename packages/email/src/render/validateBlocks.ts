@@ -68,12 +68,15 @@ type Frame = {
   duplicateSlot?: string;
   childNamespace: SlotNamespace;
   enclosingNamespace: SlotNamespace;
+  childShadowed: ReadonlySet<string>;
+  enclosingShadowed: ReadonlySet<string>;
 };
 
 export const validateBlocks = (input: string): void => {
   assertNoStrayTagShapes(input);
 
   const rootNamespace: SlotNamespace = { names: new Set(), owner: 'this body' };
+  const rootShadowed: ReadonlySet<string> = new Set();
   let duplicateExposedSlot: { name: string; owner: string } | undefined;
 
   const expose = (name: string, namespace: SlotNamespace): void => {
@@ -101,16 +104,25 @@ export const validateBlocks = (input: string): void => {
     if (marker === '#') {
       const parent = stack.at(-1);
       const positionNamespace = parent ? parent.childNamespace : rootNamespace;
+      const positionShadowed = parent ? parent.childShadowed : rootShadowed;
       const isDefault = kind === 'slot' && defaultModifier === 'default';
 
       let childNamespace: SlotNamespace;
+      let childShadowed: ReadonlySet<string>;
       if (kind === 'component') {
         childNamespace = { names: new Set(), owner: `component "${name}"` };
+        childShadowed = new Set();
       } else if (parent?.kind === 'component' && !isDefault) {
         childNamespace = parent.enclosingNamespace;
+        childShadowed = parent.enclosingShadowed;
       } else {
-        expose(name, positionNamespace);
+        // why: an enclosing slot of the same name consumes the caller's fill first, so this
+        // why: descendant is SHADOWED — only reachable when the ancestor is unfilled, never a
+        // why: second simultaneous injection point, so it is not a duplicate exposure.
+        const isShadowed = positionShadowed.has(name);
+        if (!isShadowed) expose(name, positionNamespace);
         childNamespace = positionNamespace;
+        childShadowed = isShadowed ? positionShadowed : new Set([...positionShadowed, name]);
       }
 
       stack.push({
@@ -120,6 +132,8 @@ export const validateBlocks = (input: string): void => {
         overrideSlots: new Set(),
         childNamespace,
         enclosingNamespace: positionNamespace,
+        childShadowed,
+        enclosingShadowed: positionShadowed,
       });
       continue;
     }
