@@ -159,6 +159,39 @@ describe('validateBlocks — duplicate exposed slot names in one component body'
     ).toBe('duplicate_slot');
   });
 
+  it('rejects two refs to the same component re-exposing one name under different override slots', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#component:c}}{{#slot:left}}{{#slot:x:default}}1{{/slot:x}}{{/slot:left}}{{/component:c}}' +
+            '{{#component:c}}{{#slot:right}}{{#slot:x:default}}2{{/slot:x}}{{/slot:right}}{{/component:c}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
+  it('rejects re-exposures reachable through two different enclosing defaults', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#slot:a:default}}{{#component:c}}{{#slot:body}}{{#slot:x:default}}1{{/slot:x}}{{/slot:body}}{{/component:c}}{{/slot:a}}' +
+            '{{#slot:b:default}}{{#component:c}}{{#slot:body}}{{#slot:x:default}}2{{/slot:x}}{{/slot:body}}{{/component:c}}{{/slot:b}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
+  it('does not let shadowing swallow a real duplicate elsewhere in the body', () => {
+    expect(
+      reasonOf(() =>
+        validateBlocks(
+          '{{#slot:x:default}}{{#component:c}}{{#slot:body}}{{#slot:x:default}}1{{/slot:x}}{{/slot:body}}{{/component:c}}{{/slot:x}}' +
+            '{{#slot:x:default}}sibling{{/slot:x}}',
+        ),
+      ),
+    ).toBe('duplicate_slot');
+  });
+
   it('allows a fill for a child to share a name with the enclosing component own slot', () => {
     expect(() =>
       validateBlocks(
