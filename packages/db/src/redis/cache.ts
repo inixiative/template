@@ -44,6 +44,24 @@ export const cacheKey = (
   return compact([redisNamespace.cache, toAccessorName(domain), ...idParts, ...tags, wildcard && '*']).join(':');
 };
 
+// The application Redis is ONE shared keyspace under an eviction policy — cache, session, otp,
+// lock, ratelimit and bull all live in it. An oversized value does not merely waste cache space:
+// under LRU it evicts sessions, OTP codes and job locks, arbitrarily far from the caller that
+// wrote it. Refuse, never throw — a cache is an optimization, and turning an oversized value into
+// a request failure converts a performance problem into an outage. The caller still gets its
+// value; only the write is skipped.
+const MAX_VALUE_BYTES = 256 * 1024;
+
+const serializeForCache = <T>(key: string, value: T): string | null => {
+  const payload = superjson.stringify(value);
+  const bytes = Buffer.byteLength(payload, 'utf8');
+  if (bytes > MAX_VALUE_BYTES) {
+    log.error(`Cache value too large for key ${key} (${bytes} bytes, max ${MAX_VALUE_BYTES}); not cached`);
+    return null;
+  }
+  return payload;
+};
+
 const validateKey = (key: string): void => {
   if (key.includes('undefined')) {
     throw new Error(`Cache key contains 'undefined': ${key}`);
@@ -160,8 +178,10 @@ export const cache = async <T>(
     const value = await fn();
     const effectiveTtl = resolveTtl(value, ttl);
 
-    if (effectiveTtl > 0) {
-      const write = redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
+    const payload = effectiveTtl > 0 ? serializeForCache(key, value) : null;
+
+    if (payload !== null) {
+      const write = redis.setex(key, effectiveTtl, payload).catch((error) => {
         log.error(`Cache write error for key ${key}:`, error);
       });
       // Awaited only while holding the lock: waiters poll the value key, so releasing before
@@ -190,7 +210,9 @@ export const upsertCache = async <T>(
   try {
     const redis = getRedisClient();
     if (!force && (await redis.exists(key))) return false;
-    await redis.setex(key, ttl, superjson.stringify(value));
+    const payload = serializeForCache(key, value);
+    if (payload === null) return false;
+    await redis.setex(key, ttl, payload);
     return true;
   } catch {
     return false;
