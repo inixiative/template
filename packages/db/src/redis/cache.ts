@@ -44,6 +44,17 @@ export const cacheKey = (
   return compact([redisNamespace.cache, toAccessorName(domain), ...idParts, ...tags, wildcard && '*']).join(':');
 };
 
+// The application Redis is ONE shared keyspace under an eviction policy — cache, session, otp,
+// lock, ratelimit and bull all live in it, so an oversized value evicts unrelated keys rather than
+// merely wasting cache space. Exported so a caller that must not cache past a size drives the
+// existing `ttl` callback (`(value) => cacheValueBytes(value) > LARGE_CACHE_VALUE_BYTES ? 0 : TTL`)
+// instead of hand-rolling a byte check. A reporting threshold, not a limit — nothing refuses at it,
+// because a skipped write leaves nothing under the key and sends every later caller back through
+// single-flight to recompute serially.
+export const LARGE_CACHE_VALUE_BYTES = 256 * 1024;
+
+export const cacheValueBytes = <T>(value: T): number => Buffer.byteLength(superjson.stringify(value), 'utf8');
+
 const validateKey = (key: string): void => {
   if (key.includes('undefined')) {
     throw new Error(`Cache key contains 'undefined': ${key}`);
@@ -161,7 +172,8 @@ export const cache = async <T>(
     const effectiveTtl = resolveTtl(value, ttl);
 
     if (effectiveTtl > 0) {
-      const write = redis.setex(key, effectiveTtl, superjson.stringify(value)).catch((error) => {
+      const payload = superjson.stringify(value);
+      const write = redis.setex(key, effectiveTtl, payload).catch((error) => {
         log.error(`Cache write error for key ${key}:`, error);
       });
       // Awaited only while holding the lock: waiters poll the value key, so releasing before
