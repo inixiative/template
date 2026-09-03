@@ -1,10 +1,10 @@
 # API-003: Cursor (Keyset) Pagination Mode
 
-**Status**: 🆕 Not Started
+**Status**: 🟡 Core landed — signing + integration tests outstanding
 **Assignee**: TBD
 **Priority**: Low
 **Created**: 2026-07-30
-**Updated**: 2026-07-30
+**Updated**: 2026-09-03
 
 ---
 
@@ -29,24 +29,24 @@ Trade-off accepted: cursor mode has no random access (no jump to page N, no tota
 
 ### Core
 
-- [ ] Enforce total order: unconditionally append the primary key (UUIDv7) as final `orderBy` tiebreaker after `buildOrderBy` resolves
-- [ ] Seek instead of skip:
-  - [ ] Default: Prisma native `cursor: { id } + skip: 1 + take` (id tiebreaker mitigates the documented non-unique-orderBy footguns)
-  - [ ] Fallback for sorts Prisma's cursor mishandles: expand composite keyset into OR-chain where — `{ OR: [{ sortField: { lt: v } }, { sortField: v, id: { lt: lastId } }] }` — composed through the existing where pipeline (Prisma has no row-value comparison; accept the index-efficiency cost or `queryRaw` later)
-- [ ] Drop `count()`: fetch `take + 1`; extra row ⇒ `hasMore`, last kept row's sort-key values ⇒ next token
+- [x] Enforce total order: unconditionally append the primary key (UUIDv7) as final `orderBy` tiebreaker after `buildOrderBy` resolves
+- [x] Seek instead of skip:
+  - [x] Default: Prisma native `cursor: { id } + skip: 1 + take` (id tiebreaker mitigates the documented non-unique-orderBy footguns)
+  - [x] Fallback for sorts Prisma's cursor mishandles: expand composite keyset into OR-chain where — `{ OR: [{ sortField: { lt: v } }, { sortField: v, id: { lt: lastId } }] }` — composed through the existing where pipeline (Prisma has no row-value comparison; accept the index-efficiency cost or `queryRaw` later)
+- [x] Drop `count()`: fetch `take + 1`; extra row ⇒ `hasMore`, last kept row's sort-key values ⇒ next token
 - [ ] Token contract: base64 of `{ sortKeyValues, orderByHash, filterHash }`, HMAC-signed
   - [ ] Reject token on orderBy/filter mismatch (400, not silent garbage) — cursors are only valid for the sort+filter they were minted under
   - [ ] Reject tampered/unsigned tokens
 
 ### Route templates / schemas
 
-- [ ] `cursorPaginateRequestSchema` (`limit`, `cursor?`) and response schema (`data`, `hasMore`, `nextCursor`) with OpenAPI registration
-- [ ] `readRoute({ pagination })` selects schema pair + executor; default stays `'offset'`
+- [x] `cursorPaginateRequestSchema` (`limit`, `cursor?`) and response schema (`data`, `hasMore`, `nextCursor`) with OpenAPI registration
+- [x] `readRoute({ pagination })` selects schema pair + executor; default stays `'offset'`
 
 ### Tests
 
-- [ ] Stability: insert/delete rows mid-walk → no duplicates, no skips (the offset failure case as a regression test)
-- [ ] Tiebreaker: non-unique sort field with same-value rows paginates without loss
+- [ ] Stability: insert/delete rows mid-walk → no duplicates, no skips (the offset failure case as a regression test) — see Still open
+- [x] Tiebreaker: non-unique sort field with same-value rows paginates without loss
 - [ ] Token: mismatched orderBy/filter rejected; tampered signature rejected
 - [ ] hasMore correctness at exact page boundaries
 - [ ] Lens scoping + live scope apply identically in cursor mode (tenant isolation holds while paginating)
@@ -54,6 +54,26 @@ Trade-off accepted: cursor mode has no random access (no jump to page N, no tota
 ### Frontend
 
 - [ ] Load-more / infinite-scroll primitive consuming `{ data, hasMore, nextCursor }` (numbered `Pagination.tsx` stays offset-only)
+
+## Landed 2026-09-03 (ported from Zealot)
+
+Zealot had already built this; the core is ported rather than written fresh. `apps/api/src/lib/prisma/keysetCursor.ts` (new), `cursorPaginate` + `withTotalOrder` in `paginate.ts`, cursor schemas in `paginationSchemas.ts`, and `paginate: true | 'cursor'` threaded through `types.ts` / `buildRequest.ts` / `buildResponses.ts` so `readRoute({ paginate: 'cursor' })` selects the schema pair.
+
+Porting also pulled the shared composition out of `paginate` into `composeScopedFindMany`, so offset and cursor mode provably share lens binding resolution, search composition, authorization narrowing and live scope — the "reused unchanged" claim in Scope is now structural rather than a convention.
+
+Two deliberate deviations from the plan above:
+
+- **Token is versioned base64url JSON, not HMAC-signed.** It carries `{v, k: sortChain, p: values}`, and `assertChainMatches` rejects a cursor whose chain differs from the resolved sort. That covers the orderBy-mismatch case but *not* the filter-mismatch case, and an unsigned token is client-forgeable — a caller can hand-craft a boundary value. It is not a privilege escalation (the lens where is composed server-side regardless), but it is not the contract this ticket specified. Signing + `filterHash` remain open below.
+- **`withTotalOrder` anchors on `id` unconditionally.** Zealot's version accepts any non-null primary key because its `prismaMap` exposes `isId`/`isRequired`; template's `FieldDef` carries neither, so a model with a differently-named primary key must pin it itself via `options.orderBy`. Adding that metadata is `@inixiative/prisma-map` work.
+
+Tests: `keysetCursor.test.ts` covers round-tripping, Date/BigInt serialization, and every rejection path (bad version, malformed, count mismatch, null, non-scalar, duplicate key), plus `assertChainMatches` and the composite OR-chain expansion of `buildKeysetWhere`. 17 tests. Suite: 997 pass / 2 fail, the two being pre-existing `lensWhere` count-operator failures on main.
+
+## Still open
+
+- [ ] HMAC-sign the token and add `filterHash`; reject a cursor minted under a different filter (currently only the sort chain is validated)
+- [ ] Integration tests against a real delegate: `hasMore` at exact page boundaries; mid-walk insert/delete stability (the offset failure case); lens scoping + live scope hold identically in cursor mode
+- [ ] One real route serving cursor mode end-to-end (nothing sets `paginate: 'cursor'` yet)
+- [ ] FE load-more / infinite-scroll primitive
 
 ## Open Questions
 

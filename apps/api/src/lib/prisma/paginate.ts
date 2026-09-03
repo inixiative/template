@@ -12,9 +12,28 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
+import { lookupField } from '#/lib/prisma/fieldMetadata';
+import {
+  assertChainMatches,
+  buildKeysetWhere,
+  decodeCursor,
+  encodeCursor,
+  hydrateCursorValues,
+  type SortKey,
+} from '#/lib/prisma/keysetCursor';
 import { lensWhere } from '#/lib/prisma/lensWhere';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
+
+const DEFAULT_CURSOR_PAGE_SIZE = 100;
+
+type CursorPaginationQuery = {
+  pageSize?: number;
+  cursor?: string;
+  search?: string;
+  searchFields?: BracketQueryRecord;
+  orderBy?: string[];
+};
 
 type PaginationQuery = {
   page?: number;
@@ -59,17 +78,14 @@ type PaginatedResult<T> = {
 const isBracketQueryRecord = (value: BracketQueryValue | undefined): value is BracketQueryRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export const paginate = async <
-  T extends AnyDelegate,
-  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
-  C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
->(
-  c: C,
-  delegate: T,
+// Everything up to the terminal findMany is shared by offset and cursor mode: lens binding
+// resolution, search composition, authorization narrowing and live scope. Only the tail differs.
+const composeScopedFindMany = async <T extends AnyDelegate>(
+  c: ValidatedContext<'query', PaginationQuery>,
   options?: PaginateOptions<T>,
-): Promise<PaginatedResult<TItem>> => {
+) => {
   const query = getValidatedQuery(c);
-  const { page = 1, pageSize = 20, search, orderBy: rawOrderBy } = query;
+  const { search } = query;
   const {
     orderBy: callerOrderByOption,
     orNullFields,
@@ -125,6 +141,21 @@ export const paginate = async <
     }
   }
 
+  return { where, model, findManyOptions, callerOrderByOption };
+};
+
+export const paginate = async <
+  T extends AnyDelegate,
+  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  C extends ValidatedContext<'query', PaginationQuery> = ValidatedContext<'query', PaginationQuery>,
+>(
+  c: C,
+  delegate: T,
+  options?: PaginateOptions<T>,
+): Promise<PaginatedResult<TItem>> => {
+  const { page = 1, pageSize = 20, orderBy: rawOrderBy } = getValidatedQuery(c);
+  const { where, findManyOptions, callerOrderByOption } = await composeScopedFindMany(c, options);
+
   const orderBy = buildOrderBy({
     callerOrderBy: callerOrderByOption,
     clientOrderBy: rawOrderBy,
@@ -152,4 +183,90 @@ export const paginate = async <
       totalPages: Math.ceil(total / pageSize),
     },
   };
+};
+
+// why: a keyset chain must end in a non-null unique column — a nullable tiebreaker either voids
+// why: the boundary comparison or silently skips rows on ties. Every model here carries a
+// why: required uuidv7 `id`, so that is the anchor; prismaMap exposes no isId/isRequired, so a
+// why: model with a differently-named primary key cannot be detected and must pin it itself
+// why: via options.orderBy.
+const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
+  if (chain.some(([key]) => key === 'id')) return chain;
+
+  if (!lookupField(model, 'id')) {
+    throw makeError({
+      status: 500,
+      message: `cursorPaginate: ${model} has no \`id\` column to anchor the keyset — pin its primary key via options.orderBy.`,
+    });
+  }
+
+  return [...chain, ['id', 'asc'] as const];
+};
+
+// why: must return a copy — callers append to the chain, which would grow a shared constant
+// why: across every later request.
+const DEFAULT_CURSOR_CHAIN: SortKey[] = [['id', 'asc']];
+
+const normalizeChain = (orderBy: unknown): SortKey[] => {
+  const entries = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<string, unknown>[];
+  const chain: SortKey[] = [];
+  for (const entry of entries) {
+    const key = Object.keys(entry)[0];
+    if (!key) continue;
+    const dir = entry[key];
+    if (dir === 'asc' || dir === 'desc') chain.push([key, dir]);
+  }
+  return chain.length > 0 ? chain : [...DEFAULT_CURSOR_CHAIN];
+};
+
+type CursorPaginatedResult<T> = {
+  data: T[];
+  pagination: { pageSize: number; hasMore: boolean; nextCursor: string | null };
+};
+
+// Keyset pagination: seeks to the last-seen position via an index range scan rather than reading
+// and discarding `skip` rows, so it is O(pageSize) at any depth and stable under concurrent
+// writes. No count() is issued — `hasMore` comes from fetching one row past the page.
+export const cursorPaginate = async <
+  T extends AnyDelegate,
+  TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
+  C extends ValidatedContext<'query', CursorPaginationQuery> = ValidatedContext<'query', CursorPaginationQuery>,
+>(
+  c: C,
+  delegate: T,
+  options?: PaginateOptions<T>,
+): Promise<CursorPaginatedResult<TItem>> => {
+  const { pageSize = DEFAULT_CURSOR_PAGE_SIZE, cursor } = getValidatedQuery(c);
+  const { where, model, findManyOptions, callerOrderByOption } = await composeScopedFindMany(
+    c as unknown as ValidatedContext<'query', PaginationQuery>,
+    options,
+  );
+  const chain = withTotalOrder(model, normalizeChain(callerOrderByOption));
+
+  let scopedWhere = where as Record<string, unknown>;
+  if (cursor) {
+    const decoded = decodeCursor(cursor);
+    assertChainMatches(decoded.k, chain);
+    scopedWhere = { AND: [where, buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p))] };
+  }
+
+  const rows = (await delegate.findMany({
+    ...findManyOptions,
+    where: scopedWhere,
+    orderBy: chain.map(([key, dir]) => ({ [key]: dir })),
+    take: pageSize + 1,
+  } as unknown as FindManyArgs<T>)) as TItem[];
+
+  const hasMore = rows.length > pageSize;
+  const data = hasMore ? rows.slice(0, pageSize) : rows;
+  const lastRow = data[data.length - 1] as Record<string, unknown> | undefined;
+  const nextCursor =
+    hasMore && lastRow
+      ? encodeCursor(
+          chain,
+          chain.map(([key]) => lastRow[key]),
+        )
+      : null;
+
+  return { data, pagination: { pageSize, hasMore, nextCursor } };
 };
