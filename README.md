@@ -21,13 +21,13 @@ a migration path.
 
 Runtime is Bun, HTTP is Hono, data is Prisma 7 on PostgreSQL, UI is React/TanStack with Tailwind v4.
 But the stack is the least interesting thing about this repo — most of the value is in how the pieces
-compose, and in the ~95k lines of hand-written TypeScript that make them compose *correctly*.
+compose, and in the ~95k curated lines of TypeScript that make them compose *correctly*.
 
 ## At a Glance
 
 | | |
 |---|---|
-| **Hand-written TypeScript** | ~95,000 lines across `apps/` and `packages/` (excluding generated code) |
+| **Curated TypeScript** | ~95,000 lines across `apps/` and `packages/` (excluding generated code) |
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
 | **API surface** | 111 route modules, auto-registered, each generating OpenAPI 3.1 |
 | **Tests** | 205 test files across apps and packages |
