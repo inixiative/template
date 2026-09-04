@@ -4,10 +4,9 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { type Condition, ruleSourceValues } from '@inixiative/json-rules';
+import { type Condition, type Lens, type LensNarrowing, ruleSourceValues } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { collectRules } from '@template/email/render/conditionParser';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
 
 export type RuleRowReference = { model: string; id: string };
 
@@ -23,22 +22,28 @@ const isRowIdSource = (model: string, field: string): boolean =>
 
 export const referenceKey = (reference: RuleRowReference): string => `${reference.model}|${reference.id}`;
 
-const memo = new Map<string, RuleRowReferences>();
+export type RuleLens = Lens | LensNarrowing;
 
-export const ruleReferences = (rule: Condition): RuleRowReferences => {
+// why: extraction is a function of the rule AND the lens, so the memo is keyed by both — the same
+// why: rule read through a different lens names different rows.
+const memo = new WeakMap<RuleLens, Map<string, RuleRowReferences>>();
+
+export const ruleReferences = (lens: RuleLens, rule: Condition): RuleRowReferences => {
+  const byRule = memo.get(lens) ?? new Map<string, RuleRowReferences>();
+  memo.set(lens, byRule);
   const memoKey = JSON.stringify(rule);
-  const cached = memo.get(memoKey);
+  const cached = byRule.get(memoKey);
   if (cached) return cached;
-  const computed = computeRuleReferences(rule);
-  if (memo.size >= 1024) memo.clear();
-  memo.set(memoKey, computed);
+  const computed = computeRuleReferences(lens, rule);
+  if (byRule.size >= 1024) byRule.clear();
+  byRule.set(memoKey, computed);
   return computed;
 };
 
-const computeRuleReferences = (rule: Condition): RuleRowReferences => {
+const computeRuleReferences = (lens: RuleLens, rule: Condition): RuleRowReferences => {
   const references: RuleRowReference[] = [];
   let dynamic = false;
-  for (const source of ruleSourceValues(emailRuleNarrowing, rule)) {
+  for (const source of ruleSourceValues(lens, rule)) {
     if (!isRowIdSource(source.model, source.field)) continue;
     if (source.dynamic) dynamic = true;
     for (const value of source.values) {
@@ -48,13 +53,13 @@ const computeRuleReferences = (rule: Condition): RuleRowReferences => {
   return { references, dynamic };
 };
 
-export const contentRuleReferences = (...contents: string[]): RuleRowReferences => {
+export const contentRuleReferences = (lens: RuleLens, ...contents: string[]): RuleRowReferences => {
   const seen = new Set<string>();
   const references: RuleRowReference[] = [];
   let dynamic = false;
   for (const content of contents) {
     for (const rule of collectRules(content)) {
-      const found = ruleReferences(rule);
+      const found = ruleReferences(lens, rule);
       dynamic ||= found.dynamic;
       for (const reference of found.references) {
         const key = referenceKey(reference);

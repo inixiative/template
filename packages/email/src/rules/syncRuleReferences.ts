@@ -5,10 +5,14 @@
  * @uses infrastructure:prisma
  */
 
-import type { LensNarrowing } from '@inixiative/json-rules';
 import { db, type ModelName, type Prisma, resolveFalsePolymorphismRef } from '@template/db';
 import { lockedLiveReferences } from '@template/email/rules/liveReferences';
-import { contentRuleReferences, type RuleRowReference, referenceKey } from '@template/email/rules/ruleReferences';
+import {
+  contentRuleReferences,
+  type RuleLens,
+  type RuleRowReference,
+  referenceKey,
+} from '@template/email/rules/ruleReferences';
 import { contentVocabularyIssues } from '@template/email/rules/validateRuleVocabulary';
 
 export type RuleReferenceOwner = { model: ModelName; id: string };
@@ -40,13 +44,13 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 export const syncRuleReferences = async (
   owner: RuleReferenceOwner,
   contents: string[],
-  _lens: LensNarrowing,
+  lens: RuleLens,
 ): Promise<void> => {
-  const issues = contentVocabularyIssues(...contents);
+  const issues = contentVocabularyIssues(lens, ...contents);
   if (issues.length)
     throw new RuleReferenceError(`${owner.model} ${owner.id}: rule outside the lens vocabulary — ${issues[0]}`);
 
-  const { references, dynamic } = contentRuleReferences(...contents);
+  const { references, dynamic } = contentRuleReferences(lens, ...contents);
   if (dynamic) {
     throw new RuleReferenceError(
       `${owner.model} ${owner.id}: a rule reads a referenced row from path or bind, or describes it without naming it — name the row instead`,
