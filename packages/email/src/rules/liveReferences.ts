@@ -18,22 +18,10 @@ const byModel = (references: RuleRowReference[]): Map<string, Set<string>> => {
 };
 
 /**
- * The rows a set of rule references actually resolves to, as reference keys. Absence is the
- * answer to every way a reference can fail — never created, hard deleted, soft deleted — so a
- * caller asks `has()` and fails closed on `false` without needing to know which it was.
+ * The references that resolve to a live row, with those rows locked for the rest of the
+ * transaction — the save gate's fence, so a concurrent delete cannot land between the check and
+ * the edge it admits. Absence is the answer: never created and soft deleted both fail closed.
  */
-export const liveReferences = async (references: RuleRowReference[]): Promise<Set<string>> => {
-  const live = new Set<string>();
-  for (const [model, ids] of byModel(references)) {
-    const rows = (await delegate(model).findMany({
-      where: { id: { in: [...ids] }, deletedAt: null },
-    })) as { id: string }[];
-    for (const row of rows) live.add(referenceKey({ model, id: row.id }));
-  }
-  return live;
-};
-
-/** Locking variant: the save path fences its targets so a concurrent delete cannot slip past the gate. */
 export const lockedLiveReferences = async (references: RuleRowReference[]): Promise<Set<string>> => {
   const live = new Set<string>();
   for (const [model, ids] of byModel(references)) {

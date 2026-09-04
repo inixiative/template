@@ -81,37 +81,60 @@ their row, removed edges are deleted, added edges `createManyAndReturn`ed); miss
 targets and `dynamic` references are a 422 at save. `syncRuleReferences(model, rows)` is the
 callable a backfill loops over.
 
-### Staleness — asked, never stored
+### Staleness — two clocks on the edge row
 
-There is no staleness column and no staleness hook. "Which of my references are gone" is a
-question the referenced rows already answer, so the reader asks them.
+An edge has to survive the row it names, and say so. Two ways a target leaves, two signals, both
+on the edge:
 
-`composeTemplate` extracts the references from the content it just expanded and resolves them in
-one query: `liveReferences(contentRuleReferences(mjml, subject).references)` returns the reference
-keys that still resolve. `interpolate({ liveRefs })` hands that set to `evaluateConditions`, where
-a branch naming a row **outside** the set is a rule error, never a match — the template's `onError`
-policy (`fail` / `degrade` / `fallback`) decides, the same path a throwing rule takes.
+* **Soft delete** — `ruleReference:referenced` copies the target's `deletedAt` onto every edge that
+  names it, matched on `(referencedModel, referencedId)`. One `updateManyAndReturn` per model, no
+  walk and no closure. Re-resolve rather than set-once, so an undelete clears it.
+* **Purge** — the referenced FK carries no `onDelete`, so Postgres `SET NULL`s it and the edge
+  stands with `referencedId` still naming the row that went. No hook can see a purge (the client
+  path is refused by `preventHardDelete`; the redact path is raw), which is why this one is the
+  database's job rather than a listener's.
 
-Absence is the answer, which is why the set is of live rows rather than dead ones. Never created,
-soft deleted, hard deleted with the edge cascaded away — all three land outside the set and all
-three fail closed, without the render needing to tell them apart. Nothing is materialised, so
-nothing can drift, and no propagation is needed to keep it true.
+### True polymorphism beside the false
 
-The edge table's job is the two questions a row cannot answer about itself: *who references X*
-(the referenced FK's index) and *may this save name that row* (the delta gate, fenced by
-`db.findForUpdate`).
+The referenced axis carries both: the typed FK **and** `referencedId`.
+
+They are two clocks on one fact. The FK is the *relation* — owned by referential integrity, and it
+goes null at exactly the moment the row ceases to exist. `referencedId` is the *name* — owned by
+the rule content, written once and never updated. They agree for the whole time the target is
+alive and diverge precisely at the moment worth detecting, so the divergence is the signal.
+`PolymorphismRegistry` keeps them in step at write time (`idField` on the axis), and admits the
+all-FKs-null branch as legal, because that state is reachable only through a referential action
+and never through a write.
+
+That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure function in
+`@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
+alone, so a consumer writes `include: { ruleReferences: true }` and never has to grow that include
+when a model becomes referenceable. `composeTemplate` reads the template's edges and those of the
+components the cascade actually resolved (`expand` now returns their ids), and hands
+`interpolate({ liveRefs })` the keys that survive; a branch naming anything outside that set is a
+rule error, never a match, and the template's `onError` policy decides.
+
+### Open: a lens that lives in a row
+
+Extraction is a function of two inputs — the rule content and the lens — and the write hook only
+observes the first. A per-template lens is fine, because editing it *is* an owner write. A shared
+lens authored as data is not: change it and every owner's edges are wrong at once with no write to
+notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferences(model, rows)`, the
+same callable a backfill loops over, triggered by a job rather than by a save. Deliberately not
+built here — the constraint is written down so the surface registry stays broadly open rather than
+being tightened around today's two models.
 
 ### Tests
 
-`apps/api/src/hooks/ruleReference/hook.test.ts` (18, DB-backed, full prod hook set — scoper,
+`apps/api/src/hooks/ruleReference/hook.test.ts` (19, DB-backed, full prod hook set — scoper,
 preventHardDelete, rules): typed edges per surface and per referenced model, subject as a surface,
 set-diff keeps survivors, non-rule writes don't churn, clear, components, 422 on missing /
-soft-deleted / dynamic, a soft-delete drops the target from the live set while its edges stand and
-a restore brings it back, hard delete cascades, the registry refuses a contradicting FK.
-`packages/email/src/rules/ruleReferences.test.ts` (6) and the reference-liveness cases in
-`evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
-fails closed, an omitted set means the caller did not ask. json-rules:
-`test/lens.ruleSourceValues.test.ts` (10).
+soft-deleted / dynamic, a soft-delete stamps every edge naming the target and a restore clears
+them, a purge nulls the FK and leaves the edge naming the row, the client refuses a hard delete,
+the registry refuses a contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and
+the reference-liveness cases in `evaluateConditions.test.ts` — live set renders, a key outside it
+is a rule error, an empty set fails closed, an omitted set means the caller did not ask.
+json-rules: `test/lens.ruleSourceValues.test.ts` (10).
 
 ## Adversarial round (same day, 4 agents, live-DB probes)
 
@@ -141,9 +164,8 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   reported and suppressed instead of shipping raw rule JSON in the email body; a malformed
   nested marker can no longer let a `{{/if}}` inside a JSON string bisect the outer block.
 - **Hard delete**: the client path is *prevented* (`preventHardDelete`); the purge/redact path
-  cascades edges at the DB (real Postgres FKs) and needs no companion call — the render asks the
-  content's references, not the edges, so a reference whose edge was cascaded away is simply
-  outside the live set.
+  `SET NULL`s the referenced FK and needs no companion call — the edge stays, `referencedId` still
+  names the row, and the null FK is what the read calls `purged`.
 
 Known limitations, deliberately not papered over:
 
