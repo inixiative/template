@@ -7,6 +7,7 @@
 import { type LensNarrowing, lensRequiredBindings, type RuleValue, resolveLensBindings } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { rootLens } from '@template/db/lens';
+import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
@@ -15,6 +16,7 @@ import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
 import { lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
 import {
   assertChainMatches,
+  assertFilterMatches,
   buildKeysetWhere,
   decodeCursor,
   encodeCursor,
@@ -249,11 +251,16 @@ export const cursorPaginate = async <
     options,
   );
   const chain = withTotalOrder(model, normalizeChain(callerOrderByOption));
+  // The token binds to the composed filter — lens narrowing, search, live scope and the caller's
+  // where all included — so "same query?" is answered by the system that owns the query, not by
+  // the request params.
+  const filterHash = stableHash({ model, where });
 
   let scopedWhere = where as Record<string, unknown>;
   if (cursor) {
     const decoded = decodeCursor(cursor);
     assertChainMatches(decoded.k, chain);
+    assertFilterMatches(decoded.f, filterHash);
     scopedWhere = { AND: [where, buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p))] };
   }
 
@@ -272,6 +279,7 @@ export const cursorPaginate = async <
       ? encodeCursor(
           chain,
           chain.map(([key]) => lastRow[key]),
+          filterHash,
         )
       : null;
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { AnyDelegate } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { paginate } from '#/lib/prisma/paginate';
+import { AppError } from '#/lib/errors';
+import { cursorPaginate, paginate } from '#/lib/prisma/paginate';
 
 type Captured = { findManyArgs?: Record<string, unknown> };
 
@@ -125,5 +126,72 @@ describe('paginate — soft-delete scope', () => {
     await paginate(makeContext(lens), makeDelegate(captured));
 
     expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
+  });
+});
+
+type Row = { id: string };
+
+// A delegate that honours the keyset: it reads the `id > cursor` seek out of the composed where
+// and returns rows strictly after it, so a walk observes real page boundaries.
+const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
+  ({
+    findMany: async (args: Record<string, unknown>) => {
+      const keyset = (args.where as { AND?: [unknown, { OR?: { id?: { gt?: string } }[] }] }).AND?.[1]?.OR?.[0]?.id?.gt;
+      const after = keyset ? rows.filter((row) => row.id > keyset) : rows;
+      return after.slice(0, args.take as number);
+    },
+    count: async () => rows.length,
+  }) as unknown as AnyDelegate;
+
+const cursorContext = (filterLens: LensNarrowing, query: Record<string, unknown>) =>
+  makeContext(filterLens, query) as unknown as Parameters<typeof cursorPaginate>[0];
+
+describe('cursorPaginate — filter binding', () => {
+  const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
+  const rows: Row[] = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5'].map((id) => ({ id }));
+
+  it('walks page two with a cursor minted under the same filter', async () => {
+    const first = await cursorPaginate(cursorContext(userLens, { pageSize: 2 }), makeSeekDelegate(rows), {
+      where: { name: 'aron' },
+    });
+    expect(first.data).toEqual([{ id: 'u-1' }, { id: 'u-2' }]);
+    expect(first.pagination.hasMore).toBe(true);
+
+    const second = await cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeSeekDelegate(rows),
+      { where: { name: 'aron' } },
+    );
+    expect(second.data).toEqual([{ id: 'u-3' }, { id: 'u-4' }]);
+  });
+
+  // why: the cursor is only meaningful inside the sequence it was minted from. Replaying it
+  // why: under a different filter seeks into a different sequence and silently skips rows.
+  it('rejects a cursor minted under a different filter with a 400', async () => {
+    const first = await cursorPaginate(cursorContext(userLens, { pageSize: 2 }), makeSeekDelegate(rows), {
+      where: { name: 'aron' },
+    });
+
+    const replay = cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeSeekDelegate(rows),
+      { where: { name: 'sam' } },
+    );
+    await expect(replay).rejects.toThrow(AppError);
+    await expect(replay).rejects.toThrow('Pagination cursor does not match the requested filter');
+  });
+
+  it('a search term is part of the filter the cursor is bound to', async () => {
+    const first = await cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, search: 'acme' }),
+      makeSeekDelegate(rows),
+    );
+
+    await expect(
+      cursorPaginate(
+        cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+        makeSeekDelegate(rows),
+      ),
+    ).rejects.toThrow('Pagination cursor does not match the requested filter');
   });
 });

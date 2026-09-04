@@ -47,7 +47,8 @@ Trade-off accepted: cursor mode has no random access (no jump to page N, no tota
 
 - [ ] Stability: insert/delete rows mid-walk → no duplicates, no skips (the offset failure case as a regression test) — see Still open
 - [x] Tiebreaker: non-unique sort field with same-value rows paginates without loss
-- [ ] Token: mismatched orderBy/filter rejected; tampered signature rejected
+- [x] Token: mismatched orderBy rejected; mismatched filter rejected (v2 `f` = stable hash of the composed `{ model, where }`)
+- [ ] Token: tampered signature rejected
 - [ ] hasMore correctness at exact page boundaries
 - [ ] Lens scoping + live scope apply identically in cursor mode (tenant isolation holds while paginating)
 
@@ -71,7 +72,8 @@ Tests: `keysetCursor.test.ts` covers round-tripping, Date/BigInt serialization, 
 
 ## Still open
 
-- [ ] HMAC-sign the token and add `filterHash`; reject a cursor minted under a different filter (currently only the sort chain is validated)
+- [x] `filterHash` (2026-09-04): token v2 carries `f`, a `stableHash` of the composed `{ model, where }`; `assertFilterMatches` 400s a cursor minted under a different filter. v1 tokens are rejected outright.
+- [ ] HMAC-sign the token
 - [ ] Integration tests against a real delegate: `hasMore` at exact page boundaries; mid-walk insert/delete stability (the offset failure case); lens scoping + live scope hold identically in cursor mode
 - [ ] One real route serving cursor mode end-to-end (nothing sets `paginate: 'cursor'` yet)
 - [ ] FE load-more / infinite-scroll primitive

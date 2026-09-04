@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { AppError } from '#/lib/errors';
 import {
   assertChainMatches,
+  assertFilterMatches,
   buildKeysetWhere,
   decodeCursor,
   encodeCursor,
@@ -10,13 +11,24 @@ import {
 } from '#/lib/prisma/keysetCursor';
 
 const ID_ASC: SortKey[] = [['id', 'asc']];
+const FILTER = 'f0f0f0f0f0f0f0f0';
 const encode = (payload: unknown) => Buffer.from(JSON.stringify(payload)).toString('base64url');
 
 describe('encodeCursor / decodeCursor', () => {
   it('round-trips a single-key chain and its values', () => {
-    const decoded = decodeCursor(encodeCursor(ID_ASC, ['abc-123']));
+    const decoded = decodeCursor(encodeCursor(ID_ASC, ['abc-123'], FILTER));
     expect(decoded.k).toEqual([['id', 'asc']]);
     expect(decoded.p).toEqual(['abc-123']);
+    expect(decoded.f).toBe(FILTER);
+  });
+
+  it('rejects a v1 token (minted before the filter hash existed) rather than trusting its filter', () => {
+    expect(() => decodeCursor(encode({ v: 1, k: ID_ASC, p: ['x'] }))).toThrow(AppError);
+  });
+
+  it('rejects a token whose filter hash is missing or not a string', () => {
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: ['x'] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: ['x'], f: 7 }))).toThrow(AppError);
   });
 
   it('round-trips a multi-key chain', () => {
@@ -24,7 +36,7 @@ describe('encodeCursor / decodeCursor', () => {
       ['name', 'desc'],
       ['id', 'asc'],
     ];
-    const decoded = decodeCursor(encodeCursor(chain, ['active', 'z-9']));
+    const decoded = decodeCursor(encodeCursor(chain, ['active', 'z-9'], FILTER));
     expect(decoded.k).toEqual(chain);
     expect(decoded.p).toEqual(['active', 'z-9']);
   });
@@ -34,7 +46,7 @@ describe('encodeCursor / decodeCursor', () => {
       ['updatedAt', 'desc'],
       ['id', 'asc'],
     ];
-    const decoded = decodeCursor(encodeCursor(chain, [new Date('2026-07-22T10:00:00.000Z'), 'u-1']));
+    const decoded = decodeCursor(encodeCursor(chain, [new Date('2026-07-22T10:00:00.000Z'), 'u-1'], FILTER));
     expect(decoded.p).toEqual(['2026-07-22T10:00:00.000Z', 'u-1']);
   });
 
@@ -43,7 +55,7 @@ describe('encodeCursor / decodeCursor', () => {
   });
 
   it('rejects a token with the wrong version', () => {
-    expect(() => decodeCursor(encode({ v: 99, k: ID_ASC, p: ['x'] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 99, k: ID_ASC, p: ['x'], f: FILTER }))).toThrow(AppError);
   });
 
   // why: a too-short cursor produces { gt: undefined }, which Prisma drops silently — the caller
@@ -53,17 +65,17 @@ describe('encodeCursor / decodeCursor', () => {
       ['name', 'desc'],
       ['id', 'asc'],
     ];
-    expect(() => decodeCursor(encode({ v: 1, k: chain, p: ['active'] }))).toThrow(AppError);
-    expect(() => decodeCursor(encode({ v: 1, k: ID_ASC, p: ['a', 'b'] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: chain, p: ['active'], f: FILTER }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: ['a', 'b'], f: FILTER }))).toThrow(AppError);
   });
 
   it('rejects a null value (would reach Prisma as `{ gt: null }`)', () => {
-    expect(() => decodeCursor(encode({ v: 1, k: ID_ASC, p: [null] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: [null], f: FILTER }))).toThrow(AppError);
   });
 
   it('rejects a non-scalar value', () => {
-    expect(() => decodeCursor(encode({ v: 1, k: ID_ASC, p: [{}] }))).toThrow(AppError);
-    expect(() => decodeCursor(encode({ v: 1, k: ID_ASC, p: [[]] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: [{}], f: FILTER }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: [[]], f: FILTER }))).toThrow(AppError);
   });
 
   // why: a duplicate key collapses in buildKeysetWhere, so the seek never advances.
@@ -72,7 +84,7 @@ describe('encodeCursor / decodeCursor', () => {
       ['id', 'asc'],
       ['id', 'asc'],
     ];
-    expect(() => decodeCursor(encode({ v: 1, k: dup, p: ['a', 'b'] }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: dup, p: ['a', 'b'], f: FILTER }))).toThrow(AppError);
   });
 });
 
@@ -112,6 +124,20 @@ describe('assertChainMatches', () => {
         ID_ASC,
       ),
     ).toThrow(AppError);
+  });
+});
+
+describe('assertFilterMatches', () => {
+  it('passes when the cursor filter hash equals the resolved one', () => {
+    expect(() => assertFilterMatches(FILTER, FILTER)).not.toThrow();
+  });
+
+  // why: a cursor minted under one filter and replayed under another seeks into the wrong
+  // why: sequence — rows skipped or repeated with no signal. Fail closed with a 400.
+  it('throws a 400 naming the filter when the hashes differ', () => {
+    expect(() => assertFilterMatches(FILTER, '0000000000000000')).toThrow(
+      'Pagination cursor does not match the requested filter',
+    );
   });
 });
 

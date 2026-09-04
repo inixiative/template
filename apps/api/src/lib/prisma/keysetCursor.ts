@@ -10,17 +10,22 @@ import { lookupField } from '#/lib/prisma/fieldMetadata';
 export type SortDirection = 'asc' | 'desc';
 export type SortKey = readonly [string, SortDirection];
 
-const CURSOR_VERSION = 1;
+const CURSOR_VERSION = 2;
 
-type DecodedCursor = { v: number; k: SortKey[]; p: unknown[] };
+type DecodedCursor = { v: number; k: SortKey[]; p: unknown[]; f: string };
 
 // Dates and BigInts have no JSON representation that survives a round trip, and both are
 // legitimate sort keys.
 const replacer = (_key: string, value: unknown) =>
   value instanceof Date ? value.toISOString() : typeof value === 'bigint' ? value.toString() : value;
 
-export const encodeCursor = (chain: SortKey[], values: unknown[]): string => {
-  const payload: DecodedCursor = { v: CURSOR_VERSION, k: chain, p: values };
+// The token is base64url-encoded and not signed — a client can hand-craft or edit one. It carries
+// the sort chain and a hash of the composed filter, so decode fails closed on a sort-chain, arity
+// or filter mismatch; the worst a tampered token buys is reseeking to a different offset inside
+// data the caller may read anyway. Version 2 added the filter hash; there is no v1 fallback — a v1
+// token has no filter to check, so it is rejected and the caller restarts the walk.
+export const encodeCursor = (chain: SortKey[], values: unknown[], filterHash: string): string => {
+  const payload: DecodedCursor = { v: CURSOR_VERSION, k: chain, p: values, f: filterHash };
   return Buffer.from(JSON.stringify(payload, replacer)).toString('base64url');
 };
 
@@ -42,7 +47,8 @@ export const decodeCursor = (cursor: string): DecodedCursor => {
     // why: cursor value count must equal key-chain length — a mismatch silently drops the
     // why: filter and traps the caller on page 1 forever.
     parsed.p.length !== parsed.k.length ||
-    new Set(parsed.k.map(([key]) => key)).size !== parsed.k.length
+    new Set(parsed.k.map(([key]) => key)).size !== parsed.k.length ||
+    typeof parsed.f !== 'string'
   ) {
     throw makeError({ status: 400, message: 'Unsupported pagination cursor' });
   }
@@ -73,6 +79,14 @@ export const assertChainMatches = (cursorChain: SortKey[], resolvedChain: SortKe
     });
   if (!same) {
     throw makeError({ status: 400, message: 'Pagination cursor does not match the requested sort order' });
+  }
+};
+
+// why: the cursor is only meaningful inside the sequence it was minted from. A different composed
+// why: filter is a different sequence, so a replayed cursor seeks into the wrong rows silently.
+export const assertFilterMatches = (cursorHash: string, resolvedHash: string): void => {
+  if (cursorHash !== resolvedHash) {
+    throw makeError({ status: 400, message: 'Pagination cursor does not match the requested filter' });
   }
 };
 
