@@ -114,19 +114,19 @@ rule error, never a match, and the template's `onError` policy decides.
 
 ### Open: a lens that lives in a row
 
-Extraction is a function of two inputs — the rule content and the lens — and the write hook only
+Extraction is a function of two inputs — the rule content and the lens — and a save-time sync only
 observes the first. A per-template lens is fine, because editing it *is* an owner write. A shared
 lens authored as data is not: change it and every owner's edges are wrong at once with no write to
 notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferences(model, rows)`, the
 same callable a backfill loops over, triggered by a job rather than by a save. Deliberately not
-built here — the constraint is written down so the surface registry stays broadly open rather than
-being tightened around today's two models.
+built here — the constraint is written down so the owner set stays open rather than being
+tightened around today's two models.
 
 ### Tests
 
-`apps/api/src/hooks/ruleReference/hook.test.ts` (19, DB-backed, full prod hook set — scoper,
+`apps/api/src/hooks/ruleReference/ruleReference.test.ts` (18, DB-backed — scoper,
 preventHardDelete, rules): typed edges per surface and per referenced model, subject as a surface,
-set-diff keeps survivors, non-rule writes don't churn, clear, components, 422 on missing /
+set-diff keeps survivors, clear, components, refused on missing /
 soft-deleted / dynamic, a soft-delete stamps every edge naming the target and a restore clears
 them, a purge nulls the FK and leaves the edge naming the row, the client refuses a hard delete,
 the registry refuses a contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and
@@ -145,8 +145,8 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   a source on each referenceable model's `id` answers **wherever the model appears** (json-rules
   2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and every FK column that duplicates a
   relation to a referenceable model is derived from `prismaMap` and omitted from the vocabulary.
-  The write hook now runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path
-  is a 422, and any relation path to a referenceable id is a registered edge.
+  The save path runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path is
+  refused at save, and any relation path to a referenceable id is a registered edge.
 - **The save race, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`, where an
   empty list locks nothing rather than the whole table): the save gate locks the referenced rows
   before reading liveness, so a save can no longer commit an edge to a row a concurrent

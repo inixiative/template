@@ -2,6 +2,7 @@ export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing, REFERENCEABLE_MO
 export { lockedLiveReferences } from './liveReferences';
 export {
   contentRuleReferences,
+  type RuleLens,
   type RuleRowReference,
   type RuleRowReferences,
   referenceKey,

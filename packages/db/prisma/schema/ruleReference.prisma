@@ -1,9 +1,9 @@
 // ============================================================================
 // RULE REFERENCE - the rows a stored rule names, as edges
 // ============================================================================
-// One row per (owner row → referenced row) edge, recomputed by the ruleReference
-// hook in the same transaction as every save of a rule-bearing column
-// (registry: apps/api/src/hooks/ruleReference/surfaces.ts). Both ends are
+// One row per (owner row → referenced row) edge, recomputed by
+// syncRuleReferences (packages/email/src/rules) inside the transaction of every
+// save of a rule-bearing column; there is no owner-side hook. Both ends are
 // false-polymorphic (exactly one FK matches each discriminator; config in
 // registries/falsePolymorphism.ts) so either end can be included. The owner side
 // cascades — an owner's edges die with it. The referenced side does not.

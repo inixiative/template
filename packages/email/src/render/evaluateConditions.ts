@@ -7,6 +7,7 @@
 import { check } from '@inixiative/json-rules';
 import { type Branch, IF, parseIfBlock } from '@template/email/render/conditionParser';
 import type { Variables } from '@template/email/render/interpolate';
+import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
 import { referenceKey, ruleReferences } from '@template/email/rules/ruleReferences';
 
 // Notified once per render-time rule throw (malformed/uncheckable rule). The caller decides what to
@@ -62,7 +63,7 @@ const renderBranches = (
       continue;
     }
 
-    const { references, dynamic } = ruleReferences(branch.rule!);
+    const { references, dynamic } = ruleReferences(emailRuleNarrowing, branch.rule!);
     // why: absence is stale, so a reference the liveness pass never confirmed fails closed. The
     // why: undefined set means the caller did not ask, which is the standalone-render case.
     const stale = liveRefs && references.find((reference) => !liveRefs.has(referenceKey(reference)));

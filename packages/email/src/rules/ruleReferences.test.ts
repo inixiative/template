@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { Condition } from '@inixiative/json-rules';
+import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
 import { contentRuleReferences, ruleReferences } from '@template/email/rules/ruleReferences';
 
 const block = (rule: unknown, body = 'X') => `{{#if rule=${JSON.stringify(rule)}}}${body}{{/if}}`;
@@ -11,7 +12,7 @@ describe('ruleReferences — the rows an email rule names', () => {
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'in', value: ['tag-a', 'tag-b'] },
     };
-    expect(ruleReferences(rule)).toEqual({
+    expect(ruleReferences(emailRuleNarrowing, rule)).toEqual({
       references: [
         { model: 'Tag', id: 'tag-a' },
         { model: 'Tag', id: 'tag-b' },
@@ -27,7 +28,7 @@ describe('ruleReferences — the rows an email rule names', () => {
         { field: 'recipient.organizationUsers.organization.id', operator: 'notEquals', value: 'org-1' },
       ],
     };
-    expect(ruleReferences(rule).references).toEqual([
+    expect(ruleReferences(emailRuleNarrowing, rule).references).toEqual([
       { model: 'Space', id: 'space-1' },
       { model: 'Organization', id: 'org-1' },
     ]);
@@ -42,12 +43,12 @@ describe('ruleReferences — the rows an email rule names', () => {
         { field: 'data.tagId', operator: 'equals', value: 'tag-a' },
       ],
     };
-    expect(ruleReferences(rule)).toEqual({ references: [], dynamic: false });
+    expect(ruleReferences(emailRuleNarrowing, rule)).toEqual({ references: [], dynamic: false });
   });
 
   it('a row read from path is dynamic, not a reference', () => {
     const rule: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', path: 'data.tagId' };
-    expect(ruleReferences(rule)).toEqual({ references: [], dynamic: true });
+    expect(ruleReferences(emailRuleNarrowing, rule)).toEqual({ references: [], dynamic: true });
   });
 
   it('contentRuleReferences folds every block, branch and nesting across contents, deduped', () => {
@@ -56,7 +57,7 @@ describe('ruleReferences — the rows an email rule names', () => {
     const space: Condition = { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: 'space-1' };
     const mjml = `<mj-text>${block(tagA, `inner ${block(space)}`)}{{#if rule=${JSON.stringify(tagB)}}}B{{else if rule=${JSON.stringify(tagA)}}}A{{else}}none{{/if}}</mj-text>`;
     const subject = `Hello ${block(space, 'there')}`;
-    expect(contentRuleReferences(subject, mjml)).toEqual({
+    expect(contentRuleReferences(emailRuleNarrowing, subject, mjml)).toEqual({
       references: [
         { model: 'Space', id: 'space-1' },
         { model: 'Tag', id: 'tag-a' },
@@ -67,7 +68,7 @@ describe('ruleReferences — the rows an email rule names', () => {
   });
 
   it('content without conditionals names nothing', () => {
-    expect(contentRuleReferences('<mj-text>Hi {{recipient.name}}</mj-text>')).toEqual({
+    expect(contentRuleReferences(emailRuleNarrowing, '<mj-text>Hi {{recipient.name}}</mj-text>')).toEqual({
       references: [],
       dynamic: false,
     });

@@ -6,17 +6,17 @@
  */
 import { type Condition, checkRuleAgainstLens } from '@inixiative/json-rules';
 import { collectRules } from '@template/email/render/conditionParser';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
+import type { RuleLens } from '@template/email/rules/ruleReferences';
 
-export const ruleVocabularyIssues = (rule: Condition): string[] =>
-  checkRuleAgainstLens(rule, emailRuleNarrowing).violations.map(
+export const ruleVocabularyIssues = (lens: RuleLens, rule: Condition): string[] =>
+  checkRuleAgainstLens(rule, lens).violations.map(
     (violation) => `${violation.path}: ${violation.reason}`,
   );
 
-export const contentVocabularyIssues = (...contents: string[]): string[] => {
+export const contentVocabularyIssues = (lens: RuleLens, ...contents: string[]): string[] => {
   const issues: string[] = [];
   for (const content of contents) {
-    for (const rule of collectRules(content)) issues.push(...ruleVocabularyIssues(rule));
+    for (const rule of collectRules(content)) issues.push(...ruleVocabularyIssues(lens, rule));
   }
   return issues;
 };
