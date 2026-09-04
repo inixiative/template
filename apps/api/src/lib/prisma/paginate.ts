@@ -12,7 +12,7 @@ import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { lookupField } from '#/lib/prisma/fieldMetadata';
+import { lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
 import {
   assertChainMatches,
   buildKeysetWhere,
@@ -190,22 +190,29 @@ export const paginate = async <
 // why: required uuidv7 `id`, so that is the anchor; prismaMap exposes no isId/isRequired, so a
 // why: model with a differently-named primary key cannot be detected and must pin it itself
 // why: via options.orderBy.
-const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
-  if (chain.some(([key]) => key === 'id')) return chain;
+// why: a keyset chain must end in a non-null unique column - a nullable or non-unique tiebreaker
+// why: either voids the boundary comparison or silently skips rows on ties. That column is the
+// why: model's own @id, read off prismaMap rather than assumed by name.
+const primaryKeysOf = (model: string): string[] =>
+  Object.entries(modelFields(model) ?? {})
+    .filter(([, field]) => field.isId && field.isRequired)
+    .map(([name]) => name);
 
-  if (!lookupField(model, 'id')) {
+export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
+  const lastKey = chain[chain.length - 1]?.[0];
+  const lastField = lastKey ? lookupField(model, lastKey) : undefined;
+  if (lastField?.isId && lastField.isRequired) return chain;
+
+  const [primaryKey, ...rest] = primaryKeysOf(model);
+  if (!primaryKey || rest.length > 0) {
     throw makeError({
       status: 500,
-      message: `cursorPaginate: ${model} has no \`id\` column to anchor the keyset — pin its primary key via options.orderBy.`,
+      message: `cursorPaginate: ${model} has no single non-null @id column to anchor the keyset - pin its primary key via options.orderBy.`,
     });
   }
 
-  return [...chain, ['id', 'asc'] as const];
+  return chain.some(([key]) => key === primaryKey) ? chain : [...chain, [primaryKey, 'asc']];
 };
-
-// why: must return a copy — callers append to the chain, which would grow a shared constant
-// why: across every later request.
-const DEFAULT_CURSOR_CHAIN: SortKey[] = [['id', 'asc']];
 
 const normalizeChain = (orderBy: unknown): SortKey[] => {
   const entries = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<string, unknown>[];
@@ -216,7 +223,7 @@ const normalizeChain = (orderBy: unknown): SortKey[] => {
     const dir = entry[key];
     if (dir === 'asc' || dir === 'desc') chain.push([key, dir]);
   }
-  return chain.length > 0 ? chain : [...DEFAULT_CURSOR_CHAIN];
+  return chain;
 };
 
 type CursorPaginatedResult<T> = {

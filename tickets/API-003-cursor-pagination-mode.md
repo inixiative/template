@@ -61,10 +61,11 @@ Zealot had already built this; the core is ported rather than written fresh. `ap
 
 Porting also pulled the shared composition out of `paginate` into `composeScopedFindMany`, so offset and cursor mode provably share lens binding resolution, search composition, authorization narrowing and live scope — the "reused unchanged" claim in Scope is now structural rather than a convention.
 
-Two deliberate deviations from the plan above:
+One deliberate deviation from the plan above:
 
 - **Token is versioned base64url JSON, not HMAC-signed.** It carries `{v, k: sortChain, p: values}`, and `assertChainMatches` rejects a cursor whose chain differs from the resolved sort. That covers the orderBy-mismatch case but *not* the filter-mismatch case, and an unsigned token is client-forgeable — a caller can hand-craft a boundary value. It is not a privilege escalation (the lens where is composed server-side regardless), but it is not the contract this ticket specified. Signing + `filterHash` remain open below.
-- **`withTotalOrder` anchors on `id` unconditionally.** Zealot's version accepts any non-null primary key because its `prismaMap` exposes `isId`/`isRequired`; template's `FieldDef` carries neither, so a model with a differently-named primary key must pin it itself via `options.orderBy`. Adding that metadata is `@inixiative/prisma-map` work.
+
+`withTotalOrder` derives the keyset anchor from prismaMap (the model's single `isId && isRequired` field) rather than assuming a column name, and refuses composite primary keys with a message telling the caller to pin the chain via `options.orderBy`. Zealot's copy hardcodes a `uuid` fallback on purpose - its legacy models carry integer `@id` columns that v2 routes must not sort on - so that difference stays.
 
 Tests: `keysetCursor.test.ts` covers round-tripping, Date/BigInt serialization, and every rejection path (bad version, malformed, count mismatch, null, non-scalar, duplicate key), plus `assertChainMatches` and the composite OR-chain expansion of `buildKeysetWhere`. 17 tests. Suite: 997 pass / 2 fail, the two being pre-existing `lensWhere` count-operator failures on main.
 

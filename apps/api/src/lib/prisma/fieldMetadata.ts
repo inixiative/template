@@ -10,6 +10,8 @@ export type FieldDef = {
   kind: 'scalar' | 'enum' | 'object';
   type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Json' | <ModelName> | <EnumName>
   isList?: boolean;
+  isRequired?: boolean;
+  isId?: boolean;
   values?: readonly string[];
   relationName?: string;
   fromFields?: readonly string[];
