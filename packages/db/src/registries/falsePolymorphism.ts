@@ -23,14 +23,6 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, string[]>>; // typeValue → required FK fields
-  /**
-   * True polymorphism alongside the false: the column holding the referenced row's id as a plain
-   * scalar. The typed FK is the *relation* — the database may null it when the row is purged. This
-   * is the *name*, written once and never updated, so it outlives the row it points at. An axis
-   * that declares one may therefore have every FK empty; that state means "the row this named is
-   * gone", and it is reachable only through a referential action, never through a write.
-   */
-  idField?: string;
 };
 
 export type PolymorphicConfig = {
@@ -219,7 +211,6 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           Organization: ['organizationId'],
           Space: ['spaceId'],
         },
-        idField: 'referencedId',
       },
     ],
   },
