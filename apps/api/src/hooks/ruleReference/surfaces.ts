@@ -2,9 +2,10 @@
  * @atlas
  * @kind registry
  * @partOf infrastructure:prisma
- * @uses none
+ * @uses feature:email
  */
-import { getPolymorphismConfig, type ModelName, resolveFalsePolymorphismRef } from '@template/db';
+import { type ModelName, resolveFalsePolymorphismRef } from '@template/db';
+import { REFERENCEABLE_MODELS } from '@template/email/rules';
 
 export type RuleReferenceSurface = { columns: readonly string[] };
 
@@ -14,12 +15,6 @@ export const RULE_REFERENCE_SURFACES: Partial<Record<ModelName, RuleReferenceSur
 };
 
 type Axis = 'ownerModel' | 'referencedModel';
-
-const axisModels = (axis: Axis): ModelName[] => {
-  const config = getPolymorphismConfig('RuleReference');
-  const fkMap = config?.axes.find((candidate) => candidate.field === axis)?.fkMap ?? {};
-  return Object.keys(fkMap) as ModelName[];
-};
 
 const axisKey = (axis: Axis, value: string): string => {
   const key = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: value as ModelName });
@@ -31,7 +26,10 @@ const axisKey = (axis: Axis, value: string): string => {
   return key;
 };
 
-export const REFERENCED_MODELS: ModelName[] = axisModels('referencedModel');
+// why: what a rule may name is the lens's fact, not the FK map's. Deriving it from the columns
+// why: that happen to exist lets storage grant and revoke vocabulary silently; this way a lens the
+// why: schema has not caught up with fails loudly in axisKey instead.
+export const REFERENCED_MODELS: ModelName[] = REFERENCEABLE_MODELS;
 
 export const ownerKey = (model: string): string => axisKey('ownerModel', model);
 export const referencedKey = (model: string): string => axisKey('referencedModel', model);

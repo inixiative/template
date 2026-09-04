@@ -94,6 +94,13 @@ export {
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { revive } from './utils/revive';
+export {
+  liveRuleReferenceKeys,
+  type RuleReferenceIssue,
+  type RuleReferenceRow,
+  ruleReferenceIssues,
+  ruleReferenceKey,
+} from './utils/ruleReferenceHealth';
 
 // Hook shared utilities (ignore fields, redact fields)
 

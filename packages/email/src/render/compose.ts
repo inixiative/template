@@ -4,12 +4,13 @@
  * @partOf feature:email
  * @uses none
  */
+
+import { db, liveRuleReferenceKeys, type RuleReferenceRow } from '@template/db';
 import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
 import type { OwnerScope } from '@template/email/render/types';
-import { contentRuleReferences, liveReferences } from '@template/email/rules';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -19,11 +20,32 @@ export type ComposeTemplateResult = {
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel; // where the cascade actually resolved (may differ from the requested owner)
   onError: EmailErrorPolicy; // render-error policy for the resolved template
-  liveRuleRefs: Set<string>; // reference keys the composed content names that still resolve; absence is stale
+  liveRuleRefs: Set<string>; // reference keys the composing rows' edges still resolve to; absence is stale
 };
 
 // The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
 // user (SpaceUser→OrganizationUser→User→default) and org (Space→Organization→default); admin/default have no parent.
+/**
+ * The reference keys the composing rows still resolve to — the template's own edges and those of
+ * every component the cascade actually picked.
+ *
+ * Read off the edge rows alone. A soft-deleted target is copied onto the edge as
+ * `referencedDeletedAt`; a purged one leaves the typed FK null with `referencedId` still naming it.
+ * Neither needs the referenced tables included, so this query does not change shape when a model
+ * becomes referenceable.
+ */
+const liveRuleReferencesOf = async (templateId: string, componentIds: string[]): Promise<Set<string>> => {
+  const edges = (await db.ruleReference.findMany({
+    where: {
+      OR: [
+        { emailTemplateId: templateId },
+        ...(componentIds.length ? [{ emailComponentId: { in: componentIds } }] : []),
+      ],
+    },
+  })) as RuleReferenceRow[];
+  return liveRuleReferenceKeys(edges);
+};
+
 export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
   switch (owner) {
     case 'SpaceUser':
@@ -49,10 +71,8 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
-  const mjml = await expand(template.mjml, template.componentRefs, ctx);
-  // why: asked of the expanded content, so a component's rules are covered by the same pass and a
-  // why: reference whose edge was cascaded away by a hard delete is still seen as gone.
-  const liveRuleRefs = await liveReferences(contentRuleReferences(mjml, template.subject).references);
+  const { mjml, componentIds } = await expand(template.mjml, template.componentRefs, ctx);
+  const liveRuleRefs = await liveRuleReferencesOf(template.id, componentIds);
 
   return {
     id: template.id,
@@ -70,7 +90,7 @@ export const composeComponent = async (slug: string, ctx: OwnerScope): Promise<C
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
-  const mjml = await expand(component.mjml, component.componentRefs, ctx);
+  const { mjml } = await expand(component.mjml, component.componentRefs, ctx);
 
   return { mjml };
 };

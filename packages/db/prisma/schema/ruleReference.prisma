@@ -5,14 +5,20 @@
 // hook in the same transaction as every save of a rule-bearing column
 // (registry: apps/api/src/hooks/ruleReference/surfaces.ts). Both ends are
 // false-polymorphic (exactly one FK matches each discriminator; config in
-// registries/falsePolymorphism.ts) so either end can be included and a hard
-// delete on either side cascades the edge. Append/delete only: the set-diff
-// hard-deletes edges that left the rule; a row is never mutated.
+// registries/falsePolymorphism.ts) so either end can be included. The owner side
+// cascades — an owner's edges die with it. The referenced side does not.
 //
-// "Who references X" is the referenced FK's index, and that is the whole job.
-// "Which of my references are gone" is not stored anywhere: the referenced rows
-// answer it, so a reader includes them and asks. Nothing is materialised, so
-// nothing can be stale, and no propagation is needed to keep it true.
+// A rule that names a row which is gone has no correct evaluation: `any` matches
+// nobody, `none` is vacuously true for everyone. So an edge has to survive its
+// target and say so. Two ways a target goes, two signals, both on the edge row:
+// a soft delete lands in `referencedDeletedAt`, a purge nulls the typed FK and
+// leaves `referencedId` naming the row that went. A reader answers "is this rule
+// degraded" from the edge alone — no include of the referenced tables, so the
+// read does not change shape when a model becomes referenceable.
+//
+// Nothing here is computed from anything else. `referencedDeletedAt` is one
+// scalar copied across one hop, which can be fresh or stale but never subtly
+// wrong; there is no closure, no propagation, and no transitive flag.
 
 model RuleReference {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -23,24 +29,32 @@ model RuleReference {
   emailComponentId String? @db.VarChar(36)
 
   referencedModel RuleReferenceReferencedModel
+  // True poly beside the false: the name, written once and never updated. The typed FK below is the
+  // relation, and the database nulls it when the row is purged - this is what still says which row
+  // the rule meant. Kept in step with the FK at write time by PolymorphismRegistry.
+  referencedId    String  @db.VarChar(36)
   tagId           String? @db.VarChar(36)
   organizationId  String? @db.VarChar(36)
   spaceId         String? @db.VarChar(36)
 
+  // Snapshot of the referenced row's deletedAt, maintained by ruleReference:referenced. One scalar
+  // copied across one hop, so a reader answers "is this rule degraded" from the edge alone rather
+  // than including every referenceable table.
+  referencedDeletedAt DateTime?
+
   emailTemplate  EmailTemplate?  @relation(fields: [emailTemplateId], references: [id], onDelete: Cascade)
   emailComponent EmailComponent? @relation(fields: [emailComponentId], references: [id], onDelete: Cascade)
-  tag            Tag?            @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space          Space?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  // No onDelete: purging a referenced row nulls the FK (SetNull) and leaves the edge standing as
+  // the record that a rule named something now gone. Cascade would delete the evidence.
+  tag            Tag?            @relation(fields: [tagId], references: [id])
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+  space          Space?          @relation(fields: [spaceId], references: [id])
 
-  // Edge identity — one partial unique per (owner, referenced) branch pair, the
-  // Contact / EmailTemplate convention for uniqueness under false polymorphism.
-  @@unique([emailTemplateId, tagId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Tag'"), map: "RuleReference_emailTemplate_tag_key")
-  @@unique([emailTemplateId, organizationId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Organization'"), map: "RuleReference_emailTemplate_organization_key")
-  @@unique([emailTemplateId, spaceId], where: raw("\"ownerModel\" = 'EmailTemplate' AND \"referencedModel\" = 'Space'"), map: "RuleReference_emailTemplate_space_key")
-  @@unique([emailComponentId, tagId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Tag'"), map: "RuleReference_emailComponent_tag_key")
-  @@unique([emailComponentId, organizationId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Organization'"), map: "RuleReference_emailComponent_organization_key")
-  @@unique([emailComponentId, spaceId], where: raw("\"ownerModel\" = 'EmailComponent' AND \"referencedModel\" = 'Space'"), map: "RuleReference_emailComponent_space_key")
+  // Edge identity. The discriminator is inside the key, so this needs no partial predicate: six
+  // partial uniques collapse to one per owner column.
+  @@unique([emailTemplateId, referencedModel, referencedId], map: "RuleReference_emailTemplate_referenced_key")
+  @@unique([emailComponentId, referencedModel, referencedId], map: "RuleReference_emailComponent_referenced_key")
+  @@index([referencedModel, referencedId])
   @@index([emailTemplateId])
   @@index([emailComponentId])
   @@index([tagId])

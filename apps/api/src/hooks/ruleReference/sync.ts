@@ -17,7 +17,7 @@ import { makeError } from '#/lib/errors';
 
 export type OwnerRow = Record<string, unknown> & { id: string };
 
-type Edge = Record<string, unknown> & { id: string; referencedModel: string };
+type Edge = Record<string, unknown> & { id: string; referencedModel: string; referencedId: string };
 
 const surfaceColumns = (model: ModelName): readonly string[] => RULE_REFERENCE_SURFACES[model]?.columns ?? [];
 
@@ -52,7 +52,7 @@ export const syncRuleReferences = async (model: ModelName, rows: OwnerRow[]): Pr
   const existingByOwner = new Map<string, Map<string, Edge>>();
   for (const edge of existing) {
     const owner = String(edge[key]);
-    const reference = { model: edge.referencedModel, id: String(edge[referencedKey(edge.referencedModel)]) };
+    const reference = { model: edge.referencedModel, id: edge.referencedId };
     const edges = existingByOwner.get(owner) ?? new Map<string, Edge>();
     edges.set(referenceKey(reference), edge);
     existingByOwner.set(owner, edges);
@@ -86,6 +86,7 @@ export const syncRuleReferences = async (model: ModelName, rows: OwnerRow[]): Pr
         ownerModel: model,
         [key]: owner,
         referencedModel: reference.model,
+        referencedId: reference.id,
         [referencedKey(reference.model)]: reference.id,
       });
     }

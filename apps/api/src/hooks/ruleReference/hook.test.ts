@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
+import { clearHookRegistry, db, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -7,9 +7,9 @@ import {
   createSpace,
   createTag,
 } from '@template/db/test';
-import { liveReferences } from '@template/email/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
@@ -44,6 +44,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerRuleReferenceHook();
+    registerRuleReferenceReferencedHook();
   });
 
   afterAll(async () => {
@@ -200,21 +201,40 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('soft-deleting a referenced tag drops it from the live set; restoring brings it back, edges untouched', async () => {
+  it('soft-deleting a referenced tag stamps every edge that names it; restoring clears them', async () => {
     const { entity: tag } = await createTag();
     await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
     await createEmailComponent({ mjml: `<mj-text>${taggedBlock(tag.id)}</mj-text>` });
-    const named = [{ model: 'Tag', id: tag.id }];
 
-    expect([...(await liveReferences(named))]).toEqual([refKey('Tag', tag.id)]);
+    expect(ruleReferenceIssues(await edgesOf({ referencedId: tag.id }))).toEqual([]);
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
-    expect([...(await liveReferences(named))]).toEqual([]);
-    expect(await edgesOf({ tagId: tag.id })).toHaveLength(2);
+    const stamped = await edgesOf({ referencedId: tag.id });
+    expect(stamped).toHaveLength(2);
+    expect(stamped.every((edge) => edge.referencedDeletedAt != null)).toBe(true);
+    expect(ruleReferenceIssues(stamped).map((issue) => [issue.key, issue.reason])).toEqual([
+      [refKey('Tag', tag.id), 'deleted'],
+      [refKey('Tag', tag.id), 'deleted'],
+    ]);
 
     await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
-    expect([...(await liveReferences(named))]).toEqual([refKey('Tag', tag.id)]);
-    expect(await edgesOf({ tagId: tag.id })).toHaveLength(2);
+    const cleared = await edgesOf({ referencedId: tag.id });
+    expect(cleared.every((edge) => edge.referencedDeletedAt == null)).toBe(true);
+    expect(ruleReferenceIssues(cleared)).toEqual([]);
+  });
+
+  it('purging a referenced row nulls the FK and leaves the edge naming it', async () => {
+    const { entity: tag } = await createTag();
+    await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+
+    await db.$executeRaw`DELETE FROM "TagAttachment" WHERE "tagId" = ${tag.id}`;
+    await db.$executeRaw`DELETE FROM "Tag" WHERE "id" = ${tag.id}`;
+
+    const edges = await edgesOf({ referencedId: tag.id });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.tagId).toBeNull();
+    expect(edges[0]!.referencedId).toBe(tag.id);
+    expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
   });
 
   it('an edit that keeps a pre-existing dead reference is allowed; adding a new dead one is not', async () => {
@@ -246,15 +266,11 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
     expect(await edgesOf({ tagId: alive.id })).toHaveLength(1);
   });
 
-  it('the client refuses a hard delete of a referenced model; the purge path cascades at the DB', async () => {
+  it('the client refuses a hard delete of a referenced model', async () => {
     const { entity: tag } = await createTag();
     await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
 
     await expect(db.tag.delete({ where: { id: tag.id } })).rejects.toThrow(/preventHardDelete/);
-
-    await db.$executeRaw`DELETE FROM "TagAttachment" WHERE "tagId" = ${tag.id}`;
-    await db.$executeRaw`DELETE FROM "Tag" WHERE "id" = ${tag.id}`;
-    expect(await edgesOf({ tagId: tag.id })).toEqual([]);
   });
 
   it('the registry governs the edge: an owner FK that contradicts ownerModel is refused', async () => {

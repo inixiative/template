@@ -618,14 +618,18 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   save — validated as a delta: a pre-existing dead reference stays editable and flagged; only a
   newly added dead one refuses. Referenced rows are locked (`db.findForUpdate`) while the gate
   reads them. `syncRuleReferences(model, rows)` is the callable a backfill loops over.
-- **Staleness is asked, never stored** — no column, no hook. `composeTemplate` resolves the
-  references of the content it just expanded in one query (`liveReferences`) and passes the live
-  keys down as `interpolate({ liveRefs })`. A branch whose rule names a row outside that set — or
-  whose references are `dynamic` — is a rule error (never a match), so the template's `onError`
-  policy decides (`fail` / `degrade` / `fallback`). Absence is the answer, so never created, soft
-  deleted, and hard deleted all fail closed without being told apart, and there is nothing to
-  propagate or repair. Client hard deletes are still prevented (`preventHardDelete`); the redact
-  path cascades edges at the DB and needs no companion call.
+- **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
+  referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
+  `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
+  purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
+  axis therefore carries true polymorphism beside the false — the FK is the relation and may go
+  null, `referencedId` is the name and never changes, and `PolymorphismRegistry` keeps them in step
+  at write time. `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  write `include: { ruleReferences: true }` and never grow that include as models become
+  referenceable. At render, `composeTemplate` reads the template's edges plus those of the
+  components the cascade resolved, and a branch naming a row outside the surviving set — or whose
+  references are `dynamic` — is a rule error (never a match), so `onError` decides
+  (`fail` / `degrade` / `fallback`). Client hard deletes stay prevented (`preventHardDelete`).
 - Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
   resolve through the owner cascade at read time, so an id persisted at save would be wrong the
   moment an override appears.
