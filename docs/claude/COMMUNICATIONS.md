@@ -623,8 +623,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
   purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
-  null, `referencedId` is the name and never changes, and `PolymorphismRegistry` keeps them in step
-  at write time. `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  null, `referencedId` is the name and never changes, and the sync writes both from one value.
+  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
   write `include: { ruleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved, and a branch naming a row outside the surviving set — or whose

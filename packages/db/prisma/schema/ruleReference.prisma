@@ -31,7 +31,7 @@ model RuleReference {
   referencedModel RuleReferenceReferencedModel
   // True poly beside the false: the name, written once and never updated. The typed FK below is the
   // relation, and the database nulls it when the row is purged - this is what still says which row
-  // the rule meant. Kept in step with the FK at write time by PolymorphismRegistry.
+  // the rule meant. Written from the same value as the FK, so the two agree by construction.
   referencedId    String  @db.VarChar(36)
   tagId           String? @db.VarChar(36)
   organizationId  String? @db.VarChar(36)

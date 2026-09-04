@@ -102,9 +102,7 @@ They are two clocks on one fact. The FK is the *relation* — owned by referenti
 goes null at exactly the moment the row ceases to exist. `referencedId` is the *name* — owned by
 the rule content, written once and never updated. They agree for the whole time the target is
 alive and diverge precisely at the moment worth detecting, so the divergence is the signal.
-`PolymorphismRegistry` keeps them in step at write time (`idField` on the axis), and admits the
-all-FKs-null branch as legal, because that state is reachable only through a referential action
-and never through a write.
+`syncRuleReferences` writes both from the same value, so they agree by construction.
 
 That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure function in
 `@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
