@@ -1,14 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createEmailComponent,
-  createEmailTemplate,
-  createSpace,
-  createTag,
-} from '@template/db/test';
+import { cleanupTouchedTables, createEmailComponent, createSpace, createTag } from '@template/db/test';
+import { saveEmailTemplate } from '@template/email/render';
+import { RuleReferenceError } from '@template/email/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -34,16 +29,30 @@ const inSpaceBlock = (spaceId: string) => {
   return `{{#if rule=${JSON.stringify(rule)}}}member{{/if}}`;
 };
 
+const component = (slug: string, content: string) =>
+  `{{#component:${slug}}}<mj-text>${content}</mj-text>{{/component:${slug}}}`;
+
+let seq = 0;
+const save = (body: string, extra: { subject?: string; slug?: string } = {}) =>
+  saveEmailTemplate({
+    slug: extra.slug ?? `t-${++seq}`,
+    name: 't',
+    subject: 's',
+    ownerModel: 'default',
+    kind: 'system',
+    mjml: body,
+    ...extra,
+  });
+
 const edgesOf = (where: Record<string, unknown>) => db.ruleReference.findMany({ where, orderBy: { createdAt: 'asc' } });
 
 const refKey = (model: string, id: string) => `${model}|${id}`;
 
-describe('ruleReference hook — edges follow every save of a rule-bearing column', () => {
+describe('ruleReference — the save path writes edges, the referenced side stamps them', () => {
   beforeAll(() => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerPreventHardDeleteHook();
     registerRulesHook();
-    registerRuleReferenceHook();
     registerRuleReferenceReferencedHook();
   });
 
@@ -63,7 +72,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   it('a template naming a tag in its body gets one typed edge to that tag', async () => {
     const { entity: tag } = await createTag();
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    const { template } = await save(mjml(taggedBlock(tag.id)));
 
     const edges = await edgesOf({ emailTemplateId: template.id });
     expect(edges).toHaveLength(1);
@@ -72,6 +81,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
       emailTemplateId: template.id,
       emailComponentId: null,
       referencedModel: 'Tag',
+      referencedId: tag.id,
       tagId: tag.id,
       organizationId: null,
       spaceId: null,
@@ -80,7 +90,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   it('the subject is a surface too, and a space reference lands on the space FK', async () => {
     const { entity: space } = await createSpace();
-    const { entity: template } = await createEmailTemplate({ subject: `Welcome ${inSpaceBlock(space.id)}` });
+    const { template } = await save(mjml('hi'), { subject: `Welcome ${inSpaceBlock(space.id)}` });
 
     const edges = await edgesOf({ emailTemplateId: template.id });
     expect(edges).toHaveLength(1);
@@ -94,9 +104,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
       arrayOperator: 'any',
       condition: { field: 'id', operator: 'equals', value: tag.id },
     };
-    const { entity: template } = await createEmailTemplate({
-      mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`),
-    });
+    const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`));
 
     const edges = await edgesOf({ emailTemplateId: template.id });
     expect(edges).toHaveLength(1);
@@ -111,71 +119,58 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
       condition: { field: 'tagId', operator: 'equals', value: tag.id },
     };
 
-    await expect(
-      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
-    ).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('a typo path is refused at save instead of silently never matching', async () => {
     const rule = { field: 'recipient.zzzNope', operator: 'equals', value: 'x' };
 
-    await expect(
-      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
-    ).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('re-saving the body set-diffs: survivors keep their row, removed edges go, added edges appear', async () => {
     const [{ entity: a }, { entity: b }, { entity: c }] = await Promise.all([createTag(), createTag(), createTag()]);
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(a.id, b.id)) });
+    const { template } = await save(mjml(taggedBlock(a.id, b.id)), { slug: 'diff' });
     const before = await edgesOf({ emailTemplateId: template.id });
     const survivor = before.find((edge) => edge.tagId === b.id);
 
-    await db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml(taggedBlock(b.id, c.id)) } });
+    await save(mjml(taggedBlock(b.id, c.id)), { slug: 'diff' });
 
     const after = await edgesOf({ emailTemplateId: template.id });
     expect(after.map((edge) => edge.tagId).sort()).toEqual([b.id, c.id].sort());
     expect(after.find((edge) => edge.tagId === b.id)).toEqual(survivor);
   });
 
-  it('a write that does not touch a rule column leaves the edges alone', async () => {
-    const { entity: tag } = await createTag();
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
-    const before = await edgesOf({ emailTemplateId: template.id });
-
-    await db.emailTemplate.update({ where: { id: template.id }, data: { name: 'Renamed' } });
-
-    expect(await edgesOf({ emailTemplateId: template.id })).toEqual(before);
-  });
-
   it('a body with no rules clears the edges', async () => {
     const { entity: tag } = await createTag();
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    const { template } = await save(mjml(taggedBlock(tag.id)), { slug: 'clear' });
 
-    await db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml('plain') } });
+    await save(mjml('plain'), { slug: 'clear' });
 
     expect(await edgesOf({ emailTemplateId: template.id })).toEqual([]);
   });
 
   it('components are a surface: an edge from the component, not the template that embeds it', async () => {
     const { entity: tag } = await createTag();
-    const { entity: component } = await createEmailComponent({ mjml: `<mj-text>${taggedBlock(tag.id)}</mj-text>` });
+    const { template, components } = await save(mjml(component('vip', taggedBlock(tag.id))));
 
-    const edges = await edgesOf({ emailComponentId: component.id });
+    expect(await edgesOf({ emailTemplateId: template.id })).toEqual([]);
+    const edges = await edgesOf({ emailComponentId: components[0]!.id });
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({ ownerModel: 'EmailComponent', emailTemplateId: null, tagId: tag.id });
   });
 
   it('naming a row that does not exist is refused at save', async () => {
-    await expect(
-      createEmailTemplate({ mjml: mjml(taggedBlock('01900000-0000-7000-8000-000000000000')) }),
-    ).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(taggedBlock('01900000-0000-7000-8000-000000000000')))).rejects.toBeInstanceOf(
+      RuleReferenceError,
+    );
   });
 
   it('naming a soft-deleted row is refused at save', async () => {
     const { entity: tag } = await createTag();
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    await expect(createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) })).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(taggedBlock(tag.id)))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('a rule that reads the row from path is refused: the reference cannot be registered', async () => {
@@ -184,9 +179,8 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'equals', path: 'recipient.id' },
     };
-    const body = `{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`;
 
-    await expect(createEmailTemplate({ mjml: mjml(body) })).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('an operator that describes the referenced row without naming it is refused', async () => {
@@ -196,15 +190,13 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
       condition: { field: 'tag.id', operator: 'contains', value: 'abc' },
     };
 
-    await expect(
-      createEmailTemplate({ mjml: mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`) }),
-    ).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('soft-deleting a referenced tag stamps every edge that names it; restoring clears them', async () => {
     const { entity: tag } = await createTag();
-    await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
-    await createEmailComponent({ mjml: `<mj-text>${taggedBlock(tag.id)}</mj-text>` });
+    await save(mjml(taggedBlock(tag.id)));
+    await save(mjml(component('vip', taggedBlock(tag.id))));
 
     expect(ruleReferenceIssues(await edgesOf({ referencedId: tag.id }))).toEqual([]);
 
@@ -225,7 +217,7 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   it('purging a referenced row nulls the FK and leaves the edge naming it', async () => {
     const { entity: tag } = await createTag();
-    await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    await save(mjml(taggedBlock(tag.id)));
 
     await db.$executeRaw`DELETE FROM "TagAttachment" WHERE "tagId" = ${tag.id}`;
     await db.$executeRaw`DELETE FROM "Tag" WHERE "id" = ${tag.id}`;
@@ -239,28 +231,25 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   it('an edit that keeps a pre-existing dead reference is allowed; adding a new dead one is not', async () => {
     const [{ entity: tag }, { entity: other }] = await Promise.all([createTag(), createTag()]);
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    await save(mjml(taggedBlock(tag.id)), { slug: 'edit' });
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    const edited = await db.emailTemplate.update({
-      where: { id: template.id },
-      data: { subject: 'Typo fixed', mjml: mjml(taggedBlock(tag.id)) },
-    });
+    const { template: edited } = await save(mjml(taggedBlock(tag.id)), { slug: 'edit', subject: 'Typo fixed' });
     expect(edited.subject).toBe('Typo fixed');
 
     await db.tag.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
-    await expect(
-      db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml(taggedBlock(tag.id, other.id)) } }),
-    ).rejects.toMatchObject({ status: 422 });
+    await expect(save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit' })).rejects.toBeInstanceOf(
+      RuleReferenceError,
+    );
   });
 
   it('a save that removes the dead reference removes its edge', async () => {
     const [{ entity: dead }, { entity: alive }] = await Promise.all([createTag(), createTag()]);
-    const { entity: template } = await createEmailTemplate({ mjml: mjml(taggedBlock(dead.id)) });
+    await save(mjml(taggedBlock(dead.id)), { slug: 'rm' });
     await db.tag.update({ where: { id: dead.id }, data: { deletedAt: new Date() } });
     expect(await edgesOf({ tagId: dead.id })).toHaveLength(1);
 
-    await db.emailTemplate.update({ where: { id: template.id }, data: { mjml: mjml(taggedBlock(alive.id)) } });
+    await save(mjml(taggedBlock(alive.id)), { slug: 'rm' });
 
     expect(await edgesOf({ tagId: dead.id })).toEqual([]);
     expect(await edgesOf({ tagId: alive.id })).toHaveLength(1);
@@ -268,18 +257,24 @@ describe('ruleReference hook — edges follow every save of a rule-bearing colum
 
   it('the client refuses a hard delete of a referenced model', async () => {
     const { entity: tag } = await createTag();
-    await createEmailTemplate({ mjml: mjml(taggedBlock(tag.id)) });
+    await save(mjml(taggedBlock(tag.id)));
 
     await expect(db.tag.delete({ where: { id: tag.id } })).rejects.toThrow(/preventHardDelete/);
   });
 
   it('the registry governs the edge: an owner FK that contradicts ownerModel is refused', async () => {
     const { entity: tag } = await createTag();
-    const { entity: component } = await createEmailComponent();
+    const { entity: comp } = await createEmailComponent();
 
     await expect(
       db.ruleReference.create({
-        data: { ownerModel: 'EmailTemplate', emailComponentId: component.id, referencedModel: 'Tag', tagId: tag.id },
+        data: {
+          ownerModel: 'EmailTemplate',
+          emailComponentId: comp.id,
+          referencedModel: 'Tag',
+          referencedId: tag.id,
+          tagId: tag.id,
+        },
       }),
     ).rejects.toMatchObject({ status: 422 });
   });

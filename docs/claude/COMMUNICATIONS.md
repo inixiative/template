@@ -608,16 +608,16 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `path`/`bind` leaf at a source — or an operator that describes the row without naming it
   (`contains`, `between`) — is `dynamic` and refused at save. The narrowing is `mapDefaults`-shaped:
   the source answers on **every** path to the model, FK columns duplicating a relation to a
-  referenceable model are derived from `prismaMap` and omitted, and the write hook runs
+  referenceable model are derived from `prismaMap` and omitted, and the save path runs
   `checkRuleAgainstLens` — an FK spelling or typo path is a 422, never a silently unregistered
   rule. Adding a referenceable model = a registry entry + an FK column (source and omits derive);
-  adding a rule-bearing column = an entry in `RULE_REFERENCE_SURFACES`.
-- **Write hook** (`apps/api/src/hooks/ruleReference/hook.ts`, after-timing on the surface models):
-  every save that touches `subject`/`mjml` recomputes the owner's edges inside the same
-  transaction — set-diff (survivors keep their row), missing or soft-deleted targets are a 422 at
-  save — validated as a delta: a pre-existing dead reference stays editable and flagged; only a
-  newly added dead one refuses. Referenced rows are locked (`db.findForUpdate`) while the gate
-  reads them. `syncRuleReferences(model, rows)` is the callable a backfill loops over.
+  adding a rule-bearing column = a `syncRuleReferences` call from its save path.
+- **Edges are written by the save path, not a hook.** `saveEmailTemplate` calls
+  `syncRuleReferences(owner, contents, emailRuleNarrowing)` inside its transaction for the template
+  and each saved component — set-diff (survivors keep their row), vocabulary and `dynamic` refused,
+  a newly added missing or soft-deleted target refused as a delta (a pre-existing dead reference
+  stays editable), referenced rows locked with `db.findForUpdate` while the gate reads them. Throws
+  `RuleReferenceError`. It is the only writer of `mjml`/`subject`, so nothing bypasses it.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
   `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a

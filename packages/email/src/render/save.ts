@@ -8,7 +8,7 @@ import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
 import { expand } from '@template/email/render/expand';
-import { mapRefs } from '@template/email/render/extractRefs';
+import { cleanRefs, mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { resolveVariants } from '@template/email/render/resolveVariants';
 import { saveComponents } from '@template/email/render/saveComponents';
@@ -16,6 +16,7 @@ import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
+import { emailRuleNarrowing, syncRuleReferences } from '@template/email/rules';
 import { validateMjml } from '@template/email/validations/validateMjml';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
@@ -88,6 +89,17 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
 
       const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
       const template = await saveTemplate(finalTemplate, ctx);
+
+      for (const component of components) {
+        await syncRuleReferences({ model: 'EmailComponent', id: component.id }, [component.mjml], emailRuleNarrowing);
+      }
+      // why: the stored template body still carries each component block inline; its own references
+      // why: are the ones left once those blocks are emptied, or every component rule is counted twice.
+      await syncRuleReferences(
+        { model: 'EmailTemplate', id: template.id },
+        [template.subject ?? '', cleanRefs(template.mjml)],
+        emailRuleNarrowing,
+      );
 
       // Non-system kinds are subject to unsubscribe compliance: the composed body (template +
       // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.

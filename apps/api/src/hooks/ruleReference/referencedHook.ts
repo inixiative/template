@@ -5,9 +5,18 @@
  * @uses feature:email
  */
 
-import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  type ModelName,
+  type Prisma,
+  registerDbHook,
+  resolveFalsePolymorphismRef,
+} from '@template/db';
+import { REFERENCEABLE_MODELS } from '@template/email/rules';
 import { castArray } from 'lodash-es';
-import { REFERENCED_MODELS, referencedKey } from '#/hooks/ruleReference/surfaces';
 import { buildPreviousById, type HookRow } from '#/hooks/shared/hookRows';
 
 const isLive = (row: HookRow): boolean => row.deletedAt == null;
@@ -37,7 +46,7 @@ const flippedLiveness = (result: unknown, previous: unknown): string[] => {
 export const registerRuleReferenceReferencedHook = () => {
   registerDbHook(
     'ruleReference:referenced',
-    REFERENCED_MODELS,
+    REFERENCEABLE_MODELS,
     HookTiming.after,
     [DbAction.create, DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, previous, result }: HookOptions) => {
@@ -53,7 +62,12 @@ export const registerRuleReferenceReferencedHook = () => {
         byDeletedAt.set(bucket, [...(byDeletedAt.get(bucket) ?? []), id]);
       }
 
-      const column = referencedKey(model);
+      const column = resolveFalsePolymorphismRef({
+        model: 'RuleReference',
+        axis: 'referencedModel',
+        value: model as ModelName,
+      });
+      if (!column) return;
       for (const [bucket, ids] of byDeletedAt) {
         await db.ruleReference.updateManyAndReturn({
           where: {
