@@ -9,9 +9,7 @@ import { collectRules } from '@template/email/render/conditionParser';
 import type { RuleLens } from '@template/email/rules/ruleReferences';
 
 export const ruleVocabularyIssues = (lens: RuleLens, rule: Condition): string[] =>
-  checkRuleAgainstLens(rule, lens).violations.map(
-    (violation) => `${violation.path}: ${violation.reason}`,
-  );
+  checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
 
 export const contentVocabularyIssues = (lens: RuleLens, ...contents: string[]): string[] => {
   const issues: string[] = [];
