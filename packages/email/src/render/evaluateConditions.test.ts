@@ -105,7 +105,7 @@ describe('evaluateConditions — non-object rules', () => {
   });
 });
 
-describe('evaluateConditions — stale references', () => {
+describe('evaluateConditions — reference liveness', () => {
   const tagged = JSON.stringify({
     field: 'recipient.tagAttachments',
     arrayOperator: 'any',
@@ -114,14 +114,26 @@ describe('evaluateConditions — stale references', () => {
   const tpl = `{{#if rule=${tagged}}}VIP{{else}}BASE{{/if}}`;
   const vars = { recipient: { tagAttachments: [{ tag: { id: 'tag-1' } }] } };
 
-  it('a branch whose rule names a stale row is a rule error, never a match', () => {
-    const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set(['Tag|tag-1']))).toBe('BASE');
-    expect(errors).toEqual(['rule names a missing Tag tag-1']);
+  it('renders normally when the named row is in the live set', () => {
+    expect(evaluateConditions(tpl, vars, undefined, new Set(['Tag|tag-1']))).toBe('VIP');
   });
 
-  it('renders normally when the named row is live', () => {
-    expect(evaluateConditions(tpl, vars, undefined, new Set(['Tag|tag-other']))).toBe('VIP');
+  it('a branch whose rule names a row outside the live set is a rule error, never a match', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set(['Tag|tag-other']))).toBe('BASE');
+    expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
+  });
+
+  it('fails closed on an empty live set — absence is the answer, not an unchecked pass', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set())).toBe('BASE');
+    expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
+  });
+
+  it('an omitted live set means the caller did not ask, and the rule evaluates', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message))).toBe('VIP');
+    expect(errors).toEqual([]);
   });
 });
 

@@ -8,7 +8,6 @@ import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceDegradedHook } from '#/hooks/ruleReference/degraded';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
@@ -30,7 +29,6 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceHook();
-  registerRuleReferenceDegradedHook();
   registerRulesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();

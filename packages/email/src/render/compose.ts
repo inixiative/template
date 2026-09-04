@@ -5,11 +5,11 @@
  * @uses none
  */
 import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
-import { collectDegradedRuleRefs } from '@template/email/render/degradedRuleRefs';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
 import type { OwnerScope } from '@template/email/render/types';
+import { contentRuleReferences, liveReferences } from '@template/email/rules';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -19,7 +19,7 @@ export type ComposeTemplateResult = {
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel; // where the cascade actually resolved (may differ from the requested owner)
   onError: EmailErrorPolicy; // render-error policy for the resolved template
-  degradedRuleRefs: string[]; // rows the template's and its components' rules name that no longer resolve
+  liveRuleRefs: Set<string>; // reference keys the composed content names that still resolve; absence is stale
 };
 
 // The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
@@ -50,7 +50,9 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
   const mjml = await expand(template.mjml, template.componentRefs, ctx);
-  const degradedRuleRefs = await collectDegradedRuleRefs(template, ctx);
+  // why: asked of the expanded content, so a component's rules are covered by the same pass and a
+  // why: reference whose edge was cascaded away by a hard delete is still seen as gone.
+  const liveRuleRefs = await liveReferences(contentRuleReferences(mjml, template.subject).references);
 
   return {
     id: template.id,
@@ -60,7 +62,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     kind: template.kind,
     ownerModel: template.ownerModel,
     onError: template.onError,
-    degradedRuleRefs,
+    liveRuleRefs,
   };
 };
 

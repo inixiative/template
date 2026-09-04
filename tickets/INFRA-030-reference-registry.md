@@ -81,27 +81,37 @@ their row, removed edges are deleted, added edges `createManyAndReturn`ed); miss
 targets and `dynamic` references are a 422 at save. `syncRuleReferences(model, rows)` is the
 callable a backfill loops over.
 
-### Staleness — on the referenced side, re-resolved
+### Staleness — asked, never stored
 
-`degraded.ts`, after-timing on the referenced models, in `softDeleteCascade`'s shape: when a
-target's `deletedAt` flips either way, every live owner over the reverse edges is re-resolved and
-its `degradedRuleRefs` projection rewritten (`degradedComponentRefs` is the precedent). Re-resolve
-rather than set-once, so an undelete un-flags. Hard delete of a target is the FK cascade.
+There is no staleness column and no staleness hook. "Which of my references are gone" is a
+question the referenced rows already answer, so the reader asks them.
 
-At render, `composeTemplate` unions the template's and its expanded components'
-`degradedRuleRefs`; `interpolate({ staleRefs })` hands them to `evaluateConditions`, where a branch
-whose rule names one is a rule error, never a match — the template's `onError` policy
-(`fail` / `degrade` / `fallback`) decides, the same path a throwing rule takes. A stale rule is never
-evaluated.
+`composeTemplate` extracts the references from the content it just expanded and resolves them in
+one query: `liveReferences(contentRuleReferences(mjml, subject).references)` returns the reference
+keys that still resolve. `interpolate({ liveRefs })` hands that set to `evaluateConditions`, where
+a branch naming a row **outside** the set is a rule error, never a match — the template's `onError`
+policy (`fail` / `degrade` / `fallback`) decides, the same path a throwing rule takes.
+
+Absence is the answer, which is why the set is of live rows rather than dead ones. Never created,
+soft deleted, hard deleted with the edge cascaded away — all three land outside the set and all
+three fail closed, without the render needing to tell them apart. Nothing is materialised, so
+nothing can drift, and no propagation is needed to keep it true.
+
+The edge table's job is the two questions a row cannot answer about itself: *who references X*
+(the referenced FK's index) and *may this save name that row* (the delta gate, fenced by
+`db.findForUpdate`).
 
 ### Tests
 
-`apps/api/src/hooks/ruleReference/hook.test.ts` (19, DB-backed, full prod hook set — scoper, preventHardDelete, rules): typed edges per surface and per
-referenced model, subject as a surface, set-diff keeps survivors, non-rule writes don't churn, clear,
-components, 422 on missing / soft-deleted / dynamic, soft-delete flags every owner and restore
-un-flags, unrelated target writes don't re-resolve, hard delete cascades, the registry refuses a
-contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and the stale-reference
-cases in `evaluateConditions.test.ts`. json-rules: `test/lens.ruleSourceValues.test.ts` (10).
+`apps/api/src/hooks/ruleReference/hook.test.ts` (18, DB-backed, full prod hook set — scoper,
+preventHardDelete, rules): typed edges per surface and per referenced model, subject as a surface,
+set-diff keeps survivors, non-rule writes don't churn, clear, components, 422 on missing /
+soft-deleted / dynamic, a soft-delete drops the target from the live set while its edges stand and
+a restore brings it back, hard delete cascades, the registry refuses a contradicting FK.
+`packages/email/src/rules/ruleReferences.test.ts` (6) and the reference-liveness cases in
+`evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
+fails closed, an omitted set means the caller did not ask. json-rules:
+`test/lens.ruleSourceValues.test.ts` (10).
 
 ## Adversarial round (same day, 4 agents, live-DB probes)
 
@@ -116,25 +126,24 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   relation to a referenceable model is derived from `prismaMap` and omitted from the vocabulary.
   The write hook now runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path
   is a 422, and any relation path to a referenceable id is a registered edge.
-- **Races, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`): the save gate
-  locks the referenced rows before reading liveness (a save can no longer commit an edge to a row
-  a concurrent transaction is deleting), and `reresolveDegraded` locks the owners before
-  computing (two concurrent target deletes no longer lose an update to `degradedRuleRefs`).
-  Opposite lock orders can deadlock under contention; Postgres aborts one transaction loudly.
+- **The save race, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`, where an
+  empty list locks nothing rather than the whole table): the save gate locks the referenced rows
+  before reading liveness, so a save can no longer commit an edge to a row a concurrent
+  transaction is deleting. This is the only lock left — with nothing materialised there is no
+  second writer to lose an update against.
 - **The gate validates the delta, not the document**: a pre-existing dead reference no longer
   freezes its owner — edits that keep it are allowed and the projection stays truthful; only a
-  *newly added* dead reference is a 422. Archived owners keep their projection maintained
-  (`db.withDeleted` for the maintenance write), so restore needs no repair pass.
-- **`degradedRuleRefs` holds `Model|id` keys** (`referenceKey`), the same key discipline as the
-  edges, and defaults to `[]` at the DB (raw reads see NULL otherwise).
+  *newly added* dead reference is a 422. Archived owners need no repair pass on restore, because
+  there is no projection to have gone stale while they were away.
 - **Render**: rules evaluate over the **nested** `{ sender, recipient, data }` object (dotted
   to-one paths resolve; the one-level flattening could not); a `dynamic` rule is a rule error
   unconditionally, not only when something is already stale; an unterminated `{{#if}}` is
   reported and suppressed instead of shipping raw rule JSON in the email body; a malformed
   nested marker can no longer let a `{{/if}}` inside a JSON string bisect the outer block.
 - **Hard delete**: the client path is *prevented* (`preventHardDelete`); the purge/redact path
-  cascades edges at the DB (real Postgres FKs) but must call `reresolveDegraded` on the owners
-  before purging — the cascade removes the reverse edge that would otherwise find them.
+  cascades edges at the DB (real Postgres FKs) and needs no companion call — the render asks the
+  content's references, not the edges, so a reference whose edge was cascaded away is simply
+  outside the live set.
 
 Known limitations, deliberately not papered over:
 
