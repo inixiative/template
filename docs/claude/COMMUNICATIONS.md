@@ -618,14 +618,14 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   save — validated as a delta: a pre-existing dead reference stays editable and flagged; only a
   newly added dead one refuses. Referenced rows are locked (`db.findForUpdate`) while the gate
   reads them. `syncRuleReferences(model, rows)` is the callable a backfill loops over.
-- **Staleness** (`degraded.ts`, after-timing on the referenced models): when a referenced row's
-  `deletedAt` flips either way, every owner over the reverse edges is re-resolved and its
-  `degradedRuleRefs` projection rewritten — an undelete un-flags. At render, `composeTemplate`
-  unions the template's and its expanded components' `degradedRuleRefs`; a branch whose rule names
-  one — or whose references are `dynamic` — is a rule error (never a match), so the template's
-  `onError` policy decides (`fail` / `degrade` / `fallback`). `degradedRuleRefs` holds `Model|id`
-  keys. Client hard deletes are prevented (`preventHardDelete`); the redact path must
-  `reresolveDegraded` the owners before purging — the DB cascade removes the reverse edge.
+- **Staleness is asked, never stored** — no column, no hook. `composeTemplate` resolves the
+  references of the content it just expanded in one query (`liveReferences`) and passes the live
+  keys down as `interpolate({ liveRefs })`. A branch whose rule names a row outside that set — or
+  whose references are `dynamic` — is a rule error (never a match), so the template's `onError`
+  policy decides (`fail` / `degrade` / `fallback`). Absence is the answer, so never created, soft
+  deleted, and hard deleted all fail closed without being told apart, and there is nothing to
+  propagate or repair. Client hard deletes are still prevented (`preventHardDelete`); the redact
+  path cascades edges at the DB and needs no companion call.
 - Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
   resolve through the owner cascade at read time, so an id persisted at save would be wrong the
   moment an override appears.

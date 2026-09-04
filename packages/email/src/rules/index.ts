@@ -1,4 +1,5 @@
 export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing, REFERENCEABLE_MODELS } from './emailRuleLens';
+export { liveReferences, lockedLiveReferences } from './liveReferences';
 export {
   contentRuleReferences,
   type RuleRowReference,

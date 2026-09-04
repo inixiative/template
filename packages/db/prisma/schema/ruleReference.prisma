@@ -9,9 +9,10 @@
 // delete on either side cascades the edge. Append/delete only: the set-diff
 // hard-deletes edges that left the rule; a row is never mutated.
 //
-// "Who references X" is the referenced FK's index. "Which of my references are
-// gone" is the owner's degradedRuleRefs projection, re-resolved by the
-// ruleReference:degraded hook when a referenced row's deletedAt flips.
+// "Who references X" is the referenced FK's index, and that is the whole job.
+// "Which of my references are gone" is not stored anywhere: the referenced rows
+// answer it, so a reader includes them and asks. Nothing is materialised, so
+// nothing can be stale, and no propagation is needed to keep it true.
 
 model RuleReference {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)

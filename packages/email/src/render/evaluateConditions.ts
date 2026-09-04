@@ -37,11 +37,11 @@ const onRuleError = (
   body: string,
   data: Record<string, unknown>,
   onError?: RuleErrorSink,
-  staleRefs?: ReadonlySet<string>,
+  liveRefs?: ReadonlySet<string>,
 ): string | null => {
   onError?.(message);
   return inlineRenderErrors()
-    ? `<!-- RULE ERROR: ${message} -->\n${renderConditions(body, data, onError, staleRefs)}`
+    ? `<!-- RULE ERROR: ${message} -->\n${renderConditions(body, data, onError, liveRefs)}`
     : null;
 };
 
@@ -51,24 +51,26 @@ const renderBranches = (
   branches: Branch[],
   data: Record<string, unknown>,
   onError?: RuleErrorSink,
-  staleRefs?: ReadonlySet<string>,
+  liveRefs?: ReadonlySet<string>,
 ): string => {
   for (const branch of branches) {
-    if (branch.kind === 'else') return renderConditions(branch.body, data, onError, staleRefs);
+    if (branch.kind === 'else') return renderConditions(branch.body, data, onError, liveRefs);
 
     if (branch.ruleError !== undefined) {
-      const rendered = onRuleError(branch.ruleError, branch.body, data, onError, staleRefs);
+      const rendered = onRuleError(branch.ruleError, branch.body, data, onError, liveRefs);
       if (rendered !== null) return rendered;
       continue;
     }
 
     const { references, dynamic } = ruleReferences(branch.rule!);
-    const stale = references.find((reference) => staleRefs?.has(referenceKey(reference)));
+    // why: absence is stale, so a reference the liveness pass never confirmed fails closed. The
+    // why: undefined set means the caller did not ask, which is the standalone-render case.
+    const stale = liveRefs && references.find((reference) => !liveRefs.has(referenceKey(reference)));
     if (dynamic || stale) {
       const message = stale
-        ? `rule names a missing ${stale.model} ${stale.id}`
+        ? `rule names a ${stale.model} that no longer resolves: ${stale.id}`
         : 'rule reads a referenced row from path or bind, or describes it without naming it — refusing to evaluate';
-      const rendered = onRuleError(message, branch.body, data, onError, staleRefs);
+      const rendered = onRuleError(message, branch.body, data, onError, liveRefs);
       if (rendered !== null) return rendered;
       continue;
     }
@@ -77,14 +79,14 @@ const renderBranches = (
     // error) when it doesn't — so only `=== true` renders. A genuinely invalid rule throws, and the
     // catch surfaces it.
     try {
-      if (check(branch.rule!, data) === true) return renderConditions(branch.body, data, onError, staleRefs);
+      if (check(branch.rule!, data) === true) return renderConditions(branch.body, data, onError, liveRefs);
     } catch (err) {
       const rendered = onRuleError(
         err instanceof Error ? err.message : 'Unknown error',
         branch.body,
         data,
         onError,
-        staleRefs,
+        liveRefs,
       );
       if (rendered !== null) return rendered;
     }
@@ -96,7 +98,7 @@ function renderConditions(
   content: string,
   data: Record<string, unknown>,
   onError?: RuleErrorSink,
-  staleRefs?: ReadonlySet<string>,
+  liveRefs?: ReadonlySet<string>,
 ): string {
   let result = '';
   let i = 0;
@@ -112,7 +114,7 @@ function renderConditions(
       onError?.('unterminated {{#if}} block — the marker and everything after it was suppressed');
       break;
     }
-    result += renderBranches(block.branches, data, onError, staleRefs);
+    result += renderBranches(block.branches, data, onError, liveRefs);
     i = block.end;
   }
   return result;
@@ -122,5 +124,5 @@ export const evaluateConditions = (
   content: string,
   variables: Variables,
   onError?: RuleErrorSink,
-  staleRefs?: ReadonlySet<string>,
-): string => renderConditions(content, ruleData(variables), onError, staleRefs);
+  liveRefs?: ReadonlySet<string>,
+): string => renderConditions(content, ruleData(variables), onError, liveRefs);

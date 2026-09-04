@@ -192,19 +192,28 @@ const dbMethods = {
     if (!dbMethods.isInTxn()) throw new Error('db.findForUpdate() requires db.txn()');
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
-    const table = prismaMap.models[model]?.dbName ?? model;
+    const meta = prismaMap.models[model];
+    const table = meta?.dbName ?? model;
+    // why: prismaMap carries no per-field dbName, so a predicate on an @map'd column would build
+    // why: SQL against a name that does not exist. No column in this schema is mapped; the field
+    // why: check is what keeps that true, by refusing any predicate the map cannot account for.
+    const columnFor = (key: string): string => {
+      const fields = meta?.fields as Record<string, unknown> | undefined;
+      if (!fields?.[key]) throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
+      return key;
+    };
     const conds = keys.map((key) => {
+      const column = Prisma.raw(`"${columnFor(key)}"`);
       const value = where[key];
       if (value !== null && typeof value === 'object' && 'in' in (value as Record<string, unknown>)) {
         const list = (value as { in: unknown[] }).in;
-        if (!Array.isArray(list) || !list.length)
-          throw new Error(`db.findForUpdate() requires a non-empty in-list for '${key}'`);
-        return Prisma.sql`${Prisma.raw(`"${key}"`)} IN (${Prisma.join(
-          list.map((item) => Prisma.sql`${item}`),
-          ', ',
-        )})`;
+        if (!Array.isArray(list)) throw new Error(`db.findForUpdate(): the 'in' for '${key}' must be an array`);
+        // why: an empty list locks nothing, which is what a batch caller with no rows means. Widening
+        // why: to the whole table would be the one unrecoverable reading, and `IN ()` is a syntax error.
+        if (!list.length) return Prisma.sql`1 = 0`;
+        return Prisma.sql`${column} IN (${Prisma.join(list)})`;
       }
-      return Prisma.sql`${Prisma.raw(`"${key}"`)} = ${value}`;
+      return Prisma.sql`${column} = ${value}`;
     });
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
