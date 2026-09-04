@@ -70,16 +70,16 @@ the model, and every FK column duplicating a relation to a referenceable model i
 (`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
 block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
 a `RuleReference` FK column + a registry entry (source and omits derive); adding a rule-bearing
-column = an entry in `RULE_REFERENCE_SURFACES`.
+column = a `syncRuleReferences` call from its save path.
 
-### Write hook — edges in the save's transaction
+### No owner-side hook
 
-`apps/api/src/hooks/ruleReference/hook.ts`, after-timing on the surface models (never `'*'`),
-because the edges need the created row's id and the stored body. Key-presence skip (a write that
-does not touch `subject` / `mjml` returns before any query); set-diff per owner (survivors keep
-their row, removed edges are deleted, added edges `createManyAndReturn`ed); missing or soft-deleted
-targets and `dynamic` references are a 422 at save. `syncRuleReferences(model, rows)` is the
-callable a backfill loops over.
+Edges are written by `syncRuleReferences(owner, contents, lens)` — a service in
+`packages/email/src/rules/`, called by `saveEmailTemplate` inside its transaction for the template
+and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
+nothing for a hook to catch that the call does not. The gate (vocabulary, `dynamic`, delta against
+live rows under `findForUpdate`) throws `RuleReferenceError`, a sibling of
+`ConditionValidationError` on the same path. The one hook left is on the referenced side.
 
 ### Staleness — two clocks on the edge row
 

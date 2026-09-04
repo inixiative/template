@@ -103,8 +103,11 @@ const findClose = (input: string, slug: string, from: number): number => {
   return -1;
 };
 
-const cleanRefs = (content: string): string =>
+/** Collapse component blocks to empty tags — the body with its embedded components taken out. Accepts
+ * both the tagged intermediate form (`slug:0`) and the stored form (`slug`); the backreference keeps a
+ * nested block from closing its parent. */
+export const cleanRefs = (content: string): string =>
   content.replace(
-    /\{\{#component:([a-z0-9-]+:\d+)\}\}[\s\S]*?\{\{\/component:\1\}\}/g,
+    /\{\{#component:([a-z0-9-]+(?::\d+)?)\}\}[\s\S]*?\{\{\/component:\1\}\}/g,
     '{{#component:$1}}{{/component:$1}}',
   );

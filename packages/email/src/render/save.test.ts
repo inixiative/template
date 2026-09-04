@@ -58,7 +58,7 @@ describe('saveEmailTemplate', () => {
   });
 
   it('rejects a non-system template whose only unsubscribe link is inside a conditional', async () => {
-    const rule = '{"field":"recipient.role","operator":"equals","value":"admin"}';
+    const rule = '{"field":"recipient.email","operator":"equals","value":"admin@example.com"}';
     await expect(
       saveEmailTemplate({
         slug: 'promo-condlink',

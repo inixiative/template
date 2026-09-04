@@ -7,4 +7,5 @@ export {
   referenceKey,
   ruleReferences,
 } from './ruleReferences';
+export { RuleReferenceError, type RuleReferenceOwner, syncRuleReferences } from './syncRuleReferences';
 export { contentVocabularyIssues, ruleVocabularyIssues } from './validateRuleVocabulary';

@@ -4,10 +4,8 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, type ModelName, type RuntimeDelegate, toAccessor } from '@template/db';
+import { db, type ModelName } from '@template/db';
 import { type RuleRowReference, referenceKey } from '@template/email/rules/ruleReferences';
-
-const delegate = (model: string): RuntimeDelegate => db[toAccessor(model as ModelName)] as unknown as RuntimeDelegate;
 
 const byModel = (references: RuleRowReference[]): Map<string, Set<string>> => {
   const idsByModel = new Map<string, Set<string>>();
