@@ -8,7 +8,8 @@ import { check } from '@inixiative/json-rules';
 import { type Branch, IF, parseIfBlock } from '@template/email/render/conditionParser';
 import type { Variables } from '@template/email/render/interpolate';
 import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
-import { referenceKey, ruleReferences } from '@template/email/rules/ruleReferences';
+import { ruleReferences } from '@template/email/rules/ruleReferences';
+import { withRule } from '@template/shared/rules';
 
 // Notified once per render-time rule throw (malformed/uncheckable rule). The caller decides what to
 // do with it (log it, apply the template's error policy) — the evaluator stays free of those concerns.
@@ -63,34 +64,32 @@ const renderBranches = (
       continue;
     }
 
-    const { references, dynamic } = ruleReferences(emailRuleNarrowing, branch.rule!);
-    // why: absence is stale, so a reference the liveness pass never confirmed fails closed. The
-    // why: undefined set means the caller did not ask, which is the standalone-render case.
-    const stale = liveRefs && references.find((reference) => !liveRefs.has(referenceKey(reference)));
-    if (dynamic || stale) {
-      const message = stale
-        ? `rule names a ${stale.model} that no longer resolves: ${stale.id}`
-        : 'rule reads a referenced row from path or bind, or describes it without naming it — refusing to evaluate';
-      const rendered = onRuleError(message, branch.body, data, onError, liveRefs);
-      if (rendered !== null) return rendered;
-      continue;
-    }
-
-    // `check` returns `true` on match, or a string explaining the mismatch (a *reason*, not an
-    // error) when it doesn't — so only `=== true` renders. A genuinely invalid rule throws, and the
-    // catch surfaces it.
-    try {
-      if (check(branch.rule!, data) === true) return renderConditions(branch.body, data, onError, liveRefs);
-    } catch (err) {
-      const rendered = onRuleError(
-        err instanceof Error ? err.message : 'Unknown error',
-        branch.body,
-        data,
-        onError,
-        liveRefs,
-      );
-      if (rendered !== null) return rendered;
-    }
+    // why: the fork every stored rule goes through. Degraded — the lens no longer admits it, it reads
+    // why: its row dynamically, or a row it names is outside the live set (absent set = nothing
+    // why: confirmed) — is a rule error, never a match. Sound runs `check`, which returns `true` on
+    // why: match or a reason string on mismatch; a genuinely invalid rule throws and is reported.
+    const rule = branch.rule!;
+    const rendered = withRule(
+      { lens: emailRuleNarrowing, rule, references: ruleReferences(emailRuleNarrowing, rule), live: liveRefs },
+      {
+        degraded: (issues) =>
+          onRuleError(issues.map((issue) => issue.detail).join('; '), branch.body, data, onError, liveRefs),
+        sound: (sound) => {
+          try {
+            return check(sound, data) === true ? renderConditions(branch.body, data, onError, liveRefs) : null;
+          } catch (err) {
+            return onRuleError(
+              err instanceof Error ? err.message : 'Unknown error',
+              branch.body,
+              data,
+              onError,
+              liveRefs,
+            );
+          }
+        },
+      },
+    );
+    if (rendered !== null) return rendered;
   }
   return '';
 };

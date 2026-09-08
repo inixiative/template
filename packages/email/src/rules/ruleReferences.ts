@@ -4,25 +4,19 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { type Condition, type Lens, type LensNarrowing, ruleSourceValues } from '@inixiative/json-rules';
+import { type Condition, ruleSourceValues } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { collectRules } from '@template/email/render/conditionParser';
+import { type RuleLens, type RuleReference, type RuleReferences, referenceKey } from '@template/shared/rules';
 
-export type RuleRowReference = { model: string; id: string };
-
-export type RuleRowReferences = {
-  references: RuleRowReference[];
-  dynamic: boolean;
-};
+export type RuleRowReference = RuleReference;
+export type RuleRowReferences = RuleReferences;
+export { type RuleLens, referenceKey };
 
 type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
 
 const isRowIdSource = (model: string, field: string): boolean =>
   (prismaMap.models as unknown as IdFields)[model]?.fields[field]?.isId === true;
-
-export const referenceKey = (reference: RuleRowReference): string => `${reference.model}|${reference.id}`;
-
-export type RuleLens = Lens | LensNarrowing;
 
 // why: extraction is a function of the rule AND the lens, so the memo is keyed by both — the same
 // why: rule read through a different lens names different rows.

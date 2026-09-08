@@ -51,7 +51,7 @@ Not a bare `(model, id)` string pair (Zealot #2116's first cut). Typed relations
 consumers need: `include` on either end, relation-scoped `deletedAt` joins, and a hard delete on
 either side removing the edge at the DB.
 
-### Extraction is the lens's — `ruleSourceValues` (json-rules 2.20.0)
+### Extraction is the lens's — `ruleSourceValues` (json-rules 2.21.1)
 
 `ruleSourceValues(lens, rule)` reports the values a rule compares at each source the lens declares,
 keyed by `projectByPath`'s `path` + `field` with the source's model — the caller never spells a
@@ -109,8 +109,28 @@ That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure
 alone, so a consumer writes `include: { ruleReferences: true }` and never has to grow that include
 when a model becomes referenceable. `composeTemplate` reads the template's edges and those of the
 components the cascade actually resolved (`expand` now returns their ids), and hands
-`interpolate({ liveRefs })` the keys that survive; a branch naming anything outside that set is a
-rule error, never a match, and the template's `onError` policy decides.
+`interpolate({ liveRefs })` the keys that survive. What the renderer does with that set is the next
+section's — it is the one fork, not the email package's own.
+
+### `withRule` — the one fork a stored rule is evaluated through
+
+`packages/shared/src/rules/withRule.ts`, in `shared` because it is pure: json-rules plus a live set
+the caller hands in. `withRule({ lens, rule, references, live }, { degraded, sound })` asks, at
+evaluation and against the *current* lens, whether the rule can be evaluated correctly. Three
+questions, one answer:
+
+* the lens still admits it (`checkRuleAgainstLens` — so a lens change after save degrades the
+  rule instead of silently narrowing it; the save gate alone never saw that);
+* it names its rows rather than reading them from `path` / `bind`;
+* every row it names is in the live set the caller confirmed. An absent set is nothing confirmed,
+  so every reference is missing — absence is the answer on every arm.
+
+Degraded means "do nothing new, say why": the arm receives every issue, not the first. Sound runs
+the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
+sources are ids; the live set comes from the caller's own read, locked when the sound arm decides
+money. Nothing about degradation is stored. `evaluateConditions` runs every branch through it —
+degraded is a rule error, never a match, and the template's `onError` policy decides. Existing
+state is never touched by a degraded rule.
 
 ### Open: a lens that lives in a row
 
@@ -129,9 +149,12 @@ preventHardDelete, rules): typed edges per surface and per referenced model, sub
 set-diff keeps survivors, clear, components, refused on missing /
 soft-deleted / dynamic, a soft-delete stamps every edge naming the target and a restore clears
 them, a purge nulls the FK and leaves the edge naming the row, the client refuses a hard delete,
-the registry refuses a contradicting FK. `packages/email/src/rules/ruleReferences.test.ts` (6) and
-the reference-liveness cases in `evaluateConditions.test.ts` — live set renders, a key outside it
-is a rule error, an empty set fails closed, an omitted set means the caller did not ask.
+the registry refuses a contradicting FK. `packages/shared/src/rules/withRule.test.ts` (7): sound,
+missing, no live set, no references, dynamic, lens drift, every issue reported.
+`packages/email/src/rules/ruleReferences.test.ts` (6) and the reference-liveness cases in
+`evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
+fails closed, an omitted set fails closed too (nothing was confirmed). The renderer tests use
+`data.*` paths because rules are now checked against the real lens at evaluation.
 json-rules: `test/lens.ruleSourceValues.test.ts` (10).
 
 ## Adversarial round (same day, 4 agents, live-DB probes)
@@ -194,20 +217,36 @@ Known limitations, deliberately not papered over:
    that org resolves without touching either row. An id edge persisted at save would be wrong the
    moment the cascade changes. Only id-addressed references ride this table.
 
+## Rulings (Aron, 2026-09-04 → 2026-09-08)
+
+6. Edges are written by a service from the save path; the only hook is on the referenced side and
+   copies one scalar across one hop. No owner-side hook, no projection.
+7. Staleness is asked, not stored. Degraded is a function of the current lens and the rows the
+   rule names; nothing is computed ahead of time and nothing thaws.
+8. Save is always valid: a rule that cannot be evaluated correctly cannot be saved. Leaving an
+   existing rule untouched is fine.
+9. Existing state is never touched by a degraded rule — members stay members, approvals stand,
+   matches stand. What stops is new evaluation.
+10. Every surface evaluates stored rules through one wrapper with two arms, so the fallback is
+    declared where the rule is used and cannot be forgotten. It lives in `packages/shared`
+    because it is pure, and both the email package and Zealot's api consume it.
+
 ## Zealot follow-through
 
-#2116 reshapes to the rulings (typed FKs, `brandUuid` dropped, `referencedModel` from
-`ruleSourceValues` over the segment lens, `syncRuleReferences` callable, staleness hook on Groups
-writing `reconcilePausedAt`); ZLT-4444 is the consumer side (segment freeze, auto-approve → manual,
-match filters stop). Cycle check on save reads the registry (persisted + in-flight, in the txn) and
-retires `segmentsReferencing`.
+#2116 (registry) and #2142 (backfill) merged 2026-09-08 — the same primitive on MySQL. The
+consumer PRs, #2201 (frozen segments), #2216 (stale match filters) and #2217 (stale
+auto-approval), each hand-roll the fork; the ruling on #2201 is to port all three onto `withRule`,
+drop the `reconcilePausedAt` / `matchFiltersStaleAt` columns and their thaw logic, and let the
+reconcile sweep, the admin read and the approval path ask the same function. Zealot's degraded
+set gains one reason the template has no use for yet — "names a segment whose own rule is
+degraded" — which is the same question asked transitively over the segment graph.
 
 ## Not in scope
 
 Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
 `referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
-Transitive propagation over reverse edges (nothing in the template references a rule-bearing row
-from a rule yet; the walk is `emailVersioning`'s when it's needed). Tenancy of a reference (a
+Transitive degradation (nothing in the template references a rule-bearing row from a rule yet;
+Zealot's segments do, and it is the `withRule` question asked over the segment graph). Tenancy of a reference (a
 Space-owned template naming another org's tag) — the lens narrowing's `where` scope owns that
 (INFRA-017 / INFRA-018).
 

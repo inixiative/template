@@ -627,9 +627,19 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
   write `include: { ruleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
-  components the cascade resolved, and a branch naming a row outside the surviving set — or whose
-  references are `dynamic` — is a rule error (never a match), so `onError` decides
-  (`fail` / `degrade` / `fallback`). Client hard deletes stay prevented (`preventHardDelete`).
+  components the cascade resolved into one live set, and every branch goes through **`withRule`**
+  (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.
+- **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
+  whether the rule can be evaluated correctly: the lens still admits it (`checkRuleAgainstLens` —
+  so a lens change after save degrades the rule instead of silently narrowing it), it names its
+  rows rather than reading them from `path`/`bind`, and every row it names is in the live set the
+  caller confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do
+  nothing new, say why": in email that is a rule error, never a match, so `onError` decides
+  (`fail` / `degrade` / `fallback`); existing state is never touched by a degraded rule. Sound runs
+  the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
+  sources are ids; the live set comes from the caller's own read, locked when the sound arm decides
+  money. Nothing about degradation is stored. Client hard deletes stay prevented
+  (`preventHardDelete`).
 - Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
   resolve through the owner cascade at read time, so an id persisted at save would be wrong the
   moment an override appears.

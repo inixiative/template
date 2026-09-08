@@ -1,57 +1,60 @@
 import { describe, expect, it } from 'bun:test';
 import { evaluateConditions } from '@template/email/render/evaluateConditions';
 
+// why: rules are checked against the real lens at evaluation, so these use paths it admits — `data.*`
+// why: is the free-form Json bucket; a made-up recipient column is a vocabulary violation, not a match.
+
 const rule = (field: string, operator: string, value: unknown) => JSON.stringify({ field, operator, value });
 
 describe('evaluateConditions — else / else if', () => {
-  const tiered = `{{#if rule=${rule('recipient.tier', 'equals', 'gold')}}}G{{else if rule=${rule('recipient.tier', 'equals', 'silver')}}}S{{else}}B{{/if}}`;
+  const tiered = `{{#if rule=${rule('data.tier', 'equals', 'gold')}}}G{{else if rule=${rule('data.tier', 'equals', 'silver')}}}S{{else}}B{{/if}}`;
 
   it('renders the if branch when its rule is true (else ignored)', () => {
-    expect(evaluateConditions(tiered, { recipient: { tier: 'gold' } })).toBe('G');
+    expect(evaluateConditions(tiered, { data: { tier: 'gold' } })).toBe('G');
   });
 
   it('renders the else branch when the if rule is false', () => {
-    const tpl = `{{#if rule=${rule('recipient.tier', 'equals', 'gold')}}}G{{else}}OTHER{{/if}}`;
-    expect(evaluateConditions(tpl, { recipient: { tier: 'silver' } })).toBe('OTHER');
+    const tpl = `{{#if rule=${rule('data.tier', 'equals', 'gold')}}}G{{else}}OTHER{{/if}}`;
+    expect(evaluateConditions(tpl, { data: { tier: 'silver' } })).toBe('OTHER');
   });
 
   it('picks the first matching else-if branch', () => {
-    expect(evaluateConditions(tiered, { recipient: { tier: 'silver' } })).toBe('S');
+    expect(evaluateConditions(tiered, { data: { tier: 'silver' } })).toBe('S');
   });
 
   it('falls through to else when no branch matches', () => {
-    expect(evaluateConditions(tiered, { recipient: { tier: 'bronze' } })).toBe('B');
+    expect(evaluateConditions(tiered, { data: { tier: 'bronze' } })).toBe('B');
   });
 
   it('renders nothing when no branch matches and there is no else', () => {
-    const tpl = `{{#if rule=${rule('recipient.tier', 'equals', 'gold')}}}G{{else if rule=${rule('recipient.tier', 'equals', 'silver')}}}S{{/if}}`;
-    expect(evaluateConditions(tpl, { recipient: { tier: 'bronze' } })).toBe('');
+    const tpl = `{{#if rule=${rule('data.tier', 'equals', 'gold')}}}G{{else if rule=${rule('data.tier', 'equals', 'silver')}}}S{{/if}}`;
+    expect(evaluateConditions(tpl, { data: { tier: 'bronze' } })).toBe('');
   });
 });
 
 describe('evaluateConditions — nesting', () => {
-  const outer = rule('recipient.tier', 'equals', 'gold');
-  const inner = rule('recipient.vip', 'equals', true);
+  const outer = rule('data.tier', 'equals', 'gold');
+  const inner = rule('data.vip', 'equals', true);
 
   it('evaluates a nested if inside a matched branch', () => {
     const tpl = `{{#if rule=${outer}}}G[{{#if rule=${inner}}}VIP{{/if}}]{{else}}X{{/if}}`;
-    expect(evaluateConditions(tpl, { recipient: { tier: 'gold', vip: true } })).toBe('G[VIP]');
-    expect(evaluateConditions(tpl, { recipient: { tier: 'gold', vip: false } })).toBe('G[]');
-    expect(evaluateConditions(tpl, { recipient: { tier: 'silver', vip: true } })).toBe('X');
+    expect(evaluateConditions(tpl, { data: { tier: 'gold', vip: true } })).toBe('G[VIP]');
+    expect(evaluateConditions(tpl, { data: { tier: 'gold', vip: false } })).toBe('G[]');
+    expect(evaluateConditions(tpl, { data: { tier: 'silver', vip: true } })).toBe('X');
   });
 
   it("a nested block's else/else-if does not leak into the outer block", () => {
     const tpl = `{{#if rule=${outer}}}A{{#if rule=${inner}}}B{{else}}C{{/if}}D{{else}}E{{/if}}`;
-    expect(evaluateConditions(tpl, { recipient: { tier: 'gold', vip: true } })).toBe('ABD');
-    expect(evaluateConditions(tpl, { recipient: { tier: 'gold', vip: false } })).toBe('ACD');
-    expect(evaluateConditions(tpl, { recipient: { tier: 'silver', vip: true } })).toBe('E');
+    expect(evaluateConditions(tpl, { data: { tier: 'gold', vip: true } })).toBe('ABD');
+    expect(evaluateConditions(tpl, { data: { tier: 'gold', vip: false } })).toBe('ACD');
+    expect(evaluateConditions(tpl, { data: { tier: 'silver', vip: true } })).toBe('E');
   });
 });
 
 describe('evaluateConditions — regression', () => {
   it('handles multiple sequential conditionals', () => {
-    const tpl = `{{#if rule=${rule('recipient.role', 'equals', 'admin')}}}[A]{{/if}}{{#if rule=${rule('recipient.premium', 'equals', true)}}}[P]{{/if}} U`;
-    expect(evaluateConditions(tpl, { recipient: { role: 'admin', premium: false } })).toBe('[A] U');
+    const tpl = `{{#if rule=${rule('data.role', 'equals', 'admin')}}}[A]{{/if}}{{#if rule=${rule('recipient.premium', 'equals', true)}}}[P]{{/if}} U`;
+    expect(evaluateConditions(tpl, { data: { role: 'admin', premium: false } })).toBe('[A] U');
   });
 
   it('passes content through unchanged when there are no conditionals', () => {
@@ -98,10 +101,10 @@ describe('evaluateConditions — non-object rules', () => {
   });
 
   it('a boolean rule in a nested block does not corrupt the outer block', () => {
-    const outer = rule('recipient.tier', 'equals', 'gold');
+    const outer = rule('data.tier', 'equals', 'gold');
     const tpl = `{{#if rule=${outer}}}A{{#if rule=true}}B{{/if}}C{{else}}D{{/if}}`;
-    expect(evaluateConditions(tpl, { recipient: { tier: 'gold' } })).toBe('ABC');
-    expect(evaluateConditions(tpl, { recipient: { tier: 'x' } })).toBe('D');
+    expect(evaluateConditions(tpl, { data: { tier: 'gold' } })).toBe('ABC');
+    expect(evaluateConditions(tpl, { data: { tier: 'x' } })).toBe('D');
   });
 });
 
@@ -130,10 +133,10 @@ describe('evaluateConditions — reference liveness', () => {
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
-  it('an omitted live set means the caller did not ask, and the rule evaluates', () => {
+  it('an omitted live set means nothing was confirmed, so a rule naming a row is degraded', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message))).toBe('VIP');
-    expect(errors).toEqual([]);
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message))).toBe('BASE');
+    expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 });
 
@@ -155,9 +158,9 @@ describe('evaluateConditions — unregisterable and unterminated rules', () => {
   });
 
   it('an unterminated block is suppressed and reported, never emitted raw', () => {
-    const rule = JSON.stringify({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    const rule = JSON.stringify({ field: 'data.tier', operator: 'equals', value: 'gold' });
     const errors: string[] = [];
-    const out = evaluateConditions(`before {{#if rule=${rule}}}secret tail`, { recipient: { tier: 'gold' } }, (m) =>
+    const out = evaluateConditions(`before {{#if rule=${rule}}}secret tail`, { data: { tier: 'gold' } }, (m) =>
       errors.push(m),
     );
     expect(out).toBe('before ');
