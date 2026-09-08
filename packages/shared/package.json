@@ -17,6 +17,7 @@
     "./bracketQuery": "./src/lib/bracketQuery/index.ts",
     "./errors": "./src/errors/index.ts",
     "./lib": "./src/lib/index.ts",
+    "./rules": "./src/rules/index.ts",
     "./logger": "./src/logger/index.ts",
     "./logger/*": "./src/logger/*.ts",
     "./adapter": "./src/adapter/index.ts",
@@ -37,7 +38,7 @@
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",
-    "@inixiative/json-rules": "^2.21.0",
+    "@inixiative/json-rules": "^2.21.1",
     "clsx": "^2.1.1",
     "consola": "^3.4.2",
     "lodash-es": "^4.18.1",
