@@ -54,7 +54,8 @@ export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrow
   },
 });
 
-const eqBind = (field: string, bind: string): Condition => ({ field, operator: 'equals', bind }) as unknown as Condition;
+const eqBind = (field: string, bind: string): Condition =>
+  ({ field, operator: 'equals', bind }) as unknown as Condition;
 
 const userEntity = (path: string): EntitySpec => ({
   narrowing: { parent: lensFor('User'), root: { where: eqBind('id', 'userId'), picks: ['id', 'name', 'email'] } },
@@ -74,7 +75,7 @@ export const registry: Record<string, EmailEntry> = {
         parent: lensFor('Inquiry'),
         root: {
           where: eqBind('id', 'inquiryId'),
-          picks: ['id', 'content', 'sourceOrganization'],
+          picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
           relations: { sourceOrganization: { picks: ['name'] } },
         },
       },

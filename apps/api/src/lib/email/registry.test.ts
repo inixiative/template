@@ -47,6 +47,19 @@ describe('registry — declarative invariants', () => {
     }
   });
 
+  it('every entity-rooted bind path names a field the entity picks', () => {
+    for (const entry of Object.values(registry)) {
+      const picks = (entry.entity.narrowing.root as { picks: string[] }).picks;
+      const specs = [entry.recipients, entry.cc, entry.bcc].flatMap((spec) => (spec ? [spec.bindings] : []));
+      if ('bindings' in entry.sender) specs.push(entry.sender.bindings);
+      if (entry.data) specs.push(entry.data);
+      for (const path of specs.flatMap(Object.values)) {
+        const [root, field] = path.split('.');
+        if (root === 'entity') expect(picks).toContain(field);
+      }
+    }
+  });
+
   it('entries are plain serializable data (no functions)', () => {
     for (const entry of Object.values(registry)) {
       expect(typeof entry.sender).toBe('object');

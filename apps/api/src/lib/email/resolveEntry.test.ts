@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { registry } from '#/lib/email/registry';
-import { resolveData, resolveEntity, resolveRecipients, resolveSenderIdentity } from '#/lib/email/resolveEntry';
+import {
+  resolveData,
+  resolveEntity,
+  resolveRecipients,
+  resolveSenderIdentity,
+  UnresolvedBindError,
+} from '#/lib/email/resolveEntry';
 
 const inquiry = registry['inquiry-invite-organization-user'];
 
@@ -13,8 +19,12 @@ describe('resolveEntity', () => {
   it('keeps the static picks/relations surface', () => {
     const lens = resolveEntity(inquiry, { inquiryId: 'inq-1' });
     const root = lens.root as { picks: string[]; relations: unknown };
-    expect(root.picks).toEqual(['id', 'content', 'sourceOrganization']);
+    expect(root.picks).toEqual(['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization']);
     expect(root.relations).toEqual({ sourceOrganization: { picks: ['name'] } });
+  });
+
+  it('throws when the handoff lacks the bound path instead of matching nothing', () => {
+    expect(() => resolveEntity(inquiry, {})).toThrow(UnresolvedBindError);
   });
 });
 
@@ -29,6 +39,10 @@ describe('resolveSenderIdentity', () => {
       organizationId: 'org-9',
     });
   });
+
+  it('throws when the entity lacks the bound field', () => {
+    expect(() => resolveSenderIdentity(inquiry.sender, { sourceOrganizationId: null })).toThrow(UnresolvedBindError);
+  });
 });
 
 describe('resolveRecipients', () => {
@@ -41,6 +55,12 @@ describe('resolveRecipients', () => {
   it('resolves the inquiry recipient from the entity target', () => {
     const lens = resolveRecipients(inquiry.recipients, { targetUserId: 'u-7' }, { type: 'platform' });
     expect((lens.root as { where: unknown }).where).toEqual({ field: 'id', operator: 'equals', value: 'u-7' });
+  });
+
+  it('throws on a typo-d or unthreaded path instead of addressing nobody', () => {
+    expect(() => resolveRecipients(inquiry.recipients, { targetUser: 'u-7' }, { type: 'platform' })).toThrow(
+      'Email bind "recipientId" resolved to nothing at "entity.targetUserId"',
+    );
   });
 });
 
