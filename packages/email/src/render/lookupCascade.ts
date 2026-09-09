@@ -4,58 +4,10 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
 import type { EmailComponent } from '@template/db/generated/client/client';
-import {
-  lookupAtAdmin,
-  lookupAtDefault,
-  lookupAtOrg,
-  lookupAtOrgUser,
-  lookupAtSpace,
-  lookupAtSpaceUser,
-  lookupAtUser,
-} from '@template/email/render/lookup';
+import { lookupAtOwner } from '@template/email/render/lookup';
+import { cascadeLookups } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
-
-type LookupFn = () => Promise<Record<string, EmailComponent>>;
-
-const getLookups = (slugs: string[], ctx: OwnerScope): LookupFn[] => {
-  switch (ctx.ownerModel) {
-    case 'Space':
-      return [
-        () => lookupAtSpace(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtOrg(db, null, slugs, ctx, true).then((r) => r.components),
-        () => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components),
-      ];
-    case 'Organization':
-      return [
-        () => lookupAtOrg(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components),
-      ];
-    case 'admin':
-      return [() => lookupAtAdmin(db, null, slugs, ctx).then((r) => r.components)];
-    case 'default':
-      return [() => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components)];
-    case 'SpaceUser':
-      return [
-        () => lookupAtSpaceUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtOrgUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components),
-      ];
-    case 'OrganizationUser':
-      return [
-        () => lookupAtOrgUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components),
-      ];
-    case 'User':
-      return [
-        () => lookupAtUser(db, null, slugs, ctx).then((r) => r.components),
-        () => lookupAtDefault(db, null, slugs, ctx).then((r) => r.components),
-      ];
-  }
-};
 
 export const lookupCascade = async (
   slugs: string[],
@@ -63,7 +15,7 @@ export const lookupCascade = async (
 ): Promise<Record<string, EmailComponent | undefined>> => {
   if (!slugs.length) return {};
 
-  const lookups = getLookups(slugs, ctx);
+  const lookups = cascadeLookups(ctx, (tier) => lookupAtOwner(null, slugs, ctx, tier).then((r) => r.components));
   const results = await Promise.all(lookups.map((fn) => fn()));
 
   const merged: Record<string, EmailComponent | undefined> = Object.create(null);

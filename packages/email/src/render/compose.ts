@@ -22,23 +22,6 @@ export type ComposeTemplateResult = {
   componentResolutions: Record<string, string>;
 };
 
-export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
-  switch (owner) {
-    case 'SpaceUser':
-      return 'OrganizationUser';
-    case 'OrganizationUser':
-      return 'User';
-    case 'User':
-      return 'default';
-    case 'Space':
-      return 'Organization';
-    case 'Organization':
-      return 'default';
-    default:
-      return null;
-  }
-};
-
 export type ComposeComponentResult = {
   mjml: string;
 };
