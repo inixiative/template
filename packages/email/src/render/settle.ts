@@ -15,18 +15,17 @@ import {
   parseEachBlock,
   parseIfBlock,
   RESERVED_BINDING_NAMES,
+  RESERVED_SCOPE_ROOTS,
+  TOKEN_PATTERN,
 } from '@template/email/render/conditionParser';
+import { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from '@template/email/render/limits';
 import { escape as escapeHtml, get, isNil } from 'lodash-es';
 
 export type RuleErrorSink = (message: string) => void;
 
 export type Scope = Record<string, unknown>;
 
-export type SettleOptions = { substitute: boolean };
-
-const RESERVED_SCOPE_ROOTS: ReadonlySet<string> = new Set(['sender', 'recipient', 'data', 'system']);
-
-const TOKEN_PATTERN = /\{\{([a-z][a-z0-9-]*)((?:\.[a-zA-Z0-9_-]+)*)\}\}/g;
+export type SettleOptions = { substitute: boolean; eachDepth?: number };
 
 const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
 const hasUnsafeSegment = (path: string): boolean =>
@@ -128,6 +127,13 @@ const resolvePath = (path: string, scope: Scope): unknown => {
 };
 
 const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
+  const eachDepth = (options.eachDepth ?? 0) + 1;
+  if (eachDepth > EACH_MAX_DEPTH) {
+    onError?.(`{{#each}} blocks nested more than ${EACH_MAX_DEPTH} deep are not supported`);
+    return '';
+  }
+  const bodyOptions: SettleOptions = { ...options, eachDepth };
+
   if (block.attributeErrors?.length) {
     for (const message of block.attributeErrors) onError?.(message);
     return '';
@@ -153,13 +159,19 @@ const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onEr
   if (block.filterError !== undefined) {
     onError?.(`invalid filter JSON - ${block.filterError}`);
     return inlineRenderErrors()
-      ? `<!-- RULE ERROR: ${block.filterError} -->\n${settle(block.body, scope, options, onError)}`
+      ? `<!-- RULE ERROR: ${block.filterError} -->\n${settle(block.body, scope, bodyOptions, onError)}`
       : '';
   }
 
   const arrayValue = resolvePath(block.path, scope);
   if (!Array.isArray(arrayValue)) {
     onError?.(`{{#each ${block.path}}} did not resolve to an array`);
+    return '';
+  }
+  if (arrayValue.length > EACH_MAX_ELEMENTS) {
+    onError?.(
+      `{{#each ${block.path}}} resolved to ${arrayValue.length} elements, over the ${EACH_MAX_ELEMENTS}-element limit`,
+    );
     return '';
   }
 
@@ -182,7 +194,7 @@ const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onEr
   if (filterThrew) {
     onError?.(firstThrowMessage!);
     if (inlineRenderErrors()) {
-      return `<!-- RULE ERROR: ${firstThrowMessage} -->\n${settle(block.body, scope, options, onError)}`;
+      return `<!-- RULE ERROR: ${firstThrowMessage} -->\n${settle(block.body, scope, bodyOptions, onError)}`;
     }
   }
 
@@ -190,7 +202,7 @@ const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onEr
   emitted.forEach((element, position) => {
     const elementScope: Scope = { ...scope, [as]: element };
     if (index) elementScope[index] = position;
-    out += settle(block.body, elementScope, options, onError);
+    out += settle(block.body, elementScope, bodyOptions, onError);
   });
   return out;
 };

@@ -2,9 +2,15 @@
  * @atlas
  * @kind validator
  * @partOf feature:email
- * @uses none
+ * @uses primitive:shared
  */
-import { validateRule } from '@inixiative/json-rules';
+import {
+  type Condition,
+  checkRuleAgainstLens,
+  type Lens,
+  type LensNarrowing,
+  validateRule,
+} from '@inixiative/json-rules';
 import {
   type Branch,
   EACH,
@@ -16,19 +22,88 @@ import {
   RESERVED_BINDING_NAMES,
   RESERVED_SCOPE_ROOTS,
 } from '@template/email/render/conditionParser';
+import { EACH_MAX_DEPTH } from '@template/email/render/limits';
 import { type Node, parseBlocks } from '@template/email/render/parseBlocks';
+import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 
 export type ConditionIssue = { path: string; message: string };
 
 export type ValidateConditionsOptions = {
   isSubject?: boolean;
+  lens?: Lens | LensNarrowing;
 };
 
-// Lens-awareness (is the field actually exposed to this email?) is intentionally out of scope until
-// the builder lands — this is the structural floor we can enforce today.
+type ConditionNode = Record<string, unknown>;
+
+const collectContextPathRoots = (cond: Condition | undefined, out: Set<string>): void => {
+  walkConditionTree(cond, out, (leaf, roots) => {
+    const node = leaf as ConditionNode;
+    if (typeof node.path === 'string' && node.path && !node.path.startsWith('$.')) roots.add(node.path.split('.')[0]!);
+    return [
+      { condition: node.condition as Condition | undefined, context: roots },
+      { condition: node.filter as Condition | undefined, context: roots },
+    ];
+  });
+};
+
+const desugarLeafForLens = (node: ConditionNode, bindingScope: BindingChain): ConditionNode | undefined => {
+  if (typeof node.field !== 'string' || !node.field) return undefined;
+  const rewritten: ConditionNode = { ...node };
+  for (const key of ['field', 'path'] as const) {
+    const raw = node[key];
+    if (typeof raw !== 'string' || !raw) continue;
+    const resolved = resolveBindingPath(raw, bindingScope);
+    if (resolved === undefined) return undefined;
+    if (!RESERVED_SCOPE_ROOTS.has(resolved.split('.')[0]!)) return undefined;
+    rewritten[key] = resolved;
+  }
+  return rewritten;
+};
+
+const validateFieldRoots = (
+  rule: Condition,
+  lens: Lens | LensNarrowing | undefined,
+  bindingScope: BindingChain,
+  path: string,
+  issues: ConditionIssue[],
+): void => {
+  const bindingRoots = new Set<string>();
+  const contextPathRoots = new Set<string>();
+  collectContextPathRoots(rule, contextPathRoots);
+  for (const root of contextPathRoots) {
+    if (!RESERVED_SCOPE_ROOTS.has(root)) bindingRoots.add(root);
+  }
+
+  walkConditionTree(rule, undefined, (leaf) => {
+    const node = leaf as ConditionNode;
+    if (typeof node.field === 'string' && node.field) {
+      const root = node.field.split('.')[0]!;
+      if (!RESERVED_SCOPE_ROOTS.has(root)) bindingRoots.add(root);
+    }
+    if (!lens) return undefined;
+    const rewritten = desugarLeafForLens(node, bindingScope);
+    if (rewritten) {
+      for (const violation of checkRuleAgainstLens(rewritten as Condition, lens).violations) {
+        issues.push({ path: `${path}:${violation.path}`, message: violation.reason });
+      }
+    }
+    return undefined;
+  });
+
+  for (const root of bindingRoots) {
+    if (!bindingScope.has(root)) {
+      issues.push({
+        path,
+        message: `references unknown binding "${root}" — not the current or an enclosing {{#each}}'s as=`,
+      });
+    }
+  }
+};
+
 const validateEachAttributes = (
   block: { as?: string; asMissing?: boolean; index?: string; path: string; attributeErrors?: string[] },
-  bindingScope: ReadonlySet<string>,
+  bindingScope: BindingChain,
   path: string,
   issues: ConditionIssue[],
 ): void => {
@@ -72,12 +147,16 @@ const validateEachAttributes = (
   }
 };
 
+const bindsAs = (name: string | undefined): name is string =>
+  name !== undefined && isValidBindingIdentifier(name) && !RESERVED_BINDING_NAMES.has(name);
+
 const collect = (
   content: string,
   at: string,
   issues: ConditionIssue[],
-  bindingScope: ReadonlySet<string>,
+  bindingScope: BindingChain,
   options: ValidateConditionsOptions,
+  eachDepth: number,
 ): void => {
   let i = 0;
   let blockIdx = 0;
@@ -118,9 +197,10 @@ const collect = (
           } else {
             const result = validateRule(branch.rule, { target: 'check' });
             for (const err of result.errors) issues.push({ path: `${path}:${err.path}`, message: err.message });
+            if (result.errors.length === 0) validateFieldRoots(branch.rule!, options.lens, bindingScope, path, issues);
           }
         }
-        collect(branch.body, path, issues, bindingScope, options);
+        collect(branch.body, path, issues, bindingScope, options, eachDepth);
       });
 
       i = block.end;
@@ -141,22 +221,31 @@ const collect = (
       issues.push({ path, message: '{{#each}} is not allowed in the subject line — conditionals only' });
     }
 
+    const blockDepth = eachDepth + 1;
+    if (blockDepth === EACH_MAX_DEPTH + 1) {
+      issues.push({ path, message: `{{#each}} blocks may not nest more than ${EACH_MAX_DEPTH} deep` });
+    }
+
     validateEachAttributes(block, bindingScope, path, issues);
+
+    const elementPath = resolveBindingPath(block.path, bindingScope);
 
     if (block.filterError !== undefined) {
       issues.push({ path: `${path}.filter`, message: `invalid filter JSON — ${block.filterError}` });
     } else if (block.filter) {
       const result = validateRule(block.filter, { target: 'check' });
       for (const err of result.errors) issues.push({ path: `${path}.filter:${err.path}`, message: err.message });
+      if (result.errors.length === 0) {
+        const filterScope: BindingChain = new Map(bindingScope);
+        if (bindsAs(block.as)) filterScope.set(block.as, elementPath);
+        validateFieldRoots(block.filter, options.lens, filterScope, `${path}.filter`, issues);
+      }
     }
 
-    const bodyScope = new Set(bindingScope);
-    if (block.as && isValidBindingIdentifier(block.as) && !RESERVED_BINDING_NAMES.has(block.as))
-      bodyScope.add(block.as);
-    if (block.index && isValidBindingIdentifier(block.index) && !RESERVED_BINDING_NAMES.has(block.index)) {
-      bodyScope.add(block.index);
-    }
-    collect(block.body, `${path}.each`, issues, bodyScope, options);
+    const bodyScope: BindingChain = new Map(bindingScope);
+    if (bindsAs(block.as)) bodyScope.set(block.as, elementPath);
+    if (bindsAs(block.index)) bodyScope.set(block.index, undefined);
+    collect(block.body, `${path}.each`, issues, bodyScope, options, blockDepth);
 
     i = block.end;
     blockIdx++;
@@ -203,7 +292,7 @@ const collectStraddleIssues = (nodes: Node[], issues: ConditionIssue[]): void =>
 
 export const validateConditions = (content: string, options: ValidateConditionsOptions = {}): ConditionIssue[] => {
   const issues: ConditionIssue[] = [];
-  collect(content, '$', issues, new Set(), options);
+  collect(content, '$', issues, new Map(), options, 0);
 
   const nodes = parseBlocks(content);
   if (!(nodes.length === 1 && nodes[0]?.type === 'text')) collectStraddleIssues(nodes, issues);

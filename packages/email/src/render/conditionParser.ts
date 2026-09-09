@@ -5,25 +5,47 @@
  * @uses none
  */
 import type { Condition } from '@inixiative/json-rules';
+import { SLUG_PATTERN } from '@template/email/render/parseBlocks';
 
-// Conditional block syntax (Handlebars-flavored, json-rules predicates):
-//   {{#if rule=<Condition JSON>}} … {{else if rule=<Condition JSON>}} … {{else}} … {{/if}}
 export const IF = '{{#if rule=';
 export const ELSE_IF = '{{else if rule=';
 export const ELSE = '{{else}}';
 export const END = '{{/if}}';
 
+export const EACH = '{{#each ';
+export const END_EACH = '{{/each}}';
+
+export const RESERVED_SCOPE_ROOTS: ReadonlySet<string> = new Set(['sender', 'recipient', 'data', 'system']);
+
+export const TOKEN_PATTERN = /\{\{([a-z][a-z0-9-]*)((?:\.[a-zA-Z0-9_-]+)*)\}\}/g;
+
+const GRAMMAR_KEYWORDS = ['else', 'if', 'each', 'as', 'index', 'rule', 'filter'] as const;
+
+export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([...RESERVED_SCOPE_ROOTS, ...GRAMMAR_KEYWORDS]);
+
+export const isValidBindingIdentifier = (value: string): boolean => /^[a-z]/.test(value) && SLUG_PATTERN.test(value);
+
 export type Branch = {
   kind: 'if' | 'elseIf' | 'else';
-  rule?: Condition; // present for if/elseIf when the embedded JSON parsed
-  ruleError?: string; // present for if/elseIf when the embedded JSON was invalid
+  rule?: Condition;
+  ruleError?: string;
   body: string;
 };
 
-export type IfBlock = { branches: Branch[]; end: number }; // `end` = index just past {{/if}}
+export type IfBlock = { branches: Branch[]; end: number };
 
-// Index of the `}` that balances the JSON object starting at `start` (`str[start] === '{'`),
-// string-aware so braces inside string values don't count. -1 if unbalanced.
+export type EachBlock = {
+  path: string;
+  as?: string;
+  asMissing?: boolean;
+  index?: string;
+  filter?: Condition;
+  filterError?: string;
+  attributeErrors?: string[];
+  body: string;
+  end: number;
+};
+
 export const findJsonEnd = (str: string, start: number): number => {
   let depth = 0;
   let inString = false;
@@ -54,38 +76,46 @@ export const findJsonEnd = (str: string, start: number): number => {
 
 type RuleMarker = { rule?: Condition; ruleError?: string; next: number };
 
-// Read a rule-bearing marker (IF / ELSE_IF) whose token starts at `i`. The value is any JSON
-// Condition: an object `{…}` (brace-matched, string-aware) or a bare literal like `true`/`false`
-// (a valid Condition with no braces — fall back to the marker's closing `}}`). Markers are tight:
-// `}}` immediately follows the value (no padding), matching the interpolation syntax. Returns the
-// parsed rule (or a parse error) and the index past `}}`, or null if there is no closing `}}`.
+const skipWhitespace = (content: string, i: number): number => {
+  let next = i;
+  while (/\s/.test(content[next] ?? '')) next++;
+  return next;
+};
+
 const readRuleMarker = (content: string, i: number, token: string): RuleMarker | null => {
-  const jsonStart = i + token.length;
+  const jsonStart = skipWhitespace(content, i + token.length);
 
   let valueEnd: number;
+  let markerEnd: number;
   if (content[jsonStart] === '{') {
     const braceEnd = findJsonEnd(content, jsonStart);
-    if (braceEnd === -1) return null;
-    valueEnd = braceEnd + 1;
+    const afterJson = braceEnd === -1 ? -1 : skipWhitespace(content, braceEnd + 1);
+    if (afterJson !== -1 && content.slice(afterJson, afterJson + 2) === '}}') {
+      valueEnd = braceEnd + 1;
+      markerEnd = afterJson;
+    } else {
+      const close = content.indexOf('}}', jsonStart);
+      if (close === -1) return null;
+      valueEnd = close;
+      markerEnd = close;
+    }
   } else {
     const close = content.indexOf('}}', jsonStart);
     if (close === -1) return null;
     valueEnd = close;
+    markerEnd = close;
   }
-  if (content.slice(valueEnd, valueEnd + 2) !== '}}') return null;
 
-  const next = valueEnd + 2;
+  if (content.slice(markerEnd, markerEnd + 2) !== '}}') return null;
+
+  const next = markerEnd + 2;
   try {
-    return { rule: JSON.parse(content.slice(jsonStart, valueEnd)) as Condition, next };
+    return { rule: JSON.parse(content.slice(jsonStart, valueEnd).trim()) as Condition, next };
   } catch (err) {
     return { ruleError: err instanceof Error ? err.message : 'invalid JSON', next };
   }
 };
 
-// Parse the {{#if}} … {{/if}} block whose opening IF marker begins at `openIdx`, splitting it on
-// its top-level {{else if}} / {{else}} separators. Depth-aware: nested blocks are skipped (their
-// separators belong to them) and contribute to the enclosing branch's body. Returns null if the
-// opening marker is malformed or there is no matching {{/if}}.
 export const parseIfBlock = (content: string, openIdx: number): IfBlock | null => {
   const open = readRuleMarker(content, openIdx, IF);
   if (!open) return null;
@@ -115,7 +145,7 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
         i = nested.next;
         continue;
       }
-      i += IF.length; // malformed nested open — skip the token, don't char-walk into it
+      i += IF.length;
       continue;
     }
     if (content.startsWith(END, i)) {
@@ -128,16 +158,16 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
       continue;
     }
     if (content.startsWith(ELSE_IF, i)) {
-      const m = readRuleMarker(content, i, ELSE_IF);
-      if (m) {
+      const marker = readRuleMarker(content, i, ELSE_IF);
+      if (marker) {
         if (depth === 1) {
           closeCurrent(i);
-          current = { kind: 'elseIf', rule: m.rule, ruleError: m.ruleError, bodyStart: m.next };
+          current = { kind: 'elseIf', rule: marker.rule, ruleError: marker.ruleError, bodyStart: marker.next };
         }
-        i = m.next;
+        i = marker.next;
         continue;
       }
-      i += ELSE_IF.length; // malformed else-if — skip the token
+      i += ELSE_IF.length;
       continue;
     }
     if (content.startsWith(ELSE, i)) {
@@ -150,36 +180,7 @@ export const parseIfBlock = (content: string, openIdx: number): IfBlock | null =
     }
     i++;
   }
-  return null; // no matching {{/if}}
-};
-
-export const EACH = '{{#each ';
-export const END_EACH = '{{/each}}';
-
-export const RESERVED_SCOPE_ROOTS: ReadonlySet<string> = new Set(['sender', 'recipient', 'data', 'system']);
-
-const GRAMMAR_KEYWORDS = ['else', 'if', 'each', 'as', 'index', 'rule', 'filter'] as const;
-
-export const RESERVED_BINDING_NAMES: ReadonlySet<string> = new Set([...RESERVED_SCOPE_ROOTS, ...GRAMMAR_KEYWORDS]);
-
-export const isValidBindingIdentifier = (value: string): boolean => /^[a-z][a-z0-9-]*$/.test(value);
-
-export type EachBlock = {
-  path: string;
-  as?: string;
-  asMissing?: boolean;
-  index?: string;
-  filter?: Condition;
-  filterError?: string;
-  attributeErrors?: string[];
-  body: string;
-  end: number;
-};
-
-const skipWhitespace = (content: string, i: number): number => {
-  let next = i;
-  while (/\s/.test(content[next] ?? '')) next++;
-  return next;
+  return null;
 };
 
 const readBareWord = (content: string, i: number): { value: string; next: number } => {
@@ -315,26 +316,6 @@ const findEachBodyEnd = (content: string, bodyStart: number): number => {
   return i;
 };
 
-export const parseEachBlock = (content: string, openIdx: number): EachBlock | null => {
-  const marker = readEachMarker(content, openIdx);
-  if (!marker) return null;
-
-  const bodyEnd = findEachBodyEnd(content, marker.next);
-  if (bodyEnd === -1) return null;
-
-  return {
-    path: marker.path,
-    as: marker.as,
-    asMissing: marker.asMissing,
-    index: marker.index,
-    filter: marker.filter,
-    filterError: marker.filterError,
-    attributeErrors: marker.attributeErrors,
-    body: content.slice(marker.next, bodyEnd - END_EACH.length),
-    end: bodyEnd,
-  };
-};
-
 export const isStructurallyBalanced = (text: string): boolean => {
   const stack: Kind[] = [];
   let i = 0;
@@ -356,9 +337,28 @@ export const isStructurallyBalanced = (text: string): boolean => {
       continue;
     }
 
-    const top = stack.at(-1);
-    if (top !== token.kind) return false;
+    if (stack.at(-1) !== token.kind) return false;
     stack.pop();
     i = token.index + (token.kind === 'if' ? END.length : END_EACH.length);
   }
+};
+
+export const parseEachBlock = (content: string, openIdx: number): EachBlock | null => {
+  const marker = readEachMarker(content, openIdx);
+  if (!marker) return null;
+
+  const bodyEnd = findEachBodyEnd(content, marker.next);
+  if (bodyEnd === -1) return null;
+
+  return {
+    path: marker.path,
+    as: marker.as,
+    asMissing: marker.asMissing,
+    index: marker.index,
+    filter: marker.filter,
+    filterError: marker.filterError,
+    attributeErrors: marker.attributeErrors,
+    body: content.slice(marker.next, bodyEnd - END_EACH.length),
+    end: bodyEnd,
+  };
 };
