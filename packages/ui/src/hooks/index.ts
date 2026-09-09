@@ -1,4 +1,12 @@
 export {
+  type EmailRuleSurface,
+  type EmailScopeFrame,
+  type EmailVariableRow,
+  emailRuleSurfaceQueryKey,
+  useEmailRuleSurface,
+  useEmailVariableScope,
+} from './email';
+export {
   useCancelInquiryMutation,
   useCreateInquiryMutation,
   useInquiryResolutionEffects,
