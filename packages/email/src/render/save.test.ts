@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
-import { DivergentDuplicateSlugError } from '@template/email/render/decompose';
+import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
+import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
 import { saveEmailTemplate } from '@template/email/render/save';
-import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;

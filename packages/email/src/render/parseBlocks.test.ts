@@ -1,15 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  assertNoDuplicateExposedSlots,
-  type ComponentNode,
-  componentTagPattern,
-  isOverrideSlot,
-  ParseBlocksError,
-  type ParseBlocksErrorReason,
-  parseBlocks,
-  SLUG_PATTERN,
-  type SlotNode,
-} from '@template/email/render/parseBlocks';
+import { ParseBlocksError, type ParseBlocksErrorReason } from '@template/email/errors/ParseBlocksError';
+import { componentTagPattern, SLUG_PATTERN } from '@template/email/render/blockTags';
+import { type ComponentNode, isOverrideSlot, type SlotNode } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
+import { assertNoDuplicateExposedSlots } from '@template/email/validations/assertNoDuplicateExposedSlots';
 
 const reasonOf = (fn: () => void): ParseBlocksErrorReason | string | undefined => {
   try {

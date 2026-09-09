@@ -4,10 +4,12 @@
  * @partOf feature:email
  * @uses none
  */
+
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { serialize } from '@template/email/render/decompose';
-import { EmailRenderError } from '@template/email/render/errors';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { type ComponentNode, type Node, parseBlocks, type SlotNode } from '@template/email/render/parseBlocks';
+import type { ComponentNode, Node, SlotNode } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import type { OwnerScope } from '@template/email/render/types';
 
 // Resolve component slugs' cascade bodies for hydration. `undefined` for a slug = it isn't resolvable

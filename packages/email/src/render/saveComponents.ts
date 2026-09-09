@@ -5,11 +5,12 @@
  * @uses infrastructure:prisma
  */
 import type { EmailComponent } from '@template/db/generated/client/client';
-import { assertNoDuplicateExposedSlots, parseBlocks } from '@template/email/render/parseBlocks';
+import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveScopedRow } from '@template/email/render/saveScopedRow';
 import type { OwnerScope } from '@template/email/render/types';
-import { assertValidConditions } from '@template/email/render/validateConditions';
-import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
+import { assertNoDuplicateExposedSlots } from '@template/email/validations/assertNoDuplicateExposedSlots';
+import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 
 // A fragment can legitimately belong to any of these MJML contexts; the first wrapping that validates

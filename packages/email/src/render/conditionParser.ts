@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { Condition } from '@inixiative/json-rules';
-import { SLUG_PATTERN } from '@template/email/render/parseBlocks';
+import { SLUG_PATTERN } from '@template/email/render/blockTags';
 
 export const IF = '{{#if rule=';
 export const ELSE_IF = '{{else if rule=';
@@ -76,6 +76,16 @@ export const findJsonEnd = (str: string, start: number): number => {
 
 type RuleMarker = { rule?: Condition; ruleError?: string; next: number };
 
+type ParsedRule = { rule: Condition; ruleError?: never } | { rule?: never; ruleError: string };
+
+const parseRuleJson = (text: string): ParsedRule => {
+  try {
+    return { rule: JSON.parse(text) as Condition };
+  } catch (err) {
+    return { ruleError: `invalid rule JSON: ${(err as SyntaxError).message}` };
+  }
+};
+
 const skipWhitespace = (content: string, i: number): number => {
   let next = i;
   while (/\s/.test(content[next] ?? '')) next++;
@@ -108,12 +118,7 @@ const readRuleMarker = (content: string, i: number, token: string): RuleMarker |
 
   if (content.slice(markerEnd, markerEnd + 2) !== '}}') return null;
 
-  const next = markerEnd + 2;
-  try {
-    return { rule: JSON.parse(content.slice(jsonStart, valueEnd).trim()) as Condition, next };
-  } catch (err) {
-    return { ruleError: err instanceof Error ? err.message : 'invalid JSON', next };
-  }
+  return { ...parseRuleJson(content.slice(jsonStart, valueEnd).trim()), next: markerEnd + 2 };
 };
 
 export const parseIfBlock = (content: string, openIdx: number): IfBlock | null => {
@@ -249,11 +254,7 @@ const readEachMarker = (content: string, i: number): EachMarker | null => {
           cursor = close;
           continue;
         }
-        try {
-          filter = JSON.parse(content.slice(valueStart, braceEnd + 1)) as Condition;
-        } catch (err) {
-          filterError = err instanceof Error ? err.message : 'invalid JSON';
-        }
+        ({ rule: filter, ruleError: filterError } = parseRuleJson(content.slice(valueStart, braceEnd + 1)));
         cursor = braceEnd + 1;
         continue;
       }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { collectSlugs, DivergentDuplicateSlugError, decompose, serialize } from '@template/email/render/decompose';
+import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
+import { collectSlugs, decompose, serialize } from '@template/email/render/decompose';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 
 describe('collectSlugs', () => {

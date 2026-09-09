@@ -4,9 +4,10 @@
  * @partOf feature:email
  * @uses none
  */
-import { EmailRenderError } from '@template/email/render/errors';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { type ComponentNode, isOverrideSlot, type Node, parseBlocks } from '@template/email/render/parseBlocks';
+import { type ComponentNode, collectSlugsFromNodes, isOverrideSlot, type Node } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import type { OwnerScope } from '@template/email/render/types';
 
 export type LookupComponents = (slugs: string[]) => Promise<Record<string, { mjml: string } | undefined>>;
@@ -38,17 +39,8 @@ const loadComponents = async (slugs: string[], renderer: Renderer): Promise<void
   }
 };
 
-const immediateComponentSlugs = (nodes: Node[]): string[] => {
-  const slugs: string[] = [];
-  for (const node of nodes) {
-    if (node.type === 'component') slugs.push(node.slug);
-    else if (node.type === 'slot') slugs.push(...immediateComponentSlugs(node.children));
-  }
-  return slugs;
-};
-
 const renderNodes = async (nodes: Node[], scope: RenderScope, renderer: Renderer): Promise<string> => {
-  await loadComponents(immediateComponentSlugs(nodes), renderer);
+  await loadComponents(collectSlugsFromNodes(nodes), renderer);
 
   let out = '';
   for (const node of nodes) {

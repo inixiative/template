@@ -5,9 +5,9 @@
  * @uses none
  */
 import type { CommunicationKind } from '@template/db/generated/client/client';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
   composeTemplate,
-  EmailRenderError,
   interpolate,
   type OwnerScope,
   parentOwner,

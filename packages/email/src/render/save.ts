@@ -7,16 +7,17 @@
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
-import { collectSlugsFromNodes, decomposeNodes } from '@template/email/render/decompose';
+import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
+import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
-import { assertValidConditions } from '@template/email/render/validateConditions';
-import { validateNoCycle } from '@template/email/render/validateNoCycle';
+import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
+import { validateNoCycle } from '@template/email/validations/validateNoCycle';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
   mjml: string;
@@ -32,9 +33,6 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-// Strip {{#if rule=…}}…{{/if}} blocks so a link that only renders conditionally doesn't satisfy the
-// unsubscribe requirement — the link must be unconditional. Uses the canonical string-aware, depth-aware
-// parser (not a brace-naive regex) so a rule-JSON value containing a literal {{/if}} can't fool it.
 const withoutConditionals = (mjml: string): string => {
   let out = '';
   let i = 0;
@@ -53,8 +51,6 @@ const withoutConditionals = (mjml: string): string => {
 
 export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
-  // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
-  // Subjects are interpolated too, so they carry conditionals and need the same floor.
   const nodes = parseBlocks(input.mjml);
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject, { isSubject: true });
@@ -66,16 +62,11 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
     locale: input.locale ?? 'en',
   };
 
-  // Every referenced component slug, so we can diff each inlined body against the cascade.
   const slugs = collectSlugsFromNodes(nodes);
 
   return db.txn(
     async () => {
-      // The cascade body per slug (tenant → parent → platform) is the diff baseline: an inlined
-      // body equal to it is a noop/inherit; a divergence (or an unknown slug) is a write at this tenant.
       const existing = await lookupCascade(slugs, ctx);
-      // decompose collapses identical duplicate slugs to one write and throws DivergentDuplicateSlugError
-      // on the same slug carrying two different bodies, so `writes` is already unique per slug.
       const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
       const finalComponents = writes.map((write) => ({
@@ -92,8 +83,6 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
         locale: ctx.locale,
       } as EmailTemplate;
 
-      // Cycle check before writes: defends against a cross-save cycle where this save's new edge
-      // closes a loop with edges already in the DB (the intra-save graph is a tree by construction).
       for (const component of finalComponents) {
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
@@ -101,8 +90,6 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
       const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
       const template = await saveTemplate(finalTemplate, ctx);
 
-      // Non-system kinds are subject to unsubscribe compliance: the composed body (template +
-      // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.
       if (template.kind && template.kind !== 'system') {
         const composed = await expand(template.mjml, ctx);
         if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {

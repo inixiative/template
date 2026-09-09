@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { decompose } from '@template/email/render/decompose';
-import { EmailRenderError } from '@template/email/render/errors';
 import { hydrate, hydrateCascade, type ResolveHydrateBodies } from '@template/email/render/hydrate';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { saveEmailTemplate } from '@template/email/render/save';

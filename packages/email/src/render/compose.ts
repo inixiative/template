@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
-import { EmailRenderError } from '@template/email/render/errors';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
 import type { OwnerScope } from '@template/email/render/types';

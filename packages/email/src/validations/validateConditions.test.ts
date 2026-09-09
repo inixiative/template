@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createLens, type Lens } from '@inixiative/json-rules';
+import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
-import {
-  assertValidConditions,
-  ConditionValidationError,
-  validateConditions,
-} from '@template/email/render/validateConditions';
+import { assertValidConditions, validateConditions } from '@template/email/validations/validateConditions';
 
 const rule = (o: Record<string, unknown>) => JSON.stringify(o);
 

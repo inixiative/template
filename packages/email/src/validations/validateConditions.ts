@@ -11,6 +11,7 @@ import {
   type LensNarrowing,
   validateRule,
 } from '@inixiative/json-rules';
+import { type ConditionIssue, ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import {
   type Branch,
   EACH,
@@ -23,11 +24,10 @@ import {
   RESERVED_SCOPE_ROOTS,
 } from '@template/email/render/conditionParser';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
-import { type Node, parseBlocks } from '@template/email/render/parseBlocks';
+import type { Node } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
-
-export type ConditionIssue = { path: string; message: string };
 
 export type ValidateConditionsOptions = {
   isSubject?: boolean;
@@ -299,16 +299,6 @@ export const validateConditions = (content: string, options: ValidateConditionsO
 
   return issues;
 };
-
-export class ConditionValidationError extends Error {
-  readonly issues: ConditionIssue[];
-
-  constructor(issues: ConditionIssue[]) {
-    super(`Invalid conditional rule(s):\n${issues.map((x) => `  ${x.path}: ${x.message}`).join('\n')}`);
-    this.name = 'ConditionValidationError';
-    this.issues = issues;
-  }
-}
 
 export const assertValidConditions = (content: string, options: ValidateConditionsOptions = {}): void => {
   const issues = validateConditions(content, options);

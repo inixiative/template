@@ -1,111 +1,16 @@
 /**
  * @atlas
- * @kind helper
+ * @kind parser
  * @partOf feature:email
  * @uses none
  */
-export type TextNode = { type: 'text'; value: string };
-export type SlotNode = { type: 'slot'; name: string; isDefault: boolean; children: Node[] };
-export type ComponentNode = { type: 'component'; slug: string; children: Node[] };
-export type Node = TextNode | ComponentNode | SlotNode;
-
-export const isOverrideSlot = (node: Node): node is SlotNode => node.type === 'slot' && !node.isDefault;
-
-export type ParseBlocksErrorReason =
-  | 'mismatched_close'
-  | 'stray_close'
-  | 'unclosed_open'
-  | 'invalid_slug'
-  | 'invalid_modifier'
-  | 'duplicate_slot';
-
-export class ParseBlocksError extends Error {
-  readonly reason: ParseBlocksErrorReason;
-
-  constructor(reason: ParseBlocksErrorReason, message: string) {
-    super(message);
-    this.name = 'ParseBlocksError';
-    this.reason = reason;
-  }
-}
-
-export const SLUG_PATTERN = /^[a-z0-9-]+$/;
-
-const TAG = /\{\{(#|\/)(component|slot):([a-z0-9-]+)(?::(default))?\}\}/g;
-
-export const componentTagPattern = (): RegExp => new RegExp(TAG.source, TAG.flags);
-
-const TAG_SHAPED = /\{\{\s*(#|\/)\s*(component|slot)\s*:[^}]*\}\}/g;
-
-const CLASSIFY_TAG = /^\{\{\s*[#/]\s*(?:component|slot)\s*:\s*([^}:]*?)\s*(?::[^}]*)?\}\}$/;
+import { ParseBlocksError } from '@template/email/errors/ParseBlocksError';
+import { BLOCK_TAG, SLUG_PATTERN } from '@template/email/render/blockTags';
+import type { ComponentNode, Node, SlotNode } from '@template/email/render/nodes';
+import { assertNoDuplicateOverrideSlots } from '@template/email/validations/assertNoDuplicateOverrideSlots';
+import { assertNoStrayTagShapes } from '@template/email/validations/assertNoStrayTagShapes';
 
 type Frame = { node: ComponentNode | SlotNode; kind: 'component' | 'slot'; name: string; children: Node[] };
-
-const assertNoStrayTagShapes = (input: string): void => {
-  const shaped = new Map<number, string>();
-  for (const shapedMatch of input.matchAll(TAG_SHAPED)) shaped.set(shapedMatch.index ?? 0, shapedMatch[0]);
-  for (const cleanMatch of input.matchAll(TAG)) shaped.delete(cleanMatch.index ?? 0);
-
-  if (shaped.size === 0) return;
-
-  const firstIndex = Math.min(...shaped.keys());
-  const offending = shaped.get(firstIndex) ?? input.slice(firstIndex, firstIndex + 40);
-
-  const badName = CLASSIFY_TAG.exec(offending)?.[1];
-  if (badName !== undefined && badName !== '' && !SLUG_PATTERN.test(badName)) {
-    throw new ParseBlocksError(
-      'invalid_slug',
-      `Invalid component/slot name "${badName}" — must match ^[a-z0-9-]+$ (tag: ${offending}).`,
-    );
-  }
-
-  throw new ParseBlocksError(
-    'mismatched_close',
-    `Malformed component/slot tag near "${input.slice(firstIndex, firstIndex + 40)}" — whitespace-spaced or otherwise non-canonical tags are rejected, not silently treated as text.`,
-  );
-};
-
-export const assertNoDuplicateExposedSlots = (nodes: Node[], componentSlug?: string): void => {
-  const seen = new Set<string>();
-  const walk = (list: Node[], ancestorNames: ReadonlySet<string>): void => {
-    for (const node of list) {
-      if (node.type === 'slot') {
-        const isShadowed = ancestorNames.has(node.name);
-        if (!isShadowed) {
-          if (seen.has(node.name)) {
-            throw new ParseBlocksError(
-              'duplicate_slot',
-              `Slot "${node.name}" is exposed more than once in ${
-                componentSlug ? `component "${componentSlug}"` : 'this component body'
-              } — a component may expose each slot name at most once; a caller's single fill cannot target two injection points.`,
-            );
-          }
-          seen.add(node.name);
-        }
-        walk(node.children, isShadowed ? ancestorNames : new Set([...ancestorNames, node.name]));
-      } else if (node.type === 'component') {
-        for (const child of node.children) {
-          if (isOverrideSlot(child)) walk(child.children, ancestorNames);
-        }
-      }
-    }
-  };
-  walk(nodes, new Set());
-};
-
-const assertNoDuplicateOverrideSlots = (node: ComponentNode): void => {
-  const seen = new Set<string>();
-  for (const child of node.children) {
-    if (!isOverrideSlot(child)) continue;
-    if (seen.has(child.name)) {
-      throw new ParseBlocksError(
-        'duplicate_slot',
-        `Duplicate override slot "${child.name}" on component ref "${node.slug}" — a ref may fill each named slot at most once.`,
-      );
-    }
-    seen.add(child.name);
-  }
-};
 
 export const parseBlocks = (input: string): Node[] => {
   assertNoStrayTagShapes(input);
@@ -115,7 +20,7 @@ export const parseBlocks = (input: string): Node[] => {
   const current = (): Node[] => stack.at(-1)?.children ?? root;
 
   let cursor = 0;
-  for (const match of input.matchAll(TAG)) {
+  for (const match of input.matchAll(BLOCK_TAG)) {
     const [tag, marker, kind, name, defaultModifier] = match as unknown as [
       string,
       '#' | '/',

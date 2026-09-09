@@ -8,13 +8,6 @@ import { type RuleErrorSink, type Scope, settle } from '@template/email/render/s
 import type { SystemTokenName } from '@template/email/render/systemTokens';
 import { escape as escapeHtml } from 'lodash-es';
 
-export enum Lens {
-  sender = 'sender',
-  recipient = 'recipient',
-  data = 'data',
-  system = 'system',
-}
-
 export type Variables = {
   sender?: Record<string, unknown>;
   recipient?: Record<string, unknown>;
