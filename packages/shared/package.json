@@ -28,6 +28,8 @@
     "./contact/defs": "./src/contact/defs/index.ts",
     "./contact/defs/*": "./src/contact/defs/*.ts",
     "./contact/*": "./src/contact/*.ts",
+    "./resourceBinding": "./src/resourceBinding/index.ts",
+    "./resourceBinding/*": "./src/resourceBinding/*.ts",
     "./reference": "./src/reference/index.ts",
     "./reference/*": "./src/reference/*.ts",
     "./vcr": "./src/vcr/index.ts",
