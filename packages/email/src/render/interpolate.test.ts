@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 
@@ -256,18 +256,15 @@ describe('interpolate', () => {
     it('reads the clock once per render, so tokens in one email agree with each other', () => {
       const RealDate = Date;
       let ticks = 0;
-      // @ts-expect-error — swapping the global clock is the point of the test.
-      globalThis.Date = class extends RealDate {
-        constructor() {
-          super(RealDate.UTC(2026 + ticks++, 11, 31, 23, 59, 59));
-        }
-      };
+      const clock = spyOn(globalThis, 'Date').mockImplementation(
+        (() => new RealDate(RealDate.UTC(2026 + ticks++, 11, 31, 23, 59, 59))) as never,
+      );
       try {
         const [first, second, year] = interpolate('{{system.now}} / {{system.now}} / {{system.year}}', {}).split(' / ');
         expect(second).toBe(first as string);
         expect(year).toBe('2026');
       } finally {
-        globalThis.Date = RealDate;
+        clock.mockRestore();
       }
     });
   });

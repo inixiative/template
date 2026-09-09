@@ -1,17 +1,14 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 
 describe('makeUnrefInterval', () => {
-  const originalSetInterval = globalThis.setInterval;
-
   afterEach(() => {
-    globalThis.setInterval = originalSetInterval;
+    mock.restore();
   });
 
   it('unrefs the timer so a pending tick cannot hold a shutdown open', () => {
     let unrefCalls = 0;
-    // @ts-expect-error — narrow stub; only the unref contract matters.
-    globalThis.setInterval = () => ({ unref: () => (unrefCalls += 1) });
+    spyOn(globalThis, 'setInterval').mockImplementation((() => ({ unref: () => (unrefCalls += 1) })) as never);
 
     makeUnrefInterval({ intervalMs: 1000, tick: () => {} }).start();
 
@@ -20,11 +17,10 @@ describe('makeUnrefInterval', () => {
 
   it('starts once, so a repeated start cannot stack tickers', () => {
     let created = 0;
-    // @ts-expect-error — narrow stub; we only count constructions.
-    globalThis.setInterval = () => {
+    spyOn(globalThis, 'setInterval').mockImplementation((() => {
       created += 1;
       return { unref: () => {} };
-    };
+    }) as never);
 
     const ticker = makeUnrefInterval({ intervalMs: 1000, tick: () => {} });
     ticker.start();
