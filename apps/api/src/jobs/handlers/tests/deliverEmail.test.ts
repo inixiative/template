@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCommunicationLog,
+  createEmailComponent,
+  createOrganization,
+  createSpace,
+} from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
@@ -51,17 +57,8 @@ describe('deliverEmail — send-time component version closure', () => {
 
   const ctx = () => ({ db, log: () => {} }) as never;
 
-  const createLog = (data: Record<string, unknown>) =>
-    db.communicationLog.create({
-      data: {
-        sendKey: 'closure-test',
-        channel: 'email',
-        address: 'fan@example.com',
-        idempotencyKey: crypto.randomUUID(),
-        senderType: 'platform',
-        ...data,
-      },
-    });
+  const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
+    (await createCommunicationLog({ address: 'fan@example.com', ...data })).entity;
 
   const payloadFor = (logId: string, sender: DeliverEmailPayload['sender']): DeliverEmailPayload => ({
     template: 'closure-template',
@@ -93,7 +90,7 @@ describe('deliverEmail — send-time component version closure', () => {
       mjml: documentMjml('{{#component:closure-footer}}{{/component:closure-footer}}'),
       ownerModel: 'default',
     });
-    const log = await createLog({ senderType: 'Space', senderSpaceId: space.id, senderOrganizationId: org.id });
+    const log = await createLog({ senderType: 'Space', senderSpaceId: space.id });
 
     await deliverEmail(ctx(), payloadFor(log.id, { type: 'Space', spaceId: space.id, organizationId: org.id }));
 
