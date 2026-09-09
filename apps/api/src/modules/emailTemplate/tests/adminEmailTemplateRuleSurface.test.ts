@@ -7,7 +7,11 @@ import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 
 type Surface = {
-  source: { model: string; mapName: string; maps: Record<string, { models: Record<string, { fields: Record<string, unknown> }> }> };
+  source: {
+    model: string;
+    mapName: string;
+    maps: Record<string, { models: Record<string, { fields: Record<string, unknown> }> }>;
+  };
   decoration: { facets: { path: string; label: string }[] };
 };
 
@@ -44,7 +48,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       },
     });
 
-    const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })));
+    const { data } = await json<Surface>(
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })),
+    );
 
     expect(data.source.model).toBe('EmailRuleContext');
     expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient']);
@@ -64,10 +70,17 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     expect(fieldsOf(data, 'Organization')).toContain('name');
   });
 
-  it('serves a recipient-only projection for a slug the registry does not know', async () => {
+  it('serves a recipient plus an unknown data bag for a slug the registry does not know', async () => {
     const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })));
 
-    expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['recipient']);
-    expect(data.decoration.facets).toEqual([{ path: 'recipient', label: 'Recipient' }]);
+    expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient']);
+    expect(data.source.maps[data.source.mapName]?.models.EmailRuleContext?.fields.data).toEqual({
+      kind: 'scalar',
+      type: 'Json',
+    });
+    expect(data.decoration.facets).toEqual([
+      { path: 'recipient', label: 'Recipient' },
+      { path: 'data', label: 'Data' },
+    ]);
   });
 });

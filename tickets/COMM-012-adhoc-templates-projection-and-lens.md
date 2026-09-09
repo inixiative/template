@@ -30,9 +30,12 @@ Two things adhoc needs that system does not:
 
 - **Projection.** What the system provides: the models and fields reachable for this template — a
   projection of the field map with a synthetic root (`EmailRuleContext` → `recipient`, `sender`,
-  `data`). It has no narrowing of its own. For a **system** template the registry entry supplies it
-  (sender model from `SenderSpec`, data from the entity model or the declared `data` keys). For an
-  **adhoc** template something else must (open below).
+  `data`). It has no narrowing of its own. `recipient` and `sender` are real models. **`data` is
+  unknown by construction** — the per-template payload nobody can declare ahead of the event — so
+  its root is a `Json` field: every `{{data.…}}` path and every rule beneath it is addressable at
+  any depth, and save-time validation reports it as *beneath Json* (a warning, never a rejection).
+  A registry entry may refine `data` into a declared shape (the entity model, or the declared
+  `data` keys) when one is known; that is an overlay on the unknown bag, not a replacement for it.
 - **Lens.** What the row holds: `EmailTemplate.lens`, per-slot narrowings over the projection
   (`{ recipient?, sender?, data? }`, each a `ModelNarrowing`). Authored on the slug's default-tier row
   and inherited by every tenant row through the cascade. Null = engine defaults (recipient = the
@@ -65,10 +68,10 @@ Two things adhoc needs that system does not:
 
 ## What remains
 
-1. **Where an adhoc template's projection comes from.** The lens on the row is a narrowing and cannot
-   name models. Options: (a) the row also declares its data projection (`{ kind: 'relations', relations }`
-   as `emailProjection` already accepts), or (b) a per-kind projection provider in code. Decide before
-   any adhoc row exists.
+1. **Where an adhoc template's projection comes from.** Recipient and the unknown data bag need no
+   declaration, so an adhoc row already has a usable projection. What is undeclared is the sender
+   model (a narrowing cannot name it). Options: (a) the row declares it, or (b) the adhoc send request
+   supplies it and the row's lens is validated against every sender tier it allows.
 2. **Registry `picks` vs the row lens.** `RecipientSpec.picks` and `DEFAULT_RECIPIENT_LENS` say the
    same thing twice. Once system templates have a row lens, the planner should hydrate from it and the
    registry should keep only `where` + `bindings`.
