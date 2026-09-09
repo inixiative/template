@@ -1,3 +1,4 @@
+export * from './authoring';
 export { BLOCK_TAG, componentTagPattern, SLUG_PATTERN } from './blockTags';
 export {
   type ComposeComponentResult,
