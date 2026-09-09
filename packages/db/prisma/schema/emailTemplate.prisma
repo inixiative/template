@@ -22,9 +22,10 @@ model EmailTemplate {
   componentRefs         String[] // Slugs of nested {{component:slug}} references
   degradedComponentRefs String[] // Subset of componentRefs that don't resolve — live "broken" projection for the index list
 
-  // The authoring lens, declared on the slug's default-tier row and inherited by every tenant row:
-  // per-slot narrowings over the projection the system provides for this template
-  // ({ recipient?: ModelNarrowing, data?: { [name]: { model, narrowing? } } }). Null = engine defaults.
+  // The authoring lenses, declared on the slug's default-tier row and inherited by every tenant row.
+  // One lens per slot, each built from the projection by choosing an entry point and relations:
+  // { recipient?: ModelNarrowing, sender?: ModelNarrowing, data?: { model?, narrowing? } }.
+  // data with no entry point is the unknown bag (addressable at any depth). Null = engine defaults.
   lens Json?
 
   // Owner (false polymorphism - default/admin have no FK)

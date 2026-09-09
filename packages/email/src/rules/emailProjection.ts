@@ -34,10 +34,12 @@ export type EmailProjectionInput = {
   data?: EmailDataProjection;
 };
 
+export type EmailDataLens = { model?: ModelName; narrowing?: ModelNarrowing };
+
 export type EmailSlotLenses = {
   recipient?: ModelNarrowing;
   sender?: ModelNarrowing;
-  data?: ModelNarrowing;
+  data?: EmailDataLens;
 };
 
 export const DEFAULT_RECIPIENT_LENS: ModelNarrowing = { picks: ['id', 'name', 'email'] };
@@ -128,7 +130,7 @@ export const emailLens = (projection: Lens, slots: EmailSlotLenses = {}): LensNa
       relations: {
         recipient: slots.recipient ?? DEFAULT_RECIPIENT_LENS,
         ...(senderModel ? { sender: slots.sender ?? allScalarPicks(projection, senderModel) } : {}),
-        ...(dataModel ? { data: slots.data ?? defaultDataLens(projection, dataModel) } : {}),
+        ...(dataModel ? { data: slots.data?.narrowing ?? defaultDataLens(projection, dataModel) } : {}),
       },
     },
   };
@@ -142,12 +144,22 @@ export const emailSurface = (projection: Lens, slots?: EmailSlotLenses): Lens =>
 const isNarrowing = (value: unknown): value is ModelNarrowing =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const parseDataLens = (value: unknown): EmailDataLens | undefined => {
+  if (!isNarrowing(value)) return undefined;
+  const doc = value as Record<string, unknown>;
+  return {
+    ...(typeof doc.model === 'string' ? { model: doc.model as ModelName } : {}),
+    ...(isNarrowing(doc.narrowing) ? { narrowing: doc.narrowing } : {}),
+  };
+};
+
 export const parseSlotLenses = (stored: unknown): EmailSlotLenses => {
   if (!isNarrowing(stored)) return {};
   const doc = stored as Record<string, unknown>;
+  const data = parseDataLens(doc.data);
   return {
     ...(isNarrowing(doc.recipient) ? { recipient: doc.recipient } : {}),
     ...(isNarrowing(doc.sender) ? { sender: doc.sender } : {}),
-    ...(isNarrowing(doc.data) ? { data: doc.data } : {}),
+    ...(data ? { data } : {}),
   };
 };

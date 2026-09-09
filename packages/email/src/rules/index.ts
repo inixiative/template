@@ -12,6 +12,7 @@ export {
   EMAIL_RULE_MAP_NAME,
   EMAIL_RULE_ROOT_MODEL,
   type EmailContextRelation,
+  type EmailDataLens,
   type EmailDataProjection,
   type EmailProjectionInput,
   type EmailSlotLenses,
