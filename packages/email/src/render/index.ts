@@ -4,7 +4,6 @@ export {
   type ComposeTemplateResult,
   composeComponent,
   composeTemplate,
-  parentOwner,
 } from './compose';
 export {
   type ComponentWrite,
@@ -23,6 +22,7 @@ export { type InterpolateOptions, interpolate, type Variables } from './interpol
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
+export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
 export {
   type ComponentNode,
   collectSlugsFromNodes,
