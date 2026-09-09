@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'bun:test';
+import { requiredBindings } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { type RecipientSpec, recipientLens, registry } from '#/lib/email/registry';
 
 describe('recipientLens', () => {
-  it('assembles a User-rooted narrowing from the static surface and a resolved where', () => {
+  it('assembles a User-rooted narrowing from the static surface and a bound where', () => {
     const spec: RecipientSpec = {
       picks: ['id', 'name', 'email'],
       relations: { organizationUser: { picks: ['role'] } },
-      where: { field: 'id', operator: 'equals', bind: 'recipientId' } as never,
-      bindings: { recipientId: 'entity.id' },
+      where: { field: 'id', operator: 'equals', bind: 'id' },
     };
-    const where = { field: 'id', operator: 'equals', value: 'u1' } as never;
+    const where = { field: 'id', operator: 'equals', value: 'u1' } as const;
 
     const lens = recipientLens(spec, where);
 
@@ -23,47 +23,39 @@ describe('recipientLens', () => {
   it('omits relations when the spec declares none', () => {
     const spec: RecipientSpec = {
       picks: ['id', 'name', 'email'],
-      where: { field: 'id', operator: 'equals', bind: 'recipientId' } as never,
-      bindings: { recipientId: 'entity.id' },
+      where: { field: 'id', operator: 'equals', bind: 'id' },
     };
-    const lens = recipientLens(spec, { field: 'id', operator: 'equals', value: 'u1' } as never);
+    const lens = recipientLens(spec, { field: 'id', operator: 'equals', value: 'u1' });
     expect('relations' in lens.root).toBe(false);
   });
 });
 
 describe('registry — declarative invariants', () => {
+  const entityPicks = (entry: (typeof registry)[string]) => (entry.entity.root as { picks: string[] }).picks;
+
   it('every entry declares the delivery leaf in its static recipient surface', () => {
     for (const entry of Object.values(registry)) {
       for (const leaf of ['id', 'name', 'email']) expect(entry.recipients.picks).toContain(leaf);
     }
   });
 
-  it('every recipient bind name used in the where is declared in bindings', () => {
+  it('every recipient bind names a field the entity picks', () => {
     for (const entry of Object.values(registry)) {
-      const where = JSON.stringify(entry.recipients.where);
-      for (const [, bind] of [...where.matchAll(/"bind":"([^"]+)"/g)]) {
-        expect(entry.recipients.bindings).toHaveProperty(bind);
-      }
+      for (const name of requiredBindings(entry.recipients.where)) expect(entityPicks(entry)).toContain(name);
     }
   });
 
-  it('every entity-rooted bind path names a field the entity picks', () => {
+  it('every sender id names a field the entity picks', () => {
     for (const entry of Object.values(registry)) {
-      const picks = (entry.entity.narrowing.root as { picks: string[] }).picks;
-      const specs = [entry.recipients, entry.cc, entry.bcc].flatMap((spec) => (spec ? [spec.bindings] : []));
-      if ('bindings' in entry.sender) specs.push(entry.sender.bindings);
-      if (entry.data) specs.push(entry.data);
-      for (const path of specs.flatMap(Object.values)) {
-        const [root, field] = path.split('.');
-        if (root === 'entity') expect(picks).toContain(field);
+      for (const [key, field] of Object.entries(entry.sender)) {
+        if (key !== 'type') expect(entityPicks(entry)).toContain(field);
       }
     }
   });
 
   it('entries are plain serializable data (no functions)', () => {
     for (const entry of Object.values(registry)) {
-      expect(typeof entry.sender).toBe('object');
-      expect(JSON.parse(JSON.stringify(entry.recipients))).toEqual(entry.recipients);
+      expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
     }
   });
 });

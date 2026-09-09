@@ -6,45 +6,25 @@
  */
 import type { Condition, LensNarrowing } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
+import type { Sender } from '#/lib/email/sender';
 
-// A bind name → a path into the resolution context available when it resolves.
-// entity binds read `{ data }` (the handoff); sender reads `{ entity }`;
-// recipients read `{ entity, sender }`; data reads `{ entity, handoff }`.
-export type BindSources = Record<string, string>;
+export type SenderSpec = Sender;
 
-// The subject-model query. `narrowing.root.where` carries `{ bind }` tokens; `bindings`
-// declares where each token's value comes from. Declarative + serializable — no closures.
-export type EntitySpec = { narrowing: LensNarrowing; bindings: BindSources };
-
-// Which sender identity to construct; id fields are bound from the resolved entity.
-export type SenderSpec =
-  | { type: 'platform' }
-  | { type: 'admin' }
-  | { type: 'User'; bindings: { userId: string } }
-  | { type: 'Organization'; bindings: { organizationId: string } }
-  | { type: 'Space'; bindings: { spaceId: string; organizationId: string } }
-  | { type: 'OrganizationUser'; bindings: { userId: string; organizationId: string } }
-  | { type: 'SpaceUser'; bindings: { userId: string; spaceId: string; organizationId: string } };
-
-// Recipients are always User-rooted. `picks`/`relations` are the static interpolation surface
-// (known at save time); `where` carries `{ bind }` tokens filled from `bindings`.
 export type RecipientSpec = {
   picks: string[];
   relations?: Record<string, { picks: string[] }>;
   where: Condition;
-  bindings: BindSources;
 };
 
 export type EmailEntry = {
-  entity: EntitySpec;
+  entity: LensNarrowing;
   sender: SenderSpec;
   recipients: RecipientSpec;
   cc?: RecipientSpec;
   bcc?: RecipientSpec;
-  data?: BindSources;
+  data?: string[];
 };
 
-// Assemble a User-rooted recipient narrowing from the static surface + a resolved where.
 export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
   parent: lensFor('User'),
   root: {
@@ -54,47 +34,40 @@ export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrow
   },
 });
 
-const userEntity = (path: string): EntitySpec => ({
-  narrowing: {
-    parent: lensFor('User'),
-    root: { where: { field: 'id', operator: 'equals', bind: 'userId' }, picks: ['id', 'name', 'email'] },
-  },
-  bindings: { userId: path },
+const userEntity = (bind: string): LensNarrowing => ({
+  parent: lensFor('User'),
+  root: { where: { field: 'id', operator: 'equals', bind }, picks: ['id', 'name', 'email'] },
 });
 
-const userRecipient = (path: string): RecipientSpec => ({
+const userRecipient = (bind: string): RecipientSpec => ({
   picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: 'equals', bind: 'recipientId' },
-  bindings: { recipientId: path },
+  where: { field: 'id', operator: 'equals', bind },
 });
 
 export const registry: Record<string, EmailEntry> = {
   'inquiry-invite-organization-user': {
     entity: {
-      narrowing: {
-        parent: lensFor('Inquiry'),
-        root: {
-          where: { field: 'id', operator: 'equals', bind: 'inquiryId' },
-          picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
-          relations: { sourceOrganization: { picks: ['name'] } },
-        },
+      parent: lensFor('Inquiry'),
+      root: {
+        where: { field: 'id', operator: 'equals', bind: 'inquiryId' },
+        picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
+        relations: { sourceOrganization: { picks: ['name'] } },
       },
-      bindings: { inquiryId: 'data.inquiryId' },
     },
-    sender: { type: 'Organization', bindings: { organizationId: 'entity.sourceOrganizationId' } },
-    recipients: userRecipient('entity.targetUserId'),
+    sender: { type: 'Organization', organizationId: 'sourceOrganizationId' },
+    recipients: userRecipient('targetUserId'),
   },
 
   welcome: {
-    entity: userEntity('data.userId'),
+    entity: userEntity('userId'),
     sender: { type: 'platform' },
-    recipients: userRecipient('entity.id'),
+    recipients: userRecipient('id'),
   },
 
   'email-verification': {
-    entity: userEntity('data.userId'),
+    entity: userEntity('userId'),
     sender: { type: 'platform' },
-    recipients: userRecipient('entity.id'),
-    data: { verificationUrl: 'handoff.verificationUrl' },
+    recipients: userRecipient('id'),
+    data: ['verificationUrl'],
   },
 };

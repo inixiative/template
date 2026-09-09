@@ -9,12 +9,15 @@ import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { prune } from '@template/db/lens';
 import { log } from '@template/shared/logger';
+import { pick } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry } from '#/lib/email';
+import { bindLens } from '#/lib/email/bindLens';
+import { bindWhere } from '#/lib/email/bindWhere';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
-import { registry } from '#/lib/email/registry';
-import { resolveData, resolveEntity, resolveRecipients, resolveSenderIdentity } from '#/lib/email/resolveEntry';
+import { pickSender } from '#/lib/email/pickSender';
+import { recipientLens, registry } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
 
 export type SendEmailPayload = {
@@ -66,7 +69,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return;
   }
 
-  const entityLens = resolveEntity(entry, data);
+  const entityLens = bindLens(entry.entity, data);
   const [entity] = await fetchLens(db, entityLens);
   if (!entity) return;
 
@@ -76,7 +79,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   }
 
   const entityRow = entity as Record<string, unknown>;
-  const dataVars = resolveData(entry, entityRow, data) ?? (prune(entity, entityLens) as Record<string, unknown>);
+  const dataVars = entry.data ? pick(data, entry.data) : (prune(entity, entityLens) as Record<string, unknown>);
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(db, lens);
@@ -84,8 +87,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return (prune(rows, lens) as Array<{ email: string }>).map((r) => r.email);
   };
 
-  const sender = resolveSenderIdentity(entry.sender, entityRow);
-  const lens = resolveRecipients(entry.recipients, entityRow, sender);
+  const sender = pickSender(entry.sender, entityRow);
+  const lens = recipientLens(entry.recipients, bindWhere(entry.recipients.where, entityRow));
   const sendKey = plannerJobId(eventName, template, data);
 
   const users = await fetchLens(db, lens);
@@ -134,8 +137,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     const communicationLogId = logByKey.get(idempotencyKey);
     if (!communicationLogId) continue;
     const userRow = user as Record<string, unknown>;
-    const cc = entry.cc ? await emailsOf(resolveRecipients(entry.cc, userRow, sender)) : undefined;
-    const bcc = entry.bcc ? await emailsOf(resolveRecipients(entry.bcc, userRow, sender)) : undefined;
+    const cc = entry.cc ? await emailsOf(recipientLens(entry.cc, bindWhere(entry.cc.where, userRow))) : undefined;
+    const bcc = entry.bcc ? await emailsOf(recipientLens(entry.bcc, bindWhere(entry.bcc.where, userRow))) : undefined;
     await enqueueJob(
       'deliverEmail',
       { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },

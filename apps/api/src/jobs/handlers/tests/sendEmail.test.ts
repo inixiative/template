@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { type Condition, Operator } from '@inixiative/json-rules';
+import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { cleanupTouchedTables, createEmailTemplate, createUser } from '@template/db/test';
@@ -20,37 +20,24 @@ registerUserEmailContactHook();
 
 const ADAPTER = 'test-recorder';
 
-// Declarative entity: User by id, bound from the handoff (`data.userId`).
 const userEntity = (): EmailEntry['entity'] => ({
-  narrowing: {
-    parent: lensFor('User'),
-    root: {
-      where: { field: 'id', operator: Operator.equals, bind: 'userId' } as unknown as Condition,
-      picks: ['id', 'name', 'email'],
-    },
-  },
-  bindings: { userId: 'data.userId' },
+  parent: lensFor('User'),
+  root: { where: { field: 'id', operator: Operator.equals, bind: 'userId' }, picks: ['id', 'name', 'email'] },
 });
 
-// Recipient = the resolved entity itself (bind the recipient id from `entity.id`).
 const recipientSelf: RecipientSpec = {
   picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.equals, bind: 'recipientId' } as unknown as Condition,
-  bindings: { recipientId: 'entity.id' },
+  where: { field: 'id', operator: Operator.equals, bind: 'id' },
 };
 
-// Recipients by a fixed id set — a literal `value`, no binding needed.
 const recipientsIn = (ids: string[]): RecipientSpec => ({
   picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.in, value: ids } as unknown as Condition,
-  bindings: {},
+  where: { field: 'id', operator: Operator.in, value: ids },
 });
 
-// A single recipient by a fixed id (used for cc) — literal `value`, no binding.
 const recipientById = (id: string): RecipientSpec => ({
   picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.equals, value: id } as unknown as Condition,
-  bindings: {},
+  where: { field: 'id', operator: Operator.equals, value: id },
 });
 
 const plainMjml = (body: string) =>
