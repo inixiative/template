@@ -61,7 +61,7 @@ describe('emailLens + emailSurface', () => {
     const surface = emailSurface(projection, {
       recipient: { picks: ['email'], relations: { organizationUsers: { picks: ['role'] } } },
       sender: { picks: ['name'] },
-      data: { picks: ['content'] },
+      data: { narrowing: { picks: ['content'] } },
     });
     expect(fieldsOf(surface, 'User')).toEqual(['email', 'organizationUsers']);
     expect(fieldsOf(surface, 'OrganizationUser')).toEqual(['role']);
@@ -96,6 +96,9 @@ describe('parseSlotLenses', () => {
   it('keeps only object-shaped slots', () => {
     expect(parseSlotLenses({ recipient: { picks: ['email'] }, sender: 'nope', data: null })).toEqual({
       recipient: { picks: ['email'] },
+    });
+    expect(parseSlotLenses({ data: { model: 'Inquiry', narrowing: { picks: ['content'] }, extra: 1 } })).toEqual({
+      data: { model: 'Inquiry', narrowing: { picks: ['content'] } },
     });
     expect(parseSlotLenses(null)).toEqual({});
     expect(parseSlotLenses([1])).toEqual({});

@@ -26,23 +26,30 @@ Two things adhoc needs that system does not:
    variable picker and condition builder show a real surface and save-time validation has something to
    check against.
 
-## Vocabulary (ruling 2026-09-09)
+## Vocabulary (rulings 2026-09-09)
 
-- **Projection.** What the system provides: the models and fields reachable for this template — a
-  projection of the field map with a synthetic root (`EmailRuleContext` → `recipient`, `sender`,
-  `data`). It has no narrowing of its own. `recipient` and `sender` are real models. **`data` is
-  unknown by construction** — the per-template payload nobody can declare ahead of the event — so
-  its root is a `Json` field: every `{{data.…}}` path and every rule beneath it is addressable at
-  any depth, and save-time validation reports it as *beneath Json* (a warning, never a rejection).
-  A registry entry may refine `data` into a declared shape (the entity model, or the declared
-  `data` keys) when one is known; that is an overlay on the unknown bag, not a replacement for it.
-- **Lens.** What the row holds: `EmailTemplate.lens`, per-slot narrowings over the projection
-  (`{ recipient?, sender?, data? }`, each a `ModelNarrowing`). Authored on the slug's default-tier row
-  and inherited by every tenant row through the cascade. Null = engine defaults (recipient = the
-  delivery leaf `id, name, email`; sender and data = their scalars).
+- **Projection.** What the system provides: the models and fields reachable **from your
+  perspective** — a projection of the field map with a synthetic root (`EmailRuleContext` →
+  `recipient`, `sender`, `data`). It has no narrowing of its own; it is the space a lens is built
+  from. Perspective is the open half (below): today the projection is the whole map; it must become
+  what the authoring actor can actually reach.
+- **Lens.** A lens has a starting point. Each slot on the row is **its own lens**, built from the
+  projection by choosing an **entry point** and then **relations** (and the picks along them):
+  - `recipient` — entry point fixed at `User` (COMM-010); the author chooses relations.
+  - `sender` — entry point is the sender model (from the registry entry's `SenderSpec` for a system
+    template); the author chooses relations.
+  - `data` — **unknown by construction**: the per-template payload nobody can declare ahead of the
+    event. With no entry point chosen its root is a `Json` field, so every `{{data.…}}` path and
+    every rule beneath it stays addressable at any depth and validation reports it as *beneath
+    Json* (a warning, never a rejection). The author may **choose an entry point** for it from the
+    projection (`lens.data.model`) and then relations (`lens.data.narrowing`); a registry entry's
+    entity model is the default entry when the row is silent.
+  The row column `EmailTemplate.lens` holds the three: `{ recipient?: ModelNarrowing, sender?:
+  ModelNarrowing, data?: { model?, narrowing? } }`, authored on the slug's default-tier row and
+  inherited through the cascade.
 - **Surface.** `exposedSurface(lens)` — what the builder receives. Never carries a `where`.
-- **Floor.** The scope bound from the sender at send time (an organization sender reaches its own
-  users and nobody else), applied server-side under the row's lens. Never stored on the row.
+- **Floor.** The scope bound from the sender at send time, applied server-side under the row's
+  lens. Never stored on the row.
 
 `packages/email/src/rules/emailProjection.ts` implements projection → lens → surface.
 
@@ -68,20 +75,58 @@ Two things adhoc needs that system does not:
 
 ## What remains
 
-1. **Where an adhoc template's projection comes from.** Recipient and the unknown data bag need no
-   declaration, so an adhoc row already has a usable projection. What is undeclared is the sender
-   model (a narrowing cannot name it). Options: (a) the row declares it, or (b) the adhoc send request
-   supplies it and the row's lens is validated against every sender tier it allows.
-2. **Registry `picks` vs the row lens.** `RecipientSpec.picks` and `DEFAULT_RECIPIENT_LENS` say the
+1. **Perspective.** The projection must narrow to what the authoring actor can reach — the same
+   question the API already answers for reads (`scopeNarrowing` stacks the actor's scope under a
+   route's `filterLens`; FE-004 derives lenses from the endpoint schema). Decide whether the
+   projection is built server-side from the actor's rebac scope, or served as the full map and
+   narrowed by the same mechanism the read routes use. Until then the admin route serves the whole
+   map (superadmin only).
+2. **Sender entry point for an adhoc row.** Recipient and the data bag need no declaration, so an
+   adhoc row already has a usable projection. What is undeclared is the sender model (a narrowing
+   cannot name it). Options: (a) the row declares it, or (b) the adhoc send request supplies it and
+   the row's lens is validated against every sender tier it allows.
+3. **Registry `picks` vs the row lens.** `RecipientSpec.picks` and `DEFAULT_RECIPIENT_LENS` say the
    same thing twice. Once system templates have a row lens, the planner should hydrate from it and the
    registry should keep only `where` + `bindings`.
-3. **Entry-from-row.** `resolveEntry` for a template with no registry entry: sender from the send
+4. **Entry-from-row.** `resolveEntry` for a template with no registry entry: sender from the send
    request, recipient narrowing from the row lens under the sender floor.
-4. **Model-keyed surface.** `exposedSurface` keys fields by model, so two slots that reach the same
+5. **Model-keyed surface.** `exposedSurface` keys fields by model, so two slots that reach the same
    model (a `welcome` template whose recipient and entity are both `User`) expose the union of both
    narrowings to each slot. Harmless for system templates; decide whether an adhoc picker needs a
    path-keyed surface before it matters.
-5. **Adhoc send event** + the `sendEmail` fallback from "no entry → skip" to "no entry → row".
+6. **Adhoc send event** + the `sendEmail` fallback from "no entry → skip" to "no entry → row".
+
+## Forms — the palette and the shell (Aron, on top of #97)
+
+Headless pieces land in #97: projection/lens/surface, regions, the MJML nesting table, the rule
+surface route, `useEmailRuleSurface`, `useEmailVariableScope`. The forms are a port of Zealot's
+admin-dashboard components onto those hooks, plus two API surfaces template lacks.
+
+**Palette** — what the editor can insert, and where each list comes from:
+
+- **Components** from the library: the slugs at the author's tier plus what cascades from above.
+  Needs EmailComponent list/CRUD routes (Zealot #1653) and EmailTemplate read/save routes
+  (hydrate on read, decompose on save, authoring errors → 422).
+- **Slots**: a slot with a default when authoring a component; an override when filling a ref.
+- **MJML objects**: section, column, text, button, image, … — constrained by `canNestMjml` so the
+  palette only offers what fits the cursor's parent.
+- **Conditionals, loops, variables** off the surface: the condition builder anchored at the
+  surface (`RuleBuilder` from rules-builder), loop portals from `useEmailVariableScope`, tokens
+  from its values.
+
+**Panes** — editor surface, preview, data, MJML source. The data pane is where the unknown bag
+becomes concrete: the author supplies a sample payload; the preview renders against it; the same
+fixture drives the beneath-Json warnings so the author sees which data paths the sample does not
+satisfy. Needs a preview route (compose + interpolate against the fixture → HTML + warnings; Zealot
+has one).
+
+**Shell** — platform-level authoring lands in `apps/superadmin`, matching the admin routes, in the
+rail / editor / inspector layout `docs/email-builder-mockup.html` shows. Regions drive the
+inspector: per-component tier badges (inherited / shadowed / forked / dangling), collapse-to-ref,
+remove-override, revert-to-default.
+
+**Order**: component + template routes → preview route → palette + insert dialogs → editor surface
++ panes → shell mount.
 
 ## Related
 

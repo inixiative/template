@@ -44,7 +44,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       locale: 'en',
       lens: {
         recipient: { picks: ['email'], relations: { organizationUsers: { picks: ['role'] } } },
-        data: { picks: ['name'] },
+        data: { narrowing: { picks: ['name'] } },
       },
     });
 
@@ -57,6 +57,31 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     expect(fieldsOf(data, 'User')).toEqual(['email', 'name', 'organizationUsers']);
     expect(fieldsOf(data, 'OrganizationUser')).toEqual(['role']);
     expect(data.decoration.facets.map((f) => f.path)).toEqual(['recipient', 'data']);
+  });
+
+  it('lets the row choose the data entry point and relations from the projection', async () => {
+    await createEmailTemplate({
+      slug: 'adhoc-with-entry',
+      ownerModel: 'default',
+      locale: 'en',
+      lens: {
+        data: {
+          model: 'Inquiry',
+          narrowing: { picks: ['content'], relations: { sourceOrganization: { picks: ['name'] } } },
+        },
+      },
+    });
+
+    const { data } = await json<Surface>(
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc-with-entry' })),
+    );
+
+    expect(data.source.maps[data.source.mapName]?.models.EmailRuleContext?.fields.data).toMatchObject({
+      kind: 'object',
+      type: 'Inquiry',
+    });
+    expect(fieldsOf(data, 'Inquiry')).toEqual(['content', 'sourceOrganization']);
+    expect(fieldsOf(data, 'Organization')).toEqual(['name']);
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
