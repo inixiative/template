@@ -149,7 +149,10 @@ describe('lensWhere — query-plan execution (count operators)', () => {
 
     const lens: LensNarrowing = {
       parent: lensFor('User'),
-      root: { picks: ['name'], where: { field: 'contacts', arrayOperator: 'atLeast', count: 1 } },
+      root: {
+        picks: ['name'],
+        where: { field: 'contacts', arrayOperator: 'atLeast', count: 1, condition: { all: [] } },
+      },
     };
 
     const where = await lensWhere(lens, {});
@@ -165,7 +168,10 @@ describe('lensWhere — query-plan execution (count operators)', () => {
 
     const lens: LensNarrowing = {
       parent: lensFor('User'),
-      root: { picks: ['name'], where: { field: 'sessions', arrayOperator: 'atLeast', count: 1 } },
+      root: {
+        picks: ['name'],
+        where: { field: 'sessions', arrayOperator: 'atLeast', count: 1, condition: { all: [] } },
+      },
     };
 
     const where = await lensWhere(lens, {});
