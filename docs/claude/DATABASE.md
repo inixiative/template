@@ -755,7 +755,8 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `token.prisma` - API tokens (user/org/space scoped)
 - `webhookSubscription.prisma` - Webhook configurations
 - `inquiry.prisma` - False polymorphic inquiry system
-- `customer.prisma` - Customer references
+- `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
+- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic User/Organization/Space) named set of its customer references; `static` (manual members) or `dynamic` (json-rules `conditions` over the segment lens, reconciled by jobs); members carry `source` rule|manual
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 
 **Communications:**

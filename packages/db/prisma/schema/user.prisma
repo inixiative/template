@@ -43,6 +43,7 @@ model User {
   auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
   communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
   communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
+  segments               Segment[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

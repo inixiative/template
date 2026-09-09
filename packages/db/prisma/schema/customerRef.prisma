@@ -23,8 +23,9 @@ model CustomerRef {
   providerModel   ProviderModel
   providerSpaceId String?       @db.VarChar(36)
 
-  providerSpace Space?     @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
-  auditLogs     AuditLog[]
+  providerSpace  Space?          @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+  auditLogs      AuditLog[]
+  segmentMembers SegmentMember[]
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.

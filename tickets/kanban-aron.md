@@ -36,6 +36,7 @@ kanban
     INFRA-011-railway-buckets
   Review
     INFRA-030-reference-registry
+    FEAT-021-segments
   Done
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
@@ -94,6 +95,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 ### 👀 Review
 - [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save hook + staleness re-resolve + render gate; email conditionals are the first surface; json-rules 2.20.0 `ruleSourceValues` does the extraction. Zealot #2116 reshapes to it
+- [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef: false-poly owner, static/dynamic + rule/manual members, lens-driven validation + set/entity reconcile jobs, DB-hook triggers, `segment.membershipChanged` app event, Segments page in all three contexts
 
 ### ✅ Done
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)
@@ -107,6 +109,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - **Total Tickets**: 19
 - **Todo**: 13
 - **In Progress**: 6
+- **Review**: 1
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
 
@@ -130,3 +133,4 @@ INFRA-004 (WebSockets)
 ---
 
 _Last Updated: 2026-08-31_
+_Last Updated: 2026-09-09_

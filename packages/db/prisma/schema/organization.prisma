@@ -32,6 +32,7 @@ model Organization {
   auditLogsAsContext   AuditLog[]            @relation("AuditLogContextOrganization")
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectOrganization")
   communicationsSent   CommunicationLog[]    @relation("CommunicationSenderOrganization")
+  segments             Segment[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -113,6 +113,10 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
+| `segmentConditions` | Segment `conditions` validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and a static/dynamic mismatch |
+| `segmentFreeze` | Flipping a Segment from dynamic to static converts its rule members to manual |
+| `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
+| `segmentReconcile` | Enqueues `reconcileSegment` / `reconcileCustomerRefSegments` (post-commit) for writes on any model the segment lens reaches |
 | `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
 | `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
 | `webhooks` | Webhook delivery on mutations (post-commit) |

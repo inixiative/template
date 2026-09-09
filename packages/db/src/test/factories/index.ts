@@ -10,6 +10,8 @@ export * from './inquiryFactory';
 export * from './integrationFactory';
 export * from './organizationFactory';
 export * from './organizationUserFactory';
+export * from './segmentFactory';
+export * from './segmentMemberFactory';
 export * from './sessionFactory';
 export * from './spaceFactory';
 export * from './spaceUserFactory';

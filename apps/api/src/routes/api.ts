@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @uses feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:users, feature:webhooks, primitive:batch
+ * @uses feature:auth, feature:contact, feature:inquiry, feature:segment, feature:tenancy, feature:users, feature:webhooks, primitive:batch
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
@@ -19,6 +19,8 @@ import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
+import { segmentRouter } from '#/modules/segment';
+import { segmentMemberRouter } from '#/modules/segmentMember';
 import { spaceRouter } from '#/modules/space';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { tokenRouter } from '#/modules/token';
@@ -64,6 +66,8 @@ apiRouter.route('/v1/integration', integrationRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);
+apiRouter.route('/v1/segment', segmentRouter);
+apiRouter.route('/v1/segmentMember', segmentMemberRouter);
 apiRouter.route('/v1/space', spaceRouter);
 apiRouter.route('/v1/spaceUser', spaceUserRouter);
 apiRouter.route('/v1/token', tokenRouter);

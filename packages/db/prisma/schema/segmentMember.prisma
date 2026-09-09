@@ -1,0 +1,34 @@
+// ============================================================================
+// SEGMENT MEMBER - One customer reference's membership in one segment
+// ============================================================================
+// Append/delete lifecycle, no soft delete: a membership either holds or it
+// does not, and the reconcile jobs diff against the live set. `source` says
+// who put the row there — `rule` rows are owned by reconcile and are evicted
+// when the rule stops matching; `manual` rows are pinned by a person and are
+// never evicted by a rule. The member's customer reference must belong to the
+// segment's owner as its provider (segmentMemberOwner hook).
+
+model SegmentMember {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  segmentId String  @db.VarChar(36)
+  segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  customerRefId String      @db.VarChar(36)
+  customerRef   CustomerRef @relation(fields: [customerRefId], references: [id], onDelete: Cascade)
+
+  source SegmentMemberSource
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([segmentId, customerRefId])
+  @@index([customerRefId])
+}
+
+enum SegmentMemberSource {
+  rule
+  manual
+}
