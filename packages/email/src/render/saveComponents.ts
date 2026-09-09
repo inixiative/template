@@ -5,9 +5,9 @@
  * @uses infrastructure:prisma
  */
 import type { EmailComponent } from '@template/db/generated/client/client';
+import { assertNoDuplicateExposedSlots, parseBlocks } from '@template/email/render/parseBlocks';
 import { saveScopedRow } from '@template/email/render/saveScopedRow';
 import type { OwnerScope } from '@template/email/render/types';
-import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -76,7 +76,7 @@ const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<Em
   // Validate at the unit boundary — a component can be saved on a path that didn't run the
   // template-level check.
   await validateComponentMjml(input.mjml);
-  validateBlocks(input.mjml);
+  assertNoDuplicateExposedSlots(parseBlocks(input.mjml), input.slug);
   assertValidConditions(input.mjml);
 
   return saveScopedRow('emailComponent', input, ctx);

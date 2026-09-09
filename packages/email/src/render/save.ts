@@ -14,7 +14,6 @@ import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
-import { validateBlocks } from '@template/email/render/validateBlocks';
 import { assertValidConditions } from '@template/email/render/validateConditions';
 import { validateNoCycle } from '@template/email/render/validateNoCycle';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -56,7 +55,7 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
   await validateMjml(input.mjml);
   // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
   // Subjects are interpolated too, so they carry conditionals and need the same floor.
-  validateBlocks(input.mjml);
+  const nodes = parseBlocks(input.mjml);
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject, { isSubject: true });
 
@@ -66,10 +65,6 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
     spaceId: input.spaceId,
     locale: input.locale ?? 'en',
   };
-
-  // Parse the payload ONCE (grammar validation + stray-tag scan over the largest strings in the
-  // system), then collect slugs and decompose off that same tree.
-  const nodes = parseBlocks(input.mjml);
 
   // Every referenced component slug, so we can diff each inlined body against the cascade.
   const slugs = collectSlugsFromNodes(nodes);

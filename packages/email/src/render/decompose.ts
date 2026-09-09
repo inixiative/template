@@ -6,9 +6,6 @@
  */
 import { type ComponentNode, type Node, parseBlocks } from '@template/email/render/parseBlocks';
 
-// Resolve the currently-stored body for a component slug, already walked through the
-// owner cascade (tenant → parent → platform). `undefined` = the slug exists nowhere yet.
-// Injected so this module stays pure and DB-free (mirrors renderBlocks' `load`).
 export type ResolveCascade = (slug: string) => string | undefined;
 
 // A component row to upsert: its slug, its reconstructed body, and the refs it owns.
