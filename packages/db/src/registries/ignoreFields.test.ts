@@ -61,14 +61,29 @@ describe('isNoOpUpdate', () => {
   });
 
   it('returns true for model-specific ignored field changes', () => {
-    const previous = { id: '123', name: 'Token', lastUsedAt: new Date('2024-01-01'), updatedAt: new Date('2024-01-01') };
+    const previous = {
+      id: '123',
+      name: 'Token',
+      lastUsedAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+    };
     const current = { id: '123', name: 'Token', lastUsedAt: new Date('2024-01-02'), updatedAt: new Date('2024-01-02') };
     expect(isNoOpUpdate('Token', current, previous, NOOP_FIELDS)).toBe(true);
   });
 
   it('returns false when non-ignored field changes alongside ignored', () => {
-    const previous = { id: '123', name: 'Old Token', lastUsedAt: new Date('2024-01-01'), updatedAt: new Date('2024-01-01') };
-    const current = { id: '123', name: 'New Token', lastUsedAt: new Date('2024-01-02'), updatedAt: new Date('2024-01-02') };
+    const previous = {
+      id: '123',
+      name: 'Old Token',
+      lastUsedAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
+    };
+    const current = {
+      id: '123',
+      name: 'New Token',
+      lastUsedAt: new Date('2024-01-02'),
+      updatedAt: new Date('2024-01-02'),
+    };
     expect(isNoOpUpdate('Token', current, previous, NOOP_FIELDS)).toBe(false);
   });
 

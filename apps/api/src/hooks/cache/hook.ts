@@ -5,7 +5,16 @@
  * @uses infrastructure:prisma
  */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { clearKey, DbAction, db, HookTiming, isNoOpUpdate, NOOP_FIELDS, type Prisma, registerDbHook } from '@template/db';
+import {
+  clearKey,
+  DbAction,
+  db,
+  HookTiming,
+  isNoOpUpdate,
+  NOOP_FIELDS,
+  type Prisma,
+  registerDbHook,
+} from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
