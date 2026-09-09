@@ -9,6 +9,7 @@ import { MjmlValidationError } from '@template/email/errors/MjmlValidationError'
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveScopedRow } from '@template/email/render/saveScopedRow';
 import type { OwnerScope } from '@template/email/render/types';
+import { deriveComponentExpectations } from '@template/email/rules/componentExpectations';
 import { assertNoDuplicateExposedSlots } from '@template/email/validations/assertNoDuplicateExposedSlots';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -75,5 +76,5 @@ const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<Em
   assertNoDuplicateExposedSlots(parseBlocks(input.mjml), input.slug);
   assertValidConditions(input.mjml);
 
-  return saveScopedRow('emailComponent', input, ctx);
+  return saveScopedRow('emailComponent', { ...input, expectations: deriveComponentExpectations(input.mjml) }, ctx);
 };
