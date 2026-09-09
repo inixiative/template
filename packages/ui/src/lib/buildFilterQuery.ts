@@ -11,6 +11,7 @@ import {
   type ScalarFieldOperator,
 } from '@template/shared/bracketQuery';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
+import { castArray } from 'lodash-es';
 
 // Values carry their real type end to end: serializeBracketQuery marks null/boolean with `[:]`
 // and finite numbers with `[$]`, and the server parses both back to the real type — so `null` is
@@ -85,7 +86,7 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
       continue;
     }
     // A field may carry several operator clauses (e.g. gte + lte for a range); each is folded in.
-    const clauses: unknown[] = Array.isArray(state) ? state : [state];
+    const clauses = castArray<unknown>(state);
     for (const raw of clauses) {
       if (!isFilterState(raw)) continue;
       const clause = raw as { operator: string; value: FilterValue | FilterValue[] };
