@@ -55,6 +55,7 @@ type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: 
 type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
+  searchPaths?: string[];
   bindings?: Record<string, RuleValue>;
   where?: FindManyWhere<T>;
   orderBy?: FindManyOrderBy<T>;
@@ -91,6 +92,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   const {
     orderBy: callerOrderByOption,
     orNullFields,
+    searchPaths,
     bindings,
     ...findManyOptions
   } = (options ?? {}) as PaginateOptions<T>;
@@ -126,6 +128,7 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
     filterLens,
     search,
     searchFields,
+    searchPaths,
     skipFieldValidation: superadmin,
     orNullFields,
   });

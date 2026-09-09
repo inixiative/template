@@ -28,6 +28,7 @@ type BuildWhereOptions = {
   filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
+  searchPaths?: string[];
   // Superadmin: skips the picks whitelist (coercion + op validation still apply).
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
@@ -325,18 +326,36 @@ const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Recor
 };
 
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
+  const {
+    filterLens,
+    search,
+    searchFields,
+    searchPaths,
+    skipFieldValidation = false,
+    filters = {},
+    orNullFields = [],
+  } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  if (search?.trim() && searchableFields.length) {
+  for (const path of searchPaths ?? []) {
+    if (!searchableFields.includes(path)) {
+      throw makeError({
+        status: 500,
+        message: `buildWhereClause: searchPaths entry '${path}' is not a searchable path of the ${model} lens.`,
+      });
+    }
+  }
+  const globalSearchFields = searchPaths ?? searchableFields;
+
+  if (search?.trim() && globalSearchFields.length) {
     // Split on whitespace so "Phil Smith" matches a row where one field contains "Phil" and another
     // contains "Smith" — the whole string is rarely in one column. Each token ORs across the fields;
     // tokens AND together.
     for (const token of search.trim().split(/\s+/)) {
-      const searchConditions = searchableFields.flatMap((field) => {
+      const searchConditions = globalSearchFields.flatMap((field) => {
         const def = lookupField(model, stripRelationOperators(field));
         const clause = def && fieldSearchOperator(def, token);
         if (!clause) return [];

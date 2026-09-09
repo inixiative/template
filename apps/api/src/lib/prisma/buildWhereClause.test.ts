@@ -570,6 +570,63 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({ AND: [{ deletedAt: { not: null } }] });
     });
   });
+  describe('searchPaths — restricting the global fan-out', () => {
+    const WITH_TO_MANY = {
+      parent: lensFor('User'),
+      root: { picks: ['name', 'email'], relations: { tokens: { picks: ['name'] } } },
+    };
+
+    it('restricts the global search fan-out to the given subset, in caller order', () => {
+      const result = buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: ['name', 'email'] });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'greg', mode: 'insensitive' } },
+              { email: { contains: 'greg', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('leaves explicit searchFields on the full lens whitelist, so relation filters still work', () => {
+      const result = buildWhereClause({
+        filterLens: WITH_TO_MANY,
+        search: 'greg',
+        searchPaths: ['name'],
+        searchFields: { tokens: { some: { name: 'tok-a' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          { OR: [{ name: { contains: 'greg', mode: 'insensitive' } }] },
+          { tokens: { some: { name: { contains: 'tok-a', mode: 'insensitive' } } } },
+        ],
+      });
+    });
+
+    it('an empty searchPaths disables free-text search entirely', () => {
+      expect(buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: [] })).toEqual({});
+    });
+
+    it('throws 500 (route-author bug, not a client 400) on a path outside the lens', () => {
+      expect(() => buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: ['nope'] })).toThrow(
+        "searchPaths entry 'nope' is not a searchable path of the User lens",
+      );
+      try {
+        buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: ['nope'] });
+      } catch (err) {
+        expect((err as { status: number }).status).toBe(500);
+      }
+    });
+
+    it('validates searchPaths even without a search term, so lens drift fails on every request', () => {
+      expect(() => buildWhereClause({ filterLens: WITH_TO_MANY, searchPaths: ['nope'] })).toThrow(
+        "searchPaths entry 'nope' is not a searchable path of the User lens",
+      );
+    });
+  });
+
   describe('AND / OR combinators (clause groups)', () => {
     const TOKENS = { parent: lensFor('User'), root: { relations: { tokens: { picks: ['name'] } } } };
 
@@ -797,6 +854,49 @@ describe('buildWhereClause', () => {
               },
             },
           },
+        ],
+      });
+    });
+
+    it('splits a NULL member out of `in` inside an AND group, as it does at the top level', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { AND: { 0: { platformRole: { in: ['superadmin', null] } } } },
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }],
+      });
+    });
+
+    it('applies orNullFields inside an AND group', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 0: { name: 'aron' } } },
+        orNullFields: ['name'],
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { name: null }] }],
+      });
+    });
+
+    it('400s on a scalar combinator value', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: 'aron' },
+        }),
+      ).toThrow(/requires indexed children/);
+    });
+
+    it('accepts sparse indices', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { AND: { 0: { name: 'aron' }, 5: { email: 'aron@x.com' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          { name: { contains: 'aron', mode: 'insensitive' } },
+          { email: { contains: 'aron@x.com', mode: 'insensitive' } },
         ],
       });
     });
