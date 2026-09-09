@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { projectByPath } from '@inixiative/json-rules';
+import { checkRuleAgainstLens, projectByPath } from '@inixiative/json-rules';
 import {
   DEFAULT_RECIPIENT_LENS,
   EMAIL_RULE_MAP_NAME,
@@ -9,15 +9,26 @@ import {
   parseSlotLenses,
 } from '@template/email/rules/emailProjection';
 import { emailRuleDecoration } from '@template/email/rules/emailRuleDecoration';
+import { walkLensPath } from '@template/email/rules/walkLensPath';
 
 const fieldsOf = (surface: ReturnType<typeof emailSurface>, model: string): string[] =>
   Object.keys(surface.maps[EMAIL_RULE_MAP_NAME]?.models[model]?.fields ?? {}).sort();
 
 describe('emailProjection', () => {
-  it('roots the projection at EmailRuleContext with a recipient and no sender or data by default', () => {
+  it('roots the projection at EmailRuleContext with a recipient and an unknown data bag by default', () => {
     const projection = emailProjection();
     expect(projection.model).toBe('EmailRuleContext');
-    expect(fieldsOf(projection, 'EmailRuleContext')).toEqual(['recipient']);
+    expect(fieldsOf(projection, 'EmailRuleContext')).toEqual(['data', 'recipient']);
+  });
+
+  it('keeps an undeclared data bag addressable to any depth, as beneath-Json rather than missing', () => {
+    const surface = emailSurface(emailProjection());
+    expect(walkLensPath('data.mission.reward.amount', surface).outcome).toBe('beneathJson');
+    expect(
+      checkRuleAgainstLens({ field: 'data.mission.reward.amount', operator: 'greaterThan', value: 1 } as never, surface)
+        .ok,
+    ).toBe(true);
+    expect(walkLensPath('recipient.nope', surface).outcome).toBe('missing');
   });
 
   it('carries the whole prisma map so the row lens can reach any relation', () => {
@@ -97,6 +108,7 @@ describe('emailRuleDecoration', () => {
     expect(emailRuleDecoration(surface).facets).toEqual([
       { path: 'recipient', label: 'Recipient' },
       { path: 'sender', label: 'Sender' },
+      { path: 'data', label: 'Data' },
     ]);
   });
 });

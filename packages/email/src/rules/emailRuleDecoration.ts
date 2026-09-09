@@ -14,7 +14,7 @@ export type EmailRuleDecoration = { facets: EmailRuleFacet[] };
 export const emailRuleDecoration = (surface: Lens): EmailRuleDecoration => {
   const rootFields = surface.maps[EMAIL_RULE_MAP_NAME]?.models[EMAIL_RULE_ROOT_MODEL]?.fields ?? {};
   const facets = Object.entries(rootFields)
-    .filter(([, field]) => field.kind === 'object')
+    .filter(([, field]) => field.kind === 'object' || (field.kind === 'scalar' && field.type === 'Json'))
     .map(([name]) => ({ path: name, label: startCase(name) }));
   return { facets };
 };

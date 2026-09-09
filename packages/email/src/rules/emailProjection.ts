@@ -42,6 +42,8 @@ export type EmailSlotLenses = {
 
 export const DEFAULT_RECIPIENT_LENS: ModelNarrowing = { picks: ['id', 'name', 'email'] };
 
+const OPAQUE_DATA: FieldMapEntry = { kind: 'scalar', type: 'Json' };
+
 const relation = (model: string, relationName: string, isList = false): FieldMapEntry => ({
   kind: 'object',
   type: model,
@@ -83,7 +85,7 @@ export const emailProjection = ({ recipientModel = 'User', senderModel, data }: 
       fields: {
         recipient: relation(recipientModel, 'EmailRecipient'),
         ...(senderModel ? { sender: relation(senderModel, 'EmailSender') } : {}),
-        ...(data ? { data: relation(dataType, 'EmailDataRel') } : {}),
+        data: data ? relation(dataType, 'EmailDataRel') : OPAQUE_DATA,
       },
     },
   };
