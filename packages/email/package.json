@@ -11,6 +11,7 @@
     "./errors": "./src/errors/index.ts",
     "./errors/*": "./src/errors/*.ts",
     "./render": "./src/render/index.ts",
+    "./rules": "./src/rules/index.ts",
     "./targeting": "./src/targeting/index.ts",
     "./validations": "./src/validations/index.ts",
     "./validations/*": "./src/validations/*.ts"
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@types/html-to-text": "^9.0.4",
-    "@types/mjml": "^5.0.0"
+    "@types/mjml": "^5.0.0",
+    "mjml-preset-core": "5.3.0"
   }
 }
