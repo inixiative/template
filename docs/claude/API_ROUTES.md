@@ -514,6 +514,12 @@ List endpoints support search via query parameters. Define a `filterLens` on the
 GET /api/v1/organizations?search=acme
 ```
 
+**Narrowing the fan-out** — every to-many relation path in the lens becomes a correlated `some` subquery with a leading-wildcard `contains`, evaluated once per candidate row, which does not scale past tens of thousands of rows. Routes whose lens carries such paths pin the global `search` term to a subset:
+```typescript
+const { data, pagination } = await paginate(c, db.user, { searchPaths: ['name', 'email'] });
+```
+`searchPaths` must be a subset of the lens's searchable paths — a stray entry throws 500 on every request, so lens drift fails loudly rather than silently dropping a field from search. An empty array disables free-text search. Explicit `searchFields` filters keep the full lens whitelist.
+
 **Advanced search** — bracket notation per field:
 ```
 GET /api/v1/organizations?searchFields[name]=acme&searchFields[slug]=corp

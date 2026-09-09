@@ -195,3 +195,25 @@ describe('cursorPaginate — filter binding', () => {
     ).rejects.toThrow('Pagination cursor does not match the requested filter');
   });
 });
+
+describe('paginate — searchPaths', () => {
+  const lens: LensNarrowing = {
+    parent: lensFor('User'),
+    root: { picks: ['name', 'email'], relations: { tokens: { picks: ['name'] } } },
+  };
+
+  it('narrows the global search fan-out to the route-authored subset', async () => {
+    const captured: Captured = {};
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), { searchPaths: ['name'] });
+
+    expect(JSON.stringify(captured.findManyArgs?.where)).toContain('"OR":[{"name":{"contains":"acme"');
+    expect(JSON.stringify(captured.findManyArgs?.where)).not.toContain('tokens');
+  });
+
+  it('does not leak searchPaths into the Prisma findMany args', async () => {
+    const captured: Captured = {};
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), { searchPaths: ['name'] });
+
+    expect(captured.findManyArgs).not.toHaveProperty('searchPaths');
+  });
+});
