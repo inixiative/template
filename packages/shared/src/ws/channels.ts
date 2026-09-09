@@ -4,7 +4,7 @@
  * @partOf primitive:shared, primitive:websockets
  * @uses none
  */
-import { channelKey } from './channelKey';
+import { channelKey } from '@template/shared/ws/channelKey';
 
 // Live queries, keyed by operationId and named by channelKey(queryKey). Authorization is the
 // route itself — the subscribe handler probes the operation with the connection's credential.
