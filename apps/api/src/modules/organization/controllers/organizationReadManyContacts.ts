@@ -13,7 +13,7 @@ export const organizationReadManyContactsController = makeController(
   async (c, respond) => {
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.contact, {
-      where: { deletedAt: null, organizationId: getResource<'organization'>(c).id },
+      where: { organizationId: getResource<'organization'>(c).id },
     });
     return respond.ok(data, { pagination });
   },

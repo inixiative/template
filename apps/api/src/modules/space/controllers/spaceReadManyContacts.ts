@@ -11,7 +11,7 @@ import { spaceReadManyContactsRoute } from '#/modules/space/routes/spaceReadMany
 export const spaceReadManyContactsController = makeController(spaceReadManyContactsRoute, async (c, respond) => {
   const db = c.get('db');
   const { data, pagination } = await paginate(c, db.contact, {
-    where: { deletedAt: null, spaceId: getResource<'space'>(c).id },
+    where: { spaceId: getResource<'space'>(c).id },
   });
   return respond.ok(data, { pagination });
 });

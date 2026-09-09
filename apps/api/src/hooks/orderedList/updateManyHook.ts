@@ -16,7 +16,7 @@ export const registerOrderedListUpdateManyHook = () => {
   // update() per row — the update hook handles sibling shifts atomically.
   registerDbHook(
     'orderedList:updateMany:before',
-    '*',
+    Object.keys(orderedListRegistry),
     HookTiming.before,
     [DbAction.updateManyAndReturn],
     async (options) => {
@@ -41,7 +41,7 @@ export const registerOrderedListUpdateManyHook = () => {
   // across all touched scopes. Position writes are blocked by the BEFORE hook.
   registerDbHook(
     'orderedList:updateMany:after',
-    '*',
+    Object.keys(orderedListRegistry),
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async (options) => {

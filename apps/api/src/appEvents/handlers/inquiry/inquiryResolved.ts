@@ -23,11 +23,4 @@ const getLifecycleHandlers = (data: InquiryResolvedPayload) => {
 export const inquiryResolved = makeAppEvent<InquiryResolvedPayload>({
   email: (data) => getLifecycleHandlers(data)?.email?.(data) ?? null,
   websocket: (data) => inquiryHandlers[data.type]?.appEvents?.resolved?.websocket?.(data) ?? null,
-  observe: (data) => ({
-    inquiryId: data.id,
-    type: data.type,
-    resolution: data._resolution,
-    sourceOrganizationId: data.sourceOrganizationId,
-    targetUserId: data.targetUserId,
-  }),
 });

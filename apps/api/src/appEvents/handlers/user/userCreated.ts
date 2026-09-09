@@ -18,5 +18,4 @@ export const userCreated = makeAppEvent<UserCreatedPayload>({
       data: { userId: data.userId, isGuest: data.isGuest },
     },
   ],
-  observe: (data) => ({ userId: data.userId, isGuest: data.isGuest }),
 });

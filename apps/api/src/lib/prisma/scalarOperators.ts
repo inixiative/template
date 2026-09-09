@@ -20,6 +20,9 @@ const ENUM_OPS = ['equals', 'in', 'notIn', 'not'] as const;
 const OPERATORS_BY_TYPE: Record<string, readonly string[]> = {
   String: ['contains', 'startsWith', 'endsWith', 'equals', 'in', 'notIn', 'not'],
   Int: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  BigInt: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  Float: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  Decimal: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
   DateTime: ['equals', 'gt', 'gte', 'lt', 'lte', 'not'],
   Boolean: ['equals', 'not'],
   Json: [],

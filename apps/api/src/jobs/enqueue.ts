@@ -4,11 +4,10 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { claimLane, db, laneKey } from '@template/db';
+import { claimLane, db, laneKey, releaseLane } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
-import { uuidv7 } from 'uuidv7';
 import type { JobPayloads } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { isOverflowing, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
@@ -42,8 +41,16 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
   // happen for real, errors propagate, no queue infrastructure involved.
+  // Delayed jobs are the exception: they're scheduled for a future moment, so
+  // running them at enqueue time would execute wrong-time semantics — they
+  // return unrun, like the queue still holding them. To test one, call the
+  // handler directly.
   if (isTest) {
-    const jobId = id ?? uuidv7();
+    const jobId = id ?? Bun.randomUUIDv7();
+    if (jobOptions.delay !== undefined) {
+      log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
+      return { jobId, name: handlerName };
+    }
     const ctx: WorkerContext = {
       db,
       queue,
@@ -54,23 +61,43 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   }
 
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
-  const jobId = jobOptions.jobId ?? uuidv7();
+  const jobId = jobOptions.jobId ?? Bun.randomUUIDv7();
+
+  const lane = dedupeKey ? laneKey(handlerName, dedupeKey) : undefined;
 
   const overflowing = type === JobType.adhoc && !bypass && (await isOverflowing());
   if (shouldSpill(type, bypass, overflowing)) {
-    await spillToOutbox({
-      handlerName,
-      jobId,
-      dedupeKey: dedupeKey ?? null,
-      data: { type, id, payload, dedupeKey },
-      options: jobOptions,
-    });
+    // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while
+    // buffered, so an older in-flight run aborts now instead of finishing with stale data during the
+    // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
+    const previousHolder = lane ? await claimLane(lane, jobId, jobOptions.delay) : null;
+    try {
+      await spillToOutbox({
+        handlerName,
+        jobId,
+        dedupeKey: dedupeKey ?? null,
+        data: { type, id, payload, dedupeKey },
+        options: jobOptions,
+      });
+    } catch (err) {
+      if (lane) await releaseLane(lane, jobId, previousHolder).catch(() => {});
+      throw err;
+    }
     log.info(`Spilled job ${handlerName} to outbox (${jobId})`);
     return { jobId, name: handlerName, outboxed: true as const };
   }
 
-  if (dedupeKey) await claimLane(laneKey(handlerName, dedupeKey), jobId);
-  await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  // Claim the lane BEFORE adding so the job holds the baton the instant it starts. If the add then
+  // fails, no job exists to hold the baton — roll the claim back (fenced, so a concurrent claim isn't
+  // clobbered) rather than leaving the prior job superseded by a phantom that never ran. The claim's
+  // TTL stretches by the job's `delay` — the baton must survive until the job actually runs.
+  const previousHolder = lane ? await claimLane(lane, jobId, jobOptions.delay) : null;
+  try {
+    await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+  } catch (err) {
+    if (lane) await releaseLane(lane, jobId, previousHolder).catch(() => {});
+    throw err;
+  }
   if (type === JobType.adhoc) await tripIfFull();
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);

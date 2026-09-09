@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db';
+import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/render/errors';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';

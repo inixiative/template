@@ -11,7 +11,7 @@ import { searchablePaths } from '@template/db/lens';
 import { buildOrderBySchema } from '#/lib/routeTemplates/filters/buildOrderBySchema';
 import { buildSearchFieldsSchema } from '#/lib/routeTemplates/filters/buildSearchFieldsSchema';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
-import { paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
+import { cursorPaginateRequestSchema, paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
@@ -55,17 +55,25 @@ type ParamsType<T extends RouteArgs> = T['params'] extends ZodSchema
     : ZodAnyObject;
 
 type PaginateShape = (typeof paginateRequestSchema)['shape'];
+type CursorPaginateShape = (typeof cursorPaginateRequestSchema)['shape'];
 
 type MergedQuery<Q extends ZodSchema> =
   Q extends z.ZodObject<infer Shape> ? z.ZodObject<Shape & PaginateShape> : typeof paginateRequestSchema;
 
-type QueryType<T extends RouteArgs> = T['paginate'] extends true
+type MergedCursorQuery<Q extends ZodSchema> =
+  Q extends z.ZodObject<infer Shape> ? z.ZodObject<Shape & CursorPaginateShape> : typeof cursorPaginateRequestSchema;
+
+type QueryType<T extends RouteArgs> = T['paginate'] extends 'cursor'
   ? T['query'] extends ZodSchema
-    ? MergedQuery<T['query']>
-    : typeof paginateRequestSchema
-  : T['query'] extends ZodSchema
-    ? T['query']
-    : ZodAnyObject;
+    ? MergedCursorQuery<T['query']>
+    : typeof cursorPaginateRequestSchema
+  : T['paginate'] extends true
+    ? T['query'] extends ZodSchema
+      ? MergedQuery<T['query']>
+      : typeof paginateRequestSchema
+    : T['query'] extends ZodSchema
+      ? T['query']
+      : ZodAnyObject;
 
 type RequestWithBody<T extends RouteArgs> = {
   params: ParamsType<T>;
@@ -113,7 +121,8 @@ export const buildRequest = <const T extends RouteArgs>(
     querySchema = querySchema.merge(z.object({ lookup: z.string().optional() }));
   }
 
-  if (many && paginate) querySchema = querySchema.merge(paginateRequestSchema);
+  if (many && paginate)
+    querySchema = querySchema.merge(paginate === 'cursor' ? cursorPaginateRequestSchema : paginateRequestSchema);
 
   if (filterLens) {
     const orderBy = buildOrderBySchema(filterLens);

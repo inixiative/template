@@ -25,7 +25,7 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   sanitizeKeys?: readonly string[];
   skipId?: boolean;
   many?: boolean;
-  paginate?: boolean;
+  paginate?: boolean | 'cursor';
   admin?: boolean;
   internal?: boolean;
   filterLens?: LensNarrowing;

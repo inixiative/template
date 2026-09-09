@@ -18,5 +18,4 @@ export const userVerificationRequested = makeAppEvent<UserVerificationRequestedP
       data: { userId: data.userId, verificationUrl: data.verificationUrl },
     },
   ],
-  observe: (data) => ({ userId: data.userId }),
 });

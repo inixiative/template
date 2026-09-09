@@ -53,9 +53,12 @@ export const createLock = (opts: LockOptions): Lock => {
     stop = null;
   };
 
+  // Fenced delete in one Lua eval so the key can't expire and be re-acquired between a separate
+  // GET and DEL — an unfenced delete would then remove the new holder's lock (steal-and-cascade).
+  const FENCED_DELETE =
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
   const compareAndDelete = async () => {
-    const current = await redis.get(key);
-    if (current === processId) await redis.del(key);
+    await redis.eval(FENCED_DELETE, 1, key, processId);
   };
 
   const declareLost = async () => {
@@ -70,9 +73,16 @@ export const createLock = (opts: LockOptions): Lock => {
   const tick = async () => {
     const current = await redis.get(key).catch(() => null);
     if (current === processId) {
-      await redis.pexpire(key, ttlMs).catch(() => null);
-      missed = 0;
-      return;
+      // Clear `missed` only once the renewal actually lands — a failed pexpire counts as a missed
+      // beat, so persistent renewal failure still trips declareLost before the TTL silently lapses.
+      const renewed = await redis
+        .pexpire(key, ttlMs)
+        .then((r) => r === 1)
+        .catch(() => false);
+      if (renewed) {
+        missed = 0;
+        return;
+      }
     }
     missed += 1;
     if (missed > maxMissed) await declareLost();

@@ -29,6 +29,7 @@ Follow-up work after the first audit log PR lands. This ticket covers the change
 - [x] Split `contextOrganizationId` / `contextSpaceId` (org/space context) from `subjectOrganizationId` / `subjectSpaceId` (the record's own FK fields) — both sets present in schema
 - [ ] Remove cascade semantics from audit relations so audit rows can outlive deleted subjects
 - [ ] Review whether some audit references should be plain scalar IDs instead of relational FKs
+- [ ] **Non-PII apiToken actor snapshot** (bring-back from Zealot `#1510`/ZLT-3316, 2026-07-13). `auditActorContext` today carries only `actorTokenId` (an FK); when the token is later deleted the audit row loses all trace of what acted. Denormalize a non-PII token snapshot (name / label / non-secret attrs — never the secret) at stamp time alongside `actorTokenId`, so token-authenticated actions stay legible after the token is gone. Same durability rationale as the cascade-removal task above. Prune/retention is explicitly **out of scope** here (no prune job wanted).
 
 ### Audit Capture Semantics
 

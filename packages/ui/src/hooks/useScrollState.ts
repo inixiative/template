@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
+import { useDebouncedCallback } from '@template/ui/hooks/useDebounce';
 import * as React from 'react';
 
 const DEBOUNCE_MS = 150;
@@ -85,9 +86,21 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
     });
   }, [enabled, ready, getScrollElement, scrollRef]);
 
-  // Persist scroll position on scroll (debounced).
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Persist scroll position on scroll (debounced). Reads the position when the timer fires, not on
+  // the event, so the entry is where the scroll came to rest.
   const lastTopRef = React.useRef<number | null>(null);
+  const persistScrollTop = useDebouncedCallback((el: HTMLElement, isElement: boolean) => {
+    const scrollTop = isElement ? el.scrollTop : window.scrollY;
+    if (scrollTop === lastTopRef.current) return;
+    lastTopRef.current = scrollTop;
+    try {
+      const entry: ScrollStateEntry = { scrollTop };
+      const state = { ...window.history.state, [stateKey]: entry };
+      window.history.replaceState(state, '');
+    } catch {
+      // replaceState fails in SSR / sandboxed iframes / quota — accept partial state loss
+    }
+  }, DEBOUNCE_MS);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -96,34 +109,14 @@ export function useScrollState(options: UseScrollStateOptions): UseScrollStateRe
 
     const isElement = scrollRef?.current != null;
     const target = isElement ? el : window;
-
-    const onScroll = () => {
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        const scrollTop = isElement ? el.scrollTop : window.scrollY;
-        if (scrollTop === lastTopRef.current) return;
-        lastTopRef.current = scrollTop;
-        try {
-          const entry: ScrollStateEntry = { scrollTop };
-          const state = { ...window.history.state, [stateKey]: entry };
-          window.history.replaceState(state, '');
-        } catch {
-          // replaceState fails in SSR / sandboxed iframes / quota — accept partial state loss
-        }
-      }, DEBOUNCE_MS);
-    };
+    const onScroll = () => persistScrollTop(el, isElement);
 
     target.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      clearTimeout(timerRef.current);
+      persistScrollTop.cancel();
       target.removeEventListener('scroll', onScroll);
     };
-  }, [stateKey, getScrollElement, scrollRef, enabled]);
-
-  // Cleanup timer on unmount.
-  React.useEffect(() => {
-    return () => clearTimeout(timerRef.current);
-  }, []);
+  }, [getScrollElement, scrollRef, enabled, persistScrollTop]);
 
   return { hasSavedPosition };
 }

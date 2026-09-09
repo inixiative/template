@@ -8,6 +8,8 @@
     "paths": {
       "@template/sdk": ["./src/index.ts"],
       "@template/sdk/openapi.gen.json": ["./openapi.gen.json"],
+      "@template/sdk/lenses": ["./src/lenses/index.ts"],
+      "@template/sdk/lenses/*": ["./src/lenses/*"],
       "@template/sdk/*": ["./src/*"]
     }
   },

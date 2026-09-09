@@ -39,6 +39,7 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
       const target = (err.meta?.target as string[])?.join(', ') || 'unknown';
       return makeError({ status: 409, message: `Resource already exists: ${target}` }).getResponse();
     }
+    if (err.code === 'P2034') return makeError({ status: 409, message: 'Write conflict' }).getResponse();
     if (err.code === 'P2025') return makeError({ status: 404, message: 'Resource not found' }).getResponse();
   }
 

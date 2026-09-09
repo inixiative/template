@@ -27,6 +27,7 @@ model Space {
   spaceUsers           SpaceUser[]
   tokens               Token[]
   webhookSubscriptions WebhookSubscription[]
+  integrations         Integration[]
   contacts             Contact[]
   tagAttachments       TagAttachment[]
   tags                 Tag[]

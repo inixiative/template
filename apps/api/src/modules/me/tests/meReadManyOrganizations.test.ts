@@ -75,4 +75,28 @@ describe('GET /me/organizations', () => {
     expect(data.length).toBeGreaterThanOrEqual(2);
     expect(pagination!.total).toBeGreaterThanOrEqual(2);
   });
+
+  it('hides a soft-deleted organization (injected live scope — no hand-written deletedAt in the controller)', async () => {
+    const { entity: org } = await createOrganization({ name: 'Soft Deleted Org' });
+    await createOrganizationUser({ role: Role.member }, { user, organization: org });
+    await db.organization.update({ where: { id: org.id }, data: { deletedAt: new Date() } });
+
+    const response = await fetch(get('/api/v1/me/organizations'));
+    const { data } = await json<ReadManyOrgsResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.find((m) => m.id === org.id)).toBeUndefined();
+  });
+
+  it('hides a soft-deleted membership row from the relation include', async () => {
+    const { entity: org } = await createOrganization({ name: 'Stale Membership Org' });
+    const { entity: membership } = await createOrganizationUser({ role: Role.member }, { user, organization: org });
+    await db.organizationUser.update({ where: { id: membership.id }, data: { deletedAt: new Date() } });
+
+    const response = await fetch(get('/api/v1/me/organizations'));
+    const { data } = await json<ReadManyOrgsResponse>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.find((m) => m.id === org.id)).toBeUndefined();
+  });
 });

@@ -5,13 +5,10 @@
  * @uses infrastructure:prisma
  */
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { clearKey, DbAction, db, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import { clearKey, DbAction, db, HookTiming, isNoOpUpdate, NOOP_FIELDS, type Prisma, registerDbHook } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
-import { isNoOpUpdate } from '#/hooks/isNoOpUpdate';
-
-const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
+import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
 const isUpdateAction = (action: DbAction): boolean =>
   action === DbAction.update || action === DbAction.updateManyAndReturn;
@@ -37,18 +34,12 @@ export const registerClearCacheHook = () => {
     if (isManyAction(action)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
       const results = (result ?? []) as Record<string, unknown>[];
-      const previouses = (previous ?? []) as Record<string, unknown>[];
-
-      // Build a map of previous records by id for efficient lookup
-      const previousById = new Map<string, Record<string, unknown>>();
-      for (const prev of previouses) {
-        if (prev.id) previousById.set(prev.id as string, prev);
-      }
+      const previousById = buildPreviousById(previous);
 
       for (const resultData of results) {
         const previousData = previousById.get(resultData.id as string);
 
-        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData)) continue;
+        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS)) continue;
 
         collect(resultData);
         if (previousData) collect(previousData);
@@ -58,8 +49,7 @@ export const registerClearCacheHook = () => {
       const resultData = result as Record<string, unknown>;
       const previousData = previous as Record<string, unknown> | undefined;
 
-      // Skip cache clear if only tracking fields changed
-      if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData)) {
+      if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS)) {
         return;
       }
 

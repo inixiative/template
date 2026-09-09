@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import type { CommunicationKind } from '@template/db';
+import type { CommunicationKind } from '@template/db/generated/client/client';
 import {
   composeTemplate,
   EmailRenderError,
@@ -73,8 +73,9 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const mjml = interpolate(composed.mjml, vars, onError);
-    const subject = interpolate(composed.subject, vars, onError);
+    // `locale`: `{{system.now}}` formats a date into body copy, so it follows the template it renders into.
+    const mjml = interpolate(composed.mjml, vars, onError, { locale: scope.locale });
+    const subject = interpolate(composed.subject, vars, onError, { locale: scope.locale });
     const settled = {
       subject,
       mjml,

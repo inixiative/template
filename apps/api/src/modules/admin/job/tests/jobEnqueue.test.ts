@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { adminJobRouter } from '#/modules/admin/job';
 import type { JobEnqueueResponse } from '#/modules/admin/job/routes/jobEnqueue';

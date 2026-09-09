@@ -26,4 +26,10 @@ describe('lookupCascade', () => {
     const result = await lookupCascade(protoSlugs, defaultCtx);
     for (const slug of protoSlugs) expect(result[slug]).toBeUndefined();
   });
+
+  it('resolves a real component whose slug collides with a prototype key', async () => {
+    await createEmailComponent({ slug: 'constructor', ownerModel: 'default', locale: 'en' });
+    const result = await lookupCascade(['constructor'], defaultCtx);
+    expect(result['constructor']?.slug).toBe('constructor');
+  });
 });

@@ -23,7 +23,7 @@ export {
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { type DataFilters, useDataFilters } from './useDataFilters';
-export { useDebounce, useDebouncedCallback } from './useDebounce';
+export { type DebouncedCallback, useDebounce, useDebouncedCallback } from './useDebounce';
 export { type InfiniteDataResult, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
 export {
   type InfiniteDataPage,

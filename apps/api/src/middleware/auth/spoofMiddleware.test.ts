@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Token, User } from '@template/db';
+import type { Token, User } from '@template/db/generated/client/client';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';

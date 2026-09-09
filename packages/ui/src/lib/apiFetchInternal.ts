@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import { type Client, createClient } from '@template/sdk/client';
+import { type Client, createClient } from '@template/sdk/generated/client';
 import { getToken } from '@template/ui/lib/auth/token';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 

@@ -17,10 +17,10 @@ export const emitAppEvent = async <K extends keyof AppEventPayloads>(
   const actor = auditActorContext.getScope() ?? nullAuditActor;
 
   const event: AppEventPayload = {
+    id: Bun.randomUUIDv7(),
     name,
     actor,
     data: data as Record<string, unknown>,
-    timestamp: new Date().toISOString(),
   };
 
   const handler = appEventHandlers[name];

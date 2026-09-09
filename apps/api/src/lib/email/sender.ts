@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import type { SenderType } from '@template/db';
+import type { SenderType } from '@template/db/generated/client/client';
 
 export type { SenderType };
 

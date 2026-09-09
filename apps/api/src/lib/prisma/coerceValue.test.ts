@@ -33,6 +33,35 @@ describe('coerceValueForField', () => {
       expect(() => coerceValueForField(scalar('Int'), 'abc')).toThrow(/Cannot coerce/);
       expect(() => coerceValueForField(scalar('Int'), 'NaN')).toThrow(/Cannot coerce/);
     });
+
+    it('rejects non-integer floats (Prisma Int would error at query time)', () => {
+      expect(() => coerceValueForField(scalar('Int'), '3.5')).toThrow(/Cannot coerce/);
+      expect(() => coerceValueForField(scalar('Int'), 3.5)).toThrow(/Cannot coerce/);
+    });
+  });
+
+  describe('BigInt', () => {
+    it('coerces integer strings and numbers to bigint', () => {
+      expect(coerceValueForField(scalar('BigInt'), '42')).toBe(42n);
+      expect(coerceValueForField(scalar('BigInt'), 42)).toBe(42n);
+      expect(coerceValueForField(scalar('BigInt'), 9007199254740993n)).toBe(9007199254740993n);
+    });
+
+    it('throws on non-integer or non-numeric inputs', () => {
+      expect(() => coerceValueForField(scalar('BigInt'), '3.5')).toThrow(/Cannot coerce/);
+      expect(() => coerceValueForField(scalar('BigInt'), 'abc')).toThrow(/Cannot coerce/);
+    });
+  });
+
+  describe('Float', () => {
+    it('coerces numeric strings (integer or decimal) to numbers', () => {
+      expect(coerceValueForField(scalar('Float'), '3.5')).toBe(3.5);
+      expect(coerceValueForField(scalar('Float'), '42')).toBe(42);
+    });
+
+    it('throws on non-numeric inputs', () => {
+      expect(() => coerceValueForField(scalar('Float'), 'abc')).toThrow(/Cannot coerce/);
+    });
   });
 
   describe('Boolean', () => {

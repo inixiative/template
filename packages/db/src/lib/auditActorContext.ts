@@ -5,37 +5,53 @@
  * @uses none
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Integration } from '@template/db/generated/client/enums';
 
 export type AuditActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
   actorTokenId: string | null;
+  actorTokenName: string | null;
+  actorTokenKeyPrefix: string | null;
   actorJobName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
-  originIntegration: Integration | null;
+  integrationId: string | null;
+  platformSuperadmin: boolean;
+  bypassSoftDeleteScope: boolean;
 };
 
 export const nullAuditActor: AuditActor = {
   actorUserId: null,
   actorSpoofUserId: null,
   actorTokenId: null,
+  actorTokenName: null,
+  actorTokenKeyPrefix: null,
   actorJobName: null,
   ipAddress: null,
   userAgent: null,
   sourceInquiryId: null,
-  originIntegration: null,
+  integrationId: null,
+  platformSuperadmin: false,
+  bypassSoftDeleteScope: false,
 };
 
-const store = new AsyncLocalStorage<AuditActor>();
+export const auditActorStore = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
-  scope: <T>(actor: AuditActor, fn: () => T): T => store.run(actor, fn),
-  getScope: (): AuditActor | null => store.getStore() ?? null,
+  // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
+  scope: <T>(actor: AuditActor, fn: () => T | Promise<T>): Promise<T> =>
+    auditActorStore.run(actor, async () => await fn()),
+  getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,
   extend: (partial: Partial<AuditActor>): void => {
-    const current = store.getStore();
+    const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);
+  },
+  withSoftDeleteBypass: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+    const current = auditActorStore.getStore() ?? nullAuditActor;
+    return auditActorStore.run(
+      { ...current, bypassSoftDeleteScope: true },
+      async (): Promise<Awaited<T>> => await fn(),
+    );
   },
 };

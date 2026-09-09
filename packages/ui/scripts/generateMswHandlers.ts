@@ -84,7 +84,7 @@ export const handlers = [${handlerCases.join('')}
 };
 
 const main = async () => {
-  const sdkPath = path.join(process.cwd(), '../sdk/src/sdk.gen.ts');
+  const sdkPath = path.join(process.cwd(), '../sdk/src/generated/sdk.gen.ts');
 
   const sdkContent = fs.readFileSync(sdkPath, 'utf-8');
   const endpoints = extractEndpoints(sdkContent);

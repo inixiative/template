@@ -7,7 +7,9 @@
 import { type AccessorName, type Db, toModelName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';
 import type { MiddlewareHandler } from 'hono';
+import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import { resourceContextArgs } from '#/middleware/resources/resourceContextArgs';
 
 export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next) => {
@@ -31,9 +33,17 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   // Get accessor from route path (e.g., /api/v1/organization/:id → 'organization')
   const pathParts = c.req.path.split('/');
   const accessor = pathParts[3] as AccessorName | undefined;
-  if (!accessor || !toModelName(accessor)) return next();
+  const modelName = accessor ? toModelName(accessor) : undefined;
+  if (!accessor || !modelName) return next();
 
-  const resources = await findResources(db, accessor, lookup, id);
+  // Soft-deleted rows are invisible outside superadmin — enforced once here for
+  // every resource route instead of per-controller deletedAt checks. Revival
+  // flows go through create-path upserts on unique keys, never load-by-id.
+  const superadmin = isSuperadmin(c);
+  const base: Record<string, unknown> = { [lookup]: id };
+  const where = superadmin ? base : liveWhere(modelName, base);
+
+  const resources = await findResources(db, accessor, where, superadmin ? undefined : modelName);
 
   if (!resources.length) throw makeError({ status: 404, message: 'Resource not found' });
   if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found' });
@@ -44,12 +54,17 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   return next();
 };
 
-const findResources = async (db: Db, accessor: AccessorName, lookup: string, id: string) => {
+const findResources = async (db: Db, accessor: AccessorName, where: Record<string, unknown>, scopeModel?: string) => {
   const delegate = db[accessor] as { findMany: (...args: unknown[]) => Promise<unknown[]> } | undefined;
   if (!delegate?.findMany) return [];
 
-  return delegate.findMany({
-    where: { [lookup]: id },
-    ...resourceContextArgs[accessor],
-  });
+  const args = { ...resourceContextArgs[accessor] } as Record<string, unknown>;
+  if (scopeModel) {
+    for (const key of ['include', 'select'] as const) {
+      const tree = args[key];
+      if (tree && typeof tree === 'object') args[key] = liveIncludes(scopeModel, tree as Record<string, unknown>);
+    }
+  }
+
+  return delegate.findMany({ where, ...args });
 };

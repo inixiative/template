@@ -132,6 +132,26 @@ readRoute({ model: 'user', many: true, admin: true, responseSchema })
 
 ---
 
+## Lens Wheres
+
+A lens narrowing can declare a `where` in three places, and they assert three different things.
+
+**Root where** (`root.where`, plus any stacked `scopeNarrowing` layers) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
+
+**Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
+
+**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `redactLens` rides.
+
+`projectByPath` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
+
+### How pagination applies them
+
+- **Root clauses**: compiled in `buildWhereClause` and ANDed into the query unconditionally — superadmin included. Lens narrowing is authorization shape, not a visibility preference.
+- **Non-root clauses**: `lensWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
+- **Soft-delete live scope** rides the identical walk afterward as a separate concern with different authority: superadmin bypasses it, because it is visibility, not authorization.
+
+One line: **root where = who's in the list; relation where = what you see when you look sideways from a row; model where = the same, declared once per model instead of once per edge.**
+
 ## Controllers
 
 Use `makeController()` with responders:
@@ -514,7 +534,25 @@ GET /api/v1/orgs?searchFields[members][every][role]=admin
 GET /api/v1/items?searchFields[comments][none][flagged]=true
 ```
 
-**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`.
+**Clause groups via `AND` / `OR`** — every path sharing a prefix merges into one object, so a relation carries one group by default. Two filters on the SAME relation therefore need a combinator with indexed children, or the second silently merges into the first and changes its meaning:
+```
+# One group: ONE post must be both published AND pinned
+GET /api/v1/users?searchFields[posts][some][status]=published&searchFields[posts][some][pinned][:]=true
+
+# Two groups: one published post AND a (possibly different) pinned post
+GET /api/v1/users?searchFields[AND][0][posts][some][status]=published&searchFields[AND][1][posts][some][pinned][:]=true
+
+# Same two groups under OR: either will do
+GET /api/v1/users?searchFields[OR][0][posts][some][status]=published&searchFields[OR][1][posts][some][pinned][:]=true
+
+# Nested: verified, and either published or pinned
+GET /api/v1/users?searchFields[AND][0][verified][:]=true&searchFields[AND][1][OR][0][posts][some][status]=published&searchFields[AND][1][OR][1][posts][some][pinned][:]=true
+```
+Indices are required — repeated keys merge, so siblings need them to stay distinct. A combinator names no field, so it does not lengthen the field path a group's leaves resolve against, and the per-field whitelist still applies inside each group. It does count as a level against the max-10 nesting guard. Capped at 25 groups each: every group is its own relation subquery.
+
+The two combinators differ in one place. `AND` is associative with the enclosing `AND`, so its groups flatten into it. `OR` is not, so it stays one condition whose arms are each group's own leaves AND'd together. Nest them freely on the wire; the typed `searchFields` schema advertises only one level, because each advertised level multiplies the inlined shape across every read route's OpenAPI doc.
+
+**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`, plus the `AND` / `OR` combinators above.
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 

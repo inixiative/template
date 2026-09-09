@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import type { Organization, User } from '@template/db';
+import type { Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
 import { adminOrganizationRouter } from '#/modules/organization';
