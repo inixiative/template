@@ -216,6 +216,7 @@
       "devDependencies": {
         "@types/html-to-text": "^9.0.4",
         "@types/mjml": "^5.0.0",
+        "mjml-preset-core": "5.3.0",
       },
     },
     "packages/permissions": {
@@ -282,6 +283,7 @@
       "dependencies": {
         "@ariakit/react": "^0.4.22",
         "@iconify/react": "^6.0.2",
+        "@inixiative/rules-builder": "0.27.0",
         "@tanstack/react-router": "^1.166.2",
         "@template/db": "workspace:*",
         "@template/permissions": "workspace:*",
@@ -634,6 +636,8 @@
     "@inixiative/permissions": ["@inixiative/permissions@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^2.10.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-owHklfNmaBfkW0mUQITlaHeLj01rkOU72Xu1xCO1QvqQnhzaJzvaKiOSk29lHUONv67dvKFFPs33WNW8a4h0aw=="],
 
     "@inixiative/prisma-map": ["@inixiative/prisma-map@0.2.0", "", {}, "sha512-8zXkKog5zQ4Chu/oJLzbDjY66FvPaf7f0ttuo4WBjtnXblnKdDkXvoqx0XDYlXvWllTCLxE0g9G/39N450PzYA=="],
+
+    "@inixiative/rules-builder": ["@inixiative/rules-builder@0.27.0", "", { "peerDependencies": { "@inixiative/json-rules": "^2.21.0", "react": "^18.0.0 || ^19.0.0" } }, "sha512-ljEwiMuxooZKnCwAFw2Milb7cHPMYR+QAQTNAuZdxWwEAwiRrOBqaXjQ4H454eYs6ZdmIWcKk98Hzu/+qcwQkg=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 

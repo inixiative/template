@@ -41,8 +41,8 @@
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
+    "@inixiative/rules-builder": "0.27.0",
     "@tanstack/react-router": "^1.166.2",
-    "consola": "^3.4.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
     "@template/sdk": "workspace:*",
@@ -50,6 +50,7 @@
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "consola": "^3.4.2",
     "lodash-es": "^4.18.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
