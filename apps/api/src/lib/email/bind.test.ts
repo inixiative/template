@@ -65,3 +65,25 @@ describe('pickSender', () => {
     );
   });
 });
+
+describe('bindOptional', () => {
+  const where = {
+    all: [
+      { field: 'id', operator: 'equals', bind: 'targetUserId' },
+      { field: 'locale', operator: 'equals', bind: 'locale', bindOptional: true },
+    ],
+  } as const;
+
+  it('an optional name the row does not carry is not required and stays a token for the compiler', () => {
+    expect(bindWhere(where as never, { targetUserId: 'u-7' })).toEqual({
+      all: [
+        { field: 'id', operator: 'equals', value: 'u-7' },
+        { field: 'locale', operator: 'equals', bind: 'locale', bindOptional: true },
+      ],
+    });
+  });
+
+  it('a required name is still refused when absent, optional or not beside it', () => {
+    expect(() => bindWhere(where as never, { locale: 'en' })).toThrow('Email bind "targetUserId" was not supplied');
+  });
+});
