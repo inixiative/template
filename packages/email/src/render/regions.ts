@@ -4,15 +4,11 @@
  * @partOf feature:email
  * @uses none
  */
+
+import { ParseBlocksError } from '@template/email/errors/ParseBlocksError';
 import { serialize } from '@template/email/render/decompose';
-import {
-  type ComponentNode,
-  isOverrideSlot,
-  type Node,
-  ParseBlocksError,
-  parseBlocks,
-  type SlotNode,
-} from '@template/email/render/parseBlocks';
+import { type ComponentNode, isOverrideSlot, type Node, type SlotNode } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 
 export type ComponentRegion = {
   slug: string;

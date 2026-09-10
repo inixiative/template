@@ -5,8 +5,8 @@
  * @uses none
  */
 import { describe, expect, test } from 'bun:test';
+import { ParseBlocksError } from '@template/email/errors/ParseBlocksError';
 import { decompose } from '@template/email/render/decompose';
-import { ParseBlocksError } from '@template/email/render/parseBlocks';
 import {
   collapseComponentBodies,
   collectComponentRegions,

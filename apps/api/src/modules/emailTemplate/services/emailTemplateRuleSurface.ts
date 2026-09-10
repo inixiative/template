@@ -23,8 +23,8 @@ export type EmailTemplateRuleSurface = { source: Lens; sourceValues: SourceValue
 
 const entryData = (entry: EmailEntry): EmailProjectionInput['data'] =>
   entry.data
-    ? { kind: 'fields', fields: Object.fromEntries(Object.keys(entry.data).map((name) => [name, 'String'])) }
-    : { kind: 'model', model: rootLens(entry.entity.narrowing).model as ModelName };
+    ? { kind: 'fields', fields: Object.fromEntries(entry.data.map((name) => [name, 'String'])) }
+    : { kind: 'model', model: rootLens(entry.entity).model as ModelName };
 
 export const projectionForEntry = (entry: EmailEntry | undefined, slots: EmailSlotLenses): EmailProjectionInput => {
   const chosen = slots.data?.model;
