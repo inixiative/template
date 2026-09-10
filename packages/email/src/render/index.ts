@@ -23,7 +23,6 @@ export { type InterpolateOptions, interpolate, type Variables } from './interpol
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
 export { lookupCascade } from './lookupCascade';
 export { lookupComponent, lookupTemplate } from './lookupTemplate';
-export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
 export {
   type ComponentNode,
   collectSlugsFromNodes,
@@ -32,6 +31,7 @@ export {
   type SlotNode,
   type TextNode,
 } from './nodes';
+export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
 export { parseBlocks } from './parseBlocks';
 export { sanitizeSubject } from './sanitizeSubject';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';

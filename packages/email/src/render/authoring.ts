@@ -4,6 +4,8 @@
  * @partOf feature:email
  * @uses none
  */
+
+export { componentTagPattern, SLUG_PATTERN as COMPONENT_SLUG_PATTERN } from '@template/email/render/blockTags';
 export {
   EACH,
   type EachBlock,
@@ -21,24 +23,14 @@ export {
 export {
   type ComponentWrite,
   type DecomposeResult,
-  DivergentDuplicateSlugError,
   decompose,
   decomposeNodes,
   type ResolveCascade,
   serialize,
 } from '@template/email/render/decompose';
 export { canNestMjml, MJML_CHILD_TAGS } from '@template/email/render/mjmlNesting';
-export {
-  type ComponentNode,
-  componentTagPattern,
-  type Node,
-  ParseBlocksError,
-  type ParseBlocksErrorReason,
-  parseBlocks,
-  SLUG_PATTERN as COMPONENT_SLUG_PATTERN,
-  type SlotNode,
-  type TextNode,
-} from '@template/email/render/parseBlocks';
+export type { ComponentNode, Node, SlotNode, TextNode } from '@template/email/render/nodes';
+export { parseBlocks } from '@template/email/render/parseBlocks';
 export {
   type ComponentRegion,
   collapseComponentBodies,
