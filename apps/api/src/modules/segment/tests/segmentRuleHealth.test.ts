@@ -98,3 +98,52 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     );
   });
 });
+
+describe('segment rule health — edge upkeep', () => {
+  let space: Space;
+
+  beforeAll(async () => {
+    registerSoftDeleteScoper({ liveWhere, liveIncludes });
+    registerSegmentConditionsHook();
+    registerSegmentRuleReferencesHook();
+    registerRuleReferenceReferencedHook();
+    const { context } = await createOrganizationUser({ role: 'admin' });
+    space = (await createSpace({}, { organization: context.organization })).entity;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+    clearHookRegistry();
+    registerSoftDeleteScoper(null);
+  });
+
+  it('a narrowed update still resyncs the edges', async () => {
+    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: dependent } = await createSegment({ conditions: acmeRule }, { space });
+
+    await db.segment.update({
+      where: { id: dependent.id },
+      data: { conditions: membersOf(target.id) },
+      select: { id: true },
+    });
+    expect(await edgesOf(dependent.id)).toHaveLength(1);
+  });
+
+  it('a save that keeps a reference that has since died is allowed; a new dead reference is not', async () => {
+    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: dependent } = await createSegment({ conditions: membersOf(target.id) }, { space });
+    await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
+
+    const renamed = await db.segment.update({
+      where: { id: dependent.id },
+      data: { name: 'renamed', conditions: membersOf(target.id) },
+    });
+    expect(renamed.name).toBe('renamed');
+
+    const { entity: other } = await createSegment({ conditions: acmeRule }, { space });
+    await db.segment.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
+    await expect(
+      db.segment.update({ where: { id: dependent.id }, data: { conditions: membersOf(other.id) } }),
+    ).rejects.toThrow('does not own');
+  });
+});

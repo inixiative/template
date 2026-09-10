@@ -62,5 +62,8 @@ export const syncRuleReferenceEdges = async (
 
   if (toDelete.length) await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
   if (toCreate.length)
-    await db.ruleReference.createManyAndReturn({ data: toCreate as Prisma.RuleReferenceCreateManyInput[] });
+    await db.ruleReference.createManyAndReturn({
+      data: toCreate as Prisma.RuleReferenceCreateManyInput[],
+      skipDuplicates: true,
+    });
 };

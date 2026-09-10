@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { applyLens, check } from '@inixiative/json-rules';
-import { type Db, db as defaultDb } from '@template/db';
+import { type Db, db as defaultDb, type RuleReferenceRow } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
@@ -15,7 +15,7 @@ import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/serv
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
 import { buildReferenceMap, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
-import { segmentRuleEdges, segmentRuleHealth } from '#/modules/segment/services/segmentRuleHealth';
+import { segmentRuleHealth } from '#/modules/segment/services/segmentRuleHealth';
 
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
@@ -53,10 +53,15 @@ export const reconcileCustomerRef = async (
   const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId], db);
   const lens = resolvedSegmentLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
+  const edges = (await db.ruleReference.findMany({
+    where: { segmentId: { in: ordered.map((segment) => segment.id) } },
+  })) as (RuleReferenceRow & { segmentId: string })[];
+  const edgesBySegment = new Map<string, RuleReferenceRow[]>();
+  for (const edge of edges) edgesBySegment.set(edge.segmentId, [...(edgesBySegment.get(edge.segmentId) ?? []), edge]);
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
-    const matches = withRule(segmentRuleHealth(segment, await segmentRuleEdges(segment.id, db)), {
+    const matches = withRule(segmentRuleHealth(segment, edgesBySegment.get(segment.id) ?? []), {
       degraded: () => null,
       sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
     });

@@ -17,16 +17,20 @@ const ownerOf = (row: SegmentRow, previous?: SegmentRow) => {
   const ownerModel = (row.ownerModel ?? previous?.ownerModel) as Segment['ownerModel'] | undefined;
   if (!ownerModel) throw makeError({ status: 422, message: 'ownerModel is required to validate conditions' });
   const ownerFk = segmentOwnerFk(ownerModel);
-  return { ownerModel, ownerFk, ownerId: (row[ownerFk] ?? previous?.[ownerFk]) as string | undefined };
+  const ownerId = (row[ownerFk] ?? previous?.[ownerFk]) as string | undefined;
+  if (!ownerId) throw makeError({ status: 422, message: `${ownerFk} is required to validate conditions` });
+  return { ownerModel, ownerFk, ownerId };
 };
 
 const assertReferencesResolve = async (row: SegmentRow, previous?: Segment): Promise<void> => {
   const { ownerModel, ownerFk, ownerId } = ownerOf(row, previous);
-  const ids = segmentReferences(row.conditions as never, segmentLensFor(ownerModel));
+  const lens = segmentLensFor(ownerModel);
+  const ids = segmentReferences(row.conditions as never, lens);
   if (!ids.length) return;
   const owned = await db.segment.findMany({ where: { ownerModel, [ownerFk]: ownerId, deletedAt: null } });
   const found = new Set(owned.map((segment) => segment.id));
-  const missing = ids.filter((id) => !found.has(id));
+  const held = new Set(previous ? segmentReferences(previous.conditions as never, lens) : []);
+  const missing = ids.filter((id) => !found.has(id) && !held.has(id));
   if (missing.length) {
     throw makeError({
       status: 422,

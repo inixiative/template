@@ -11,6 +11,6 @@ import { segmentDeleteRoute } from '#/modules/segment/routes/segmentDelete';
 export const segmentDeleteController = makeController(segmentDeleteRoute, async (c, respond) => {
   const db = c.get('db');
   const segment = getResource<'segment'>(c);
-  await db.segment.delete({ where: { id: segment.id } });
+  await db.segment.update({ where: { id: segment.id }, data: { deletedAt: new Date() } });
   return respond.noContent();
 });
