@@ -74,7 +74,10 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const [entity] = await fetchLens(db, entityLens);
   if (!entity) return;
 
-  if (!emailRegistry.names().length) throw new Error(`No email adapter registered — cannot send "${template}"`);
+  if (!emailRegistry.names().length) {
+    log.warn(`No email adapter registered — skipping (template=${template})`);
+    return;
+  }
 
   const entityRow = entity as Record<string, unknown>;
   const dataVars = entry.data ? pick(data, entry.data) : (prune(entity, entityLens) as Record<string, unknown>);
