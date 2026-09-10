@@ -204,6 +204,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           EmailTemplate: ['emailTemplateId'],
           EmailComponent: ['emailComponentId'],
+          Segment: ['segmentId'],
         },
       },
       {
@@ -212,6 +213,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           Tag: ['tagId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+          Segment: ['referencedSegmentId'],
         },
       },
     ],

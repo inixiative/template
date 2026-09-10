@@ -7,6 +7,7 @@
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
+import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 import { spaceCreateSegmentRoute } from '#/modules/space/routes/spaceCreateSegment';
 
 export const spaceCreateSegmentController = makeController(spaceCreateSegmentRoute, async (c, respond) => {
@@ -22,5 +23,5 @@ export const spaceCreateSegmentController = makeController(spaceCreateSegmentRou
     } as Prisma.SegmentUncheckedCreateInput,
   });
 
-  return respond.created(segment);
+  return respond.created(await withSegmentRuleIssues(segment, db));
 });

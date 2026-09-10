@@ -32,8 +32,7 @@ const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boolean =>
   if (!previous) return true;
   return (
     !isEqual(previous.conditions, segment.conditions) ||
-    (segment.type === SegmentType.dynamic && previous.type !== segment.type) ||
-    (!!previous.reconcilePausedAt && !segment.reconcilePausedAt)
+    (segment.type === SegmentType.dynamic && previous.type !== segment.type)
   );
 };
 

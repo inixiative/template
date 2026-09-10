@@ -4,16 +4,18 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { applyLens, type Condition, check } from '@inixiative/json-rules';
+import { applyLens, check } from '@inixiative/json-rules';
 import { type Db, db as defaultDb } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
+import { withRule } from '@template/shared/rules';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
 import { customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
 import { buildReferenceMap, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
+import { segmentRuleEdges, segmentRuleHealth } from '#/modules/segment/services/segmentRuleHealth';
 
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
@@ -54,7 +56,11 @@ export const reconcileCustomerRef = async (
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
-    const matches = row ? check(applyLens(segment.conditions as Condition, lens), row) === true : false;
+    const matches = withRule(segmentRuleHealth(segment, await segmentRuleEdges(segment.id, db)), {
+      degraded: () => null,
+      sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
+    });
+    if (matches === null) continue;
     if (row) recordDecision(row, segment, matches);
     const diff = await applyMembershipDiff(
       { segmentId: segment.id, matching: matches ? [customerRefId] : [], within: [customerRefId] },

@@ -13,11 +13,10 @@
 // segment is recomputed continuously as the rows its rule reads are written.
 // A hand-picked audience is a static segment whose rule is `id in [...]`.
 //
-// The reconcile-pause triple freezes a segment whose rule cannot produce a
-// correct answer (a reference loop, a rule naming a segment that is gone, a
-// rule reading the referenced segment from a bind, or an evaluation error).
-// A paused segment is skipped by the sweep and treated as static by everyone
-// that references it.
+// Nothing about a rule's health is stored here. The segments a rule names are
+// RuleReference edges (segmentId → referencedSegmentId); a rule whose named
+// segment is gone is degraded, read off those edges at evaluation and on the
+// owner's read, and a degraded rule does nothing new until its author fixes it.
 
 model Segment {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -44,12 +43,10 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
-  reconcilePausedAt     DateTime?
-  reconcilePausedReason SegmentReconcilePauseReason?
-  reconcilePausedDetail String?
-
-  members   SegmentMember[]
-  auditLogs AuditLog[]
+  members           SegmentMember[]
+  auditLogs         AuditLog[]
+  ruleReferences    RuleReference[] @relation("RuleReferenceOwnerSegment")
+  referencedByRules RuleReference[] @relation("RuleReferenceReferencedSegment")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -69,9 +66,3 @@ enum SegmentType {
   dynamic
 }
 
-enum SegmentReconcilePauseReason {
-  cycle
-  danglingReference
-  dynamicReference
-  evaluationError
-}

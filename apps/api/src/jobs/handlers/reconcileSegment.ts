@@ -5,23 +5,20 @@
  * @uses feature:segment, primitive:appEvents
  */
 import { db } from '@template/db';
+import { log } from '@template/shared/logger';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { SegmentRuleEvaluationError } from '#/modules/segment/services/evaluateSegment';
+import { SegmentRuleDegradedError } from '#/modules/segment/services/evaluateSegment';
 import { publishMembershipChange } from '#/modules/segment/services/publishMembershipChange';
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import { isReconcilable, reconcileSegment as reconcile } from '#/modules/segment/services/reconcileSegment';
-import { clearEvaluationPause, pauseForEvaluationError } from '#/modules/segment/services/segmentReconcilePause';
 import { buildReferenceMap, referencedBy } from '#/modules/segment/services/segmentReferenceGraph';
 
 export type ReconcileSegmentPayload = {
   segmentId: string;
   referencePath?: string[];
 };
-
-const isFinalAttempt = (job: { attemptsMade?: number; opts?: { attempts?: number } }): boolean =>
-  (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
 
 export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
   async (ctx, payload) => {
@@ -33,12 +30,10 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     try {
       diff = await reconcile(segment, db, ctx.signal);
     } catch (error) {
-      if (!(error instanceof SegmentRuleEvaluationError)) throw error;
-      if (!isFinalAttempt(ctx.job)) throw error;
-      await pauseForEvaluationError(segmentId, error, db);
+      if (!(error instanceof SegmentRuleDegradedError)) throw error;
+      log.warn(`reconcileSegment: ${error.message}`);
       return;
     }
-    await clearEvaluationPause(segmentId, db);
 
     if (!diff.added.length && !diff.removed.length) return;
     await publishMembershipChange(segment, diff, db);

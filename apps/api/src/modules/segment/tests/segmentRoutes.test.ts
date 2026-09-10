@@ -125,9 +125,10 @@ describe('segment routes', () => {
 
   it('the space lists the segments it owns', async () => {
     const response = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
-    const { data } = await json<Segment[]>(response);
+    const { data } = await json<(Segment & { ruleIssues: unknown[] })[]>(response);
     expect(response.status).toBe(200);
     expect(data.map((each) => each.id)).toContain(segment.id);
+    expect(data.find((each) => each.id === segment.id)!.ruleIssues).toEqual([]);
   });
 
   it('the customer sees the segment they belong to and cannot read the owner view', async () => {
@@ -136,7 +137,7 @@ describe('segment routes', () => {
     expect(mine.status).toBe(200);
     expect(data.map((member) => member.segment.id)).toEqual([segment.id]);
     expect(data[0]!.segment).not.toHaveProperty('conditions');
-    expect(data[0]!.segment).not.toHaveProperty('reconcilePausedDetail');
+    expect(data[0]!.segment).not.toHaveProperty('ruleIssues');
 
     const denied = await customerFetch(get(`/api/v1/segment/${segment.id}`));
     expect(denied.status).toBe(403);

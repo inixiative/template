@@ -7,6 +7,7 @@
 import type { Prisma } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateSegmentRoute } from '#/modules/me/routes/meCreateSegment';
+import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export const meCreateSegmentController = makeController(meCreateSegmentRoute, async (c, respond) => {
   const user = c.get('user')!;
@@ -21,5 +22,5 @@ export const meCreateSegmentController = makeController(meCreateSegmentRoute, as
     } as Prisma.SegmentUncheckedCreateInput,
   });
 
-  return respond.created(segment);
+  return respond.created(await withSegmentRuleIssues(segment, db));
 });

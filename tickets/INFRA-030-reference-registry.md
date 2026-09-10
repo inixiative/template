@@ -71,7 +71,12 @@ the model, and every FK column duplicating a relation to a referenceable model i
 (`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
 block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
 a `RuleReference` FK column + a registry entry (source and omits derive); adding a rule-bearing
-column = a `syncRuleReferences` call from its save path.
+column = a `syncRuleReferenceEdges(owner, references)` call from its save path — the edge writer
+lives in `packages/db` (`utils/syncRuleReferenceEdges.ts`, with `lockedLiveReferences` and
+`RuleReferenceError` beside it); email's `syncRuleReferences(owner, contents, lens)` is the
+content-level wrapper that adds the vocabulary gate and extraction. Segment (FEAT-021) is the
+second owner and the fourth referenced model: `segmentId` / `referencedSegmentId`, edges written
+by the `segmentRuleReferences` after-write hook.
 
 ### No owner-side hook
 
@@ -159,6 +164,9 @@ naming the target and a restore clears them, a purge nulls the FK and leaves the
 row, the client refuses a hard delete, the registry refuses a contradicting FK.
 `packages/shared/src/rules/withRule.test.ts` (8): sound, reference issue, no live set, no
 references, missing binding, supplied binding (null included), lens drift, every issue reported.
+`apps/api/src/modules/segment/tests/segmentRuleHealth.test.ts` (4): a segment's edge written and
+set-diffed, sound rule, a gone segment degrades evaluation and the read says why until restore, a
+membership loop refused at save.
 `packages/email/src/rules/ruleReferences.test.ts` (7) and the reference-liveness cases in
 `evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
 fails closed, an omitted set fails closed too (nothing was confirmed). The renderer tests use
@@ -271,8 +279,9 @@ degraded" — which is the same question asked transitively over the segment gra
 
 Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
 `referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
-Transitive degradation (nothing in the template references a rule-bearing row from a rule yet;
-Zealot's segments do, and it is the `withRule` question asked over the segment graph). Tenancy of a reference (a
+Transitive degradation (segments now reference a rule-bearing row from a rule — a segment whose
+named segment is live but itself degraded evaluates over its last good members; it is the
+`withRule` question asked over the segment graph, tracked on FEAT-021). Tenancy of a reference (a
 Space-owned template naming another org's tag) — the lens narrowing's `where` scope owns that
 (INFRA-017 / INFRA-018).
 

@@ -100,13 +100,7 @@ export const validateSegmentConditions = (
   const openArm = emptyArmInsideAny(conditions);
   if (openArm) return invalid([openArm]);
 
-  const references = segmentReferences(conditions, lens);
-  if (references.dynamic) {
-    return invalid([
-      'a membership rule must name the segment it references; reading it from a path or bind is refused',
-    ]);
-  }
-  if (options.selfId && references.ids.includes(options.selfId)) {
+  if (options.selfId && segmentReferences(conditions, lens).includes(options.selfId)) {
     return invalid(['a segment cannot reference its own membership']);
   }
 

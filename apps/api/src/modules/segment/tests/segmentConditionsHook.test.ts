@@ -75,7 +75,7 @@ describe('segmentConditions hook', () => {
     ).rejects.toThrow('reference its own membership');
   });
 
-  it('refuses a membership rule that reads the segment from a path', async () => {
+  it('refuses a rule that reads its value from a path: the set rail cannot compile a column-to-column compare', async () => {
     await expect(
       createSegment(
         {
@@ -87,7 +87,7 @@ describe('segmentConditions hook', () => {
         },
         { space },
       ),
-    ).rejects.toThrow('must name the segment');
+    ).rejects.toThrow('Invalid segment conditions');
   });
 
   it('refuses a rule naming a segment that does not exist or belongs to another owner', async () => {

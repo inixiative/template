@@ -18,8 +18,10 @@ export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
       map.set(segment.id, new Set());
       continue;
     }
-    const { ids } = segmentReferences(segment.conditions as Condition, segmentLensFor(segment.ownerModel));
-    map.set(segment.id, new Set(ids));
+    map.set(
+      segment.id,
+      new Set(segmentReferences(segment.conditions as Condition, segmentLensFor(segment.ownerModel))),
+    );
   }
   return map;
 };

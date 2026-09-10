@@ -13,6 +13,7 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
+import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
@@ -37,6 +38,7 @@ export const registerHooks = () => {
   registerSegmentConditionsHook();
   registerSegmentMemberOwnerHook();
   registerSegmentReconcileHook();
+  registerSegmentRuleReferencesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailInvariantHook();

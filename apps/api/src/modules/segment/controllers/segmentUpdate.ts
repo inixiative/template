@@ -8,6 +8,7 @@ import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
+import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
@@ -19,5 +20,5 @@ export const segmentUpdateController = makeController(segmentUpdateRoute, async 
     data: body as Prisma.SegmentUncheckedUpdateInput,
   });
 
-  return respond.ok(updated);
+  return respond.ok(await withSegmentRuleIssues(updated, db));
 });

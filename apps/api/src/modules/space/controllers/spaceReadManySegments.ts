@@ -7,6 +7,7 @@
 import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
+import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 import { spaceReadManySegmentsRoute } from '#/modules/space/routes/spaceReadManySegments';
 
 export const spaceReadManySegmentsController = makeController(spaceReadManySegmentsRoute, async (c, respond) => {
@@ -17,5 +18,5 @@ export const spaceReadManySegmentsController = makeController(spaceReadManySegme
     where: { ownerModel: 'Space', spaceId: space.id },
   });
 
-  return respond.ok(data, { pagination });
+  return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });
 });

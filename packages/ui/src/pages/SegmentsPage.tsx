@@ -38,12 +38,12 @@ const ownedColumns = [
   },
   { key: 'type', label: 'Type', render: (segment: OwnedSegment) => <span className="capitalize">{segment.type}</span> },
   {
-    key: 'reconcilePausedReason',
+    key: 'ruleIssues',
     label: 'Status',
     render: (segment: OwnedSegment) =>
-      segment.reconcilePausedReason ? (
-        <span className="text-destructive" title={segment.reconcilePausedDetail ?? undefined}>
-          Paused: {segment.reconcilePausedReason}
+      segment.ruleIssues.length ? (
+        <span className="text-destructive" title={segment.ruleIssues.map((issue) => issue.detail).join('\n')}>
+          Degraded: {segment.ruleIssues.map((issue) => issue.kind).join(', ')}
         </span>
       ) : (
         <span className="text-muted-foreground">Active</span>

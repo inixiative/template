@@ -4,6 +4,7 @@ import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
 import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
+import { buildReferenceMap, findReferenceCycle } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 import { validateSegmentConditions } from '#/modules/segment/services/validateSegmentConditions';
 
@@ -19,14 +20,12 @@ const ownerOf = (row: SegmentRow, previous?: SegmentRow) => {
   return { ownerModel, ownerFk, ownerId: (row[ownerFk] ?? previous?.[ownerFk]) as string | undefined };
 };
 
-const assertReferencesResolve = async (row: SegmentRow, previous?: SegmentRow): Promise<void> => {
+const assertReferencesResolve = async (row: SegmentRow, previous?: Segment): Promise<void> => {
   const { ownerModel, ownerFk, ownerId } = ownerOf(row, previous);
-  const { ids } = segmentReferences(row.conditions as never, segmentLensFor(ownerModel));
+  const ids = segmentReferences(row.conditions as never, segmentLensFor(ownerModel));
   if (!ids.length) return;
-  const live = await db.segment.findMany({
-    where: { id: { in: ids }, ownerModel, [ownerFk]: ownerId, deletedAt: null },
-  });
-  const found = new Set(live.map((segment) => segment.id));
+  const owned = await db.segment.findMany({ where: { ownerModel, [ownerFk]: ownerId, deletedAt: null } });
+  const found = new Set(owned.map((segment) => segment.id));
   const missing = ids.filter((id) => !found.has(id));
   if (missing.length) {
     throw makeError({
@@ -34,14 +33,26 @@ const assertReferencesResolve = async (row: SegmentRow, previous?: SegmentRow): 
       message: `Invalid segment conditions: references a segment this ${ownerModel} does not own: ${missing.join(', ')}`,
     });
   }
+  if (previous) assertNoReferenceCycle({ ...previous, conditions: row.conditions as Segment['conditions'] }, owned);
 };
 
-const processSegmentRow = async (row: SegmentRow, previous?: SegmentRow): Promise<void> => {
+const assertNoReferenceCycle = (candidate: Segment, owned: Segment[]): void => {
+  const others = owned.filter((segment) => segment.id !== candidate.id);
+  const cycle = findReferenceCycle(buildReferenceMap([candidate, ...others]), candidate.id);
+  if (cycle) {
+    throw makeError({
+      status: 422,
+      message: `Invalid segment conditions: membership references form a loop: ${cycle.join(' -> ')}`,
+    });
+  }
+};
+
+const processSegmentRow = async (row: SegmentRow, previous?: Segment): Promise<void> => {
   if (row.conditions === undefined && previous) return;
   if (isCleared(row.conditions)) throw makeError({ status: 422, message: 'a segment requires conditions' });
 
   const { ownerModel } = ownerOf(row, previous);
-  const result = validateSegmentConditions(row.conditions, ownerModel, { selfId: previous?.id as string | undefined });
+  const result = validateSegmentConditions(row.conditions, ownerModel, { selfId: previous?.id });
   if (!result.valid)
     throw makeError({ status: 422, message: `Invalid segment conditions: ${result.errors.join('; ')}` });
   row.conditions = result.normalized as Prisma.InputJsonValue;
@@ -50,7 +61,7 @@ const processSegmentRow = async (row: SegmentRow, previous?: SegmentRow): Promis
 
 const rowsOf = (data: unknown): SegmentRow[] => (data === undefined ? [] : (castArray(data) as SegmentRow[]));
 
-const loadPrevious = (where: unknown): Promise<SegmentRow[]> =>
+const loadPrevious = (where: unknown): Promise<Segment[]> =>
   db.segment.findMany({ where: where as Prisma.SegmentWhereInput });
 
 export const registerSegmentConditionsHook = () => {

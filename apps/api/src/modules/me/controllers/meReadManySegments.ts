@@ -7,6 +7,7 @@
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManySegmentsRoute } from '#/modules/me/routes/meReadManySegments';
+import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export const meReadManySegmentsController = makeController(meReadManySegmentsRoute, async (c, respond) => {
   const db = c.get('db');
@@ -16,5 +17,5 @@ export const meReadManySegmentsController = makeController(meReadManySegmentsRou
     where: { ownerModel: 'User', userId: user.id },
   });
 
-  return respond.ok(data, { pagination });
+  return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });
 });

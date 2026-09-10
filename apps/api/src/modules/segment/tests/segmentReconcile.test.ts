@@ -6,7 +6,6 @@ import {
   CommunicationKind,
   ContactType,
   ProviderModel,
-  SegmentReconcilePauseReason,
   SegmentType,
   SenderType,
 } from '@template/db/generated/client/enums';
@@ -25,6 +24,7 @@ import {
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
+import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
 
@@ -56,6 +56,7 @@ describe('segment reconcile', () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
     registerSegmentReconcileHook();
+    registerSegmentRuleReferencesHook();
 
     const { context } = await createOrganizationUser({ role: 'admin' });
     organization = context.organization;
@@ -277,26 +278,6 @@ describe('segment reconcile', () => {
 
     await db.user.update({ where: { id: newcomer.id }, data: { email: `chain-${getNextSeq()}@example.test` } });
     expect(await memberIds(derived.id)).toEqual([acmeRef.id]);
-  });
-
-  it('an evaluation-error pause is retried and cleared by the next reconcile', async () => {
-    const { entity: segment } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
-    await db.segment.update({
-      where: { id: segment.id },
-      data: {
-        reconcilePausedAt: new Date(),
-        reconcilePausedReason: SegmentReconcilePauseReason.evaluationError,
-        reconcilePausedDetail: 'boom',
-      },
-    });
-    const updated = await db.segment.update({
-      where: { id: segment.id },
-      data: { conditions: { field: 'customerUser.email', operator: Operator.equals, value: other.email } },
-    });
-    expect(updated.reconcilePausedReason).toBe(SegmentReconcilePauseReason.evaluationError);
-    expect(await memberIds(segment.id)).toEqual([otherRef.id]);
-    const after = await db.segment.findUnique({ where: { id: segment.id } });
-    expect(after!.reconcilePausedAt).toBeNull();
   });
 
   it('flipping to static keeps the members and stops reacting; flipping back catches up', async () => {

@@ -8,6 +8,7 @@ import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateSegmentRoute } from '#/modules/organization/routes/organizationCreateSegment';
+import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export const organizationCreateSegmentController = makeController(
   organizationCreateSegmentRoute,
@@ -24,6 +25,6 @@ export const organizationCreateSegmentController = makeController(
       } as Prisma.SegmentUncheckedCreateInput,
     });
 
-    return respond.created(segment);
+    return respond.created(await withSegmentRuleIssues(segment, db));
   },
 );
