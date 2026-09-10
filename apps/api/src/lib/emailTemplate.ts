@@ -76,8 +76,9 @@ export const settleTemplate = async (
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
     // `locale`: `{{system.now}}` formats a date into body copy, so it follows the template it renders into.
-    const mjml = interpolate(composed.mjml, vars, onError, { locale: scope.locale });
-    const subject = interpolate(composed.subject, vars, onError, { locale: scope.locale });
+    const liveRefs = composed.liveRuleRefs;
+    const mjml = interpolate(composed.mjml, vars, onError, { locale: scope.locale, liveRefs });
+    const subject = interpolate(composed.subject, vars, onError, { locale: scope.locale, liveRefs });
     const settled = {
       subject,
       mjml,

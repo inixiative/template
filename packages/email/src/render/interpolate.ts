@@ -13,6 +13,7 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
+  liveRefs?: ReadonlySet<string>;
 };
 
 const SYSTEM_TOKEN_PATTERN = /\{\{system\.([a-zA-Z0-9_-]+)\}\}/g;
@@ -47,4 +48,10 @@ export const interpolate = (
   variables: Variables,
   onError?: RuleErrorSink,
   options: InterpolateOptions = {},
-): string => settle(resolveSystemTokens(template, options), toScope(variables), { substitute: true }, onError);
+): string =>
+  settle(
+    resolveSystemTokens(template, options),
+    toScope(variables),
+    { substitute: true, liveRefs: options.liveRefs },
+    onError,
+  );

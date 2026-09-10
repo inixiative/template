@@ -8,4 +8,4 @@ export type RuleErrorSink = (message: string) => void;
 
 export type Scope = Record<string, unknown>;
 
-export type SettleOptions = { substitute: boolean; eachDepth?: number };
+export type SettleOptions = { substitute: boolean; eachDepth?: number; liveRefs?: ReadonlySet<string> };

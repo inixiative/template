@@ -46,6 +46,7 @@ model EmailTemplate {
   user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs         AuditLog[]
   communicationLogs CommunicationLog[]
+  ruleReferences    RuleReference[]
 
   // Per-owner uniqueness — partial uniques per ownerModel branch (see
   // EmailComponent / Contact for rationale).

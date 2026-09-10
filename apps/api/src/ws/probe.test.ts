@@ -1,8 +1,8 @@
 // canSubscribe/resolveIdentity dry-run the REAL app: real session auth, real spoof middleware,
 // real permissions. Route auth IS channel auth, end to end.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db/generated/client/client';
 import { db } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';

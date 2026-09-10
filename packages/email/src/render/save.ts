@@ -14,7 +14,9 @@ import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
+import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
+import { emailRuleNarrowing, syncRuleReferences } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -89,6 +91,15 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
 
       const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
       const template = await saveTemplate(finalTemplate, ctx);
+
+      for (const component of components) {
+        await syncRuleReferences({ model: 'EmailComponent', id: component.id }, [component.mjml], emailRuleNarrowing);
+      }
+      await syncRuleReferences(
+        { model: 'EmailTemplate', id: template.id },
+        [template.subject ?? '', stripComponentBodies(template.mjml)],
+        emailRuleNarrowing,
+      );
 
       if (template.kind && template.kind !== 'system') {
         const composed = await expand(template.mjml, ctx);

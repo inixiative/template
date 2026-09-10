@@ -65,6 +65,8 @@
       "!**/*.generated.ts",
       "!**/generated",
       "!tmp",
+      "!.worktrees",
+      "!docs/**/*.html",
       "!packages/shared/styles/theme.css",
       "!scripts/ci/rule-violations"
     ]
