@@ -13,9 +13,6 @@ import { assertNoDuplicateExposedSlots } from '@template/email/validations/asser
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 
-// A fragment can legitimately belong to any of these MJML contexts; the first wrapping that validates
-// is proof it's well-formed somewhere, so a header, an mj-attributes block, or an mj-social element
-// each pass in their own right.
 const componentValidationDocuments = (mjml: string): string[] => [
   `<mjml><mj-body>${mjml}</mj-body></mjml>`,
   `<mjml><mj-head>${mjml}</mj-head><mj-body></mj-body></mjml>`,
@@ -74,8 +71,6 @@ export const saveComponents = async (inputs: EmailComponent[], ctx: OwnerScope):
 };
 
 const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<EmailComponent> => {
-  // Validate at the unit boundary — a component can be saved on a path that didn't run the
-  // template-level check.
   await validateComponentMjml(input.mjml);
   assertNoDuplicateExposedSlots(parseBlocks(input.mjml), input.slug);
   assertValidConditions(input.mjml);

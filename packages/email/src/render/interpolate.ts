@@ -4,16 +4,12 @@
  * @partOf feature:email
  * @uses none
  */
+import type { ScopeRoot } from '@template/email/render/conditionParser';
 import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
 import type { SystemTokenName } from '@template/email/render/systemTokens';
 import { escape as escapeHtml } from 'lodash-es';
 
-export type Variables = {
-  sender?: Record<string, unknown>;
-  recipient?: Record<string, unknown>;
-  data?: Record<string, unknown>;
-  system?: Record<string, unknown>;
-};
+export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
@@ -44,12 +40,7 @@ const resolveSystemTokens = (template: string, options: InterpolateOptions): str
   );
 };
 
-export const toScope = (variables: Variables): Scope => ({
-  sender: variables.sender,
-  recipient: variables.recipient,
-  data: variables.data,
-  system: variables.system,
-});
+export const toScope = (variables: Variables): Scope => ({ ...variables });
 
 export const interpolate = (
   template: string,

@@ -20,8 +20,6 @@ export type ComposeTemplateResult = {
   onError: EmailErrorPolicy; // render-error policy for the resolved template
 };
 
-// The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
-// user (SpaceUser→OrganizationUser→User→default) and org (Space→Organization→default); admin/default have no parent.
 export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
   switch (owner) {
     case 'SpaceUser':

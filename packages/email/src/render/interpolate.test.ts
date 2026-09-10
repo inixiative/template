@@ -500,14 +500,11 @@ describe('interpolate — {{#each}} structural-error posture', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('an orphan {{/each}} at depth 0 stays inert but sinks — asymmetric with the silent {{/if}} orphan', () => {
-    const eachErrors: string[] = [];
-    expect(interpolate('hello {{/each}} world', {}, (m) => eachErrors.push(m))).toBe('hello {{/each}} world');
-    expect(eachErrors.length).toBeGreaterThan(0);
-
-    const ifErrors: string[] = [];
-    expect(interpolate('hello {{/if}} world', {}, (m) => ifErrors.push(m))).toBe('hello {{/if}} world');
-    expect(ifErrors).toEqual([]);
+  it('an orphan close at depth 0 stays inert and silent for {{/each}} and {{/if}} alike', () => {
+    const errors: string[] = [];
+    expect(interpolate('hello {{/each}} world', {}, (m) => errors.push(m))).toBe('hello {{/each}} world');
+    expect(interpolate('hello {{/if}} world', {}, (m) => errors.push(m))).toBe('hello {{/if}} world');
+    expect(errors).toEqual([]);
   });
 });
 

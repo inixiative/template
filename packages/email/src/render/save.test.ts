@@ -33,6 +33,27 @@ describe('saveEmailTemplate', () => {
     expect(result.components).toEqual([]);
   });
 
+  it('re-saving a soft-deleted slug creates a live row instead of updating the tombstone', async () => {
+    const input = {
+      slug: 'revived',
+      name: 'Revived',
+      subject: 'Hello',
+      kind: 'system' as const,
+      mjml: mjml('<mj-text>v1</mj-text>'),
+      ownerModel: 'default' as const,
+    };
+    const first = await saveEmailTemplate(input);
+    await db.emailTemplate.update({ where: { id: first.template.id }, data: { deletedAt: new Date() } });
+
+    const second = await saveEmailTemplate({ ...input, mjml: mjml('<mj-text>v2</mj-text>') });
+
+    expect(second.template.id).not.toBe(first.template.id);
+    expect(second.template.deletedAt).toBeNull();
+    const tombstone = await db.emailTemplate.findUnique({ where: { id: first.template.id } });
+    expect(tombstone?.deletedAt).not.toBeNull();
+    expect(tombstone?.mjml).toContain('v1');
+  });
+
   it('rejects a non-system template with no unsubscribe link', async () => {
     await expect(
       saveEmailTemplate({

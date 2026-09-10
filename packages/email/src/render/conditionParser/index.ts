@@ -16,6 +16,8 @@ export {
   isValidBindingIdentifier,
   RESERVED_BINDING_NAMES,
   RESERVED_SCOPE_ROOTS,
+  SCOPE_ROOTS,
+  type ScopeRoot,
   TOKEN_PATTERN,
 } from './grammar';
 export { isStructurallyBalanced } from './isStructurallyBalanced';
