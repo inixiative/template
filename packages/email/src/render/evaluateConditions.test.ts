@@ -296,3 +296,135 @@ describe('evaluateConditions — loop bindings are judged through the lens as ab
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 });
+
+const ENV_KEY = 'EMAIL_INLINE_RENDER_ERRORS';
+
+const withInlineErrors = <T>(value: string | undefined, fn: () => T): T => {
+  const previous = process.env[ENV_KEY];
+  if (value === undefined) delete process.env[ENV_KEY];
+  else process.env[ENV_KEY] = value;
+  try {
+    return fn();
+  } finally {
+    if (previous === undefined) delete process.env[ENV_KEY];
+    else process.env[ENV_KEY] = previous;
+  }
+};
+
+describe('evaluateConditions — check() throwing at evaluation time', () => {
+  const THROWING_RULE = '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A{{else}}B{{/if}}';
+
+  it('reports the thrown rule error via onError and skips the branch by default', () => {
+    const errors: string[] = [];
+    const output = evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }, (m) => errors.push(m));
+
+    expect(output).toBe('B');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('Unknown operator');
+  });
+
+  it('renders the offending branch inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
+    const output = withInlineErrors('true', () => evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }));
+
+    expect(output).toContain('RULE ERROR');
+    expect(output).toContain('Unknown operator');
+    expect(output).toContain('A');
+  });
+
+  it('skips the throwing branch and continues to a later else-if that matches', () => {
+    const template =
+      '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A' +
+      '{{else if rule={"field":"recipient.plan","operator":"equals","value":"pro"}}}C{{else}}B{{/if}}';
+
+    expect(evaluateConditions(template, { recipient: { plan: 'pro' } })).toBe('C');
+  });
+});
+
+describe('evaluateConditions — unterminated block', () => {
+  it('passes the remaining content through verbatim when the {{#if}} has no {{/if}}', () => {
+    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} })).toBe('before {{#if rule=true}}A');
+  });
+
+  it('renders content before an unterminated block and stops at it', () => {
+    const output = evaluateConditions('lead {{#if rule={"field":}}}tail', { recipient: {} });
+
+    expect(output).toContain('lead ');
+    expect(output).toContain('{{#if rule={"field":}}}tail');
+  });
+});
+
+describe('evaluateConditions — undefined variable stripping', () => {
+  it('drops undefined top-level variable groups from the rule data', () => {
+    const output = evaluateConditions(
+      '{{#if rule={"field":"recipient.name","operator":"isDefined","value":true}}}has{{else}}none{{/if}}',
+      { recipient: undefined, data: { x: 1 } },
+    );
+
+    expect(output).toBe('none');
+  });
+});
+
+describe('evaluateConditions — {{#each}} filter errors, the each-analog of the if-branch affordance', () => {
+  const THROWING_FILTER =
+    '{{#each data.items as=item filter={"field":"item.x","operator":"nope","value":1}}}{{item.n}}{{/each}}';
+
+  it('a throwing filter check() sinks once and excludes every element by default', () => {
+    const errors: string[] = [];
+    const output = evaluateConditions(THROWING_FILTER, { data: { items: [{ x: 1 }, { x: 1 }] } }, (m) =>
+      errors.push(m),
+    );
+
+    expect(output).toBe('');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('Unknown operator');
+  });
+
+  it('renders the each body inline (unchanged scope) when EMAIL_INLINE_RENDER_ERRORS is set', () => {
+    const output = withInlineErrors('true', () => evaluateConditions(THROWING_FILTER, { data: { items: [{ x: 1 }] } }));
+
+    expect(output).toContain('RULE ERROR');
+    expect(output).toContain('Unknown operator');
+  });
+
+  it('malformed filter= JSON sinks and renders empty by default', () => {
+    const errors: string[] = [];
+    const output = evaluateConditions(
+      '{{#each data.items as=item filter={bad json}}}X{{/each}}',
+      { data: { items: [1] } },
+      (m) => errors.push(m),
+    );
+
+    expect(output).toBe('');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('invalid filter JSON');
+  });
+
+  it('malformed filter= JSON renders inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
+    const output = withInlineErrors('true', () =>
+      evaluateConditions('{{#each data.items as=item filter={bad json}}}X{{/each}}', { data: { items: [1] } }),
+    );
+
+    expect(output).toContain('RULE ERROR');
+  });
+});
+
+describe('evaluateConditions — {{#each}} resolved structurally, never substituted', () => {
+  it('iterates and filters, but leaves binding + reserved-root tokens inside the body unsubstituted', () => {
+    expect(evaluateConditions('{{#each data.items as=item}}[{{item}}]{{/each}}', { data: { items: ['a', 'b'] } })).toBe(
+      '[{{item}}][{{item}}]',
+    );
+  });
+
+  it('filter= still excludes elements structurally', () => {
+    const result = evaluateConditions(
+      '{{#each data.items as=item filter={"field":"item.ok","operator":"equals","value":true}}}X{{/each}}',
+      { data: { items: [{ ok: false }, { ok: true }] } },
+    );
+
+    expect(result).toBe('X');
+  });
+
+  it('an empty array still renders empty with no structural change', () => {
+    expect(evaluateConditions('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } })).toBe('');
+  });
+});
