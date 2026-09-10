@@ -15,6 +15,7 @@ export {
   type ResolveCascade,
   serialize,
 } from './decompose';
+export { deriveTextFromHtml } from './deriveTextFromHtml';
 export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
 export { expand, expandWith, type LookupComponents } from './expand';
 export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
@@ -31,6 +32,7 @@ export {
   type TextNode,
 } from './nodes';
 export { parseBlocks } from './parseBlocks';
+export { sanitizeSubject } from './sanitizeSubject';
 export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
 export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from './systemTokens';
 export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
