@@ -69,28 +69,15 @@ describe('evaluateConditions — render-error reporting', () => {
 
   it('reports a malformed rule via onError and skips the branch (degrades) by default', () => {
     const errors: string[] = [];
-    const out = evaluateConditions(broken, {}, (m) => errors.push(m));
+    const out = evaluateConditions(broken, {}, (m) => errors.push(m.detail));
     expect(out).toBe('B');
     expect(errors).toHaveLength(1);
   });
 
   it('never calls onError when every rule is valid', () => {
     const errors: string[] = [];
-    evaluateConditions('{{#if rule=true}}X{{else}}Y{{/if}}', {}, (m) => errors.push(m));
+    evaluateConditions('{{#if rule=true}}X{{else}}Y{{/if}}', {}, (m) => errors.push(m.detail));
     expect(errors).toEqual([]);
-  });
-
-  it('emits the offending block inline only when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-    const prev = process.env.EMAIL_INLINE_RENDER_ERRORS;
-    process.env.EMAIL_INLINE_RENDER_ERRORS = 'true';
-    try {
-      const out = evaluateConditions(broken, {});
-      expect(out).toContain('RULE ERROR');
-      expect(out).toContain('A');
-    } finally {
-      if (prev === undefined) delete process.env.EMAIL_INLINE_RENDER_ERRORS;
-      else process.env.EMAIL_INLINE_RENDER_ERRORS = prev;
-    }
   });
 });
 
@@ -123,19 +110,21 @@ describe('evaluateConditions — reference liveness', () => {
 
   it('a branch whose rule names a row outside the live set is a rule error, never a match', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set(['Tag|tag-other']))).toBe('BASE');
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail), new Set(['Tag|tag-other']))).toBe(
+      'BASE',
+    );
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
   it('fails closed on an empty live set — absence is the answer, not an unchecked pass', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message), new Set())).toBe('BASE');
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail), new Set())).toBe('BASE');
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
   it('an omitted live set means nothing was confirmed, so a rule naming a row is degraded', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message))).toBe('BASE');
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail))).toBe('BASE');
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 });
@@ -151,10 +140,12 @@ describe('evaluateConditions — bindings and unterminated rules', () => {
     const tpl = `{{#if rule=${rule}}}X{{else}}Y{{/if}}`;
     expect(
       evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [{ tag: { id: 'u1' } }] } }, (m) =>
-        errors.push(m),
+        errors.push(m.detail),
       ),
     ).toBe('X');
-    expect(evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [] } }, (m) => errors.push(m))).toBe('Y');
+    expect(evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [] } }, (m) => errors.push(m.detail))).toBe(
+      'Y',
+    );
     expect(errors).toHaveLength(0);
   });
 
@@ -162,63 +153,31 @@ describe('evaluateConditions — bindings and unterminated rules', () => {
     const rule = JSON.stringify({ field: 'recipient.name', operator: 'equals', bind: 'name' });
     const errors: string[] = [];
     const out = evaluateConditions(`{{#if rule=${rule}}}X{{else}}Y{{/if}}`, { recipient: { name: 'Ada' } }, (m) =>
-      errors.push(m),
+      errors.push(m.detail),
     );
     expect(out).toBe('Y');
     expect(errors).toEqual(['rule requires a binding that was not supplied: name']);
   });
-
-  it('an unterminated block is suppressed and reported, never emitted raw', () => {
-    const rule = JSON.stringify({ field: 'data.tier', operator: 'equals', value: 'gold' });
-    const errors: string[] = [];
-    const out = evaluateConditions(`before {{#if rule=${rule}}}secret tail`, { data: { tier: 'gold' } }, (m) =>
-      errors.push(m),
-    );
-    expect(out).toBe('before ');
-    expect(errors).toEqual(['unterminated {{#if}} block — the marker and everything after it was suppressed']);
-  });
 });
-
-const ENV_KEY = 'EMAIL_INLINE_RENDER_ERRORS';
-
-const withInlineErrors = <T>(value: string | undefined, fn: () => T): T => {
-  const previous = process.env[ENV_KEY];
-  if (value === undefined) delete process.env[ENV_KEY];
-  else process.env[ENV_KEY] = value;
-  try {
-    return fn();
-  } finally {
-    if (previous === undefined) delete process.env[ENV_KEY];
-    else process.env[ENV_KEY] = previous;
-  }
-};
 
 describe('evaluateConditions — check() throwing at evaluation time', () => {
   const THROWING_RULE = '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A{{else}}B{{/if}}';
 
   it('reports the thrown rule error via onError and skips the branch by default', () => {
     const errors: string[] = [];
-    const output = evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }, (m) => errors.push(m));
+    const output = evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }, (m) => errors.push(m.detail));
 
     expect(output).toBe('B');
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Unknown operator');
-  });
-
-  it('renders the offending branch inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-    const output = withInlineErrors('true', () => evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }));
-
-    expect(output).toContain('RULE ERROR');
-    expect(output).toContain('Unknown operator');
-    expect(output).toContain('A');
+    expect(errors[0]).toContain('recipient.plan');
   });
 
   it('skips the throwing branch and continues to a later else-if that matches', () => {
     const template =
-      '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A' +
-      '{{else if rule={"field":"recipient.plan","operator":"equals","value":"pro"}}}C{{else}}B{{/if}}';
+      '{{#if rule={"field":"data.plan","operator":"nope","value":"pro"}}}A' +
+      '{{else if rule={"field":"data.plan","operator":"equals","value":"pro"}}}C{{else}}B{{/if}}';
 
-    expect(evaluateConditions(template, { recipient: { plan: 'pro' } })).toBe('C');
+    expect(evaluateConditions(template, { data: { plan: 'pro' } })).toBe('C');
   });
 });
 
@@ -253,7 +212,7 @@ describe('evaluateConditions — {{#each}} filter errors, the each-analog of the
   it('a throwing filter check() sinks once and excludes every element by default', () => {
     const errors: string[] = [];
     const output = evaluateConditions(THROWING_FILTER, { data: { items: [{ x: 1 }, { x: 1 }] } }, (m) =>
-      errors.push(m),
+      errors.push(m.detail),
     );
 
     expect(output).toBe('');
@@ -261,32 +220,17 @@ describe('evaluateConditions — {{#each}} filter errors, the each-analog of the
     expect(errors[0]).toContain('Unknown operator');
   });
 
-  it('renders the each body inline (unchanged scope) when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-    const output = withInlineErrors('true', () => evaluateConditions(THROWING_FILTER, { data: { items: [{ x: 1 }] } }));
-
-    expect(output).toContain('RULE ERROR');
-    expect(output).toContain('Unknown operator');
-  });
-
   it('malformed filter= JSON sinks and renders empty by default', () => {
     const errors: string[] = [];
     const output = evaluateConditions(
       '{{#each data.items as=item filter={bad json}}}X{{/each}}',
       { data: { items: [1] } },
-      (m) => errors.push(m),
+      (m) => errors.push(m.detail),
     );
 
     expect(output).toBe('');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('invalid filter JSON');
-  });
-
-  it('malformed filter= JSON renders inline when EMAIL_INLINE_RENDER_ERRORS is set', () => {
-    const output = withInlineErrors('true', () =>
-      evaluateConditions('{{#each data.items as=item filter={bad json}}}X{{/each}}', { data: { items: [1] } }),
-    );
-
-    expect(output).toContain('RULE ERROR');
   });
 });
 

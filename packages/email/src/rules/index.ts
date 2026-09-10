@@ -1,3 +1,4 @@
+export { absoluteRule } from './absoluteRule';
 export { collectConditionFieldPaths, collectHydrationPaths } from './collectHydrationPaths';
 export { collectJsonOpacityWarnings } from './collectJsonOpacityWarnings';
 export {

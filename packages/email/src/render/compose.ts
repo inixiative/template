@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { db, liveRuleReferenceKeys, type RuleReferenceRow } from '@template/db';
-import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
+import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
@@ -19,7 +19,6 @@ export type ComposeTemplateResult = {
   subject: string;
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel;
-  onError: EmailErrorPolicy;
   componentResolutions: Record<string, string>;
   liveRuleRefs: Set<string>;
 };
@@ -62,7 +61,6 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     subject: template.subject,
     kind: template.kind,
     ownerModel: template.ownerModel,
-    onError: template.onError,
     componentResolutions,
     liveRuleRefs,
   };

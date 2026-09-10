@@ -34,9 +34,7 @@ describe('composeTemplate', () => {
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
     expect(result.kind).toBe('system');
-    // Resolved owner + render-error policy drive the send-side fallback loop.
     expect(result.ownerModel).toBe('default');
-    expect(result.onError).toBe('fail');
   });
 
   it('composes template with single component', async () => {

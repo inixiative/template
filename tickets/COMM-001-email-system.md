@@ -27,14 +27,13 @@ inserting variables) plus delivery tracking, preferences, and admin UI.
 - `apps/api/src/jobs/handlers/sendEmail.ts` — wired end to end (resolveTargets →
   composeTemplate → interpolate → mjml2html → `client.sendBatch`); emails enqueue
   as BullMQ jobs via the app-event email bridge, not synchronously.
-- **Render-error policy** — per-template `onError` enum (`fail`/`degrade`/`fallback`,
-  default `fail`). A conditional rule that *throws* at render (not a non-match) is
-  surfaced via the evaluator's `onError` sink, always logged, then handled per
-  policy: `fail` → `EmailRenderError` → BullMQ retries → DLQ; `degrade` → send with
-  the throwing block dropped; `fallback` → re-compose one owner up (`parentOwner`:
-  Space → Org → default). Base owners always `fail`. Save-time validates conditionals
-  in both `mjml` and `subject`. Debug-only inline error comments gate on
-  `EMAIL_INLINE_RENDER_ERRORS` (decoupled from env, so testable).
+- **Render issues** (COMM-013 ruling, 2026-09-10) — save refuses everything the lens can
+  decide (rules and tokens, both `mjml` and `subject`, components judged through the
+  template that embeds them, a component save re-validates the same-owner templates that
+  embed it). Render records typed `RenderIssue`s and never ships a literal token. The
+  registry entry's `render: { onIssue, substitute }` decides: `fail` (default) →
+  `EmailRenderError` → BullMQ retries → DLQ; `degrade` → send, issues stored on
+  `CommunicationLog.renderIssues`; `substitute` → a named stable template renders instead.
 
 **Interpolation** today is three fixed roots `sender` / `recipient` / `data`
 (`VariablePrefix`, HTML-escaped). See `docs/claude/COMMUNICATIONS.md`.

@@ -4,6 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
+import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { IF, parseIfBlock } from '@template/email/render/conditionParser';
@@ -16,10 +17,12 @@ import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
+import { validateDependents } from '@template/email/render/validateDependents';
 import { emailRuleNarrowing, syncRuleReferences } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
+import { assertValidTokens } from '@template/email/validations/validateTokens';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
   mjml: string;
@@ -33,6 +36,13 @@ export type SaveTemplateInput = Partial<EmailTemplate> & {
 export type SaveTemplateResult = {
   template: EmailTemplate;
   components: EmailComponent[];
+};
+
+export type LensForSlug = (slug: string, locale: string) => Promise<Lens | LensNarrowing | undefined>;
+
+export type SaveTemplateOptions = {
+  lens?: Lens | LensNarrowing;
+  lensFor?: LensForSlug;
 };
 
 const withoutConditionals = (mjml: string): string => {
@@ -51,11 +61,14 @@ const withoutConditionals = (mjml: string): string => {
   return out;
 };
 
-export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
+export const saveEmailTemplate = async (
+  input: SaveTemplateInput,
+  options: SaveTemplateOptions = {},
+): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
   const nodes = parseBlocks(input.mjml);
-  assertValidConditions(input.mjml);
-  if (input.subject) assertValidConditions(input.subject, { isSubject: true });
+  assertValidConditions(input.mjml, { lens: options.lens });
+  if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens: options.lens });
 
   const ctx: OwnerScope = {
     ownerModel: input.ownerModel,
@@ -101,13 +114,21 @@ export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveT
         emailRuleNarrowing,
       );
 
+      const composed = await expand(template.mjml, ctx);
+      assertValidTokens(composed, { lens: options.lens });
+      if (template.subject) assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
+
       if (template.kind && template.kind !== 'system') {
-        const composed = await expand(template.mjml, ctx);
         if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {
           throw new Error(
             `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{system.unsubscribeUrl}}.`,
           );
         }
+      }
+
+      if (options.lensFor) {
+        for (const component of components)
+          await validateDependents(component.slug, template.slug, ctx, options.lensFor);
       }
 
       return { template, components };

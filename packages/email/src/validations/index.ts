@@ -4,3 +4,4 @@ export { assertNoStrayTagShapes } from './assertNoStrayTagShapes';
 export { assertValidConditions, type ValidateConditionsOptions, validateConditions } from './validateConditions';
 export { validateMjml } from './validateMjml';
 export { validateNoCycle } from './validateNoCycle';
+export { assertValidTokens, type ValidateTokensOptions, validateTokens } from './validateTokens';

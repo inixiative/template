@@ -4,7 +4,12 @@
  * @partOf feature:email
  * @uses none
  */
-export type EmailErrorType = 'component_missing' | 'template_missing' | 'circular_ref' | 'render_failed';
+export type EmailErrorType =
+  | 'component_missing'
+  | 'template_missing'
+  | 'circular_ref'
+  | 'render_failed'
+  | 'unsubscribe_unavailable';
 
 const message = (slug: string, type: EmailErrorType, path?: string[]): string => {
   switch (type) {
@@ -15,7 +20,9 @@ const message = (slug: string, type: EmailErrorType, path?: string[]): string =>
     case 'circular_ref':
       return path?.length ? `Circular reference detected: ${path.join(' → ')}` : `Circular reference detected: ${slug}`;
     case 'render_failed':
-      return `Template render failed (unrenderable conditional rule): ${slug}`;
+      return path?.length ? `Template render failed: ${slug} — ${path.join('; ')}` : `Template render failed: ${slug}`;
+    case 'unsubscribe_unavailable':
+      return `Template ${slug} is not a system email and the recipient has no contact to unsubscribe`;
   }
 };
 

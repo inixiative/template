@@ -37,10 +37,6 @@ model EmailTemplate {
   // For org-owned: should spaces inherit this template?
   inheritToSpaces Boolean @default(true)
 
-  // What to do when a conditional rule throws at render time (applies to tenant owners only;
-  // default/admin always fail). See EmailErrorPolicy.
-  onError EmailErrorPolicy @default(fail)
-
   organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   space             Space?             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -63,8 +59,3 @@ model EmailTemplate {
   @@index([componentRefs(ops: ArrayOps)], type: Gin)
 }
 
-enum EmailErrorPolicy {
-  fail // throw → job retries → DLQ (safest default)
-  degrade // drop the throwing block(s), send the rest
-  fallback // re-render at the next owner up: Space → Organization → default
-}

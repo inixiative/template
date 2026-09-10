@@ -28,7 +28,7 @@ export const settle = (content: string, scope: Scope, options: SettleOptions, on
     if (isEach) {
       const block = parseEachBlock(content, openIdx);
       if (!block) {
-        onError?.('unterminated {{#each}} block - missing {{/each}}');
+        onError?.({ kind: 'each', detail: 'unterminated {{#each}} block - missing {{/each}}' });
         result += settleText(content.slice(openIdx), scope, options, onError);
         return result;
       }

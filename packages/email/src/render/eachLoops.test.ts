@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
+import type { RuleErrorSink } from '@template/email/render/settle';
 
-const render = (template: string, data: Record<string, unknown>, onError?: (m: string) => void) =>
+const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
   interpolate(template, { data }, onError);
 
 describe('{{#each}} loops', () => {
@@ -60,35 +61,37 @@ describe('{{#each}} loops', () => {
 
   it('sinks and renders nothing when the path is not an array', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) => errors.push(m));
+    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) => errors.push(m.detail));
     expect(out).toBe('');
     expect(errors).toContain('{{#each data.missing}} did not resolve to an array');
   });
 
-  it('leaves a bare binding token visible (and sinks) when it resolves to an object', () => {
+  it('renders a bare binding token empty (and sinks) when it resolves to an object', () => {
     const errors: string[] = [];
     const out = render('{{#each data.items as=item}}{{item}}{{/each}}', { items: [{ name: 'A' }] }, (m) =>
-      errors.push(m),
+      errors.push(m.detail),
     );
-    expect(out).toBe('{{item}}');
+    expect(out).toBe('');
     expect(errors.some((m) => m.includes('non-primitive'))).toBe(true);
   });
 
   it('rejects an as= that collides with a reserved root', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items as=data}}x{{/each}}', { items: [{ name: 'A' }] }, (m) => errors.push(m));
+    const out = render('{{#each data.items as=data}}x{{/each}}', { items: [{ name: 'A' }] }, (m) =>
+      errors.push(m.detail),
+    );
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('collides'))).toBe(true);
   });
 
   it('rejects a missing as= attribute', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) => errors.push(m));
+    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) => errors.push(m.detail));
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('as='))).toBe(true);
   });
 
-  it('leaves loop-free binding-shaped text byte-identical', () => {
-    expect(render('hello {{unknown.thing}} world', {})).toBe('hello {{unknown.thing}} world');
+  it('renders an unknown root empty outside any loop, never the literal token', () => {
+    expect(render('hello {{unknown.thing}} world', {})).toBe('hello  world');
   });
 });

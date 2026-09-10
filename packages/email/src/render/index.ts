@@ -34,6 +34,13 @@ export {
 export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
 export { parseBlocks } from './parseBlocks';
 export { sanitizeSubject } from './sanitizeSubject';
-export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
+export {
+  type LensForSlug,
+  type SaveTemplateInput,
+  type SaveTemplateOptions,
+  type SaveTemplateResult,
+  saveEmailTemplate,
+} from './save';
+export type { RenderIssue, RenderIssueKind } from './settle';
 export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from './systemTokens';
 export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
