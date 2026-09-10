@@ -4,7 +4,6 @@
  * @partOf feature:segment
  * @uses feature:customer
  */
-import { z } from '@hono/zod-openapi';
 import { SegmentMemberScalarSchema, SegmentScalarInputSchema, SegmentScalarSchema } from '@template/db';
 import { customerRefAsProviderSchema } from '#/modules/customerRef/schemas/customerRefSchemas';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
@@ -33,10 +32,6 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();
 
 export const segmentReadResponseSchema = SegmentScalarSchema;
-
-export const segmentMemberCreateBodySchema = z.object({
-  customerRefId: z.string().uuid(),
-});
 
 export const segmentMemberWithCustomerSchema = SegmentMemberScalarSchema.extend({
   customerRef: customerRefAsProviderSchema,

@@ -5,14 +5,15 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { SegmentOwnerModel, SegmentType } from '@template/db/generated/client/enums';
+import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const segmentFactory = createFactory('Segment', {
   defaults: () => ({
     name: `${faker.word.adjective()}-${faker.string.alphanumeric(6).toLowerCase()}`,
-    ownerModel: SegmentOwnerModel.Space,
+    ownerModel: ProviderModel.Space,
     type: SegmentType.static,
+    conditions: { all: [] },
   }),
   dependencies: {
     user: {

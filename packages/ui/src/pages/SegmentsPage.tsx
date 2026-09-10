@@ -68,13 +68,6 @@ const membershipColumns = [
     render: (membership: Membership) => <span className="capitalize">{membership.segment.ownerModel}</span>,
   },
   {
-    key: 'source',
-    label: 'Added by',
-    render: (membership: Membership) => (
-      <span className="capitalize">{membership.source === 'rule' ? 'Rule' : 'Manual'}</span>
-    ),
-  },
-  {
     key: 'createdAt',
     label: 'Since',
     render: (membership: Membership) => (
@@ -105,7 +98,9 @@ export const SegmentsPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>Segments you own</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">Named sets of your customers, static or rule-driven</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Named sets of your customers, computed once or continuously
+          </p>
         </CardHeader>
         <CardContent>
           <Table

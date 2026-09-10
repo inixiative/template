@@ -4,13 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { SegmentMemberSource } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const segmentMemberFactory = createFactory('SegmentMember', {
-  defaults: () => ({
-    source: SegmentMemberSource.manual,
-  }),
+  defaults: () => ({}),
   dependencies: {
     segment: {
       modelName: 'Segment',

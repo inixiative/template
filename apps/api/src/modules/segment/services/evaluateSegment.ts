@@ -9,7 +9,7 @@ import { type Db, db as defaultDb, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { rootLens } from '@template/db/lens';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
-import { requireCustomerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 export class SegmentRuleEvaluationError extends Error {
   constructor(cause: unknown) {
@@ -33,7 +33,7 @@ const segmentWhere = async (segment: Segment, db: Db = defaultDb): Promise<Recor
     now: new Date(),
   });
   const where = await executePrismaQueryPlan(plan, db as never);
-  return { AND: [where, { [requireCustomerRefProviderFk(segment.ownerModel)]: ownerId }] };
+  return { AND: [where, { [customerRefProviderFk(segment.ownerModel)]: ownerId }] };
 };
 
 export const evaluateSegment = async (segment: Segment, db: Db = defaultDb): Promise<string[]> => {

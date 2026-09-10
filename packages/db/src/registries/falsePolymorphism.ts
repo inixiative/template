@@ -184,14 +184,16 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'providerModel',
         fkMap: {
+          User: ['providerUserId'],
+          Organization: ['providerOrganizationId'],
           Space: ['providerSpaceId'],
         },
       },
     ],
     allowedCombinations: {
-      User: ['Space'],
-      Organization: ['Space'],
-      Space: ['Space'],
+      User: ['User', 'Organization', 'Space'],
+      Organization: ['User', 'Organization', 'Space'],
+      Space: ['User', 'Organization', 'Space'],
     },
   },
 

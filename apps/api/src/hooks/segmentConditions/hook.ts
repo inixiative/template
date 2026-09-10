@@ -1,16 +1,16 @@
 import { DbAction, db, type HookOptions, HookTiming, Prisma, registerDbHook, type SingleAction } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
-import { SegmentType } from '@template/db/generated/client/enums';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
-import { SegmentOwnerError, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
+import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 import { validateSegmentConditions } from '#/modules/segment/services/validateSegmentConditions';
 
 type SegmentRow = Record<string, unknown>;
 
-const isCleared = (value: unknown): boolean => value === null || value === Prisma.DbNull || value === Prisma.JsonNull;
+const isCleared = (value: unknown): boolean =>
+  value === undefined || value === null || value === Prisma.DbNull || value === Prisma.JsonNull;
 
 const ownerOf = (row: SegmentRow, previous?: SegmentRow) => {
   const ownerModel = (row.ownerModel ?? previous?.ownerModel) as Segment['ownerModel'] | undefined;
@@ -37,32 +37,14 @@ const assertReferencesResolve = async (row: SegmentRow, previous?: SegmentRow): 
 };
 
 const processSegmentRow = async (row: SegmentRow, previous?: SegmentRow): Promise<void> => {
-  const type = (row.type ?? previous?.type ?? SegmentType.static) as SegmentType;
-  const conditionsTouched = row.conditions !== undefined;
-  const conditions = conditionsTouched ? row.conditions : previous?.conditions;
-  const cleared = conditions === undefined || isCleared(conditions);
-
-  if (type === SegmentType.static) {
-    if (conditionsTouched && !cleared)
-      throw makeError({ status: 422, message: 'a static segment carries no conditions' });
-    if (row.type === SegmentType.static || conditionsTouched) row.conditions = Prisma.DbNull;
-    return;
-  }
-
-  if (cleared) throw makeError({ status: 422, message: 'a dynamic segment requires conditions' });
-  if (!conditionsTouched && row.type === undefined) return;
+  if (row.conditions === undefined && previous) return;
+  if (isCleared(row.conditions)) throw makeError({ status: 422, message: 'a segment requires conditions' });
 
   const { ownerModel } = ownerOf(row, previous);
-
-  try {
-    const result = validateSegmentConditions(conditions, ownerModel, { selfId: previous?.id as string | undefined });
-    if (!result.valid)
-      throw makeError({ status: 422, message: `Invalid segment conditions: ${result.errors.join('; ')}` });
-    row.conditions = result.normalized as Prisma.InputJsonValue;
-  } catch (error) {
-    if (error instanceof SegmentOwnerError) throw makeError({ status: 422, message: error.message });
-    throw error;
-  }
+  const result = validateSegmentConditions(row.conditions, ownerModel, { selfId: previous?.id as string | undefined });
+  if (!result.valid)
+    throw makeError({ status: 422, message: `Invalid segment conditions: ${result.errors.join('; ')}` });
+  row.conditions = result.normalized as Prisma.InputJsonValue;
   await assertReferencesResolve(row, previous);
 };
 
@@ -91,7 +73,7 @@ export const registerSegmentConditionsHook = () => {
       const { args, previous } = options as HookOptions<Segment> & { previous?: Segment | Segment[] };
       const a = args as { where?: unknown; data?: unknown };
       const [row] = rowsOf(a.data);
-      if (!row) return;
+      if (!row || row.conditions === undefined) return;
       const befores = previous ? castArray(previous) : await loadPrevious(a.where);
       for (const before of befores) await processSegmentRow(row, before);
     },

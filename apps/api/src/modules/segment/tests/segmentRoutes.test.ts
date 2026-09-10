@@ -23,12 +23,14 @@ import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook'
 import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
 import { meRouter } from '#/modules/me';
 import { segmentRouter } from '#/modules/segment';
-import { segmentMemberRouter } from '#/modules/segmentMember';
 import { spaceRouter } from '#/modules/space';
+import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, get, json, post } from '#tests/utils/request';
+import { get, json, post } from '#tests/utils/request';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+
+type Membership = SegmentMember & { segment: Segment };
 
 describe('segment routes', () => {
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -77,8 +79,8 @@ describe('segment routes', () => {
       (app) => {
         app.route('/api/v1/space', spaceRouter);
         app.route('/api/v1/segment', segmentRouter);
-        app.route('/api/v1/segmentMember', segmentMemberRouter);
         app.route('/api/v1/me', meRouter);
+        app.route('/api/v1/user', userRouter);
       },
     ];
     const spaceUser = await db.spaceUser.create({
@@ -130,10 +132,9 @@ describe('segment routes', () => {
 
   it('the customer sees the segment they belong to and cannot read the owner view', async () => {
     const mine = await customerFetch(get('/api/v1/me/segmentMemberships'));
-    const { data } = await json<(SegmentMember & { segment: Segment })[]>(mine);
+    const { data } = await json<Membership[]>(mine);
     expect(mine.status).toBe(200);
     expect(data.map((member) => member.segment.id)).toEqual([segment.id]);
-    expect(data[0]!.source).toBe('rule');
     expect(data[0]!.segment).not.toHaveProperty('conditions');
     expect(data[0]!.segment).not.toHaveProperty('reconcilePausedDetail');
 
@@ -141,7 +142,21 @@ describe('segment routes', () => {
     expect(denied.status).toBe(403);
   });
 
-  it('a customer of another provider is refused as a manual member, a customer of this one is pinned', async () => {
+  it('the user context reads a user’s own segments and memberships and refuses everyone else', async () => {
+    const memberships = await customerFetch(get(`/api/v1/user/${customer.id}/segmentMemberships`));
+    expect(memberships.status).toBe(200);
+    const { data } = await json<Membership[]>(memberships);
+    expect(data.map((member) => member.segment.id)).toEqual([segment.id]);
+
+    const owned = await customerFetch(get(`/api/v1/user/${customer.id}/segments`));
+    expect(owned.status).toBe(200);
+    expect((await json<Segment[]>(owned)).data).toEqual([]);
+
+    const denied = await ownerFetch(get(`/api/v1/user/${customer.id}/segmentMemberships`));
+    expect(denied.status).toBe(403);
+  });
+
+  it('the owner hand-picks an audience as a static segment over ids, scoped to their own customers', async () => {
     const elsewhere = (await createSpace({}, { organization: org })).entity;
     const foreign = (
       await createCustomerRef({
@@ -151,37 +166,22 @@ describe('segment routes', () => {
         providerSpace: elsewhere,
       })
     ).entity;
-    const refused = await ownerFetch(
-      post(`/api/v1/segment/${segment.id}/segmentMembers`, { customerRefId: foreign.id }),
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/segments`, {
+        name: `picked-${getNextSeq()}`,
+        type: 'static',
+        conditions: { field: 'id', operator: Operator.in, value: [outsiderRef.id, foreign.id] },
+      }),
     );
-    expect(refused.status).toBe(422);
+    expect(response.status).toBe(201);
+    const picked = (await json<Segment>(response)).data;
 
-    const pinned = await ownerFetch(
-      post(`/api/v1/segment/${segment.id}/segmentMembers`, { customerRefId: outsiderRef.id }),
-    );
-    expect(pinned.status).toBe(201);
-    const member = (await json<SegmentMember>(pinned)).data;
-    expect(member.source).toBe('manual');
-
-    const ruleMember = await db.segmentMember.findFirst({
-      where: { segmentId: segment.id, customerRefId: customerRef.id },
-    });
-    const notAllowed = await ownerFetch(del(`/api/v1/segmentMember/${ruleMember!.id}`));
-    expect(notAllowed.status).toBe(422);
-
-    const unpinned = await ownerFetch(del(`/api/v1/segmentMember/${member.id}`));
-    expect(unpinned.status).toBe(204);
+    const members = await ownerFetch(get(`/api/v1/segment/${picked.id}/segmentMembers`));
+    const { data } = await json<SegmentMember[]>(members);
+    expect(data.map((member) => member.customerRefId)).toEqual([outsiderRef.id]);
   });
 
-  it('pinning a customer the rule already selected converts the row to manual', async () => {
-    const pinned = await ownerFetch(
-      post(`/api/v1/segment/${segment.id}/segmentMembers`, { customerRefId: customerRef.id }),
-    );
-    expect(pinned.status).toBe(201);
-    expect((await json<SegmentMember>(pinned)).data.source).toBe('manual');
-  });
-
-  it('rejects conditions outside the lens with a 422 on update', async () => {
+  it('rejects conditions outside the lens with a 422', async () => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments`, {
         name: `bad-${getNextSeq()}`,

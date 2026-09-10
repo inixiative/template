@@ -13,14 +13,9 @@ import {
   resolveLensBindings,
   ruleSourceValues,
 } from '@inixiative/json-rules';
-import { SegmentOwnerModel } from '@template/db/generated/client/enums';
+import { ProviderModel } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
-import {
-  communicationSenderFk,
-  customerRefProviderFk,
-  requireCustomerRefProviderFk,
-  segmentOwnerFk,
-} from '#/modules/segment/lib/segmentOwner';
+import { communicationSenderFk, customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 
 const SEGMENT_OWNER_BIND = 'ownerId';
 
@@ -57,7 +52,7 @@ const tagAttachments = (ownerFk: string): ModelNarrowing => ({
   },
 });
 
-const communicationsReceived = (ownerModel: SegmentOwnerModel): ModelNarrowing => ({
+const communicationsReceived = (ownerModel: ProviderModel): ModelNarrowing => ({
   picks: ['channel', 'kind', 'status', 'sentAt', 'createdAt'],
   where: {
     any: [
@@ -77,8 +72,8 @@ const customer = (
   relations: { contacts, tagAttachments: tagAttachments(ownerFk), ...relations },
 });
 
-export const segmentLensFor = (ownerModel: SegmentOwnerModel): LensNarrowing => {
-  const providerFk = requireCustomerRefProviderFk(ownerModel);
+export const segmentLensFor = (ownerModel: ProviderModel): LensNarrowing => {
+  const providerFk = customerRefProviderFk(ownerModel);
   const ownerFk = segmentOwnerFk(ownerModel);
 
   return {
@@ -104,7 +99,7 @@ export const segmentLensFor = (ownerModel: SegmentOwnerModel): LensNarrowing => 
         customerOrganization: customer(ownerFk, ['id', 'name', 'createdAt']),
         customerSpace: customer(ownerFk, ['id', 'name', 'createdAt']),
         segmentMembers: {
-          picks: ['source'],
+          picks: [],
           relations: {
             segment: { picks: ['id'], where: { all: [ownedBy(ownerFk), live] } },
           },
@@ -114,15 +109,12 @@ export const segmentLensFor = (ownerModel: SegmentOwnerModel): LensNarrowing => 
   };
 };
 
-export const resolvedSegmentLens = (ownerModel: SegmentOwnerModel, ownerId: string): LensNarrowing =>
+export const resolvedSegmentLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
   resolveLensBindings(segmentLensFor(ownerModel), { [SEGMENT_OWNER_BIND]: ownerId }) as LensNarrowing;
-
-const segmentOwnerModelsWithCustomers = (): SegmentOwnerModel[] =>
-  Object.values(SegmentOwnerModel).filter((ownerModel) => customerRefProviderFk(ownerModel) !== null);
 
 export const segmentReachedModels = (): Set<string> => {
   const models = new Set<string>();
-  for (const ownerModel of segmentOwnerModelsWithCustomers()) {
+  for (const ownerModel of Object.values(ProviderModel)) {
     for (const visit of projectByPath(segmentLensFor(ownerModel)).values()) models.add(visit.modelName);
   }
   return models;
@@ -134,7 +126,7 @@ const membershipProbe = {
   condition: { field: 'segment.id', operator: Operator.equals, value: '00000000-0000-7000-8000-000000000000' },
 } as Condition;
 
-for (const ownerModel of segmentOwnerModelsWithCustomers()) {
+for (const ownerModel of Object.values(ProviderModel)) {
   const reachesMembershipSource = ruleSourceValues(segmentLensFor(ownerModel), membershipProbe).some(
     (source) => source.model === 'Segment' && source.field === 'id' && !source.dynamic,
   );

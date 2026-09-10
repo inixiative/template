@@ -6,17 +6,17 @@
  */
 import { type LensNarrowing, Operator } from '@inixiative/json-rules';
 import { type Db, db as defaultDb } from '@template/db';
-import type { SegmentMemberSource, SegmentOwnerModel } from '@template/db/generated/client/enums';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
 
 export type HydratedCustomerRef = Record<string, unknown> & {
   id: string;
-  segmentMembers: { source: SegmentMemberSource; segment: (Record<string, unknown> & { id: string }) | null }[];
+  segmentMembers: { segment: (Record<string, unknown> & { id: string }) | null }[];
 };
 
 export const hydrateCustomerRefs = async (
-  ownerModel: SegmentOwnerModel,
+  ownerModel: ProviderModel,
   ownerId: string,
   customerRefIds: string[],
   db: Db = defaultDb,

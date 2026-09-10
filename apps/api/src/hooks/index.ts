@@ -11,7 +11,6 @@ import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentFreezeHook } from '#/hooks/segmentFreeze/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
@@ -36,7 +35,6 @@ export const registerHooks = () => {
   registerRuleReferenceReferencedHook();
   registerRulesHook();
   registerSegmentConditionsHook();
-  registerSegmentFreezeHook();
   registerSegmentMemberOwnerHook();
   registerSegmentReconcileHook();
   registerSoftDeleteCascadeHook();

@@ -756,7 +756,7 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `webhookSubscription.prisma` - Webhook configurations
 - `inquiry.prisma` - False polymorphic inquiry system
 - `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
-- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic User/Organization/Space) named set of its customer references; `static` (manual members) or `dynamic` (json-rules `conditions` over the segment lens, reconciled by jobs); members carry `source` rule|manual
+- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer references. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 
 **Communications:**

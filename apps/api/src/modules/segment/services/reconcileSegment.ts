@@ -14,7 +14,10 @@ const retryablePause = (segment: Segment): boolean =>
   !segment.reconcilePausedAt || segment.reconcilePausedReason === SegmentReconcilePauseReason.evaluationError;
 
 export const isReconcilable = (segment: Segment): boolean =>
-  !segment.deletedAt && segment.type === SegmentType.dynamic && !!segment.conditions && retryablePause(segment);
+  !segment.deletedAt && !!segment.conditions && retryablePause(segment);
+
+export const isContinuous = (segment: Segment): boolean =>
+  segment.type === SegmentType.dynamic && isReconcilable(segment);
 
 export const reconcileSegment = async (
   segment: Segment,

@@ -4,14 +4,14 @@
  * @partOf primitive:appEvents
  * @uses feature:segment, primitive:websockets
  */
-import type { SegmentOwnerModel } from '@template/db/generated/client/enums';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { WS_CHANNELS, type WSEvent } from '@template/shared/ws';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { WSHandoff } from '#/appEvents/types';
 
 export type SegmentMembershipChangedPayload = {
   segmentId: string;
-  ownerModel: SegmentOwnerModel;
+  ownerModel: ProviderModel;
   ownerId: string;
   added: string[];
   removed: string[];

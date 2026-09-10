@@ -11,7 +11,7 @@ import { groupBy } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { isReconcilable } from '#/modules/segment/services/reconcileSegment';
+import { isContinuous } from '#/modules/segment/services/reconcileSegment';
 import { applyPauseVerdicts } from '#/modules/segment/services/segmentReconcilePause';
 import { buildReferenceMap, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
 
@@ -22,7 +22,7 @@ export const sweepSegments = makeSingletonJob(async () => {
   let enqueued = 0;
   for (const owned of Object.values(byOwner)) {
     const verdicts = await applyPauseVerdicts(owned, db);
-    const runnable = verdicts.filter(isReconcilable);
+    const runnable = verdicts.filter(isContinuous);
     for (const segment of sortByDependency(runnable, buildReferenceMap(runnable))) {
       await enqueueJob('reconcileSegment', { segmentId: segment.id });
       enqueued += 1;

@@ -1,25 +1,23 @@
 // ============================================================================
 // SEGMENT - A named set of a provider's customer references
 // ============================================================================
-// Owner is false-polymorphic: User | Organization | Space (one FK populated to
-// match `ownerModel`, enforced by the falsePolymorphism hook + registry entry).
-// The owner is the PROVIDER whose customers are segmented: a member is a
-// CustomerRef whose provider is this owner, so the owner axis is coupled to
-// CustomerRef.providerModel. A branch of the owner axis with no provider
-// branch on CustomerRef (User and Organization today) can own a segment but
-// has no customer references to select from — it lights up when CustomerRef
-// gains that provider FK.
+// Owner is false-polymorphic over ProviderModel (User | Organization | Space,
+// one FK populated to match `ownerModel`, enforced by the falsePolymorphism
+// hook + registry entry). The owner is the PROVIDER whose customers are
+// segmented: a member is a CustomerRef whose provider is this owner, so the
+// owner enum IS CustomerRef.providerModel.
 //
-// `dynamic` segments carry `conditions`, a json-rules tree over the segment
-// lens rooted at CustomerRef, and their membership is recomputed by the
-// reconcile jobs. `static` segments carry no conditions and only manual
-// members. Both kinds accept manual members, which reconcile never evicts.
+// Every segment carries `conditions`, a json-rules tree over the segment lens
+// rooted at CustomerRef. `type` says when it is evaluated: a `static` segment
+// is computed once when it is created or its conditions change; a `dynamic`
+// segment is recomputed continuously as the rows its rule reads are written.
+// A hand-picked audience is a static segment whose rule is `id in [...]`.
 //
-// The reconcile-pause triple freezes a dynamic segment whose rule cannot
-// produce a correct answer (a reference loop, a rule naming a segment that is
-// gone, a rule reading the referenced segment from a bind, or an evaluation
-// error). A paused segment is skipped by the sweep and treated as static by
-// everyone that references it.
+// The reconcile-pause triple freezes a segment whose rule cannot produce a
+// correct answer (a reference loop, a rule naming a segment that is gone, a
+// rule reading the referenced segment from a bind, or an evaluation error).
+// A paused segment is skipped by the sweep and treated as static by everyone
+// that references it.
 
 model Segment {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
@@ -28,10 +26,10 @@ model Segment {
   deletedAt DateTime?
 
   // Owner — false polymorphism, exactly one FK matches the discriminator.
-  ownerModel     SegmentOwnerModel
-  userId         String?           @db.VarChar(36)
-  organizationId String?           @db.VarChar(36)
-  spaceId        String?           @db.VarChar(36)
+  ownerModel     ProviderModel
+  userId         String?       @db.VarChar(36)
+  organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -42,9 +40,8 @@ model Segment {
   type        SegmentType @default(static)
 
   // json-rules Condition over the segment lens (apps/api/src/modules/segment/lib/segmentLens.ts).
-  // Null for static segments. Validated, normalized and reference-checked by the
-  // segmentConditions hook on every write.
-  conditions       Json?
+  // Validated, normalized and reference-checked by the segmentConditions hook on every write.
+  conditions       Json
   conditionsPrompt String?
 
   reconcilePausedAt     DateTime?
@@ -65,12 +62,6 @@ model Segment {
   @@unique([spaceId, name], where: { spaceId: { not: null } })
   @@index([ownerModel])
   @@index([type])
-}
-
-enum SegmentOwnerModel {
-  User
-  Organization
-  Space
 }
 
 enum SegmentType {

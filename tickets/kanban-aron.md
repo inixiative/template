@@ -95,7 +95,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 ### 👀 Review
 - [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save hook + staleness re-resolve + render gate; email conditionals are the first surface; json-rules 2.20.0 `ruleSourceValues` does the extraction. Zealot #2116 reshapes to it
-- [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef: false-poly owner, static/dynamic + rule/manual members, lens-driven validation + set/entity reconcile jobs, DB-hook triggers, `segment.membershipChanged` app event, Segments page in all three contexts
+- [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef: owner = `ProviderModel` (grown to User/Organization/Space), every segment is a rule (static = computed at save, dynamic = continuous, hand-picked = `id in [...]`), lens-driven validation + set/entity reconcile jobs, DB-hook triggers, `segment.membershipChanged` app event, `/segments` + `/segmentMemberships` read-many on me/user/organization/space, Segments page in all three contexts
 
 ### ✅ Done
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)

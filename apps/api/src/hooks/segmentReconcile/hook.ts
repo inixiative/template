@@ -1,6 +1,6 @@
 import { DbAction, db, type HookOptions, HookTiming, isNoOpUpdate, NOOP_FIELDS, registerDbHook } from '@template/db';
-import type { Segment, SegmentMember } from '@template/db/generated/client/client';
-import { SegmentMemberSource, SegmentType } from '@template/db/generated/client/enums';
+import type { Segment } from '@template/db/generated/client/client';
+import { SegmentType } from '@template/db/generated/client/enums';
 import { ConcurrencyType } from '@template/shared/utils';
 import { castArray, isEqual } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -28,11 +28,11 @@ const changedRows = (options: HookOptions): Row[] => {
 };
 
 const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boolean => {
-  if (segment.deletedAt || segment.type !== SegmentType.dynamic || !segment.conditions) return false;
+  if (segment.deletedAt || !segment.conditions) return false;
   if (!previous) return true;
   return (
-    previous.type !== segment.type ||
     !isEqual(previous.conditions, segment.conditions) ||
+    (segment.type === SegmentType.dynamic && previous.type !== segment.type) ||
     (!!previous.reconcilePausedAt && !segment.reconcilePausedAt)
   );
 };
@@ -44,12 +44,6 @@ const enqueueSegments = (segments: Segment[], before: Map<string, Row>) =>
       await enqueueJob('reconcileSegment', { segmentId: segment.id });
     });
 
-const manualMemberRefs = (options: HookOptions): string[] => {
-  const rows = castArray(options.result ?? []) as SegmentMember[];
-  const manual = rows.filter((member) => member.source === SegmentMemberSource.manual);
-  return manual.map((member) => member.customerRefId);
-};
-
 export const registerSegmentReconcileHook = () => {
   registerDbHook('segmentReconcile', '*', HookTiming.after, ACTIONS, async (options) => {
     const { model } = options;
@@ -60,9 +54,7 @@ export const registerSegmentReconcileHook = () => {
 
     if (model === 'Segment') {
       callbacks = enqueueSegments(castArray(options.result ?? []) as Segment[], previousById(options.previous));
-    } else if (model === 'SegmentMember') {
-      customerRefIds = manualMemberRefs(options);
-    } else {
+    } else if (model !== 'SegmentMember') {
       const rows =
         options.action === DbAction.delete || options.action === DbAction.deleteMany
           ? (castArray(options.result ?? []) as Row[])

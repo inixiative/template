@@ -12,7 +12,7 @@ import {
   toPrisma,
   validateRule,
 } from '@inixiative/json-rules';
-import type { SegmentOwnerModel } from '@template/db/generated/client/enums';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
 import { resolvedSegmentLens, segmentLensFor } from '#/modules/segment/lib/segmentLens';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
@@ -81,7 +81,7 @@ export type ConditionsValidation = { valid: boolean; errors: string[]; normalize
 
 export const validateSegmentConditions = (
   rawConditions: unknown,
-  ownerModel: SegmentOwnerModel,
+  ownerModel: ProviderModel,
   options: { selfId?: string } = {},
 ): ConditionsValidation => {
   const normalized = anchorBareQuantifiers(rawConditions);
