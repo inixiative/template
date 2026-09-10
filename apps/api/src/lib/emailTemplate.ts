@@ -65,7 +65,7 @@ export type SettledTemplate = {
   issues: RenderIssue[];
 };
 
-type Rendered = { settled: SettledTemplate; subjectIssues: RenderIssue[] };
+type Rendered = { settled: SettledTemplate; subjectIssues: RenderIssue[]; ownerModel: OwnerScope['ownerModel'] };
 
 const renderComposed = (
   slug: string,
@@ -94,6 +94,7 @@ const renderComposed = (
       issues,
     },
     subjectIssues,
+    ownerModel: composed.ownerModel,
   };
 };
 
@@ -110,35 +111,46 @@ export const settleTemplate = async (
 ): Promise<SettledTemplate> => {
   const scope = ownerScope(sender);
 
-  const render = async (slug: string): Promise<Rendered> => {
-    const composed = await composeTemplate(slug, scope);
+  const render = async (slug: string, at: OwnerScope = scope): Promise<Rendered> => {
+    const composed = await composeTemplate(slug, at);
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const { source } = await emailTemplateRuleSurface(slug, scope.locale);
-    return renderComposed(slug, composed, vars, scope, source);
+    const { source } = await emailTemplateRuleSurface(slug, at.locale);
+    return renderComposed(slug, composed, vars, at, source);
   };
 
   const clean = (rendered: Rendered): boolean => !rendered.subjectIssues.length && !rendered.settled.issues.length;
 
   let primaryKind: CommunicationKind | undefined;
+  let primaryOwner: OwnerScope['ownerModel'] | undefined;
 
-  const substituted = async (reason: string): Promise<SettledTemplate> => {
-    if (!policy.substitute) throw new EmailRenderError(template, 'render_failed', [reason]);
-    log.warn(`Email substituted: template=${template} substitute=${policy.substitute} — ${reason}`, LogScope.email);
-    const rendered = await render(policy.substitute);
+  const platformScope: OwnerScope = { locale: scope.locale, ownerModel: 'default' };
+
+  const fallback = async (reason: string, slug: string, at: OwnerScope, label: string): Promise<SettledTemplate> => {
+    log.warn(`Email ${label}: template=${template} → ${slug}@${at.ownerModel} — ${reason}`, LogScope.email);
+    const rendered = await render(slug, at);
     if (!clean(rendered)) {
-      throw new EmailRenderError(policy.substitute, 'render_failed', [
+      throw new EmailRenderError(slug, 'render_failed', [
         describe([...rendered.subjectIssues, ...rendered.settled.issues]),
       ]);
     }
     return { ...rendered.settled, kind: primaryKind ?? rendered.settled.kind };
   };
 
+  const substituted = async (reason: string): Promise<SettledTemplate> => {
+    if (policy.substitute) return fallback(reason, policy.substitute, scope, 'substituted');
+    const platformCanDiffer = primaryOwner !== 'default' && primaryOwner !== 'admin' && scope.ownerModel !== 'admin';
+    if (policy.onIssue === 'platform' && platformCanDiffer)
+      return fallback(reason, template, platformScope, 'unbranded');
+    throw new EmailRenderError(template, 'render_failed', [reason]);
+  };
+
   let rendered: Rendered;
   try {
     rendered = await render(template);
     primaryKind = rendered.settled.kind;
+    primaryOwner = rendered.ownerModel;
   } catch (error) {
     if (error instanceof EmailRenderError && error.type !== 'render_failed') return substituted(error.message);
     throw error;
@@ -148,7 +160,7 @@ export const settleTemplate = async (
   if (!rendered.settled.issues.length) return rendered.settled;
 
   const summary = describe(rendered.settled.issues);
-  if (policy.onIssue === 'fail') return substituted(summary);
+  if (policy.onIssue !== 'degrade') return substituted(summary);
 
   log.warn(`Email render degraded: template=${template} owner=${scope.ownerModel} — ${summary}`, LogScope.email);
   return rendered.settled;
