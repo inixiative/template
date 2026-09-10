@@ -11,6 +11,7 @@ import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
+import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
@@ -30,6 +31,7 @@ export const registerHooks = () => {
   registerRulesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
+  registerUserEmailInvariantHook();
   registerUserEmailContactHook();
   registerWebhookHook();
   registerWebhookSubscriptionUrlHook();

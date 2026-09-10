@@ -5,13 +5,18 @@ export type { Db } from './clientTypes';
 export {
   clearHookRegistry,
   DbAction,
+  type DbInvariant,
+  type DbInvariantAction,
+  type DbInvariantOptions,
   executeHooks,
   type HookFunction,
   type HookOptions,
   HookTiming,
   type ManyAction,
   registerDbHook,
+  registerDbInvariant,
   type SingleAction,
+  unregisterDbInvariant,
 } from './extensions/mutationLifeCycle';
 // Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
 export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
