@@ -28,8 +28,10 @@ model CommunicationLog {
   recipientContact   Contact? @relation(fields: [recipientContactId], references: [id], onDelete: SetNull)
   address            String
 
-  settledMjml String? @db.Text
-  variables   Json?
+  settledMjml  String? @db.Text
+  variables    Json?
+  // Typed render issues the send proceeded past (the registry entry opted into degrade). Null = clean.
+  renderIssues Json?
 
   idempotencyKey    String    @unique
   providerMessageId String?

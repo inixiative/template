@@ -61,13 +61,13 @@ Located in `packages/email` (`@template/email`).
 |-----------|--------|-------|
 | Email clients | Done | Resend + Console |
 | MJML validation | Done | Syntax checking |
-| Component extraction | Done | `mapRefs()` |
+| Component extraction | Done | `parseBlocks` + `decompose` |
 | Variable interpolation | Done | sender/recipient/data + conditionals |
 | Cascade resolution | Done | Two chains: user (SpaceUser→OrgUser→User→default) + org (Space→Org→default) |
 | Save pipeline | Done | Template + component persistence |
 | Compose pipeline | Done | Fetch + expand components |
 | Conditional rules | Done | `{{#if rule={...}}}` with json-rules |
-| Render-error policy | Done | Per-template `onError` (`fail`/`degrade`/`fallback`) on render-time rule throws |
+| Render issues | Done | Save refuses what the lens can decide; render records typed issues; the registry entry says `fail` (default), `degrade`, or names a `substitute` |
 | **Sending jobs** | Done | `sendEmail` BullMQ job (resolve → verify → compose → interpolate → render → send) |
 | **Authoring layer** | Planned | Narrowed-lens rule builder + field selector (COMM-001 / INFRA-002 / INFRA-017) |
 | **Data hydration** | TODO | Pipe `{sender,recipient,data}` in; the lens is its schema |
@@ -162,8 +162,6 @@ model EmailTemplate {
   organizationId   String?
   spaceId          String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
-
-  onError          EmailErrorPolicy    // fail|degrade|fallback on a render-time rule throw
 }
 ```
 
@@ -242,11 +240,6 @@ enum EmailOwnerModel {
   Space         // Space-specific overrides
 }
 
-enum EmailErrorPolicy {
-  fail          // throw → job retries → DLQ (safest default)
-  degrade       // drop the throwing block(s), send the rest
-  fallback      // re-render at the next owner up: Space → Organization → default
-}
 ```
 
 ---
@@ -419,15 +412,16 @@ for (const recipient of recipients) {
 }
 ```
 
-`interpolate(template, variables, onError?)` and `evaluateConditions(template,
-variables, onError?)` take an optional `onError: RuleErrorSink` (`(message:
-string) => void`). It fires **only** when a conditional rule *throws* at render
-(malformed/uncheckable rule) — never on a normal non-match. The throwing branch is
-dropped (the next branch / `{{else}}` renders), so a clean render is the default;
-the caller uses `onError` to drive the send-side policy below. Setting
-`EMAIL_INLINE_RENDER_ERRORS=true` additionally emits the offending block inline as
-an HTML comment (a debug override, independent of environment — useful in a
-template preview or a single test).
+`interpolate(template, variables, onError?, { locale, liveRefs, lens })` and
+`evaluateConditions(template, variables, onError?, liveRefs?)` take an optional
+`onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
+'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
+rule is degraded (`withRule`: a required binding missing, the lens no longer admits
+the rule, a row it names is gone) or throws renders nothing; an `{{#each}}` whose
+filter throws renders nothing; a token that resolves to nothing, to an object, or to
+an unknown root renders **empty** — never the literal `{{…}}`. Every such case is one
+issue in the sink. Save is where the lens decides (`validateTokens`,
+`validateConditions`), so at render an issue means drift since save, not authoring.
 
 ---
 
@@ -548,18 +542,25 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{hash(data)}`; deliver adds
 `{hash(sender)}:{email}:{hash(contents)}`. Intentional resends are distinct events, never key mutation.
 
-#### Render-error policy
+#### Render issues — behaviour lives in the registry entry
 
-A conditional rule that *throws* at render (not a non-match) triggers the resolved
-template's `onError`. The error is always logged (`LogScope.email`), then:
+`settleTemplate` renders subject and body, collecting `RenderIssue`s. What happens next is
+declared on the template's code registry entry (`apps/api/src/lib/email/registry.ts`,
+`render: { onIssue, substitute }`), never on the row:
 
-- **`fail`** (default) — throw `EmailRenderError('render_failed')` → BullMQ retries
-  → DLQ-equivalent (`attempts: 3`, `removeOnFail: { age: 30d }`). Safest.
-- **`degrade`** — send with the throwing blocks dropped (the evaluator already excluded them).
-- **`fallback`** — re-compose one owner up (`parentOwner`: Space → Organization →
-  default) and re-render; loops until it renders clean or hits a base owner.
+- **subject issue** — always fatal for that template (a truncated subject is never sent).
+- **`onIssue: 'fail'`** (default) — any body issue throws `EmailRenderError('render_failed')`
+  → the CommunicationLog is marked `failed` → BullMQ retries → DLQ. System mail (verification,
+  password reset) stays here.
+- **`onIssue: 'degrade'`** — the send proceeds with the failing blocks and tokens rendered
+  empty; the issues are stored on `CommunicationLog.renderIssues` and logged.
+- **`substitute: '<slug>'`** — when the primary cannot be composed (missing template row,
+  missing component, cycle) or would fail under `fail`, the substitute is rendered instead,
+  with the primary's sender, recipient and variables. It must render clean or the send fails.
+  A substitute may not itself name a substitute.
 
-Base owners (`default`/`admin`) have no parent, so they always `fail` — the loop is bounded.
+A non-system template rendered for a recipient with no contact row fails
+(`unsubscribe_unavailable`) before anything is sent: the unsubscribe link is not optional.
 
 ### Template Versioning & Recompose
 
@@ -588,6 +589,62 @@ lives in the audit log**:
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots.
+
+### Rule References (the rows a rule names)
+
+A `{{#if rule=…}}` block can name a row — "recipient is tagged X", "recipient is in space Y". Those
+edges are persisted so that "who references X" is an index and a stale rule is never evaluated
+(INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
+
+- **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
+  (owner row → referenced row), false-polymorphic on both ends — `ownerModel` + one typed FK per
+  rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
+  referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
+  Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
+- **Extraction is the lens's** (`packages/email/src/rules/`): `emailRuleNarrowing` roots the rule
+  context at `recipient → User` and declares the referenceable sources
+  (`tagAttachments.tag.id`, `organizationUsers.organization.id`, `spaceUsers.space.id`);
+  `ruleSourceValues` (json-rules ≥ 2.20) reports the values a rule names at each source, and a
+  source on a model's id field is a row reference. Nested and dotted spellings are one path; a
+  `path`/`bind` leaf at a source — or an operator that describes the row without naming it
+  (`contains`, `between`) — is `dynamic` and refused at save. The narrowing is `mapDefaults`-shaped:
+  the source answers on **every** path to the model, FK columns duplicating a relation to a
+  referenceable model are derived from `prismaMap` and omitted, and the save path runs
+  `checkRuleAgainstLens` — an FK spelling or typo path is a 422, never a silently unregistered
+  rule. Adding a referenceable model = a registry entry + an FK column (source and omits derive);
+  adding a rule-bearing column = a `syncRuleReferences` call from its save path.
+- **Edges are written by the save path, not a hook.** `saveEmailTemplate` calls
+  `syncRuleReferences(owner, contents, emailRuleNarrowing)` inside its transaction for the template
+  and each saved component — set-diff (survivors keep their row), vocabulary and `dynamic` refused,
+  a newly added missing or soft-deleted target refused as a delta (a pre-existing dead reference
+  stays editable), referenced rows locked with `db.findForUpdate` while the gate reads them. Throws
+  `RuleReferenceError`. It is the only writer of `mjml`/`subject`, so nothing bypasses it.
+- **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
+  referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
+  `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
+  purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
+  axis therefore carries true polymorphism beside the false — the FK is the relation and may go
+  null, `referencedId` is the name and never changes, and the sync writes both from one value.
+  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  write `include: { ruleReferences: true }` and never grow that include as models become
+  referenceable. At render, `composeTemplate` reads the template's edges plus those of the
+  components the cascade resolved into one live set, and every branch goes through **`withRule`**
+  (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.
+- **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
+  whether the rule can be evaluated correctly — two questions: every binding it requires is
+  supplied (`bindOptional` marks the ones that may be left out and resolve to null), and it is
+  still valid — the lens admits it (`checkRuleAgainstLens`, so a lens change after save degrades
+  the rule instead of silently narrowing it) and every row it names is in the live set the caller
+  confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do nothing
+  new, say why": in email that is a rule issue, never a match, and the registry entry's `render`
+  spec decides the send; existing state is never touched by a degraded rule. Sound runs
+  the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
+  sources are ids; the live set comes from the caller's own read, locked when the sound arm decides
+  money. Nothing about degradation is stored. Client hard deletes stay prevented
+  (`preventHardDelete`).
+- Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
+  resolve through the owner cascade at read time, so an id persisted at save would be wrong the
+  moment an override appears.
 
 ---
 

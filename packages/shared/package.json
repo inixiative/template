@@ -17,6 +17,7 @@
     "./bracketQuery": "./src/lib/bracketQuery/index.ts",
     "./errors": "./src/errors/index.ts",
     "./lib": "./src/lib/index.ts",
+    "./rules": "./src/rules/index.ts",
     "./logger": "./src/logger/index.ts",
     "./logger/*": "./src/logger/*.ts",
     "./adapter": "./src/adapter/index.ts",

@@ -1,9 +1,13 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
+import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
+import { TokenValidationError } from '@template/email/errors/TokenValidationError';
+import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
+import { emailProjection, emailSurface } from '@template/email/rules/emailProjection';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -96,7 +100,7 @@ describe('saveEmailTemplate', () => {
   });
 
   it('rejects a non-system template whose only unsubscribe link is inside a conditional', async () => {
-    const rule = '{"field":"recipient.role","operator":"equals","value":"admin"}';
+    const rule = '{"field":"recipient.email","operator":"equals","value":"admin@example.com"}';
     await expect(
       saveEmailTemplate({
         slug: 'promo-condlink',
@@ -409,5 +413,77 @@ describe('saveEmailTemplate', () => {
       expect(err).toBeInstanceOf(MjmlValidationError);
       expect((err as MjmlValidationError).issues.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('saveEmailTemplate — the lens decides at save', () => {
+  const lens = emailSurface(emailProjection({ senderModel: 'Organization' }));
+  const strict = emailSurface(emailProjection());
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  beforeEach(async () => {
+    await db.emailComponent.deleteMany({});
+    await db.emailTemplate.deleteMany({});
+  });
+
+  const input = (slug: string, content: string, subject = 'Hi {{recipient.email}}') => ({
+    slug,
+    name: slug,
+    subject,
+    kind: 'system' as const,
+    mjml: mjml(content),
+    ownerModel: 'default' as const,
+  });
+
+  it('refuses a token the lens does not provide, and an optional path without a guard', async () => {
+    await expect(
+      saveEmailTemplate(input('t', '<mj-text>{{recipient.nickname}}</mj-text>'), { lens }),
+    ).rejects.toBeInstanceOf(TokenValidationError);
+    await expect(
+      saveEmailTemplate(input('t', '<mj-text>{{recipient.email}}</mj-text>', 'Code {{data.code}}'), { lens }),
+    ).rejects.toThrow(/may be empty/);
+    const ok = await saveEmailTemplate(
+      input('t', `<mj-text>{{recipient.email}} ${guardedToken('data.code', 'none')}</mj-text>`),
+      { lens },
+    );
+    expect(ok.template.slug).toBe('t');
+  });
+
+  it('a component is judged through the template that embeds it', async () => {
+    await expect(
+      saveEmailTemplate(
+        input('t', '{{#component:greeting}}<mj-text>{{sender.nickname}}</mj-text>{{/component:greeting}}'),
+        {
+          lens,
+        },
+      ),
+    ).rejects.toBeInstanceOf(TokenValidationError);
+  });
+
+  it('a component save that would break a same-owner template embedding it is refused', async () => {
+    const lensFor = async (slug: string) => (slug === 'strict' ? strict : lens);
+    await saveEmailTemplate(
+      input('strict', '{{#component:greeting}}<mj-text>{{recipient.email}}</mj-text>{{/component:greeting}}'),
+      {
+        lens: strict,
+        lensFor,
+      },
+    );
+
+    await expect(
+      saveEmailTemplate(
+        input('loose', '{{#component:greeting}}<mj-text>{{sender.name}}</mj-text>{{/component:greeting}}'),
+        {
+          lens,
+          lensFor,
+        },
+      ),
+    ).rejects.toBeInstanceOf(DependentTemplateError);
+
+    const untouched = await db.emailComponent.findFirst({ where: { slug: 'greeting' } });
+    expect(untouched?.mjml).toContain('recipient.email');
   });
 });

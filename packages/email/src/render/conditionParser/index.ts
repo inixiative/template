@@ -5,6 +5,7 @@
  * @uses none
  */
 
+export { collectRules } from './collectRules';
 export { findJsonEnd } from './findJsonEnd';
 export {
   EACH,

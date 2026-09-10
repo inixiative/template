@@ -64,9 +64,10 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const { eventName, template, data } = payload;
 
   const entry = registry[template];
-  if (!entry) {
-    log.info(`No email registry entry — skipping (template=${template})`);
-    return;
+  if (!entry) throw new Error(`No email registry entry for template "${template}" (event=${eventName})`);
+  for (const name of entry.data ?? []) {
+    if (data[name] === undefined)
+      throw new Error(`Email "${template}" declares data field "${name}" and the event did not supply it`);
   }
 
   const entityLens = bindLens(entry.entity, data);
@@ -74,7 +75,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   if (!entity) return;
 
   if (!emailRegistry.names().length) {
-    log.info(`No email adapter registered — skipping (template=${template})`);
+    log.warn(`No email adapter registered — skipping (template=${template})`);
     return;
   }
 

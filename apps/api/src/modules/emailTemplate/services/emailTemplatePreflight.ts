@@ -53,8 +53,8 @@ export const emailTemplatePreflight = async (
   if (input.subject) assertValidConditions(input.subject, { isSubject: true });
 
   const renderWarnings: string[] = [];
-  const onRenderWarning: RuleErrorSink = (message) => {
-    renderWarnings.push(message);
+  const onRenderWarning: RuleErrorSink = (issue) => {
+    if (issue.kind !== 'token') renderWarnings.push(issue.detail);
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);

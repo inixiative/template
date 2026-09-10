@@ -16,6 +16,13 @@ export type RecipientSpec = {
   where: Condition;
 };
 
+export type RenderIssuePolicy = 'fail' | 'degrade';
+
+export type RenderSpec = {
+  onIssue?: RenderIssuePolicy;
+  substitute?: string;
+};
+
 export type EmailEntry = {
   entity: LensNarrowing;
   sender: SenderSpec;
@@ -23,6 +30,7 @@ export type EmailEntry = {
   cc?: RecipientSpec;
   bcc?: RecipientSpec;
   data?: string[];
+  render?: RenderSpec;
 };
 
 export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
@@ -44,7 +52,21 @@ const userRecipient = (bind: string): RecipientSpec => ({
   where: { field: 'id', operator: 'equals', bind },
 });
 
-export const registry: Record<string, EmailEntry> = {
+const assertSubstitutes = (entries: Record<string, EmailEntry>): Record<string, EmailEntry> => {
+  for (const [slug, entry] of Object.entries(entries)) {
+    const substitute = entry.render?.substitute;
+    if (substitute === undefined) continue;
+    if (substitute === slug) throw new Error(`Email registry: "${slug}" names itself as its substitute`);
+    const target = entries[substitute];
+    if (!target) throw new Error(`Email registry: "${slug}" names an unregistered substitute "${substitute}"`);
+    if (target.render?.substitute !== undefined) {
+      throw new Error(`Email registry: substitute "${substitute}" of "${slug}" may not itself declare a substitute`);
+    }
+  }
+  return entries;
+};
+
+export const registry: Record<string, EmailEntry> = assertSubstitutes({
   'inquiry-invite-organization-user': {
     entity: {
       parent: lensFor('Inquiry'),
@@ -70,4 +92,11 @@ export const registry: Record<string, EmailEntry> = {
     recipients: userRecipient('id'),
     data: ['verificationUrl'],
   },
-};
+});
+
+export const renderPolicyFor = (
+  slug: string,
+): Required<Pick<RenderSpec, 'onIssue'>> & Pick<RenderSpec, 'substitute'> => ({
+  onIssue: registry[slug]?.render?.onIssue ?? 'fail',
+  substitute: registry[slug]?.render?.substitute,
+});

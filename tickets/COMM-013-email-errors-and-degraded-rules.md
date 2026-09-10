@@ -1,7 +1,8 @@
 # COMM-013: Email errors and degraded rule behaviour — problem statement
 
-**Status**: problem statement (2026-09-10), no decisions yet. Parked from the #74 review.
-**Stack**: #74 ← #91 ← #96 ← #97. Everything below is what the branches do today.
+**Status**: ruled and built (2026-09-10) on `feat/email-errors` (stacked on #97, carries #92).
+**Stack**: #74 ← #91 ← #96 ← #97 ← errors. The problem statement below is preserved as the
+record of what the branches did before the ruling; the ruling and what shipped are at the end.
 
 ## The problem
 
@@ -114,3 +115,53 @@ the failing block, and it walks down to the base owner and then fails.
    projection? (COMM-012 open item 3.)
 8. Planning failures (16 to 18) happen before a CommunicationLog exists. Are they recorded
    anywhere?
+
+
+## Ruling (Aron, 2026-09-10) — and what shipped
+
+1. **Save refuses everything the lens can decide.** `validateTokens` (packages/email
+   `validations/validateTokens/`) runs on the expanded body and the subject when a lens is
+   handed to `saveEmailTemplate` (the api's `saveEmailTemplate` wrapper resolves the slug's
+   rule surface): an unknown mustache, an unknown root, a path the lens lacks, a read through a
+   scalar or through a list without `{{#each}}`, an object where a value is expected, a system
+   token the rail does not provide. A token on an *optional* path — a nullable field or
+   relation, anything beneath a Json column — must sit inside an `{{#if}}` branch whose rule
+   conjoins a positive presence leaf (`exists` / `notEmpty` / `isDefined: true`) on that path
+   or on the nullable prefix that introduced the optionality. Negated leaves, `any` groups and
+   the `{{else}}` branch guard nothing. `guardedToken(path, fallback)` in the authoring surface
+   emits the guarded form — the builder's fallback shortcut. Rules keep the vocabulary gate
+   (`validateConditions` with the lens) and the reference gate (`syncRuleReferences`).
+2. **Component ↔ template checks propagate both ways.** A template save judges the components
+   it embeds through its own lens (the expanded body is what is validated). A component save
+   walks every same-owner template that embeds it, transitively through components, and
+   re-validates each against that template's lens (`validateDependents`); one failure refuses the
+   save with the list (`DependentTemplateError`). Other owners' templates are stamped by the
+   versioning hook (`degradedComponentRefs` stays as the at-rest projection) and never refused —
+   the same direction as a gone tag degrading a rule instead of blocking the delete.
+3. **No raw token ever ships.** `substituteToken` renders empty and records a typed issue for a
+   nil value, an object, an unknown root, a prototype key, an unknown system token. The
+   literal `{{…}}` never reaches a recipient.
+4. **One render behaviour, declared in the registry entry.** `EmailErrorPolicy`, the row's
+   `onError`, and `EMAIL_INLINE_RENDER_ERRORS` are gone. Render produces `RenderIssue[]`
+   (`kind: rule | token | each`, `path`, `detail`); a failing block or token renders nothing.
+   `settleTemplate` reads `render: { onIssue, substitute }` from the code registry entry: `fail`
+   (default — system mail stays here) throws `render_failed` and the job retries to DLQ;
+   `degrade` sends and stores the issues on `CommunicationLog.renderIssues`; `substitute` names
+   a slug rendered instead when the primary cannot be composed or would fail, with the primary's
+   sender, recipient and variables, and it must render clean. A subject issue is always fatal.
+   A non-system template with no recipient contact fails (`unsubscribe_unavailable`) — the
+   unsubscribe link is not optional. `{{#each}}` with a throwing filter renders nothing (no more
+   partial lists).
+5. **Planning failures are loud.** `sendEmail` throws on a missing registry entry, a missing
+   adapter, and a declared `data` field the event did not supply; zero recipients stays an
+   info line. `withRule` gained the `bindings` question (json-rules 2.22.0 `bindOptional`).
+
+Adversarial pass on the plan (before build) moved five things: a `fail` floor instead of
+"degrade everywhere" (system mail would have shipped a verification link rendered empty); the
+unsubscribe token as a hard failure rather than an issue; Json-backed paths treated as optional
+so the guard is required where nil actually lives; one lens threaded into `settle` for the
+vocabulary question while reference extraction keeps the registry-derived narrowing; and the
+reverse walk refusing only same-owner dependents. Findings not taken: a planner-side
+CommunicationLog row for skipped sends (zero recipients is a legitimate outcome, the rest now
+throw), and keeping `fallback`'s tier walk (`substitute` covers the complete-email case
+explicitly).

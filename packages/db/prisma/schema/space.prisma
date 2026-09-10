@@ -34,6 +34,7 @@ model Space {
   tagCategories        TagCategory[]
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
+  ruleReferences       RuleReference[]
   customerRefs         CustomerRef[]         @relation("customerRefs")
   providerRefs         CustomerRef[]         @relation("providerRefs")
   inquiriesSent        Inquiry[]             @relation("InquirySource")

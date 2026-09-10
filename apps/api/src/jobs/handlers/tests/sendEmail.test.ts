@@ -219,4 +219,24 @@ describe('sendEmail handler', () => {
     expect(rows[0].status).toBe('undeliverable');
     expect(sent.filter((s) => s.to === u.email)).toHaveLength(0);
   });
+  it('a template with no registry entry is a planning failure, not a silent skip', async () => {
+    await expect(sendEmail(ctx(), { eventName: 'test', template: 'unregistered', data: {} })).rejects.toThrow(
+      'No email registry entry',
+    );
+  });
+
+  it('a declared data field the event did not supply is a planning failure', async () => {
+    const { entity: u } = await createUser({ name: 'Needs data' });
+    await createEmailTemplate({ slug: 'test-data', subject: 'Hi', mjml: plainMjml('{{data.code}}') });
+    addEntry('test-data', {
+      entity: userEntity(),
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
+      data: ['code'],
+    });
+
+    await expect(
+      sendEmail(ctx(), { eventName: 'test', template: 'test-data', data: { userId: u.id } }),
+    ).rejects.toThrow('declares data field "code"');
+  });
 });

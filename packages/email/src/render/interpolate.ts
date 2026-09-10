@@ -4,6 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
+import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import type { ScopeRoot } from '@template/email/render/conditionParser';
 import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
 import type { SystemTokenName } from '@template/email/render/systemTokens';
@@ -13,6 +14,8 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
+  liveRefs?: ReadonlySet<string>;
+  lens?: Lens | LensNarrowing;
 };
 
 const SYSTEM_TOKEN_PATTERN = /\{\{system\.([a-zA-Z0-9_-]+)\}\}/g;
@@ -47,4 +50,10 @@ export const interpolate = (
   variables: Variables,
   onError?: RuleErrorSink,
   options: InterpolateOptions = {},
-): string => settle(resolveSystemTokens(template, options), toScope(variables), { substitute: true }, onError);
+): string =>
+  settle(
+    resolveSystemTokens(template, options),
+    toScope(variables),
+    { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
+    onError,
+  );

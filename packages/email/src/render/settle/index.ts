@@ -5,4 +5,4 @@
  * @uses primitive:shared
  */
 export { settle } from './settle';
-export type { RuleErrorSink, Scope, SettleOptions } from './types';
+export type { RenderIssue, RenderIssueKind, RuleErrorSink, Scope, SettleOptions } from './types';
