@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { CommunicationKind, EmailErrorPolicy, EmailOwnerModel } from '@template/db/generated/client/client';
-import { EmailRenderError } from '@template/email/render/errors';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand } from '@template/email/render/expand';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
 import type { OwnerScope } from '@template/email/render/types';
@@ -20,8 +20,6 @@ export type ComposeTemplateResult = {
   onError: EmailErrorPolicy; // render-error policy for the resolved template
 };
 
-// The next owner up the cascade, used to re-compose on a `fallback` render error. Two chains:
-// user (SpaceUser→OrganizationUser→User→default) and org (Space→Organization→default); admin/default have no parent.
 export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
   switch (owner) {
     case 'SpaceUser':
@@ -47,7 +45,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
-  const mjml = await expand(template.mjml, template.componentRefs, ctx);
+  const mjml = await expand(template.mjml, ctx);
 
   return {
     id: template.id,
@@ -64,7 +62,7 @@ export const composeComponent = async (slug: string, ctx: OwnerScope): Promise<C
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 
-  const mjml = await expand(component.mjml, component.componentRefs, ctx);
+  const mjml = await expand(component.mjml, ctx);
 
   return { mjml };
 };

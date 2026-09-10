@@ -5,54 +5,69 @@
  * @uses infrastructure:prisma
  */
 import type { Condition, LensNarrowing } from '@inixiative/json-rules';
-import type { Inquiry, User } from '@template/db/generated/client/client';
 import { lensFor } from '@template/db/lens';
 import type { Sender } from '#/lib/email/sender';
 
-const eq = (field: string, value: unknown): Condition => ({ field, operator: 'equals', value }) as unknown as Condition;
+export type SenderSpec = Sender;
 
-type Row = Record<string, unknown>;
-
-export type EmailEntry<E = Row> = {
-  entity: (data: Record<string, unknown>) => LensNarrowing;
-  sender: (entity: E) => Sender;
-  recipients: (entity: E, sender: Sender) => LensNarrowing;
-  cc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  bcc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  data?: (entity: E, handoff: Record<string, unknown>) => Record<string, unknown>;
+export type RecipientSpec = {
+  picks: string[];
+  relations?: Record<string, { picks: string[] }>;
+  where: Condition;
 };
 
-const defineEntry = <E>(entry: EmailEntry<E>): EmailEntry => entry as EmailEntry;
+export type EmailEntry = {
+  entity: LensNarrowing;
+  sender: SenderSpec;
+  recipients: RecipientSpec;
+  cc?: RecipientSpec;
+  bcc?: RecipientSpec;
+  data?: string[];
+};
 
-const userById = (id: unknown): LensNarrowing => ({
+export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
   parent: lensFor('User'),
-  root: { where: eq('id', id), picks: ['id', 'name', 'email'] },
+  root: {
+    where,
+    picks: spec.picks,
+    ...(spec.relations ? { relations: spec.relations } : {}),
+  },
+});
+
+const userEntity = (bind: string): LensNarrowing => ({
+  parent: lensFor('User'),
+  root: { where: { field: 'id', operator: 'equals', bind }, picks: ['id', 'name', 'email'] },
+});
+
+const userRecipient = (bind: string): RecipientSpec => ({
+  picks: ['id', 'name', 'email'],
+  where: { field: 'id', operator: 'equals', bind },
 });
 
 export const registry: Record<string, EmailEntry> = {
-  'inquiry-invite-organization-user': defineEntry<Inquiry & { sourceOrganizationId: string }>({
-    entity: (data) => ({
+  'inquiry-invite-organization-user': {
+    entity: {
       parent: lensFor('Inquiry'),
       root: {
-        where: eq('id', data.inquiryId),
-        picks: ['id', 'content', 'sourceOrganization'],
+        where: { field: 'id', operator: 'equals', bind: 'inquiryId' },
+        picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
         relations: { sourceOrganization: { picks: ['name'] } },
       },
-    }),
-    sender: (inquiry) => ({ type: 'Organization', organizationId: inquiry.sourceOrganizationId }),
-    recipients: (inquiry) => userById(inquiry.targetUserId),
-  }),
+    },
+    sender: { type: 'Organization', organizationId: 'sourceOrganizationId' },
+    recipients: userRecipient('targetUserId'),
+  },
 
-  welcome: defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-  }),
+  welcome: {
+    entity: userEntity('userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+  },
 
-  'email-verification': defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-    data: (_user, handoff) => ({ verificationUrl: handoff.verificationUrl }),
-  }),
+  'email-verification': {
+    entity: userEntity('userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+    data: ['verificationUrl'],
+  },
 };

@@ -4,11 +4,9 @@ import { cleanupTouchedTables, createEmailComponent } from '@template/db/test';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { OwnerScope } from '@template/email/render/types';
 
-const defaultScope: OwnerScope = { ownerModel: 'default', locale: 'en' };
-// A slug that matches the slug regex but collides with Object.prototype.
-const protoSlug = 'constructor';
+const defaultCtx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 
-describe('lookupCascade — prototype-pollution guard', () => {
+describe('lookupCascade', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
   });
@@ -17,14 +15,21 @@ describe('lookupCascade — prototype-pollution guard', () => {
     await db.emailComponent.deleteMany({});
   });
 
-  it('does not resolve a phantom component for a prototype-key slug when none exists', async () => {
-    const merged = await lookupCascade([protoSlug], defaultScope);
-    expect(merged[protoSlug]).toBeUndefined();
+  it('resolves a present slug to its component', async () => {
+    await createEmailComponent({ slug: 'header', mjml: '<mj-text>H</mj-text>', ownerModel: 'default' });
+    const result = await lookupCascade(['header'], defaultCtx);
+    expect(result.header?.mjml).toBe('<mj-text>H</mj-text>');
+  });
+
+  it('resolves an absent slug named like an Object prototype key to undefined', async () => {
+    const protoSlugs = ['constructor', '__proto__', 'toString'];
+    const result = await lookupCascade(protoSlugs, defaultCtx);
+    for (const slug of protoSlugs) expect(result[slug]).toBeUndefined();
   });
 
   it('resolves a real component whose slug collides with a prototype key', async () => {
-    await createEmailComponent({ slug: protoSlug, ownerModel: 'default', locale: 'en' });
-    const merged = await lookupCascade([protoSlug], defaultScope);
-    expect(merged[protoSlug]?.slug).toBe(protoSlug);
+    await createEmailComponent({ slug: 'constructor', ownerModel: 'default', locale: 'en' });
+    const result = await lookupCascade(['constructor'], defaultCtx);
+    expect(result['constructor']?.slug).toBe('constructor');
   });
 });

@@ -111,14 +111,14 @@ describe('emailVersioning', () => {
       locale: template.locale,
     };
 
-    const live1 = await expand(template.mjml, template.componentRefs, ctx);
+    const live1 = await expand(template.mjml, ctx);
     const snap1 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap1!.id)).toBe(live1);
 
     await db.emailComponent.update({ where: { id: components[0].id }, data: { mjml: '<mj-text>Updated</mj-text>' } });
 
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
-    const live2 = await expand(liveTemplate.mjml, liveTemplate.componentRefs, ctx);
+    const live2 = await expand(liveTemplate.mjml, ctx);
     const snap2 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap2!.id)).toBe(live2);
   });

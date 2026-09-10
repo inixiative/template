@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { composeComponent, composeTemplate, parentOwner } from '@template/email/render/compose';
-import { EmailRenderError } from '@template/email/render/errors';
 
 describe('composeTemplate', () => {
   afterAll(async () => {

@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind validator, error
+ * @kind constructor
  * @partOf feature:email
  * @uses none
  */

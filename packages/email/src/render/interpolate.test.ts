@@ -1,5 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
+import { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from '@template/email/render/limits';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 
 describe('interpolate', () => {
@@ -23,6 +24,23 @@ describe('interpolate', () => {
         data: { code: '123456' },
       });
       expect(result).toBe('Your code is 123456');
+    });
+
+    it('substitutes system lens values', () => {
+      const result = interpolate('Manage your prefs: {{system.preferencesUrl}}', {
+        system: { preferencesUrl: 'https://app.example.com/prefs' },
+      });
+      expect(result).toBe('Manage your prefs: https://app.example.com/prefs');
+    });
+
+    it('resolves all four lenses together', () => {
+      const result = interpolate('{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.appName}}]', {
+        sender: { name: 'Acme' },
+        recipient: { name: 'Jo' },
+        data: { code: '42' },
+        system: { appName: 'Tmpl' },
+      });
+      expect(result).toBe('Acme→Jo:42 [Tmpl]');
     });
 
     it('keeps placeholder if value not found', () => {
@@ -267,5 +285,333 @@ describe('interpolate', () => {
         clock.mockRestore();
       }
     });
+  });
+});
+
+describe('interpolate — {{#each}} grammar', () => {
+  it('substitutes a bare binding token per element when the element is a primitive', () => {
+    expect(interpolate('{{#each data.items as=item}}[{{item}}]{{/each}}', { data: { items: ['a', 'b', 'c'] } })).toBe(
+      '[a][b][c]',
+    );
+  });
+
+  it('tolerates as=/index=/filter= attributes in any order', () => {
+    const filterJson = '{"field":"item.ok","operator":"equals","value":true}';
+    const result = interpolate(`{{#each data.items index=i filter=${filterJson} as=item}}{{i}}:{{item.n}} {{/each}}`, {
+      data: {
+        items: [
+          { n: 1, ok: true },
+          { n: 2, ok: false },
+        ],
+      },
+    });
+    expect(result).toBe('0:1 ');
+  });
+
+  it('tolerates whitespace inside an {{#if}} marker within a loop body', () => {
+    const result = interpolate(
+      '{{#each data.items as=item}}{{#if rule= {"field":"item.ok","operator":"equals","value":true} }}Y{{/if}}{{/each}}',
+      { data: { items: [{ ok: true }, { ok: false }] } },
+    );
+    expect(result).toBe('Y');
+  });
+});
+
+describe('interpolate — {{#each}} scope', () => {
+  it('an unresolved identifier (not a binding, not a reserved root) stays visible with no sink', () => {
+    const errors: string[] = [];
+    expect(interpolate('{{notabinding}}', {}, (m) => errors.push(m))).toBe('{{notabinding}}');
+    expect(errors).toEqual([]);
+  });
+
+  it('an inherited Object.prototype property is not mistaken for an in-scope binding', () => {
+    const errors: string[] = [];
+    const result = interpolate('{{constructor}} {{constructor.name}}', {}, (m) => errors.push(m));
+    expect(result).toBe('{{constructor}} {{constructor.name}}');
+    expect(errors).toEqual([]);
+  });
+
+  it('as=system fails closed instead of half-resolving against the pre-pass or the system scope', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=system}}{{system.now}}|{{system.label}}{{/each}}',
+      { data: { items: [{ label: 'shadowed', now: 'shadowed' }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual(['as= "system" collides with a reserved or enclosing binding']);
+  });
+
+  it('unknown or duplicate attributes fail closed at render time', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=first typo=value as=second}}{{second}}{{/each}}',
+      { data: { items: ['unsafe'] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual([
+      'unknown typo= attribute on {{#each}} block',
+      'duplicate as= attribute on {{#each}} block',
+    ]);
+  });
+
+  it('an attribute missing = fails closed without being treated as an unterminated block', () => {
+    const errors: string[] = [];
+    const result = interpolate('{{#each data.items as item}}X{{/each}}', { data: { items: ['unsafe'] } }, (m) =>
+      errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual([
+      'malformed attribute "as" on {{#each}} block (expected name=value)',
+      'malformed attribute "item" on {{#each}} block (expected name=value)',
+    ]);
+  });
+
+  it('a nested binding path resolving to a non-primitive stays visible AND sinks', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item}}{{item.meta}}{{/each}}',
+      { data: { items: [{ meta: { a: 1 } }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('{{item.meta}}');
+    expect(errors).toEqual(['{{item.meta}} resolved to a non-primitive value and was left unsubstituted']);
+  });
+});
+
+describe('interpolate — prototype-chain token safety on bindings', () => {
+  it('leaves a constructor token on an each binding visible', () => {
+    expect(interpolate('{{#each data.items as=item}}{{item.constructor}}{{/each}}', { data: { items: [{}] } })).toBe(
+      '{{item.constructor}}',
+    );
+  });
+
+  it('leaves function-valued each-binding properties visible', () => {
+    expect(
+      interpolate('{{#each data.items as=item}}{{item.fn}}{{/each}}', {
+        data: { items: [{ fn: () => 'should not render' }] },
+      }),
+    ).toBe('{{item.fn}}');
+  });
+});
+
+describe('interpolate — {{#each}} semantics', () => {
+  it('an empty array renders empty with no sink', () => {
+    const errors: string[] = [];
+    expect(interpolate('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } }, (m) => errors.push(m))).toBe(
+      '',
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it('a malformed filter still sinks when the loop path is empty or missing', () => {
+    for (const variables of [{ data: { items: [] } }, { data: {} }]) {
+      const errors: string[] = [];
+      const result = interpolate('{{#each data.items as=item filter={bad json}}}X{{/each}}', variables, (m) =>
+        errors.push(m),
+      );
+      expect(result).toBe('');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toStartWith('invalid filter JSON - ');
+    }
+  });
+
+  it('filter= excludes non-matching elements; index= counts the POST-FILTER sequence', () => {
+    const filterJson = '{"field":"item.ok","operator":"equals","value":true}';
+    const result = interpolate(
+      `{{#each data.items as=item index=i filter=${filterJson}}}{{i}}:{{item.name}} {{/each}}`,
+      {
+        data: {
+          items: [
+            { name: 'A', ok: false },
+            { name: 'B', ok: true },
+            { name: 'C', ok: false },
+            { name: 'D', ok: true },
+          ],
+        },
+      },
+    );
+    expect(result).toBe('0:B 1:D ');
+  });
+
+  it('filter= path RHS reference resolves against an ENCLOSING loop binding', () => {
+    const template =
+      '{{#each recipient.missions as=m}}' +
+      '{{#each m.rewards as=r filter={"field":"r.tier","operator":"greaterThanEquals","path":"m.minTier"}}}' +
+      '{{r.tier}} ' +
+      '{{/each}}' +
+      '{{/each}}';
+    const result = interpolate(template, {
+      recipient: { missions: [{ minTier: 2, rewards: [{ tier: 1 }, { tier: 2 }, { tier: 3 }] }] },
+    });
+    expect(result).toBe('2 3 ');
+  });
+
+  it('check() returning a string (missing leaf) is a silent non-match — no sink', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item filter={"field":"item.missingField","operator":"equals","value":"x"}}}{{item.n}}{{/each}}',
+      { data: { items: [{ n: 1 }, { n: 2 }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual([]);
+  });
+
+  it('check() throwing excludes that element and sinks once per loop (deduped)', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item filter={"field":"item.x","operator":"nope","value":1}}}{{item.n}}{{/each}}',
+      {
+        data: {
+          items: [
+            { n: 1, x: 1 },
+            { n: 2, x: 1 },
+          ],
+        },
+      },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toHaveLength(1);
+  });
+});
+
+describe('interpolate — {{#each}} structural-error posture', () => {
+  it('an unterminated {{#each}} dumps the remainder verbatim (still substituted) and sinks', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      'before {{data.x}} {{#each data.items as=item}}tail',
+      { data: { x: 'V', items: [1] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('before V {{#each data.items as=item}}tail');
+    expect(errors).toEqual(['unterminated {{#each}} block - missing {{/each}}']);
+  });
+
+  it('a kind-mismatched close ({{#each}}...{{/if}}) degrades to unterminated-each and sinks', () => {
+    const errors: string[] = [];
+    const result = interpolate('{{#each data.items as=item}}X{{/if}}', { data: { items: [1] } }, (m) => errors.push(m));
+    expect(result).toBe('{{#each data.items as=item}}X{{/if}}');
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('an orphan close at depth 0 stays inert and silent for {{/each}} and {{/if}} alike', () => {
+    const errors: string[] = [];
+    expect(interpolate('hello {{/each}} world', {}, (m) => errors.push(m))).toBe('hello {{/each}} world');
+    expect(interpolate('hello {{/if}} world', {}, (m) => errors.push(m))).toBe('hello {{/if}} world');
+    expect(errors).toEqual([]);
+  });
+});
+
+describe('interpolate — substitution exactly-once (injection)', () => {
+  it('a data value containing literal {{recipient.x}} text is NOT resolved (no trailing re-scan)', () => {
+    const result = interpolate('{{data.evil}}', {
+      data: { evil: '{{recipient.email}}' },
+      recipient: { email: 'real@example.com' },
+    });
+    expect(result).toBe('{{recipient.email}}');
+  });
+
+  it('the same injection guard holds for a value substituted from inside a loop body', () => {
+    const result = interpolate('{{#each data.items as=item}}{{item}}{{/each}}', {
+      data: { items: ['{{recipient.email}}'] },
+      recipient: { email: 'real@example.com' },
+    });
+    expect(result).toBe('{{recipient.email}}');
+  });
+});
+
+describe('interpolate — reserved-root carve-out characterization', () => {
+  it('an array value stringifies via Array.prototype.toString (comma-joined)', () => {
+    expect(interpolate('{{data.tags}}', { data: { tags: ['a', 'b'] } })).toBe('a,b');
+  });
+
+  it('an object value stringifies to "[object Object]"', () => {
+    expect(interpolate('{{data.obj}}', { data: { obj: { x: 1 } } })).toBe('[object Object]');
+  });
+
+  it('the number 0 and the boolean false substitute, not treated as missing values', () => {
+    expect(interpolate('{{data.n}}', { data: { n: 0 } })).toBe('0');
+    expect(interpolate('{{data.flag}}', { data: { flag: false } })).toBe('false');
+  });
+
+  it('a reserved token span crossing an if marker boundary is reassembled, never substituted', () => {
+    const result = interpolate('{{data.{{#if rule=true}}x{{/if}}}}', { data: { x: 'SHOULD_NOT_APPEAR' } });
+    expect(result).toBe('{{data.x}}');
+  });
+});
+
+describe('interpolate — {{#each}} expansion bounds', () => {
+  const items = (count: number) => Array.from({ length: count }, (_, i) => ({ n: i }));
+
+  it(`expands a loop at exactly the ${EACH_MAX_ELEMENTS}-element limit`, () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item}}X{{/each}}',
+      { data: { items: items(EACH_MAX_ELEMENTS) } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('X'.repeat(EACH_MAX_ELEMENTS));
+    expect(errors).toEqual([]);
+  });
+
+  it('sinks and renders nothing one element over the limit', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item}}X{{/each}}',
+      { data: { items: items(EACH_MAX_ELEMENTS + 1) } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual([
+      `{{#each data.items}} resolved to ${EACH_MAX_ELEMENTS + 1} elements, over the ${EACH_MAX_ELEMENTS}-element limit`,
+    ]);
+  });
+
+  it('bounds the SOURCE array, so a narrowing filter= cannot smuggle an over-cap loop through', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=item filter={"field":"item.n","operator":"equals","value":0}}}X{{/each}}',
+      { data: { items: items(EACH_MAX_ELEMENTS + 1) } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('over the');
+  });
+
+  it(`expands loops nested exactly ${EACH_MAX_DEPTH} deep`, () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=a}}{{#each a.kids as=b}}{{b.v}}{{/each}}{{/each}}',
+      { data: { items: [{ kids: [{ v: 'x' }, { v: 'y' }] }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('xy');
+    expect(errors).toEqual([]);
+  });
+
+  it(`sinks and renders nothing one level deeper than ${EACH_MAX_DEPTH}`, () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.items as=a}}{{#each a.kids as=b}}{{#each b.grandkids as=c}}{{c.v}}{{/each}}{{/each}}{{/each}}',
+      { data: { items: [{ kids: [{ grandkids: [{ v: 'x' }] }] }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('');
+    expect(errors).toEqual([`{{#each}} blocks nested more than ${EACH_MAX_DEPTH} deep are not supported`]);
+  });
+
+  it('the depth cap resets across sibling loops — only true nesting counts', () => {
+    const errors: string[] = [];
+    const result = interpolate(
+      '{{#each data.a as=x}}{{#each x.k as=y}}{{y}}{{/each}}{{/each}}|{{#each data.a as=x}}{{#each x.k as=y}}{{y}}{{/each}}{{/each}}',
+      { data: { a: [{ k: [1] }] } },
+      (m) => errors.push(m),
+    );
+    expect(result).toBe('1|1');
+    expect(errors).toEqual([]);
   });
 });

@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent } from '@template/db/test';
-import { EmailRenderError } from '@template/email/render/errors';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import type { OwnerScope } from '@template/email/render/types';
-import { validateNoCycle } from '@template/email/render/validateNoCycle';
+import { validateNoCycle } from '@template/email/validations/validateNoCycle';
 
 const ctx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 

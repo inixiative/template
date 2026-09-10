@@ -5,9 +5,9 @@
  * @uses none
  */
 import type { CommunicationKind } from '@template/db/generated/client/client';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
   composeTemplate,
-  EmailRenderError,
   interpolate,
   type OwnerScope,
   parentOwner,
@@ -62,7 +62,7 @@ export const settleTemplate = async (
   template: string,
   sender: Sender,
   variables: Variables,
-  recipientVarsForKind?: (kind: CommunicationKind) => Record<string, unknown>,
+  systemVarsForKind?: (kind: CommunicationKind) => Record<string, unknown>,
 ): Promise<SettledTemplate> => {
   const scope = ownerScope(sender);
   let composed = await composeTemplate(template, scope);
@@ -70,8 +70,8 @@ export const settleTemplate = async (
   while (true) {
     const errors: string[] = [];
     const onError: RuleErrorSink = (message) => errors.push(message);
-    const vars: Variables = recipientVarsForKind
-      ? { ...variables, recipient: { ...variables.recipient, ...recipientVarsForKind(composed.kind) } }
+    const vars: Variables = systemVarsForKind
+      ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
     // `locale`: `{{system.now}}` formats a date into body copy, so it follows the template it renders into.
     const mjml = interpolate(composed.mjml, vars, onError, { locale: scope.locale });

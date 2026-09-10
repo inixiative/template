@@ -8,15 +8,19 @@
     "./client": "./src/client/index.ts",
     "./client/verification": "./src/client/verification/index.ts",
     "./client/verification/*": "./src/client/verification/*.ts",
+    "./errors": "./src/errors/index.ts",
+    "./errors/*": "./src/errors/*.ts",
     "./render": "./src/render/index.ts",
-    "./targeting": "./src/targeting/index.ts"
+    "./targeting": "./src/targeting/index.ts",
+    "./validations": "./src/validations/index.ts",
+    "./validations/*": "./src/validations/*.ts"
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd packages/email src/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.21.0",
+    "@inixiative/json-rules": "^2.22.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "lodash-es": "^4.18.1",

@@ -66,8 +66,6 @@ export const lookupCascade = async (
   const lookups = getLookups(slugs, ctx);
   const results = await Promise.all(lookups.map((fn) => fn()));
 
-  // Null-proto + own-property probe: `constructor` matches the slug regex but would otherwise
-  // resolve to Object.prototype.constructor and register a phantom component.
   const merged: Record<string, EmailComponent | undefined> = Object.create(null);
   for (const slug of slugs) {
     merged[slug] = results.find((r) => Object.hasOwn(r, slug))?.[slug];
