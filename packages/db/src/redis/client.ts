@@ -13,14 +13,16 @@ let __main: Redis | null = null;
 let __subscriber: Redis | null = null;
 let __mock: Redis | null = null;
 
-export const createRedisConnection = (scope: LogScope | string = LogScope.db): Redis => {
+export const resolveRedisUrl = (url?: string): string => url || process.env.REDIS_URL || 'redis://localhost:6379';
+
+export const createRedisConnection = (scope: LogScope | string = LogScope.db, url?: string): Redis => {
   if (isTest) {
     if (!__mock) __mock = new RedisMock() as unknown as Redis;
     log.info('Using shared in-memory mock', scope);
     return __mock;
   }
 
-  const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  const redis = new Redis(resolveRedisUrl(url), {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
   });
