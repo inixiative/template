@@ -54,6 +54,22 @@ describe('saveEmailTemplate', () => {
     expect(tombstone?.mjml).toContain('v1');
   });
 
+  it('derives a component row expectations from its body at save', async () => {
+    const result = await saveEmailTemplate({
+      slug: 'expects',
+      name: 'Expects',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml(
+        '{{#component:greeting}}<mj-text>Hi {{recipient.name}}, {{#if rule={"field":"sender.name","operator":"notEmpty"}}}from {{sender.name}}{{/if}}</mj-text>{{/component:greeting}}',
+      ),
+      ownerModel: 'default',
+    });
+
+    expect(result.components).toHaveLength(1);
+    expect(result.components[0]?.expectations).toEqual(['recipient.name', 'sender.name']);
+  });
+
   it('rejects a non-system template with no unsubscribe link', async () => {
     await expect(
       saveEmailTemplate({
