@@ -14,13 +14,7 @@ const empty = (path: string, detail: string, onError?: RuleErrorSink): string =>
   return '';
 };
 
-export const substituteToken = (
-  match: string,
-  root: string,
-  segments: string,
-  scope: Scope,
-  onError?: RuleErrorSink,
-): string => {
+export const substituteToken = (root: string, segments: string, scope: Scope, onError?: RuleErrorSink): string => {
   const path = segments.slice(1);
   const token = `${root}${segments}`;
   if (path && hasUnsafeSegment(path)) return empty(token, `{{${token}}} addresses a prototype key`, onError);
