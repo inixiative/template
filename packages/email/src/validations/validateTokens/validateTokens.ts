@@ -42,51 +42,39 @@ const isGuarded = (path: string, optionalDepth: number, guarded: Set<string>): b
   return false;
 };
 
-const checkToken = (token: string, root: string, segments: string, walk: Walk): void => {
-  const issue = (message: string): void => {
-    walk.issues.push({ path: `{{${token}}}`, message });
-  };
-
+const tokenProblem = (token: string, root: string, segments: string, walk: Walk): string | undefined => {
   if (root === 'system') {
     const name = segments.slice(1);
-    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name))) return;
-    return issue('is not a system token the rail provides');
+    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name))) return undefined;
+    return 'is not a system token the rail provides';
   }
 
   const viaEach = walk.bindings.has(root);
   if (!viaEach && !RESERVED_SCOPE_ROOTS.has(root)) {
-    return issue('names no scope root (sender, recipient, data, system) or enclosing {{#each}} binding');
+    return 'names no scope root (sender, recipient, data, system) or enclosing {{#each}} binding';
   }
   const resolved = resolveBindingPath(token, walk.bindings);
-  if (resolved === undefined) {
-    if (!segments) return;
-    return issue('reads a field off a loop index');
-  }
-  if (!walk.options.lens) return;
+  if (resolved === undefined) return segments ? 'reads a field off a loop index' : undefined;
+  if (!walk.options.lens) return undefined;
 
   const kind = tokenPathKind(resolved, walk.options.lens, walk.eachRoots.has(root) || viaEach);
   switch (kind.kind) {
     case 'missing':
-      return issue(`"${resolved}" is not provided by this template's lens`);
+      return `"${resolved}" is not provided by this template's lens`;
     case 'pastScalar':
-      return issue(`"${resolved}" reads through a scalar`);
+      return `"${resolved}" reads through a scalar`;
     case 'listWithoutEach':
-      return issue(`"${resolved}" reads through a list — iterate it with {{#each}}`);
+      return `"${resolved}" reads through a list — iterate it with {{#each}}`;
     case 'object':
-      return issue(
-        viaEach && !segments
-          ? 'names the loop element, which is an object — pick a field'
-          : `"${resolved}" is an object, not a value — pick a field`,
-      );
+      return viaEach && !segments
+        ? 'names the loop element, which is an object — pick a field'
+        : `"${resolved}" is an object, not a value — pick a field`;
     case 'ok':
-      if (viaEach && !segments && !kind.scalarList)
-        return issue('names the loop element, which is an object — pick a field');
+      if (viaEach && !segments && !kind.scalarList) return 'names the loop element, which is an object — pick a field';
       if (kind.optionalDepth > 0 && !isGuarded(resolved, kind.optionalDepth, walk.guarded)) {
-        return issue(
-          `"${resolved}" may be empty — guard it with {{#if rule={"field":"${resolved}","operator":"exists"}}} … {{else}} … {{/if}}`,
-        );
+        return `"${resolved}" may be empty — guard it with {{#if rule={"field":"${resolved}","operator":"exists"}}} … {{else}} … {{/if}}`;
       }
-      return;
+      return undefined;
   }
 };
 
@@ -94,7 +82,10 @@ const checkText = (text: string, walk: Walk): void => {
   for (const match of text.matchAll(TOKEN_PATTERN)) {
     const root = match[1];
     const segments = match[2] ?? '';
-    if (root) checkToken(`${root}${segments}`, root, segments, walk);
+    if (!root) continue;
+    const token = `${root}${segments}`;
+    const message = tokenProblem(token, root, segments, walk);
+    if (message) walk.issues.push({ path: `{{${token}}}`, message });
   }
 };
 
