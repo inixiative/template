@@ -11,6 +11,7 @@ import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logge
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
 import { registerHooks } from '#/hooks';
+import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { flushOutbox } from '#/jobs/outbox';
@@ -33,7 +34,7 @@ export const initializeWorker = async (): Promise<void> => {
   }
 
   // BullMQ Worker needs its own connection (separate from Queue)
-  workerRedis = createRedisConnection('Redis:BullMQ:Worker');
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
 
   jobsWorker = new Worker(
     'jobs',

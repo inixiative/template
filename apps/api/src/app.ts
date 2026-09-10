@@ -4,6 +4,7 @@
  * @uses primitive:routeTemplates
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { registerSecuritySchemes } from '#/lib/auth/securitySchemes';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { Tags } from '#/modules/tags';
@@ -25,6 +26,7 @@ app.onError(errorHandlerMiddleware);
 app.route('/', routes);
 
 // OpenAPI
+registerSecuritySchemes(app);
 app.doc31('/openapi/docs', {
   openapi: '3.1.0',
   info: { title: `${process.env.PROJECT_NAME ?? 'Template'} API`, version: '0.1.0' },

@@ -137,3 +137,51 @@ export const clearHookRegistry = () => {
     delete registeredHooks[model];
   }
 };
+
+export type DbInvariantAction = Exclude<DbAction, DbAction.delete | DbAction.deleteMany>;
+
+export type DbInvariantOptions = {
+  model: string;
+  action: DbInvariantAction;
+  data: unknown;
+};
+
+export type DbInvariant = (options: DbInvariantOptions) => void | Promise<void>;
+
+type DbInvariantRegistration = { targets: string[]; invariant: DbInvariant };
+
+const registeredInvariants: Record<string, DbInvariantRegistration[]> = {};
+
+const invariantRegistrations = new Map<string, DbInvariantRegistration>();
+
+export const registerDbInvariant = (name: string, model: string | string[] | '*', invariant: DbInvariant) => {
+  if (invariantRegistrations.has(name)) {
+    log.warn(`Invariant '${name}' already registered - skipping duplicate`, LogScope.hook);
+    return;
+  }
+
+  const registration: DbInvariantRegistration = { targets: castArray(model), invariant };
+  invariantRegistrations.set(name, registration);
+  for (const target of registration.targets) {
+    registeredInvariants[target] ??= [];
+    registeredInvariants[target].push(registration);
+  }
+};
+
+export const unregisterDbInvariant = (name: string) => {
+  const registration = invariantRegistrations.get(name);
+  if (!registration) return;
+  for (const target of registration.targets) {
+    registeredInvariants[target] = (registeredInvariants[target] ?? []).filter(
+      (candidate) => candidate !== registration,
+    );
+  }
+  invariantRegistrations.delete(name);
+};
+
+export const runInvariants = async (model: string, action: DbInvariantAction, data: unknown): Promise<void> => {
+  const registrations = new Set([...(registeredInvariants[model] ?? []), ...(registeredInvariants['*'] ?? [])]);
+  for (const { invariant } of registrations) {
+    await invariant({ model, action, data });
+  }
+};

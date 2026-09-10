@@ -6,20 +6,36 @@
  */
 import type { Db, OpenTransaction } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
-import { DbAction, executeHooks, type HookOptions, HookTiming } from '@template/db/extensions/hookRegistry';
+import {
+  DbAction,
+  executeHooks,
+  type HookOptions,
+  HookTiming,
+  runInvariants,
+} from '@template/db/extensions/hookRegistry';
 import { claimPendingRegistration, getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 
-export type { HookFunction, HookOptions, ManyAction, SingleAction } from '@template/db/extensions/hookRegistry';
+export type {
+  DbInvariant,
+  DbInvariantAction,
+  DbInvariantOptions,
+  HookFunction,
+  HookOptions,
+  ManyAction,
+  SingleAction,
+} from '@template/db/extensions/hookRegistry';
 export {
   clearHookRegistry,
   DbAction,
   executeHooks,
   HookTiming,
   registerDbHook,
+  registerDbInvariant,
+  unregisterDbInvariant,
 } from '@template/db/extensions/hookRegistry';
 
 const SLOW_MUTATION_THRESHOLD = 5000;
@@ -70,6 +86,7 @@ export const mutationLifeCycleExtension = () => {
         async create(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
+          await runInvariants(model, DbAction.create, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
@@ -92,6 +109,7 @@ export const mutationLifeCycleExtension = () => {
         async createManyAndReturn(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
+          await runInvariants(model, DbAction.createManyAndReturn, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
@@ -107,6 +125,7 @@ export const mutationLifeCycleExtension = () => {
         async update(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
+          await runInvariants(model, DbAction.update, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
@@ -131,6 +150,7 @@ export const mutationLifeCycleExtension = () => {
         async updateManyAndReturn(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
+          await runInvariants(model, DbAction.updateManyAndReturn, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
@@ -148,6 +168,8 @@ export const mutationLifeCycleExtension = () => {
         async upsert(params) {
           const { model, operation, args, query } = params;
           const openTransaction = getCurrentTransaction(model, operation, params);
+          const { create, update } = args as { create?: unknown; update?: unknown };
+          await runInvariants(model, DbAction.upsert, [create, update]);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
           const { where } = args as { where: Record<string, unknown> };
