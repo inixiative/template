@@ -548,16 +548,19 @@ Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{has
 declared on the template's code registry entry (`apps/api/src/lib/email/registry.ts`,
 `render: { onIssue, substitute }`), never on the row:
 
-- **subject issue** — always fatal for that template (a truncated subject is never sent).
-- **`onIssue: 'fail'`** (default) — any body issue throws `EmailRenderError('render_failed')`
-  → the CommunicationLog is marked `failed` → BullMQ retries → DLQ. System mail (verification,
-  password reset) stays here.
+- **subject issue** — always fatal for that render (a truncated subject is never sent).
+- **`onIssue: 'platform'`** (default) — a branded (tenant-tier) render with any issue, or one
+  that cannot be composed, is re-rendered from the platform tier's own row of the same slug:
+  unbranded but stable, so the mail still goes out. It must render clean or the send fails. A
+  render that already resolved at the platform tier has nowhere to go and fails.
+- **`onIssue: 'fail'`** — opt-in for a template that would rather wait and be fixed: any body
+  issue throws `EmailRenderError('render_failed')` → the CommunicationLog is marked `failed` →
+  BullMQ retries → DLQ.
 - **`onIssue: 'degrade'`** — the send proceeds with the failing blocks and tokens rendered
   empty; the issues are stored on `CommunicationLog.renderIssues` and logged.
-- **`substitute: '<slug>'`** — when the primary cannot be composed (missing template row,
-  missing component, cycle) or would fail under `fail`, the substitute is rendered instead,
-  with the primary's sender, recipient and variables. It must render clean or the send fails.
-  A substitute may not itself name a substitute.
+- **`substitute: '<slug>'`** — a different template rendered instead of the platform fallback,
+  with the primary's sender, recipient and variables. Same clean-or-fail rule. A substitute may
+  not itself name a substitute.
 
 A non-system template rendered for a recipient with no contact row fails
 (`unsubscribe_unavailable`) before anything is sent: the unsubscribe link is not optional.

@@ -16,7 +16,7 @@ export type RecipientSpec = {
   where: Condition;
 };
 
-export type RenderIssuePolicy = 'fail' | 'degrade';
+export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
 
 export type RenderSpec = {
   onIssue?: RenderIssuePolicy;
@@ -97,6 +97,6 @@ export const registry: Record<string, EmailEntry> = assertSubstitutes({
 export const renderPolicyFor = (
   slug: string,
 ): Required<Pick<RenderSpec, 'onIssue'>> & Pick<RenderSpec, 'substitute'> => ({
-  onIssue: registry[slug]?.render?.onIssue ?? 'fail',
+  onIssue: registry[slug]?.render?.onIssue ?? 'platform',
   substitute: registry[slug]?.render?.substitute,
 });

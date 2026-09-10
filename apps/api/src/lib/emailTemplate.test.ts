@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import type { Organization } from '@template/db/generated/client/client';
+import { cleanupTouchedTables, createOrganization } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -13,16 +14,32 @@ const mjml = (content: string) =>
 const save = (slug: string, content: string, subject = 'Hello {{recipient.name}}') =>
   saveEmailTemplate({ slug, name: slug, subject, kind: 'system', mjml: mjml(content), ownerModel: 'default' });
 
+const saveForOrganization = (organizationId: string, slug: string, content: string) =>
+  saveEmailTemplate({
+    slug,
+    name: slug,
+    subject: 'Hello {{recipient.name}}',
+    kind: 'system',
+    mjml: mjml(content),
+    ownerModel: 'Organization',
+    organizationId,
+  });
+
 const platform = { type: 'platform' } as const;
 const variables = { recipient: { id: 'u1', name: 'Ada', email: 'ada@example.com' }, data: {} };
 
 describe('settleTemplate — the registry entry decides what an issue does', () => {
+  let organization: Organization;
+
   beforeAll(async () => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerRulesHook();
+    organization = (await createOrganization()).entity;
     await save('clean', 'Hi {{recipient.name}}');
     await save('holey', 'Hi {{recipient.name}} {{data.missing}}');
     await save('bad-subject', 'Hi {{recipient.name}}', 'Code {{data.code}}');
+    await save('branded', 'Hi {{recipient.name}} from the platform');
+    await saveForOrganization(organization.id, 'branded', 'Hi {{recipient.name}} {{data.brokenBrand}}');
   });
 
   afterAll(async () => {
@@ -38,8 +55,26 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     expect(settled.mjml).toContain('Hi Ada');
   });
 
-  it('fail is the default: a body issue refuses the send', async () => {
+  it('the default is the platform tier: a broken branded template sends the unbranded one', async () => {
+    const settled = await settleTemplate(
+      'branded',
+      { type: 'Organization', organizationId: organization.id },
+      variables,
+    );
+    expect(settled.mjml).toContain('from the platform');
+    expect(settled.issues).toEqual([]);
+  });
+
+  it('the platform tier has nowhere to fall back to, so its own issue refuses the send', async () => {
     await expect(settleTemplate('holey', platform, variables)).rejects.toBeInstanceOf(EmailRenderError);
+  });
+
+  it('fail is an opt-in: a branded template that would rather wait refuses instead of unbranding', async () => {
+    await expect(
+      settleTemplate('branded', { type: 'Organization', organizationId: organization.id }, variables, undefined, {
+        onIssue: 'fail',
+      }),
+    ).rejects.toBeInstanceOf(EmailRenderError);
   });
 
   it('degrade sends the body with the token empty and records the typed issue', async () => {

@@ -144,11 +144,14 @@ the failing block, and it walks down to the base owner and then fails.
 4. **One render behaviour, declared in the registry entry.** `EmailErrorPolicy`, the row's
    `onError`, and `EMAIL_INLINE_RENDER_ERRORS` are gone. Render produces `RenderIssue[]`
    (`kind: rule | token | each`, `path`, `detail`); a failing block or token renders nothing.
-   `settleTemplate` reads `render: { onIssue, substitute }` from the code registry entry: `fail`
-   (default — system mail stays here) throws `render_failed` and the job retries to DLQ;
-   `degrade` sends and stores the issues on `CommunicationLog.renderIssues`; `substitute` names
-   a slug rendered instead when the primary cannot be composed or would fail, with the primary's
-   sender, recipient and variables, and it must render clean. A subject issue is always fatal.
+   `settleTemplate` reads `render: { onIssue, substitute }` from the code registry entry:
+   `platform` (default, Aron 2026-09-10 after the first merge: "the default needs to be the one
+   that falls back to the system template, which should be stable, so these things could go out
+   even if they're not branded properly") re-renders the platform tier's own row of the slug when
+   a branded render has an issue or cannot be composed; `fail` is the opt-in for a template that
+   would rather wait; `degrade` sends and stores the issues on `CommunicationLog.renderIssues`;
+   `substitute` names a different slug instead of the platform row. Every fallback must render
+   clean or the send fails. A subject issue is always fatal.
    A non-system template with no recipient contact fails (`unsubscribe_unavailable`) — the
    unsubscribe link is not optional. `{{#each}}` with a throwing filter renders nothing (no more
    partial lists).
