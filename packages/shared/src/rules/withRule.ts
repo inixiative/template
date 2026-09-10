@@ -4,34 +4,37 @@
  * @partOf primitive:shared
  * @uses none
  */
-import { type Condition, checkRuleAgainstLens, type Lens, type LensNarrowing } from '@inixiative/json-rules';
+import {
+  type Condition,
+  checkRuleAgainstLens,
+  type Lens,
+  type LensNarrowing,
+  type RuleValue,
+  requiredBindings,
+} from '@inixiative/json-rules';
 
 export type RuleLens = Lens | LensNarrowing;
 
 /** A row a stored rule names by id. `model` is the lens's model name for that source. */
 export type RuleReference = { model: string; id: string };
 
-export type RuleReferences = {
-  references: RuleReference[];
-  /** The rule reads a referenced row from `path` / `bind`, or describes it without naming it. */
-  dynamic: boolean;
-};
-
 export const referenceKey = (reference: RuleReference): string => `${reference.model}|${reference.id}`;
 
 /** One way a stored rule has stopped having a correct evaluation. */
 export type RuleIssue =
+  | { kind: 'binding'; name: string; detail: string }
   | { kind: 'vocabulary'; detail: string }
-  | { kind: 'dynamic'; detail: string }
-  | { kind: 'missing'; detail: string; reference: RuleReference };
+  | { kind: 'reference'; reference: RuleReference; detail: string };
 
 export type RuleHealth = {
   lens: RuleLens;
   rule: Condition;
   /** The rows the rule names, extracted by the caller's rules module — it knows which sources are ids. */
-  references: RuleReferences;
+  references: RuleReference[];
   /** Reference keys confirmed usable by the caller's own read. Absent means none were confirmed. */
   live?: ReadonlySet<string>;
+  /** The bindings the caller evaluates with. A required name outside this map is an issue. */
+  bindings?: Record<string, RuleValue>;
 };
 
 export type RuleArms<T> = {
@@ -41,27 +44,24 @@ export type RuleArms<T> = {
   sound: (rule: Condition) => T;
 };
 
-// why: a stored rule degrades two ways — the lens stops admitting it, or a row it names is gone —
-// why: and both are asked here, at evaluation, against the current lens and the caller's live set.
-// why: Absence is the answer on every arm: a reference nobody confirmed is missing, a lens that
-// why: no longer resolves the rule is a violation. Nothing is stored and nothing is inferred.
-export const ruleIssues = ({ lens, rule, references, live }: RuleHealth): RuleIssue[] => {
-  const issues: RuleIssue[] = checkRuleAgainstLens(rule, lens).violations.map((violation) => ({
-    kind: 'vocabulary',
-    detail: `rule is outside the lens vocabulary — ${violation.path}: ${violation.reason}`,
-  }));
-  if (references.dynamic) {
+export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
+  const issues: RuleIssue[] = [];
+  for (const name of requiredBindings(rule)) {
+    if (bindings && Object.hasOwn(bindings, name)) continue;
+    issues.push({ kind: 'binding', name, detail: `rule requires a binding that was not supplied: ${name}` });
+  }
+  for (const violation of checkRuleAgainstLens(rule, lens).violations) {
     issues.push({
-      kind: 'dynamic',
-      detail: 'rule reads a referenced row from path or bind, or describes it without naming it — refusing to evaluate',
+      kind: 'vocabulary',
+      detail: `rule is outside the lens vocabulary — ${violation.path}: ${violation.reason}`,
     });
   }
-  for (const reference of references.references) {
+  for (const reference of references) {
     if (live?.has(referenceKey(reference))) continue;
     issues.push({
-      kind: 'missing',
-      detail: `rule names a ${reference.model} that no longer resolves: ${reference.id}`,
+      kind: 'reference',
       reference,
+      detail: `rule names a ${reference.model} that no longer resolves: ${reference.id}`,
     });
   }
   return issues;
@@ -69,8 +69,8 @@ export const ruleIssues = ({ lens, rule, references, live }: RuleHealth): RuleIs
 
 /**
  * Evaluate a stored rule through one fork: `degraded` when it cannot be evaluated correctly,
- * `sound` when it can. Every surface that runs stored rules goes through here, so the fallback
- * is declared where the rule is used and cannot be forgotten.
+ * `sound` when it can. Two questions: is every binding the rule requires supplied, and is the
+ * rule still valid — admitted by the current lens, every row it names still live.
  */
 export const withRule = <T>(health: RuleHealth, arms: RuleArms<T>): T => {
   const issues = ruleIssues(health);

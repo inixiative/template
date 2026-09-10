@@ -50,12 +50,7 @@ export const syncRuleReferences = async (
   if (issues.length)
     throw new RuleReferenceError(`${owner.model} ${owner.id}: rule outside the lens vocabulary — ${issues[0]}`);
 
-  const { references, dynamic } = contentRuleReferences(lens, ...contents);
-  if (dynamic) {
-    throw new RuleReferenceError(
-      `${owner.model} ${owner.id}: a rule reads a referenced row from path or bind, or describes it without naming it — name the row instead`,
-    );
-  }
+  const references = contentRuleReferences(lens, ...contents);
 
   const ownerColumn = fkColumn('ownerModel', owner.model);
   const existing = (await db.ruleReference.findMany({
@@ -65,8 +60,6 @@ export const syncRuleReferences = async (
     existing.map((edge) => [referenceKey({ model: edge.referencedModel, id: edge.referencedId }), edge]),
   );
 
-  // why: the gate is delta-only and fenced — a reference already held stays editable so a save can
-  // why: remove it, and the lock stops a concurrent delete landing between this check and the edge.
   const live = await lockedLiveReferences(references);
   const fresh = references.find((ref) => !held.has(referenceKey(ref)) && !live.has(referenceKey(ref)));
   if (fresh) throw new RuleReferenceError(`rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`);

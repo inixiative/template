@@ -7,10 +7,9 @@
 import { type Condition, ruleSourceValues } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { collectRules } from '@template/email/render/conditionParser';
-import { type RuleLens, type RuleReference, type RuleReferences, referenceKey } from '@template/shared/rules';
+import { type RuleLens, type RuleReference, referenceKey } from '@template/shared/rules';
 
 export type RuleRowReference = RuleReference;
-export type RuleRowReferences = RuleReferences;
 export { type RuleLens, referenceKey };
 
 type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
@@ -18,12 +17,10 @@ type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
 const isRowIdSource = (model: string, field: string): boolean =>
   (prismaMap.models as unknown as IdFields)[model]?.fields[field]?.isId === true;
 
-// why: extraction is a function of the rule AND the lens, so the memo is keyed by both — the same
-// why: rule read through a different lens names different rows.
-const memo = new WeakMap<RuleLens, Map<string, RuleRowReferences>>();
+const memo = new WeakMap<RuleLens, Map<string, RuleRowReference[]>>();
 
-export const ruleReferences = (lens: RuleLens, rule: Condition): RuleRowReferences => {
-  const byRule = memo.get(lens) ?? new Map<string, RuleRowReferences>();
+export const ruleReferences = (lens: RuleLens, rule: Condition): RuleRowReference[] => {
+  const byRule = memo.get(lens) ?? new Map<string, RuleRowReference[]>();
   memo.set(lens, byRule);
   const memoKey = JSON.stringify(rule);
   const cached = byRule.get(memoKey);
@@ -34,28 +31,23 @@ export const ruleReferences = (lens: RuleLens, rule: Condition): RuleRowReferenc
   return computed;
 };
 
-const computeRuleReferences = (lens: RuleLens, rule: Condition): RuleRowReferences => {
+const computeRuleReferences = (lens: RuleLens, rule: Condition): RuleRowReference[] => {
   const references: RuleRowReference[] = [];
-  let dynamic = false;
   for (const source of ruleSourceValues(lens, rule)) {
     if (!isRowIdSource(source.model, source.field)) continue;
-    if (source.dynamic) dynamic = true;
     for (const value of source.values) {
       if (typeof value === 'string' && value) references.push({ model: source.model, id: value });
     }
   }
-  return { references, dynamic };
+  return references;
 };
 
-export const contentRuleReferences = (lens: RuleLens, ...contents: string[]): RuleRowReferences => {
+export const contentRuleReferences = (lens: RuleLens, ...contents: string[]): RuleRowReference[] => {
   const seen = new Set<string>();
   const references: RuleRowReference[] = [];
-  let dynamic = false;
   for (const content of contents) {
     for (const rule of collectRules(content)) {
-      const found = ruleReferences(lens, rule);
-      dynamic ||= found.dynamic;
-      for (const reference of found.references) {
+      for (const reference of ruleReferences(lens, rule)) {
         const key = referenceKey(reference);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -63,5 +55,5 @@ export const contentRuleReferences = (lens: RuleLens, ...contents: string[]): Ru
       }
     }
   }
-  return { references, dynamic };
+  return references;
 };

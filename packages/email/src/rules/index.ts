@@ -4,7 +4,6 @@ export {
   contentRuleReferences,
   type RuleLens,
   type RuleRowReference,
-  type RuleRowReferences,
   referenceKey,
   ruleReferences,
 } from './ruleReferences';

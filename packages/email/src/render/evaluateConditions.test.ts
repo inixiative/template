@@ -140,21 +140,32 @@ describe('evaluateConditions — reference liveness', () => {
   });
 });
 
-describe('evaluateConditions — unregisterable and unterminated rules', () => {
-  it('a rule that reads its referenced row dynamically is a rule error even with no stale refs', () => {
+describe('evaluateConditions — bindings and unterminated rules', () => {
+  it('a rule that reads its referenced row from path evaluates against the data it reads', () => {
     const rule = JSON.stringify({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'equals', path: 'recipient.id' },
     });
     const errors: string[] = [];
-    const out = evaluateConditions(
-      `{{#if rule=${rule}}}X{{else}}Y{{/if}}`,
-      { recipient: { id: 'u1', tagAttachments: [] } },
-      (m) => errors.push(m),
+    const tpl = `{{#if rule=${rule}}}X{{else}}Y{{/if}}`;
+    expect(
+      evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [{ tag: { id: 'u1' } }] } }, (m) =>
+        errors.push(m),
+      ),
+    ).toBe('X');
+    expect(evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [] } }, (m) => errors.push(m))).toBe('Y');
+    expect(errors).toHaveLength(0);
+  });
+
+  it('a rule that requires a binding nobody supplies is a rule error, never a match', () => {
+    const rule = JSON.stringify({ field: 'recipient.name', operator: 'equals', bind: 'name' });
+    const errors: string[] = [];
+    const out = evaluateConditions(`{{#if rule=${rule}}}X{{else}}Y{{/if}}`, { recipient: { name: 'Ada' } }, (m) =>
+      errors.push(m),
     );
     expect(out).toBe('Y');
-    expect(errors).toHaveLength(1);
+    expect(errors).toEqual(['rule requires a binding that was not supplied: name']);
   });
 
   it('an unterminated block is suppressed and reported, never emitted raw', () => {

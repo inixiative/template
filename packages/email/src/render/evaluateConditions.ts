@@ -64,10 +64,6 @@ const renderBranches = (
       continue;
     }
 
-    // why: the fork every stored rule goes through. Degraded — the lens no longer admits it, it reads
-    // why: its row dynamically, or a row it names is outside the live set (absent set = nothing
-    // why: confirmed) — is a rule error, never a match. Sound runs `check`, which returns `true` on
-    // why: match or a reason string on mismatch; a genuinely invalid rule throws and is reported.
     const rule = branch.rule!;
     const rendered = withRule(
       { lens: emailRuleNarrowing, rule, references: ruleReferences(emailRuleNarrowing, rule), live: liveRefs },

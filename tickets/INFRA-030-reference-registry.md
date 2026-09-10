@@ -59,8 +59,9 @@ dotted path (the #9/#10 shape, rejected for exactly that). Nested and dotted rel
 one path; quantifier- and operator-blind (`none` / `notIn` name their values as much as `any` /
 `in`) except no-value operators; a windowing `filter` is walked at its anchor; an aggregate's own
 threshold is not a source value; `path` / `bind`, non-enumerating operator shapes (substring,
-pattern, range, window) and unknown operators report `dynamic` — the fail-closed flag. This
-registry is the named first consumer that API was waiting for.
+pattern, range, window) and unknown operators report `dynamic`. A `dynamic` leaf names no row,
+so it registers no edge — it is not a refusal (ruling 2026-09-10, below). This registry is the
+named first consumer that API was waiting for.
 
 `packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`. The
 narrowing is `mapDefaults`-shaped: a source on each referenceable model's `id` (`Tag`,
@@ -77,8 +78,8 @@ column = a `syncRuleReferences` call from its save path.
 Edges are written by `syncRuleReferences(owner, contents, lens)` — a service in
 `packages/email/src/rules/`, called by `saveEmailTemplate` inside its transaction for the template
 and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
-nothing for a hook to catch that the call does not. The gate (vocabulary, `dynamic`, delta against
-live rows under `findForUpdate`) throws `RuleReferenceError`, a sibling of
+nothing for a hook to catch that the call does not. The gate (vocabulary, delta against live rows
+under `findForUpdate`) throws `RuleReferenceError`, a sibling of
 `ConditionValidationError` on the same path. The one hook left is on the referenced side.
 
 ### Staleness — two clocks on the edge row
@@ -115,15 +116,21 @@ section's — it is the one fork, not the email package's own.
 ### `withRule` — the one fork a stored rule is evaluated through
 
 `packages/shared/src/rules/withRule.ts`, in `shared` because it is pure: json-rules plus a live set
-the caller hands in. `withRule({ lens, rule, references, live }, { degraded, sound })` asks, at
-evaluation and against the *current* lens, whether the rule can be evaluated correctly. Three
-questions, one answer:
+the caller hands in. `withRule({ lens, rule, references, live, bindings }, { degraded, sound })`
+asks, at evaluation and against the *current* lens, whether the rule can be evaluated correctly.
+Two questions, one answer (ruling 2026-09-10):
 
-* the lens still admits it (`checkRuleAgainstLens` — so a lens change after save degrades the
-  rule instead of silently narrowing it; the save gate alone never saw that);
-* it names its rows rather than reading them from `path` / `bind`;
-* every row it names is in the live set the caller confirmed. An absent set is nothing confirmed,
-  so every reference is missing — absence is the answer on every arm.
+* **bindings** — every name `requiredBindings(rule)` reports is present in the caller's map.
+  A bind the author marks `bindOptional` (json-rules 2.22.0) is not required; unsupplied, it
+  evaluates and compiles as `null`, and the leaf is never pruned.
+* **validity** — the lens still admits the rule (`checkRuleAgainstLens`, so a lens change after
+  save degrades the rule instead of silently narrowing it), and every row it names is in the live
+  set the caller confirmed. An absent set is nothing confirmed, so every reference is an issue —
+  absence is the answer on every arm.
+
+A rule that reads its value from `path` / `bind` names no row: it registers no edge and is not
+degraded for it. Refusing that was the registry's limitation leaking into evaluation, not a
+soundness question — a bound value is valid exactly when the binding is supplied.
 
 Degraded means "do nothing new, say why": the arm receives every issue, not the first. Sound runs
 the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
@@ -147,11 +154,12 @@ tightened around today's two models.
 `apps/api/src/hooks/ruleReference/ruleReference.test.ts` (18, DB-backed — scoper,
 preventHardDelete, rules): typed edges per surface and per referenced model, subject as a surface,
 set-diff keeps survivors, clear, components, refused on missing /
-soft-deleted / dynamic, a soft-delete stamps every edge naming the target and a restore clears
-them, a purge nulls the FK and leaves the edge naming the row, the client refuses a hard delete,
-the registry refuses a contradicting FK. `packages/shared/src/rules/withRule.test.ts` (7): sound,
-missing, no live set, no references, dynamic, lens drift, every issue reported.
-`packages/email/src/rules/ruleReferences.test.ts` (6) and the reference-liveness cases in
+soft-deleted, a `path` or describing operator saves with no edge, a soft-delete stamps every edge
+naming the target and a restore clears them, a purge nulls the FK and leaves the edge naming the
+row, the client refuses a hard delete, the registry refuses a contradicting FK.
+`packages/shared/src/rules/withRule.test.ts` (8): sound, reference issue, no live set, no
+references, missing binding, supplied binding (null included), lens drift, every issue reported.
+`packages/email/src/rules/ruleReferences.test.ts` (7) and the reference-liveness cases in
 `evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
 fails closed, an omitted set fails closed too (nothing was confirmed). The renderer tests use
 `data.*` paths because rules are now checked against the real lens at evaluation.
@@ -180,8 +188,8 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   *newly added* dead reference is a 422. Archived owners need no repair pass on restore, because
   there is no projection to have gone stale while they were away.
 - **Render**: rules evaluate over the **nested** `{ sender, recipient, data }` object (dotted
-  to-one paths resolve; the one-level flattening could not); a `dynamic` rule is a rule error
-  unconditionally, not only when something is already stale; an unterminated `{{#if}}` is
+  to-one paths resolve; the one-level flattening could not); a rule that requires an unsupplied
+  binding is a rule error, never a match; an unterminated `{{#if}}` is
   reported and suppressed instead of shipping raw rule JSON in the email body; a malformed
   nested marker can no longer let a `{{/if}}` inside a JSON string bisect the outer block.
 - **Hard delete**: the client path is *prevented* (`preventHardDelete`); the purge/redact path
@@ -230,6 +238,24 @@ Known limitations, deliberately not papered over:
 10. Every surface evaluates stored rules through one wrapper with two arms, so the fallback is
     declared where the rule is used and cannot be forgotten. It lives in `packages/shared`
     because it is pure, and both the email package and Zealot's api consume it.
+
+## Ruling (Aron, 2026-09-10) — two failure paths, nothing else
+
+Zealot's `withRule` (ZLT-4444 / #2252) asked three questions: vocabulary, dynamic, missing. The
+template keeps two:
+
+1. **Bindings.** A `{ bind }` leaf carries an optional flag (`bindOptional`, json-rules 2.22.0).
+   Without it the binding is required, and an absent required binding fails the rule. An absent
+   optional binding resolves to `null` and the rule is evaluated as written — the leaf is never
+   pruned, because pruning would flip `in {{bind}}` from "matches nothing" to "matches everything",
+   the engine adding meaning to a bind.
+2. **Gone data.** A row the rule names that no longer resolves marks the rule degraded, read off the
+   `RuleReference` edges. Lens-vocabulary drift is the same validity failure with a different
+   reason string, not a third kind.
+
+"Dynamic" is gone: a value read through `path` / `bind` names no row, so the registry records no
+edge for that leaf and evaluation is not refused for it. A bound value is valid exactly when its
+binding is supplied, which the first path already decides.
 
 ## Zealot follow-through
 

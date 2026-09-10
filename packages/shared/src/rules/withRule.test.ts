@@ -22,7 +22,7 @@ const tagged: Condition = {
   arrayOperator: 'any',
   condition: { field: 'tag.id', operator: 'equals', value: 'tag-1' },
 };
-const tagRef = { references: [{ model: 'Tag', id: 'tag-1' }], dynamic: false };
+const tagRef = [{ model: 'Tag', id: 'tag-1' }];
 const arms = { degraded: (issues: ReturnType<typeof ruleIssues>) => issues.map((i) => i.kind), sound: () => ['sound'] };
 
 describe('withRule', () => {
@@ -31,37 +31,49 @@ describe('withRule', () => {
     expect(withRule({ lens, rule: tagged, references: tagRef, live }, arms)).toEqual(['sound']);
   });
 
-  it('a named row outside the live set is missing — absence is the answer', () => {
-    expect(withRule({ lens, rule: tagged, references: tagRef, live: new Set() }, arms)).toEqual(['missing']);
+  it('a named row outside the live set is a reference issue — absence is the answer', () => {
+    expect(withRule({ lens, rule: tagged, references: tagRef, live: new Set() }, arms)).toEqual(['reference']);
   });
 
-  it('no live set means nothing was confirmed, so every named row is missing', () => {
-    expect(withRule({ lens, rule: tagged, references: tagRef }, arms)).toEqual(['missing']);
+  it('no live set means nothing was confirmed, so every named row is a reference issue', () => {
+    expect(withRule({ lens, rule: tagged, references: tagRef }, arms)).toEqual(['reference']);
   });
 
   it('a rule with no references and no live set is sound — there is nothing to confirm', () => {
     const plain: Condition = { field: 'tier', operator: 'equals', value: 'gold' };
-    expect(withRule({ lens, rule: plain, references: { references: [], dynamic: false } }, arms)).toEqual(['sound']);
+    expect(withRule({ lens, rule: plain, references: [] }, arms)).toEqual(['sound']);
   });
 
-  it('a dynamic reference is degraded even when the live set is full', () => {
-    const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
-    const health = { lens, rule: tagged, references: { ...tagRef, dynamic: true }, live };
-    expect(withRule(health, arms)).toEqual(['dynamic']);
+  it('a required binding the caller did not supply is a binding issue', () => {
+    const bound: Condition = { field: 'tier', operator: 'equals', bind: 'tier' };
+    expect(withRule({ lens, rule: bound, references: [] }, arms)).toEqual(['binding']);
+    expect(withRule({ lens, rule: bound, references: [], bindings: {} }, arms)).toEqual(['binding']);
+    const issues = ruleIssues({ lens, rule: bound, references: [] });
+    expect(issues[0]).toMatchObject({ kind: 'binding', name: 'tier' });
+  });
+
+  it('a supplied binding is sound, null included — presence is the contract', () => {
+    const bound: Condition = { field: 'tier', operator: 'equals', bind: 'tier' };
+    expect(withRule({ lens, rule: bound, references: [], bindings: { tier: 'gold' } }, arms)).toEqual(['sound']);
+    expect(withRule({ lens, rule: bound, references: [], bindings: { tier: null } }, arms)).toEqual(['sound']);
   });
 
   it('a rule the lens no longer admits is degraded at evaluation, not only at save', () => {
     const drifted: Condition = { field: 'retiredColumn', operator: 'equals', value: 'x' };
-    const issues = ruleIssues({ lens, rule: drifted, references: { references: [], dynamic: false } });
+    const issues = ruleIssues({ lens, rule: drifted, references: [] });
     expect(issues.map((issue) => issue.kind)).toEqual(['vocabulary']);
     expect(issues[0]?.detail).toContain('retiredColumn');
   });
 
   it('reports every issue, not the first — the degraded arm gets the whole picture', () => {
     const drifted: Condition = {
-      all: [{ field: 'retiredColumn', operator: 'equals', value: 'x' }, tagged],
+      all: [
+        { field: 'retiredColumn', operator: 'equals', value: 'x' },
+        { field: 'tier', operator: 'equals', bind: 'tier' },
+        tagged,
+      ],
     };
-    const issues = ruleIssues({ lens, rule: drifted, references: { ...tagRef, dynamic: true } });
-    expect(issues.map((issue) => issue.kind)).toEqual(['vocabulary', 'dynamic', 'missing']);
+    const issues = ruleIssues({ lens, rule: drifted, references: tagRef });
+    expect(issues.map((issue) => issue.kind)).toEqual(['binding', 'vocabulary', 'reference']);
   });
 });
