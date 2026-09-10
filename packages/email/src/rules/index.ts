@@ -24,7 +24,6 @@ export {
 } from './emailProjection';
 export { type EmailRuleDecoration, type EmailRuleFacet, emailRuleDecoration } from './emailRuleDecoration';
 export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing, REFERENCEABLE_MODELS } from './emailRuleLens';
-export { lockedLiveReferences } from './liveReferences';
 export {
   isRailProvidedSystemField,
   RAIL_PROVIDED_SYSTEM_FIELDS,

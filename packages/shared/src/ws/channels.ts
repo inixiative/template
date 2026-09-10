@@ -13,6 +13,10 @@ export const WS_CHANNELS = {
     type: 'query',
     name: (id: string) => channelKey({ _id: 'inquiryRead', path: { id } }),
   },
+  segmentReadManySegmentMembers: {
+    type: 'query',
+    name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
+  },
 } as const;
 
 export type WSChannelFamily = keyof typeof WS_CHANNELS;

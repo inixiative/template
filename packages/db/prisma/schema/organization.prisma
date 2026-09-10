@@ -27,11 +27,13 @@ model Organization {
   emailTemplates       EmailTemplate[]
   ruleReferences       RuleReference[]
   spaces               Space[]
+  customerRefs         CustomerRef[]         @relation("customerRefs")
   providerRefs         CustomerRef[]         @relation("providerRefs")
   authProviders        AuthProvider[]
   auditLogsAsContext   AuditLog[]            @relation("AuditLogContextOrganization")
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectOrganization")
   communicationsSent   CommunicationLog[]    @relation("CommunicationSenderOrganization")
+  segments             Segment[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

@@ -16,8 +16,10 @@ const customerSchema = {
   }).nullable(),
 };
 
-// Provider side - who is the provider (Space for now)
+// Provider side - who is the provider (User, Org, or Space)
 const providerSchema = {
+  providerUser: UserScalarSchema.nullable(),
+  providerOrganization: OrganizationScalarSchema.nullable(),
   providerSpace: SpaceScalarSchema.extend({
     organization: OrganizationScalarSchema,
   }).nullable(),

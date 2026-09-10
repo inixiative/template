@@ -43,5 +43,17 @@ export const cronJobSeeds: SeedFile<CronJob> = {
       maxAttempts: 3,
       backoffMs: 5000,
     },
+    {
+      id: '01900000-0000-7000-8000-000000000003',
+      name: 'sweepSegments',
+      jobId: 'sweepSegments',
+      description: 'Nightly backstop: pause unevaluable dynamic segments and reconcile the rest in dependency order.',
+      pattern: '0 4 * * *',
+      enabled: true,
+      handler: 'sweepSegments',
+      payload: null,
+      maxAttempts: 3,
+      backoffMs: 5000,
+    },
   ],
 };
