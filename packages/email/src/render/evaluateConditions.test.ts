@@ -182,15 +182,14 @@ describe('evaluateConditions — check() throwing at evaluation time', () => {
 });
 
 describe('evaluateConditions — unterminated block', () => {
-  it('passes the remaining content through verbatim when the {{#if}} has no {{/if}}', () => {
-    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} })).toBe('before {{#if rule=true}}A');
+  it('renders nothing from an unterminated {{#if}} on and sinks the issue', () => {
+    const errors: string[] = [];
+    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} }, (m) => errors.push(m.kind))).toBe('before ');
+    expect(errors).toEqual(['rule']);
   });
 
-  it('renders content before an unterminated block and stops at it', () => {
-    const output = evaluateConditions('lead {{#if rule={"field":}}}tail', { recipient: {} });
-
-    expect(output).toContain('lead ');
-    expect(output).toContain('{{#if rule={"field":}}}tail');
+  it('renders content before an unterminated malformed block and stops at it', () => {
+    expect(evaluateConditions('lead {{#if rule={"field":}}}tail', { recipient: {} })).toBe('lead ');
   });
 });
 
@@ -252,5 +251,48 @@ describe('evaluateConditions — {{#each}} resolved structurally, never substitu
 
   it('an empty array still renders empty with no structural change', () => {
     expect(evaluateConditions('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } })).toBe('');
+  });
+});
+
+describe('evaluateConditions — loop bindings are judged through the lens as absolute paths', () => {
+  it('a rule on the loop element evaluates instead of degrading as out-of-vocabulary', () => {
+    const errors: string[] = [];
+    const out = evaluateConditions(
+      '{{#each data.items as=item}}{{#if rule={"field":"item.active","operator":"equals","value":true}}}x{{/if}}{{/each}}',
+      { data: { items: [{ active: true }, { active: false }] } },
+      (m) => errors.push(m.detail),
+    );
+    expect(out).toBe('x');
+    expect(errors).toEqual([]);
+  });
+
+  it('a rule on the loop index evaluates without a lens question', () => {
+    const errors: string[] = [];
+    const out = evaluateConditions(
+      '{{#each data.items as=item index=i}}{{#if rule={"field":"i","operator":"lessThan","value":1}}}first{{/if}}{{/each}}',
+      { data: { items: [1, 2] } },
+      (m) => errors.push(m.detail),
+    );
+    expect(out).toBe('first');
+    expect(errors).toEqual([]);
+  });
+
+  it('an unterminated {{#if}} renders nothing from the marker on and sinks a rule issue', () => {
+    const errors: string[] = [];
+    const out = evaluateConditions('hello {{#if rule=true}}NAME', {}, (m) => errors.push(m.detail));
+    expect(out).toBe('hello ');
+    expect(errors).toEqual(['unterminated {{#if}} block - missing {{/if}}']);
+  });
+
+  it('an each filter naming a gone row degrades the whole block, never a partial list', () => {
+    const errors: string[] = [];
+    const out = evaluateConditions(
+      '{{#each recipient.tagAttachments as=a filter={"field":"a.tag.id","operator":"equals","value":"tag-1"}}}x{{/each}}',
+      { recipient: { tagAttachments: [{ tag: { id: 'tag-1' } }] } },
+      (m) => errors.push(m.detail),
+      new Set(),
+    );
+    expect(out).toBe('');
+    expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 });

@@ -7,7 +7,7 @@
 import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
-import { IF, parseIfBlock } from '@template/email/render/conditionParser';
+import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
@@ -49,14 +49,17 @@ const withoutConditionals = (mjml: string): string => {
   let out = '';
   let i = 0;
   while (i < mjml.length) {
-    const open = mjml.indexOf(IF, i);
-    if (open === -1) {
+    const ifIdx = mjml.indexOf(IF, i);
+    const eachIdx = mjml.indexOf(EACH, i);
+    if (ifIdx === -1 && eachIdx === -1) {
       out += mjml.slice(i);
       break;
     }
+    const isEach = eachIdx !== -1 && (ifIdx === -1 || eachIdx < ifIdx);
+    const open = isEach ? eachIdx : ifIdx;
     out += mjml.slice(i, open);
-    const block = parseIfBlock(mjml, open);
-    i = block ? block.end : open + IF.length;
+    const block = isEach ? parseEachBlock(mjml, open) : parseIfBlock(mjml, open);
+    i = block ? block.end : open + (isEach ? EACH.length : IF.length);
   }
   return out;
 };

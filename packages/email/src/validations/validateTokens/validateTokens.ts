@@ -71,6 +71,7 @@ const tokenProblem = (token: string, root: string, segments: string, walk: Walk)
         : `"${resolved}" is an object, not a value — pick a field`;
     case 'ok':
       if (viaEach && !segments && !kind.scalarList) return 'names the loop element, which is an object — pick a field';
+      if (!viaEach && kind.scalarList) return `"${resolved}" is a list — iterate it with {{#each}}`;
       if (kind.optionalDepth > 0 && !isGuarded(resolved, kind.optionalDepth, walk.guarded)) {
         return `"${resolved}" may be empty — guard it with {{#if rule={"field":"${resolved}","operator":"exists"}}} … {{else}} … {{/if}}`;
       }
@@ -121,6 +122,9 @@ const walkContent = (content: string, walk: Walk): void => {
     if (!block) {
       i = openIdx + EACH.length;
       continue;
+    }
+    if (walk.options.isSubject) {
+      walk.issues.push({ path: `offset ${openIdx}`, message: '{{#each}} is not allowed in the subject line' });
     }
     const bindings: BindingChain = new Map(walk.bindings);
     const eachRoots = new Set(walk.eachRoots);

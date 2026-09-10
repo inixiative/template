@@ -37,7 +37,7 @@ export const settle = (content: string, scope: Scope, options: SettleOptions, on
     } else {
       const block = parseIfBlock(content, openIdx);
       if (!block) {
-        result += settleText(content.slice(openIdx), scope, options, onError);
+        onError?.({ kind: 'rule', detail: 'unterminated {{#if}} block - missing {{/if}}' });
         return result;
       }
       result += settleBranches(block.branches, scope, options, onError);

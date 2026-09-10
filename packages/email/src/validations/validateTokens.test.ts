@@ -92,3 +92,21 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
     expect(validateTokens('{{recipient.anything}}')).toEqual([]);
   });
 });
+
+describe('validateTokens — guards the review found gameable', () => {
+  it('a guard on the Json root does not cover a path beneath it', () => {
+    expect(messages('{{#if rule={"field":"data","operator":"exists"}}}{{data.anything}}{{/if}}')[0]).toContain(
+      'may be empty',
+    );
+  });
+
+  it('a scalar list outside a loop is a list, not a value', () => {
+    expect(messages('{{recipient.tags}}')[0]).toContain('is a list');
+  });
+
+  it('a subject cannot iterate', () => {
+    expect(
+      validateTokens('{{#each recipient.tags as=t}}{{t}}{{/each}}', { lens, isSubject: true }).map((issue) => issue.message)[0],
+    ).toContain('not allowed in the subject');
+  });
+});

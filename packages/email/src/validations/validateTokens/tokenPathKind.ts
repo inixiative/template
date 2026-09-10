@@ -23,7 +23,7 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
     const last = i === segments.length - 1;
 
     if (field.kind === 'scalar' && field.type === 'Json') {
-      return { kind: 'ok', optionalDepth: last && field.isRequired !== false ? 0 : i + 1, scalarList: false };
+      return { kind: 'ok', optionalDepth: last && field.isRequired !== false ? 0 : segments.length, scalarList: false };
     }
 
     if ((field.kind === 'object' || field.kind === 'bridge') && field.type) {

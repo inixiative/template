@@ -433,13 +433,13 @@ describe('interpolate — {{#each}} semantics', () => {
 
   it('filter= path RHS reference resolves against an ENCLOSING loop binding', () => {
     const template =
-      '{{#each recipient.missions as=m}}' +
+      '{{#each data.missions as=m}}' +
       '{{#each m.rewards as=r filter={"field":"r.tier","operator":"greaterThanEquals","path":"m.minTier"}}}' +
       '{{r.tier}} ' +
       '{{/each}}' +
       '{{/each}}';
     const result = interpolate(template, {
-      recipient: { missions: [{ minTier: 2, rewards: [{ tier: 1 }, { tier: 2 }, { tier: 3 }] }] },
+      data: { missions: [{ minTier: 2, rewards: [{ tier: 1 }, { tier: 2 }, { tier: 3 }] }] },
     });
     expect(result).toBe('2 3 ');
   });

@@ -14,5 +14,11 @@ import { emailTemplateRuleSurface } from '#/modules/emailTemplate/services/email
 
 export const emailLensFor: LensForSlug = async (slug, locale) => (await emailTemplateRuleSurface(slug, locale)).source;
 
-export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> =>
-  saveWithoutLens(input, { lens: await emailLensFor(input.slug, input.locale ?? 'en'), lensFor: emailLensFor });
+export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
+  const locale = input.locale ?? 'en';
+  const lens =
+    input.ownerModel === 'default' && input.lens !== undefined
+      ? (await emailTemplateRuleSurface(input.slug, locale, input.lens)).source
+      : await emailLensFor(input.slug, locale);
+  return saveWithoutLens(input, { lens, lensFor: emailLensFor });
+};

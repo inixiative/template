@@ -29,29 +29,33 @@ export const settleBranches = (
     }
 
     const rule = branch.rule!;
-    const judged = absoluteRule(rule, options.bindings) ?? rule;
-    const rendered = withRule(
-      {
-        lens: options.lens ?? emailRuleNarrowing,
-        rule: judged,
-        references: ruleReferences(emailRuleNarrowing, judged),
-        live: options.liveRefs,
-      },
-      {
-        degraded: (issues) => {
-          onError?.({ kind: 'rule', detail: issues.map((issue) => issue.detail).join('; ') });
-          return null;
-        },
-        sound: () => {
-          try {
-            return check(rule, toRuleData(scope)) === true ? settle(branch.body, scope, options, onError) : null;
-          } catch (err) {
-            onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
-            return null;
-          }
-        },
-      },
-    );
+    const evaluate = (): string | null => {
+      try {
+        return check(rule, toRuleData(scope)) === true ? settle(branch.body, scope, options, onError) : null;
+      } catch (err) {
+        onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
+        return null;
+      }
+    };
+    const judged = absoluteRule(rule, options.bindings);
+    const rendered =
+      judged === undefined
+        ? evaluate()
+        : withRule(
+            {
+              lens: options.lens ?? emailRuleNarrowing,
+              rule: judged,
+              references: ruleReferences(emailRuleNarrowing, judged),
+              live: options.liveRefs,
+            },
+            {
+              degraded: (issues) => {
+                onError?.({ kind: 'rule', detail: issues.map((issue) => issue.detail).join('; ') });
+                return null;
+              },
+              sound: evaluate,
+            },
+          );
     if (rendered !== null) return rendered;
   }
 

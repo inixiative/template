@@ -34,9 +34,16 @@ export const projectionForEntry = (entry: EmailEntry | undefined, slots: EmailSl
   return { senderModel, data };
 };
 
-export const emailTemplateRuleSurface = async (slug: string, locale = 'en'): Promise<EmailTemplateRuleSurface> => {
-  const { template } = await lookupAtOwner(slug, [], { ownerModel: 'default', locale });
-  const slots = parseSlotLenses(template?.lens);
+export const emailTemplateRuleSurface = async (
+  slug: string,
+  locale = 'en',
+  lensOverride?: unknown,
+): Promise<EmailTemplateRuleSurface> => {
+  const stored =
+    lensOverride === undefined
+      ? (await lookupAtOwner(slug, [], { ownerModel: 'default', locale })).template?.lens
+      : lensOverride;
+  const slots = parseSlotLenses(stored);
   const projection = emailProjection(projectionForEntry(registry[slug], slots));
   const source = emailSurface(projection, slots);
   return { source, sourceValues: [], decoration: emailRuleDecoration(source) };

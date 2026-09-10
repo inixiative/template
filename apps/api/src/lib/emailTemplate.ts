@@ -121,6 +121,8 @@ export const settleTemplate = async (
 
   const clean = (rendered: Rendered): boolean => !rendered.subjectIssues.length && !rendered.settled.issues.length;
 
+  let primaryKind: CommunicationKind | undefined;
+
   const substituted = async (reason: string): Promise<SettledTemplate> => {
     if (!policy.substitute) throw new EmailRenderError(template, 'render_failed', [reason]);
     log.warn(`Email substituted: template=${template} substitute=${policy.substitute} — ${reason}`, LogScope.email);
@@ -130,12 +132,13 @@ export const settleTemplate = async (
         describe([...rendered.subjectIssues, ...rendered.settled.issues]),
       ]);
     }
-    return rendered.settled;
+    return { ...rendered.settled, kind: primaryKind ?? rendered.settled.kind };
   };
 
   let rendered: Rendered;
   try {
     rendered = await render(template);
+    primaryKind = rendered.settled.kind;
   } catch (error) {
     if (error instanceof EmailRenderError && error.type !== 'render_failed') return substituted(error.message);
     throw error;
