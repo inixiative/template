@@ -18,6 +18,7 @@ kanban
     INFRA-018-lens-builder
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
+    INFRA-030-jobs-lane-and-lock-port-from-zealot
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
