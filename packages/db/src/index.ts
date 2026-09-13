@@ -82,6 +82,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { lockedLiveReferences, type RuleReferenceTarget } from './utils/lockedLiveReferences';
 // Model name utilities
 export {
   type AccessorName,
@@ -99,6 +100,7 @@ export {
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { revive } from './utils/revive';
+export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
   liveRuleReferenceKeys,
   type RuleReferenceIssue,
@@ -106,6 +108,7 @@ export {
   ruleReferenceIssues,
   ruleReferenceKey,
 } from './utils/ruleReferenceHealth';
+export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 
 // Hook shared utilities (ignore fields, redact fields)
 

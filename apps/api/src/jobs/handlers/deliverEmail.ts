@@ -8,6 +8,7 @@ import { db, Prisma } from '@template/db';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { deriveTextFromHtml, sanitizeSubject, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
+import { emitAppEvent } from '#/appEvents/emit';
 import { makeJob } from '#/jobs/makeJob';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { resolveSender } from '#/lib/email/resolveSender';
@@ -17,6 +18,14 @@ import { type SettledTemplate, settleTemplate } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 
 const DELIVERABILITY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+const settle = async (
+  where: Prisma.CommunicationLogWhereInput,
+  data: Prisma.CommunicationLogUpdateManyMutationInput,
+): Promise<void> => {
+  const [row] = await db.communicationLog.updateManyAndReturn({ where, data });
+  if (row) await emitAppEvent('communication.settled', { communicationLog: row });
+};
 
 export type DeliverEmailPayload = {
   template: string;
@@ -53,10 +62,10 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
       return { unsubscribeUrl: unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind }) };
     });
   } catch (error) {
-    await db.communicationLog.updateManyAndReturn({
-      where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-      data: { status: 'failed', error: error instanceof Error ? error.message : String(error) },
-    });
+    await settle(
+      { id: communicationLogId, status: { in: ['queued', 'failed'] } },
+      { status: 'failed', error: error instanceof Error ? error.message : String(error) },
+    );
     throw error;
   }
   const resolved = {
@@ -69,10 +78,10 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     ? canDeliver(settled.kind, entry.recipientContact)
     : settled.kind === 'system';
   if (!deliverable) {
-    await db.communicationLog.updateManyAndReturn({
-      where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-      data: { status: 'suppressed', ...resolved },
-    });
+    await settle(
+      { id: communicationLogId, status: { in: ['queued', 'failed'] } },
+      { status: 'suppressed', ...resolved },
+    );
     return;
   }
 
@@ -89,17 +98,18 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     deliverability = verdict.status;
     undeliverableReason = verdict.reason ?? null;
     if (entry.recipientContactId) {
-      await db.contact.update({
+      const contact = await db.contact.update({
         where: { id: entry.recipientContactId },
         data: { deliverability: verdict.status, deliverabilityCheckedAt: new Date() },
       });
+      await emitAppEvent('contact.updated', { contact });
     }
   }
   if (deliverability === 'undeliverable') {
-    await db.communicationLog.updateManyAndReturn({
-      where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-      data: { status: 'undeliverable', error: undeliverableReason ?? 'undeliverable', ...resolved },
-    });
+    await settle(
+      { id: communicationLogId, status: { in: ['queued', 'failed'] } },
+      { status: 'undeliverable', error: undeliverableReason ?? 'undeliverable', ...resolved },
+    );
     return;
   }
 
@@ -139,6 +149,7 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
   });
   if (claimed.length === 0) return;
 
+  let providerMessageId: string;
   try {
     const from = await resolveFromAddress(settled.slug, sender);
     const { html } = await mjml2html(settled.mjml, { validationLevel: 'skip' });
@@ -160,15 +171,16 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
       headers,
     });
     if (!result.success) throw new Error(`Email provider rejected send (id=${result.id})`);
-    await db.communicationLog.updateManyAndReturn({
-      where: { id: communicationLogId, status: 'sending' },
-      data: { status: 'sent', providerMessageId: result.id, sentAt: new Date() },
-    });
+    providerMessageId = result.id;
   } catch (error) {
-    await db.communicationLog.updateManyAndReturn({
-      where: { id: communicationLogId, status: 'sending' },
-      data: { status: 'failed', error: error instanceof Error ? error.message : String(error) },
-    });
+    await settle(
+      { id: communicationLogId, status: 'sending' },
+      { status: 'failed', error: error instanceof Error ? error.message : String(error) },
+    );
     throw error;
   }
+  await settle(
+    { id: communicationLogId, status: 'sending' },
+    { status: 'sent', providerMessageId, sentAt: new Date() },
+  );
 });

@@ -9,6 +9,7 @@ import type { ContactType } from '@template/db/generated/client/enums';
 import { contactId as toContactId } from '@template/db/typedModelIds';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
+import { emitAppEvent } from '#/appEvents/emit';
 import type { AppEnv } from '#/types/appEnv';
 
 export const redactUser = async (c: Context<AppEnv>, userId: string) => {
@@ -21,10 +22,11 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     select: { id: true },
   });
   if (singleMemberOrgs.length) {
-    await db.organization.updateManyAndReturn({
+    const organizations = await db.organization.updateManyAndReturn({
       where: { id: { in: singleMemberOrgs.map((o) => o.id) } },
       data: { deletedAt: now },
     });
+    for (const organization of organizations) await emitAppEvent('organization.deleted', { organization });
   }
 
   const singleMemberSpaces = await db.space.findMany({
@@ -32,10 +34,11 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
     select: { id: true },
   });
   if (singleMemberSpaces.length) {
-    await db.space.updateManyAndReturn({
+    const spaces = await db.space.updateManyAndReturn({
       where: { id: { in: singleMemberSpaces.map((s) => s.id) } },
       data: { deletedAt: now },
     });
+    for (const space of spaces) await emitAppEvent('space.deleted', { space });
   }
 
   // Ephemeral auth state — hard delete.
@@ -83,4 +86,5 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
       deletedAt: now,
     },
   });
+  await emitAppEvent('user.redacted', { userId });
 };

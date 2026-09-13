@@ -184,14 +184,16 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'providerModel',
         fkMap: {
+          User: ['providerUserId'],
+          Organization: ['providerOrganizationId'],
           Space: ['providerSpaceId'],
         },
       },
     ],
     allowedCombinations: {
-      User: ['Space'],
-      Organization: ['Space'],
-      Space: ['Space'],
+      User: ['User', 'Organization', 'Space'],
+      Organization: ['User', 'Organization', 'Space'],
+      Space: ['User', 'Organization', 'Space'],
     },
   },
 
@@ -202,6 +204,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           EmailTemplate: ['emailTemplateId'],
           EmailComponent: ['emailComponentId'],
+          Segment: ['segmentId'],
         },
       },
       {
@@ -210,6 +213,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           Tag: ['tagId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+          Segment: ['referencedSegmentId'],
         },
       },
     ],
@@ -293,6 +297,20 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           EmailComponent: ['subjectEmailComponentId'],
           CustomerRef: ['subjectCustomerRefId'],
           Integration: ['subjectIntegrationId'],
+          Segment: ['subjectSegmentId'],
+        },
+      },
+    ],
+  },
+
+  Segment: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
         },
       },
     ],

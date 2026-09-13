@@ -70,6 +70,15 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:webhookSubscription': { actions: ownerActions() },
+    'db:segment': { actions: ownerActions() },
+    'db:segmentMember': {
+      actions: {
+        own: { rel: 'segment', action: 'own' },
+        manage: { rel: 'segment', action: 'manage' },
+        operate: { rel: 'segment', action: 'operate' },
+        read: { rel: 'segment', action: 'read' },
+      },
+    },
     'db:integration': { actions: ownerActions() },
 
     'db:organizationUser': {
