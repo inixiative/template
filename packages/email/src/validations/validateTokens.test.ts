@@ -106,7 +106,9 @@ describe('validateTokens — guards the review found gameable', () => {
 
   it('a subject cannot iterate', () => {
     expect(
-      validateTokens('{{#each recipient.tags as=t}}{{t}}{{/each}}', { lens, isSubject: true }).map((issue) => issue.message)[0],
+      validateTokens('{{#each recipient.tags as=t}}{{t}}{{/each}}', { lens, isSubject: true }).map(
+        (issue) => issue.message,
+      )[0],
     ).toContain('not allowed in the subject');
   });
 });

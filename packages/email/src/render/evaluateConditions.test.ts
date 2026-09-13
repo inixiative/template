@@ -184,7 +184,9 @@ describe('evaluateConditions — check() throwing at evaluation time', () => {
 describe('evaluateConditions — unterminated block', () => {
   it('renders nothing from an unterminated {{#if}} on and sinks the issue', () => {
     const errors: string[] = [];
-    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} }, (m) => errors.push(m.kind))).toBe('before ');
+    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} }, (m) => errors.push(m.kind))).toBe(
+      'before ',
+    );
     expect(errors).toEqual(['rule']);
   });
 
