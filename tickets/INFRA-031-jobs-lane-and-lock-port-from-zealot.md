@@ -18,7 +18,7 @@ The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drai
 
 ### 1. `createLock` hardening — Zealot #2271 (ZLT-4600, closes ZLT-4658) — PORTED
 
-Landed on the `INFRA-031` branch (PR below). Two template-side deltas from Zealot: no `SINGLETON_LOCK_REFRESH_MS` knob (the singleton keeps its constants, the constructor assertion covers them), and `maxSafeHeartbeatMs` takes `commandTimeoutMs` as a required argument because no template Redis connection sets a command timeout — which also means a heartbeat on those connections can hang rather than time out. Whether to set one on the non-blocking connections (Zealot sets 5 s, excluding the BullMQ worker and subscribers) is open.
+Landed in [template #104](https://github.com/inixiative/template/pull/104). Two template-side deltas from Zealot: no `SINGLETON_LOCK_REFRESH_MS` knob (the singleton keeps its constants, the constructor assertion covers them), and `maxSafeHeartbeatMs` takes `commandTimeoutMs` as a required argument because no template Redis connection sets a command timeout — which also means a heartbeat on those connections can hang rather than time out. Whether to set one on the non-blocking connections (Zealot sets 5 s, excluding the BullMQ worker and subscribers) is open.
 
 Template's `tick()` (`packages/db/src/lock/createLock.ts`) is `GET` then `PEXPIRE`: the key can expire and be re-acquired between the two calls, and the refresh then extends the new holder's TTL. Port:
 - The refresh is one compare-and-expire Lua eval. `0` = token definitively not ours → declare lost, reason `token_mismatch`, stop the heartbeat. A thrown refresh spends the missed-beat budget; exhausting it declares loss with reason `refresh_errors` but keeps refreshing (ownership uncertain, not gone).
