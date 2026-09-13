@@ -1,0 +1,68 @@
+// ============================================================================
+// SEGMENT - A named set of a provider's customer references
+// ============================================================================
+// Owner is false-polymorphic over ProviderModel (User | Organization | Space,
+// one FK populated to match `ownerModel`, enforced by the falsePolymorphism
+// hook + registry entry). The owner is the PROVIDER whose customers are
+// segmented: a member is a CustomerRef whose provider is this owner, so the
+// owner enum IS CustomerRef.providerModel.
+//
+// Every segment carries `conditions`, a json-rules tree over the segment lens
+// rooted at CustomerRef. `type` says when it is evaluated: a `static` segment
+// is computed once when it is created or its conditions change; a `dynamic`
+// segment is recomputed continuously as the rows its rule reads are written.
+// A hand-picked audience is a static segment whose rule is `id in [...]`.
+//
+// Nothing about a rule's health is stored here. The segments a rule names are
+// RuleReference edges (segmentId → referencedSegmentId); a rule whose named
+// segment is gone is degraded, read off those edges at evaluation and on the
+// owner's read, and a degraded rule does nothing new until its author fixes it.
+
+model Segment {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Owner — false polymorphism, exactly one FK matches the discriminator.
+  ownerModel     ProviderModel
+  userId         String?       @db.VarChar(36)
+  organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  type        SegmentType @default(static)
+
+  // json-rules Condition over the segment lens (apps/api/src/modules/segment/lib/segmentLens.ts).
+  // Validated, normalized and reference-checked by the segmentConditions hook on every write.
+  conditions       Json
+  conditionsPrompt String?
+
+  members           SegmentMember[]
+  auditLogs         AuditLog[]
+  ruleReferences    RuleReference[] @relation("RuleReferenceOwnerSegment")
+  referencedByRules RuleReference[] @relation("RuleReferenceReferencedSegment")
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  // Per-owner uniqueness on name — partial uniques (see Contact for rationale).
+  // Each partial doubles as that owner's lookup index.
+  @@unique([userId, name], where: { userId: { not: null } })
+  @@unique([organizationId, name], where: { organizationId: { not: null } })
+  @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@index([ownerModel])
+  @@index([type])
+}
+
+enum SegmentType {
+  static
+  dynamic
+}
+

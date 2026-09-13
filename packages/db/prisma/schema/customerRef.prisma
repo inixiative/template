@@ -20,11 +20,17 @@ model CustomerRef {
   customerSpace        Space?        @relation("providerRefs", fields: [customerSpaceId], references: [id], onDelete: Cascade)
 
   // Provider (false polymorphism: Space, etc.)
-  providerModel   ProviderModel
-  providerSpaceId String?       @db.VarChar(36)
+  providerModel          ProviderModel
+  providerUserId         String?       @db.VarChar(36)
+  providerOrganizationId String?       @db.VarChar(36)
+  providerSpaceId        String?       @db.VarChar(36)
 
-  providerSpace Space?     @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
-  auditLogs     AuditLog[]
+  providerUser         User?         @relation("customerRefs", fields: [providerUserId], references: [id], onDelete: Cascade)
+  providerOrganization Organization? @relation("customerRefs", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
+  providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
+
+  auditLogs      AuditLog[]
+  segmentMembers SegmentMember[]
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.
@@ -44,11 +50,19 @@ model CustomerRef {
   // populated customer FK paired with each provider FK. Each partial doubles
   // as a lookup index for that customer column. Add new partials when a new
   // ProviderModel FK is introduced.
+  @@unique([customerUserId, providerUserId], where: { customerUserId: { not: null }, providerUserId: { not: null } })
+  @@unique([customerUserId, providerOrganizationId], where: { customerUserId: { not: null }, providerOrganizationId: { not: null } })
   @@unique([customerUserId, providerSpaceId], where: { customerUserId: { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerOrganizationId, providerUserId], where: { customerOrganizationId: { not: null }, providerUserId: { not: null } })
+  @@unique([customerOrganizationId, providerOrganizationId], where: { customerOrganizationId: { not: null }, providerOrganizationId: { not: null } })
   @@unique([customerOrganizationId, providerSpaceId], where: { customerOrganizationId: { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerSpaceId, providerUserId], where: { customerSpaceId: { not: null }, providerUserId: { not: null } })
+  @@unique([customerSpaceId, providerOrganizationId], where: { customerSpaceId: { not: null }, providerOrganizationId: { not: null } })
   @@unique([customerSpaceId, providerSpaceId], where: { customerSpaceId: { not: null }, providerSpaceId: { not: null } })
   @@index([customerModel])
   @@index([providerModel])
+  @@index([providerUserId])
+  @@index([providerOrganizationId])
   @@index([providerSpaceId])
 }
 
@@ -59,6 +73,7 @@ enum CustomerModel {
 }
 
 enum ProviderModel {
+  User
+  Organization
   Space
-  // App-specific: extend as needed
 }

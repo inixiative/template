@@ -42,6 +42,8 @@ export const cacheReference: CacheReference = {
     if (r.customerUserId) keys.push(cacheKey('user', r.customerUserId, ['customerRefs']));
     if (r.customerOrganizationId) keys.push(cacheKey('organization', r.customerOrganizationId, ['customerRefs']));
     if (r.customerSpaceId) keys.push(cacheKey('space', r.customerSpaceId, ['customerRefs']));
+    if (r.providerUserId) keys.push(cacheKey('user', r.providerUserId, ['providerRefs']));
+    if (r.providerOrganizationId) keys.push(cacheKey('organization', r.providerOrganizationId, ['providerRefs']));
     if (r.providerSpaceId) keys.push(cacheKey('space', r.providerSpaceId, ['providerRefs']));
     return keys;
   },
