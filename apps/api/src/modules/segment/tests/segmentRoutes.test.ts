@@ -20,7 +20,6 @@ import {
 } from '@template/db/test';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
 import { meRouter } from '#/modules/me';
 import { segmentRouter } from '#/modules/segment';
 import { spaceRouter } from '#/modules/space';
@@ -48,7 +47,6 @@ describe('segment routes', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
-    registerSegmentReconcileHook();
 
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;

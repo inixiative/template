@@ -10,7 +10,7 @@ import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { SegmentRuleDegradedError } from '#/modules/segment/services/evaluateSegment';
-import { publishMembershipChange } from '#/modules/segment/services/publishMembershipChange';
+import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import { isReconcilable, reconcileSegment as reconcile } from '#/modules/segment/services/reconcileSegment';
 import { buildReferenceMap, referencedBy } from '#/modules/segment/services/segmentReferenceGraph';
@@ -36,7 +36,7 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     }
 
     if (!diff.added.length && !diff.removed.length) return;
-    await publishMembershipChange(segment, diff, db);
+    await publishMembershipChanges([{ segment, diff }], db);
 
     const path = [...referencePath, segmentId];
     const siblings = await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment), db);

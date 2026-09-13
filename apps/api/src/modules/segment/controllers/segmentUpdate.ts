@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates
  */
 import type { Prisma } from '@template/db';
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
@@ -19,6 +20,8 @@ export const segmentUpdateController = makeController(segmentUpdateRoute, async 
     where: { id: segment.id },
     data: body as Prisma.SegmentUncheckedUpdateInput,
   });
+
+  await emitAppEvent('segment.updated', { segment: updated, previous: segment });
 
   return respond.ok(await withSegmentRuleIssues(updated, db));
 });

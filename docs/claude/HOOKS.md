@@ -115,7 +115,6 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
 | `segmentConditions` | Segment `conditions` required, validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
 | `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
-| `segmentReconcile` | Enqueues `reconcileSegment` (post-commit) when a segment is created, its conditions change, it turns dynamic, or it is unpaused; enqueues `reconcileCustomerRefSegments` for writes on any other model the segment lens reaches |
 | `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
 | `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
 | `webhooks` | Webhook delivery on mutations (post-commit) |

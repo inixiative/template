@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db } from '@template/db';
-import type { CustomerRef, Organization, Space, User } from '@template/db/generated/client/client';
+import { clearHookRegistry, db, type Prisma } from '@template/db';
+import type { CustomerRef, Organization, Segment, Space, User } from '@template/db/generated/client/client';
 import {
   CommunicationKind,
   ContactType,
@@ -21,10 +21,11 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
+import { emitAppEvent } from '#/appEvents/emit';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentReconcileHook } from '#/hooks/segmentReconcile/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
+import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
 
@@ -33,6 +34,26 @@ const idsRule = (ids: string[]) => ({ field: 'id', operator: Operator.in, value:
 
 const memberIds = async (segmentId: string): Promise<string[]> =>
   (await db.segmentMember.findMany({ where: { segmentId } })).map((member) => member.customerRefId).sort();
+
+type SegmentInput = Parameters<typeof createSegment>[0];
+type SegmentDeps = Parameters<typeof createSegment>[1];
+
+const saveSegment = async (data: SegmentInput, deps: SegmentDeps): Promise<Segment> => {
+  const { entity } = await createSegment(data, deps);
+  await emitAppEvent('segment.created', { segment: entity });
+  return entity;
+};
+
+const updateSegment = async (previous: Segment, data: Prisma.SegmentUncheckedUpdateInput): Promise<Segment> => {
+  const segment = await db.segment.update({ where: { id: previous.id }, data });
+  await emitAppEvent('segment.updated', { segment, previous });
+  return segment;
+};
+
+const setEmail = async (user: User, email: string): Promise<void> => {
+  await db.user.update({ where: { id: user.id }, data: { email } });
+  await enqueueJob('reconcileCustomerRefSegments', { customerModel: 'User', customerId: user.id });
+};
 
 describe('segment reconcile', () => {
   let organization: Organization;
@@ -55,7 +76,6 @@ describe('segment reconcile', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
-    registerSegmentReconcileHook();
     registerSegmentRuleReferencesHook();
 
     const { context } = await createOrganizationUser({ role: 'admin' });
@@ -72,9 +92,11 @@ describe('segment reconcile', () => {
     clearHookRegistry();
   });
 
-  it('creating a dynamic segment reconciles its membership set-wise', async () => {
+  it('a saved segment is not reconciled until its created event fires', async () => {
     const { entity: segment } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    expect(await memberIds(segment.id)).toEqual([]);
 
+    await emitAppEvent('segment.created', { segment });
     expect(await evaluateSegment(segment)).toEqual([acmeRef.id]);
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
@@ -84,34 +106,35 @@ describe('segment reconcile', () => {
     const stranger = (await createUser({ email: `stranger-${getNextSeq()}@acme.test` })).entity;
     await customerOf(stranger, elsewhere);
 
-    const { entity: segment } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const segment = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 
   it('a static segment is computed when saved and holds until its conditions change', async () => {
     const picked = (await createUser({ email: `picked-${getNextSeq()}@example.test` })).entity;
     const pickedRef = await customerOf(picked);
-    const { entity: segment } = await createSegment(
+    const segment = await saveSegment(
       { type: SegmentType.static, conditions: { all: [acmeRule, idsRule([pickedRef.id])] } },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([]);
 
-    await db.user.update({ where: { id: picked.id }, data: { email: `picked-${getNextSeq()}@acme.test` } });
+    await setEmail(picked, `picked-${getNextSeq()}@acme.test`);
     expect(await memberIds(segment.id)).toEqual([]);
     expect(await reconcileCustomerRef(pickedRef.id)).toEqual([]);
 
-    await db.segment.update({ where: { id: segment.id }, data: { conditions: idsRule([pickedRef.id, otherRef.id]) } });
+    const repicked = await updateSegment(segment, { conditions: idsRule([pickedRef.id, otherRef.id]) });
     expect(await memberIds(segment.id)).toEqual([pickedRef.id, otherRef.id].sort());
 
-    await db.user.update({ where: { id: picked.id }, data: { email: `picked-${getNextSeq()}@example.test` } });
+    await updateSegment(repicked, { name: `renamed-${getNextSeq()}` });
+    await setEmail(picked, `picked-${getNextSeq()}@example.test`);
     expect(await memberIds(segment.id)).toEqual([pickedRef.id, otherRef.id].sort());
   });
 
   it('a hand-picked segment only admits the owner’s own customer references', async () => {
     const elsewhere = (await createSpace({}, { organization })).entity;
     const foreignRef = await customerOf(other, elsewhere);
-    const { entity: segment } = await createSegment(
+    const segment = await saveSegment(
       { type: SegmentType.static, conditions: idsRule([otherRef.id, foreignRef.id]) },
       { space },
     );
@@ -141,34 +164,34 @@ describe('segment reconcile', () => {
       })
     ).entity;
 
-    const mine = await createSegment(
+    const mine = await saveSegment(
       { ownerModel: ProviderModel.User, type: SegmentType.dynamic, conditions: acmeRule },
       { user: provider },
     );
-    expect(await memberIds(mine.entity.id)).toEqual([viaUser.id]);
+    expect(await memberIds(mine.id)).toEqual([viaUser.id]);
 
-    const ours = await createSegment(
+    const ours = await saveSegment(
       { ownerModel: ProviderModel.Organization, type: SegmentType.dynamic, conditions: acmeRule },
       { organization },
     );
-    expect(await memberIds(ours.entity.id)).toEqual([viaOrganization.id]);
+    expect(await memberIds(ours.id)).toEqual([viaOrganization.id]);
   });
 
-  it('a write to the customer user re-evaluates that customer reference only', async () => {
-    const { entity: segment } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+  it('a customer-side reconcile re-evaluates every reference of that customer, and only those', async () => {
+    const segment = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
     const newcomer = (await createUser({ email: `late-${getNextSeq()}@example.test` })).entity;
     const newcomerRef = await customerOf(newcomer);
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
 
-    await db.user.update({ where: { id: newcomer.id }, data: { email: `late-${getNextSeq()}@acme.test` } });
+    await setEmail(newcomer, `late-${getNextSeq()}@acme.test`);
     expect(await memberIds(segment.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
 
-    await db.user.update({ where: { id: newcomer.id }, data: { email: `gone-${getNextSeq()}@example.test` } });
+    await setEmail(newcomer, `gone-${getNextSeq()}@example.test`);
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 
-  it('a write to a related row (contact) reaches the customer reference through the owner', async () => {
-    const { entity: segment } = await createSegment(
+  it('a contact event reaches the customer reference through the contact owner', async () => {
+    const segment = await saveSegment(
       {
         type: SegmentType.dynamic,
         conditions: {
@@ -188,15 +211,18 @@ describe('segment reconcile', () => {
       },
       { user: other },
     );
+    expect(await memberIds(segment.id)).toEqual([]);
+    await emitAppEvent('contact.created', { contact });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
 
-    await db.contact.delete({ where: { id: contact.id } });
+    const deleted = await db.contact.delete({ where: { id: contact.id } });
+    await emitAppEvent('contact.deleted', { contact: deleted });
     expect(await memberIds(segment.id)).toEqual([]);
   });
 
   it('a segment can be built from the membership of another, evaluated in dependency order', async () => {
-    const { entity: base } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
-    const { entity: derived } = await createSegment(
+    const base = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const derived = await saveSegment(
       {
         type: SegmentType.dynamic,
         conditions: {
@@ -217,16 +243,15 @@ describe('segment reconcile', () => {
     const changes = await reconcileCustomerRef(acmeRef.id);
     expect(changes).toEqual([]);
 
-    await db.segment.update({
-      where: { id: base.id },
-      data: { conditions: { field: 'customerUser.email', operator: Operator.endsWith, value: '@nobody.test' } },
+    await updateSegment(base, {
+      conditions: { field: 'customerUser.email', operator: Operator.endsWith, value: '@nobody.test' },
     });
     expect(await memberIds(base.id)).toEqual([]);
     expect(await memberIds(derived.id)).toEqual([]);
   });
 
   it("a communication from another provider does not satisfy this provider's rule", async () => {
-    const { entity: segment } = await createSegment(
+    const segment = await saveSegment(
       {
         type: SegmentType.dynamic,
         conditions: {
@@ -238,26 +263,28 @@ describe('segment reconcile', () => {
       { space },
     );
     const elsewhere = (await createSpace({}, { organization })).entity;
-    await createCommunicationLog({
+    const foreign = await createCommunicationLog({
       kind: CommunicationKind.marketing,
       senderType: SenderType.Space,
       recipientUser: other,
       senderSpace: elsewhere,
     });
+    await emitAppEvent('communication.settled', { communicationLog: foreign.entity });
     expect(await memberIds(segment.id)).toEqual([]);
 
-    await createCommunicationLog({
+    const ours = await createCommunicationLog({
       kind: CommunicationKind.marketing,
       senderType: SenderType.Space,
       recipientUser: other,
       senderSpace: space,
     });
+    await emitAppEvent('communication.settled', { communicationLog: ours.entity });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
   });
 
   it('a single customer write resolves a segment-of-segment in one pass', async () => {
-    const { entity: base } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
-    const { entity: derived } = await createSegment(
+    const base = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const derived = await saveSegment(
       {
         type: SegmentType.dynamic,
         conditions: {
@@ -272,24 +299,25 @@ describe('segment reconcile', () => {
     const newcomerRef = await customerOf(newcomer);
     expect(await memberIds(derived.id)).toEqual([acmeRef.id]);
 
-    await db.user.update({ where: { id: newcomer.id }, data: { email: `chain-${getNextSeq()}@acme.test` } });
+    await setEmail(newcomer, `chain-${getNextSeq()}@acme.test`);
     expect(await memberIds(base.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
     expect(await memberIds(derived.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
 
-    await db.user.update({ where: { id: newcomer.id }, data: { email: `chain-${getNextSeq()}@example.test` } });
+    await setEmail(newcomer, `chain-${getNextSeq()}@example.test`);
     expect(await memberIds(derived.id)).toEqual([acmeRef.id]);
   });
 
   it('flipping to static keeps the members and stops reacting; flipping back catches up', async () => {
-    const { entity: segment } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const segment = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
 
-    await db.segment.update({ where: { id: segment.id }, data: { type: SegmentType.static } });
+    const frozen = await updateSegment(segment, { type: SegmentType.static });
     const newcomer = (await createUser({ email: `frozen-${getNextSeq()}@acme.test` })).entity;
     const newcomerRef = await customerOf(newcomer);
+    await enqueueJob('reconcileCustomerRefSegments', { customerRefId: newcomerRef.id });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
 
-    await db.segment.update({ where: { id: segment.id }, data: { type: SegmentType.dynamic } });
+    await updateSegment(frozen, { type: SegmentType.dynamic });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
   });
 });

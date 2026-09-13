@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import type { Prisma } from '@template/db';
+import { emitAppEvent } from '#/appEvents/emit';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateSegmentRoute } from '#/modules/me/routes/meCreateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
@@ -21,6 +22,8 @@ export const meCreateSegmentController = makeController(meCreateSegmentRoute, as
       userId: user.id,
     } as Prisma.SegmentUncheckedCreateInput,
   });
+
+  await emitAppEvent('segment.created', { segment });
 
   return respond.created(await withSegmentRuleIssues(segment, db));
 });
