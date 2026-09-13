@@ -1,10 +1,10 @@
-# INFRA-030: Jobs — port the Gate 5 lane, the lock hardening, and the claim policy from Zealot
+# INFRA-031: Jobs — port the Gate 5 lane, the lock hardening, and the claim policy from Zealot
 
-**Status**: 📋 Todo — blocked until Zealot #2248 (reworked per Aron's 2026-09-12 review) and #2271 merge
+**Status**: 🔄 In Progress — §1 (`createLock` hardening) ported 2026-09-13, in review; §2 / §3 wait for Steven's rework of Zealot #2248 (Aron's 2026-09-12 review) to land
 **Assignee**: Aron
 **Priority**: Medium (template's `createLock` carries the same refresh race Zealot fixes in #2271)
 **Created**: 2026-09-12
-**Updated**: 2026-09-12
+**Updated**: 2026-09-13
 
 The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `createLock`, `heartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
 
@@ -16,7 +16,9 @@ The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drai
 
 ## What to port
 
-### 1. `createLock` hardening — Zealot #2271 (ZLT-4600, closes ZLT-4658)
+### 1. `createLock` hardening — Zealot #2271 (ZLT-4600, closes ZLT-4658) — PORTED
+
+Landed on the `INFRA-031` branch (PR below). Two template-side deltas from Zealot: no `SINGLETON_LOCK_REFRESH_MS` knob (the singleton keeps its constants, the constructor assertion covers them), and `maxSafeHeartbeatMs` takes `commandTimeoutMs` as a required argument because no template Redis connection sets a command timeout — which also means a heartbeat on those connections can hang rather than time out. Whether to set one on the non-blocking connections (Zealot sets 5 s, excluding the BullMQ worker and subscribers) is open.
 
 Template's `tick()` (`packages/db/src/lock/createLock.ts`) is `GET` then `PEXPIRE`: the key can expire and be re-acquired between the two calls, and the refresh then extends the new holder's TTL. Port:
 - The refresh is one compare-and-expire Lua eval. `0` = token definitively not ours → declare lost, reason `token_mismatch`, stop the heartbeat. A thrown refresh spends the missed-beat budget; exhausting it declares loss with reason `refresh_errors` but keeps refreshing (ownership uncertain, not gone).

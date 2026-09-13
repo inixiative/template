@@ -40,7 +40,15 @@ export {
   watchLane,
 } from './lanes';
 // Distributed lock
-export { createLock, type Lock, type LockOptions } from './lock';
+export {
+  createLock,
+  type Lock,
+  type LockLostReason,
+  type LockOptions,
+  type LockRedis,
+  type LockReleaseResult,
+  maxSafeHeartbeatMs,
+} from './lock';
 // Redis client and cache utilities
 export {
   cache,
