@@ -17,8 +17,6 @@ export const includeCustomer = {
 
 // Include provider side relations
 export const includeProvider = {
-  providerUser: true,
-  providerOrganization: true,
   providerSpace: {
     include: { organization: true },
   },

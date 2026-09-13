@@ -13,7 +13,6 @@ export const Modules = {
   provider: 'provider',
   customer: 'customer',
   batch: 'batch',
-  segmentMembership: 'segmentMembership',
 } as const;
 
 export type Module = (typeof Modules)[keyof typeof Modules];

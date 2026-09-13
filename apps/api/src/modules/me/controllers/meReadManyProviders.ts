@@ -6,7 +6,6 @@
  */
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
-import { includeProvider } from '#/modules/customerRef/queries/customerRefIncludes';
 import { meReadManyProvidersRoute } from '#/modules/me/routes/meReadManyProviders';
 
 export const meReadManyProvidersController = makeController(meReadManyProvidersRoute, async (c, respond) => {
@@ -22,7 +21,11 @@ export const meReadManyProvidersController = makeController(meReadManyProvidersR
       ...(providerSpaceId && { providerSpaceId }),
       ...(providerOrganizationId && { providerSpace: { organizationId: providerOrganizationId } }),
     },
-    include: includeProvider,
+    include: {
+      providerSpace: {
+        include: { organization: true },
+      },
+    },
   });
 
   return respond.ok(data, { pagination });

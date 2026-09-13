@@ -12,7 +12,6 @@ export * from './OrganizationSpacesPage';
 export * from './OrganizationsPage';
 export * from './OrganizationUsersPage';
 export * from './ProfilePage';
-export * from './SegmentsPage';
 export * from './SignupPage';
 export * from './SpaceProfilePage';
 export * from './SpaceTransferInquiryPage';

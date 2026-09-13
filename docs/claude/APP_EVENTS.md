@@ -254,8 +254,6 @@ apps/api/src/
 │   │   ├── inquiry/
 │   │   │   ├── inquirySent.ts
 │   │   │   └── inquiryResolved.ts
-│   │   ├── segment/
-│   │   │   └── segmentMembershipChanged.ts   websocket: member-list refetch + per-user membership refetch
 │   │   └── user/
 │   │       ├── userCreated.ts
 │   │       └── userVerificationRequested.ts

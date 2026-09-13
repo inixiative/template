@@ -24,16 +24,6 @@ const customerRefFactory = createFactory('CustomerRef', {
       foreignKey: { id: 'customerSpaceId' },
       required: false,
     },
-    providerUser: {
-      modelName: 'User',
-      foreignKey: { id: 'providerUserId' },
-      required: false,
-    },
-    providerOrganization: {
-      modelName: 'Organization',
-      foreignKey: { id: 'providerOrganizationId' },
-      required: false,
-    },
     providerSpace: {
       modelName: 'Space',
       foreignKey: { id: 'providerSpaceId' },
