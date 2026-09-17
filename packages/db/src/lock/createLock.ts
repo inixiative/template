@@ -1,5 +1,6 @@
 /**
  * @atlas
+ * @kind constructor
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
@@ -9,31 +10,22 @@
 //     + we wake up thinking we hold it. Mitigation: ttlMs >> expected pause duration.
 //   - verify() is point-in-time; the race between verify-returns-true and the next op
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
+import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
+import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
+import type { Lock, LockLostReason, LockOptions, LockReleaseResult } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
 
-export type LockOptions = {
-  service: string;
-  identifier: string;
-  ttlMs?: number;
-  heartbeatMs?: number;
-  maxMissed?: number;
-  onLockLost?: () => void | Promise<void>;
-};
-
-export type Lock = {
-  acquire: () => Promise<boolean>;
-  verify: () => Promise<boolean>;
-  release: () => Promise<void>;
-};
-
 export const createLock = (opts: LockOptions): Lock => {
-  const { service, identifier, ttlMs = 30_000, heartbeatMs = 10_000, maxMissed = 1, onLockLost } = opts;
+  const { ttlMs = 30_000, heartbeatMs = 10_000, maxMissed = 1, onLockLost } = opts;
 
   if (maxMissed < 1) {
     throw new Error(`createLock: maxMissed must be >= 1, got ${maxMissed}`);
+  }
+  if (heartbeatMs <= 0) {
+    throw new Error(`createLock: heartbeatMs must be > 0, got ${heartbeatMs}`);
   }
   if ((maxMissed + 1) * heartbeatMs >= ttlMs) {
     throw new Error(
@@ -41,51 +33,71 @@ export const createLock = (opts: LockOptions): Lock => {
     );
   }
 
-  const redis = getRedisClient();
-  const key = `${redisNamespace.lock}:${service}:${identifier}`;
+  const redis = opts.redis ?? getRedisClient();
+  const key = 'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
   const processId = crypto.randomUUID();
   let stop: (() => void) | null = null;
   let missed = 0;
-  let declared = false;
+  let hasDeclaredLoss = false;
+  let hasReleased = false;
 
   const stopHeartbeat = () => {
     stop?.();
     stop = null;
   };
 
-  // Fenced delete in one Lua eval so the key can't expire and be re-acquired between a separate
-  // GET and DEL — an unfenced delete would then remove the new holder's lock (steal-and-cascade).
-  const FENCED_DELETE =
-    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
-  const compareAndDelete = async () => {
-    await redis.eval(FENCED_DELETE, 1, key, processId);
-  };
-
-  const declareLost = async () => {
-    if (declared) return;
-    declared = true;
-    stopHeartbeat();
-    log.warn(`Lock lost: ${key}`);
-    if (onLockLost) await onLockLost();
-    await compareAndDelete();
-  };
-
-  const tick = async () => {
-    const current = await redis.get(key).catch(() => null);
-    if (current === processId) {
-      // Clear `missed` only once the renewal actually lands — a failed pexpire counts as a missed
-      // beat, so persistent renewal failure still trips declareLost before the TTL silently lapses.
-      const renewed = await redis
-        .pexpire(key, ttlMs)
-        .then((r) => r === 1)
-        .catch(() => false);
-      if (renewed) {
-        missed = 0;
-        return;
-      }
+  // `unconfirmed`: the delete threw, but ioredis may still send it after a reconnect. The key is
+  // freed if the delete still reaches Redis, otherwise at its TTL — say so, don't stay silent.
+  const compareAndDelete = async (): Promise<LockReleaseResult> => {
+    try {
+      const result = await fencedDelete(redis, key, processId);
+      return result === 1 ? 'released' : 'notHeld';
+    } catch (err) {
+      log.error(
+        `Lock fenced delete unconfirmed; the key is freed if the delete still reaches Redis, otherwise at its TTL: ${key}`,
+        err,
+      );
+      return 'unconfirmed';
     }
-    missed += 1;
-    if (missed > maxMissed) await declareLost();
+  };
+
+  // Never deletes: a spent missed-beat budget means ownership is uncertain, not gone, and deleting
+  // here could give up a lease we still hold while the caller's critical section is running.
+  // The callback is not awaited — after refresh_errors the declaring beat must return at once so
+  // the next refresh is scheduled; a slow callback could let a lease that survived lapse.
+  const declareLost = (reason: LockLostReason): void => {
+    if (hasDeclaredLoss || hasReleased) return;
+    hasDeclaredLoss = true;
+    log.warn(`Lock lost: ${key}`, { reason });
+    if (!onLockLost) return;
+    try {
+      void Promise.resolve(onLockLost(reason)).catch((err) =>
+        log.error(`Lock onLockLost callback failed: ${key}`, err),
+      );
+    } catch (err) {
+      log.error(`Lock onLockLost callback failed: ${key}`, err);
+    }
+  };
+
+  // Only a thrown refresh spends the missed-beat budget, and exhausting it keeps refreshing — a
+  // lease that survived a Redis blip is held until release. A `0` is a definitive token mismatch:
+  // loss at once, and the heartbeat stops because there is nothing left to refresh.
+  const tick = async () => {
+    let renewed: unknown;
+    try {
+      renewed = await fencedRefresh(redis, key, processId, ttlMs);
+    } catch (err) {
+      missed += 1;
+      log.warn(`Lock refresh failed: ${key}`, { missed }, err);
+      if (missed > maxMissed) declareLost('refresh_errors');
+      return;
+    }
+    if (renewed === 1) {
+      missed = 0;
+      return;
+    }
+    stopHeartbeat();
+    declareLost('token_mismatch');
   };
 
   const acquire = async (): Promise<boolean> => {
@@ -96,19 +108,17 @@ export const createLock = (opts: LockOptions): Lock => {
   };
 
   const verify = async (): Promise<boolean> => {
-    if (declared) return false;
+    if (hasDeclaredLoss || hasReleased) return false;
     const current = await redis.get(key);
     return current === processId;
   };
 
-  const release = async (): Promise<void> => {
-    if (declared) {
-      stopHeartbeat();
-      return;
-    }
-    declared = true;
+  // Always attempts the fenced delete, once, after the critical section — the only place the
+  // key is ever deleted.
+  const release = async (): Promise<LockReleaseResult> => {
+    hasReleased = true;
     stopHeartbeat();
-    await compareAndDelete();
+    return compareAndDelete();
   };
 
   return { acquire, verify, release };

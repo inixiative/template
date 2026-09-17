@@ -63,26 +63,30 @@ pattern, range, window) and unknown operators report `dynamic`. A `dynamic` leaf
 so it registers no edge — it is not a refusal (ruling 2026-09-10, below). This registry is the
 named first consumer that API was waiting for.
 
-`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`. The
-narrowing is `mapDefaults`-shaped: a source on each referenceable model's `id` (`Tag`,
-`Organization`, `Space` — derived from the `PolymorphismRegistry` axis) answers on every path to
-the model, and every FK column duplicating a relation to a referenceable model is derived from
-`prismaMap` and omitted from the vocabulary. `ruleReferences(rule)` keeps the id-field sources
-(`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
-block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
-a `RuleReference` FK column + a registry entry (source and omits derive); adding a rule-bearing
-column = a `syncRuleReferenceEdges(owner, references)` call from its save path — the edge writer
-lives in `packages/db` (`utils/syncRuleReferenceEdges.ts`, with `lockedLiveReferences` and
-`RuleReferenceError` beside it); email's `syncRuleReferences(owner, contents, lens)` is the
-content-level wrapper that adds the vocabulary gate and extraction. Segment (FEAT-021) is the
-second owner and the fourth referenced model: `segmentId` / `referencedSegmentId`, edges written
-by the `segmentRuleReferences` after-write hook.
+Which models are referenceable is the registry's answer, not a surface's:
+`RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `referencedModel`
+axis of `PolymorphismRegistry.RuleReference`. A rule-tracked lens never exposes an FK column:
+`omitForeignKeys(lens)` (`packages/db/src/lens`, the `redactLens` shape) omits every FK column
+`prismaMap` knows, on every model, wherever it appears. Sources are the surface's own:
+email has one rule lens per template — `emailLens` (`packages/email/src/rules/emailProjection.ts`)
+wraps in `omitForeignKeys` and declares `sources: { id: { label: 'name' } }` as a `mapDefaults`
+entry per `RULE_REFERENCEABLE_MODELS`; the api's `emailTemplateRuleLens` builds it, the builder
+gets its `exposedSurface` (sources stripped), save and settle keep the narrowing; the segment lens
+(FEAT-021) declares its own labeled, owner-scoped id sources. `ruleReferences(lens, rule)`
+(`packages/db`) keeps the id-field sources (`prismaMap.isId`) as row references;
+`contentRuleReferences(lens, ...contents)` (email) folds every `{{#if}}` block, branch and nesting
+(`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
+column + a registry entry (the referenced-side hook and email's id sources derive); adding a
+rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
+Segment (FEAT-021) is the second owner and the fourth referenced model: `segmentId` /
+`referencedSegmentId`, edges written by the `segmentRuleReferences` after-write hook.
 
 ### No owner-side hook
 
-Edges are written by `syncRuleReferences(owner, contents, lens)` — a service in
-`packages/email/src/rules/`, called by `saveEmailTemplate` inside its transaction for the template
-and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
+Edges are written by `syncRuleReferenceEdges(owner, references)` — a service in `packages/db`,
+fronted for email by `syncRuleReferences(owner, contents, lens)` in `packages/email/src/rules/`
+(vocabulary gate + `collectRules` over MJML and subject), called by `saveEmailTemplate` inside its
+transaction for the template and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
 nothing for a hook to catch that the call does not. The gate (vocabulary, delta against live rows
 under `findForUpdate`) throws `RuleReferenceError`, a sibling of
 `ConditionValidationError` on the same path. The one hook left is on the referenced side.
@@ -108,7 +112,7 @@ They are two clocks on one fact. The FK is the *relation* — owned by referenti
 goes null at exactly the moment the row ceases to exist. `referencedId` is the *name* — owned by
 the rule content, written once and never updated. They agree for the whole time the target is
 alive and diverge precisely at the moment worth detecting, so the divergence is the signal.
-`syncRuleReferences` writes both from the same value, so they agree by construction.
+`syncRuleReferenceEdges` writes both from the same value, so they agree by construction.
 
 That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure function in
 `@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
@@ -149,7 +153,7 @@ state is never touched by a degraded rule.
 Extraction is a function of two inputs — the rule content and the lens — and a save-time sync only
 observes the first. A per-template lens is fine, because editing it *is* an owner write. A shared
 lens authored as data is not: change it and every owner's edges are wrong at once with no write to
-notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferences(model, rows)`, the
+notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferenceEdges(owner, refs)`, the
 same callable a backfill loops over, triggered by a job rather than by a save. Deliberately not
 built here — the constraint is written down so the owner set stays open rather than being
 tightened around today's two models.
@@ -182,8 +186,8 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   evaluated at render while registering zero edges: the vacuous-`none` failure this primitive
   exists to kill. Closed structurally, not by whitelist: the narrowing is now `mapDefaults` —
   a source on each referenceable model's `id` answers **wherever the model appears** (json-rules
-  2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and every FK column that duplicates a
-  relation to a referenceable model is derived from `prismaMap` and omitted from the vocabulary.
+  2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and `omitForeignKeys` drops every FK
+  column from the vocabulary so the FK spelling does not exist to be written.
   The save path runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path is
   refused at save, and any relation path to a referenceable id is a registered edge.
 - **The save race, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`, where an

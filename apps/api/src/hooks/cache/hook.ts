@@ -16,8 +16,9 @@ import {
   registerDbHook,
 } from '@template/db';
 import { ConcurrencyType } from '@template/shared/utils';
+import { keyBy } from 'lodash-es';
 import { fetchCacheKeys } from '#/hooks/cache/constants/cacheReference';
-import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
+import { isManyAction } from '#/hooks/shared/hookRows';
 
 const isUpdateAction = (action: DbAction): boolean =>
   action === DbAction.update || action === DbAction.updateManyAndReturn;
@@ -43,10 +44,10 @@ export const registerClearCacheHook = () => {
     if (isManyAction(action)) {
       const { result, previous } = options as HookOptions & { action: ManyAction };
       const results = (result ?? []) as Record<string, unknown>[];
-      const previousById = buildPreviousById(previous);
+      const previousById = keyBy(previous, 'id');
 
       for (const resultData of results) {
-        const previousData = previousById.get(resultData.id as string);
+        const previousData = previousById[resultData.id as string];
 
         if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS)) continue;
 

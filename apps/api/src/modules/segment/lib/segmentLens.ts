@@ -14,7 +14,7 @@ import {
   ruleSourceValues,
 } from '@inixiative/json-rules';
 import { ProviderModel } from '@template/db/generated/client/enums';
-import { lensFor } from '@template/db/lens';
+import { lensFor, omitForeignKeys } from '@template/db/lens';
 import { communicationSenderFk, customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 
 const SEGMENT_OWNER_BIND = 'ownerId';
@@ -76,7 +76,7 @@ export const segmentLensFor = (ownerModel: ProviderModel): LensNarrowing => {
   const providerFk = customerRefProviderFk(ownerModel);
   const ownerFk = segmentOwnerFk(ownerModel);
 
-  return {
+  return omitForeignKeys({
     parent: lensFor('CustomerRef'),
     mapDefaults: {
       prisma: {
@@ -106,7 +106,7 @@ export const segmentLensFor = (ownerModel: ProviderModel): LensNarrowing => {
         },
       },
     },
-  };
+  });
 };
 
 export const resolvedSegmentLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
