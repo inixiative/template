@@ -23,7 +23,12 @@ import {
   type OrganizationUpdatedPayload,
   organizationUpdated,
 } from '#/appEvents/handlers/organization/organizationUpdated';
+import {
+  type RuleReferenceStalePayload,
+  ruleReferenceStale,
+} from '#/appEvents/handlers/ruleReference/ruleReferenceStale';
 import { type SegmentCreatedPayload, segmentCreated } from '#/appEvents/handlers/segment/segmentCreated';
+import { type SegmentDeletedPayload, segmentDeleted } from '#/appEvents/handlers/segment/segmentDeleted';
 import { type SegmentMembersAddedPayload, segmentMembersAdded } from '#/appEvents/handlers/segment/segmentMembersAdded';
 import {
   type SegmentMembersRemovedPayload,
@@ -51,8 +56,10 @@ export type AppEventPayloads = {
   'inquiry.resolved': InquiryResolvedPayload;
   'organization.updated': OrganizationUpdatedPayload;
   'organization.deleted': OrganizationDeletedPayload;
+  'ruleReference.stale': RuleReferenceStalePayload;
   'segment.created': SegmentCreatedPayload;
   'segment.updated': SegmentUpdatedPayload;
+  'segment.deleted': SegmentDeletedPayload;
   'segment.membersAdded': SegmentMembersAddedPayload;
   'segment.membersRemoved': SegmentMembersRemovedPayload;
   'space.updated': SpaceUpdatedPayload;
@@ -73,8 +80,10 @@ export const AppEventName = {
   inquiryResolved: 'inquiry.resolved',
   organizationUpdated: 'organization.updated',
   organizationDeleted: 'organization.deleted',
+  ruleReferenceStale: 'ruleReference.stale',
   segmentCreated: 'segment.created',
   segmentUpdated: 'segment.updated',
+  segmentDeleted: 'segment.deleted',
   segmentMembersAdded: 'segment.membersAdded',
   segmentMembersRemoved: 'segment.membersRemoved',
   spaceUpdated: 'space.updated',
@@ -97,8 +106,10 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'inquiry.resolved': inquiryResolved,
   'organization.updated': organizationUpdated,
   'organization.deleted': organizationDeleted,
+  'ruleReference.stale': ruleReferenceStale,
   'segment.created': segmentCreated,
   'segment.updated': segmentUpdated,
+  'segment.deleted': segmentDeleted,
   'segment.membersAdded': segmentMembersAdded,
   'segment.membersRemoved': segmentMembersRemoved,
   'space.updated': spaceUpdated,

@@ -28,7 +28,7 @@ import { segmentRouter } from '#/modules/segment';
 import { spaceRouter } from '#/modules/space';
 import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json, post } from '#tests/utils/request';
+import { del, get, json, post } from '#tests/utils/request';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -233,5 +233,20 @@ describe('segment routes', () => {
     const orgs = await ownerFetch(post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }));
     expect(orgs.status).toBe(200);
     expect((await json<{ count: number }>(orgs)).data).toEqual({ count: 0 });
+  });
+
+  it('deleting a segment tells its members: the member-side removal event names the segment', async () => {
+    const response = await ownerFetch(del(`/api/v1/segment/${segment.id}`));
+    expect(response.status).toBe(204);
+
+    const deleted = await db.appEvent.findMany({
+      where: { name: 'segment.deleted', data: { path: ['segment', 'id'], equals: segment.id } },
+    });
+    expect(deleted).toHaveLength(1);
+
+    const removed = await db.appEvent.findMany({
+      where: { name: 'customerRef.segmentsRemoved', data: { path: ['customerRefId'], equals: customerRef.id } },
+    });
+    expect(removed.map((event) => (event.data as { segmentIds: string[] }).segmentIds)).toContainEqual([segment.id]);
   });
 });
