@@ -40,6 +40,9 @@ model CustomerRef {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
+  fileGrants       FilePermission[]  @relation("FilePermissionGranteeCustomerRef")
+  resourceBindings ResourceBinding[] @relation("ResourceBindingCustomerRef")
+
   // (customer, provider) pair uniqueness — partial uniques across each
   // populated customer FK paired with each provider FK. Each partial doubles
   // as a lookup index for that customer column. Add new partials when a new
