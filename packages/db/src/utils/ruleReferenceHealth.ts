@@ -6,6 +6,7 @@
  */
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
+import { referenceKey } from '@template/shared/rules';
 
 /** The shape a rule-reference edge has to arrive in for its health to be readable. No relations. */
 export type RuleReferenceRow = {
@@ -20,9 +21,6 @@ export type RuleReferenceIssue = {
   referencedId: string;
   reason: 'deleted' | 'purged';
 };
-
-export const ruleReferenceKey = (reference: { model: string; id: string }): string =>
-  `${reference.model}|${reference.id}`;
 
 const purged = (edge: RuleReferenceRow): boolean => {
   const column = resolveFalsePolymorphismRef({
@@ -46,9 +44,7 @@ export const ruleReferenceIssues = (edges: RuleReferenceRow[]): RuleReferenceIss
     const reason = edge.referencedDeletedAt != null ? 'deleted' : purged(edge) ? 'purged' : null;
     if (!reason) return [];
     const { referencedModel, referencedId } = edge;
-    return [
-      { key: ruleReferenceKey({ model: referencedModel, id: referencedId }), referencedModel, referencedId, reason },
-    ];
+    return [{ key: referenceKey({ model: referencedModel, id: referencedId }), referencedModel, referencedId, reason }];
   });
 
 /** The reference keys these edges name that are still usable — absence is the answer, so callers fail closed. */
@@ -56,7 +52,7 @@ export const liveRuleReferenceKeys = (edges: RuleReferenceRow[]): Set<string> =>
   const broken = new Set(ruleReferenceIssues(edges).map((issue) => issue.key));
   const live = new Set<string>();
   for (const edge of edges) {
-    const key = ruleReferenceKey({ model: edge.referencedModel, id: edge.referencedId });
+    const key = referenceKey({ model: edge.referencedModel, id: edge.referencedId });
     if (!broken.has(key)) live.add(key);
   }
   return live;

@@ -14,7 +14,8 @@ import {
   type ModelNarrowing,
   validateNarrowing,
 } from '@inixiative/json-rules';
-import { lensFor } from '@template/db/lens';
+import { RULE_REFERENCEABLE_MODELS } from '@template/db';
+import { lensFor, omitForeignKeys } from '@template/db/lens';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 export const EMAIL_RULE_ROOT_MODEL = 'EmailRuleContext';
@@ -42,7 +43,20 @@ export type EmailSlotLenses = {
   data?: EmailDataLens;
 };
 
-export const DEFAULT_RECIPIENT_LENS: ModelNarrowing = { picks: ['id', 'name', 'email'] };
+const referenced: ModelNarrowing = { picks: ['id', 'name'] };
+
+export const DEFAULT_RECIPIENT_LENS: ModelNarrowing = {
+  picks: ['id', 'name', 'email'],
+  relations: {
+    tagAttachments: { picks: [], relations: { tag: referenced } },
+    spaceUsers: { picks: ['role'], relations: { space: referenced } },
+    organizationUsers: { picks: ['role'], relations: { organization: referenced } },
+  },
+};
+
+const referenceableSources = Object.fromEntries(
+  RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
+);
 
 const OPAQUE_DATA: FieldMapEntry = { kind: 'scalar', type: 'Json' };
 
@@ -124,8 +138,9 @@ const defaultDataLens = (projection: Lens, dataModel: string): ModelNarrowing =>
 export const emailLens = (projection: Lens, slots: EmailSlotLenses = {}): LensNarrowing => {
   const senderModel = rootFieldModel(projection, 'sender');
   const dataModel = rootFieldModel(projection, 'data');
-  const narrowing: LensNarrowing = {
+  const declared: LensNarrowing = {
     parent: projection,
+    mapDefaults: { [EMAIL_RULE_MAP_NAME]: { models: referenceableSources } },
     root: {
       relations: {
         recipient: slots.recipient ?? DEFAULT_RECIPIENT_LENS,
@@ -134,12 +149,14 @@ export const emailLens = (projection: Lens, slots: EmailSlotLenses = {}): LensNa
       },
     },
   };
-  validateNarrowing(narrowing);
-  return narrowing;
+  validateNarrowing(declared);
+  return omitForeignKeys(declared);
 };
 
 export const emailSurface = (projection: Lens, slots?: EmailSlotLenses): Lens =>
   exposedSurface(emailLens(projection, slots));
+
+export const defaultEmailRuleLens: LensNarrowing = emailLens(emailProjection());
 
 const isNarrowing = (value: unknown): value is ModelNarrowing =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -90,6 +90,8 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+// Rule references: the rows a stored rule names, as edges
+export { lockedLiveReferences } from './utils/lockedLiveReferences';
 // Model name utilities
 export {
   type AccessorName,
@@ -107,13 +109,16 @@ export {
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { revive } from './utils/revive';
+export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
+export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
   liveRuleReferenceKeys,
   type RuleReferenceIssue,
   type RuleReferenceRow,
   ruleReferenceIssues,
-  ruleReferenceKey,
 } from './utils/ruleReferenceHealth';
+export { ruleReferences } from './utils/ruleReferences';
+export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 
 // Hook shared utilities (ignore fields, redact fields)
 

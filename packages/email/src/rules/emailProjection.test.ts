@@ -53,7 +53,9 @@ describe('emailProjection', () => {
 describe('emailLens + emailSurface', () => {
   it('applies the engine default recipient lens when the row declares none', () => {
     const surface = emailSurface(emailProjection());
-    expect(fieldsOf(surface, 'User')).toEqual([...DEFAULT_RECIPIENT_LENS.picks!].sort());
+    expect(fieldsOf(surface, 'User')).toEqual(
+      [...DEFAULT_RECIPIENT_LENS.picks!, ...Object.keys(DEFAULT_RECIPIENT_LENS.relations!)].sort(),
+    );
   });
 
   it('exposes exactly what the row lens reaches, and nothing beyond it', () => {
