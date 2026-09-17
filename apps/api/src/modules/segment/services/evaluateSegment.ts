@@ -7,6 +7,7 @@
 import { applyLens, type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
 import { type Db, db as defaultDb, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
 import { type RuleIssue, withRule } from '@template/shared/rules';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
@@ -34,9 +35,13 @@ export class SegmentRuleDegradedError extends Error {
 const isInfrastructureFault = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientInitializationError || error instanceof Prisma.PrismaClientRustPanicError;
 
-const compileWhere = async (segment: Segment, rule: Condition, db: Db): Promise<Record<string, unknown>> => {
-  const ownerId = segmentOwnerId(segment);
-  const lens = resolvedSegmentLens(segment.ownerModel, ownerId);
+export const compileSegmentWhere = async (
+  ownerModel: ProviderModel,
+  ownerId: string,
+  rule: Condition,
+  db: Db,
+): Promise<Record<string, unknown>> => {
+  const lens = resolvedSegmentLens(ownerModel, ownerId);
   const root = rootLens(lens);
   const plan = toPrisma(applyLens(rule, lens), {
     map: root,
@@ -45,13 +50,13 @@ const compileWhere = async (segment: Segment, rule: Condition, db: Db): Promise<
     now: new Date(),
   });
   const where = await executePrismaQueryPlan(plan, db as never);
-  return { AND: [where, { [customerRefProviderFk(segment.ownerModel)]: ownerId }] };
+  return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
 };
 
 const segmentWhere = async (segment: Segment, db: Db = defaultDb): Promise<Record<string, unknown>> =>
   withRule(segmentRuleHealth(segment, await segmentRuleEdges(segment.id, db)), {
     degraded: (issues) => Promise.reject(new SegmentRuleDegradedError(segment.id, issues)),
-    sound: (rule) => compileWhere(segment, rule, db),
+    sound: (rule) => compileSegmentWhere(segment.ownerModel, segmentOwnerId(segment), rule, db),
   });
 
 export const evaluateSegment = async (segment: Segment, db: Db = defaultDb): Promise<string[]> => {
@@ -64,6 +69,3 @@ export const evaluateSegment = async (segment: Segment, db: Db = defaultDb): Pro
     throw new SegmentRuleEvaluationError(error);
   }
 };
-
-export const estimateSegmentReach = async (segment: Segment, db: Db = defaultDb): Promise<number> =>
-  db.customerRef.count({ where: await segmentWhere(segment, db) });

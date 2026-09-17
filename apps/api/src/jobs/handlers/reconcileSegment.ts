@@ -14,6 +14,7 @@ import { publishMembershipChanges } from '#/modules/segment/services/publishMemb
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import { isReconcilable, reconcileSegment as reconcile } from '#/modules/segment/services/reconcileSegment';
 import { buildReferenceMap, referencedBy } from '#/modules/segment/services/segmentReferenceGraph';
+import { soundSegments } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export type ReconcileSegmentPayload = {
   segmentId: string;
@@ -39,7 +40,7 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
     await publishMembershipChanges([{ segment, diff }], db);
 
     const path = [...referencePath, segmentId];
-    const siblings = await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment), db);
+    const siblings = await soundSegments(await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment), db), db);
     const dependents = referencedBy(buildReferenceMap(siblings), segmentId).filter((id) => !path.includes(id));
     for (const dependentId of dependents) {
       await enqueueJob('reconcileSegment', { segmentId: dependentId, referencePath: path });

@@ -126,6 +126,9 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
+// Action on a subresource collection → POST /:id/segments/reach
+actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
+
 // Admin
 readRoute({ model: 'user', many: true, admin: true, responseSchema })
 ```

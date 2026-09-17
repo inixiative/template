@@ -9,6 +9,7 @@ import { type Db, db as defaultDb, type RuleReferenceRow } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
+import { groupBy } from 'lodash-es';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
 import { customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
@@ -56,12 +57,11 @@ export const reconcileCustomerRef = async (
   const edges = (await db.ruleReference.findMany({
     where: { segmentId: { in: ordered.map((segment) => segment.id) } },
   })) as (RuleReferenceRow & { segmentId: string })[];
-  const edgesBySegment = new Map<string, RuleReferenceRow[]>();
-  for (const edge of edges) edgesBySegment.set(edge.segmentId, [...(edgesBySegment.get(edge.segmentId) ?? []), edge]);
+  const edgesBySegment = groupBy(edges, 'segmentId');
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
-    const matches = withRule(segmentRuleHealth(segment, edgesBySegment.get(segment.id) ?? []), {
+    const matches = withRule(segmentRuleHealth(segment, edgesBySegment[segment.id] ?? []), {
       degraded: () => null,
       sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
     });

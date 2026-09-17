@@ -7,6 +7,7 @@
 import { type Db, db as defaultDb, type RuleReferenceRow } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { RuleIssue } from '@template/shared/rules';
+import { groupBy } from 'lodash-es';
 import { segmentRuleIssues } from '#/modules/segment/services/segmentRuleHealth';
 
 export type SegmentWithRuleIssues = Segment & { ruleIssues: RuleIssue[] };
@@ -24,10 +25,12 @@ export const withSegmentsRuleIssues = async (
   const edges = (await db.ruleReference.findMany({
     where: { segmentId: { in: segments.map((segment) => segment.id) } },
   })) as (RuleReferenceRow & { segmentId: string })[];
-  const bySegment = new Map<string, RuleReferenceRow[]>();
-  for (const edge of edges) bySegment.set(edge.segmentId, [...(bySegment.get(edge.segmentId) ?? []), edge]);
+  const bySegment = groupBy(edges, 'segmentId');
   return segments.map((segment) => ({
     ...segment,
-    ruleIssues: segmentRuleIssues(segment, bySegment.get(segment.id) ?? []),
+    ruleIssues: segmentRuleIssues(segment, bySegment[segment.id] ?? []),
   }));
 };
+
+export const soundSegments = async (segments: Segment[], db: Db = defaultDb): Promise<SegmentWithRuleIssues[]> =>
+  (await withSegmentsRuleIssues(segments, db)).filter((segment) => !segment.ruleIssues.length);

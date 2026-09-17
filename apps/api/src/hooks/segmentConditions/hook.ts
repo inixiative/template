@@ -2,8 +2,10 @@ import { DbAction, db, type HookOptions, HookTiming, Prisma, registerDbHook, typ
 import type { Segment } from '@template/db/generated/client/client';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
+import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
 import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
 import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
+import { assertSegmentReferencesOwned } from '#/modules/segment/services/assertSegmentReferencesOwned';
 import { buildReferenceMap, findReferenceCycle } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 import { validateSegmentConditions } from '#/modules/segment/services/validateSegmentConditions';
@@ -23,21 +25,15 @@ const ownerOf = (row: SegmentRow, previous?: SegmentRow) => {
 };
 
 const assertReferencesResolve = async (row: SegmentRow, previous?: Segment): Promise<void> => {
-  const { ownerModel, ownerFk, ownerId } = ownerOf(row, previous);
-  const lens = segmentLensFor(ownerModel);
-  const ids = segmentReferences(row.conditions as never, lens);
-  if (!ids.length) return;
-  const owned = await db.segment.findMany({ where: { ownerModel, [ownerFk]: ownerId, deletedAt: null } });
-  const found = new Set(owned.map((segment) => segment.id));
-  const held = new Set(previous ? segmentReferences(previous.conditions as never, lens) : []);
-  const missing = ids.filter((id) => !found.has(id) && !held.has(id));
-  if (missing.length) {
-    throw makeError({
-      status: 422,
-      message: `Invalid segment conditions: references a segment this ${ownerModel} does not own: ${missing.join(', ')}`,
-    });
-  }
-  if (previous) assertNoReferenceCycle({ ...previous, conditions: row.conditions as Segment['conditions'] }, owned);
+  const { ownerModel, ownerId } = ownerOf(row, previous);
+  const conditions = row.conditions as Segment['conditions'];
+  const owned = await assertSegmentReferencesOwned({
+    ownerModel,
+    ownerId,
+    conditions: conditions as never,
+    held: previous ? segmentReferences(previous.conditions as never, segmentLensFor(ownerModel)) : [],
+  });
+  if (previous) assertNoReferenceCycle({ ...previous, conditions }, owned);
 };
 
 const assertNoReferenceCycle = (candidate: Segment, owned: Segment[]): void => {
@@ -57,8 +53,7 @@ const processSegmentRow = async (row: SegmentRow, previous?: Segment): Promise<v
 
   const { ownerModel } = ownerOf(row, previous);
   const result = validateSegmentConditions(row.conditions, ownerModel, { selfId: previous?.id });
-  if (!result.valid)
-    throw makeError({ status: 422, message: `Invalid segment conditions: ${result.errors.join('; ')}` });
+  if (!result.valid) throw invalidSegmentConditions(result.errors);
   row.conditions = result.normalized as Prisma.InputJsonValue;
   await assertReferencesResolve(row, previous);
 };

@@ -14,6 +14,7 @@ import {
   cleanupTouchedTables,
   createCustomerRef,
   createOrganizationUser,
+  createSegment,
   createSpace,
   createUser,
   getNextSeq,
@@ -21,6 +22,7 @@ import {
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { meRouter } from '#/modules/me';
+import { organizationRouter } from '#/modules/organization';
 import { segmentRouter } from '#/modules/segment';
 import { spaceRouter } from '#/modules/space';
 import { userRouter } from '#/modules/user';
@@ -28,6 +30,12 @@ import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+
+const membersOf = (segmentId: string) => ({
+  field: 'segmentMembers',
+  arrayOperator: 'any',
+  condition: { field: 'segment.id', operator: Operator.equals, value: segmentId },
+});
 
 type Membership = SegmentMember & { segment: Segment };
 
@@ -78,6 +86,7 @@ describe('segment routes', () => {
         app.route('/api/v1/space', spaceRouter);
         app.route('/api/v1/segment', segmentRouter);
         app.route('/api/v1/me', meRouter);
+        app.route('/api/v1/organization', organizationRouter);
         app.route('/api/v1/user', userRouter);
       },
     ];
@@ -189,5 +198,41 @@ describe('segment routes', () => {
       }),
     );
     expect(response.status).toBe(422);
+  });
+
+  it('reach counts the customers a candidate rule would match, without saving anything', async () => {
+    const before = await db.segment.count();
+    const response = await ownerFetch(post(`/api/v1/space/${space.id}/segments/reach`, { conditions: acmeRule }));
+    expect(response.status).toBe(200);
+    expect((await json<{ count: number }>(response)).data).toEqual({ count: 1 });
+    expect(await db.segment.count()).toBe(before);
+  });
+
+  it('reach refuses a rule the save gate would refuse', async () => {
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/segments/reach`, {
+        conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'superadmin' },
+      }),
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it('reach refuses a rule naming a segment the owner does not have', async () => {
+    const elsewhere = (await createSpace({}, { organization: org })).entity;
+    const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/segments/reach`, { conditions: membersOf(foreign.id) }),
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it('reach is offered wherever a segment can be created: me and organization as provider', async () => {
+    const mine = await ownerFetch(post('/api/v1/me/segments/reach', { conditions: acmeRule }));
+    expect(mine.status).toBe(200);
+    expect((await json<{ count: number }>(mine)).data).toEqual({ count: 0 });
+
+    const orgs = await ownerFetch(post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }));
+    expect(orgs.status).toBe(200);
+    expect((await json<{ count: number }>(orgs)).data).toEqual({ count: 0 });
   });
 });
