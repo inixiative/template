@@ -8,6 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
+import { assertNoResultNarrowing } from '@template/db/extensions/assertNoResultNarrowing';
 import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
 import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
@@ -255,6 +256,7 @@ const bareDelegate = (model: string | symbol): unknown => {
       return async (args: unknown) => {
         if (!hasHooksFor(modelName)) {
           assertNoNestedWrites(modelName, args);
+          assertNoResultNarrowing(modelName, args);
           return (member as (a: unknown) => Promise<unknown>).call(t, args);
         }
         return dbMethods.txn(() => {
