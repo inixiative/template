@@ -11,6 +11,7 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
+import { apiRateLimit, authRateLimit } from '#/middleware/rateLimit';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
@@ -40,6 +41,7 @@ apiRouter.use('*', prepareRequest);
 apiRouter.route('/internal', internalRouter);
 
 // Auth routes (better-auth handles its own auth, returns early)
+apiRouter.use('/auth/*', authRateLimit);
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
 // One-click unsubscribe — public (no session/token); authorized by its own signed link.
@@ -52,6 +54,7 @@ apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
+apiRouter.use('*', apiRateLimit);
 
 // Admin Routes (superadmin only - see routes/admin.ts)
 apiRouter.route('/admin', adminRouter);

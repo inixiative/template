@@ -40,7 +40,8 @@ The test: **500 = the server is broken/misconfigured (not the caller's fault);
 ## makeError / AppError
 
 `makeError(options) → AppError`, where `AppError extends HTTPException`. Options:
-`{ status?, message?, guidance?, fieldErrors? }` (status defaults to 500).
+`{ status?, message?, guidance?, fieldErrors?, headers? }` (status defaults to 500;
+`headers` rides on the response — the 429 limiter sets `Retry-After` this way).
 `requestId` is **not** an option — it's stamped onto the thrown `AppError` by the
 handler. `AppError.getResponse()` emits:
 

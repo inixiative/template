@@ -8,6 +8,7 @@
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { clientAddress } from '#/lib/clientIp';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
@@ -42,7 +43,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     actorTokenName: token?.name ?? null,
     actorTokenKeyPrefix: token?.keyPrefix ?? null,
     actorJobName: null,
-    ipAddress: (c.req.header('x-forwarded-for') ?? '').split(',')[0].trim() || c.req.header('x-real-ip') || null,
+    ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
     integrationId: await resolveOriginIntegrationId(c),

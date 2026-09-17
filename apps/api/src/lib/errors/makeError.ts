@@ -12,21 +12,24 @@ type MakeErrorOptions = {
   message?: string;
   guidance?: Guidance;
   fieldErrors?: Record<string, string[]>;
+  headers?: Record<string, string>;
 };
 
 export class AppError extends HTTPException {
   requestId?: string;
   private __body: Record<string, unknown>;
+  private __headers: Record<string, string>;
 
-  constructor(status: number, body: Record<string, unknown>) {
+  constructor(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}) {
     super(status as HttpErrorCode, { message: body.message as string });
     this.__body = body;
+    this.__headers = headers;
   }
 
   getResponse(): Response {
     return new Response(JSON.stringify({ ...this.__body, requestId: this.requestId }), {
       status: this.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...this.__headers, 'Content-Type': 'application/json' },
     });
   }
 }
@@ -35,10 +38,14 @@ export const makeError = (options: MakeErrorOptions): AppError => {
   const status = options.status ?? 500;
   const meta = HTTP_ERROR_MAP[status];
 
-  return new AppError(status, {
-    error: meta.label,
-    message: options.message ?? meta.name,
-    guidance: options.guidance ?? meta.guidance,
-    fieldErrors: options.fieldErrors,
-  });
+  return new AppError(
+    status,
+    {
+      error: meta.label,
+      message: options.message ?? meta.name,
+      guidance: options.guidance ?? meta.guidance,
+      fieldErrors: options.fieldErrors,
+    },
+    options.headers,
+  );
 };

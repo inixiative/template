@@ -131,17 +131,22 @@ secondaryStorage: {
 
 ### Rate Limiting (`limit:*`)
 
-Request rate limiting by token or IP:
+Fixed windows, one atomic Lua `INCR` + first-hit `PEXPIRE` per rule (`incrementFixedWindows`).
+A `rateLimit(rules)` middleware ANDs its rules — every bucket must be under its max — and 429s
+with `Retry-After`. Redis down = fail open (warn + report, request allowed).
 
 ```typescript
-// API rate limit (per second)
-`${redisNamespace.limit}:api:token:${tokenId}`
-`${redisNamespace.limit}:api:ip:${clientIp}`
-
-// Custom rate limits
-`${redisNamespace.limit}:auth:${ip}`      // Auth endpoints
-`${redisNamespace.limit}:email:${ip}`     // Email sending
+// `${redisNamespace.limit}:${scope}:${windowMs}:${identity}`
+`limit:api:principal:1000:user:${userId}`        // session, or any token owned by / through the user
+`limit:api:principal:1000:ip:${clientIp}`        // anonymous fallback
+`limit:api:space:1000:space:${spaceId}`          // Space / SpaceUser tokens
+`limit:api:organization:1000:organization:${organizationId}`
+`limit:auth:60000:ip:${clientIp}`                // /api/auth/* per IP
 ```
+
+Identity comes from `getActor` (session user, token owner, token scope), the IP from the trusted
+`x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
+the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
 ### Job Coordination (`job:*`)
 
