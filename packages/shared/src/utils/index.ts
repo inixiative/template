@@ -2,8 +2,16 @@ export { cn } from './cn';
 export { ConcurrencyType, concurrencyLimits, getConcurrency } from './concurrency';
 export { containsAny } from './containsAny';
 export { type Environment, isLocal, isPR, isProd, isStaging, isTest } from './env';
+export {
+  installEnvOverrideProxy,
+  resetEnvOverrides,
+  setEnvOverride,
+  withEnv,
+  wrapEnvWithOverrides,
+} from './envOverrides';
 export { heartbeat } from './heartbeat';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export { resolveAll } from './resolveAll';
+export { type RetryOptions, withRetry } from './retry';
 export { createSerializedQueue, type SerializedQueue } from './serializedQueue';
 export { stableHash } from './stableHash';

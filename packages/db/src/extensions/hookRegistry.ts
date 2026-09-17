@@ -63,6 +63,10 @@ const registeredHooks: {
 
 const hookRegistry = new Set<string>();
 
+const hookRegistrations = new Map<
+  string,
+  { targets: string[]; timing: HookTiming; actions: DbAction[]; hook: HookFunction }
+>();
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived. A hook
 // that reads an ambient context declares its store here and db.txn carries the value across.
 const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
@@ -85,6 +89,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 
   hookRegistry.add(name);
+  hookRegistrations.set(name, { targets: castArray(model), timing, actions, hook: hook as HookFunction });
   for (const store of bridges) bridgedStores.add(store);
 
   for (const target of castArray(model)) {
@@ -98,6 +103,24 @@ export const registerDbHook = <T = Record<string, unknown>>(
       registeredHooks[target][timing][action]!.push(hook as HookFunction);
     }
   }
+};
+
+export const unregisterDbHook = (name: string) => {
+  const registration = hookRegistrations.get(name);
+  if (!registration) return;
+
+  for (const target of registration.targets) {
+    const timingHooks = registeredHooks[target]?.[registration.timing];
+    if (!timingHooks) continue;
+
+    for (const action of registration.actions) {
+      const hooks = timingHooks[action];
+      if (hooks) timingHooks[action] = hooks.filter((hook) => hook !== registration.hook);
+    }
+  }
+
+  hookRegistry.delete(name);
+  hookRegistrations.delete(name);
 };
 
 // Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
@@ -132,6 +155,7 @@ export const runInBridgedContext = <TResult>(bridgedContext: BridgedContext, fn:
 
 export const clearHookRegistry = () => {
   hookRegistry.clear();
+  hookRegistrations.clear();
   bridgedStores.clear();
   for (const model of Object.keys(registeredHooks)) {
     delete registeredHooks[model];
