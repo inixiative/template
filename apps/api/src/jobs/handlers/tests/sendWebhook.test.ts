@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock,
 import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
+import { setEnvOverride } from '@template/shared/utils';
 import { sendWebhook } from '#/jobs/handlers/sendWebhook';
 import { createTestApp } from '#tests/createTestApp';
 
@@ -25,8 +26,6 @@ describe('sendWebhook handler', () => {
   const mockLog = () => {};
 
   beforeAll(async () => {
-    process.env.WEBHOOK_SIGNING_PRIVATE_KEY = privateKey;
-
     const { entity } = await createUser();
     user = entity;
 
@@ -35,6 +34,7 @@ describe('sendWebhook handler', () => {
   });
 
   beforeEach(() => {
+    setEnvOverride('WEBHOOK_SIGNING_PRIVATE_KEY', privateKey);
     receivedWebhooks.length = 0;
     spyOn(globalThis, 'fetch').mockImplementation(((url: string, init?: RequestInit) => {
       const headers: Record<string, string> = {};

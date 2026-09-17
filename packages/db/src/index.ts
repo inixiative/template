@@ -16,6 +16,7 @@ export {
   registerDbHook,
   registerDbInvariant,
   type SingleAction,
+  unregisterDbHook,
   unregisterDbInvariant,
 } from './extensions/mutationLifeCycle';
 // Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
@@ -90,6 +91,9 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+// Prisma error narrowing
+export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
+export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
 export { lockedLiveReferences } from './utils/lockedLiveReferences';
 // Model name utilities
