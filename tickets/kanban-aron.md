@@ -29,6 +29,7 @@ kanban
     COMM-001-email-system
     FEAT-008-permissions-builder
   In Progress
+    INFRA-027-rate-limiter-atomicity-fail-open-scopes
     INFRA-029-preset-facet-knobs
     AUTH-002-unified-auth-system
     INFRA-004-websockets

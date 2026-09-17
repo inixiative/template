@@ -1,7 +1,7 @@
 # INFRA-027: Rate limiter — atomic fixed window, fail-open, hierarchical scopes
 
-**Status**: 🆕 Not Started
-**Assignee**: TBD
+**Status**: 🔄 In Progress (branch `INFRA-027-rate-limiter`)
+**Assignee**: Aron
 **Priority**: High
 **Created**: 2026-07-03
 
@@ -86,14 +86,45 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
   shared `getClientIp` so both the limiter and `auditActorMiddleware` inherit a trustworthy value; the
   audit-actor spoof closes with the same change.
 
+## Rulings (2026-09-17, supersede the Decision bullets where they differ)
+
+- **Identity is the user.** A session and every token owned by or through a user (`User`, `OrganizationUser`,
+  `SpaceUser` owner models) share one `user:{id}` bucket, so minting tokens buys nothing at the principal.
+  `Organization` / `Space` owned tokens have no person behind them: the tenant is the principal.
+  Anonymous requests key on the trusted client IP.
+- **Context is the other axis.** An organization bucket and a space bucket, taken from the token's scope
+  (`getActor`), AND-checked with the principal bucket. Space nests under organization. A session user acting
+  in an org contributes to no org bucket in this cut — resource-derived context is a later seam, not a column.
+- **Limits are entitlements, not columns.** No `rateLimitPerSecond` on Organization or Space; the existing
+  column on Token is no longer read. Every max resolves through `rateLimitMax(tier, c)` — one stub with code
+  defaults, to be fed by subscriptions / feature flags (FEAT-003) when they land. Token's column retires with
+  that work.
+- **Shape = Zealot's rule-array middleware** (`rateLimit(rules, { onLimited })`): scope + window + max (number
+  or per-request fn) + key fn per rule; null key skips the rule; 429 through `makeError` with `Retry-After` and
+  `Cache-Control: no-store` (`makeError` grew a `headers` option); fail-open on any Redis error with a warn and
+  an `errorReporter` capture.
+- **These are identity rate limits.** Abuse-shape buckets keyed on who is calling (user / space / organization / IP). A **cost** limit — how many AI calls a tenant may make, or any cap that bounds spend — is a different detector with its own semantics, not a rule in `apiRateLimit`; it lives with the thing it meters and must still be able to run inside a batch. When one arrives it gets its own factory or a flag on `RateLimitRule`, never a share of the identity buckets.
+- **Batch sub-requests are not counted by identity limits** (ruling 2026-09-17): the batch request paid once. The skip keys on the batch transaction prepareRequest resolves from the registry, since the `x-batch-id` header alone is spoofable.
+- **Wired.** `apiRateLimit` (principal AND space AND organization, 1 s windows) on every route after auth in
+  `routes/api.ts`; `authRateLimit` (per IP, 1 min) on `/api/auth/*`. `emailRateLimit` had no consumer and is gone.
+- **`clientIp` / `clientAddress`.** Trusted right-most XFF hop; `clientIp` buckets IPv6 to /64 for limiting,
+  `clientAddress` keeps the full address for `auditActorMiddleware`.
+
 ## Tasks
 
-- [ ] Replace the two-command INCR/EXPIRE with the atomic `INCR_WITH_EXPIRY` eval in `apiRateLimit` and `rateLimit`
-- [ ] Wrap the Redis call fail-open; `logger.warn` on unreachable and wire an alert on that warn
-- [ ] Add `rateLimitPerSecond` to `Organization`; source the org `max` from it
-- [ ] Make the token limiter (`apiRateLimit`) check actor AND organization scopes in one request, 429 on the first breach
-- [ ] Fix `getClientIp` to parse XFF from the trusted hop (not `[0]`) and mask IPv6 to /64; one shared helper feeding both the limiter and `auditActorMiddleware`
-- [ ] Tests: atomic window (a failure between commands can't strand a key), fail-open on Redis-down, per-scope breach (token over vs org over), org cap holds across multiple tokens, spoofed `X-Forwarded-For` can't mint a fresh IP bucket
+- [x] Atomic `INCR` + first-hit `PEXPIRE` Lua window (`incrementFixedWindows`, batch of windows per call)
+- [x] Fail-open on Redis error: warn + `errorReporter.captureException`, request allowed
+- [x] Rule-array `rateLimit` middleware, AND-checked, `Retry-After`, `onLimited` hook
+- [x] Identities: `userIdentity` / `principalIdentity` / `organizationIdentity` / `spaceIdentity` / `ipIdentity` from `getActor`
+- [x] `rateLimitMax(tier, c)` seam with code defaults (user 20/s, space 30/s, org 60/s, auth 60/min)
+- [x] `clientIp` trusted-hop + /64 bucketing; `clientAddress` feeding `auditActorMiddleware`
+- [x] Wire `apiRateLimit` after auth and `authRateLimit` on `/api/auth/*`
+- [x] Tests: window count/ttl, 429 + `Retry-After` + envelope, `onLimited`, per-client isolation, AND rules, fn max, null-key skip, spoofed XFF, fail-open, identities per owner model
+- [ ] Feed `rateLimitMax` from subscriptions / feature flags (FEAT-003) and drop `Token.rateLimitPerSecond` — ASAP per Aron 2026-09-17; flags also govern whether limiting is on at all
+- [ ] Resource-derived organization / space context for session users, if per-tenant fair share is wanted
+- [ ] Alert on the fail-open warn
+- [ ] Collapse a request's windows into one multi-key eval (one command instead of one per rule). Blocked on ioredis-mock, which returns `undefined` for any Lua table built by a loop that runs more than once; the per-window evals are still dispatched in one write.
+- [x] Lua lives in `queries/` (`lanes/queries/`, `lock/queries/`, `rateLimit/queries/`), enforced by the `lua-in-queries` CI rule
 
 ---
 
