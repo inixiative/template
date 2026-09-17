@@ -10,7 +10,7 @@ import type { AppEnv } from '#/types/appEnv';
 export type RateLimitTier = 'user' | 'space' | 'organization' | 'auth';
 
 const DEFAULT_MAX: Record<RateLimitTier, number> = {
-  user: 10,
+  user: 20,
   space: 30,
   organization: 60,
   auth: 60,

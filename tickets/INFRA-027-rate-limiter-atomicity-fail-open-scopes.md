@@ -116,7 +116,7 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
 - [x] Fail-open on Redis error: warn + `errorReporter.captureException`, request allowed
 - [x] Rule-array `rateLimit` middleware, AND-checked, `Retry-After`, `onLimited` hook
 - [x] Identities: `userIdentity` / `principalIdentity` / `organizationIdentity` / `spaceIdentity` / `ipIdentity` from `getActor`
-- [x] `rateLimitMax(tier, c)` seam with code defaults (user 10/s, space 30/s, org 60/s, auth 60/min)
+- [x] `rateLimitMax(tier, c)` seam with code defaults (user 20/s, space 30/s, org 60/s, auth 60/min)
 - [x] `clientIp` trusted-hop + /64 bucketing; `clientAddress` feeding `auditActorMiddleware`
 - [x] Wire `apiRateLimit` after auth and `authRateLimit` on `/api/auth/*`
 - [x] Tests: window count/ttl, 429 + `Retry-After` + envelope, `onLimited`, per-client isolation, AND rules, fn max, null-key skip, spoofed XFF, fail-open, identities per owner model
