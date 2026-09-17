@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createSpace, createTag } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createRuleReference,
+  createSpace,
+  createTag,
+} from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
@@ -294,15 +300,10 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     const { entity: comp } = await createEmailComponent();
 
     await expect(
-      db.ruleReference.create({
-        data: {
-          ownerModel: 'EmailTemplate',
-          emailComponentId: comp.id,
-          referencedModel: 'Tag',
-          referencedId: tag.id,
-          tagId: tag.id,
-        },
-      }),
+      createRuleReference(
+        { ownerModel: 'EmailTemplate', referencedModel: 'Tag', referencedId: tag.id },
+        { emailComponent: comp, tag },
+      ),
     ).rejects.toMatchObject({ status: 422 });
   });
 });

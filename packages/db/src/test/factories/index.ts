@@ -11,6 +11,7 @@ export * from './integrationFactory';
 export * from './jobOutboxFactory';
 export * from './organizationFactory';
 export * from './organizationUserFactory';
+export * from './ruleReferenceFactory';
 export * from './segmentFactory';
 export * from './segmentMemberFactory';
 export * from './sessionFactory';
