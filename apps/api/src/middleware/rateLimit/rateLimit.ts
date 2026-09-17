@@ -9,7 +9,7 @@ import { LogScope, log } from '@template/shared/logger';
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { errorReporter } from '#/lib/errorReporter';
 import { makeError } from '#/lib/errors';
-import { incrementFixedWindows } from '#/middleware/rateLimit/incrementFixedWindows';
+import { incrementFixedWindows } from '#/middleware/rateLimit/queries/incrementFixedWindows';
 import type { AppEnv } from '#/types/appEnv';
 
 // Rules AND together: every rule must pass. An OR would let a tenant buy N times the throughput by minting N tokens.

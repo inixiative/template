@@ -144,6 +144,10 @@ with `Retry-After`. Redis down = fail open (warn + report, request allowed).
 `limit:auth:60000:ip:${clientIp}`                // /api/auth/* per IP
 ```
 
+Lua scripts are queries: each lives in its module's `queries/` folder (`lanes/queries/`, `lock/queries/`,
+`middleware/rateLimit/queries/`), one script plus the function that evals it per file — the
+`lua-in-queries` CI rule holds the line.
+
 Identity comes from `getActor` (session user, token owner, token scope), the IP from the trusted
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.

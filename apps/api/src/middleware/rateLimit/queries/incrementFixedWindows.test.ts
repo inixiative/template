@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { getRedisClient } from '@template/db';
 
-import { incrementFixedWindows } from '#/middleware/rateLimit/incrementFixedWindows';
+import { incrementFixedWindows } from '#/middleware/rateLimit/queries/incrementFixedWindows';
 
 describe('incrementFixedWindows', () => {
   beforeEach(async () => {

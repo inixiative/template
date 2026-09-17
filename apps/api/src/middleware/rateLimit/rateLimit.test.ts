@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { getRedisClient } from '@template/db';
 import { clientIp } from '#/lib/clientIp';
-import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit';
+import { type RateLimitRule, rateLimit } from '#/middleware/rateLimit/rateLimit';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 
 const mount =

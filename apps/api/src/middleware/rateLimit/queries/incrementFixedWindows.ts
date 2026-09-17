@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind utils
+ * @kind query
  * @partOf primitive:requestContext
  * @uses infrastructure:redis
  */
@@ -14,6 +14,7 @@ type EvalCapable = { eval: (script: string, numKeys: number, ...args: (string | 
 export type FixedWindow = { key: string; windowMs: number };
 export type WindowState = { count: number; ttlMs: number };
 
+// One eval per window, dispatched together: ioredis writes them back-to-back, so a request pays one round trip.
 export const incrementFixedWindows = async (redis: EvalCapable, windows: FixedWindow[]): Promise<WindowState[]> => {
   const results = (await Promise.all(
     windows.map(({ key, windowMs }) => redis.eval(INCR_WINDOW, 1, key, String(windowMs))),
