@@ -412,11 +412,12 @@ for (const recipient of recipients) {
 }
 ```
 
-`interpolate(template, variables, onError?, { locale, lens })` and
-`evaluateConditions(template, variables, onError?)` take an optional
+`interpolate(template, variables, onError?, { locale, liveRefs, lens })` and
+`evaluateConditions(template, variables, onError?, liveRefs?)` take an optional
 `onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
 'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
-rule throws renders nothing; an `{{#each}}` whose
+rule is degraded (`withRule`: a required binding missing, the lens no longer admits
+the rule, a row it names is gone) or throws renders nothing; an `{{#each}}` whose
 filter throws renders nothing; a token that resolves to nothing, to an object, or to
 an unknown root renders **empty** — never the literal `{{…}}`. Every such case is one
 issue in the sink. Save is where the lens decides (`validateTokens`,
@@ -591,6 +592,71 @@ lives in the audit log**:
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots.
+
+### Rule References (the rows a rule names)
+
+A `{{#if rule=…}}` block can name a row — "recipient is tagged X", "recipient is in space Y". Those
+edges are persisted so that "who references X" is an index and a stale rule is never evaluated
+(INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
+
+- **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
+  (owner row → referenced row), false-polymorphic on both ends — `ownerModel` + one typed FK per
+  rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
+  referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
+  Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
+- **Extraction is the lens's** (`packages/email/src/rules/`): `emailRuleNarrowing` roots the rule
+  context at `recipient → User` and declares the referenceable sources
+  (`tagAttachments.tag.id`, `organizationUsers.organization.id`, `spaceUsers.space.id`);
+  `ruleSourceValues` (json-rules ≥ 2.20) reports the values a rule names at each source, and a
+  source on a model's id field is a row reference. Nested and dotted spellings are one path; a
+  `path`/`bind` leaf at a source — or an operator that describes the row without naming it
+  (`contains`, `between`) — is `dynamic` and refused at save. The narrowing is `mapDefaults`-shaped:
+  the source answers on **every** path to the model, FK columns duplicating a relation to a
+  referenceable model are derived from `prismaMap` and omitted, and the save path runs
+  `checkRuleAgainstLens` — an FK spelling or typo path is a 422, never a silently unregistered
+  rule. Adding a referenceable model = a registry entry + an FK column (source and omits derive);
+  adding a rule-bearing column = a `syncRuleReferences` call from its save path.
+- **Edges are written by the save path, not a hook.** `saveEmailTemplate` calls
+  `syncRuleReferences(owner, contents, emailRuleNarrowing)` inside its transaction for the template
+  and each saved component — set-diff (survivors keep their row), vocabulary and `dynamic` refused,
+  a newly added missing or soft-deleted target refused as a delta (a pre-existing dead reference
+  stays editable), referenced rows locked with `db.findForUpdate` while the gate reads them. Throws
+  `RuleReferenceError`. It is the only writer of `mjml`/`subject`, so nothing bypasses it.
+- **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
+  referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
+  `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
+  purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
+  axis therefore carries true polymorphism beside the false — the FK is the relation and may go
+  null, `referencedId` is the name and never changes, and the sync writes both from one value.
+  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  write `include: { ruleReferences: true }` and never grow that include as models become
+  referenceable. At render, `composeTemplate` reads the template's edges plus those of the
+  components the cascade resolved into one live set, and every branch goes through **`withRule`**
+  (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.
+- **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
+  whether the rule can be evaluated correctly — two questions: every binding it requires is
+  supplied (`bindOptional` marks the ones that may be left out and resolve to null), and it is
+  still valid — the lens admits it (`checkRuleAgainstLens`, so a lens change after save degrades
+  the rule instead of silently narrowing it) and every row it names is in the live set the caller
+  confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do nothing
+  new, say why": in email that is a rule issue, never a match, and the registry entry's `render`
+  spec decides the send; existing state is never touched by a degraded rule. Sound runs
+  the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
+  sources are ids; the live set comes from the caller's own read, locked when the sound arm decides
+  money. Nothing about degradation is stored. Client hard deletes stay prevented
+  (`preventHardDelete`).
+- Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
+  resolve through the owner cascade at read time, so an id persisted at save would be wrong the
+  moment an override appears.
+
+---
+
+## Messaging (non-email channels)
+
+A separate lane from email for direct, per-`ContactType` channels (SMS, push, chat). Where email is a
+template/cascade/versioning system, messaging is a thin dispatch primitive: render `{{recipient.*}}` /
+`{{data.*}}` / `{{sender.*}}` into a payload and hand it to a pluggable per-channel sender. Located in
+`apps/api/src/lib/messaging` (jobs in `apps/api/src/jobs/handlers`).
 
 ### Provider Registry
 

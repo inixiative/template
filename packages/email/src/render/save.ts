@@ -18,6 +18,7 @@ import { saveTemplate } from '@template/email/render/saveTemplate';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
+import { emailRuleNarrowing, syncRuleReferences } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -106,6 +107,15 @@ export const saveEmailTemplate = async (
 
       const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
       const template = await saveTemplate(finalTemplate, ctx);
+
+      for (const component of components) {
+        await syncRuleReferences({ model: 'EmailComponent', id: component.id }, [component.mjml], emailRuleNarrowing);
+      }
+      await syncRuleReferences(
+        { model: 'EmailTemplate', id: template.id },
+        [template.subject ?? '', stripComponentBodies(template.mjml)],
+        emailRuleNarrowing,
+      );
 
       const composed = await expand(template.mjml, ctx);
       assertValidTokens(composed, { lens: options.lens });

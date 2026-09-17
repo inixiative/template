@@ -32,6 +32,7 @@ model EmailComponent {
   space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs    AuditLog[]
+  ruleReferences RuleReference[]
 
   communicationComponentVersions CommunicationComponentVersion[]
 
