@@ -44,17 +44,18 @@ export type RuleArms<T> = {
   sound: (rule: Condition) => T;
 };
 
+/** Where a rule leaves the lens vocabulary, one line per violation. Empty means the lens admits it. */
+export const ruleVocabularyIssues = (lens: RuleLens, rule: Condition): string[] =>
+  checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
+
 export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];
   for (const name of requiredBindings(rule)) {
     if (bindings && Object.hasOwn(bindings, name)) continue;
     issues.push({ kind: 'binding', name, detail: `rule requires a binding that was not supplied: ${name}` });
   }
-  for (const violation of checkRuleAgainstLens(rule, lens).violations) {
-    issues.push({
-      kind: 'vocabulary',
-      detail: `rule is outside the lens vocabulary — ${violation.path}: ${violation.reason}`,
-    });
+  for (const issue of ruleVocabularyIssues(lens, rule)) {
+    issues.push({ kind: 'vocabulary', detail: `rule is outside the lens vocabulary — ${issue}` });
   }
   for (const reference of references) {
     if (live?.has(referenceKey(reference))) continue;

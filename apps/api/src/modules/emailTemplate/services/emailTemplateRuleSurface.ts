@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
-import type { Lens, SourceValues } from '@inixiative/json-rules';
+import { exposedSurface, type Lens, type LensNarrowing, type SourceValues } from '@inixiative/json-rules';
 import { rootLens } from '@template/db/lens';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { lookupAtOwner } from '@template/email/render/lookup';
@@ -12,9 +12,9 @@ import {
   type EmailProjectionInput,
   type EmailRuleDecoration,
   type EmailSlotLenses,
+  emailLens,
   emailProjection,
   emailRuleDecoration,
-  emailSurface,
   parseSlotLenses,
 } from '@template/email/rules';
 import { type EmailEntry, registry } from '#/lib/email/registry';
@@ -34,17 +34,24 @@ export const projectionForEntry = (entry: EmailEntry | undefined, slots: EmailSl
   return { senderModel, data };
 };
 
-export const emailTemplateRuleSurface = async (
+export const emailTemplateRuleLens = async (
   slug: string,
   locale = 'en',
   lensOverride?: unknown,
-): Promise<EmailTemplateRuleSurface> => {
+): Promise<LensNarrowing> => {
   const stored =
     lensOverride === undefined
       ? (await lookupAtOwner(slug, [], { ownerModel: 'default', locale })).template?.lens
       : lensOverride;
   const slots = parseSlotLenses(stored);
-  const projection = emailProjection(projectionForEntry(registry[slug], slots));
-  const source = emailSurface(projection, slots);
+  return emailLens(emailProjection(projectionForEntry(registry[slug], slots)), slots);
+};
+
+export const emailTemplateRuleSurface = async (
+  slug: string,
+  locale = 'en',
+  lensOverride?: unknown,
+): Promise<EmailTemplateRuleSurface> => {
+  const source = exposedSurface(await emailTemplateRuleLens(slug, locale, lensOverride));
   return { source, sourceValues: [], decoration: emailRuleDecoration(source) };
 };

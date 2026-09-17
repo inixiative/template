@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import type { Lens } from '@inixiative/json-rules';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import type { CommunicationKind } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -19,7 +19,7 @@ import {
 import { LogScope, log } from '@template/shared/logger';
 import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
-import { emailTemplateRuleSurface } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
+import { emailTemplateRuleLens } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
 
 export const ownerScope = (sender: Sender): OwnerScope => {
   switch (sender.type) {
@@ -72,7 +72,7 @@ const renderComposed = (
   composed: ComposeTemplateResult,
   vars: Variables,
   scope: OwnerScope,
-  lens: Lens,
+  lens: LensNarrowing,
 ): Rendered => {
   const issues: RenderIssue[] = [];
   const subjectIssues: RenderIssue[] = [];
@@ -116,8 +116,7 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const { source } = await emailTemplateRuleSurface(slug, at.locale);
-    return renderComposed(slug, composed, vars, at, source);
+    return renderComposed(slug, composed, vars, at, await emailTemplateRuleLens(slug, at.locale));
   };
 
   const clean = (rendered: Rendered): boolean => !rendered.subjectIssues.length && !rendered.settled.issues.length;

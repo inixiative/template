@@ -12,10 +12,10 @@ import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
-import { emailProjection, emailSurface } from '@template/email/rules/emailProjection';
+import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import mjml2html from 'mjml';
-import { emailTemplateRuleSurface } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
+import { emailTemplateRuleLens } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
 
 export type EmailTemplatePreflightInput = { mjml: string; subject?: string; slug?: string; locale?: string };
 
@@ -62,9 +62,7 @@ export const emailTemplatePreflight = async (
   const subject = input.subject ? interpolate(input.subject, SAMPLE_VARIABLES, onRenderWarning, { locale }) : '';
   const { html } = await mjml2html(interpolatedMjml, { validationLevel: 'skip' });
 
-  const lens = input.slug
-    ? (await emailTemplateRuleSurface(input.slug, locale)).source
-    : emailSurface(emailProjection());
+  const lens = input.slug ? await emailTemplateRuleLens(input.slug, locale) : defaultEmailRuleLens;
 
   const result = await runPreflight({
     mjml: expandedMjml,
