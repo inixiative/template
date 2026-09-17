@@ -11,8 +11,9 @@ import {
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
+import { keyBy } from 'lodash-es';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
-import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
+import { isManyAction } from '#/hooks/shared/hookRows';
 
 const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
   previous?.deletedAt == null && record?.deletedAt != null;
@@ -128,10 +129,10 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
     const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-    const previousById = buildPreviousById(previous);
+    const previousById = keyBy(previous, 'id');
 
     for (const record of results) {
-      const prev = previousById.get(record.id);
+      const prev = previousById[record.id];
       const entry = buildAuditEntry(model, dbActionToAuditAction(dbAction, record, prev), record, prev);
       if (entry) entries.push(entry);
     }

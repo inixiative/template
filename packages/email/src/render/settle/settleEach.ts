@@ -5,6 +5,7 @@
  * @uses primitive:shared
  */
 import { check } from '@inixiative/json-rules';
+import { ruleReferences } from '@template/db';
 import {
   type EachBlock,
   isValidBindingIdentifier,
@@ -18,7 +19,6 @@ import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render
 import { absoluteRule } from '@template/email/rules/absoluteRule';
 import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
-import { ruleReferences } from '@template/email/rules/ruleReferences';
 import { withRule } from '@template/shared/rules';
 
 export const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {

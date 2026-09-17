@@ -5,13 +5,13 @@
  * @uses primitive:shared
  */
 import { check } from '@inixiative/json-rules';
+import { ruleReferences } from '@template/db';
 import type { Branch } from '@template/email/render/conditionParser';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
 import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
-import { ruleReferences } from '@template/email/rules/ruleReferences';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (

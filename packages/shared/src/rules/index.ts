@@ -6,5 +6,6 @@ export {
   type RuleReference,
   referenceKey,
   ruleIssues,
+  ruleVocabularyIssues,
   withRule,
 } from './withRule';

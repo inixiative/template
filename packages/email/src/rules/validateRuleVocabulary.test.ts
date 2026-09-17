@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
-import { contentVocabularyIssues, ruleVocabularyIssues } from '@template/email/rules/validateRuleVocabulary';
+import { contentVocabularyIssues } from '@template/email/rules/validateRuleVocabulary';
+import { ruleVocabularyIssues } from '@template/shared/rules';
 
 describe('ruleVocabularyIssues — the lens owns the rule vocabulary', () => {
   it('the canonical membership spelling is clean', () => {

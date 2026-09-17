@@ -1,8 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createSpace, createTag } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
-import { RuleReferenceError } from '@template/email/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';

@@ -2,7 +2,7 @@
  * @atlas
  * @kind hook
  * @partOf infrastructure:prisma
- * @uses feature:email
+ * @uses none
  */
 
 import {
@@ -12,25 +12,16 @@ import {
   HookTiming,
   type ModelName,
   type Prisma,
+  RULE_REFERENCEABLE_MODELS,
   registerDbHook,
   resolveFalsePolymorphismRef,
 } from '@template/db';
-import { REFERENCEABLE_MODELS } from '@template/email/rules';
-import { castArray } from 'lodash-es';
-import { buildPreviousById, type HookRow } from '#/hooks/shared/hookRows';
+import { castArray, groupBy, keyBy, map } from 'lodash-es';
+import type { HookRow } from '#/hooks/shared/hookRows';
 
 const isLive = (row: HookRow): boolean => row.deletedAt == null;
 
-const flippedLiveness = (result: unknown, previous: unknown): string[] => {
-  const previousById = buildPreviousById(castArray((previous ?? []) as HookRow[]));
-  return castArray((result ?? []) as HookRow[])
-    .filter((row) => {
-      if (typeof row.id !== 'string') return false;
-      const prior = previousById.get(row.id);
-      return prior ? isLive(prior) !== isLive(row) : isLive(row);
-    })
-    .map((row) => row.id as string);
-};
+const deletedAtStamp = (row: HookRow): number => (row.deletedAt as Date | null)?.getTime() ?? 0;
 
 /**
  * Copies a referenced row's `deletedAt` onto the edges that name it, so a reader answers "is this
@@ -46,21 +37,17 @@ const flippedLiveness = (result: unknown, previous: unknown): string[] => {
 export const registerRuleReferenceReferencedHook = () => {
   registerDbHook(
     'ruleReference:referenced',
-    REFERENCEABLE_MODELS,
+    RULE_REFERENCEABLE_MODELS,
     HookTiming.after,
     [DbAction.create, DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, previous, result }: HookOptions) => {
-      const rows = castArray((result ?? []) as HookRow[]);
-      const flipped = flippedLiveness(result, previous);
+      const previousById = keyBy(castArray((previous ?? []) as HookRow[]), 'id');
+      const flipped = castArray((result ?? []) as HookRow[]).filter((row) => {
+        if (typeof row.id !== 'string') return false;
+        const prior = previousById[row.id];
+        return prior ? isLive(prior) !== isLive(row) : isLive(row);
+      });
       if (!flipped.length) return;
-
-      const deletedAtById = new Map(rows.map((row) => [row.id as string, (row.deletedAt ?? null) as Date | null]));
-      const byDeletedAt = new Map<number, string[]>();
-      for (const id of flipped) {
-        const at = deletedAtById.get(id) ?? null;
-        const bucket = at == null ? 0 : at.getTime();
-        byDeletedAt.set(bucket, [...(byDeletedAt.get(bucket) ?? []), id]);
-      }
 
       const column = resolveFalsePolymorphismRef({
         model: 'RuleReference',
@@ -68,14 +55,14 @@ export const registerRuleReferenceReferencedHook = () => {
         value: model as ModelName,
       });
       if (!column) return;
-      for (const [bucket, ids] of byDeletedAt) {
+      for (const [stamp, rows] of Object.entries(groupBy(flipped, deletedAtStamp))) {
         await db.ruleReference.updateManyAndReturn({
           where: {
             referencedModel: model,
-            referencedId: { in: ids },
+            referencedId: { in: map(rows, 'id') as string[] },
             [column]: { not: null },
           } as Prisma.RuleReferenceWhereInput,
-          data: { referencedDeletedAt: bucket === 0 ? null : new Date(bucket) },
+          data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
         });
       }
     },

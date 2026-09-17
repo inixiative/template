@@ -14,7 +14,8 @@ import {
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
+import { keyBy } from 'lodash-es';
+import { isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -130,11 +131,11 @@ export const registerWebhookHook = () => {
         if (isManyAction(dbAction)) {
           const { result, previous } = options as HookOptions & { action: ManyAction };
           const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-          const previousById = buildPreviousById(previous);
+          const previousById = keyBy(previous, 'id');
 
           for (const resultData of results) {
-            const webhookAction = dbActionToWebhookAction(dbAction, previousById.has(resultData.id));
-            const previousData = previousById.get(resultData.id);
+            const previousData = previousById[resultData.id];
+            const webhookAction = dbActionToWebhookAction(dbAction, previousData !== undefined);
             const callbacks = processSingleRecord(
               subscriptions,
               webhookModel,

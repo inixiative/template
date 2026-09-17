@@ -63,21 +63,26 @@ pattern, range, window) and unknown operators report `dynamic`. A `dynamic` leaf
 so it registers no edge — it is not a refusal (ruling 2026-09-10, below). This registry is the
 named first consumer that API was waiting for.
 
-`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`. The
-narrowing is `mapDefaults`-shaped: a source on each referenceable model's `id` (`Tag`,
-`Organization`, `Space` — derived from the `PolymorphismRegistry` axis) answers on every path to
-the model, and every FK column duplicating a relation to a referenceable model is derived from
-`prismaMap` and omitted from the vocabulary. `ruleReferences(rule)` keeps the id-field sources
-(`prismaMap.isId`) as row references; `contentRuleReferences(...contents)` folds every `{{#if}}`
-block, branch and nesting (`collectRules` in the condition parser). Adding a referenceable model =
-a `RuleReference` FK column + a registry entry (source and omits derive); adding a rule-bearing
-column = a `syncRuleReferences` call from its save path.
+Which models are referenceable is the registry's answer, not a surface's:
+`RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `referencedModel`
+axis of `PolymorphismRegistry.RuleReference`, and `ruleReferenceNarrowingDefaults()` is the
+`mapDefaults` every rule lens applies — a source on each referenceable model's `id` answers on
+every path to the model, and every FK column duplicating a relation to a referenceable model is
+derived from `prismaMap` and omitted from the vocabulary.
+`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User` and
+applies those defaults; a segment lens applies the same ones. `ruleReferences(lens, rule)`
+(`packages/db`) keeps the id-field sources (`prismaMap.isId`) as row references;
+`contentRuleReferences(lens, ...contents)` (email) folds every `{{#if}}` block, branch and nesting
+(`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
+column + a registry entry (source, omits and the referenced-side hook derive); adding a
+rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
 
 ### No owner-side hook
 
-Edges are written by `syncRuleReferences(owner, contents, lens)` — a service in
-`packages/email/src/rules/`, called by `saveEmailTemplate` inside its transaction for the template
-and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
+Edges are written by `syncRuleReferenceEdges(owner, references)` — a service in `packages/db`,
+fronted for email by `syncRuleReferences(owner, contents, lens)` in `packages/email/src/rules/`
+(vocabulary gate + `collectRules` over MJML and subject), called by `saveEmailTemplate` inside its
+transaction for the template and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
 nothing for a hook to catch that the call does not. The gate (vocabulary, delta against live rows
 under `findForUpdate`) throws `RuleReferenceError`, a sibling of
 `ConditionValidationError` on the same path. The one hook left is on the referenced side.
@@ -103,7 +108,7 @@ They are two clocks on one fact. The FK is the *relation* — owned by referenti
 goes null at exactly the moment the row ceases to exist. `referencedId` is the *name* — owned by
 the rule content, written once and never updated. They agree for the whole time the target is
 alive and diverge precisely at the moment worth detecting, so the divergence is the signal.
-`syncRuleReferences` writes both from the same value, so they agree by construction.
+`syncRuleReferenceEdges` writes both from the same value, so they agree by construction.
 
 That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure function in
 `@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
@@ -144,7 +149,7 @@ state is never touched by a degraded rule.
 Extraction is a function of two inputs — the rule content and the lens — and a save-time sync only
 observes the first. A per-template lens is fine, because editing it *is* an owner write. A shared
 lens authored as data is not: change it and every owner's edges are wrong at once with no write to
-notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferences(model, rows)`, the
+notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferenceEdges(owner, refs)`, the
 same callable a backfill loops over, triggered by a job rather than by a save. Deliberately not
 built here — the constraint is written down so the owner set stays open rather than being
 tightened around today's two models.

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import type { Condition } from '@inixiative/json-rules';
+import { ruleReferences } from '@template/db';
 import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
-import { contentRuleReferences, ruleReferences } from '@template/email/rules/ruleReferences';
+import { contentRuleReferences } from '@template/email/rules/ruleReferences';
 
 const block = (rule: unknown, body = 'X') => `{{#if rule=${JSON.stringify(rule)}}}${body}{{/if}}`;
 
