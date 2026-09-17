@@ -119,7 +119,7 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
 - [x] `clientIp` trusted-hop + /64 bucketing; `clientAddress` feeding `auditActorMiddleware`
 - [x] Wire `apiRateLimit` after auth and `authRateLimit` on `/api/auth/*`
 - [x] Tests: window count/ttl, 429 + `Retry-After` + envelope, `onLimited`, per-client isolation, AND rules, fn max, null-key skip, spoofed XFF, fail-open, identities per owner model
-- [ ] Feed `rateLimitMax` from subscriptions / feature flags (FEAT-003) and drop `Token.rateLimitPerSecond`
+- [ ] Feed `rateLimitMax` from subscriptions / feature flags (FEAT-003) and drop `Token.rateLimitPerSecond` — ASAP per Aron 2026-09-17; flags also govern whether limiting is on at all
 - [ ] Resource-derived organization / space context for session users, if per-tenant fair share is wanted
 - [ ] Alert on the fail-open warn
 - [ ] Collapse a request's windows into one multi-key eval (one command instead of one per rule). Blocked on ioredis-mock, which returns `undefined` for any Lua table built by a loop that runs more than once; the per-window evals are still dispatched in one write.
