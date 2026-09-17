@@ -6,7 +6,6 @@
  */
 import type { Db, OpenTransaction } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
-import { assertNoResultNarrowing } from '@template/db/extensions/assertNoResultNarrowing';
 import {
   DbAction,
   executeHooks,
@@ -91,7 +90,6 @@ export const mutationLifeCycleExtension = () => {
           await runInvariants(model, DbAction.create, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.create, args };
           return timed(model, operation, async () => {
             await runHooks(openTransaction, HookTiming.before, hookOptions);
@@ -115,7 +113,6 @@ export const mutationLifeCycleExtension = () => {
           await runInvariants(model, DbAction.createManyAndReturn, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const hookOptions: HookOptions = { model, operation, action: DbAction.createManyAndReturn, args };
           return timed(model, operation, async () => {
             await runHooks(openTransaction, HookTiming.before, hookOptions);
@@ -132,7 +129,6 @@ export const mutationLifeCycleExtension = () => {
           await runInvariants(model, DbAction.update, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.update, args };
           return timed(model, operation, async () => {
@@ -158,7 +154,6 @@ export const mutationLifeCycleExtension = () => {
           await runInvariants(model, DbAction.updateManyAndReturn, (args as { data?: unknown }).data);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.updateManyAndReturn, args };
           return timed(model, operation, async () => {
@@ -178,7 +173,6 @@ export const mutationLifeCycleExtension = () => {
           await runInvariants(model, DbAction.upsert, [create, update]);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.upsert, args };
           return timed(model, operation, async () => {
@@ -196,7 +190,6 @@ export const mutationLifeCycleExtension = () => {
           const openTransaction = getCurrentTransaction(model, operation, params);
           if (!openTransaction) return query(args);
           assertNoNestedWrites(model, args);
-          assertNoResultNarrowing(model, args);
           const { where } = args as { where: Record<string, unknown> };
           const hookOptions: HookOptions = { model, operation, action: DbAction.delete, args };
           return timed(model, operation, async () => {
