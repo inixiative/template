@@ -148,6 +148,11 @@ Lua scripts are queries: each lives in its module's `queries/` folder (`lanes/qu
 `middleware/rateLimit/queries/`), one script plus the function that evals it per file — the
 `lua-in-queries` CI rule holds the line.
 
+These are **identity** limits — abuse protection keyed on who is calling. A batch's sub-requests
+are not counted (the batch request paid once; the skip keys on the registry-resolved batch
+transaction, not the spoofable `x-batch-id` header). A **cost** limit — AI calls, anything that bounds
+spend — is a separate detector that must still run inside a batch; it is not an `apiRateLimit` rule.
+
 Identity comes from `getActor` (session user, token owner, token scope), the IP from the trusted
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.

@@ -103,7 +103,8 @@ provenance in the audit log. IPv6 compounds it: the key is a full /128, so a rou
   or per-request fn) + key fn per rule; null key skips the rule; 429 through `makeError` with `Retry-After` and
   `Cache-Control: no-store` (`makeError` grew a `headers` option); fail-open on any Redis error with a warn and
   an `errorReporter` capture.
-- **Batch sub-requests are not counted** (ruling 2026-09-17): the batch request paid once. The skip keys on the batch transaction prepareRequest resolves from the registry, since the `x-batch-id` header alone is spoofable.
+- **These are identity rate limits.** Abuse-shape buckets keyed on who is calling (user / space / organization / IP). A **cost** limit — how many AI calls a tenant may make, or any cap that bounds spend — is a different detector with its own semantics, not a rule in `apiRateLimit`; it lives with the thing it meters and must still be able to run inside a batch. When one arrives it gets its own factory or a flag on `RateLimitRule`, never a share of the identity buckets.
+- **Batch sub-requests are not counted by identity limits** (ruling 2026-09-17): the batch request paid once. The skip keys on the batch transaction prepareRequest resolves from the registry, since the `x-batch-id` header alone is spoofable.
 - **Wired.** `apiRateLimit` (principal AND space AND organization, 1 s windows) on every route after auth in
   `routes/api.ts`; `authRateLimit` (per IP, 1 min) on `/api/auth/*`. `emailRateLimit` had no consumer and is gone.
 - **`clientIp` / `clientAddress`.** Trusted right-most XFF hop; `clientIp` buckets IPv6 to /64 for limiting,
