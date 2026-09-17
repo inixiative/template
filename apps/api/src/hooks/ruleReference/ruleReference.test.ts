@@ -1,11 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createSpace, createTag } from '@template/db/test';
-import { saveEmailTemplate } from '@template/email/render';
-import { RuleReferenceError } from '@template/email/rules';
+import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
@@ -97,18 +97,17 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     expect(edges[0]).toMatchObject({ referencedModel: 'Space', spaceId: space.id, tagId: null });
   });
 
-  it('an undeclared relation path to a referenceable id still registers — the source is the model, not the path', async () => {
+  it('a relation the lens does not declare is refused at save, even when it reaches a referenceable id', async () => {
     const { entity: tag } = await createTag();
     const rule = {
       field: 'recipient.tags',
       arrayOperator: 'any',
       condition: { field: 'id', operator: 'equals', value: tag.id },
     };
-    const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`));
 
-    const edges = await edgesOf({ emailTemplateId: template.id });
-    expect(edges).toHaveLength(1);
-    expect(edges[0]).toMatchObject({ referencedModel: 'Tag', tagId: tag.id });
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`))).rejects.toBeInstanceOf(
+      ConditionValidationError,
+    );
   });
 
   it('the FK-column spelling of a reference is refused at save — outside the lens vocabulary', async () => {
@@ -119,13 +118,17 @@ describe('ruleReference — the save path writes edges, the referenced side stam
       condition: { field: 'tagId', operator: 'equals', value: tag.id },
     };
 
-    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(
+      ConditionValidationError,
+    );
   });
 
   it('a typo path is refused at save instead of silently never matching', async () => {
     const rule = { field: 'recipient.zzzNope', operator: 'equals', value: 'x' };
 
-    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(RuleReferenceError);
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toBeInstanceOf(
+      ConditionValidationError,
+    );
   });
 
   it('re-saving the body set-diffs: survivors keep their row, removed edges go, added edges appear', async () => {

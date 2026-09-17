@@ -11,6 +11,7 @@ import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
+import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -123,6 +124,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     } else {
       // Org/Space token → just set up permissions (no user context)
       await setupOrgPermissions(c);
+      await setupSpacePermissions(c);
     }
   } catch (err) {
     // Invalid token, lookup failure, or cache miss. Log so failure modes like

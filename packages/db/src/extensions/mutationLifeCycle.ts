@@ -35,6 +35,7 @@ export {
   HookTiming,
   registerDbHook,
   registerDbInvariant,
+  unregisterDbHook,
   unregisterDbInvariant,
 } from '@template/db/extensions/hookRegistry';
 

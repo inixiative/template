@@ -604,24 +604,42 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
   referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
   Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
-- **Extraction is the lens's** (`packages/email/src/rules/`): `emailRuleNarrowing` roots the rule
-  context at `recipient → User` and declares the referenceable sources
-  (`tagAttachments.tag.id`, `organizationUsers.organization.id`, `spaceUsers.space.id`);
-  `ruleSourceValues` (json-rules ≥ 2.20) reports the values a rule names at each source, and a
-  source on a model's id field is a row reference. Nested and dotted spellings are one path; a
-  `path`/`bind` leaf at a source — or an operator that describes the row without naming it
-  (`contains`, `between`) — is `dynamic` and refused at save. The narrowing is `mapDefaults`-shaped:
-  the source answers on **every** path to the model, FK columns duplicating a relation to a
-  referenceable model are derived from `prismaMap` and omitted, and the save path runs
-  `checkRuleAgainstLens` — an FK spelling or typo path is a 422, never a silently unregistered
-  rule. Adding a referenceable model = a registry entry + an FK column (source and omits derive);
-  adding a rule-bearing column = a `syncRuleReferences` call from its save path.
-- **Edges are written by the save path, not a hook.** `saveEmailTemplate` calls
-  `syncRuleReferences(owner, contents, emailRuleNarrowing)` inside its transaction for the template
-  and each saved component — set-diff (survivors keep their row), vocabulary and `dynamic` refused,
-  a newly added missing or soft-deleted target refused as a delta (a pre-existing dead reference
-  stays editable), referenced rows locked with `db.findForUpdate` while the gate reads them. Throws
-  `RuleReferenceError`. It is the only writer of `mjml`/`subject`, so nothing bypasses it.
+- **Which models are referenceable is the registry's answer, not any surface's.**
+  `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `referencedModel` axis of
+  `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
+- **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
+  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
+  itself in it and declares its own id sources. Email has one rule lens per template:
+  `emailLens(projection, slots)` (`packages/email/src/rules/emailProjection.ts`) wraps in
+  `omitForeignKeys` and declares `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for
+  each of `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  recipient lens reaches `tagAttachments.tag`, `spaceUsers.space` and
+  `organizationUsers.organization` (`id`, `name`); a relation the lens does not declare is refused
+  at save. The api's `emailTemplateRuleLens(slug, locale)` builds the template's narrowing; the
+  builder gets `exposedSurface` of it (which strips sources), while save and settle keep the
+  narrowing itself (`defaultEmailRuleLens` when none is threaded) — extraction never runs on the
+  exposed surface. Adding a referenceable model = a registry entry + an FK column (the hook and
+  email's sources derive); a surface that reaches it declares its own labeled id source.
+- **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `ruleSourceValues`
+  (json-rules ≥ 2.20) reports the values a rule names at each source, and a source on a model's
+  id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a
+  source — or an operator that describes the row without naming it (`contains`, `between`) — is
+  `dynamic`: it names no row and registers no edge. When save is handed a lens (the api
+  always is), its condition gate (`assertValidConditions`) refuses any rule path the lens does not
+  resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
+  asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
+  to decide and only extraction runs.
+- **Edges are written by the save path, not a hook.** The writer is
+  `syncRuleReferenceEdges(owner, references)` in `packages/db` — set-diff (survivors keep their
+  row), a newly added missing or soft-deleted target refused as a delta (a pre-existing dead
+  reference stays editable), referenced rows locked with `db.findForUpdate` while the gate reads
+  them. Throws `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
+  call from its save path. Email's `syncRuleReferences(owner, contents, lens)` is the
+  content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
+  and hands the references down. `saveEmailTemplate` calls it inside
+  its transaction for the template and each saved component; it is the only writer of
+  `mjml`/`subject`, so nothing bypasses it.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
   `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
@@ -641,9 +659,9 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do nothing
   new, say why": in email that is a rule issue, never a match, and the registry entry's `render`
   spec decides the send; existing state is never touched by a degraded rule. Sound runs
-  the caller's evaluator. Extraction (`ruleReferences`) stays in the rules module that knows which
-  sources are ids; the live set comes from the caller's own read, locked when the sound arm decides
-  money. Nothing about degradation is stored. Client hard deletes stay prevented
+  the caller's evaluator. Extraction (`ruleReferences`) lives in `packages/db` with the registry
+  that knows which sources are ids; the live set comes from the caller's own read, locked when the
+  sound arm decides money. Nothing about degradation is stored. Client hard deletes stay prevented
   (`preventHardDelete`).
 - Component references (`componentRefs`) stay slug-keyed and do **not** ride this table: they
   resolve through the owner cascade at read time, so an id persisted at save would be wrong the
