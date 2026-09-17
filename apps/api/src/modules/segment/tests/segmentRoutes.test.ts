@@ -16,6 +16,7 @@ import {
   createOrganizationUser,
   createSegment,
   createSpace,
+  createSpaceUser,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -90,9 +91,7 @@ describe('segment routes', () => {
         app.route('/api/v1/user', userRouter);
       },
     ];
-    const spaceUser = await db.spaceUser.create({
-      data: { role: 'admin', organizationId: org.id, spaceId: space.id, userId: owner.id },
-    });
+    const { entity: spaceUser } = await createSpaceUser({ role: 'admin' }, { ...context, space });
     const ownerHarness = createTestApp({
       mockUser: owner,
       mockOrganizationUsers: [orgUser],
