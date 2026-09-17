@@ -23,6 +23,7 @@ const baseEnvSchema = z
     DATABASE_URL: z.string(),
     BETTER_AUTH_SECRET: z.string().min(32),
     REDIS_URL: z.string(),
+    REDIS_BULLMQ_URL: z.string().optional(),
 
     // Core (defaults)
     PORT: z.coerce.number().default(8000),

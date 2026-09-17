@@ -30,7 +30,12 @@ export const serializeBracketQuery = (obj: Record<string, unknown>, prefix = '')
   };
   const append = (key: string, val: unknown) => {
     if (Array.isArray(val)) {
-      for (const item of val) appendScalar(key, item);
+      // Scalars repeat the key (an `in` list); objects take an index, because the parse merges
+      // repeated keys and combinator siblings would collapse into one another without it.
+      val.forEach((item, index) => {
+        if (item !== null && typeof item === 'object') append(`${key}[${index}]`, item);
+        else appendScalar(key, item);
+      });
     } else if (val !== null && typeof val === 'object') {
       for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
         append(`${key}[${k}]`, v);

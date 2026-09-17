@@ -11,6 +11,6 @@ import { integrationDeleteRoute } from '#/modules/integration/routes/integration
 export const integrationDeleteController = makeController(integrationDeleteRoute, async (c, respond) => {
   const db = c.get('db');
   const integration = getResource<'integration'>(c);
-  await db.integration.delete({ where: { id: integration.id } });
+  await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
   return respond.noContent();
 });

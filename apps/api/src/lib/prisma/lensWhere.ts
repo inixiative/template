@@ -16,6 +16,7 @@ import { db } from '@template/db';
 import { rootLens } from '@template/db/lens';
 import { makeError } from '#/lib/errors';
 import { modelFields } from '#/lib/prisma/fieldMetadata';
+import { liveWhere } from '#/lib/prisma/softDeleteScope';
 import { walkWhere } from '#/lib/prisma/whereWalker';
 
 type Visit = { modelName: string; mapName: string; whereClauses: Condition[] };
@@ -35,6 +36,15 @@ const scopePlan = (plan: { steps: unknown[] }, rootModel: string, scope: Record<
   );
   if (!back) return;
   step.args.where = step.args.where ? { AND: [step.args.where, { [back[0]]: scope }] } : { [back[0]]: scope };
+};
+
+// Count plans run before paginate's outer liveWhere; scope each groupBy to live rows or a soft-deleted child satisfies count narrowing (fail-open).
+const liveScopePlan = (plan: { steps: unknown[] }) => {
+  for (const raw of plan.steps) {
+    const step = raw as PlanStep;
+    if (step.operation !== 'groupBy' || !step.model || !step.args) continue;
+    step.args.where = liveWhere(step.model, step.args.where ?? {});
+  }
 };
 
 // Bridge conditions cross into another source and can never run inside the
@@ -75,6 +85,7 @@ const visitWheres = async (
         where = step.where;
       } else {
         if (key === rootKey) scopePlan(plan, visit.modelName, rootScope);
+        liveScopePlan(plan);
         where = await executePrismaQueryPlan(plan, db as never);
       }
       if (Object.keys(where).length > 0) clauses.push(where);

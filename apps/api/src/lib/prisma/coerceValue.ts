@@ -17,8 +17,24 @@ type Coercer = (value: unknown) => unknown;
 const COERCERS: Record<string, Coercer> = {
   Int: (value) => {
     const num = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(num))
+    // isFinite alone accepts floats like 3.5; Prisma's Int field then errors at query time with an
+    // unhelpful "expected Int got Float" — reject at the coercion boundary so the 400 is precise.
+    if (!Number.isFinite(num) || !Number.isInteger(num))
       throw makeError({ status: 400, message: `Cannot coerce ${JSON.stringify(value)} to Int` });
+    return num;
+  },
+
+  BigInt: (value) => {
+    if (typeof value === 'bigint') return value;
+    if (typeof value === 'number' && Number.isInteger(value)) return BigInt(value);
+    if (typeof value === 'string' && /^-?\d+$/.test(value)) return BigInt(value);
+    throw makeError({ status: 400, message: `Cannot coerce ${JSON.stringify(value)} to BigInt` });
+  },
+
+  Float: (value) => {
+    const num = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(num))
+      throw makeError({ status: 400, message: `Cannot coerce ${JSON.stringify(value)} to Float` });
     return num;
   },
 

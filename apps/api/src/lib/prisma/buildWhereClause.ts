@@ -11,6 +11,7 @@ import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
   isBracketSymbol,
+  isCombinator,
   isRelationOperator,
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
@@ -27,6 +28,7 @@ type BuildWhereOptions = {
   filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
+  searchPaths?: string[];
   // Superadmin: skips the picks whitelist (coercion + op validation still apply).
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
@@ -39,6 +41,18 @@ const isPrimitive = (v: BracketQueryValue): v is BracketQueryPrimitive =>
 const isRecord = (v: BracketQueryValue | undefined): v is BracketQueryRecord =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+// Prisma rejects a NULL member inside `in` (a typed `Int | Null` array is invalid). When the bracket
+// query carries one (`[in][:]=null`), pull the NULL out so it can be OR'd back as `{ field: null }` —
+// the only way to match concrete values PLUS NULL in one filter.
+const splitNullFromInClause = (
+  value: BracketQueryValue | undefined,
+): { clause: BracketQueryValue | undefined; orNull: boolean } => {
+  if (!isRecord(value) || !Array.isArray(value.in) || !value.in.includes(null)) {
+    return { clause: value, orNull: false };
+  }
+  return { clause: { ...value, in: value.in.filter((v) => v !== null) }, orNull: true };
+};
+
 // `tokens.some.name` → `tokens.name`. `lookupField` walks Prisma model
 // relations but doesn't know about Prisma's relation operators, so we strip
 // them before calling.
@@ -47,6 +61,30 @@ const stripRelationOperators = (path: string): string =>
     .split('.')
     .filter((seg) => !isRelationOperator(seg))
     .join('.');
+
+const MAX_COMBINATOR_CHILDREN = 25;
+
+// `{ '0': …, '1': … }` → ordered array. The wire carries combinator siblings under numeric
+// segments and the parse yields numeric-STRING keys, never a real array, so order comes from
+// the key rather than insertion.
+const indexedChildren = (combinator: string, value: BracketQueryValue | undefined): BracketQueryRecord[] => {
+  const entries = isRecord(value) ? Object.entries(value) : [];
+  if (!entries.length || entries.some(([key, child]) => !/^\d+$/.test(key) || !isRecord(child))) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' requires indexed children, e.g. ${combinator}[0][field]`,
+    });
+  }
+  // Every group is its own relation subquery, so an unbounded list buys unbounded database
+  // work off one URL. Bounded for the same reason the nesting depth is.
+  if (entries.length > MAX_COMBINATOR_CHILDREN) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
+    });
+  }
+  return entries.sort(([a], [b]) => Number(a) - Number(b)).map(([, child]) => child as BracketQueryRecord);
+};
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
@@ -123,6 +161,16 @@ const validateAndTransformSearchFields = (
 
   for (const [key, value] of Object.entries(obj)) {
     if (value === undefined) continue;
+
+    // Combinators group clauses and name no field, so they do NOT extend the path — children
+    // resolve against the same prefix, and the per-leaf whitelist still applies inside each.
+    if (isCombinator(key)) {
+      result[key] = indexedChildren(key, value).map((child) =>
+        validateAndTransformSearchFields(child, searchableFields, skipFieldValidation, model, prefix, depth + 1),
+      ) as unknown as BracketQueryValue;
+      continue;
+    }
+
     const currentPath = prefix ? `${prefix}.${key}` : key;
 
     // Bare scalar — apply field's default operator + coerce.
@@ -238,33 +286,90 @@ const validateAndTransformSearchFields = (
   return result;
 };
 
+// A group's own conditions AND together. One condition needs no wrapper. An empty group cannot
+// reach here: `indexedChildren` requires every child to be a record, and every key of a record
+// yields a condition.
+const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =>
+  conditions.length === 1 ? (conditions[0] as Record<string, unknown>) : { AND: conditions };
+
+// One transformed record → the conditions it contributes, which the caller ANDs together.
+// Combinator children recurse through here rather than being pushed raw, so a grouped leaf gets
+// the same null-in-`in` split and orNull treatment a top-level leaf gets.
+//
+// AND is the ONLY combinator associative with the caller's AND, so it alone flattens into the
+// caller's list. Every other combinator contributes exactly one condition, whose arms are each
+// group's own conditions AND'd together — flattening OR would turn a union into an
+// intersection, silently. The check names AND rather than OR so that a combinator added later
+// lands on the correct side by default.
+const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
+  const out: Record<string, unknown>[] = [];
+
+  for (const [key, value] of Object.entries(record)) {
+    if (isCombinator(key) && Array.isArray(value)) {
+      const children = value as unknown as BracketQueryRecord[];
+      if (key === 'AND') {
+        for (const child of children) out.push(...toConditions(child, orNullFields));
+      } else {
+        out.push({ [key]: children.map((child) => allOf(toConditions(child, orNullFields))) });
+      }
+      continue;
+    }
+    const { clause, orNull } = splitNullFromInClause(value);
+    if (orNull || orNullFields.includes(key)) {
+      out.push({ OR: [{ [key]: clause }, { [key]: null }] });
+    } else {
+      out.push({ [key]: clause });
+    }
+  }
+
+  return out;
+};
+
 export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
+  const {
+    filterLens,
+    search,
+    searchFields,
+    searchPaths,
+    skipFieldValidation = false,
+    filters = {},
+    orNullFields = [],
+  } = options;
   const lens = rootLens(filterLens);
   const model = lens.model as ModelName;
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
-  if (search && searchableFields.length) {
-    const searchConditions = searchableFields.flatMap((field) => {
-      const def = lookupField(model, stripRelationOperators(field));
-      const clause = def && fieldSearchOperator(def, search);
-      if (!clause) return [];
-      if (!validatePathNotation(field)) throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
-      return [buildSearchPath(model, field, clause)];
-    });
-    if (searchConditions.length) conditions.push({ OR: searchConditions });
+  for (const path of searchPaths ?? []) {
+    if (!searchableFields.includes(path)) {
+      throw makeError({
+        status: 500,
+        message: `buildWhereClause: searchPaths entry '${path}' is not a searchable path of the ${model} lens.`,
+      });
+    }
+  }
+  const globalSearchFields = searchPaths ?? searchableFields;
+
+  if (search?.trim() && globalSearchFields.length) {
+    // Split on whitespace so "Phil Smith" matches a row where one field contains "Phil" and another
+    // contains "Smith" — the whole string is rarely in one column. Each token ORs across the fields;
+    // tokens AND together.
+    for (const token of search.trim().split(/\s+/)) {
+      const searchConditions = globalSearchFields.flatMap((field) => {
+        const def = lookupField(model, stripRelationOperators(field));
+        const clause = def && fieldSearchOperator(def, token);
+        if (!clause) return [];
+        if (!validatePathNotation(field))
+          throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
+        return [buildSearchPath(model, field, clause)];
+      });
+      if (searchConditions.length) conditions.push({ OR: searchConditions });
+    }
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
     const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
-    for (const [key, value] of Object.entries(transformed)) {
-      if (orNullFields.includes(key)) {
-        conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
-      } else {
-        conditions.push({ [key]: value });
-      }
-    }
+    conditions.push(...toConditions(transformed, orNullFields));
   }
 
   return {

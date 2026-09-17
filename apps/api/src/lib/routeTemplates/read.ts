@@ -7,6 +7,7 @@
  */
 import { createRoute } from '@hono/zod-openapi';
 import pluralize from 'pluralize';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
@@ -48,6 +49,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
     method: 'get',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description:
       description ??
       (many

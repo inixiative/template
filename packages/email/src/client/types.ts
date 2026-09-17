@@ -11,6 +11,7 @@ export type SendEmailOptions = {
   from: string;
   subject: string;
   html: string;
+  text?: string;
   replyTo?: string;
   tags?: string[];
   metadata?: Record<string, string>;

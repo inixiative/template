@@ -4,7 +4,7 @@
 **Assignee**: Unassigned
 **Priority**: Medium
 **Created**: 2026-06-29
-**Updated**: 2026-07-03
+**Updated**: 2026-07-13
 
 ---
 
@@ -61,11 +61,27 @@ Resolve each `{{#component:slug}}` → load its row → per slot: override prese
 ## Tasks
 
 - [ ] **Cascade-diff decomposer** — replaces `mapRefs`/`cleanRefs` dedup + `resolveVariants` variant-indexing. Per component block: separate `:default` (component-owned) from un-marked overrides (caller-owned); 3-way diff vs cascade → noop / inherit / shadow / fork.
-- [ ] `expand.ts` — rewrite: inject overrides at slot markers, render `:default` for unfilled slots, thread per-call-site slot content (signature change); attribution-aware recursion.
-- [ ] `compose.ts` — thread slot content through the compose signature.
+- [x] `expand.ts` — rewrite: inject overrides at slot markers, render `:default` for unfilled slots, thread per-call-site slot content; attribution-aware recursion. **Done** — now a thin wrapper over `renderBlocks` (see below); signature dropped the redundant `componentRefs` arg (refs are discovered from the parse tree, single source of truth = the MJML). Callers updated: `compose.ts` (×2), `save.ts`, `apps/api/.../emailVersioning/hook.test.ts` (×2).
+- [x] `compose.ts` — call-site updated to the new `expand(mjml, ctx)` signature.
 - [ ] `validateNoCycle.ts` — no edges through overrides/passthroughs; test that a wrapper-with-slot doesn't register its fill.
-- [ ] `saveComponents` — slot-aware fragment validation: `{{#slot:name:default}}` defaults must be valid MJML; bare `{{slot}}` only in flow positions.
+- [ ] `saveComponents` — slot-aware fragment validation: `{{#slot:name:default}}` defaults must be valid MJML; bare `{{slot}}` only in flow positions. **This is the authoring gate** — `parseBlocks`/`renderBlocks` are deliberately lenient (garbage-in → best-effort-out), verified 2026-07-03. The validator must reject what the render layer silently tolerates: unbalanced/crossed slot-or-component tags, a stray close with no open, **bare non-slot text inside a component ref** (silently dropped at render — R1 probe: `{{#component:card}}PLAIN{{/component:card}}` → default renders, `PLAIN` lost), and **duplicate override slot names** in one ref (last-wins at render — R3 probe). Reuse `parseBlocks` to detect these; don't re-fork tag scanning.
 - [ ] Tests — named slots; defaults (filled vs unfilled); empty-default holds position; nested wrappers; a component inside a default (owned) vs inside an override (attributes to caller); noop/shadow/fork routing; 3-way diff against a moved base.
+
+## Implementation progress (2026-07-03)
+
+Built the **grammar + render** foundation first, TDD, decoupled from the DB-heavy save path:
+
+- **`packages/email/src/render/parseBlocks.ts`** — pure, DB-free parser. Tokenizes the pinned grammar (`{{#component:slug}}`, `{{#slot:name}}`, `{{#slot:name:default}}`) into a node tree (`text` / `component` / `slot{isDefault}`). It is **syntax only** — it does *not* decide ownership (override vs injection, caller vs component); that semantic layer lives in the consumers. Interpolation (`{{lens.field}}`) and `{{#if}}` are opaque text to it.
+- **`packages/email/src/render/renderBlocks.ts`** — pure render core, `renderBlocks(mjml, load)` with an injected `load(slug) => Promise<string>`. Per `{{#component}}`: collect caller override slots, load the component body, and for each slot marker inject the override else render the `:default`, recursing throughout. DB-free and fully unit-tested.
+- **`expand.ts`** wraps `renderBlocks` with a cascade-backed, per-slug-memoized loader (dedups the old N+1; missing slug → `EmailRenderError('component_missing')`).
+- Tests: `parseBlocks.test.ts` (9) + `renderBlocks.test.ts` (8) cover all three shapes, empty-default-holds-position, same-slug self-nesting, and the nesting-regression render. Full suite green: 17 unit + 106 email-pkg + 6 versioning (incl. the no-drift invariant).
+
+Backward-compatible: existing pre-slot components (bare refs, no slot markers) render identically under the tree walk.
+
+## Follow-ups surfaced during build
+
+- **`recomposeSnapshot` will drift once slots carry overrides.** `apps/api/src/lib/email/recompose.ts` uses its own regex `replaceBlock` (a *second* block matcher, separate from `expand`) that replaces the whole `{{#component:slug}}…{{/component:slug}}` block — **ignoring caller override slots**. Today (no slot data) it matches `expand` and the no-drift test passes; the moment a template fills a slot, snapshot recomposition and live composition diverge. Recompose must be made slot-aware against pinned child bodies (reuse `parseBlocks`/`renderBlocks`, don't re-fork block matching — cf. COMM-006). Own slice.
+- **Lens-aware interpolation** (raised 2026-07-03): all interpolation is lens-scoped. Decided lens set: **`sender`, `recipient`, `data` (generic/loose bag — the per-template unknown payload), `system`** (platform-injected values). A style/theme lens was floated but is not adopted. `interpolate.ts` grows a `system` lens alongside the existing `sender|recipient|data`; `data` stays a generic `Record<string, unknown>`. Larger direction the user is driving toward: a **typed template registry** (each template declares its lenses + the shape of its `data`) and a **custom template options matrix** (per-template options that expand into a render matrix). Registry/matrix design is being interrogated separately; the lens interpolation change lands with the slot work.
 - [ ] **Nesting regression test** — a parent shipping a child pre-filled:
   ```
   {{component:hero}}
@@ -84,6 +100,21 @@ Editing a component at a **parent tenancy** is not reachable from template editi
 
 - COMM-001 (email system), COMM-006 (versioning — depth-aware block matching must be reused, not re-forked).
 - Zealot `ZLT-3271` (port target — `@zealot/email`), `ZLT-3272` (builder + lens layer that consumes this).
+
+## Bring-back from Zealot #1698 / #1653 (2026-07-13)
+
+Template is **ahead** on the decomposer itself (PR #74 built `decompose.ts` + the declarative bindings registry). These two are engine capabilities template's save/read path still lacks — they sit *on top of* decompose, not a re-port of it.
+
+### `saveScopedRow` — `onConflict: 'reject' | 'upsert'` + derive `componentRefs` at save (from #1653)
+
+Template's `saveComponents.ts` is **upsert-only** (`findFirst` → update-or-create) and **trusts `input.componentRefs`** rather than deriving them. Port from Zealot `#1653`:
+
+- `onConflict: 'reject'` — a plain insert that lets the DB reject a live-slug collision (→ 409) and **revives a soft-deleted slug**, distinct from the default `'upsert'`.
+- **Derive `componentRefs` from the fragment at save** so nested `{{#component:slug}}` refs persist / expand / cycle-check on the direct component-save path (not only via the template decompose path).
+
+### Cascade-tier read decoration (from #1698, ZLT-3288)
+
+A read-side layer over the hydrated transitive closure: a breadth-first frontier walk that, per referenced slug, classifies the cascade tier as **row provenance** — `inherited` / `shadowed` / `forked` / `dangling` — by *existence per tier* (deliberately **not** a byte compare), using one tenant-tier + one default-tier query per depth (**no N+1**), returning both tiers' stored bodies for revert-preview. The tier vocabulary + bulk walk are generic; only the owner keys differ (Zealot brand/default → template org/space). Depends on nothing new — decorates the existing cascade.
 
 ## Origin
 

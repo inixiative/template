@@ -6,6 +6,7 @@
  * @constructs route
  */
 import { createRoute } from '@hono/zod-openapi';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
@@ -39,6 +40,7 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
     method: 'patch',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description: description ?? `Updates an existing ${resourceName}.`,
     middleware: prepareMiddleware(middleware, skipId),
     request: buildRequest(args),

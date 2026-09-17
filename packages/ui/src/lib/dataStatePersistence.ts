@@ -39,15 +39,23 @@ export function syncStateToUrl(state: PersistedState): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+// page/pageSize come off the URL (user-editable, shareable, stale). Reject NaN / non-positive so a
+// hand-mangled `?page=abc` or `?page=-5` can't inject invalid pagination state.
+function parsePositiveInt(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const n = Number.parseInt(value, 10);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 export function readStateFromUrl(searchString?: string): PersistedState {
   const params = new URLSearchParams(searchString ?? window.location.search);
   const state: PersistedState = {};
 
-  const page = params.get('page');
-  if (page) state.page = Number.parseInt(page, 10);
+  const page = parsePositiveInt(params.get('page'));
+  if (page !== undefined) state.page = page;
 
-  const pageSize = params.get('pageSize');
-  if (pageSize) state.pageSize = Number.parseInt(pageSize, 10);
+  const pageSize = parsePositiveInt(params.get('pageSize'));
+  if (pageSize !== undefined) state.pageSize = pageSize;
 
   const search = params.get('search');
   if (search) state.search = search;
@@ -102,6 +110,6 @@ export function writeToHistoryStateAndUrl(key: string | undefined, state: Persis
 export function parseOrderByStrings(strings: string[]): Array<{ field: string; direction: 'asc' | 'desc' }> {
   return strings.map((s) => {
     const [field, direction] = s.split(':');
-    return { field, direction: direction as 'asc' | 'desc' };
+    return { field, direction: direction === 'desc' ? 'desc' : 'asc' };
   });
 }

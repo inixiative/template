@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
+import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
-import { byChannel, byId, clearRegistry } from '#/ws/registry';
+import { byChannel, byId, byUser, clearRegistry } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
-import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createTestSocket } from '#tests/createTestSocket';
+import { createBearerToken } from '#tests/utils/createBearerToken';
 
 // Transport tests against the REAL app — probes are requests. Credentialed acceptance
 // and spoof authority live in probe.test.ts.
@@ -148,6 +148,38 @@ describe('websocketHandler', () => {
     await websocketHandler.message(socket, JSON.stringify({ action: 'logout' }));
     expect(socket.data.userId).toBeNull();
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
+  });
+
+  it('an authenticate resolving after close does not re-index the dead connection', async () => {
+    const { entity: user } = await createUser();
+    const { authorization } = await createBearerToken(user);
+
+    const { socket } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    const pending = websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'authenticate', headers: { authorization } }),
+    );
+    websocketHandler.close(socket);
+    await pending;
+
+    expect(byId.has('c1')).toBe(false);
+    expect(byUser.has(user.id)).toBe(false);
+  });
+
+  it('a subscribe resolving after close does not re-index the dead connection', async () => {
+    const inquiry = await createTestInquiry();
+    const channel = WS_CHANNELS.inquiryRead.name(inquiry.id);
+    const authorization = await createAdminBearer();
+
+    const { socket } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
+    websocketHandler.open(socket);
+    const pending = websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    websocketHandler.close(socket);
+    await pending;
+
+    expect(byId.has('c1')).toBe(false);
+    expect(byChannel.has(channel)).toBe(false);
   });
 
   it('drops a malformed frame without throwing or sending', async () => {

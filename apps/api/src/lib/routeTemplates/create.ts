@@ -6,6 +6,7 @@
  * @constructs route
  */
 import { createRoute as honoCreateRoute } from '@hono/zod-openapi';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
@@ -43,6 +44,7 @@ export const createRoute = <const T extends RouteArgs>(args: T) => {
     method: 'post',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description: description ?? `Creates a new ${resourceName}.`,
     middleware: prepareMiddleware(middleware, skipResource),
     request: buildRequest({ ...args, skipId: skipIdForRequest }),

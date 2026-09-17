@@ -1,3 +1,4 @@
+import { registerSoftDeleteScoper } from '@template/db';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -7,14 +8,18 @@ import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
+import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionUrl/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 export const registerHooks = () => {
+  registerSoftDeleteScoper({ liveWhere, liveIncludes });
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerClearCacheHook();
@@ -24,9 +29,11 @@ export const registerHooks = () => {
   registerLastLoginAtHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
+  registerRuleReferenceReferencedHook();
   registerRulesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
+  registerUserEmailInvariantHook();
   registerUserEmailContactHook();
   registerWebhookHook();
   registerWebhookSubscriptionUrlHook();

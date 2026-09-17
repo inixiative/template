@@ -17,6 +17,8 @@
       "@template/ui/test/*": ["./src/test/*"],
       "@template/sdk": ["../sdk/src/index.ts"],
       "@template/sdk/openapi.gen.json": ["../sdk/openapi.gen.json"],
+      "@template/sdk/lenses": ["../sdk/src/lenses/index.ts"],
+      "@template/sdk/lenses/*": ["../sdk/src/lenses/*"],
       "@template/sdk/*": ["../sdk/src/*"],
       "@template/ui/*": ["./src/*"]
     }

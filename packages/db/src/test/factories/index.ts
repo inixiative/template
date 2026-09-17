@@ -1,5 +1,6 @@
 export * from './auditLogFactory';
 export * from './authProviderFactory';
+export * from './communicationLogFactory';
 export * from './contactFactory';
 export * from './cronJobFactory';
 export * from './customerRefFactory';

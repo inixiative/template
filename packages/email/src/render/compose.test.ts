@@ -1,8 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
-import { composeComponent, composeTemplate, parentOwner } from '@template/email/render/compose';
-import { EmailRenderError } from '@template/email/render/errors';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
+import { composeComponent, composeTemplate } from '@template/email/render/compose';
+import { parentOwner } from '@template/email/render/owner';
 
 describe('composeTemplate', () => {
   afterAll(async () => {
@@ -33,9 +34,7 @@ describe('composeTemplate', () => {
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
     expect(result.kind).toBe('system');
-    // Resolved owner + render-error policy drive the send-side fallback loop.
     expect(result.ownerModel).toBe('default');
-    expect(result.onError).toBe('fail');
   });
 
   it('composes template with single component', async () => {

@@ -6,6 +6,7 @@
  */
 import type { PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { type DataFilters, useDataFilters } from '@template/ui/hooks/useDataFilters';
+import { useDebouncedCallback } from '@template/ui/hooks/useDebounce';
 import { useScrollState } from '@template/ui/hooks/useScrollState';
 import {
   parseOrderByStrings,
@@ -82,27 +83,20 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
     [page, pageSize, dataFilters.search, dataFilters.orderBy],
   );
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const stateRef = useRef(currentState);
-  stateRef.current = currentState;
-  const stateKeyRef = useRef(stateKey);
-  stateKeyRef.current = stateKey;
+  // Debounced write of page/search/sort to history.state (and optionally URL) whenever any persisted
+  // field changes. currentState is the dep so the debounce restarts on every change; stateKey is a dep
+  // so a remounted table with a different sectionId writes to the right slot.
+  const writeState = useDebouncedCallback((key: string | undefined, state: typeof currentState, toUrl: boolean) => {
+    if (toUrl) {
+      writeToHistoryStateAndUrl(key, state);
+    } else if (key) {
+      writeToHistoryState(key, state);
+    }
+  }, DEBOUNCE_MS);
 
   useEffect(() => {
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      const current = stateRef.current;
-      const key = stateKeyRef.current;
-
-      if (shareableUrl) {
-        writeToHistoryStateAndUrl(key, current);
-      } else if (key) {
-        writeToHistoryState(key, current);
-      }
-    }, DEBOUNCE_MS);
-
-    return () => clearTimeout(timerRef.current);
-  }, [shareableUrl]);
+    writeState(stateKey, currentState, shareableUrl);
+  }, [shareableUrl, stateKey, currentState, writeState]);
 
   const setPage = (p: number) => setPageRaw(p);
 

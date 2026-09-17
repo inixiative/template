@@ -18,21 +18,25 @@ kanban
     INFRA-018-lens-builder
     INFRA-012-typed-prisma-results
     INFRA-021-jobs-overflow-buffer
+    INFRA-030-jobs-lane-and-lock-port-from-zealot
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
+    FEAT-020-custom-fields-eav
     FEAT-004-ai-providers
     FEAT-009-file-management
     FEAT-011-dates-timezones
     COMM-001-email-system
     FEAT-008-permissions-builder
   In Progress
+    INFRA-029-preset-facet-knobs
     AUTH-002-unified-auth-system
     INFRA-004-websockets
     INFRA-017-builder-surface
     INFRA-001-init-script
     INFRA-011-railway-buckets
   Review
+    INFRA-030-reference-registry
   Done
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
@@ -75,12 +79,14 @@ kanban
 **Communications:**
 - [COMM-001: Email System](./COMM-001-email-system.md) - Complete email (blocked by rules builder)
 - [FEAT-008: Permissions Builder](./FEAT-008-permissions-builder.md) - Visual permission editor (blocked by rules builder)
+- [FEAT-020: Custom Fields (EAV)](./FEAT-020-custom-fields-eav.md) - the enrichment substrate (definitions / sources / maps / contributions / vocabulary) shipped once, with Zealot's ten lessons written down; INFRA-014 + INFRA-024 build on it
 
 ### 📦 Backlog
 
 See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
+- [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.1 shipped (`variable` slots on preset facets, builder-shape identity, `FacetCondition`); Zealot pin bump + `presets` side-channel (#1710) retirement pending
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
 - [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
 - [INFRA-017: Builder Surface](./INFRA-017-builder-surface.md) - exposedSurface ✅ + describeRule ✅; serializable projection deferred
@@ -88,7 +94,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - MinIO local + s3 adapter + bucket provisioning built
 
 ### 👀 Review
-_No tickets currently in review_
+- [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save hook + staleness re-resolve + render gate; email conditionals are the first surface; json-rules 2.20.0 `ruleSourceValues` does the extraction. Zealot #2116 reshapes to it
 
 ### ✅ Done
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)
@@ -99,9 +105,9 @@ _No tickets currently in review_
 
 ## Quick Stats
 
-- **Total Tickets**: 17
-- **Todo**: 12
-- **In Progress**: 5
+- **Total Tickets**: 19
+- **Todo**: 13
+- **In Progress**: 6
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
 
@@ -124,4 +130,4 @@ INFRA-004 (WebSockets)
 
 ---
 
-_Last Updated: 2026-06-18_
+_Last Updated: 2026-08-31_

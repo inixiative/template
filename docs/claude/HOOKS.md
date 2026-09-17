@@ -113,6 +113,7 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
 | `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
@@ -175,20 +176,27 @@ If a mutation transitions `deletedAt` from `null` to a timestamp, it is recorded
 
 ### Actor Context
 
-Actor info is set in async-local storage before the mutation:
+Actor info is scoped in async-local storage around the request:
 
 ```typescript
-import { auditActorContext } from '#/lib/auditActorContext';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 
-auditActorContext.set({
-  actorUserId: user.id,
-  actorSpoofUserId: spoofUser?.id,
-  actorTokenId: token?.id,
-  ipAddress: c.req.header('x-forwarded-for'),
-  userAgent: c.req.header('user-agent'),
-  sourceInquiryId: inquiry?.id,
-});
+auditActorContext.scope(
+  {
+    actorUserId: user.id,
+    actorSpoofUserId: spoofUser?.id,
+    actorTokenId: token?.id,
+    ipAddress: c.req.header('x-forwarded-for'),
+    userAgent: c.req.header('user-agent'),
+    sourceInquiryId: inquiry?.id,
+    platformSuperadmin: isSuperadmin(c), // bypasses soft-delete read scoping
+    bypassSoftDeleteScope: false,        // flipped by db.withDeleted()
+  },
+  () => next(),
+);
 ```
+
+The same store carries the soft-delete read-scope flags, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
 
 ---
 

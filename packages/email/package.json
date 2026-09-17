@@ -8,22 +8,33 @@
     "./client": "./src/client/index.ts",
     "./client/verification": "./src/client/verification/index.ts",
     "./client/verification/*": "./src/client/verification/*.ts",
+    "./errors": "./src/errors/index.ts",
+    "./errors/*": "./src/errors/*.ts",
+    "./preflight": "./src/preflight/index.ts",
     "./render": "./src/render/index.ts",
-    "./targeting": "./src/targeting/index.ts"
+    "./rules": "./src/rules/index.ts",
+    "./targeting": "./src/targeting/index.ts",
+    "./validations": "./src/validations/index.ts",
+    "./validations/*": "./src/validations/*.ts"
   },
   "scripts": {
     "test": "bun run --cwd ../.. with test api bun run --cwd packages/db db:push:force && bun run --cwd ../.. with test api bun test --max-concurrency=1 --cwd packages/email src/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.14.1",
+    "@inixiative/json-rules": "^2.22.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
+    "html-to-text": "^10.0.1",
     "lodash-es": "^4.18.1",
     "mjml": "^5.3.0",
+    "mjml-parser-xml": "5.3.0",
+    "node-html-parser": "^6.1.13",
     "resend": "^6.9.3"
   },
   "devDependencies": {
-    "@types/mjml": "^5.0.0"
+    "@types/html-to-text": "^9.0.4",
+    "@types/mjml": "^5.0.0",
+    "mjml-preset-core": "5.3.0"
   }
 }

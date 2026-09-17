@@ -84,7 +84,7 @@ const flush = (): void => {
 const accumulate = (row: OutboxRow): Promise<void> =>
   new Promise((resolve, reject) => {
     acc.push({ row, resolve, reject });
-    if (closing) return; // shutdown drains via flushOutbox (with retry); its finally re-arms mid-drain stragglers
+    if (closing) return; // shutdown drains via flushOutbox — its loop catches mid-drain spills, or rejects them if it gives up
     if (acc.length >= flushMaxRows())
       flush(); // size trip — partitions a Promise.all burst inline
     else if (!timer) timer = setTimeout(flush, flushLinger()); // arm for the partial-batch tail
@@ -130,6 +130,15 @@ export const flushOutbox = async (): Promise<void> => {
     }
     if (persisted) log.info(`flushOutbox: persisted ${persisted} buffered job(s)`, LogScope.job);
   } finally {
+    // Only reachable non-empty when flushBatchWithRetry gave up mid-drain: spills accepted during
+    // those awaits sit unarmed in acc, and their callers would hang forever — fail them loudly.
+    if (acc.length) {
+      const stranded = acc;
+      acc = [];
+      const err = new Error(`flushOutbox: shutdown flush gave up before ${stranded.length} spill(s) persisted`);
+      for (const p of stranded) p.reject(err);
+      log.error(err.message, err, LogScope.job);
+    }
     closing = false; // don't latch — an aborted shutdown (or a test) must be able to buffer again.
     // No timer re-arm here: during a real shutdown it could fire after Redis/DB are torn down. The
     // loop above already drained everything present; an aborted shutdown re-arms on its next spill.

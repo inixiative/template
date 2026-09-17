@@ -72,6 +72,10 @@ version of this.)
   (Aron: "its really just a hydrated table" — lean minimal.)
 - Where do live snapshots get cached, if at all? (Probably caller's concern.)
 
+## Performance contract (from FEAT-020's landmines)
+
+The hydration contract this ticket documents must be **batch-first**: a page of anchor rows → ONE fetch of their enrichment rows → in-memory pivot. Zealot's per-user `hydrateUserContext` (one query per user, every field) is the anti-pattern — a nightly reconcile over it is `segments × users × fields`. The adapter's signature should make the per-entity form impossible to reach for (take `entityUuids: string[]`, return the keyed dictionary). Hydrated values must be **typed JS values** (number/Date, never numeric strings) or every ordered `check()` silently compares lexicographically — the FE half of Zealot's ZLT-4062. See FEAT-020 § Performance landmines (3).
+
 ## Implementation Notes
 
 - `buildBridgeDictionary` is the existing hydration indexer — build on it, don't
@@ -86,5 +90,5 @@ version of this.)
 
 ## Related Tickets
 
-- **Consumes**: INFRA-013 (importer output)
+- **Consumes**: INFRA-013 (importer output); **FEAT-020** (the EAV tables this hydrates + the landmine list)
 - **Related**: INFRA-015 (bridges), INFRA-016 (serialization)

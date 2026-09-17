@@ -7,6 +7,7 @@
 
 import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
+import { auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
 import { resolveComponentVersions, type VersionedRecord } from '#/hooks/emailVersioning/resolveComponentVersions';
@@ -114,19 +115,26 @@ export const registerEmailVersioningHook = (): void => {
     DbAction.updateManyAndReturn,
   ];
 
-  registerDbHook('emailVersioning', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (!isEmailModel(options.model)) return;
-    const model = options.model;
-    const visited = new Set<string>();
+  registerDbHook(
+    'emailVersioning',
+    '*',
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      if (!isEmailModel(options.model)) return;
+      const model = options.model;
+      const visited = new Set<string>();
 
-    for (const change of extractChanges(options)) {
-      if (isSoftDelete(change)) {
+      for (const change of extractChanges(options)) {
+        if (isSoftDelete(change)) {
+          await walkUp(change.record.slug, visited);
+          continue;
+        }
+        if (!wroteSnapshot(model, change)) continue;
+        await snapshotChildVersions(model, change.record);
         await walkUp(change.record.slug, visited);
-        continue;
       }
-      if (!wroteSnapshot(model, change)) continue;
-      await snapshotChildVersions(model, change.record);
-      await walkUp(change.record.slug, visited);
-    }
-  });
+    },
+    [auditActorStore],
+  );
 };

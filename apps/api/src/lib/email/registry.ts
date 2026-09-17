@@ -5,54 +5,98 @@
  * @uses infrastructure:prisma
  */
 import type { Condition, LensNarrowing } from '@inixiative/json-rules';
-import type { Inquiry, User } from '@template/db/generated/client/client';
 import { lensFor } from '@template/db/lens';
 import type { Sender } from '#/lib/email/sender';
 
-const eq = (field: string, value: unknown): Condition => ({ field, operator: 'equals', value }) as unknown as Condition;
+export type SenderSpec = Sender;
 
-type Row = Record<string, unknown>;
-
-export type EmailEntry<E = Row> = {
-  entity: (data: Record<string, unknown>) => LensNarrowing;
-  sender: (entity: E) => Sender;
-  recipients: (entity: E, sender: Sender) => LensNarrowing;
-  cc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  bcc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  data?: (entity: E, handoff: Record<string, unknown>) => Record<string, unknown>;
+export type RecipientSpec = {
+  picks: string[];
+  relations?: Record<string, { picks: string[] }>;
+  where: Condition;
 };
 
-const defineEntry = <E>(entry: EmailEntry<E>): EmailEntry => entry as EmailEntry;
+export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
 
-const userById = (id: unknown): LensNarrowing => ({
+export type RenderSpec = {
+  onIssue?: RenderIssuePolicy;
+  substitute?: string;
+};
+
+export type EmailEntry = {
+  entity: LensNarrowing;
+  sender: SenderSpec;
+  recipients: RecipientSpec;
+  cc?: RecipientSpec;
+  bcc?: RecipientSpec;
+  data?: string[];
+  render?: RenderSpec;
+};
+
+export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
   parent: lensFor('User'),
-  root: { where: eq('id', id), picks: ['id', 'name', 'email'] },
+  root: {
+    where,
+    picks: spec.picks,
+    ...(spec.relations ? { relations: spec.relations } : {}),
+  },
 });
 
-export const registry: Record<string, EmailEntry> = {
-  'inquiry-invite-organization-user': defineEntry<Inquiry & { sourceOrganizationId: string }>({
-    entity: (data) => ({
+const userEntity = (bind: string): LensNarrowing => ({
+  parent: lensFor('User'),
+  root: { where: { field: 'id', operator: 'equals', bind }, picks: ['id', 'name', 'email'] },
+});
+
+const userRecipient = (bind: string): RecipientSpec => ({
+  picks: ['id', 'name', 'email'],
+  where: { field: 'id', operator: 'equals', bind },
+});
+
+const assertSubstitutes = (entries: Record<string, EmailEntry>): Record<string, EmailEntry> => {
+  for (const [slug, entry] of Object.entries(entries)) {
+    const substitute = entry.render?.substitute;
+    if (substitute === undefined) continue;
+    if (substitute === slug) throw new Error(`Email registry: "${slug}" names itself as its substitute`);
+    const target = entries[substitute];
+    if (!target) throw new Error(`Email registry: "${slug}" names an unregistered substitute "${substitute}"`);
+    if (target.render?.substitute !== undefined) {
+      throw new Error(`Email registry: substitute "${substitute}" of "${slug}" may not itself declare a substitute`);
+    }
+  }
+  return entries;
+};
+
+export const registry: Record<string, EmailEntry> = assertSubstitutes({
+  'inquiry-invite-organization-user': {
+    entity: {
       parent: lensFor('Inquiry'),
       root: {
-        where: eq('id', data.inquiryId),
-        picks: ['id', 'content', 'sourceOrganization'],
+        where: { field: 'id', operator: 'equals', bind: 'inquiryId' },
+        picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
         relations: { sourceOrganization: { picks: ['name'] } },
       },
-    }),
-    sender: (inquiry) => ({ type: 'Organization', organizationId: inquiry.sourceOrganizationId }),
-    recipients: (inquiry) => userById(inquiry.targetUserId),
-  }),
+    },
+    sender: { type: 'Organization', organizationId: 'sourceOrganizationId' },
+    recipients: userRecipient('targetUserId'),
+  },
 
-  welcome: defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-  }),
+  welcome: {
+    entity: userEntity('userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+  },
 
-  'email-verification': defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-    data: (_user, handoff) => ({ verificationUrl: handoff.verificationUrl }),
-  }),
-};
+  'email-verification': {
+    entity: userEntity('userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+    data: ['verificationUrl'],
+  },
+});
+
+export const renderPolicyFor = (
+  slug: string,
+): Required<Pick<RenderSpec, 'onIssue'>> & Pick<RenderSpec, 'substitute'> => ({
+  onIssue: registry[slug]?.render?.onIssue ?? 'platform',
+  substitute: registry[slug]?.render?.substitute,
+});

@@ -4,8 +4,9 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import { db } from '@template/db';
-import type { Variables } from '@template/email/render';
+import { db, Prisma } from '@template/db';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
+import { deriveTextFromHtml, sanitizeSubject, type Variables } from '@template/email/render';
 import mjml2html from 'mjml';
 import { makeJob } from '#/jobs/makeJob';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
@@ -46,11 +47,11 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
 
   let settled: SettledTemplate;
   try {
-    settled = await settleTemplate(template, sender, variables, (kind) =>
-      kind !== 'system' && entry.recipientContactId
-        ? { unsubscribeUrl: unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind }) }
-        : {},
-    );
+    settled = await settleTemplate(template, sender, variables, (kind) => {
+      if (kind === 'system') return {};
+      if (!entry.recipientContactId) throw new EmailRenderError(template, 'unsubscribe_unavailable');
+      return { unsubscribeUrl: unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind }) };
+    });
   } catch (error) {
     await db.communicationLog.updateManyAndReturn({
       where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
@@ -102,14 +103,44 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     return;
   }
 
-  const claimed = await db.communicationLog.updateManyAndReturn({
-    where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
-    data: { status: 'sending', ...resolved },
+  const claimed = await db.txn(async () => {
+    const rows = await db.communicationLog.updateManyAndReturn({
+      where: { id: communicationLogId, status: { in: ['queued', 'failed'] } },
+      data: {
+        status: 'sending',
+        ...resolved,
+        settledMjml: settled.mjml,
+        variables: settled.variables as Prisma.InputJsonValue,
+        renderIssues: settled.issues.length ? (settled.issues as Prisma.InputJsonValue) : Prisma.JsonNull,
+      },
+    });
+    if (rows.length === 0) return rows;
+
+    await db.communicationComponentVersion.deleteMany({ where: { communicationLogId } });
+    const resolutions = Object.entries(settled.componentResolutions);
+    if (resolutions.length > 0) {
+      const snapshots = await db.auditLog.findMany({
+        where: { subjectEmailComponentId: { in: resolutions.map(([, componentId]) => componentId) } },
+        orderBy: { id: 'desc' },
+        distinct: ['subjectEmailComponentId'],
+        select: { id: true, subjectEmailComponentId: true },
+      });
+      const latestByComponent = new Map(snapshots.map((snapshot) => [snapshot.subjectEmailComponentId, snapshot.id]));
+      await db.communicationComponentVersion.createManyAndReturn({
+        data: resolutions.map(([slug, emailComponentId]) => ({
+          communicationLogId,
+          slug,
+          emailComponentId,
+          emailComponentAuditLogId: latestByComponent.get(emailComponentId) ?? null,
+        })),
+      });
+    }
+    return rows;
   });
   if (claimed.length === 0) return;
 
   try {
-    const from = await resolveFromAddress(template, sender);
+    const from = await resolveFromAddress(settled.slug, sender);
     const { html } = await mjml2html(settled.mjml, { validationLevel: 'skip' });
     const headers =
       settled.kind !== 'system' && entry.recipientContactId
@@ -123,8 +154,9 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
       cc,
       bcc,
       from,
-      subject: settled.subject,
+      subject: sanitizeSubject(settled.subject),
       html,
+      text: deriveTextFromHtml(html),
       headers,
     });
     if (!result.success) throw new Error(`Email provider rejected send (id=${result.id})`);

@@ -5,7 +5,7 @@
  * @uses none
  */
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
-import { omit } from 'lodash-es';
+import { isEqual, omit } from 'lodash-es';
 
 export type FieldRegistry = Record<string, string[]>;
 
@@ -32,7 +32,7 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
 
 // Semantically-meaningless change fields: a mutation touching only these is not worth recording or
 // firing. Ordered-list position columns fold in; sensitive columns do NOT (those are REDACT_FIELDS —
-// audit masks them, webhook drops them via WEBHOOK_DROP_FIELDS).
+// audit masks them, webhook drops them via WEBHOOK_NOOP_FIELDS).
 export const NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS_BASE, getOrderedListFieldsByModel());
 
 export const filterFields = <T extends Record<string, unknown>>(
@@ -40,3 +40,13 @@ export const filterFields = <T extends Record<string, unknown>>(
   data: T,
   registry: FieldRegistry,
 ): Partial<T> => omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;
+
+export const isNoOpUpdate = <T extends Record<string, unknown>>(
+  model: string,
+  currentData: T,
+  previousData: T | undefined,
+  registry: FieldRegistry,
+): boolean => {
+  if (!previousData) return false;
+  return isEqual(filterFields(model, currentData, registry), filterFields(model, previousData, registry));
+};

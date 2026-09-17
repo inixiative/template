@@ -16,6 +16,12 @@ export type BracketQueryRecord = {
   [key: string]: BracketQueryValue | undefined;
 };
 
+// Segments that resolve to an existing prototype member on a plain object. Walking into one lets
+// a crafted `?x[__proto__][y]=1` write onto Object.prototype (an own `{}` never overwrites it, so
+// the walk descends into the prototype and the leaf assignment pollutes it, poisoning every later
+// request in the process). Any path touching one is rejected whole — it names no real field.
+const FORBIDDEN_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
 export const parseBracketNotation = (url: string): BracketQueryRecord => {
   const params = new URLSearchParams(url.split('?')[1] || '');
   const result: BracketQueryRecord = {};
@@ -26,6 +32,7 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
 
     const rawKeys = key.match(/[^[\]]+/g);
     if (!rawKeys || rawKeys.length < 2) continue;
+    if (rawKeys.some((segment) => FORBIDDEN_SEGMENTS.has(segment))) continue;
 
     // A trailing marker segment types the leaf value: `[:]` = symbol (null/boolean),
     // `[$]` = number. Drop the marker from the key path and cast the value below.

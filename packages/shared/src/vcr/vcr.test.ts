@@ -212,6 +212,45 @@ describe('VCR', () => {
     });
   });
 
+  describe('structured sanitizers', () => {
+    it('applies a structured transform before fixed-key redaction', async () => {
+      const vcr = new VCR(dir, {
+        service: 'svc',
+        version: () => '1.0.0',
+        sanitizers: {
+          fetch: {
+            fn: (body: unknown) => ({ ...(body as Record<string, unknown>), transformed: true }),
+            keys: ['secret'],
+          },
+        },
+      }).queue('fetch', 'structured');
+
+      const response = await vcr.captureResponse<Record<string, unknown>>('fetch', async () => ({
+        status: 200,
+        body: { visible: 'kept', secret: 'sensitive' },
+      }));
+
+      expect(response.body).toEqual({ visible: 'kept', secret: 'REDACTED', transformed: true });
+    });
+
+    it('applies fn to non-string capture results and to each item of an isArray rule', async () => {
+      const vcr = new VCR(dir, {
+        service: 'svc',
+        version: () => '1.0.0',
+        sanitizers: {
+          list: { isArray: true, fn: (item: unknown) => ({ ...(item as Record<string, unknown>), seen: true }) },
+        },
+      }).queue('list', 'default');
+
+      const result = await vcr.capture<Array<Record<string, unknown>>>('list', async () => [{ id: 1 }, { id: 2 }]);
+
+      expect(result).toEqual([
+        { id: 1, seen: true },
+        { id: 2, seen: true },
+      ]);
+    });
+  });
+
   describe('captureResponse', () => {
     it('preserves status/headers + sanitizes body the same on capture and replay', async () => {
       const opts = { service: 'svc', version: () => '1.0.0', sanitizers: { fetch: { keys: ['token'] } } };

@@ -129,7 +129,7 @@ describe('hydration chain: URL → filters → query', () => {
   it('shared URL hydrates into correct server query', () => {
     const persisted = readStateFromUrl('?page=3&pageSize=50&search=acme&orderBy=createdAt:desc');
     const orderByObjects = parseOrderByStrings(persisted.orderBy!);
-    const filterQuery = buildFilterQuery(persisted.search!, 'combined', ['name', 'email'], {}, orderByObjects);
+    const filterQuery = buildFilterQuery(persisted.search!, ['name', 'email'], {}, orderByObjects);
     const query: Record<string, unknown> = { ...filterQuery, page: persisted.page, pageSize: persisted.pageSize };
 
     expect(query).toEqual({
@@ -142,7 +142,7 @@ describe('hydration chain: URL → filters → query', () => {
 
   it('empty URL produces default query', () => {
     const persisted = readStateFromUrl('');
-    const filterQuery = buildFilterQuery('', 'combined', [], {}, []);
+    const filterQuery = buildFilterQuery('', [], {}, []);
     const query: Record<string, unknown> = {
       ...filterQuery,
       page: persisted.page ?? 1,

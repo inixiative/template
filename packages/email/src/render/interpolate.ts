@@ -4,34 +4,56 @@
  * @partOf feature:email
  * @uses none
  */
-import { evaluateConditions, type RuleErrorSink } from '@template/email/render/evaluateConditions';
-import { escape as escapeHtml, get, isNil } from 'lodash-es';
+import type { Lens, LensNarrowing } from '@inixiative/json-rules';
+import type { ScopeRoot } from '@template/email/render/conditionParser';
+import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
+import type { SystemTokenName } from '@template/email/render/systemTokens';
+import { escape as escapeHtml } from 'lodash-es';
 
-export enum VariablePrefix {
-  sender = 'sender',
-  recipient = 'recipient',
-  data = 'data',
-}
+export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
-const VARIABLE_PATTERN = /\{\{(sender|recipient|data)\.([a-zA-Z0-9_.-]+)\}\}/g;
-
-const UNSAFE_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
-const hasUnsafeSegment = (path: string): boolean =>
-  path.split('.').some((segment) => UNSAFE_PATH_SEGMENTS.has(segment));
-
-export type Variables = {
-  sender?: Record<string, unknown>;
-  recipient?: Record<string, unknown>;
-  data?: Record<string, unknown>;
+export type InterpolateOptions = {
+  locale?: string;
+  liveRefs?: ReadonlySet<string>;
+  lens?: Lens | LensNarrowing;
 };
 
-export const interpolate = (template: string, variables: Variables, onError?: RuleErrorSink): string => {
-  const evaluated = evaluateConditions(template, variables, onError);
+const SYSTEM_TOKEN_PATTERN = /\{\{system\.([a-zA-Z0-9_-]+)\}\}/g;
 
-  return evaluated.replace(VARIABLE_PATTERN, (match, prefix, path) => {
-    if (hasUnsafeSegment(path)) return match;
-    const value = get(variables[prefix as keyof Variables], path);
-    if (isNil(value) || typeof value === 'function') return match;
-    return escapeHtml(String(value));
-  });
+const DATE_FORMAT = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' } as const;
+
+const SYSTEM_TOKEN_RESOLVERS: Record<SystemTokenName, (now: Date, locale?: string) => string> = {
+  now: (now, locale) => {
+    try {
+      return now.toLocaleDateString(locale, DATE_FORMAT);
+    } catch {
+      return now.toLocaleDateString(undefined, DATE_FORMAT);
+    }
+  },
+  year: (now) => String(now.getUTCFullYear()),
 };
+
+const isSystemTokenName = (name: string): name is SystemTokenName => Object.hasOwn(SYSTEM_TOKEN_RESOLVERS, name);
+
+const resolveSystemTokens = (template: string, options: InterpolateOptions): string => {
+  const now = new Date();
+
+  return template.replace(SYSTEM_TOKEN_PATTERN, (match, name: string) =>
+    isSystemTokenName(name) ? escapeHtml(SYSTEM_TOKEN_RESOLVERS[name](now, options.locale)) : match,
+  );
+};
+
+export const toScope = (variables: Variables): Scope => ({ ...variables });
+
+export const interpolate = (
+  template: string,
+  variables: Variables,
+  onError?: RuleErrorSink,
+  options: InterpolateOptions = {},
+): string =>
+  settle(
+    resolveSystemTokens(template, options),
+    toScope(variables),
+    { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
+    onError,
+  );

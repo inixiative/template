@@ -15,7 +15,11 @@ import type { WSOutbound } from '#/ws/types';
 const deliver = (connectionIds: Set<string>, message: string): void => {
   for (const id of [...connectionIds]) {
     const ws = byId.get(id);
-    if (!ws) continue;
+    // Backstop: an id in a reverse-index but gone from byId is stale — drop it so a missed deindex can't leak.
+    if (!ws) {
+      connectionIds.delete(id);
+      continue;
+    }
     if (ws.readyState === WebSocket.OPEN) ws.send(message);
     else removeConnection(ws);
   }

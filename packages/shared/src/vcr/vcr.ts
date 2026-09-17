@@ -18,7 +18,7 @@ export type Fixture<T = unknown> = {
 };
 
 type Sanitizer = {
-  fn?: (s: string) => string;
+  fn?: (data: unknown) => unknown;
   keys?: string[];
   isArray?: boolean;
   binaryExtension?: string;
@@ -178,9 +178,9 @@ export class VCR {
   }
 
   private __applyRule<T>(rule: Sanitizer, data: T): T {
-    if (rule.fn && typeof data === 'string') return rule.fn(data) as unknown as T;
-    if (rule.keys?.length) return redactKeys(data, rule.keys);
-    return data;
+    const transformed = rule.fn ? (rule.fn(data) as T) : data;
+    if (rule.keys?.length) return redactKeys(transformed, rule.keys);
+    return transformed;
   }
 
   private __popFixturePath(method: string): string {

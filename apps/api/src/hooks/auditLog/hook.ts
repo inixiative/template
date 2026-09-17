@@ -1,17 +1,16 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
 import {
+  AUDIT_ENABLED_MODELS,
   DbAction,
   db,
   HookTiming,
-  isAuditEnabled,
   Prisma,
   redactChangeDiff,
   redactSensitiveFields,
   registerDbHook,
 } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { castArray, compact } from 'lodash-es';
+import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { buildContextFkFields, buildSubjectFkFields, computeDiff, filterForAudit } from '#/hooks/auditLog/utils';
 import { buildPreviousById, isManyAction } from '#/hooks/shared/hookRows';
 
@@ -85,6 +84,8 @@ const buildAuditEntry = (
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,
+    actorTokenName: actor?.actorTokenName ?? null,
+    actorTokenKeyPrefix: actor?.actorTokenKeyPrefix ?? null,
     actorJobName: actor?.actorJobName ?? null,
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
@@ -126,7 +127,7 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
 
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
-    const results = compact(castArray(result)) as (Record<string, unknown> & { id: string })[];
+    const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
     const previousById = buildPreviousById(previous);
 
     for (const record of results) {
@@ -160,13 +161,17 @@ export const registerAuditLogHook = () => {
     DbAction.deleteMany,
   ];
 
-  registerDbHook('auditLog', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (options.model === 'AuditLog') return;
-    if (!isAuditEnabled(options.model)) return;
+  registerDbHook(
+    'auditLog',
+    AUDIT_ENABLED_MODELS,
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      const entries = buildEntries(options.model as AuditSubjectModel, options);
+      if (entries.length === 0) return;
 
-    const entries = buildEntries(options.model as AuditSubjectModel, options);
-    if (entries.length === 0) return;
-
-    await db.auditLog.createManyAndReturn({ data: entries });
-  });
+      await db.auditLog.createManyAndReturn({ data: entries });
+    },
+    [auditActorStore],
+  );
 };

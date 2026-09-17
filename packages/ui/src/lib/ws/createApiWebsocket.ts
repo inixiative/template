@@ -9,6 +9,7 @@ import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 
 const HEARTBEAT_MS = 30_000;
 const PONG_TIMEOUT_MS = 5_000;
+const RECONNECT_ACK_TIMEOUT_MS = 5_000;
 
 export type ApiWebsocket = {
   connect: () => void;
@@ -30,23 +31,57 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
   let everOpened = false;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let pongTimer: ReturnType<typeof setTimeout> | undefined;
+  // Replayed subscribes still awaiting ack after a reconnect; onReconnect waits for this to drain so a refetch can't outrun the regrant.
+  let pendingAcks: Set<string> | null = null;
+  let reconnectAckTimer: ReturnType<typeof setTimeout> | undefined;
 
   const replaySubscriptions = (): void => {
     for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
   };
 
+  const finishReconnect = (): void => {
+    if (!pendingAcks) return;
+    pendingAcks = null;
+    clearTimeout(reconnectAckTimer);
+    onReconnect?.();
+  };
+
+  const settleReconnectAck = (channel: string): void => {
+    if (!pendingAcks) return;
+    pendingAcks.delete(channel);
+    if (pendingAcks.size === 0) finishReconnect();
+  };
+
   const socket = createWebSocketClient({
     url,
     onMessage: (data) => {
-      if ((data as { type?: string })?.type === 'pong') return void clearTimeout(pongTimer);
+      const frame = data as { type?: string; channel?: string };
+      switch (frame.type) {
+        case 'pong':
+          return void clearTimeout(pongTimer);
+        case 'spoofRejected':
+          return void recoverFromRejectedSpoof();
+        case 'subscribeRejected':
+          console.error(`ws subscribe rejected: ${frame.channel}`);
+          channels.delete(frame.channel as string);
+          return void settleReconnectAck(frame.channel as string);
+        case 'subscribed':
+          return void settleReconnectAck(frame.channel as string);
+      }
       dispatchMessage(data as WSEvent);
     },
     onOpen: () => {
       // Identity first — the BE processes each connection's frames in order.
       if (identityFrame) socket.send(identityFrame);
       replaySubscriptions();
-      if (everOpened) onReconnect?.(); // re-open only: recover events missed while disconnected
+      const reconnecting = everOpened;
       everOpened = true;
+      if (!reconnecting) return;
+      // Re-open only: recover missed events, but wait for the regranted subscriptions to ack (or timeout) first.
+      if (channels.size === 0) return void onReconnect?.();
+      clearTimeout(reconnectAckTimer);
+      pendingAcks = new Set(channels.keys());
+      reconnectAckTimer = setTimeout(finishReconnect, RECONNECT_ACK_TIMEOUT_MS);
     },
     // A pong pending from the previous connection must not tear down the next one.
     onClose: () => clearTimeout(pongTimer),
@@ -57,6 +92,14 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
     identityFrame = frame;
     socket.send(frame ?? { action: 'logout' });
     replaySubscriptions();
+  };
+
+  // A refused spoof would replay every reconnect and stay anonymous; drop it and re-auth as the real identity.
+  const recoverFromRejectedSpoof = (): void => {
+    const headers = identityFrame?.headers as Record<string, string> | undefined;
+    if (!headers?.['x-spoof-user-email']) return;
+    console.error('ws spoof rejected; falling back to real identity');
+    sendIdentity({ action: 'authenticate', headers: { authorization: headers.authorization } });
   };
 
   return {

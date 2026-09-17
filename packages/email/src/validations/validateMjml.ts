@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import { MjmlValidationError } from '@template/email/validations/MjmlValidationError';
+import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
 import mjml2html from 'mjml';
 
 export const validateMjml = async (mjml: string): Promise<void> => {

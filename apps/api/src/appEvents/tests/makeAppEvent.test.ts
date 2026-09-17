@@ -53,7 +53,7 @@ describe('makeAppEvent', () => {
 
     it('broadcasts alongside other channels', async () => {
       const handler = makeAppEvent<{ foo: string }>({
-        email: () => [{ template: 'test', data: {} }],
+        email: () => [{ template: 'welcome', data: { userId: 'nobody' } }],
       });
 
       await handler(createEvent('test', { foo: 'bar' }));
@@ -91,7 +91,7 @@ describe('makeAppEvent', () => {
       const handler = makeAppEvent({
         email: (data) => {
           received = data;
-          return [{ template: 'test', data: {} }];
+          return [{ template: 'welcome', data: { userId: 'nobody' } }];
         },
       });
 

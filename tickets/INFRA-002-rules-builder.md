@@ -98,6 +98,10 @@ tests). The React layer needs `react` installed + a DOM test harness, ideally
 after json-rules 2.8 is published so the dep resolves from the registry (a local
 symlink is in use for dev).
 
+## Backlog (parked — needs a clearer definition before it becomes a task)
+
+- **`readOnly` render mode.** Zealot `#1633` (ZLT-1470) shipped an `AstConditionNode` — the first read-only renderer of a json-rules condition tree (with `AST_OPERATOR_LABELS` / `AST_ARRAY_OPERATOR_LABELS`) — and Vlad flagged that a *second* consumer should trigger extracting it into `RuleBuilder` as a `readOnly` mode. The email builder's rule display is that second consumer, so a `readOnly` surface on `@inixiative/rules-builder` is directionally right and fits the headless-builder-per-primitive model. **Parked, not yet a task:** what the read-only surface actually *is* — a distinct render path, a prop on the existing shadcn renderer, or a descriptor-tree flag — is not yet pinned. Revisit and define before promoting off the backlog.
+
 ## Use Cases
 
 Feature flag targeting, email automation, notification rules, permission

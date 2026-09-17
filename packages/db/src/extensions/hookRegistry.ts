@@ -5,6 +5,8 @@
  * @uses none
  */
 
+import type { AsyncLocalStorage } from 'node:async_hooks';
+import type { BridgedContext } from '@template/db/clientTypes';
 import { LogScope, log } from '@template/shared/logger';
 import { castArray } from 'lodash-es';
 
@@ -65,6 +67,9 @@ const hookRegistrations = new Map<
   string,
   { targets: string[]; timing: HookTiming; actions: DbAction[]; hook: HookFunction }
 >();
+// Hooks run on a Prisma continuation where the caller's async-local storage has not survived. A hook
+// that reads an ambient context declares its store here and db.txn carries the value across.
+const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
 
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
@@ -72,6 +77,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
+  bridges: AsyncLocalStorage<unknown>[] = [],
 ) => {
   if (hookRegistry.has(name)) {
     log.warn(`Hook '${name}' already registered - skipping duplicate`, LogScope.hook);
@@ -84,6 +90,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
   hookRegistrations.set(name, { targets: castArray(model), timing, actions, hook: hook as HookFunction });
+  for (const store of bridges) bridgedStores.add(store);
 
   for (const target of castArray(model)) {
     registeredHooks[target] ??= {
@@ -121,6 +128,8 @@ export const unregisterDbHook = (name: string) => {
 // follow auditLog) relies on registration order, which per-model re-registration can silently break.
 // TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
 // check over the declared orderings.
+export const hasHooksFor = (model: string): boolean => '*' in registeredHooks || model in registeredHooks;
+
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];
@@ -130,10 +139,73 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
   }
 };
 
+// Read in the caller frame at db.txn() open, where storage is still reliable. Values are carried by
+// reference, so a hook mutating one is mutating the caller's object.
+export const captureBridgedContext = (): BridgedContext => [...bridgedStores].map((store) => [store, store.getStore()]);
+
+export const runInBridgedContext = <TResult>(bridgedContext: BridgedContext, fn: () => TResult): TResult => {
+  const enter = (index: number): TResult => {
+    if (index === bridgedContext.length) return fn();
+    const [store, value] = bridgedContext[index]!;
+    // A store the caller had not entered must stay unentered, not entered with undefined.
+    return value === undefined ? enter(index + 1) : store.run(value, () => enter(index + 1));
+  };
+  return enter(0);
+};
+
 export const clearHookRegistry = () => {
   hookRegistry.clear();
   hookRegistrations.clear();
+  bridgedStores.clear();
   for (const model of Object.keys(registeredHooks)) {
     delete registeredHooks[model];
+  }
+};
+
+export type DbInvariantAction = Exclude<DbAction, DbAction.delete | DbAction.deleteMany>;
+
+export type DbInvariantOptions = {
+  model: string;
+  action: DbInvariantAction;
+  data: unknown;
+};
+
+export type DbInvariant = (options: DbInvariantOptions) => void | Promise<void>;
+
+type DbInvariantRegistration = { targets: string[]; invariant: DbInvariant };
+
+const registeredInvariants: Record<string, DbInvariantRegistration[]> = {};
+
+const invariantRegistrations = new Map<string, DbInvariantRegistration>();
+
+export const registerDbInvariant = (name: string, model: string | string[] | '*', invariant: DbInvariant) => {
+  if (invariantRegistrations.has(name)) {
+    log.warn(`Invariant '${name}' already registered - skipping duplicate`, LogScope.hook);
+    return;
+  }
+
+  const registration: DbInvariantRegistration = { targets: castArray(model), invariant };
+  invariantRegistrations.set(name, registration);
+  for (const target of registration.targets) {
+    registeredInvariants[target] ??= [];
+    registeredInvariants[target].push(registration);
+  }
+};
+
+export const unregisterDbInvariant = (name: string) => {
+  const registration = invariantRegistrations.get(name);
+  if (!registration) return;
+  for (const target of registration.targets) {
+    registeredInvariants[target] = (registeredInvariants[target] ?? []).filter(
+      (candidate) => candidate !== registration,
+    );
+  }
+  invariantRegistrations.delete(name);
+};
+
+export const runInvariants = async (model: string, action: DbInvariantAction, data: unknown): Promise<void> => {
+  const registrations = new Set([...(registeredInvariants[model] ?? []), ...(registeredInvariants['*'] ?? [])]);
+  for (const { invariant } of registrations) {
+    await invariant({ model, action, data });
   }
 };

@@ -1,4 +1,5 @@
 export * from './client';
+export * from './errors';
+export * from './preflight';
 export * from './render';
-export { type MjmlIssue, MjmlValidationError } from './validations/MjmlValidationError';
-export { validateMjml } from './validations/validateMjml';
+export * from './validations';
