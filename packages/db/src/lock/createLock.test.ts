@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { createLock, type LockRedis, maxSafeHeartbeatMs } from '@template/db/lock/createLock';
+import { createLock } from '@template/db/lock/createLock';
+import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
+import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 
