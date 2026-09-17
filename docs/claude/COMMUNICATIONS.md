@@ -606,13 +606,15 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
 - **Which models are referenceable is the registry's answer, not any surface's.**
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `referencedModel` axis of
-  `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it, and
-  `ruleReferenceNarrowingDefaults()` turns it into `mapDefaults` any rule lens applies — the id of
-  every referenceable model is a source on **every** path to it, and FK columns duplicating a
-  relation to one are derived from `prismaMap` and omitted, so a reference has one spelling.
-  `emailRuleNarrowing` roots the rule context at `recipient → User` and applies those defaults; a
-  segment lens applies the same ones. Adding a referenceable model = a registry entry + an FK
-  column (source, omits and the hook all derive).
+  `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
+- **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
+  `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
+  column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
+  itself in it and declares its own id sources. `emailRuleNarrowing` roots the rule context at
+  `recipient → User`, wraps in `omitForeignKeys`, and declares `sources: { id: { label: 'name' } }`
+  as a `mapDefaults` entry for each of `RULE_REFERENCEABLE_MODELS`, so the id answers on every
+  path to the model. Adding a referenceable model = a registry entry + an FK column (the hook and
+  email's sources derive); a surface that reaches it declares its own labeled id source.
 - **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `ruleSourceValues`
   (json-rules ≥ 2.20) reports the values a rule names at each source, and a source on a model's
   id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a

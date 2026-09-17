@@ -65,16 +65,17 @@ named first consumer that API was waiting for.
 
 Which models are referenceable is the registry's answer, not a surface's:
 `RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `referencedModel`
-axis of `PolymorphismRegistry.RuleReference`, and `ruleReferenceNarrowingDefaults()` is the
-`mapDefaults` every rule lens applies — a source on each referenceable model's `id` answers on
-every path to the model, and every FK column duplicating a relation to a referenceable model is
-derived from `prismaMap` and omitted from the vocabulary.
-`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User` and
-applies those defaults; a segment lens applies the same ones. `ruleReferences(lens, rule)`
+axis of `PolymorphismRegistry.RuleReference`. A rule-tracked lens never exposes an FK column:
+`omitForeignKeys(lens)` (`packages/db/src/lens`, the `redactLens` shape) omits every FK column
+`prismaMap` knows, on every model, wherever it appears. Sources are the surface's own:
+`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`, wraps
+in `omitForeignKeys`, and declares `sources: { id: { label: 'name' } }` as a `mapDefaults` entry
+per `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model; the segment lens
+(FEAT-021) declares its own labeled, owner-scoped id sources. `ruleReferences(lens, rule)`
 (`packages/db`) keeps the id-field sources (`prismaMap.isId`) as row references;
 `contentRuleReferences(lens, ...contents)` (email) folds every `{{#if}}` block, branch and nesting
 (`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
-column + a registry entry (source, omits and the referenced-side hook derive); adding a
+column + a registry entry (the referenced-side hook and email's id sources derive); adding a
 rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
 
 ### No owner-side hook
@@ -179,8 +180,8 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   evaluated at render while registering zero edges: the vacuous-`none` failure this primitive
   exists to kill. Closed structurally, not by whitelist: the narrowing is now `mapDefaults` —
   a source on each referenceable model's `id` answers **wherever the model appears** (json-rules
-  2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and every FK column that duplicates a
-  relation to a referenceable model is derived from `prismaMap` and omitted from the vocabulary.
+  2.20.0 resolves `mapDefaults` sources via `walkLensPath`), and `omitForeignKeys` drops every FK
+  column from the vocabulary so the FK spelling does not exist to be written.
   The save path runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path is
   refused at save, and any relation path to a referenceable id is a registered edge.
 - **The save race, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`, where an

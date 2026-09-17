@@ -101,11 +101,7 @@ export {
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { revive } from './utils/revive';
-export {
-  RULE_REFERENCEABLE_MODELS,
-  type RuleReferenceModelDefaults,
-  ruleReferenceNarrowingDefaults,
-} from './utils/ruleReferenceable';
+export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
   liveRuleReferenceKeys,
