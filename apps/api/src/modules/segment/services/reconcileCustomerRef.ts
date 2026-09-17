@@ -5,18 +5,17 @@
  * @uses infrastructure:prisma
  */
 import { applyLens, check } from '@inixiative/json-rules';
-import { type Db, db as defaultDb, type RuleReferenceRow } from '@template/db';
+import { type Db, db as defaultDb } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { groupBy } from 'lodash-es';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
 import { customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
 import { buildReferenceMap, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
-import { segmentRuleHealth } from '#/modules/segment/services/segmentRuleHealth';
+import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
@@ -54,14 +53,11 @@ export const reconcileCustomerRef = async (
   const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId], db);
   const lens = resolvedSegmentLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
-  const edges = (await db.ruleReference.findMany({
-    where: { segmentId: { in: ordered.map((segment) => segment.id) } },
-  })) as (RuleReferenceRow & { segmentId: string })[];
-  const edgesBySegment = groupBy(edges, 'segmentId');
+  const states = await segmentRuleStates(ordered, db);
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
-    const matches = withRule(segmentRuleHealth(segment, edgesBySegment[segment.id] ?? []), {
+    const matches = withRule(states.get(segment.id)!.health, {
       degraded: () => null,
       sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
     });

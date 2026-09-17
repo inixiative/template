@@ -12,7 +12,7 @@ import { rootLens } from '@template/db/lens';
 import { type RuleIssue, withRule } from '@template/shared/rules';
 import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
 import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { segmentRuleEdges, segmentRuleHealth } from '#/modules/segment/services/segmentRuleHealth';
+import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
 export class SegmentRuleEvaluationError extends Error {
   constructor(cause: unknown) {
@@ -53,11 +53,13 @@ export const compileSegmentWhere = async (
   return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
 };
 
-const segmentWhere = async (segment: Segment, db: Db = defaultDb): Promise<Record<string, unknown>> =>
-  withRule(segmentRuleHealth(segment, await segmentRuleEdges(segment.id, db)), {
-    degraded: (issues) => Promise.reject(new SegmentRuleDegradedError(segment.id, issues)),
+const segmentWhere = async (segment: Segment, db: Db = defaultDb): Promise<Record<string, unknown>> => {
+  const { health, issues } = await segmentRuleState(segment, db);
+  return withRule(health, {
+    degraded: () => Promise.reject(new SegmentRuleDegradedError(segment.id, issues)),
     sound: (rule) => compileSegmentWhere(segment.ownerModel, segmentOwnerId(segment), rule, db),
   });
+};
 
 export const evaluateSegment = async (segment: Segment, db: Db = defaultDb): Promise<string[]> => {
   try {

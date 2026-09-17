@@ -4,32 +4,26 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type Db, db as defaultDb, type RuleReferenceRow } from '@template/db';
+import type { Db } from '@template/db';
+import { db as defaultDb } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { RuleIssue } from '@template/shared/rules';
-import { groupBy } from 'lodash-es';
-import { segmentRuleIssues } from '#/modules/segment/services/segmentRuleHealth';
+import { segmentRuleState, segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
 export type SegmentWithRuleIssues = Segment & { ruleIssues: RuleIssue[] };
 
-export const withSegmentRuleIssues = async (segment: Segment, db: Db = defaultDb): Promise<SegmentWithRuleIssues> => {
-  const edges = (await db.ruleReference.findMany({ where: { segmentId: segment.id } })) as RuleReferenceRow[];
-  return { ...segment, ruleIssues: segmentRuleIssues(segment, edges) };
-};
+export const withSegmentRuleIssues = async (segment: Segment, db: Db = defaultDb): Promise<SegmentWithRuleIssues> => ({
+  ...segment,
+  ruleIssues: (await segmentRuleState(segment, db)).issues,
+});
 
 export const withSegmentsRuleIssues = async (
   segments: Segment[],
   db: Db = defaultDb,
 ): Promise<SegmentWithRuleIssues[]> => {
   if (!segments.length) return [];
-  const edges = (await db.ruleReference.findMany({
-    where: { segmentId: { in: segments.map((segment) => segment.id) } },
-  })) as (RuleReferenceRow & { segmentId: string })[];
-  const bySegment = groupBy(edges, 'segmentId');
-  return segments.map((segment) => ({
-    ...segment,
-    ruleIssues: segmentRuleIssues(segment, bySegment[segment.id] ?? []),
-  }));
+  const states = await segmentRuleStates(segments, db);
+  return segments.map((segment) => ({ ...segment, ruleIssues: states.get(segment.id)?.issues ?? [] }));
 };
 
 export const soundSegments = async (segments: Segment[], db: Db = defaultDb): Promise<SegmentWithRuleIssues[]> =>
