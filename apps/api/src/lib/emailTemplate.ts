@@ -78,7 +78,7 @@ const renderComposed = (
   const subjectIssues: RenderIssue[] = [];
   const bodySink: RuleErrorSink = (issue) => issues.push(issue);
   const subjectSink: RuleErrorSink = (issue) => subjectIssues.push(issue);
-  const options = { locale: scope.locale, liveRefs: composed.liveRuleRefs, lens };
+  const options = { locale: scope.locale, lens };
   const mjml = interpolate(composed.mjml, vars, bodySink, options);
   const subject = interpolate(composed.subject, vars, subjectSink, options);
   return {

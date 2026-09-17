@@ -15,11 +15,7 @@ import { resolvePath } from '@template/email/render/settle/resolvePath';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
-import { ruleReferences } from '@template/email/rules/ruleReferences';
-import { withRule } from '@template/shared/rules';
 
 export const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
   const issue = (detail: string): '' => {
@@ -64,22 +60,6 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   }
 
   const filter = block.filter;
-  if (filter !== undefined) {
-    const judged = absoluteRule(filter, bodyOptions.bindings);
-    const degraded =
-      judged === undefined
-        ? null
-        : withRule(
-            {
-              lens: options.lens ?? emailRuleNarrowing,
-              rule: judged,
-              references: ruleReferences(emailRuleNarrowing, judged),
-              live: options.liveRefs,
-            },
-            { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },
-          );
-    if (degraded !== null) return issue(degraded);
-  }
 
   const emitted: unknown[] = [];
   for (const element of arrayValue) {

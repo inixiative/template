@@ -195,26 +195,6 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
     },
   },
 
-  RuleReference: {
-    axes: [
-      {
-        field: 'ownerModel',
-        fkMap: {
-          EmailTemplate: ['emailTemplateId'],
-          EmailComponent: ['emailComponentId'],
-        },
-      },
-      {
-        field: 'referencedModel',
-        fkMap: {
-          Tag: ['tagId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-        },
-      },
-    ],
-  },
-
   Inquiry: {
     axes: [
       {

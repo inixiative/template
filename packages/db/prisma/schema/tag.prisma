@@ -33,7 +33,6 @@ model Tag {
   tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
   attachments    TagAttachment[]
-  ruleReferences RuleReference[]
 
   // Per-owner uniqueness on (category, name) — partial uniques (see Contact
   // for rationale). The platform partial scopes platform-owned tags to one

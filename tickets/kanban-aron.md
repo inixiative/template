@@ -36,7 +36,6 @@ kanban
     INFRA-001-init-script
     INFRA-011-railway-buckets
   Review
-    INFRA-030-reference-registry
   Done
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
@@ -94,7 +93,6 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - MinIO local + s3 adapter + bucket provisioning built
 
 ### 👀 Review
-- [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save hook + staleness re-resolve + render gate; email conditionals are the first surface; json-rules 2.20.0 `ruleSourceValues` does the extraction. Zealot #2116 reshapes to it
 
 ### ✅ Done
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)

@@ -13,5 +13,4 @@ export const evaluateConditions = (
   content: string,
   variables: Variables,
   onError?: RuleErrorSink,
-  liveRefs?: ReadonlySet<string>,
-): string => settle(content, toScope(variables), { substitute: false, liveRefs }, onError);
+): string => settle(content, toScope(variables), { substitute: false }, onError);

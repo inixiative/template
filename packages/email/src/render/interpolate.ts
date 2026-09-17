@@ -14,7 +14,6 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
-  liveRefs?: ReadonlySet<string>;
   lens?: Lens | LensNarrowing;
 };
 
@@ -54,6 +53,6 @@ export const interpolate = (
   settle(
     resolveSystemTokens(template, options),
     toScope(variables),
-    { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
+    { substitute: true, lens: options.lens },
     onError,
   );

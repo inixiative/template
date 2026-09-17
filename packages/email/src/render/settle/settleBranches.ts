@@ -9,10 +9,6 @@ import type { Branch } from '@template/email/render/conditionParser';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
-import { ruleReferences } from '@template/email/rules/ruleReferences';
-import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
   branches: Branch[],
@@ -37,25 +33,7 @@ export const settleBranches = (
         return null;
       }
     };
-    const judged = absoluteRule(rule, options.bindings);
-    const rendered =
-      judged === undefined
-        ? evaluate()
-        : withRule(
-            {
-              lens: options.lens ?? emailRuleNarrowing,
-              rule: judged,
-              references: ruleReferences(emailRuleNarrowing, judged),
-              live: options.liveRefs,
-            },
-            {
-              degraded: (issues) => {
-                onError?.({ kind: 'rule', detail: issues.map((issue) => issue.detail).join('; ') });
-                return null;
-              },
-              sound: evaluate,
-            },
-          );
+    const rendered = evaluate();
     if (rendered !== null) return rendered;
   }
 
