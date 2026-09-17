@@ -9,6 +9,7 @@ export {
 } from './componentExpectations';
 export {
   DEFAULT_RECIPIENT_LENS,
+  defaultEmailRuleLens,
   EMAIL_DATA_MODEL,
   EMAIL_RULE_MAP_NAME,
   EMAIL_RULE_ROOT_MODEL,
@@ -23,7 +24,6 @@ export {
   parseSlotLenses,
 } from './emailProjection';
 export { type EmailRuleDecoration, type EmailRuleFacet, emailRuleDecoration } from './emailRuleDecoration';
-export { EMAIL_RULE_CONTEXT, emailRuleLens, emailRuleNarrowing } from './emailRuleLens';
 export {
   isRailProvidedSystemField,
   RAIL_PROVIDED_SYSTEM_FIELDS,
@@ -32,6 +32,5 @@ export {
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
 export { contentRuleReferences } from './ruleReferences';
 export { syncRuleReferences } from './syncRuleReferences';
-export { contentVocabularyIssues } from './validateRuleVocabulary';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';
 export { type LensPathWalk, walkLensPath } from './walkLensPath';

@@ -68,9 +68,10 @@ Which models are referenceable is the registry's answer, not a surface's:
 axis of `PolymorphismRegistry.RuleReference`. A rule-tracked lens never exposes an FK column:
 `omitForeignKeys(lens)` (`packages/db/src/lens`, the `redactLens` shape) omits every FK column
 `prismaMap` knows, on every model, wherever it appears. Sources are the surface's own:
-`packages/email/src/rules/emailRuleLens.ts` roots the rule context at `recipient → User`, wraps
-in `omitForeignKeys`, and declares `sources: { id: { label: 'name' } }` as a `mapDefaults` entry
-per `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model; the segment lens
+email has one rule lens per template — `emailLens` (`packages/email/src/rules/emailProjection.ts`)
+wraps in `omitForeignKeys` and declares `sources: { id: { label: 'name' } }` as a `mapDefaults`
+entry per `RULE_REFERENCEABLE_MODELS`; the api's `emailTemplateRuleLens` builds it, the builder
+gets its `exposedSurface` (sources stripped), save and settle keep the narrowing; the segment lens
 (FEAT-021) declares its own labeled, owner-scoped id sources. `ruleReferences(lens, rule)`
 (`packages/db`) keeps the id-field sources (`prismaMap.isId`) as row references;
 `contentRuleReferences(lens, ...contents)` (email) folds every `{{#if}}` block, branch and nesting

@@ -11,7 +11,7 @@ import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
+import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
@@ -38,14 +38,15 @@ export const settleBranches = (
       }
     };
     const judged = absoluteRule(rule, options.bindings);
+    const lens = options.lens ?? defaultEmailRuleLens;
     const rendered =
       judged === undefined
         ? evaluate()
         : withRule(
             {
-              lens: options.lens ?? emailRuleNarrowing,
+              lens,
               rule: judged,
-              references: ruleReferences(emailRuleNarrowing, judged),
+              references: ruleReferences(lens, judged),
               live: options.liveRefs,
             },
             {

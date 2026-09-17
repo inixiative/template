@@ -17,7 +17,7 @@ import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { emailRuleNarrowing } from '@template/email/rules/emailRuleLens';
+import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
 import { withRule } from '@template/shared/rules';
 
@@ -66,14 +66,15 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   const filter = block.filter;
   if (filter !== undefined) {
     const judged = absoluteRule(filter, bodyOptions.bindings);
+    const lens = options.lens ?? defaultEmailRuleLens;
     const degraded =
       judged === undefined
         ? null
         : withRule(
             {
-              lens: options.lens ?? emailRuleNarrowing,
+              lens,
               rule: judged,
-              references: ruleReferences(emailRuleNarrowing, judged),
+              references: ruleReferences(lens, judged),
               live: options.liveRefs,
             },
             { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },

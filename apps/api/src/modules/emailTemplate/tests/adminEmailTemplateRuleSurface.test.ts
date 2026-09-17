@@ -81,7 +81,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       type: 'Inquiry',
     });
     expect(fieldsOf(data, 'Inquiry')).toEqual(['content', 'sourceOrganization']);
-    expect(fieldsOf(data, 'Organization')).toEqual(['name']);
+    expect(fieldsOf(data, 'Organization')).toEqual(['id', 'name']);
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
@@ -90,7 +90,14 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     );
 
     expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient', 'sender']);
-    expect(fieldsOf(data, 'User')).toEqual(['email', 'id', 'name']);
+    expect(fieldsOf(data, 'User')).toEqual([
+      'email',
+      'id',
+      'name',
+      'organizationUsers',
+      'spaceUsers',
+      'tagAttachments',
+    ]);
     expect(fieldsOf(data, 'Inquiry')).toContain('content');
     expect(fieldsOf(data, 'Organization')).toContain('name');
   });
