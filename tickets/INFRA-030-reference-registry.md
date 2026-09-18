@@ -283,11 +283,12 @@ degraded" — which is the same question asked transitively over the segment gra
 
 Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
 `referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
-Transitive degradation (segments now reference a rule-bearing row from a rule — a segment whose
-named segment is live but itself degraded evaluates over its last good members; it is the
-`withRule` question asked over the segment graph, tracked on FEAT-021). Tenancy of a reference (a
-Space-owned template naming another org's tag) — the lens narrowing's `where` scope owns that
-(INFRA-017 / INFRA-018).
+Transitive degradation — built on FEAT-021 (#105): `segmentRuleStates` closes over the owner's
+edges. Tenancy of a reference — built on #105 as well: the lens narrowing's `where` alone decides
+nothing at save (`checkRuleAgainstLens` is a vocabulary check), so `syncRuleReferenceEdges` takes
+the lens's `sourceQueries` and refuses a newly named row the source's composed `where` does not
+admit (`unadmittedRuleReferences`). Email passes its owner-scoped lens; the segment gate
+(`assertSegmentReferencesOwned`) still restates the same predicate by hand and should migrate.
 
 ## Related
 

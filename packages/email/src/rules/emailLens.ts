@@ -291,42 +291,34 @@ export const emailRuleReferences = (lens: EmailLens, rule: Condition): RuleRefer
     return ruleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition);
   });
 
-const prefixed = (condition: Condition, root: string): Condition => {
+const mapRuleTree = (condition: Condition, map: (leaf: Condition) => Condition): Condition => {
   if (condition == null || typeof condition === 'boolean') return condition;
   const node = condition as Record<string, unknown>;
-  if (Array.isArray(node.all)) return { ...node, all: node.all.map((child) => prefixed(child, root)) } as Condition;
-  if (Array.isArray(node.any)) return { ...node, any: node.any.map((child) => prefixed(child, root)) } as Condition;
-  if ('if' in node) {
-    return {
-      ...node,
-      if: prefixed(node.if as Condition, root),
-      then: prefixed(node.then as Condition, root),
-      ...(node.else !== undefined ? { else: prefixed(node.else as Condition, root) } : {}),
-    } as Condition;
+  for (const key of ['all', 'any']) {
+    if (Array.isArray(node[key])) {
+      return { ...node, [key]: (node[key] as Condition[]).map((child) => mapRuleTree(child, map)) } as Condition;
+    }
   }
-  return typeof node.field === 'string' ? ({ ...node, field: `${root}.${node.field}` } as Condition) : condition;
+  if ('if' in node) {
+    const out: Record<string, unknown> = { ...node };
+    for (const key of ['if', 'then', 'else']) {
+      if (node[key] !== undefined) out[key] = mapRuleTree(node[key] as Condition, map);
+    }
+    return out as Condition;
+  }
+  return map(condition);
 };
 
-export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition => {
-  if (rule == null || typeof rule === 'boolean') return rule;
-  const node = rule as Record<string, unknown>;
-  if (Array.isArray(node.all))
-    return { ...node, all: node.all.map((child) => applyEmailLens(lens, child)) } as Condition;
-  if (Array.isArray(node.any))
-    return { ...node, any: node.any.map((child) => applyEmailLens(lens, child)) } as Condition;
-  if ('if' in node) {
-    return {
-      ...node,
-      if: applyEmailLens(lens, node.if as Condition),
-      then: applyEmailLens(lens, node.then as Condition),
-      ...(node.else !== undefined ? { else: applyEmailLens(lens, node.else as Condition) } : {}),
-    } as Condition;
-  }
-  if (!isLeaf(rule)) return rule;
-  const slice = sliceOf(lens, rule);
-  if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return rule;
-  return prefixed(applyLens({ ...rule, field: slice.rest } as Condition, slice.slot), slice.root);
-};
+const prefixed = (condition: Condition, root: string): Condition =>
+  mapRuleTree(condition, (leaf) => (isLeaf(leaf) ? ({ ...leaf, field: `${root}.${leaf.field}` } as Condition) : leaf));
+
+export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition =>
+  mapRuleTree(rule, (leaf) => {
+    if (!isLeaf(leaf)) return leaf;
+    const slice = sliceOf(lens, leaf);
+    if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return leaf;
+    return prefixed(applyLens({ ...leaf, field: slice.rest } as Condition, slice.slot), slice.root);
+  });
 
 export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
   SCOPE_ROOTS.flatMap((root) => {

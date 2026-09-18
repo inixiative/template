@@ -21,12 +21,10 @@ type Pruned<T> = T extends readonly (infer E)[]
 const whereColumns = (condition: Condition, out: Set<string>): void => {
   if (condition == null || typeof condition === 'boolean') return;
   const node = condition as Record<string, unknown>;
-  if (Array.isArray(node.all)) return void node.all.forEach((child) => whereColumns(child as Condition, out));
-  if (Array.isArray(node.any)) return void node.any.forEach((child) => whereColumns(child as Condition, out));
-  if ('if' in node) {
-    for (const key of ['if', 'then', 'else']) whereColumns(node[key] as Condition, out);
-    return;
+  for (const key of ['all', 'any']) {
+    if (Array.isArray(node[key])) for (const child of node[key] as Condition[]) whereColumns(child, out);
   }
+  for (const key of ['if', 'then', 'else']) if (node[key] !== undefined) whereColumns(node[key] as Condition, out);
   if (typeof node.field === 'string' && node.field) out.add(node.field.split('.')[0]!);
 };
 

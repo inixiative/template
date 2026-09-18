@@ -95,7 +95,10 @@ describe('segment rule health — the segments a rule names, as edges', () => {
       { type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
     );
-    const { entity: top } = await createSegment({ type: SegmentType.dynamic, conditions: membersOf(middle.id) }, { space });
+    const { entity: top } = await createSegment(
+      { type: SegmentType.dynamic, conditions: membersOf(middle.id) },
+      { space },
+    );
 
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
 

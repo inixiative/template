@@ -117,7 +117,7 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   });
 });
 
-describe('settleTemplate — rules evaluate through the owner\'s lens', () => {
+describe("settleTemplate — rules evaluate through the owner's lens", () => {
   let organization: Organization;
   let other: Organization;
   let myTag: { id: string };
@@ -189,7 +189,7 @@ describe('settleTemplate — rules evaluate through the owner\'s lens', () => {
     registerSoftDeleteScoper(null);
   });
 
-  it('a tag the owner can see matches; the same rule over another owner\'s tag does not', async () => {
+  it("a tag the owner can see matches; the same rule over another owner's tag does not", async () => {
     const own = await settleTemplate(
       'scoped-tag',
       sender(),

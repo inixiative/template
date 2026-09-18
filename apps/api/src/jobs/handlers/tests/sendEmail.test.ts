@@ -2,7 +2,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { cleanupTouchedTables, createEmailTemplate, createTag, createTagAttachment, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createTag,
+  createTagAttachment,
+  createUser,
+} from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
@@ -10,8 +16,8 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
-import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
+import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
 
 registerRulesHook();
@@ -28,9 +34,13 @@ const userEntity = (): EmailEntry['entity'] => ({
 
 const recipientSelf: RecipientTarget = { where: { field: 'id', operator: Operator.equals, bind: 'id' } };
 
-const recipientsIn = (ids: string[]): RecipientTarget => ({ where: { field: 'id', operator: Operator.in, value: ids } });
+const recipientsIn = (ids: string[]): RecipientTarget => ({
+  where: { field: 'id', operator: Operator.in, value: ids },
+});
 
-const recipientById = (id: string): RecipientTarget => ({ where: { field: 'id', operator: Operator.equals, value: id } });
+const recipientById = (id: string): RecipientTarget => ({
+  where: { field: 'id', operator: Operator.equals, value: id },
+});
 
 const taggedBlock = (tagId: string) =>
   `{{#if rule=${JSON.stringify({

@@ -162,7 +162,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const { data } = await json<Surface>(
       await fetch(
         post('/api/admin/emailTemplate/ruleSurface', {
-          slug: 'welcome',
+          slug: 'picker-probe',
           ownerModel: 'Organization',
           organizationId: mine.id,
         }),
@@ -185,7 +185,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     await createSegment({ ownerModel: 'Organization' }, { organization: org });
 
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })),
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'picker-probe' })),
     );
 
     const tags = optionsOf(data, 'Tag');
