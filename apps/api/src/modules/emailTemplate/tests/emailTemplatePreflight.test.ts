@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createEmailTemplate, createOrganization, createTag, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createOrganization,
+  createTag,
+  createUser,
+} from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { emailTemplatePreflight } from '#/modules/emailTemplate/services/emailTemplatePreflight';
 import { createTestApp } from '#tests/createTestApp';
@@ -133,7 +139,7 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
   });
 });
 
-describe('emailTemplatePreflight — rules are judged through the owner\'s lens', () => {
+describe("emailTemplatePreflight — rules are judged through the owner's lens", () => {
   const taggedDraft = (tagId: string) =>
     COMPLETE.replace(
       'Hello {{recipient.name}}',
@@ -150,7 +156,7 @@ describe('emailTemplatePreflight — rules are judged through the owner\'s lens'
     expect(result.renderWarnings).toEqual([]);
   });
 
-  it('a tag outside the owner\'s view is reported as a rule the draft cannot evaluate', async () => {
+  it("a tag outside the owner's view is reported as a rule the draft cannot evaluate", async () => {
     const { entity: theirs } = await createOrganization();
     const { entity: mine } = await createOrganization();
     const { entity: theirTag } = await createTag({ ownerModel: 'Organization' }, { organization: theirs });

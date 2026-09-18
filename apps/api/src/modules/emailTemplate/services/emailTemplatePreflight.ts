@@ -10,7 +10,7 @@ import { decompose } from '@template/email/render/decompose';
 import { expandWith } from '@template/email/render/expand';
 import { interpolate, type Variables } from '@template/email/render/interpolate';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { emailOwnerProvider, type EmailOwnerRef } from '@template/email/render/owner';
+import { type EmailOwnerRef, emailOwnerProvider } from '@template/email/render/owner';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { lensFor } from '@template/db/lens';
-import { type EmailLens, systemSlot } from '@template/email/rules/emailLens';
 import {
   checkExpectations,
   collectUnprovidedPathWarnings,
   deriveComponentExpectations,
 } from '@template/email/rules/componentExpectations';
+import { type EmailLens, systemSlot } from '@template/email/rules/emailLens';
 
 describe('deriveComponentExpectations', () => {
   it('derives the absolute paths a component body demands, from tokens, rules and loops alike', () => {

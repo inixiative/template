@@ -36,10 +36,17 @@ export const declaredEmailLens = (slug: string, stored: unknown): EmailLens => {
   return emailLens({ ...projectionForEntry(registry[slug], slots), slots });
 };
 
-export const emailLensFor = async (slug: string, owner: OwnerScope, lensOverride?: unknown): Promise<EmailLens> => {
+export const declaredEmailLensFor = async (
+  slug: string,
+  locale: string,
+  lensOverride?: unknown,
+): Promise<EmailLens> => {
   const stored =
     lensOverride === undefined
-      ? (await lookupAtOwner(slug, [], { ownerModel: 'default', locale: owner.locale })).template?.lens
+      ? (await lookupAtOwner(slug, [], { ownerModel: 'default', locale })).template?.lens
       : lensOverride;
-  return scopeEmailLens(declaredEmailLens(slug, stored), emailOwnerProvider(owner));
+  return declaredEmailLens(slug, stored);
 };
+
+export const emailLensFor = async (slug: string, owner: OwnerScope, lensOverride?: unknown): Promise<EmailLens> =>
+  scopeEmailLens(await declaredEmailLensFor(slug, owner.locale, lensOverride), emailOwnerProvider(owner));

@@ -66,17 +66,20 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     registerSoftDeleteScoper(null);
   });
 
-  it('platform tags and the owner\'s own tags and segments are admitted', async () => {
-    const saved = await saveFor(mine.id, `${taggedBlock(platformTag.id)}${taggedBlock(myTag.id)}${inSegmentBlock(mySegment.id)}`);
+  it("platform tags and the owner's own tags and segments are admitted", async () => {
+    const saved = await saveFor(
+      mine.id,
+      `${taggedBlock(platformTag.id)}${taggedBlock(myTag.id)}${inSegmentBlock(mySegment.id)}`,
+    );
     const edges = await db.ruleReference.findMany({ where: { emailTemplateId: saved.template.id } });
     expect(edges.map((edge) => edge.referencedId).sort()).toEqual([platformTag.id, myTag.id, mySegment.id].sort());
   });
 
-  it('another owner\'s tag is refused', async () => {
+  it("another owner's tag is refused", async () => {
     await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
-  it('another owner\'s segment is refused', async () => {
+  it("another owner's segment is refused", async () => {
     await expect(saveFor(mine.id, inSegmentBlock(theirSegment.id))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 

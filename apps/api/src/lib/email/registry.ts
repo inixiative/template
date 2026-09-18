@@ -6,15 +6,12 @@
  */
 import type { Condition, LensNarrowing } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
+import { OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
 import type { Sender } from '#/lib/email/sender';
 
 export type SenderSpec = Sender;
 
-export type RecipientSpec = {
-  picks: string[];
-  relations?: Record<string, { picks: string[] }>;
-  where: Condition;
-};
+export type RecipientTarget = { where: Condition };
 
 export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
 
@@ -26,20 +23,21 @@ export type RenderSpec = {
 export type EmailEntry = {
   entity: LensNarrowing;
   sender: SenderSpec;
-  recipients: RecipientSpec;
-  cc?: RecipientSpec;
-  bcc?: RecipientSpec;
+  recipients: RecipientTarget;
+  cc?: RecipientTarget;
+  bcc?: RecipientTarget;
   data?: string[];
   render?: RenderSpec;
 };
 
-export const recipientLens = (spec: RecipientSpec, where: Condition): LensNarrowing => ({
+export const recipientLens = (slot: SlotLens | undefined, where: Condition): LensNarrowing => {
+  if (!slot || slot === OPAQUE_SLOT) throw new Error('Email recipient lens is not a model lens');
+  return { parent: slot, root: { where } };
+};
+
+export const addressLens = (where: Condition): LensNarrowing => ({
   parent: lensFor('User'),
-  root: {
-    where,
-    picks: spec.picks,
-    ...(spec.relations ? { relations: spec.relations } : {}),
-  },
+  root: { where, picks: ['email'] },
 });
 
 const userEntity = (bind: string): LensNarrowing => ({
@@ -47,10 +45,7 @@ const userEntity = (bind: string): LensNarrowing => ({
   root: { where: { field: 'id', operator: 'equals', bind }, picks: ['id', 'name', 'email'] },
 });
 
-const userRecipient = (bind: string): RecipientSpec => ({
-  picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: 'equals', bind },
-});
+const userRecipient = (bind: string): RecipientTarget => ({ where: { field: 'id', operator: 'equals', bind } });
 
 const assertSubstitutes = (entries: Record<string, EmailEntry>): Record<string, EmailEntry> => {
   for (const [slug, entry] of Object.entries(entries)) {

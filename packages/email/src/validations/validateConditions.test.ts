@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createLens, type FieldMap } from '@inixiative/json-rules';
-import type { EmailLens } from '@template/email/rules/emailLens';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
+import type { EmailLens } from '@template/email/rules/emailLens';
 import { assertValidConditions, validateConditions } from '@template/email/validations/validateConditions';
 
 const rule = (o: Record<string, unknown>) => JSON.stringify(o);
@@ -140,28 +140,28 @@ describe('validateConditions — {{#each}} blocks', () => {
 
 const testMap: FieldMap = {
   models: {
-        Recipient: {
-          fields: {
-            tier: { kind: 'scalar', type: 'String' },
-            plan: { kind: 'scalar', type: 'String' },
-            memberships: { kind: 'object', type: 'Membership', isList: true },
-          },
-        },
-        Sender: {
-          fields: { name: { kind: 'scalar', type: 'String' } },
-        },
-        System: {
-          fields: { unsubscribeUrl: { kind: 'scalar', type: 'String' } },
-        },
-        Membership: {
-          fields: {
-            tier: { kind: 'scalar', type: 'String' },
-            perks: { kind: 'object', type: 'Perk', isList: true },
-          },
-        },
-        Perk: {
-          fields: { status: { kind: 'scalar', type: 'String' } },
-        },
+    Recipient: {
+      fields: {
+        tier: { kind: 'scalar', type: 'String' },
+        plan: { kind: 'scalar', type: 'String' },
+        memberships: { kind: 'object', type: 'Membership', isList: true },
+      },
+    },
+    Sender: {
+      fields: { name: { kind: 'scalar', type: 'String' } },
+    },
+    System: {
+      fields: { unsubscribeUrl: { kind: 'scalar', type: 'String' } },
+    },
+    Membership: {
+      fields: {
+        tier: { kind: 'scalar', type: 'String' },
+        perks: { kind: 'object', type: 'Perk', isList: true },
+      },
+    },
+    Perk: {
+      fields: { status: { kind: 'scalar', type: 'String' } },
+    },
   },
 };
 

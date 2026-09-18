@@ -16,9 +16,10 @@ import {
   type LensNarrowing,
   lensRequiredBindings,
   type ModelNarrowing,
-  resolveLensBindings,
+  Operator,
   type RuleLensViolation,
   type RuleValue,
+  resolveLensBindings,
   type SourceQuery,
   sourceQueries,
   validateNarrowing,
@@ -68,10 +69,12 @@ export type EmailLensInput = {
 
 const referenced: ModelNarrowing = { picks: ['id', 'name'] };
 
+const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
+
 export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   picks: ['id', 'name', 'email'],
   relations: {
-    tagAttachments: { picks: [], relations: { tag: referenced } },
+    tagAttachments: { picks: [], where: live, relations: { tag: referenced } },
     spaceUsers: { picks: ['role'], relations: { space: referenced } },
     organizationUsers: { picks: ['role'], relations: { organization: referenced } },
     providerRefs: { picks: [], relations: { segmentMembers: { picks: [], relations: { segment: referenced } } } },
@@ -172,7 +175,12 @@ const SYSTEM_FIELDS: Record<string, string> = {
 
 export const systemSlot = (): Lens => declaredSlot(EMAIL_SYSTEM_MODEL, SYSTEM_FIELDS) as Lens;
 
-export const emailLens = ({ recipientModel = 'User', senderModel, data, slots = {} }: EmailLensInput = {}): EmailLens => ({
+export const emailLens = ({
+  recipientModel = 'User',
+  senderModel,
+  data,
+  slots = {},
+}: EmailLensInput = {}): EmailLens => ({
   ...(senderModel ? { sender: prismaSlot(senderModel, slots.sender) } : {}),
   recipient: prismaSlot(
     recipientModel,
@@ -302,8 +310,10 @@ const prefixed = (condition: Condition, root: string): Condition => {
 export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition => {
   if (rule == null || typeof rule === 'boolean') return rule;
   const node = rule as Record<string, unknown>;
-  if (Array.isArray(node.all)) return { ...node, all: node.all.map((child) => applyEmailLens(lens, child)) } as Condition;
-  if (Array.isArray(node.any)) return { ...node, any: node.any.map((child) => applyEmailLens(lens, child)) } as Condition;
+  if (Array.isArray(node.all))
+    return { ...node, all: node.all.map((child) => applyEmailLens(lens, child)) } as Condition;
+  if (Array.isArray(node.any))
+    return { ...node, any: node.any.map((child) => applyEmailLens(lens, child)) } as Condition;
   if ('if' in node) {
     return {
       ...node,
@@ -332,13 +342,12 @@ export const emailLensRequiredBindings = (lens: EmailLens): Set<string> =>
 
 export const resolveEmailLensBindings = (lens: EmailLens, values: Record<string, RuleValue>): EmailLens => ({
   ...lens,
-  ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, resolveLensBindings(slot, values) as RuleLens])),
+  ...Object.fromEntries(
+    emailSlotLenses(lens).map(([root, slot]) => [root, resolveLensBindings(slot, values) as RuleLens]),
+  ),
 });
 
-export const narrowEmailLens = (
-  lens: EmailLens,
-  narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens,
-): EmailLens => ({
+export const narrowEmailLens = (lens: EmailLens, narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens): EmailLens => ({
   ...lens,
   ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
 });

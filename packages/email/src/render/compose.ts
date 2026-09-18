@@ -10,6 +10,7 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
+import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 
 export type ComposeTemplateResult = {
@@ -62,13 +63,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     subject: template.subject,
     kind: template.kind,
     ownerModel: template.ownerModel,
-    owner: {
-      ownerModel: template.ownerModel,
-      organizationId: template.organizationId,
-      spaceId: template.spaceId,
-      userId: template.userId,
-      locale: template.locale,
-    },
+    owner: rowOwner(template),
     componentResolutions,
     liveRuleRefs,
   };

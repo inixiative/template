@@ -11,7 +11,10 @@ export type LensCursor = { key?: string; mapName: string; model: string };
 
 export type LensHop = { field: FieldMapEntry; next: LensCursor };
 
-export type LensFieldResolver = { start: LensCursor; resolve: (cursor: LensCursor, segment: string) => LensHop | undefined };
+export type LensFieldResolver = {
+  start: LensCursor;
+  resolve: (cursor: LensCursor, segment: string) => LensHop | undefined;
+};
 
 export const lensFieldResolver = (lens: Lens | LensNarrowing): LensFieldResolver => {
   const base = 'parent' in lens ? rootLens(lens) : lens;

@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { cleanupTouchedTables, createEmailTemplate, createUser } from '@template/db/test';
+import { cleanupTouchedTables, createEmailTemplate, createTag, createTagAttachment, createUser } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
@@ -10,7 +10,8 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
-import { type EmailEntry, type RecipientSpec, registry } from '#/lib/email/registry';
+import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
 import { createTestApp } from '#tests/createTestApp';
 
 registerRulesHook();
@@ -25,20 +26,18 @@ const userEntity = (): EmailEntry['entity'] => ({
   root: { where: { field: 'id', operator: Operator.equals, bind: 'userId' }, picks: ['id', 'name', 'email'] },
 });
 
-const recipientSelf: RecipientSpec = {
-  picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.equals, bind: 'id' },
-};
+const recipientSelf: RecipientTarget = { where: { field: 'id', operator: Operator.equals, bind: 'id' } };
 
-const recipientsIn = (ids: string[]): RecipientSpec => ({
-  picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.in, value: ids },
-});
+const recipientsIn = (ids: string[]): RecipientTarget => ({ where: { field: 'id', operator: Operator.in, value: ids } });
 
-const recipientById = (id: string): RecipientSpec => ({
-  picks: ['id', 'name', 'email'],
-  where: { field: 'id', operator: Operator.equals, value: id },
-});
+const recipientById = (id: string): RecipientTarget => ({ where: { field: 'id', operator: Operator.equals, value: id } });
+
+const taggedBlock = (tagId: string) =>
+  `{{#if rule=${JSON.stringify({
+    field: 'recipient.tagAttachments',
+    arrayOperator: 'any',
+    condition: { field: 'tag.id', operator: 'equals', value: tagId },
+  })}}}VIP{{else}}BASE{{/if}}`;
 
 const plainMjml = (body: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${body}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -98,6 +97,33 @@ describe('sendEmail handler', () => {
 
     expect(sent.map((s) => s.to).sort()).toEqual([alice.email, bob.email].sort());
     expect(sent.every((s) => s.cc === undefined && s.bcc === undefined)).toBe(true);
+  });
+
+  it('the recipient reaches delivery hydrated through the lens, so a membership rule decides the branch', async () => {
+    const { entity: tag } = await createTag();
+    const { entity: vip } = await createUser({ name: 'Vip' });
+    const { entity: plain } = await createUser({ name: 'Plain' });
+    await createTagAttachment({ resourceModel: 'User' }, { user: vip, tag });
+    await saveEmailTemplate({
+      slug: 'test-tagged',
+      name: 'tagged',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: plainMjml(taggedBlock(tag.id)),
+      ownerModel: 'default',
+    });
+    addEntry('test-tagged', {
+      entity: userEntity(),
+      sender: { type: 'platform' },
+      recipients: recipientsIn([vip.id, plain.id]),
+    });
+
+    await sendEmail(ctx(), { eventName: 'test', template: 'test-tagged', data: { userId: vip.id } });
+
+    const byAddress = new Map(sent.map((s) => [s.to, s.html]));
+    expect(byAddress.get(vip.email)).toContain('VIP');
+    expect(byAddress.get(vip.email)).not.toContain('BASE');
+    expect(byAddress.get(plain.email)).toContain('BASE');
   });
 
   it('resolves cc per recipient and attaches it to that recipient’s email', async () => {

@@ -70,7 +70,11 @@ describe('emailLens — four lenses, one per scope root', () => {
   it('an opaque data bag is addressable at any depth, as beneath-Json rather than missing', () => {
     expect(walkEmailLensPath('data.mission.reward.amount', emailLens()).outcome).toBe('beneathJson');
     expect(
-      emailRuleVocabularyIssues(emailLens(), { field: 'data.mission.reward.amount', operator: 'greaterThan', value: 1 }),
+      emailRuleVocabularyIssues(emailLens(), {
+        field: 'data.mission.reward.amount',
+        operator: 'greaterThan',
+        value: 1,
+      }),
     ).toEqual([]);
   });
 
@@ -204,9 +208,18 @@ describe('emailLens — evaluation goes through the lens', () => {
 
   it('a tag or segment outside the owner view does not match; inside it does', () => {
     const lens = scopeEmailLens(emailLens({ senderModel: 'Organization' }), org);
-    const own = scope({ ownerModel: 'Organization', organizationId: 'org-1' }, { ownerModel: 'Organization', organizationId: 'org-1' });
-    const other = scope({ ownerModel: 'Organization', organizationId: 'org-2' }, { ownerModel: 'Organization', organizationId: 'org-2' });
-    const platform = scope({ ownerModel: 'platform', organizationId: null }, { ownerModel: 'Organization', organizationId: 'org-2' });
+    const own = scope(
+      { ownerModel: 'Organization', organizationId: 'org-1' },
+      { ownerModel: 'Organization', organizationId: 'org-1' },
+    );
+    const other = scope(
+      { ownerModel: 'Organization', organizationId: 'org-2' },
+      { ownerModel: 'Organization', organizationId: 'org-2' },
+    );
+    const platform = scope(
+      { ownerModel: 'platform', organizationId: null },
+      { ownerModel: 'Organization', organizationId: 'org-2' },
+    );
 
     expect(check(applyEmailLens(lens, tagged('tag-a')), own)).toBe(true);
     expect(check(applyEmailLens(lens, inSegment('seg-a')), own)).toBe(true);
@@ -218,7 +231,10 @@ describe('emailLens — evaluation goes through the lens', () => {
 
   it('a platform owner sees platform tags and no segments', () => {
     const lens = scopeEmailLens(emailLens(), null);
-    const own = scope({ ownerModel: 'platform', organizationId: null }, { ownerModel: 'Organization', organizationId: 'org-1' });
+    const own = scope(
+      { ownerModel: 'platform', organizationId: null },
+      { ownerModel: 'Organization', organizationId: 'org-1' },
+    );
     expect(check(applyEmailLens(lens, tagged('tag-a')), own)).toBe(true);
     expect(check(applyEmailLens(lens, inSegment('seg-a')), own)).not.toBe(true);
   });
@@ -228,14 +244,22 @@ describe('emailLens — evaluation goes through the lens', () => {
     const applied = applyEmailLens(lens, {
       all: [
         { field: 'recipient.name', operator: 'equals', value: 'Ann' },
-        { field: 'recipient.organizationUsers', arrayOperator: 'any', condition: { field: 'organization.id', operator: 'equals', path: 'sender.id' } },
+        {
+          field: 'recipient.organizationUsers',
+          arrayOperator: 'any',
+          condition: { field: 'organization.id', operator: 'equals', path: 'sender.id' },
+        },
         { field: 'item.price', operator: 'greaterThan', value: 1 },
       ],
     });
     expect(JSON.stringify(applied)).toContain('"field":"recipient.name"');
     expect(JSON.stringify(applied)).toContain('"path":"sender.id"');
     expect(JSON.stringify(applied)).toContain('"field":"item.price"');
-    const data = { ...scope({}, {}), recipient: { ...scope({}, {}).recipient, organizationUsers: [{ organization: { id: 'org-1' } }] }, item: { price: 2 } };
+    const data = {
+      ...scope({}, {}),
+      recipient: { ...scope({}, {}).recipient, organizationUsers: [{ organization: { id: 'org-1' } }] },
+      item: { price: 2 },
+    };
     expect(check(applied, data)).toBe(true);
   });
 });
@@ -245,7 +269,10 @@ describe('emailSurface — the four lenses composed for the builder', () => {
     const surface = emailSurface(emailLens({ senderModel: 'Organization' }));
     expect(surface.model).toBe(EMAIL_SURFACE_ROOT);
     expect(fieldsOf(surface, EMAIL_SURFACE_ROOT)).toEqual(['data', 'recipient', 'sender', 'system']);
-    expect(surface.maps[surface.mapName]?.models[EMAIL_SURFACE_ROOT]?.fields.data).toEqual({ kind: 'scalar', type: 'Json' });
+    expect(surface.maps[surface.mapName]?.models[EMAIL_SURFACE_ROOT]?.fields.data).toEqual({
+      kind: 'scalar',
+      type: 'Json',
+    });
     expect(fieldsOf(surface, 'User')).toEqual(
       [...DEFAULT_RECIPIENT_NARROWING.picks!, ...Object.keys(DEFAULT_RECIPIENT_NARROWING.relations!)].sort(),
     );

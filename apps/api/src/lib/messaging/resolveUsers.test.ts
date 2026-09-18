@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
 import { TagResource } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createTag, createTagAttachment, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createOrganization,
+  createTag,
+  createTagAttachment,
+  createUser,
+} from '@template/db/test';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
 import { createTestApp } from '#tests/createTestApp';
 
@@ -77,6 +84,18 @@ describe('resolveUsers', () => {
       condition: { field: 'tag.id', operator: Operator.equals, value: foundersTag.id },
     });
     expect(users.map((u) => u.id).sort()).toEqual([alice.id, bob.id].sort());
+  });
+
+  it("targets through the platform recipient lens: an organization's tag is outside its view", async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: orgTag } = await createTag({ ownerModel: 'Organization' }, { organization });
+    await createTagAttachment({ resourceModel: TagResource.User }, { user: carol, tag: orgTag });
+    const users = await resolveUsers({
+      field: 'tagAttachments',
+      arrayOperator: ArrayOperator.any,
+      condition: { field: 'tag.id', operator: Operator.equals, value: orgTag.id },
+    });
+    expect(users).toEqual([]);
   });
 
   it('returns empty when nothing matches', async () => {

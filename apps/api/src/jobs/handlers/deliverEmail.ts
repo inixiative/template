@@ -11,6 +11,7 @@ import mjml2html from 'mjml';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeJob } from '#/jobs/makeJob';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
+import type { Recipient } from '#/lib/email/recipient';
 import { resolveSender } from '#/lib/email/resolveSender';
 import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
@@ -30,7 +31,7 @@ const settle = async (
 export type DeliverEmailPayload = {
   template: string;
   sender: Sender;
-  recipient: { id: string; name: string; email: string };
+  recipient: Recipient;
   cc?: string[];
   bcc?: string[];
   data: Record<string, unknown>;

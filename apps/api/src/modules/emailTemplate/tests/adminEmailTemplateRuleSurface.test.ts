@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createEmailTemplate, createOrganization, createSegment, createTag, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createOrganization,
+  createSegment,
+  createTag,
+  createUser,
+} from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
@@ -17,7 +24,9 @@ type Surface = {
 };
 
 const optionsOf = (surface: Surface, model: string): unknown[] =>
-  surface.sourceValues.filter((source) => source.model === model).flatMap((source) => source.options.map((o) => o.value));
+  surface.sourceValues
+    .filter((source) => source.model === model)
+    .flatMap((source) => source.options.map((o) => o.value));
 
 const fieldsOf = (surface: Surface, model: string): string[] =>
   Object.keys(surface.source.maps[surface.source.mapName]?.models[model]?.fields ?? {}).sort();
@@ -141,7 +150,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     await cleanupTouchedTables(db);
   });
 
-  it('platform tags plus the owner\'s tags and segments, never another owner\'s', async () => {
+  it("platform tags plus the owner's tags and segments, never another owner's", async () => {
     const { entity: mine } = await createOrganization();
     const { entity: theirs } = await createOrganization();
     const platformTag = (await createTag()).entity;
@@ -175,7 +184,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const orgTag = (await createTag({ ownerModel: 'Organization' }, { organization: org })).entity;
     await createSegment({ ownerModel: 'Organization' }, { organization: org });
 
-    const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })));
+    const { data } = await json<Surface>(
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })),
+    );
 
     const tags = optionsOf(data, 'Tag');
     expect(tags).toContain(platformTag.id);

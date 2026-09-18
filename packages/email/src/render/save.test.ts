@@ -64,7 +64,7 @@ describe('saveEmailTemplate', () => {
     expect(tombstone?.mjml).toContain('v1');
   });
 
-  it('a User-owned save lands on that user\'s row, never on another user\'s same-slug row', async () => {
+  it("a User-owned save lands on that user's row, never on another user's same-slug row", async () => {
     const { entity: alice } = await createUser();
     const { entity: bob } = await createUser();
     const input = { slug: 'mine', name: 'Mine', subject: 'Hi', kind: 'system' as const, ownerModel: 'User' as const };

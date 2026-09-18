@@ -71,6 +71,14 @@ export const firstResolved = async <T>(lookups: (() => Promise<T | null | undefi
 
 export type EmailOwnerRef = Pick<OwnerScope, 'ownerModel' | 'organizationId' | 'spaceId' | 'userId'>;
 
+export const rowOwner = (row: EmailOwnerRef & { locale: string }): OwnerScope => ({
+  ownerModel: row.ownerModel,
+  organizationId: row.organizationId,
+  spaceId: row.spaceId,
+  userId: row.userId,
+  locale: row.locale,
+});
+
 export const emailOwnerProvider = (owner: EmailOwnerRef): EmailLensOwner => {
   switch (owner.ownerModel) {
     case 'Organization':

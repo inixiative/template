@@ -18,5 +18,9 @@ export const emailTemplateRuleSurface = async (
   lensOverride?: unknown,
 ): Promise<EmailTemplateRuleSurface> => {
   const lens = await emailLensFor(slug, owner, lensOverride);
-  return { source: emailSurface(lens), sourceValues: await emailSourceValues(lens), decoration: emailRuleDecoration(lens) };
+  return {
+    source: emailSurface(lens),
+    sourceValues: await emailSourceValues(lens),
+    decoration: emailRuleDecoration(lens),
+  };
 };
