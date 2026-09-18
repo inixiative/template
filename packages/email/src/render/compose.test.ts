@@ -1,6 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
+  createOrganization,
+  createSpace,
+} from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { composeComponent, composeTemplate } from '@template/email/render/compose';
 import { parentOwner } from '@template/email/render/owner';
@@ -224,6 +230,40 @@ describe('composeTemplate', () => {
       expect(err).toBeInstanceOf(EmailRenderError);
       expect((err as EmailRenderError).type).toBe('template_missing');
     }
+  });
+});
+
+describe('composeTemplate — the row that won the cascade names its owner', () => {
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('an Organization row rendered for a Space sender is owned by the organization, not the space', async () => {
+    const { entity: org } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization: org });
+    await createEmailTemplate({
+      slug: 'owned',
+      subject: 'Hi',
+      mjml: '<mjml><mj-body><mj-text>Org</mj-text></mj-body></mjml>',
+      ownerModel: 'Organization',
+      organizationId: org.id,
+      inheritToSpaces: true,
+    });
+
+    const result = await composeTemplate('owned', {
+      ownerModel: 'Space',
+      spaceId: space.id,
+      organizationId: org.id,
+      locale: 'en',
+    });
+
+    expect(result.owner).toEqual({
+      ownerModel: 'Organization',
+      organizationId: org.id,
+      spaceId: null,
+      userId: null,
+      locale: 'en',
+    });
   });
 });
 

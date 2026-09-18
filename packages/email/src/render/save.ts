@@ -38,7 +38,7 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-export type LensForSlug = (slug: string, locale: string) => Promise<EmailLens | undefined>;
+export type LensForSlug = (slug: string, owner: OwnerScope) => Promise<EmailLens | undefined>;
 
 export type SaveTemplateOptions = {
   lens?: EmailLens;
@@ -64,6 +64,14 @@ const withoutConditionals = (mjml: string): string => {
   return out;
 };
 
+export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
+  ownerModel: input.ownerModel,
+  organizationId: input.organizationId,
+  spaceId: input.spaceId,
+  userId: input.userId,
+  locale: input.locale ?? 'en',
+});
+
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
   options: SaveTemplateOptions = {},
@@ -73,13 +81,7 @@ export const saveEmailTemplate = async (
   assertValidConditions(input.mjml, { lens: options.lens });
   if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens: options.lens });
 
-  const ctx: OwnerScope = {
-    ownerModel: input.ownerModel,
-    organizationId: input.organizationId,
-    spaceId: input.spaceId,
-    userId: input.userId,
-    locale: input.locale ?? 'en',
-  };
+  const ctx = ownerScopeOf(input);
 
   const slugs = collectSlugsFromNodes(nodes);
 

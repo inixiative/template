@@ -19,6 +19,8 @@ import {
   resolveLensBindings,
   type RuleLensViolation,
   type RuleValue,
+  type SourceQuery,
+  sourceQueries,
   validateNarrowing,
 } from '@inixiative/json-rules';
 import { RULE_REFERENCEABLE_MODELS, ruleReferences } from '@template/db';
@@ -316,18 +318,21 @@ export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition => {
   return prefixed(applyLens({ ...rule, field: slice.rest } as Condition, slice.slot), slice.root);
 };
 
-const slotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
+export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
   SCOPE_ROOTS.flatMap((root) => {
     const slot = lens[root];
     return slot && slot !== OPAQUE_SLOT ? [[root, slot] as [ScopeRoot, RuleLens]] : [];
   });
 
+export const emailSourceQueries = (lens: EmailLens): SourceQuery[] =>
+  emailSlotLenses(lens).flatMap(([, slot]) => sourceQueries(slot));
+
 export const emailLensRequiredBindings = (lens: EmailLens): Set<string> =>
-  new Set(slotLenses(lens).flatMap(([, slot]) => [...lensRequiredBindings(slot)]));
+  new Set(emailSlotLenses(lens).flatMap(([, slot]) => [...lensRequiredBindings(slot)]));
 
 export const resolveEmailLensBindings = (lens: EmailLens, values: Record<string, RuleValue>): EmailLens => ({
   ...lens,
-  ...Object.fromEntries(slotLenses(lens).map(([root, slot]) => [root, resolveLensBindings(slot, values) as RuleLens])),
+  ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, resolveLensBindings(slot, values) as RuleLens])),
 });
 
 export const narrowEmailLens = (
@@ -335,7 +340,7 @@ export const narrowEmailLens = (
   narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens,
 ): EmailLens => ({
   ...lens,
-  ...Object.fromEntries(slotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
+  ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
 });
 
 export const emailSurface = (lens: EmailLens): Lens => {

@@ -5,9 +5,10 @@
  * @uses none
  */
 import { z } from '@hono/zod-openapi';
+import { emailOwnerSchema } from '#/modules/emailTemplate/schemas/emailOwner.schema';
 
-export const emailTemplatePreflightBodySchema = z
-  .object({
+export const emailTemplatePreflightBodySchema = emailOwnerSchema
+  .extend({
     mjml: z.string().min(1),
     subject: z.string().optional(),
     slug: z

@@ -19,6 +19,7 @@ export type ComposeTemplateResult = {
   subject: string;
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel;
+  owner: OwnerScope;
   componentResolutions: Record<string, string>;
   liveRuleRefs: Set<string>;
 };
@@ -61,6 +62,13 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     subject: template.subject,
     kind: template.kind,
     ownerModel: template.ownerModel,
+    owner: {
+      ownerModel: template.ownerModel,
+      organizationId: template.organizationId,
+      spaceId: template.spaceId,
+      userId: template.userId,
+      locale: template.locale,
+    },
     componentResolutions,
     liveRuleRefs,
   };

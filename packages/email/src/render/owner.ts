@@ -6,6 +6,7 @@
  */
 import type { EmailOwnerModel } from '@template/db/generated/client/client';
 import type { OwnerScope } from '@template/email/render/types';
+import type { EmailLensOwner } from '@template/email/rules/scopeEmailLens';
 
 export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
   switch (owner) {
@@ -66,4 +67,21 @@ export const firstResolved = async <T>(lookups: (() => Promise<T | null | undefi
     if (result) return result;
   }
   return null;
+};
+
+export type EmailOwnerRef = Pick<OwnerScope, 'ownerModel' | 'organizationId' | 'spaceId' | 'userId'>;
+
+export const emailOwnerProvider = (owner: EmailOwnerRef): EmailLensOwner => {
+  switch (owner.ownerModel) {
+    case 'Organization':
+      return owner.organizationId ? { ownerModel: 'Organization', ownerId: owner.organizationId } : null;
+    case 'Space':
+      return owner.spaceId ? { ownerModel: 'Space', ownerId: owner.spaceId } : null;
+    case 'User':
+    case 'OrganizationUser':
+    case 'SpaceUser':
+      return owner.userId ? { ownerModel: 'User', ownerId: owner.userId } : null;
+    default:
+      return null;
+  }
 };

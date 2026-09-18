@@ -30,6 +30,8 @@ export {
   emailRuleViolations,
   emailRuleVocabulary,
   emailRuleVocabularyIssues,
+  emailSlotLenses,
+  emailSourceQueries,
   emailSurface,
   narrowEmailLens,
   OPAQUE_SLOT,
@@ -41,6 +43,7 @@ export {
   systemSlot,
   walkEmailLensPath,
 } from './emailLens';
+export { emptyRowFor } from './emptyRowFor';
 export { type LensCursor, type LensFieldResolver, type LensHop, lensFieldResolver } from './lensFieldResolver';
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export {

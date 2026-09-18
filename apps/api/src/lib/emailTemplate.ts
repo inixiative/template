@@ -17,9 +17,10 @@ import {
 } from '@template/email/render';
 import type { EmailLens } from '@template/email/rules';
 import { LogScope, log } from '@template/shared/logger';
+import { emailLensFor } from '#/lib/email/emailLensFor';
 import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
-import { emailTemplateRuleLens } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
+import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
 
 export const ownerScope = (sender: Sender): OwnerScope => {
   switch (sender.type) {
@@ -73,12 +74,13 @@ const renderComposed = (
   vars: Variables,
   scope: OwnerScope,
   lens: EmailLens,
+  liveRefs: ReadonlySet<string>,
 ): Rendered => {
   const issues: RenderIssue[] = [];
   const subjectIssues: RenderIssue[] = [];
   const bodySink: RuleErrorSink = (issue) => issues.push(issue);
   const subjectSink: RuleErrorSink = (issue) => subjectIssues.push(issue);
-  const options = { locale: scope.locale, liveRefs: composed.liveRuleRefs, lens };
+  const options = { locale: scope.locale, liveRefs, lens };
   const mjml = interpolate(composed.mjml, vars, bodySink, options);
   const subject = interpolate(composed.subject, vars, subjectSink, options);
   return {
@@ -116,7 +118,11 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    return renderComposed(slug, composed, vars, at, await emailTemplateRuleLens(slug, at.locale));
+    const [lens, liveRefs] = await Promise.all([
+      emailLensFor(slug, composed.owner),
+      withoutDegradedSegments(composed.liveRuleRefs),
+    ]);
+    return renderComposed(slug, composed, vars, at, lens, liveRefs);
   };
 
   const clean = (rendered: Rendered): boolean => !rendered.subjectIssues.length && !rendered.settled.issues.length;

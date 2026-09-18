@@ -4,20 +4,31 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
+import { unadmittedRuleReferences } from '@template/db';
 import { type PreflightResult, runPreflight } from '@template/email/preflight';
 import { decompose } from '@template/email/render/decompose';
 import { expandWith } from '@template/email/render/expand';
 import { interpolate, type Variables } from '@template/email/render/interpolate';
 import { lookupCascade } from '@template/email/render/lookupCascade';
+import { emailOwnerProvider, type EmailOwnerRef } from '@template/email/render/owner';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
-import { defaultEmailLens } from '@template/email/rules/emailLens';
+import { defaultEmailLens, type EmailLens, emailSourceQueries } from '@template/email/rules/emailLens';
+import { emptyRowFor } from '@template/email/rules/emptyRowFor';
+import { contentRuleReferences } from '@template/email/rules/ruleReferences';
+import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
+import { referenceKey } from '@template/shared/rules';
 import mjml2html from 'mjml';
-import { emailTemplateRuleLens } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
+import { emailLensFor } from '#/lib/email/emailLensFor';
 
-export type EmailTemplatePreflightInput = { mjml: string; subject?: string; slug?: string; locale?: string };
+export type EmailTemplatePreflightInput = Partial<EmailOwnerRef> & {
+  mjml: string;
+  subject?: string;
+  slug?: string;
+  locale?: string;
+};
 
 export type EmailTemplatePreflightResult = PreflightResult & { renderWarnings: string[] };
 
@@ -43,14 +54,37 @@ const expandDraft = (mjml: string, ctx: OwnerScope): Promise<string> => {
   });
 };
 
+const admittedReferences = async (lens: EmailLens, ...contents: string[]): Promise<Set<string>> => {
+  const references = contentRuleReferences(lens, ...contents);
+  const outside = new Set((await unadmittedRuleReferences(emailSourceQueries(lens), references)).map(referenceKey));
+  return new Set(references.map(referenceKey).filter((key) => !outside.has(key)));
+};
+
+const sampleVariables = (lens: EmailLens): Variables => ({
+  ...SAMPLE_VARIABLES,
+  recipient: { ...emptyRowFor(lens.recipient), ...SAMPLE_VARIABLES.recipient },
+  sender: { ...emptyRowFor(lens.sender), ...SAMPLE_VARIABLES.sender },
+});
+
 export const emailTemplatePreflight = async (
   input: EmailTemplatePreflightInput,
 ): Promise<EmailTemplatePreflightResult> => {
   const locale = input.locale ?? 'en';
-  const ctx: OwnerScope = { ownerModel: 'default', locale };
+  const ctx: OwnerScope = {
+    ownerModel: input.ownerModel ?? 'default',
+    organizationId: input.organizationId,
+    spaceId: input.spaceId,
+    userId: input.userId,
+    locale,
+  };
 
   assertValidConditions(input.mjml);
   if (input.subject) assertValidConditions(input.subject, { isSubject: true });
+
+  const lens = input.slug
+    ? await emailLensFor(input.slug, ctx)
+    : scopeEmailLens(defaultEmailLens, emailOwnerProvider(ctx));
+  const variables = sampleVariables(lens);
 
   const renderWarnings: string[] = [];
   const onRenderWarning: RuleErrorSink = (issue) => {
@@ -58,11 +92,11 @@ export const emailTemplatePreflight = async (
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
-  const interpolatedMjml = interpolate(expandedMjml, SAMPLE_VARIABLES, onRenderWarning, { locale });
-  const subject = input.subject ? interpolate(input.subject, SAMPLE_VARIABLES, onRenderWarning, { locale }) : '';
+  const liveRefs = await admittedReferences(lens, expandedMjml, input.subject ?? '');
+  const options = { locale, lens, liveRefs };
+  const interpolatedMjml = interpolate(expandedMjml, variables, onRenderWarning, options);
+  const subject = input.subject ? interpolate(input.subject, variables, onRenderWarning, options) : '';
   const { html } = await mjml2html(interpolatedMjml, { validationLevel: 'skip' });
-
-  const lens = input.slug ? await emailTemplateRuleLens(input.slug, locale) : defaultEmailLens;
 
   const result = await runPreflight({
     mjml: expandedMjml,

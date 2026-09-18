@@ -27,7 +27,7 @@ const ownedBy = (model: 'Tag' | 'Segment', ownerModel: ProviderModel): Condition
 });
 
 const ownerDefaults = (owner: EmailLensOwner): NarrowingDefaults => {
-  const tag: Condition = owner ? { any: [platform, ownedBy('Tag', owner.ownerModel)] } : platform;
+  const tag: Condition = { all: [live, owner ? { any: [platform, ownedBy('Tag', owner.ownerModel)] } : platform] };
   const segment: Condition = owner ? { all: [ownedBy('Segment', owner.ownerModel), live] } : false;
   return {
     models: {
