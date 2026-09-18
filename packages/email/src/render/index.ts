@@ -31,11 +31,20 @@ export {
   type SlotNode,
   type TextNode,
 } from './nodes';
-export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
+export {
+  cascadeLookups,
+  type EmailOwnerRef,
+  emailOwnerProvider,
+  ownerCascade,
+  ownerWhere,
+  parentOwner,
+  rowOwner,
+} from './owner';
 export { parseBlocks } from './parseBlocks';
 export { sanitizeSubject } from './sanitizeSubject';
 export {
   type LensForSlug,
+  ownerScopeOf,
   type SaveTemplateInput,
   type SaveTemplateOptions,
   type SaveTemplateResult,

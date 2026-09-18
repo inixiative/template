@@ -123,6 +123,7 @@ export {
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
+export { unadmittedRuleReferences } from './utils/unadmittedRuleReferences';
 
 // Hook shared utilities (ignore fields, redact fields)
 

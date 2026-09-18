@@ -4,6 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUpdateRoute } from '#/modules/space/routes/spaceUpdate';
@@ -17,6 +18,8 @@ export const spaceUpdateController = makeController(spaceUpdateRoute, async (c, 
     where: { id: space.id },
     data: body,
   });
+
+  await emitAppEvent('space.updated', { space: updated });
 
   return respond.ok(updated);
 });

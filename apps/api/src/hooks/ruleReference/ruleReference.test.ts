@@ -1,6 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createSpace, createTag } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createRuleReference,
+  createSpace,
+  createTag,
+} from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
@@ -220,6 +226,28 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     expect(ruleReferenceIssues(cleared)).toEqual([]);
   });
 
+  it('soft-deleting a referenced row publishes one stale event per edge, naming the owner; restoring publishes none', async () => {
+    const { entity: tag } = await createTag();
+    await save(mjml(taggedBlock(tag.id)));
+    await save(mjml(component('vip', taggedBlock(tag.id))));
+
+    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
+
+    const stamped = await edgesOf({ referencedId: tag.id });
+    const staleEvents = () =>
+      db.appEvent.findMany({
+        where: { name: 'ruleReference.stale', data: { path: ['referencedId'], equals: tag.id } },
+      });
+    const published = (await staleEvents()).map((event) => event.data as Record<string, unknown>);
+    expect(published.map((data) => [data.ownerModel, data.ownerId]).sort()).toEqual(
+      stamped.map((edge) => [edge.ownerModel, edge.emailTemplateId ?? edge.emailComponentId]).sort(),
+    );
+    expect(published.every((data) => data.referencedModel === 'Tag')).toBe(true);
+
+    await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
+    expect(await staleEvents()).toHaveLength(published.length);
+  });
+
   it('purging a referenced row nulls the FK and leaves the edge naming it', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
@@ -272,15 +300,10 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     const { entity: comp } = await createEmailComponent();
 
     await expect(
-      db.ruleReference.create({
-        data: {
-          ownerModel: 'EmailTemplate',
-          emailComponentId: comp.id,
-          referencedModel: 'Tag',
-          referencedId: tag.id,
-          tagId: tag.id,
-        },
-      }),
+      createRuleReference(
+        { ownerModel: 'EmailTemplate', referencedModel: 'Tag', referencedId: tag.id },
+        { emailComponent: comp, tag },
+      ),
     ).rejects.toMatchObject({ status: 422 });
   });
 });

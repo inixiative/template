@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createEmailTemplate, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createOrganization,
+  createTag,
+  createUser,
+} from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { emailTemplatePreflight } from '#/modules/emailTemplate/services/emailTemplatePreflight';
 import { createTestApp } from '#tests/createTestApp';
@@ -130,5 +136,36 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
     const res = await fetch(post('/api/admin/emailTemplate/preflight', { subject: 'Digest' }));
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe("emailTemplatePreflight — rules are judged through the owner's lens", () => {
+  const taggedDraft = (tagId: string) =>
+    COMPLETE.replace(
+      'Hello {{recipient.name}}',
+      `{{#if rule=${JSON.stringify({
+        field: 'recipient.tagAttachments',
+        arrayOperator: 'any',
+        condition: { field: 'tag.id', operator: 'equals', value: tagId },
+      })}}}VIP{{else}}BASE{{/if}}`,
+    );
+
+  it('a membership rule over a tag the owner can see is a clean preflight, with a lens-shaped sample recipient', async () => {
+    const { entity: tag } = await createTag();
+    const result = await emailTemplatePreflight({ mjml: taggedDraft(tag.id), subject: 'Digest' });
+    expect(result.renderWarnings).toEqual([]);
+  });
+
+  it("a tag outside the owner's view is reported as a rule the draft cannot evaluate", async () => {
+    const { entity: theirs } = await createOrganization();
+    const { entity: mine } = await createOrganization();
+    const { entity: theirTag } = await createTag({ ownerModel: 'Organization' }, { organization: theirs });
+    const result = await emailTemplatePreflight({
+      mjml: taggedDraft(theirTag.id),
+      subject: 'Digest',
+      ownerModel: 'Organization',
+      organizationId: mine.id,
+    });
+    expect(result.renderWarnings).toEqual([`rule names a Tag that no longer resolves: ${theirTag.id}`]);
   });
 });

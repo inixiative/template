@@ -8,6 +8,8 @@ import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { prune } from '@template/db/lens';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
+import { lookupTemplate, rowOwner } from '@template/email/render';
 import { log } from '@template/shared/logger';
 import { pick } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -15,18 +17,19 @@ import { makeJob } from '#/jobs/makeJob';
 import { emailRegistry } from '#/lib/email';
 import { bindLens } from '#/lib/email/bindLens';
 import { bindWhere } from '#/lib/email/bindWhere';
+import { emailLensFor } from '#/lib/email/emailLensFor';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
 import { pickSender } from '#/lib/email/pickSender';
-import { recipientLens, registry } from '#/lib/email/registry';
+import type { Recipient } from '#/lib/email/recipient';
+import { addressLens, recipientLens, registry } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
+import { ownerScope } from '#/lib/emailTemplate';
 
 export type SendEmailPayload = {
   eventName: string;
   template: string;
   data: Record<string, unknown>;
 };
-
-type Recipient = { id: string; name: string; email: string };
 
 const senderColumns = (sender: Sender) => {
   switch (sender.type) {
@@ -89,7 +92,12 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   };
 
   const sender = pickSender(entry.sender, entityRow);
-  const lens = recipientLens(entry.recipients, bindWhere(entry.recipients.where, entityRow));
+  const row = await lookupTemplate(template, ownerScope(sender));
+  if (!row) throw new EmailRenderError(template, 'template_missing');
+  const lens = recipientLens(
+    (await emailLensFor(template, rowOwner(row))).recipient,
+    bindWhere(entry.recipients.where, entityRow),
+  );
   const sendKey = plannerJobId(eventName, template, data);
 
   const users = await fetchLens(db, lens);
@@ -137,8 +145,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     const communicationLogId = logByKey.get(idempotencyKey);
     if (!communicationLogId) continue;
     const userRow = user as Record<string, unknown>;
-    const cc = entry.cc ? await emailsOf(recipientLens(entry.cc, bindWhere(entry.cc.where, userRow))) : undefined;
-    const bcc = entry.bcc ? await emailsOf(recipientLens(entry.bcc, bindWhere(entry.bcc.where, userRow))) : undefined;
+    const cc = entry.cc ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow))) : undefined;
+    const bcc = entry.bcc ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow))) : undefined;
     await enqueueJob(
       'deliverEmail',
       { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },

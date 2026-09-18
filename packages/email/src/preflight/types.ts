@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
+import type { EmailLens } from '@template/email/rules/emailLens';
 
 export type PreflightSeverity = 'error' | 'warning';
 
@@ -21,7 +21,7 @@ export type PreflightInput = {
   html: string;
   fieldPaths: readonly string[];
   renderWarnings: readonly string[];
-  lens?: Lens | LensNarrowing;
+  lens?: EmailLens;
   tokenUnresolvedSeverity?: PreflightSeverity;
 };
 

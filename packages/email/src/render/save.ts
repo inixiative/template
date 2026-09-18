@@ -4,7 +4,6 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
@@ -18,7 +17,7 @@ import { saveTemplate } from '@template/email/render/saveTemplate';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import { syncRuleReferences } from '@template/email/rules';
+import { type EmailLens, syncRuleReferences } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -30,6 +29,7 @@ export type SaveTemplateInput = Partial<EmailTemplate> & {
   ownerModel: EmailOwnerModel;
   organizationId?: string | null;
   spaceId?: string | null;
+  userId?: string | null;
   locale?: string;
 };
 
@@ -38,10 +38,10 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-export type LensForSlug = (slug: string, locale: string) => Promise<Lens | LensNarrowing | undefined>;
+export type LensForSlug = (slug: string, owner: OwnerScope) => Promise<EmailLens | undefined>;
 
 export type SaveTemplateOptions = {
-  lens?: Lens | LensNarrowing;
+  lens?: EmailLens;
   lensFor?: LensForSlug;
 };
 
@@ -64,6 +64,14 @@ const withoutConditionals = (mjml: string): string => {
   return out;
 };
 
+export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
+  ownerModel: input.ownerModel,
+  organizationId: input.organizationId,
+  spaceId: input.spaceId,
+  userId: input.userId,
+  locale: input.locale ?? 'en',
+});
+
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
   options: SaveTemplateOptions = {},
@@ -73,12 +81,7 @@ export const saveEmailTemplate = async (
   assertValidConditions(input.mjml, { lens: options.lens });
   if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens: options.lens });
 
-  const ctx: OwnerScope = {
-    ownerModel: input.ownerModel,
-    organizationId: input.organizationId,
-    spaceId: input.spaceId,
-    locale: input.locale ?? 'en',
-  };
+  const ctx = ownerScopeOf(input);
 
   const slugs = collectSlugsFromNodes(nodes);
 

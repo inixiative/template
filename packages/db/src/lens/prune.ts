@@ -4,7 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type Lens, type LensNarrowing, type PathProjection, projectByPath } from '@inixiative/json-rules';
+import {
+  type Condition,
+  type Lens,
+  type LensNarrowing,
+  type PathProjection,
+  projectByPath,
+} from '@inixiative/json-rules';
 
 type Pruned<T> = T extends readonly (infer E)[]
   ? Array<Pruned<E>>
@@ -12,12 +18,28 @@ type Pruned<T> = T extends readonly (infer E)[]
     ? { [K in keyof T]?: Pruned<T[K]> }
     : T;
 
+const whereColumns = (condition: Condition, out: Set<string>): void => {
+  if (condition == null || typeof condition === 'boolean') return;
+  const node = condition as Record<string, unknown>;
+  for (const key of ['all', 'any']) {
+    if (Array.isArray(node[key])) for (const child of node[key] as Condition[]) whereColumns(child, out);
+  }
+  for (const key of ['if', 'then', 'else']) if (node[key] !== undefined) whereColumns(node[key] as Condition, out);
+  if (typeof node.field === 'string' && node.field) out.add(node.field.split('.')[0]!);
+};
+
+const readColumns = (visit: PathProjection extends Map<string, infer V> ? V : never): string[] => {
+  const columns = new Set(Object.keys(visit.fields));
+  for (const clause of visit.whereClauses) whereColumns(clause, columns);
+  return [...columns];
+};
+
 const pruneRow = (byPath: PathProjection, row: Record<string, unknown>, path: string): Record<string, unknown> => {
   const visit = byPath.get(path);
   if (!visit) return row;
 
   const out: Record<string, unknown> = {};
-  for (const name of Object.keys(visit.fields)) {
+  for (const name of readColumns(visit)) {
     if (!(name in row)) continue;
     const value = row[name];
     const childPath = `${path}.${name}`;

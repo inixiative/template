@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'bun:test';
-import { checkRuleAgainstLens, createLens, type Lens } from '@inixiative/json-rules';
+import { checkRuleAgainstLens, createLens } from '@inixiative/json-rules';
 import { collectJsonOpacityWarnings } from '@template/email/rules/collectJsonOpacityWarnings';
+import type { EmailLens } from '@template/email/rules/emailLens';
 
-const testLens: Lens = createLens({
+const recipient = createLens({
   mapName: 'test',
-  model: 'Root',
+  model: 'Recipient',
   maps: {
     test: {
       models: {
-        Root: {
-          fields: { recipient: { kind: 'object', type: 'Recipient' } },
-        },
         Recipient: {
           fields: {
             firstName: { kind: 'scalar', type: 'String' },
@@ -29,10 +27,12 @@ const testLens: Lens = createLens({
   },
 });
 
+const testLens: EmailLens = { recipient };
+
 describe('collectJsonOpacityWarnings', () => {
   it('confirms the hole: checkRuleAgainstLens does NOT catch a typo under a Json field', () => {
-    const rule = { field: 'recipient.enrichments.valueMeta.tYpo', operator: 'notEmpty' } as const;
-    expect(checkRuleAgainstLens(rule, testLens).ok).toBe(true);
+    const rule = { field: 'enrichments.valueMeta.tYpo', operator: 'notEmpty' } as const;
+    expect(checkRuleAgainstLens(rule, recipient).ok).toBe(true);
   });
 
   it('warns when a collected path descends beneath a Json field', () => {

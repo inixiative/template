@@ -4,9 +4,10 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { type Condition, checkRuleAgainstLens, type Lens, type LensNarrowing } from '@inixiative/json-rules';
+import type { Condition } from '@inixiative/json-rules';
 import type { ConditionIssue } from '@template/email/errors/ConditionValidationError';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';
+import { type EmailLens, emailRuleViolations } from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 import { collectContextPathRoots } from '@template/email/validations/validateConditions/collectContextPathRoots';
@@ -15,7 +16,7 @@ import type { ConditionNode } from '@template/email/validations/validateConditio
 
 export const validateFieldRoots = (
   rule: Condition,
-  lens: Lens | LensNarrowing | undefined,
+  lens: EmailLens | undefined,
   bindingScope: BindingChain,
   path: string,
   issues: ConditionIssue[],
@@ -36,7 +37,7 @@ export const validateFieldRoots = (
     if (!lens) return undefined;
     const rewritten = desugarLeafForLens(node, bindingScope);
     if (rewritten) {
-      for (const violation of checkRuleAgainstLens(rewritten as Condition, lens).violations) {
+      for (const violation of emailRuleViolations(lens, rewritten as Condition)) {
         issues.push({ path: `${path}:${violation.path}`, message: violation.reason });
       }
     }

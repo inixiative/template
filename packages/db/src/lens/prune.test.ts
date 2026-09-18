@@ -22,6 +22,21 @@ describe('prune', () => {
     ).toEqual([{ id: 'a' }, { id: 'b' }]);
   });
 
+  it("keeps the columns a visit's where reads, so the pruned row can still be judged by the lens", () => {
+    const lens: LensNarrowing = {
+      parent: lensFor('Inquiry'),
+      root: {
+        picks: ['id', 'sourceUser'],
+        relations: { sourceUser: { picks: ['id'], where: { field: 'deletedAt', operator: 'notExists' } } },
+      },
+      mapDefaults: {
+        prisma: { models: { Inquiry: { where: { field: 'status', operator: 'equals', value: 'sent' } } } },
+      },
+    };
+    const row = { id: 'i1', status: 'sent', content: 1, sourceUser: { id: 'u1', name: 'Bob', deletedAt: null } };
+    expect(prune(row, lens)).toEqual({ id: 'i1', status: 'sent', sourceUser: { id: 'u1', deletedAt: null } });
+  });
+
   it('prunes a nested to-one relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),

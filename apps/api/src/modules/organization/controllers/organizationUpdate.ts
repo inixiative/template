@@ -4,6 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationUpdateRoute } from '#/modules/organization/routes/organizationUpdate';
@@ -17,6 +18,8 @@ export const organizationUpdateController = makeController(organizationUpdateRou
     where: { id: org.id },
     data: body,
   });
+
+  await emitAppEvent('organization.updated', { organization });
 
   return respond.ok(organization);
 });
