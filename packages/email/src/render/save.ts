@@ -30,6 +30,7 @@ export type SaveTemplateInput = Partial<EmailTemplate> & {
   ownerModel: EmailOwnerModel;
   organizationId?: string | null;
   spaceId?: string | null;
+  userId?: string | null;
   locale?: string;
 };
 
@@ -77,6 +78,7 @@ export const saveEmailTemplate = async (
     ownerModel: input.ownerModel,
     organizationId: input.organizationId,
     spaceId: input.spaceId,
+    userId: input.userId,
     locale: input.locale ?? 'en',
   };
 

@@ -1,6 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createOrganization, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createOrganization,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
@@ -56,6 +62,19 @@ describe('saveEmailTemplate', () => {
     const tombstone = await db.emailTemplate.findUnique({ where: { id: first.template.id } });
     expect(tombstone?.deletedAt).not.toBeNull();
     expect(tombstone?.mjml).toContain('v1');
+  });
+
+  it('a User-owned save lands on that user\'s row, never on another user\'s same-slug row', async () => {
+    const { entity: alice } = await createUser();
+    const { entity: bob } = await createUser();
+    const input = { slug: 'mine', name: 'Mine', subject: 'Hi', kind: 'system' as const, ownerModel: 'User' as const };
+
+    const first = await saveEmailTemplate({ ...input, userId: alice.id, mjml: mjml('<mj-text>alice</mj-text>') });
+    const second = await saveEmailTemplate({ ...input, userId: bob.id, mjml: mjml('<mj-text>bob</mj-text>') });
+
+    expect(second.template.id).not.toBe(first.template.id);
+    expect(first.template.userId).toBe(alice.id);
+    expect(second.template.userId).toBe(bob.id);
   });
 
   it('derives a component row expectations from its body at save', async () => {
