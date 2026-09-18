@@ -4,7 +4,6 @@
  * @partOf feature:email
  * @uses none
  */
-import type { LensNarrowing } from '@inixiative/json-rules';
 import type { CommunicationKind } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
@@ -16,6 +15,7 @@ import {
   type RuleErrorSink,
   type Variables,
 } from '@template/email/render';
+import type { EmailLens } from '@template/email/rules';
 import { LogScope, log } from '@template/shared/logger';
 import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
@@ -72,7 +72,7 @@ const renderComposed = (
   composed: ComposeTemplateResult,
   vars: Variables,
   scope: OwnerScope,
-  lens: LensNarrowing,
+  lens: EmailLens,
 ): Rendered => {
   const issues: RenderIssue[] = [];
   const subjectIssues: RenderIssue[] = [];

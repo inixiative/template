@@ -4,17 +4,17 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { ruleReferences } from '@template/db';
 import { collectRules } from '@template/email/render/conditionParser';
-import { type RuleLens, type RuleReference, referenceKey } from '@template/shared/rules';
+import { type EmailLens, emailRuleReferences } from '@template/email/rules/emailLens';
+import { type RuleReference, referenceKey } from '@template/shared/rules';
 
 /** The rows the rules in these contents name, folded across every block and branch, deduped. */
-export const contentRuleReferences = (lens: RuleLens, ...contents: string[]): RuleReference[] => {
+export const contentRuleReferences = (lens: EmailLens, ...contents: string[]): RuleReference[] => {
   const seen = new Set<string>();
   const references: RuleReference[] = [];
   for (const content of contents) {
     for (const rule of collectRules(content)) {
-      for (const reference of ruleReferences(lens, rule)) {
+      for (const reference of emailRuleReferences(lens, rule)) {
         const key = referenceKey(reference);
         if (seen.has(key)) continue;
         seen.add(key);

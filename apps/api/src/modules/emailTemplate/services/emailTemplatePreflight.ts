@@ -12,7 +12,7 @@ import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
-import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
+import { defaultEmailLens } from '@template/email/rules/emailLens';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import mjml2html from 'mjml';
 import { emailTemplateRuleLens } from '#/modules/emailTemplate/services/emailTemplateRuleSurface';
@@ -62,7 +62,7 @@ export const emailTemplatePreflight = async (
   const subject = input.subject ? interpolate(input.subject, SAMPLE_VARIABLES, onRenderWarning, { locale }) : '';
   const { html } = await mjml2html(interpolatedMjml, { validationLevel: 'skip' });
 
-  const lens = input.slug ? await emailTemplateRuleLens(input.slug, locale) : defaultEmailRuleLens;
+  const lens = input.slug ? await emailTemplateRuleLens(input.slug, locale) : defaultEmailLens;
 
   const result = await runPreflight({
     mjml: expandedMjml,

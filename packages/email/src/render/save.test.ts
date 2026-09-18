@@ -13,7 +13,7 @@ import { MjmlValidationError } from '@template/email/errors/MjmlValidationError'
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
-import { emailProjection, emailSurface } from '@template/email/rules/emailProjection';
+import { emailLens } from '@template/email/rules/emailLens';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -436,8 +436,8 @@ describe('saveEmailTemplate', () => {
 });
 
 describe('saveEmailTemplate — the lens decides at save', () => {
-  const lens = emailSurface(emailProjection({ senderModel: 'Organization' }));
-  const strict = emailSurface(emailProjection());
+  const lens = emailLens({ senderModel: 'Organization' });
+  const strict = emailLens();
 
   afterAll(async () => {
     await cleanupTouchedTables(db);

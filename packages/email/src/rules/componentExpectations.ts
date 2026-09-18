@@ -4,34 +4,23 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
-import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { collectHydrationPaths } from '@template/email/rules/collectHydrationPaths';
-import { isRailProvidedSystemField } from '@template/email/rules/railProvidedSystemFields';
-import { walkLensPath } from '@template/email/rules/walkLensPath';
+import { type EmailLens, walkEmailLensPath } from '@template/email/rules/emailLens';
 
 export const deriveComponentExpectations = (mjml: string): string[] =>
   [...collectHydrationPaths(mjml).fieldPaths].sort();
 
-const SYSTEM_TOKEN_NAMES = new Set<string>(SYSTEM_TOKENS.map(({ name }) => name));
-
 export type ExpectationCheck = { path: string; ok: boolean };
 
-const pathResolves = (path: string, lens: Lens | LensNarrowing): boolean => {
-  const [root, ...rest] = path.split('.');
-  if (root === 'system') {
-    const name = rest[0] ?? '';
-    return rest.length === 1 && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name));
-  }
-
-  const { outcome } = walkLensPath(path, lens);
+const pathResolves = (path: string, lens: EmailLens): boolean => {
+  const { outcome } = walkEmailLensPath(path, lens);
   return outcome === 'resolved' || outcome === 'beneathJson';
 };
 
-export const checkExpectations = (expectations: readonly string[], lens: Lens | LensNarrowing): ExpectationCheck[] =>
+export const checkExpectations = (expectations: readonly string[], lens: EmailLens): ExpectationCheck[] =>
   expectations.map((path) => ({ path, ok: pathResolves(path, lens) }));
 
-export const collectUnprovidedPathWarnings = (fieldPaths: readonly string[], lens: Lens | LensNarrowing): string[] =>
+export const collectUnprovidedPathWarnings = (fieldPaths: readonly string[], lens: EmailLens): string[] =>
   checkExpectations(fieldPaths, lens)
     .filter((check) => !check.ok)
     .map(

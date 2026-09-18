@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { createLens, type Lens } from '@inixiative/json-rules';
+import { createLens, type FieldMap } from '@inixiative/json-rules';
+import type { EmailLens } from '@template/email/rules/emailLens';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
 import { assertValidConditions, validateConditions } from '@template/email/validations/validateConditions';
@@ -137,19 +138,8 @@ describe('validateConditions — {{#each}} blocks', () => {
   });
 });
 
-const testLens: Lens = createLens({
-  mapName: 'test',
-  model: 'Root',
-  maps: {
-    test: {
-      models: {
-        Root: {
-          fields: {
-            recipient: { kind: 'object', type: 'Recipient' },
-            sender: { kind: 'object', type: 'Sender' },
-            system: { kind: 'object', type: 'System' },
-          },
-        },
+const testMap: FieldMap = {
+  models: {
         Recipient: {
           fields: {
             tier: { kind: 'scalar', type: 'String' },
@@ -172,10 +162,12 @@ const testLens: Lens = createLens({
         Perk: {
           fields: { status: { kind: 'scalar', type: 'String' } },
         },
-      },
-    },
   },
-});
+};
+
+const slot = (model: string) => createLens({ mapName: 'test', model, maps: { test: testMap } });
+
+const testLens: EmailLens = { recipient: slot('Recipient'), sender: slot('Sender'), system: slot('System') };
 
 describe('validateConditions — whitespace-tolerant markers', () => {
   it('allows whitespace after rule= and before the closing }}', () => {

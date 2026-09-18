@@ -52,11 +52,11 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'welcome' })),
     );
 
-    expect(data.source.model).toBe('EmailRuleContext');
-    expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient']);
+    expect(data.source.model).toBe('Email');
+    expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'system']);
     expect(fieldsOf(data, 'User')).toEqual(['email', 'name', 'organizationUsers']);
     expect(fieldsOf(data, 'OrganizationUser')).toEqual(['role']);
-    expect(data.decoration.facets.map((f) => f.path)).toEqual(['recipient', 'data']);
+    expect(data.decoration.facets.map((f) => f.path)).toEqual(['recipient', 'data', 'system']);
   });
 
   it('lets the row choose the data entry point and relations from the projection', async () => {
@@ -76,7 +76,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc-with-entry' })),
     );
 
-    expect(data.source.maps[data.source.mapName]?.models.EmailRuleContext?.fields.data).toMatchObject({
+    expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toMatchObject({
       kind: 'object',
       type: 'Inquiry',
     });
@@ -89,12 +89,13 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
     );
 
-    expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient', 'sender']);
+    expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'sender', 'system']);
     expect(fieldsOf(data, 'User')).toEqual([
       'email',
       'id',
       'name',
       'organizationUsers',
+      'providerRefs',
       'spaceUsers',
       'tagAttachments',
     ]);
@@ -105,14 +106,15 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   it('serves a recipient plus an unknown data bag for a slug the registry does not know', async () => {
     const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })));
 
-    expect(fieldsOf(data, 'EmailRuleContext')).toEqual(['data', 'recipient']);
-    expect(data.source.maps[data.source.mapName]?.models.EmailRuleContext?.fields.data).toEqual({
+    expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'system']);
+    expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toEqual({
       kind: 'scalar',
       type: 'Json',
     });
     expect(data.decoration.facets).toEqual([
       { path: 'recipient', label: 'Recipient' },
       { path: 'data', label: 'Data' },
+      { path: 'system', label: 'System' },
     ]);
   });
 });

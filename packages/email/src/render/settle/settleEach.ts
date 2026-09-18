@@ -5,7 +5,6 @@
  * @uses primitive:shared
  */
 import { check } from '@inixiative/json-rules';
-import { ruleReferences } from '@template/db';
 import {
   type EachBlock,
   isValidBindingIdentifier,
@@ -17,7 +16,12 @@ import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
+import {
+  applyEmailLens,
+  defaultEmailLens,
+  emailRuleReferences,
+  emailRuleVocabulary,
+} from '@template/email/rules/emailLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
 import { withRule } from '@template/shared/rules';
 
@@ -64,17 +68,17 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   }
 
   const filter = block.filter;
+  const lens = options.lens ?? defaultEmailLens;
   if (filter !== undefined) {
     const judged = absoluteRule(filter, bodyOptions.bindings);
-    const lens = options.lens ?? defaultEmailRuleLens;
     const degraded =
       judged === undefined
         ? null
         : withRule(
             {
-              lens,
+              lens: emailRuleVocabulary(lens),
               rule: judged,
-              references: ruleReferences(lens, judged),
+              references: emailRuleReferences(lens, judged),
               live: options.liveRefs,
             },
             { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },
@@ -89,7 +93,7 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
       continue;
     }
     try {
-      if (check(filter, toRuleData({ ...scope, [as]: element })) === true) emitted.push(element);
+      if (check(applyEmailLens(lens, filter), toRuleData({ ...scope, [as]: element })) === true) emitted.push(element);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');
     }

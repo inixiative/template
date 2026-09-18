@@ -5,13 +5,17 @@
  * @uses primitive:shared
  */
 import { check } from '@inixiative/json-rules';
-import { ruleReferences } from '@template/db';
 import type { Branch } from '@template/email/render/conditionParser';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
+import {
+  applyEmailLens,
+  defaultEmailLens,
+  emailRuleReferences,
+  emailRuleVocabulary,
+} from '@template/email/rules/emailLens';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
@@ -29,24 +33,26 @@ export const settleBranches = (
     }
 
     const rule = branch.rule!;
+    const lens = options.lens ?? defaultEmailLens;
     const evaluate = (): string | null => {
       try {
-        return check(rule, toRuleData(scope)) === true ? settle(branch.body, scope, options, onError) : null;
+        return check(applyEmailLens(lens, rule), toRuleData(scope)) === true
+          ? settle(branch.body, scope, options, onError)
+          : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
         return null;
       }
     };
     const judged = absoluteRule(rule, options.bindings);
-    const lens = options.lens ?? defaultEmailRuleLens;
     const rendered =
       judged === undefined
         ? evaluate()
         : withRule(
             {
-              lens,
+              lens: emailRuleVocabulary(lens),
               rule: judged,
-              references: ruleReferences(lens, judged),
+              references: emailRuleReferences(lens, judged),
               live: options.liveRefs,
             },
             {

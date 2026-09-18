@@ -4,7 +4,6 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
 import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
@@ -18,7 +17,7 @@ import { saveTemplate } from '@template/email/render/saveTemplate';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import { syncRuleReferences } from '@template/email/rules';
+import { type EmailLens, syncRuleReferences } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -39,10 +38,10 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-export type LensForSlug = (slug: string, locale: string) => Promise<Lens | LensNarrowing | undefined>;
+export type LensForSlug = (slug: string, locale: string) => Promise<EmailLens | undefined>;
 
 export type SaveTemplateOptions = {
-  lens?: Lens | LensNarrowing;
+  lens?: EmailLens;
   lensFor?: LensForSlug;
 };
 
