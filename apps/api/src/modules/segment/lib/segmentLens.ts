@@ -57,7 +57,14 @@ const customer = (picks: string[], relations: Record<string, ModelNarrowing> = {
 
 export const segmentLens: LensNarrowing = omitForeignKeys({
   parent: lensFor('CustomerRef'),
-  mapDefaults: { prisma: { models: { Segment: { sources: { id: { label: 'name', where: segmentOwned } } } } } },
+  mapDefaults: {
+    prisma: {
+      models: {
+        Tag: { where: tagOwned },
+        Segment: { where: segmentOwned, sources: { id: { label: 'name', where: segmentOwned } } },
+      },
+    },
+  },
   root: {
     picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
     where: ownedBy('CustomerRef', 'providerModel'),

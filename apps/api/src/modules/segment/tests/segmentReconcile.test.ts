@@ -18,6 +18,8 @@ import {
   createSegment,
   createSegmentMember,
   createSpace,
+  createTag,
+  createTagAttachment,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -107,6 +109,25 @@ describe('segment reconcile', () => {
     await customerOf(stranger, elsewhere);
 
     const segment = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
+  });
+
+  it('a tag rule sees platform tags and the owner’s own, never another owner’s, even by name', async () => {
+    const elsewhere = (await createSpace({}, { organization })).entity;
+    const theirs = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space: elsewhere })).entity;
+    await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag: theirs });
+    const byName = {
+      field: 'customerUser.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.name', operator: Operator.equals, value: 'vip' },
+    };
+    const segment = await saveSegment({ type: SegmentType.dynamic, conditions: byName }, { space });
+    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await reconcileCustomerRef(acmeRef.id)).toEqual([]);
+
+    const mine = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space })).entity;
+    const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag: mine });
+    await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 
