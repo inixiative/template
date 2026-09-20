@@ -21,5 +21,7 @@
 
 ## Open
 
+- **v1 forces `default`.** Ship the columns, the untombstone and the audit cleanup with the planner always serving the live `default` variant (a forced default flag value); rule- and segment-driven A/B selection comes back later on the FEAT-003 seam.
+
 - Does a tenant override (Organization/Space row) inherit the platform's variants, or only `default`? Undefined until FEAT-022 inheritance.
 - Whether `live: false` on `default` means "slug retired" (no send at all) or "fall through the cascade to the parent tier".
