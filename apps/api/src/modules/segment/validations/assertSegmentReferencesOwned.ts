@@ -5,13 +5,12 @@
  * @uses infrastructure:prisma
  */
 import { type Condition, sourceQueries } from '@inixiative/json-rules';
-import { admitRuleReferences, db, ruleReferences } from '@template/db';
+import { admitRuleReferences, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { referenceKey } from '@template/shared/rules';
-import { customerRefLens, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens, ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
-import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 
 type Candidate = {
   ownerModel: ProviderModel;
@@ -43,5 +42,5 @@ export const assertSegmentReferencesOwned = async ({
       );
     }
   }
-  return db.segment.findMany({ where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null } });
+  return ownedSegments(ownerModel, ownerId);
 };

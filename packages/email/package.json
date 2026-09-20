@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.24.0",
+    "@inixiative/json-rules": "^2.25.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "html-to-text": "^10.0.1",

@@ -12,8 +12,10 @@ import {
   projectByPath,
   resolveLensBindings,
   ruleSourceValues,
+  sourceQueries,
 } from '@inixiative/json-rules';
-import { polymorphicBindings, polymorphicIs } from '@template/db';
+import { db, polymorphicBindings, polymorphicIs } from '@template/db';
+import type { Prisma, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { boundAndLive, lensFor, live, omitForeignKeys, platformOrBound } from '@template/db/lens';
 
@@ -74,6 +76,18 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
 
 export const resolvedCustomerRefLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
   resolveLensBindings(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
+
+/** The segments the lens lets this owner name — its own live ones — read through the Segment source it declares. */
+export const ownedSegments = async (
+  ownerModel: ProviderModel,
+  ownerId: string,
+  where: Prisma.SegmentWhereInput = {},
+): Promise<Segment[]> => {
+  const source = sourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)).find(
+    (query) => query.model === 'Segment' && query.field === 'id',
+  )!;
+  return db.segment.findMany({ where: { AND: [source.prisma.where as Prisma.SegmentWhereInput, where] } });
+};
 
 export const customerRefReachedModels = (): Set<string> =>
   new Set([...projectByPath(customerRefLens).values()].map((visit) => visit.modelName));

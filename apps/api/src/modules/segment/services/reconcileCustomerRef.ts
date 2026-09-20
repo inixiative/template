@@ -9,8 +9,7 @@ import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
+import { ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
@@ -24,10 +23,8 @@ const providerOf = (customerRef: CustomerRef): { ownerModel: ProviderModel; owne
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
-export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string) =>
-  db.segment.findMany({
-    where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null, type: 'dynamic' },
-  });
+export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string): Promise<Segment[]> =>
+  ownedSegments(ownerModel, ownerId, { type: 'dynamic' });
 
 const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boolean): void => {
   const index = row.segmentMembers.findIndex((member) => member.segment?.id === segment.id);
