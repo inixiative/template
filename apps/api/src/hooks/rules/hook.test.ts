@@ -3,12 +3,14 @@ import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
-import { clearRulesCache, setRulesCache } from '#/hooks/rules/registry';
+import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
+RulesRegistry.User = true;
 registerRulesHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  delete RulesRegistry.User;
 });
 
 afterEach(() => {
@@ -21,9 +23,7 @@ describe('rules hook', () => {
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test User' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test User' });
 
       expect(user.name).toBe('Test User');
     });
@@ -32,10 +32,7 @@ describe('rules hook', () => {
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `test${seq}@example.com`, name: '' },
-        });
+      const promise = async () => createUser({ email: `test${seq}@example.com`, name: '' });
 
       await expect(promise).toThrow('name required');
     });
@@ -151,9 +148,7 @@ describe('rules hook', () => {
       setRulesCache('User', true);
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `bool${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -162,31 +157,28 @@ describe('rules hook', () => {
       setRulesCache('User', false);
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `bool${seq}@example.com`, name: 'Test' },
-        });
+      const promise = async () => createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       await expect(promise).toThrow();
     });
   });
 
   describe('updateManyAndReturn', () => {
-    it('logs warning but allows operation (cannot validate without fetching each record)', async () => {
+    it('validates every returned record after the write, so a breaking update fails', async () => {
       const { entity: user1 } = await createUser({ name: 'User1' });
       const { entity: user2 } = await createUser({ name: 'User2' });
 
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
-      // updateManyAndReturn should succeed even though we're setting name to empty
-      // because we can't merge with previous for each record
       const results = await db.user.updateManyAndReturn({
         where: { id: { in: [user1.id, user2.id] } },
         data: { emailVerified: true },
       });
-
-      expect(results).toHaveLength(2);
       expect(results.every((r) => r.emailVerified)).toBe(true);
+
+      await expect(
+        db.user.updateManyAndReturn({ where: { id: { in: [user1.id, user2.id] } }, data: { name: '' } }),
+      ).rejects.toThrow('name required');
     });
   });
 
@@ -200,9 +192,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -217,9 +207,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Admin' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Admin' });
 
       expect(user.name).toBe('Admin');
     });

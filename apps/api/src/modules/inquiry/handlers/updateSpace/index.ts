@@ -1,6 +1,7 @@
 import type { Db, SpaceId } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
+import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
 import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
@@ -47,10 +48,11 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   autoApprove: async () => false,
 
   handleApprove: async (db, inquiry, content) => {
-    await db.space.update({
+    const space = await db.space.update({
       where: { id: inquiry.sourceSpaceId as SpaceId },
       data: content,
     });
+    await emitAppEvent('space.updated', { space });
   },
   unique: 'untargeted',
 };

@@ -8,21 +8,22 @@ import type { Condition } from '@inixiative/json-rules';
 import { EACH, IF } from '@template/email/render/conditionParser/grammar';
 import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
 import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
+import type { EmailLens } from '@template/email/rules/emailLens';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import { scopedRule } from '@template/email/rules/scopedRule';
 
-const push = (out: Condition[], rule: Condition | undefined, bindings: BindingChain): void => {
+const push = (out: Condition[], rule: Condition | undefined, bindings: BindingChain, lens?: EmailLens): void => {
   if (rule === undefined) return;
-  const judged = absoluteRule(rule, bindings);
-  if (judged !== undefined) out.push(judged);
+  const { rule: judged } = scopedRule(rule, bindings, { lens });
+  if (judged) out.push(judged);
 };
 
 /**
- * Every rule the content evaluates — `{{#if}}` branches and `{{#each filter=}}` — with loop
- * bindings resolved to the absolute paths the lens can judge. A rule reading a loop index has no
- * path in the lens and is left out.
+ * Every rule the content evaluates — `{{#if}}` branches and `{{#each filter=}}` — a loop-bound
+ * rule as the array rule the lens judges (`scopedRule`). A rule reading a loop index, the element
+ * itself or another lens's root has no shape in the lens and is left out.
  */
-export const collectRules = (content: string, bindings: BindingChain = new Map()): Condition[] => {
+export const collectRules = (content: string, bindings: BindingChain = new Map(), lens?: EmailLens): Condition[] => {
   const rules: Condition[] = [];
   let i = 0;
   while (i < content.length) {
@@ -39,8 +40,8 @@ export const collectRules = (content: string, bindings: BindingChain = new Map()
         continue;
       }
       for (const branch of block.branches) {
-        push(rules, branch.rule, bindings);
-        rules.push(...collectRules(branch.body, bindings));
+        push(rules, branch.rule, bindings, lens);
+        rules.push(...collectRules(branch.body, bindings, lens));
       }
       i = block.end;
       continue;
@@ -54,8 +55,8 @@ export const collectRules = (content: string, bindings: BindingChain = new Map()
     const next: BindingChain = new Map(bindings);
     if (block.as) next.set(block.as, resolveBindingPath(block.path, bindings));
     if (block.index) next.set(block.index, undefined);
-    push(rules, block.filter, next);
-    rules.push(...collectRules(block.body, next));
+    push(rules, block.filter, next, lens);
+    rules.push(...collectRules(block.body, next, lens));
     i = block.end;
   }
   return rules;

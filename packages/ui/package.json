@@ -41,7 +41,7 @@
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
-    "@inixiative/rules-builder": "0.27.0",
+    "@inixiative/rules-builder": "0.28.0",
     "@tanstack/react-router": "^1.166.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",

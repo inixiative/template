@@ -11,7 +11,7 @@ type BuildRoutePathArgs = {
   action?: string;
   skipId?: boolean;
   many?: boolean;
-  operation?: 'create' | 'read' | 'update' | 'delete';
+  operation?: 'create' | 'read' | 'update' | 'delete' | 'action';
 };
 
 export const buildRoutePath = (args: BuildRoutePathArgs): string => {
@@ -26,7 +26,7 @@ export const buildRoutePath = (args: BuildRoutePathArgs): string => {
   }
 
   if (submodel) {
-    parts.push(many || operation === 'create' ? pluralize(submodel) : submodel);
+    parts.push(many || operation === 'create' || operation === 'action' ? pluralize(submodel) : submodel);
   }
 
   if (action) {

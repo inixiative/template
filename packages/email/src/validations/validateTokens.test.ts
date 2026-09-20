@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { createLens, type FieldMap } from '@inixiative/json-rules';
 import { guardedToken } from '@template/email/render/guardedToken';
+import { type EmailLens, OPAQUE_SLOT, systemSlot } from '@template/email/rules/emailLens';
 import { validateTokens } from '@template/email/validations/validateTokens';
 
 const map: FieldMap = {
   models: {
-    EmailRuleContext: {
-      fields: {
-        recipient: { kind: 'object', type: 'User', isRequired: true },
-        sender: { kind: 'object', type: 'Organization', isRequired: true },
-        data: { kind: 'scalar', type: 'Json' },
-      },
-    },
     User: {
       fields: {
         id: { kind: 'scalar', type: 'String', isRequired: true },
@@ -27,7 +21,12 @@ const map: FieldMap = {
     Organization: { fields: { name: { kind: 'scalar', type: 'String', isRequired: true } } },
   },
 };
-const lens = createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'EmailRuleContext' });
+const lens: EmailLens = {
+  recipient: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'User' }),
+  sender: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'Organization' }),
+  data: OPAQUE_SLOT,
+  system: systemSlot(),
+};
 
 const messages = (content: string) => validateTokens(content, { lens }).map((issue) => issue.message);
 
@@ -42,7 +41,7 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
     expect(messages('{{recipient.nickname}}')[0]).toContain("is not provided by this template's lens");
     expect(messages('{{recipient.name.first}}')[0]).toContain('reads through a scalar');
     expect(messages('{{recipient.account}}')[0]).toContain('is an object, not a value');
-    expect(messages('{{system.nope}}')[0]).toContain('is not a system token');
+    expect(messages('{{system.nope}}')[0]).toContain("is not provided by this template's lens");
   });
 
   it('refuses an optional path that is not guarded, and accepts the guarded form', () => {

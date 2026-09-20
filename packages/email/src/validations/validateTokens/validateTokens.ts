@@ -18,7 +18,7 @@ import { absoluteRule } from '@template/email/rules/absoluteRule';
 import { isRailProvidedSystemField } from '@template/email/rules/railProvidedSystemFields';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
 import { presenceGuards } from '@template/email/validations/validateTokens/presenceGuards';
-import { tokenPathKind } from '@template/email/validations/validateTokens/tokenPathKind';
+import { emailTokenPathKind } from '@template/email/validations/validateTokens/tokenPathKind';
 import type { ValidateTokensOptions } from '@template/email/validations/validateTokens/types';
 import { unknownMustaches } from '@template/email/validations/validateTokens/unknownMustaches';
 
@@ -43,7 +43,7 @@ const isGuarded = (path: string, optionalDepth: number, guarded: Set<string>): b
 };
 
 const tokenProblem = (token: string, root: string, segments: string, walk: Walk): string | undefined => {
-  if (root === 'system') {
+  if (root === 'system' && !walk.options.lens) {
     const name = segments.slice(1);
     if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name))) return undefined;
     return 'is not a system token the rail provides';
@@ -57,7 +57,7 @@ const tokenProblem = (token: string, root: string, segments: string, walk: Walk)
   if (resolved === undefined) return segments ? 'reads a field off a loop index' : undefined;
   if (!walk.options.lens) return undefined;
 
-  const kind = tokenPathKind(resolved, walk.options.lens, walk.eachRoots.has(root) || viaEach);
+  const kind = emailTokenPathKind(resolved, walk.options.lens, walk.eachRoots.has(root) || viaEach);
   switch (kind.kind) {
     case 'missing':
       return `"${resolved}" is not provided by this template's lens`;

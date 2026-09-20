@@ -5,4 +5,5 @@ export { omitForeignKeys } from '@template/db/lens/omitForeignKeys';
 export { orderablePaths } from '@template/db/lens/orderablePaths';
 export { prune } from '@template/db/lens/prune';
 export { rootLens } from '@template/db/lens/rootLens';
+export { boundAndLive, live, platformOrBound } from '@template/db/lens/scopes';
 export { searchablePaths } from '@template/db/lens/searchablePaths';

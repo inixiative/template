@@ -11,7 +11,7 @@ import { emailTemplateRuleSurface } from '#/modules/emailTemplate/services/email
 export const adminEmailTemplateRuleSurfaceController = makeController(
   adminEmailTemplateRuleSurfaceRoute,
   async (c, respond) => {
-    const { slug, locale } = c.req.valid('json');
-    return respond.ok(await emailTemplateRuleSurface(slug, locale));
+    const { slug, locale = 'en', ownerModel = 'default', ...owner } = c.req.valid('json');
+    return respond.ok(await emailTemplateRuleSurface(slug, { ...owner, ownerModel, locale }));
   },
 );

@@ -5,20 +5,17 @@
  * @uses none
  */
 import type { Lens, LensNarrowing } from '@inixiative/json-rules';
-import { rootLens } from '@template/db/lens';
+import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/rules/emailLens';
+import { lensPathFields } from '@template/email/rules/walkLensPath';
 import type { TokenPathKind } from '@template/email/validations/validateTokens/types';
 
-const baseOf = (lens: Lens | LensNarrowing): Lens => ('parent' in lens ? rootLens(lens) : lens);
-
 export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach: boolean): TokenPathKind => {
-  const base = baseOf(lens);
+  const fields = lensPathFields(path, lens);
   const segments = path.split('.');
-  let mapName = base.mapName;
-  let model = base.model;
   let optionalDepth = 0;
 
   for (let i = 0; i < segments.length; i++) {
-    const field = base.maps[mapName]?.models[model]?.fields[segments[i] ?? ''];
+    const field = fields[i];
     if (!field) return { kind: 'missing', index: i };
     const last = i === segments.length - 1;
 
@@ -30,13 +27,6 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
       if (last) return { kind: 'object' };
       if (field.isList && !viaEach) return { kind: 'listWithoutEach', index: i };
       if (field.isRequired === false && !field.isList) optionalDepth = i + 1;
-      if (field.type.includes(':')) {
-        const [bridgeMap, bridgeModel] = field.type.split(':');
-        mapName = bridgeMap ?? mapName;
-        model = bridgeModel ?? field.type;
-      } else {
-        model = field.type;
-      }
       continue;
     }
 
@@ -46,4 +36,21 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
   }
 
   return { kind: 'ok', optionalDepth, scalarList: false };
+};
+
+export const emailTokenPathKind = (path: string, lens: EmailLens, viaEach: boolean): TokenPathKind => {
+  const { root, rest } = splitRoot(path);
+  const slot = slotOf(lens, root);
+  if (!slot) return { kind: 'missing', index: 0 };
+  if (slot === OPAQUE_SLOT) return { kind: 'ok', optionalDepth: rest ? path.split('.').length : 0, scalarList: false };
+  if (!rest) return { kind: 'object' };
+  const kind = tokenPathKind(rest, slot, viaEach);
+  switch (kind.kind) {
+    case 'ok':
+      return { ...kind, optionalDepth: kind.optionalDepth ? kind.optionalDepth + 1 : 0 };
+    case 'object':
+      return kind;
+    default:
+      return { ...kind, index: kind.index + 1 };
+  }
 };

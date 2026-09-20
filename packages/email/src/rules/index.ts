@@ -8,22 +8,41 @@ export {
   type ExpectationCheck,
 } from './componentExpectations';
 export {
-  DEFAULT_RECIPIENT_LENS,
-  defaultEmailRuleLens,
+  applyEmailLens,
+  DEFAULT_RECIPIENT_NARROWING,
+  declaredFields,
+  defaultEmailLens,
   EMAIL_DATA_MODEL,
-  EMAIL_RULE_MAP_NAME,
-  EMAIL_RULE_ROOT_MODEL,
-  type EmailContextRelation,
-  type EmailDataLens,
-  type EmailDataProjection,
-  type EmailProjectionInput,
+  EMAIL_MAP_NAME,
+  EMAIL_SURFACE_ROOT,
+  EMAIL_SYSTEM_MODEL,
+  type EmailLens,
+  type EmailLensInput,
+  type EmailRuleDecoration,
+  type EmailRuleFacet,
   type EmailSlotLenses,
   emailLens,
-  emailProjection,
+  emailRuleDecoration,
+  emailRuleReferences,
+  emailRuleViolations,
+  emailRuleVocabulary,
+  emailRuleVocabularyIssues,
+  emailSlotLenses,
+  emailSourceQueries,
   emailSurface,
+  evaluateScopedRule,
+  fieldsLens,
+  narrowEmailLens,
+  narrowVariables,
+  OPAQUE_SLOT,
   parseSlotLenses,
-} from './emailProjection';
-export { type EmailRuleDecoration, type EmailRuleFacet, emailRuleDecoration } from './emailRuleDecoration';
+  type SlotLens,
+  slotOf,
+  splitRoot,
+  systemSlot,
+  walkEmailLensPath,
+} from './emailLens';
+export { emptyRowFor } from './emptyRowFor';
 export {
   isRailProvidedSystemField,
   RAIL_PROVIDED_SYSTEM_FIELDS,
@@ -31,6 +50,8 @@ export {
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
 export { contentRuleReferences } from './ruleReferences';
+export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scopedRule';
+export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export { syncRuleReferences } from './syncRuleReferences';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';
-export { type LensPathWalk, walkLensPath } from './walkLensPath';
+export { type LensPathWalk, lensPathFields, walkLensPath } from './walkLensPath';

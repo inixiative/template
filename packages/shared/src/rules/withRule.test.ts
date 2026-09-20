@@ -26,6 +26,13 @@ const tagRef = [{ model: 'Tag', id: 'tag-1' }];
 const arms = { degraded: (issues: ReturnType<typeof ruleIssues>) => issues.map((i) => i.kind), sound: () => ['sound'] };
 
 describe('withRule', () => {
+  it('accepts a vocabulary provider in place of a lens', () => {
+    const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
+    const provider = { vocabularyIssues: (rule: Condition) => ('field' in (rule as object) ? [] : ['not a leaf']) };
+    expect(withRule({ lens: provider, rule: tagged, references: tagRef, live }, arms)).toEqual(['sound']);
+    expect(withRule({ lens: provider, rule: { all: [] }, references: [], live }, arms)).toEqual(['vocabulary']);
+  });
+
   it('runs the sound arm when the lens admits the rule and every named row is live', () => {
     const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
     expect(withRule({ lens, rule: tagged, references: tagRef, live }, arms)).toEqual(['sound']);

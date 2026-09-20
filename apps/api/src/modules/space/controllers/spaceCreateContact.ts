@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import type { Prisma } from '@template/db';
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceCreateContactRoute } from '#/modules/space/routes/spaceCreateContact';
@@ -21,6 +22,8 @@ export const spaceCreateContactController = makeController(spaceCreateContactRou
       spaceId: space.id,
     } as Prisma.ContactUncheckedCreateInput,
   });
+
+  await emitAppEvent('contact.created', { contact });
 
   return respond.created(contact);
 });

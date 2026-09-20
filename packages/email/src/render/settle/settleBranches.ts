@@ -5,13 +5,18 @@
  * @uses primitive:shared
  */
 import { check } from '@inixiative/json-rules';
-import { ruleReferences } from '@template/db';
 import type { Branch } from '@template/email/render/conditionParser';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
+import {
+  applyEmailLens,
+  defaultEmailLens,
+  emailRuleReferences,
+  emailRuleVocabulary,
+  evaluateScopedRule,
+} from '@template/email/rules/emailLens';
+import { iteratesLens, loopFrames, loopIndices, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
@@ -29,24 +34,37 @@ export const settleBranches = (
     }
 
     const rule = branch.rule!;
+    const lens = options.lens ?? defaultEmailLens;
+    const scoped = scopedRule(rule, options.bindings, {
+      lens,
+      indices: options.bindings && loopIndices(scope, options.bindings),
+    });
+    if (scoped.issue !== undefined) {
+      onError?.({ kind: 'rule', detail: scoped.issue });
+      continue;
+    }
+    const judged = scoped.rule;
+    const frames = loopFrames(options.bindings ?? new Map());
+    const lensed = iteratesLens(options.bindings, lens);
     const evaluate = (): string | null => {
       try {
-        return check(rule, toRuleData(scope)) === true ? settle(branch.body, scope, options, onError) : null;
+        const passes = lensed
+          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(scope, frames)))
+          : check(frames.length ? rule : applyEmailLens(lens, rule), toRuleData(scope));
+        return passes === true ? settle(branch.body, scope, options, onError) : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
         return null;
       }
     };
-    const judged = absoluteRule(rule, options.bindings);
-    const lens = options.lens ?? defaultEmailRuleLens;
     const rendered =
-      judged === undefined
+      frames.length && !lensed
         ? evaluate()
         : withRule(
             {
-              lens,
+              lens: emailRuleVocabulary(lens),
               rule: judged,
-              references: ruleReferences(lens, judged),
+              references: emailRuleReferences(lens, judged),
               live: options.liveRefs,
             },
             {

@@ -300,23 +300,40 @@ const html = interpolate(template, {
 
 ---
 
-### Authoring & Data Surface (planned)
+### The email lens
 
-Today conditions are hand-written `Condition` JSON inside `{{#if rule=…}}` and
-variables are hand-typed `{{recipient.x}}` tokens. The authoring layer (COMM-001,
-built on the rules builder INFRA-002 + builder surface INFRA-017) replaces the
-hand-writing with a typed editor over a **narrowed lens**:
+An email renders against four scope roots — `sender`, `recipient`, `data`, `system` — and the
+email lens is **four lenses, one per root** (`EmailLens`, `packages/email/src/rules/emailLens.ts`):
+a User narrowing for the recipient, the sender model's narrowing, a model or declared-field lens
+for `data` (or the opaque bag, addressable at any depth as beneath-Json), and a declared lens over
+the system tokens. No bridges between them; a comparison across two roots is a `path` into the
+other lens. Everything a template does with a path or a rule goes through it:
 
-- The lens is a schema over the three roots `{ sender, recipient, data }`,
-  **narrowed per actor-context** (space → space+org → org → platform) and per
-  template/event type. It is handed to the builder as `exposedSurface`
-  (where-stripped); the `where` scope floor is re-applied server-side at send.
-- The rule builder emits the exact `Condition` JSON `evaluateConditions` already
-  runs; the field selector emits the `{{recipient.x}}` tokens `interpolate`
-  already substitutes. The editor front-ends the existing runtime; it does not
-  change it.
-- Narrowing governs *what an author can reference and how far up the graph they
-  can traverse* — not what they must include.
+- **Tokens and paths** — `walkEmailLensPath` / `emailTokenPathKind` walk the *narrowing* (a slot
+  that drops a relation drops its tokens), at save (`validateTokens`), for component expectations
+  and in preflight.
+- **Rules** — `emailRuleViolations` is the vocabulary (save and `withRule` at render),
+  `emailRuleReferences` the rows a rule names, and `applyEmailLens` + `check` the evaluation:
+  settle never checks a raw rule, so a lens `where` decides at send what it decides at save. A
+  rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
+  loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
+  and evaluation all read that one form, and evaluation runs slot-relative against the iterated
+  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`).
+- **The builder** — `emailSurface` composes the four exposed surfaces under a presentation root
+  `Email` for the rule surface route; `emailRuleDecoration` derives one facet per lens present.
+
+**The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
+builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient,
+narrowed by the slots stored on the row — or on the slug's default-tier row when the row carries
+none) and scopes it to the owner of the row being saved, edited or rendered
+(`scopeEmailLens`): tags are platform-owned or the owner's, segments are the owner's (via
+`recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
+`OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The owner
+is decided per site: save takes it from the input, the rule surface and preflight from the body
+(default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
+so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
+the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
+`sourceQueries` run through Prisma); Organization and Space sources stay unscoped and unlisted.
 
 **Deferred (documented, not built):**
 
@@ -492,13 +509,14 @@ Each template slug maps to an `EmailEntry` describing how to resolve its data + 
 from the event — all as **lenses** (`@inixiative/json-rules`), resolved in the worker:
 
 ```typescript
-type EmailEntry<E> = {
-  entity: (data) => LensNarrowing;                  // the record the email is about
-  sender: (entity) => Sender;                       // identity the email is sent AS
-  recipients: (entity, sender) => LensNarrowing;
-  cc?:  (recipient, sender) => LensNarrowing;
-  bcc?: (recipient, sender) => LensNarrowing;
-  data?: (entity, handoff) => Record<string, unknown>;  // interpolation variables
+type EmailEntry = {
+  entity: LensNarrowing;         // the record the email is about, with bound where
+  sender: SenderSpec;            // identity the email is sent AS, read off the entity
+  recipients: RecipientTarget;   // { where } — the target only; the shape is the template's recipient lens
+  cc?:  RecipientTarget;         // addresses only
+  bcc?: RecipientTarget;
+  data?: string[];               // declared data fields the event must supply
+  render?: RenderSpec;
 };
 ```
 
@@ -515,7 +533,12 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 #### Planner (`sendEmail`)
 
 1. Resolve the entity lens; bail if missing or no email adapter is registered.
-2. For each recipient (lens): resolve their email `Contact` (settings + deliverability live there).
+2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
+   row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
+   `where` (`recipientLens`), pruned to what the lens picks plus what its `where`s read. The
+   recipient that reaches delivery carries its tags, memberships and segments, so a
+   `{{#if rule=…}}` over them decides at send. Then resolve each recipient's email `Contact`
+   (settings + deliverability live there).
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
 4. Enqueue `deliverEmail` with the log id.
@@ -524,6 +547,8 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 
 1. Load the log; **skip if already `sent`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
+   Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a referenced
+   segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
    A render error → mark `failed` → rethrow → retries → DLQ.
 3. **Gate ① scope** — `inScope` rebac read-check. STUB pass-through today (see COMM-005).
 4. **Gate ② settings** — `canDeliver(kind, contact)`: honor `acceptedKinds` opt-outs; `system` always
@@ -610,17 +635,17 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
   `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
-  itself in it and declares its own id sources. Email has one rule lens per template:
-  `emailLens(projection, slots)` (`packages/email/src/rules/emailProjection.ts`) wraps in
-  `omitForeignKeys` and declares `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for
-  each of `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
-  recipient lens reaches `tagAttachments.tag`, `spaceUsers.space` and
-  `organizationUsers.organization` (`id`, `name`); a relation the lens does not declare is refused
-  at save. The api's `emailTemplateRuleLens(slug, locale)` builds the template's narrowing; the
-  builder gets `exposedSurface` of it (which strips sources), while save and settle keep the
-  narrowing itself (`defaultEmailRuleLens` when none is threaded) — extraction never runs on the
-  exposed surface. Adding a referenceable model = a registry entry + an FK column (the hook and
-  email's sources derive); a surface that reaches it declares its own labeled id source.
+  itself in it and declares its own id sources. Each model-rooted lens of the email lens
+  (`emailLens`, `packages/email/src/rules/emailLens.ts`) wraps in `omitForeignKeys` and declares
+  `sources: { id: { label: 'name' } }` as a `mapDefaults` entry for each of
+  `RULE_REFERENCEABLE_MODELS`, so the id answers on every path to the model. The default
+  recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
+  and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
+  is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
+  builder gets `emailSurface` of it (which strips sources), while save and settle keep the lens
+  itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
+  surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
+  sources derive); a surface that reaches it declares its own labeled id source.
 - **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `ruleSourceValues`
   (json-rules ≥ 2.20) reports the values a rule names at each source, and a source on a model's
   id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a
@@ -631,10 +656,13 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
 - **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references)` in `packages/db` — set-diff (survivors keep their
-  row), a newly added missing or soft-deleted target refused as a delta (a pre-existing dead
-  reference stays editable), referenced rows locked with `db.findForUpdate` while the gate reads
-  them. Throws `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
+  `syncRuleReferenceEdges(owner, references, sources?)` in `packages/db` — set-diff (survivors
+  keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
+  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
+  reads them. With the lens's `sourceQueries` passed as `sources`, a newly added reference the
+  source's composed `where` does not admit is refused too (`unadmittedRuleReferences`): that is how
+  an Organization template cannot name another organization's tag or segment. Throws
+  `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
   call from its save path. Email's `syncRuleReferences(owner, contents, lens)` is the
   content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
   and hands the references down. `saveEmailTemplate` calls it inside
@@ -698,8 +726,10 @@ type MessageDispatchOptions = { replyTo?: { chatMessageId: string } };
 Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email jobs but with no template
 cascade, no `CommunicationLog`, and no fan-out planner:
 
-- **`messageUser`** — `{ rule, kind, content }`. `resolveUsers(rule)` runs the `@inixiative/json-rules`
-  `Condition` as a Prisma query, then for each resolved user interpolates `content` and dispatches to
+- **`messageUser`** — `{ rule, kind, content }`. `resolveUsers(rule, lens?)` compiles the
+  `@inixiative/json-rules` `Condition` through a recipient lens (default: the platform-scoped
+  recipient lens of the email lens, so an organization's tag is outside its view) to a Prisma
+  query, then for each resolved user interpolates `content` and dispatches to
   every `canDeliver(kind, contact)` contact via that contact's registered adapter. A missing adapter for
   a `ContactType` throws.
 - **`messageContact`** — `{ contactId, kind, content, replyTo? }`. Loads one `Contact`, gates on

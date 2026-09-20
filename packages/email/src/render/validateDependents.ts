@@ -54,7 +54,7 @@ export const validateDependents = async (
   const broken: DependentTemplateIssue[] = [];
   for (const template of await embeddingTemplates([componentSlug], ctx)) {
     if (template.slug === savingTemplateSlug) continue;
-    const lens = await lensFor(template.slug, ctx.locale);
+    const lens = await lensFor(template.slug, ctx);
     if (!lens) continue;
     const composed = await expand(template.mjml, ctx);
     const issues = [

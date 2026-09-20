@@ -5,7 +5,7 @@
     "": {
       "name": "template",
       "dependencies": {
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
         "ink": "^6.8.0",
         "ink-select-input": "^6.2.0",
         "ink-spinner": "^5.0.0",
@@ -78,7 +78,7 @@
         "@bull-board/api": "^6.20.3",
         "@bull-board/hono": "^6.20.3",
         "@hono/zod-openapi": "^1.2.2",
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
         "@opentelemetry/auto-instrumentations-node": "^0.76.0",
         "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
@@ -177,7 +177,7 @@
       "name": "@template/db",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
         "@prisma/adapter-pg": "^7.4.2",
         "@prisma/client": "^7.4.2",
         "@supercharge/promise-pool": "^3.3.0",
@@ -205,7 +205,7 @@
       "name": "@template/email",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
         "@template/db": "workspace:*",
         "@template/shared": "workspace:*",
         "html-to-text": "^10.0.1",
@@ -240,7 +240,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@hey-api/client-fetch": "^0.13.1",
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
       },
       "devDependencies": {
         "@hey-api/openapi-ts": "^0.97.3",
@@ -256,7 +256,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@hey-api/client-fetch": "^0.13.1",
-        "@inixiative/json-rules": "^2.22.0",
+        "@inixiative/json-rules": "^2.25.0",
         "clsx": "^2.1.1",
         "consola": "^3.4.2",
         "lodash-es": "^4.18.1",
@@ -285,7 +285,7 @@
       "dependencies": {
         "@ariakit/react": "^0.4.22",
         "@iconify/react": "^6.0.2",
-        "@inixiative/rules-builder": "0.27.0",
+        "@inixiative/rules-builder": "0.28.0",
         "@tanstack/react-router": "^1.166.2",
         "@template/db": "workspace:*",
         "@template/permissions": "workspace:*",
@@ -633,13 +633,13 @@
 
     "@inixiative/atlas": ["@inixiative/atlas@0.1.0", "", { "dependencies": { "@inixiative/json-rules": "^2.6.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-vHLSVVmMmPZcGCMIcO3ojoR6k1Eu0u+xuzlMMB/CaAwX6SaF8seoviRVqWbAuorGrrbuD9V5/y0lL81JPWcDxg=="],
 
-    "@inixiative/json-rules": ["@inixiative/json-rules@2.22.0", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-kCQ/fEPiK0cTSjnCtwnezqrpKShq3OzD6kppcVjZvPN3dSm4LTPa8TMJ+Qe5CaU+vzbLXccULAZsz+c0ka3VDQ=="],
+    "@inixiative/json-rules": ["@inixiative/json-rules@2.25.0", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16" }, "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"] }, "sha512-3NVyr6ejR1XcIBWOPFnJ7rAtCpH3Hp7HfCWlkGG7QBw2Wy4/qf6+QXbVbJF64LhWJ6nkJnt7Ciy99TsdKccU/A=="],
 
     "@inixiative/permissions": ["@inixiative/permissions@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^2.10.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": "^5.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-owHklfNmaBfkW0mUQITlaHeLj01rkOU72Xu1xCO1QvqQnhzaJzvaKiOSk29lHUONv67dvKFFPs33WNW8a4h0aw=="],
 
     "@inixiative/prisma-map": ["@inixiative/prisma-map@0.2.0", "", {}, "sha512-8zXkKog5zQ4Chu/oJLzbDjY66FvPaf7f0ttuo4WBjtnXblnKdDkXvoqx0XDYlXvWllTCLxE0g9G/39N450PzYA=="],
 
-    "@inixiative/rules-builder": ["@inixiative/rules-builder@0.27.0", "", { "peerDependencies": { "@inixiative/json-rules": "^2.21.0", "react": "^18.0.0 || ^19.0.0" } }, "sha512-ljEwiMuxooZKnCwAFw2Milb7cHPMYR+QAQTNAuZdxWwEAwiRrOBqaXjQ4H454eYs6ZdmIWcKk98Hzu/+qcwQkg=="],
+    "@inixiative/rules-builder": ["@inixiative/rules-builder@0.28.0", "", { "peerDependencies": { "@inixiative/json-rules": "^2.23.0", "react": "^18.0.0 || ^19.0.0" } }, "sha512-YuSEgaNXkN7BBOcI/AvUlct2ZpKLE7T5bv1lBcsq49+HxoFx62emFGTyOq6jj0Y8Q22Xh+dtgPtvr9sAvbRuDQ=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 

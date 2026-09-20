@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses none
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
+import type { EmailLens } from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
 export type RenderIssueKind = 'rule' | 'token' | 'each';
@@ -20,5 +20,5 @@ export type SettleOptions = {
   eachDepth?: number;
   liveRefs?: ReadonlySet<string>;
   bindings?: BindingChain;
-  lens?: Lens | LensNarrowing;
+  lens?: EmailLens;
 };

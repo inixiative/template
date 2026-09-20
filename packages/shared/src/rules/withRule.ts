@@ -15,6 +15,9 @@ import {
 
 export type RuleLens = Lens | LensNarrowing;
 
+/** Anything that can say where a rule leaves its vocabulary — a lens, or a composition of lenses. */
+export type RuleVocabulary = { vocabularyIssues: (rule: Condition) => string[] };
+
 /** A row a stored rule names by id. `model` is the lens's model name for that source. */
 export type RuleReference = { model: string; id: string };
 
@@ -27,7 +30,7 @@ export type RuleIssue =
   | { kind: 'reference'; reference: RuleReference; detail: string };
 
 export type RuleHealth = {
-  lens: RuleLens;
+  lens: RuleLens | RuleVocabulary;
   rule: Condition;
   /** The rows the rule names, extracted by the caller's rules module — it knows which sources are ids. */
   references: RuleReference[];
@@ -45,8 +48,10 @@ export type RuleArms<T> = {
 };
 
 /** Where a rule leaves the lens vocabulary, one line per violation. Empty means the lens admits it. */
-export const ruleVocabularyIssues = (lens: RuleLens, rule: Condition): string[] =>
-  checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
+export const ruleVocabularyIssues = (lens: RuleLens | RuleVocabulary, rule: Condition): string[] =>
+  'vocabularyIssues' in lens
+    ? lens.vocabularyIssues(rule)
+    : checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
 
 export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];

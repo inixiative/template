@@ -4,13 +4,12 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import type { Lens, LensNarrowing } from '@inixiative/json-rules';
-import { walkLensPath } from '@template/email/rules/walkLensPath';
+import { type EmailLens, walkEmailLensPath } from '@template/email/rules/emailLens';
 
-const descendsBeneathJsonField = (path: string, lens: Lens | LensNarrowing): boolean =>
-  walkLensPath(path, lens).outcome === 'beneathJson';
+const descendsBeneathJsonField = (path: string, lens: EmailLens): boolean =>
+  walkEmailLensPath(path, lens).outcome === 'beneathJson';
 
-export const collectJsonOpacityWarnings = (paths: string[], lens: Lens | LensNarrowing): string[] =>
+export const collectJsonOpacityWarnings = (paths: string[], lens: EmailLens): string[] =>
   paths
     .filter((path) => descendsBeneathJsonField(path, lens))
     .map(

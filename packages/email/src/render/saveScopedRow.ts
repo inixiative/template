@@ -35,6 +35,7 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
     ownerModel: ctx.ownerModel,
     organizationId: ctx.organizationId ?? null,
     spaceId: ctx.spaceId ?? null,
+    userId: ctx.userId ?? null,
   } as Partial<Row>;
 
   const where = { slug: input.slug, locale: input.locale, ...scope, deletedAt: null } as Partial<Row>;

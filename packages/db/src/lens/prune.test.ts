@@ -22,6 +22,137 @@ describe('prune', () => {
     ).toEqual([{ id: 'a' }, { id: 'b' }]);
   });
 
+  it("keeps the columns a visit's where reads, so the pruned row can still be judged by the lens", () => {
+    const lens: LensNarrowing = {
+      parent: lensFor('Inquiry'),
+      root: {
+        picks: ['id', 'sourceUser'],
+        relations: { sourceUser: { picks: ['id'], where: { field: 'deletedAt', operator: 'notExists' } } },
+      },
+      mapDefaults: {
+        prisma: { models: { Inquiry: { where: { field: 'status', operator: 'equals', value: 'sent' } } } },
+      },
+    };
+    const row = { id: 'i1', status: 'sent', content: 1, sourceUser: { id: 'u1', name: 'Bob', deletedAt: null } };
+    expect(prune(row, lens)).toEqual({ id: 'i1', status: 'sent', sourceUser: { id: 'u1', deletedAt: null } });
+  });
+
+  it("drops the related rows a visit's where hides: a list element is filtered out, a to-one becomes null", () => {
+    const lens = {
+      parent: lensFor('User'),
+      root: {
+        picks: ['id'],
+        relations: {
+          tagAttachments: {
+            picks: [],
+            where: { field: 'deletedAt', operator: 'notExists' },
+            relations: {
+              tag: { picks: ['id', 'name'], where: { field: 'ownerModel', operator: 'equals', value: 'platform' } },
+            },
+          },
+        },
+      },
+    } as const;
+    const row = {
+      id: 'u1',
+      tagAttachments: [
+        { deletedAt: null, tag: { id: 'mine', name: 'vip', ownerModel: 'platform' } },
+        { deletedAt: null, tag: { id: 'theirs', name: 'vip', ownerModel: 'Organization' } },
+        { deletedAt: '2026-01-01', tag: { id: 'gone', name: 'vip', ownerModel: 'platform' } },
+      ],
+    };
+    expect(prune(row, lens as never) as unknown).toEqual({
+      id: 'u1',
+      tagAttachments: [
+        { deletedAt: null, tag: { id: 'mine', name: 'vip', ownerModel: 'platform' } },
+        { deletedAt: null, tag: null },
+      ],
+    });
+  });
+
+  it("the root row is admitted by the root visit's where too: a hidden single row is null, hidden array rows are dropped", () => {
+    const lens = {
+      parent: lensFor('Organization'),
+      root: { picks: ['id', 'name'], where: { field: 'id', operator: 'equals', value: 'org-1' } },
+    } as const;
+    expect(prune({ id: 'org-1', name: 'Acme', slug: 'x' }, lens as never) as unknown).toEqual({
+      id: 'org-1',
+      name: 'Acme',
+    });
+    expect(prune({ id: 'org-2', name: 'FOREIGN' }, lens as never) as unknown).toBeNull();
+    expect(
+      prune(
+        [
+          { id: 'org-1', name: 'Acme' },
+          { id: 'org-2', name: 'FOREIGN' },
+        ],
+        lens as never,
+      ) as unknown,
+    ).toEqual([{ id: 'org-1', name: 'Acme' }]);
+  });
+
+  it('stacked narrowings: a projection, an owner scope on a model default, and a target each decide', () => {
+    const projection = {
+      parent: lensFor('User'),
+      root: {
+        picks: ['id', 'name'],
+        relations: {
+          tagAttachments: {
+            picks: [],
+            where: { field: 'deletedAt', operator: 'notExists' },
+            relations: { tag: { picks: ['id', 'name'] } },
+          },
+        },
+      },
+    };
+    const scoped = {
+      parent: projection,
+      mapDefaults: {
+        prisma: {
+          models: {
+            Tag: {
+              where: {
+                any: [
+                  { field: 'ownerModel', operator: 'equals', value: 'platform' },
+                  { field: 'organizationId', operator: 'equals', value: 'org-1' },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    const targeted = { parent: scoped, root: { where: { field: 'id', operator: 'equals', value: 'u1' } } };
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const own = { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' };
+    const theirs = { id: 't2', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' };
+    const platform = { id: 't3', name: 'vip', ownerModel: 'platform' };
+    const rows = [
+      {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          attachment(null, own),
+          attachment(null, theirs),
+          attachment(null, platform),
+          attachment('2026-01-01', own),
+        ],
+      },
+      { id: 'u2', name: 'Bob', tagAttachments: [attachment(null, own)] },
+    ];
+    expect(prune(rows, targeted as never) as unknown).toEqual([
+      {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          { deletedAt: null, tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' } },
+          { deletedAt: null, tag: null },
+          { deletedAt: null, tag: { id: 't3', name: 'vip', ownerModel: 'platform' } },
+        ],
+      },
+    ]);
+  });
+
   it('prunes a nested to-one relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),

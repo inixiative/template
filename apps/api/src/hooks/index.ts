@@ -10,6 +10,9 @@ import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
+import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
+import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
+import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
@@ -20,6 +23,7 @@ import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 export const registerHooks = () => {
   registerSoftDeleteScoper({ liveWhere, liveIncludes });
+  registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerClearCacheHook();
@@ -30,7 +34,9 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceReferencedHook();
-  registerRulesHook();
+  registerSegmentConditionsHook();
+  registerSegmentMemberOwnerHook();
+  registerSegmentRuleReferencesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailInvariantHook();

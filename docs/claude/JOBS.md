@@ -108,6 +108,10 @@ await enqueueJob('sendWebhook', {
 | Circuit breaker | Disables after 5 consecutive failures |
 | Logging | Creates `WebhookEvent` record per attempt |
 
+### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
+
+Segment membership. `reconcileSegment` (superseding by segment id) recomputes one segment set-wise via `toPrisma` — static or dynamic, it runs when `segment.created` / `segment.updated` says the rule changed — and fans out to the dynamic segments that reference it. `reconcileCustomerRefSegments` (superseding by customer ref id, or by customer model + id, which the job maps to that customer's references) hydrates each customer reference through `fetchLens` and runs `check()` per dynamic segment in dependency order; static segments are never on this rail. It is enqueued by the business events on the rows the segment lens reads (`contact.*`, `organization.*`, `space.*`, `user.redacted`, `communication.settled`), never by a DB hook. `sweepSegments` (cron, seeded at 04:00 UTC) enqueues every sound dynamic segment in dependency order (`sweepableSegments`) and is the backstop for writes that bypass a service; a degraded segment never reaches the queue, from the sweep or from a recomputed segment's dependents fan-out. Both reconcile paths publish the junction diff as four events: `segment.membersAdded` / `segment.membersRemoved` (owner side) and `customerRef.segmentsAdded` / `customerRef.segmentsRemoved` (member side).
+
 ### rotateEncryptionKeys
 
 Re-encrypts data from old encryption keys to current keys. Auto-enqueued on worker startup.

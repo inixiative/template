@@ -5,6 +5,7 @@
  * @uses primitive:websockets
  * @constructs appEventHandler
  */
+import { db } from '@template/db';
 import { deliverEmailHandoffs } from '#/appEvents/channels/email';
 import { deliverWSHandoffs } from '#/appEvents/channels/websocket';
 import type { AppEventHandlerDefinition, AppEventPayload } from '#/appEvents/types';
@@ -26,7 +27,7 @@ const throwIfFailures = (errors: unknown[]): void => {
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: Promise<unknown>[] = [observeRegistry.broadcast((adapter) => adapter.record(event))];
+    const tasks: (() => Promise<unknown>)[] = [() => observeRegistry.broadcast((adapter) => adapter.record(event))];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the
@@ -36,28 +37,28 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     if (handler.email) {
       try {
         const handoffs = handler.email(data) ?? [];
-        for (const h of handoffs) tasks.push(deliverEmailHandoffs(event, [h]));
+        for (const h of handoffs) tasks.push(() => deliverEmailHandoffs(event, [h]));
       } catch (err) {
-        tasks.push(Promise.reject(err));
+        tasks.push(() => Promise.reject(err));
       }
     }
 
     if (handler.websocket) {
       try {
         const handoffs = handler.websocket(data) ?? [];
-        for (const h of handoffs) tasks.push(deliverWSHandoffs([h]));
+        for (const h of handoffs) tasks.push(() => deliverWSHandoffs([h]));
       } catch (err) {
-        tasks.push(Promise.reject(err));
+        tasks.push(() => Promise.reject(err));
       }
     }
 
     if (handler.cb) {
       for (const callback of handler.cb) {
-        tasks.push(Promise.resolve().then(() => callback(data)));
+        tasks.push(async () => callback(data));
       }
     }
 
-    const results = await Promise.allSettled(tasks);
+    const results = await db.parallel(tasks, { resolution: 'allSettled' });
     throwIfFailures(results.filter((result) => result.status === 'rejected').map((result) => result.reason));
   };
 };

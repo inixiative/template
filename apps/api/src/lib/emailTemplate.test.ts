@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganization } from '@template/db/test';
+import { cleanupTouchedTables, createOrganization, createSegment, createTag } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -114,5 +114,108 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
     await expect(
       settleTemplate('never-saved', platform, variables, undefined, { onIssue: 'fail', substitute: 'holey' }),
     ).rejects.toBeInstanceOf(EmailRenderError);
+  });
+});
+
+describe("settleTemplate — rules evaluate through the owner's lens", () => {
+  let organization: Organization;
+  let other: Organization;
+  let myTag: { id: string };
+  let theirTag: { id: string };
+  let segment: { id: string };
+  let goneTag: { id: string };
+
+  const taggedBlock = (tagId: string) =>
+    `{{#if rule=${JSON.stringify({
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'equals', value: tagId },
+    })}}}VIP{{else}}BASE{{/if}}`;
+
+  const inSegmentBlock = (segmentId: string) =>
+    `{{#if rule=${JSON.stringify({
+      field: 'recipient.providerRefs',
+      arrayOperator: 'any',
+      condition: {
+        field: 'segmentMembers',
+        arrayOperator: 'any',
+        condition: { field: 'segment.id', operator: 'equals', value: segmentId },
+      },
+    })}}}IN{{else}}OUT{{/if}}`;
+
+  const sender = () => ({ type: 'Organization', organizationId: organization.id }) as const;
+
+  const recipientWith = (tag: { id: string; ownerModel: string; organizationId: string | null }) => ({
+    recipient: {
+      id: 'u1',
+      name: 'Ada',
+      email: 'ada@example.com',
+      tagAttachments: [{ deletedAt: null, tag: { ...tag, name: 't' } }],
+      providerRefs: [],
+    },
+    data: {},
+  });
+
+  beforeAll(async () => {
+    registerSoftDeleteScoper({ liveWhere, liveIncludes });
+    registerRulesHook();
+    organization = (await createOrganization()).entity;
+    other = (await createOrganization()).entity;
+    myTag = (await createTag({ ownerModel: 'Organization' }, { organization })).entity;
+    theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: other })).entity;
+    goneTag = (await createTag({ ownerModel: 'Organization' }, { organization })).entity;
+    segment = (
+      await createSegment(
+        {
+          ownerModel: 'Organization',
+          type: 'dynamic',
+          conditions: {
+            field: 'customerUser.tagAttachments',
+            arrayOperator: 'any',
+            condition: { field: 'tag.id', operator: 'equals', value: goneTag.id },
+          },
+        },
+        { organization },
+      )
+    ).entity;
+    await saveForOrganization(organization.id, 'scoped-tag', taggedBlock(myTag.id));
+    await saveForOrganization(organization.id, 'scoped-segment', inSegmentBlock(segment.id));
+    await db.tag.update({ where: { id: goneTag.id }, data: { deletedAt: new Date() } });
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+    clearHookRegistry();
+    registerSoftDeleteScoper(null);
+  });
+
+  it("a tag the owner can see matches; the same rule over another owner's tag does not", async () => {
+    const own = await settleTemplate(
+      'scoped-tag',
+      sender(),
+      recipientWith({ id: myTag.id, ownerModel: 'Organization', organizationId: organization.id }),
+    );
+    expect(own.mjml).toContain('VIP');
+    const foreign = await settleTemplate(
+      'scoped-tag',
+      sender(),
+      recipientWith({ id: theirTag.id, ownerModel: 'Organization', organizationId: other.id }),
+    );
+    expect(foreign.mjml).toContain('BASE');
+    expect(foreign.issues).toEqual([]);
+  });
+
+  it('a segment whose own rule is degraded leaves the live set, so the branch degrades', async () => {
+    const settled = await settleTemplate(
+      'scoped-segment',
+      sender(),
+      recipientWith({ id: myTag.id, ownerModel: 'Organization', organizationId: organization.id }),
+      undefined,
+      { onIssue: 'degrade' },
+    );
+    expect(settled.mjml).toContain('OUT');
+    expect(settled.issues.map((issue) => issue.detail)).toEqual([
+      `rule names a Segment that no longer resolves: ${segment.id}`,
+    ]);
   });
 });

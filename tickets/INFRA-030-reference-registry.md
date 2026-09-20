@@ -78,6 +78,8 @@ gets its `exposedSurface` (sources stripped), save and settle keep the narrowing
 (`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
 column + a registry entry (the referenced-side hook and email's id sources derive); adding a
 rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
+Segment (FEAT-021) is the second owner and the fourth referenced model: `segmentId` /
+`referencedSegmentId`, edges written by the `segmentRuleReferences` after-write hook.
 
 ### No owner-side hook
 
@@ -166,6 +168,9 @@ naming the target and a restore clears them, a purge nulls the FK and leaves the
 row, the client refuses a hard delete, the registry refuses a contradicting FK.
 `packages/shared/src/rules/withRule.test.ts` (8): sound, reference issue, no live set, no
 references, missing binding, supplied binding (null included), lens drift, every issue reported.
+`apps/api/src/modules/segment/tests/segmentRuleHealth.test.ts` (4): a segment's edge written and
+set-diffed, sound rule, a gone segment degrades evaluation and the read says why until restore, a
+membership loop refused at save.
 `packages/email/src/rules/ruleReferences.test.ts` (7) and the reference-liveness cases in
 `evaluateConditions.test.ts` — live set renders, a key outside it is a rule error, an empty set
 fails closed, an omitted set fails closed too (nothing was confirmed). The renderer tests use
@@ -278,10 +283,12 @@ degraded" — which is the same question asked transitively over the segment gra
 
 Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
 `referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
-Transitive degradation (nothing in the template references a rule-bearing row from a rule yet;
-Zealot's segments do, and it is the `withRule` question asked over the segment graph). Tenancy of a reference (a
-Space-owned template naming another org's tag) — the lens narrowing's `where` scope owns that
-(INFRA-017 / INFRA-018).
+Transitive degradation — built on FEAT-021 (#105): `segmentRuleStates` closes over the owner's
+edges. Tenancy of a reference — built on #105 as well: the lens narrowing's `where` alone decides
+nothing at save (`checkRuleAgainstLens` is a vocabulary check), so `syncRuleReferenceEdges` takes
+the lens's `sourceQueries` and refuses a newly named row the source's composed `where` does not
+admit (`unadmittedRuleReferences`). Email passes its owner-scoped lens; the segment gate
+(`assertSegmentReferencesOwned`) still restates the same predicate by hand and should migrate.
 
 ## Related
 

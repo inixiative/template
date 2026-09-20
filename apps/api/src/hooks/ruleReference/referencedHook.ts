@@ -16,7 +16,9 @@ import {
   registerDbHook,
   resolveFalsePolymorphismRef,
 } from '@template/db';
+import type { RuleReferenceOwnerModel } from '@template/db/generated/client/enums';
 import { castArray, groupBy, keyBy, map } from 'lodash-es';
+import { emitAppEvent } from '#/appEvents/emit';
 import type { HookRow } from '#/hooks/shared/hookRows';
 
 const isLive = (row: HookRow): boolean => row.deletedAt == null;
@@ -34,6 +36,27 @@ const deletedAtStamp = (row: HookRow): number => (row.deletedAt as Date | null)?
  * Hard deletes never reach here. The client path is refused (`preventHardDelete`); the purge path
  * is the database's, and `ON DELETE SET NULL` is what records it.
  */
+const ownerIdOf = (edge: HookRow): string | null => {
+  const column = resolveFalsePolymorphismRef({
+    model: 'RuleReference',
+    axis: 'ownerModel',
+    value: edge.ownerModel as RuleReferenceOwnerModel,
+  });
+  return column ? ((edge[column] as string | null) ?? null) : null;
+};
+
+const publishStale = async (edge: HookRow, referencedDeletedAt: Date): Promise<void> => {
+  const ownerId = ownerIdOf(edge);
+  if (!ownerId) return;
+  await emitAppEvent('ruleReference.stale', {
+    ownerModel: edge.ownerModel as RuleReferenceOwnerModel,
+    ownerId,
+    referencedModel: edge.referencedModel as never,
+    referencedId: edge.referencedId as string,
+    referencedDeletedAt,
+  });
+};
+
 export const registerRuleReferenceReferencedHook = () => {
   registerDbHook(
     'ruleReference:referenced',
@@ -56,14 +79,16 @@ export const registerRuleReferenceReferencedHook = () => {
       });
       if (!column) return;
       for (const [stamp, rows] of Object.entries(groupBy(flipped, deletedAtStamp))) {
-        await db.ruleReference.updateManyAndReturn({
+        const referencedDeletedAt = stamp === '0' ? null : new Date(Number(stamp));
+        const edges = await db.ruleReference.updateManyAndReturn({
           where: {
             referencedModel: model,
             referencedId: { in: map(rows, 'id') as string[] },
             [column]: { not: null },
           } as Prisma.RuleReferenceWhereInput,
-          data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
+          data: { referencedDeletedAt },
         });
+        if (referencedDeletedAt) for (const edge of edges) await publishStale(edge, referencedDeletedAt);
       }
     },
   );

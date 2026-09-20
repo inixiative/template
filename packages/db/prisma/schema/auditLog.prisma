@@ -73,6 +73,8 @@ model AuditLog {
   subjectCustomerRef      CustomerRef?      @relation(fields: [subjectCustomerRefId], references: [id], onDelete: SetNull)
   subjectIntegrationId    String?           @db.VarChar(36)
   subjectIntegration      Integration?      @relation("AuditLogSubjectIntegration", fields: [subjectIntegrationId], references: [id], onDelete: SetNull)
+  subjectSegmentId        String?           @db.VarChar(36)
+  subjectSegment          Segment?          @relation(fields: [subjectSegmentId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser OrganizationUser? @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser        SpaceUser?        @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -110,6 +112,7 @@ model AuditLog {
   @@index([subjectCustomerRefId])
   @@index([integrationId])
   @@index([subjectIntegrationId])
+  @@index([subjectSegmentId])
 }
 
 enum AuditAction {
@@ -135,4 +138,5 @@ enum AuditSubjectModel {
   EmailComponent
   CustomerRef
   Integration
+  Segment
 }

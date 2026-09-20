@@ -7,7 +7,7 @@ import { unresolvedLensPaths } from '@template/email/preflight/checks/unresolved
 import { unsubscribeLinkPresent } from '@template/email/preflight/checks/unsubscribeLinkPresent';
 import type { PreflightInput } from '@template/email/preflight/types';
 import { visibleText } from '@template/email/preflight/visibleText';
-import { emailProjection, emailSurface } from '@template/email/rules/emailProjection';
+import { emailLens } from '@template/email/rules/emailLens';
 import mjml2html from 'mjml';
 
 const input = (over: Partial<PreflightInput> = {}): PreflightInput => ({
@@ -19,7 +19,7 @@ const input = (over: Partial<PreflightInput> = {}): PreflightInput => ({
   ...over,
 });
 
-const surface = () => emailSurface(emailProjection());
+const surface = () => emailLens();
 
 describe('preflight checks', () => {
   it('flags a blank rendered subject as an error', () => {

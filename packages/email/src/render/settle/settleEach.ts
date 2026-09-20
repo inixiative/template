@@ -4,8 +4,7 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { check } from '@inixiative/json-rules';
-import { ruleReferences } from '@template/db';
+import { type Condition, check } from '@inixiative/json-rules';
 import {
   type EachBlock,
   isValidBindingIdentifier,
@@ -16,9 +15,14 @@ import { resolvePath } from '@template/email/render/settle/resolvePath';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
-import { defaultEmailRuleLens } from '@template/email/rules/emailProjection';
+import {
+  defaultEmailLens,
+  emailRuleReferences,
+  emailRuleVocabulary,
+  evaluateScopedRule,
+} from '@template/email/rules/emailLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import { iteratesLens, loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
@@ -64,32 +68,39 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   }
 
   const filter = block.filter;
-  if (filter !== undefined) {
-    const judged = absoluteRule(filter, bodyOptions.bindings);
-    const lens = options.lens ?? defaultEmailRuleLens;
-    const degraded =
-      judged === undefined
-        ? null
-        : withRule(
-            {
-              lens,
-              rule: judged,
-              references: ruleReferences(lens, judged),
-              live: options.liveRefs,
-            },
-            { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },
-          );
+  const lens = options.lens ?? defaultEmailLens;
+  const lensed = iteratesLens(bodyOptions.bindings, lens);
+  if (filter !== undefined && lensed) {
+    const scoped = scopedRule(filter, bodyOptions.bindings, { lens });
+    if (scoped.issue !== undefined) return issue(scoped.issue);
+    const degraded = withRule(
+      {
+        lens: emailRuleVocabulary(lens),
+        rule: scoped.rule,
+        references: emailRuleReferences(lens, scoped.rule),
+        live: options.liveRefs,
+      },
+      { degraded: (issues) => issues.map((each) => each.detail).join('; '), sound: () => null },
+    );
     if (degraded !== null) return issue(degraded);
   }
 
   const emitted: unknown[] = [];
+  const frames = loopFrames(bodyOptions.bindings);
+  const judged = filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings, { lens }).rule;
   for (const element of arrayValue) {
+    const judgeable = lensed && typeof element === 'object' && element !== null;
     if (filter === undefined) {
       emitted.push(element);
       continue;
     }
     try {
-      if (check(filter, toRuleData({ ...scope, [as]: element })) === true) emitted.push(element);
+      const elementScope = { ...scope, [as]: element };
+      const passes =
+        judged && judgeable
+          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(elementScope, frames)))
+          : check(filter as Condition, toRuleData(elementScope));
+      if (passes === true) emitted.push(element);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');
     }

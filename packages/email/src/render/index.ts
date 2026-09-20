@@ -22,7 +22,7 @@ export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
 export { type InterpolateOptions, interpolate, type Variables } from './interpolate';
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
 export { lookupCascade } from './lookupCascade';
-export { lookupComponent, lookupTemplate } from './lookupTemplate';
+export { lookupComponent, lookupLens, lookupTemplate, templateLens } from './lookupTemplate';
 export {
   type ComponentNode,
   collectSlugsFromNodes,
@@ -31,11 +31,20 @@ export {
   type SlotNode,
   type TextNode,
 } from './nodes';
-export { cascadeLookups, ownerCascade, ownerWhere, parentOwner } from './owner';
+export {
+  cascadeLookups,
+  type EmailOwnerRef,
+  emailOwnerProvider,
+  ownerCascade,
+  ownerWhere,
+  parentOwner,
+  rowOwner,
+} from './owner';
 export { parseBlocks } from './parseBlocks';
 export { sanitizeSubject } from './sanitizeSubject';
 export {
   type LensForSlug,
+  ownerScopeOf,
   type SaveTemplateInput,
   type SaveTemplateOptions,
   type SaveTemplateResult,
