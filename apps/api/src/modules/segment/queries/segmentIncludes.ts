@@ -17,3 +17,5 @@ export const selectSegmentForCustomer = {
 export const includeSegmentForCustomer = {
   segment: { select: selectSegmentForCustomer },
 } as const satisfies Prisma.SegmentMemberInclude;
+
+export const includeSegmentRuleReferences = { ruleReferences: true } as const satisfies Prisma.SegmentInclude;

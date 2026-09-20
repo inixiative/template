@@ -22,9 +22,7 @@ describe('rules hook', () => {
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test User' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test User' });
 
       expect(user.name).toBe('Test User');
     });
@@ -33,10 +31,7 @@ describe('rules hook', () => {
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `test${seq}@example.com`, name: '' },
-        });
+      const promise = async () => createUser({ email: `test${seq}@example.com`, name: '' });
 
       await expect(promise).toThrow('name required');
     });
@@ -152,9 +147,7 @@ describe('rules hook', () => {
       setRulesCache('User', true);
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `bool${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -163,10 +156,7 @@ describe('rules hook', () => {
       setRulesCache('User', false);
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `bool${seq}@example.com`, name: 'Test' },
-        });
+      const promise = async () => createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       await expect(promise).toThrow();
     });
@@ -201,9 +191,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -218,9 +206,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Admin' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Admin' });
 
       expect(user.name).toBe('Admin');
     });

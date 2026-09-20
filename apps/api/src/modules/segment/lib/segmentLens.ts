@@ -13,112 +13,70 @@ import {
   resolveLensBindings,
   ruleSourceValues,
 } from '@inixiative/json-rules';
-import { ProviderModel } from '@template/db/generated/client/enums';
+import { ownedBy, ownerBindings } from '@template/db';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { lensFor, omitForeignKeys } from '@template/db/lens';
-import { communicationSenderFk, customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
-
-const SEGMENT_OWNER_BIND = 'ownerId';
 
 const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 
-const ownedBy = (fk: string): Condition => ({ field: fk, operator: Operator.equals, bind: SEGMENT_OWNER_BIND });
+const tagOwned: Condition = {
+  all: [
+    live,
+    { any: [{ field: 'ownerModel', operator: Operator.equals, value: 'platform' }, ownedBy('Tag', 'ownerModel')] },
+  ],
+};
+
+const segmentOwned: Condition = { all: [ownedBy('Segment', 'ownerModel'), live] };
 
 const contacts: ModelNarrowing = {
   picks: ['type', 'subtype', 'valueKey', 'deliverability', 'acceptedKinds', 'verifiedAt', 'createdAt'],
   where: live,
 };
 
-const tagAttachments = (ownerFk: string): ModelNarrowing => ({
+const tagAttachments: ModelNarrowing = {
   picks: [],
   where: live,
-  relations: {
-    tag: {
-      picks: ['id', 'name'],
-      where: live,
-      sources: {
-        id: {
-          label: 'name',
-          where: {
-            all: [
-              live,
-              {
-                any: [{ field: 'ownerModel', operator: Operator.equals, value: 'platform' }, ownedBy(ownerFk)],
-              },
-            ],
-          },
-        },
-      },
-    },
-  },
-});
+  relations: { tag: { picks: ['id', 'name'], where: live, sources: { id: { label: 'name', where: tagOwned } } } },
+};
 
-const communicationsReceived = (ownerModel: ProviderModel): ModelNarrowing => ({
+const communicationsReceived: ModelNarrowing = {
   picks: ['channel', 'kind', 'status', 'sentAt', 'createdAt'],
   where: {
     any: [
       { field: 'senderType', operator: Operator.in, value: ['platform', 'admin'] },
-      ownedBy(communicationSenderFk(ownerModel)),
+      ownedBy('CommunicationLog', 'senderType'),
     ],
+  },
+};
+
+const customer = (picks: string[], relations: Record<string, ModelNarrowing> = {}): ModelNarrowing => ({
+  picks,
+  where: live,
+  relations: { contacts, tagAttachments, ...relations },
+});
+
+export const segmentLens: LensNarrowing = omitForeignKeys({
+  parent: lensFor('CustomerRef'),
+  mapDefaults: { prisma: { models: { Segment: { sources: { id: { label: 'name', where: segmentOwned } } } } } },
+  root: {
+    picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
+    where: ownedBy('CustomerRef', 'providerModel'),
+    relations: {
+      customerUser: customer(['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'], {
+        communicationsReceived,
+      }),
+      customerOrganization: customer(['id', 'name', 'createdAt']),
+      customerSpace: customer(['id', 'name', 'createdAt']),
+      segmentMembers: { picks: [], relations: { segment: { picks: ['id'], where: segmentOwned } } },
+    },
   },
 });
 
-const customer = (
-  ownerFk: string,
-  picks: string[],
-  relations: Record<string, ModelNarrowing> = {},
-): ModelNarrowing => ({
-  picks,
-  where: live,
-  relations: { contacts, tagAttachments: tagAttachments(ownerFk), ...relations },
-});
-
-export const segmentLensFor = (ownerModel: ProviderModel): LensNarrowing => {
-  const providerFk = customerRefProviderFk(ownerModel);
-  const ownerFk = segmentOwnerFk(ownerModel);
-
-  return omitForeignKeys({
-    parent: lensFor('CustomerRef'),
-    mapDefaults: {
-      prisma: {
-        models: {
-          Segment: {
-            sources: {
-              id: { label: 'name', where: { all: [ownedBy(ownerFk), live] } },
-            },
-          },
-        },
-      },
-    },
-    root: {
-      picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
-      where: ownedBy(providerFk),
-      relations: {
-        customerUser: customer(ownerFk, ['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'], {
-          communicationsReceived: communicationsReceived(ownerModel),
-        }),
-        customerOrganization: customer(ownerFk, ['id', 'name', 'createdAt']),
-        customerSpace: customer(ownerFk, ['id', 'name', 'createdAt']),
-        segmentMembers: {
-          picks: [],
-          relations: {
-            segment: { picks: ['id'], where: { all: [ownedBy(ownerFk), live] } },
-          },
-        },
-      },
-    },
-  });
-};
-
 export const resolvedSegmentLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
-  resolveLensBindings(segmentLensFor(ownerModel), { [SEGMENT_OWNER_BIND]: ownerId }) as LensNarrowing;
+  resolveLensBindings(segmentLens, ownerBindings(ownerModel, ownerId)) as LensNarrowing;
 
-export const segmentReachedModels = (): Set<string> => {
-  const models = new Set<string>();
-  for (const ownerModel of Object.values(ProviderModel)) {
-    for (const visit of projectByPath(segmentLensFor(ownerModel)).values()) models.add(visit.modelName);
-  }
-  return models;
-};
+export const segmentReachedModels = (): Set<string> =>
+  new Set([...projectByPath(segmentLens).values()].map((visit) => visit.modelName));
 
 const membershipProbe = {
   field: 'segmentMembers',
@@ -126,13 +84,12 @@ const membershipProbe = {
   condition: { field: 'segment.id', operator: Operator.equals, value: '00000000-0000-7000-8000-000000000000' },
 } as Condition;
 
-for (const ownerModel of Object.values(ProviderModel)) {
-  const reachesMembershipSource = ruleSourceValues(segmentLensFor(ownerModel), membershipProbe).some(
+if (
+  !ruleSourceValues(segmentLens, membershipProbe).some(
     (source) => source.model === 'Segment' && source.field === 'id' && !source.dynamic,
+  )
+) {
+  throw new Error(
+    'segmentLens no longer reaches the Segment.id membership source; segment references would read every rule as reference-free',
   );
-  if (!reachesMembershipSource) {
-    throw new Error(
-      `segmentLensFor(${ownerModel}) no longer reaches the Segment.id membership source; segment references would read every rule as reference-free`,
-    );
-  }
 }

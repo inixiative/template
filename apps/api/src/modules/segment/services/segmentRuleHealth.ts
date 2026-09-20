@@ -9,10 +9,12 @@ import { type Db, db as defaultDb, liveRuleReferenceKeys, type RuleReferenceRow,
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy, uniqBy } from 'lodash-es';
-import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
+import { segmentLens } from '#/modules/segment/lib/segmentLens';
 import { segmentOwnerFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
+
+export type SegmentWithEdges = Segment & { ruleReferences?: RuleReferenceRow[] };
 
 const segmentKey = (id: string): string => referenceKey({ model: 'Segment', id });
 
@@ -49,7 +51,7 @@ const closeOverOwner = (
     if (known) return known;
     visiting.add(segment.id);
 
-    const lens = segmentLensFor(segment.ownerModel);
+    const lens = segmentLens;
     const rule = segment.conditions as Condition;
     const references = ruleReferences(lens, rule);
     const live = liveRuleReferenceKeys(edges[segment.id] ?? []);
@@ -97,3 +99,14 @@ export const segmentRuleStates = async (
 
 export const segmentRuleState = async (segment: Segment, db: Db = defaultDb): Promise<SegmentRuleState> =>
   (await segmentRuleStates([segment], db)).get(segment.id)!;
+
+/** Issues read off the row's own edges; null when a live segment reference means the owner closure decides. */
+export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
+  if (!segment.ruleReferences) return null;
+  const lens = segmentLens;
+  const rule = segment.conditions as Condition;
+  const references = ruleReferences(lens, rule);
+  const live = liveRuleReferenceKeys(segment.ruleReferences);
+  if (references.some((reference) => reference.model === 'Segment' && live.has(referenceKey(reference)))) return null;
+  return ruleIssues({ lens, rule, references, live });
+};

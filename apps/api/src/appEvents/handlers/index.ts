@@ -6,6 +6,10 @@ import { type ContactCreatedPayload, contactCreated } from '#/appEvents/handlers
 import { type ContactDeletedPayload, contactDeleted } from '#/appEvents/handlers/contact/contactDeleted';
 import { type ContactUpdatedPayload, contactUpdated } from '#/appEvents/handlers/contact/contactUpdated';
 import {
+  type CustomerRefCreatedPayload,
+  customerRefCreated,
+} from '#/appEvents/handlers/customerRef/customerRefCreated';
+import {
   type CustomerRefSegmentsAddedPayload,
   customerRefSegmentsAdded,
 } from '#/appEvents/handlers/customerRef/customerRefSegmentsAdded';
@@ -37,8 +41,18 @@ import {
 import { type SegmentUpdatedPayload, segmentUpdated } from '#/appEvents/handlers/segment/segmentUpdated';
 import { type SpaceDeletedPayload, spaceDeleted } from '#/appEvents/handlers/space/spaceDeleted';
 import { type SpaceUpdatedPayload, spaceUpdated } from '#/appEvents/handlers/space/spaceUpdated';
+import { type TagDeletedPayload, tagDeleted } from '#/appEvents/handlers/tag/tagDeleted';
+import {
+  type TagAttachmentCreatedPayload,
+  tagAttachmentCreated,
+} from '#/appEvents/handlers/tagAttachment/tagAttachmentCreated';
+import {
+  type TagAttachmentDeletedPayload,
+  tagAttachmentDeleted,
+} from '#/appEvents/handlers/tagAttachment/tagAttachmentDeleted';
 import { type UserCreatedPayload, userCreated } from '#/appEvents/handlers/user/userCreated';
 import { type UserRedactedPayload, userRedacted } from '#/appEvents/handlers/user/userRedacted';
+import { type UserUpdatedPayload, userUpdated } from '#/appEvents/handlers/user/userUpdated';
 import {
   type UserVerificationRequestedPayload,
   userVerificationRequested,
@@ -50,6 +64,7 @@ export type AppEventPayloads = {
   'contact.created': ContactCreatedPayload;
   'contact.updated': ContactUpdatedPayload;
   'contact.deleted': ContactDeletedPayload;
+  'customerRef.created': CustomerRefCreatedPayload;
   'customerRef.segmentsAdded': CustomerRefSegmentsAddedPayload;
   'customerRef.segmentsRemoved': CustomerRefSegmentsRemovedPayload;
   'inquiry.sent': InquirySentPayload;
@@ -64,7 +79,11 @@ export type AppEventPayloads = {
   'segment.membersRemoved': SegmentMembersRemovedPayload;
   'space.updated': SpaceUpdatedPayload;
   'space.deleted': SpaceDeletedPayload;
+  'tag.deleted': TagDeletedPayload;
+  'tagAttachment.created': TagAttachmentCreatedPayload;
+  'tagAttachment.deleted': TagAttachmentDeletedPayload;
   'user.created': UserCreatedPayload;
+  'user.updated': UserUpdatedPayload;
   'user.redacted': UserRedactedPayload;
   'user.verificationRequested': UserVerificationRequestedPayload;
 };
@@ -74,6 +93,7 @@ export const AppEventName = {
   contactCreated: 'contact.created',
   contactUpdated: 'contact.updated',
   contactDeleted: 'contact.deleted',
+  customerRefCreated: 'customerRef.created',
   customerRefSegmentsAdded: 'customerRef.segmentsAdded',
   customerRefSegmentsRemoved: 'customerRef.segmentsRemoved',
   inquirySent: 'inquiry.sent',
@@ -88,7 +108,11 @@ export const AppEventName = {
   segmentMembersRemoved: 'segment.membersRemoved',
   spaceUpdated: 'space.updated',
   spaceDeleted: 'space.deleted',
+  tagDeleted: 'tag.deleted',
+  tagAttachmentCreated: 'tagAttachment.created',
+  tagAttachmentDeleted: 'tagAttachment.deleted',
   userCreated: 'user.created',
+  userUpdated: 'user.updated',
   userRedacted: 'user.redacted',
   userVerificationRequested: 'user.verificationRequested',
 } as const;
@@ -100,6 +124,7 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'contact.created': contactCreated,
   'contact.updated': contactUpdated,
   'contact.deleted': contactDeleted,
+  'customerRef.created': customerRefCreated,
   'customerRef.segmentsAdded': customerRefSegmentsAdded,
   'customerRef.segmentsRemoved': customerRefSegmentsRemoved,
   'inquiry.sent': inquirySent,
@@ -114,7 +139,11 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'segment.membersRemoved': segmentMembersRemoved,
   'space.updated': spaceUpdated,
   'space.deleted': spaceDeleted,
+  'tag.deleted': tagDeleted,
+  'tagAttachment.created': tagAttachmentCreated,
+  'tagAttachment.deleted': tagAttachmentDeleted,
   'user.created': userCreated,
+  'user.updated': userUpdated,
   'user.redacted': userRedacted,
   'user.verificationRequested': userVerificationRequested,
 };

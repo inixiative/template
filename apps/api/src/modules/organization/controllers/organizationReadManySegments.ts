@@ -8,6 +8,7 @@ import { getResource } from '#/lib/context/getResource';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationReadManySegmentsRoute } from '#/modules/organization/routes/organizationReadManySegments';
+import { includeSegmentRuleReferences } from '#/modules/segment/queries/segmentIncludes';
 import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 export const organizationReadManySegmentsController = makeController(
@@ -18,6 +19,7 @@ export const organizationReadManySegmentsController = makeController(
 
     const { data, pagination } = await paginate(c, db.segment, {
       where: { ownerModel: 'Organization', organizationId: organization.id },
+      include: includeSegmentRuleReferences,
     });
 
     return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });

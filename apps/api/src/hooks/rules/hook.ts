@@ -7,10 +7,10 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
+import { without } from 'lodash-es';
 import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
-import { without } from 'lodash-es';
 
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);

@@ -19,5 +19,5 @@ export const userReadManySegmentMembershipsRoute = readRoute({
   filterLens: { parent: lensFor('SegmentMember') },
   responseSchema: segmentMembershipSchema,
   middleware: [validatePermission('read')],
-  tags: [Tags.user, Tags.segment],
+  tags: [Tags.user, Tags.segment, Tags.segmentMembership],
 });

@@ -18,5 +18,5 @@ export const meReadManySegmentMembershipsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('SegmentMember') },
   responseSchema: segmentMembershipSchema,
-  tags: [Tags.me, Tags.segment],
+  tags: [Tags.me, Tags.segment, Tags.segmentMembership],
 });
