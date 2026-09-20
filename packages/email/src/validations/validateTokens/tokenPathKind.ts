@@ -6,19 +6,17 @@
  */
 import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/rules/emailLens';
-import { lensFieldResolver } from '@template/email/rules/lensFieldResolver';
+import { lensPathFields } from '@template/email/rules/walkLensPath';
 import type { TokenPathKind } from '@template/email/validations/validateTokens/types';
 
 export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach: boolean): TokenPathKind => {
-  const { start, resolve } = lensFieldResolver(lens);
+  const fields = lensPathFields(path, lens);
   const segments = path.split('.');
-  let cursor = start;
   let optionalDepth = 0;
 
   for (let i = 0; i < segments.length; i++) {
-    const hop = resolve(cursor, segments[i] ?? '');
-    if (!hop) return { kind: 'missing', index: i };
-    const { field } = hop;
+    const field = fields[i];
+    if (!field) return { kind: 'missing', index: i };
     const last = i === segments.length - 1;
 
     if (field.kind === 'scalar' && field.type === 'Json') {
@@ -29,7 +27,6 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
       if (last) return { kind: 'object' };
       if (field.isList && !viaEach) return { kind: 'listWithoutEach', index: i };
       if (field.isRequired === false && !field.isList) optionalDepth = i + 1;
-      cursor = hop.next;
       continue;
     }
 

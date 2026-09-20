@@ -42,7 +42,6 @@ export {
   walkEmailLensPath,
 } from './emailLens';
 export { emptyRowFor } from './emptyRowFor';
-export { type LensCursor, type LensFieldResolver, type LensHop, lensFieldResolver } from './lensFieldResolver';
 export {
   isRailProvidedSystemField,
   RAIL_PROVIDED_SYSTEM_FIELDS,
@@ -54,4 +53,4 @@ export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scop
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export { syncRuleReferences } from './syncRuleReferences';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';
-export { type LensPathWalk, walkLensPath } from './walkLensPath';
+export { type LensPathWalk, lensPathFields, walkLensPath } from './walkLensPath';

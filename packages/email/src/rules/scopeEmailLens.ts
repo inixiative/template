@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import { type Condition, type NarrowingDefaults, Operator, resolveLensBindings } from '@inixiative/json-rules';
-import { ownedBy, ownerBindings } from '@template/db';
+import { polymorphicBindings, polymorphicIs } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { type EmailLens, narrowEmailLens } from '@template/email/rules/emailLens';
 import type { RuleLens } from '@template/shared/rules';
@@ -15,8 +15,8 @@ export type EmailLensOwner = { ownerModel: ProviderModel; ownerId: string; organ
 const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 const platform: Condition = { field: 'ownerModel', operator: Operator.equals, value: 'platform' };
 
-const tag: Condition = { all: [live, { any: [platform, ownedBy('Tag', 'ownerModel')] }] };
-const segment: Condition = { all: [ownedBy('Segment', 'ownerModel'), live] };
+const tag: Condition = { all: [live, { any: [platform, polymorphicIs('Tag', 'ownerModel')] }] };
+const segment: Condition = { all: [polymorphicIs('Segment', 'ownerModel'), live] };
 const platformDefaults: NarrowingDefaults = {
   models: {
     Tag: { where: tag, sources: { id: { where: tag } } },
@@ -54,5 +54,5 @@ export const scopeEmailLens = (lens: EmailLens, owner: EmailLensOwner): EmailLen
   narrowEmailLens(lens, (_root, slot) => {
     if (!owner) return { parent: slot, mapDefaults: { prisma: platformDefaults } };
     const scoped: RuleLens = { parent: slot, mapDefaults: { prisma: ownerDefaults(owner) } };
-    return resolveLensBindings(scoped, ownerBindings(owner.ownerModel, owner.ownerId)) as RuleLens;
+    return resolveLensBindings(scoped, polymorphicBindings(owner.ownerModel, owner.ownerId)) as RuleLens;
   });

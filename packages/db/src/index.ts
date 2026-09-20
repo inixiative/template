@@ -70,7 +70,12 @@ export * from './registries';
 export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
-export { OWNER_BINDS, type OwnerKind, ownedBy, ownerBindings } from './registries/ownedBy';
+export {
+  POLYMORPHIC_BINDS,
+  type PolymorphicKind,
+  polymorphicBindings,
+  polymorphicIs,
+} from './registries/polymorphicIs';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';

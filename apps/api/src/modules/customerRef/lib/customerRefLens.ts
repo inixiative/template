@@ -13,7 +13,7 @@ import {
   resolveLensBindings,
   ruleSourceValues,
 } from '@inixiative/json-rules';
-import { ownedBy, ownerBindings } from '@template/db';
+import { polymorphicBindings, polymorphicIs } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { lensFor, omitForeignKeys } from '@template/db/lens';
 
@@ -22,11 +22,13 @@ const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 const tagOwned: Condition = {
   all: [
     live,
-    { any: [{ field: 'ownerModel', operator: Operator.equals, value: 'platform' }, ownedBy('Tag', 'ownerModel')] },
+    {
+      any: [{ field: 'ownerModel', operator: Operator.equals, value: 'platform' }, polymorphicIs('Tag', 'ownerModel')],
+    },
   ],
 };
 
-const segmentOwned: Condition = { all: [ownedBy('Segment', 'ownerModel'), live] };
+const segmentOwned: Condition = { all: [polymorphicIs('Segment', 'ownerModel'), live] };
 
 const contacts: ModelNarrowing = {
   picks: ['type', 'subtype', 'valueKey', 'deliverability', 'acceptedKinds', 'verifiedAt', 'createdAt'],
@@ -44,7 +46,7 @@ const communicationsReceived: ModelNarrowing = {
   where: {
     any: [
       { field: 'senderType', operator: Operator.in, value: ['platform', 'admin'] },
-      ownedBy('CommunicationLog', 'senderType'),
+      polymorphicIs('CommunicationLog', 'senderType'),
     ],
   },
 };
@@ -67,7 +69,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
   },
   root: {
     picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
-    where: ownedBy('CustomerRef', 'providerModel'),
+    where: polymorphicIs('CustomerRef', 'providerModel'),
     relations: {
       customerUser: customer(['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'], {
         communicationsReceived,
@@ -80,7 +82,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
 });
 
 export const resolvedCustomerRefLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
-  resolveLensBindings(customerRefLens, ownerBindings(ownerModel, ownerId)) as LensNarrowing;
+  resolveLensBindings(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
 
 export const customerRefReachedModels = (): Set<string> =>
   new Set([...projectByPath(customerRefLens).values()].map((visit) => visit.modelName));
