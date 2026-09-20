@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import type { Condition } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
-import { emailLens } from '@template/email/rules/emailLens';
+import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
@@ -128,6 +129,40 @@ describe('{{#each}} loops', () => {
       { lens },
     );
     expect(out).toBe('live ');
+  });
+
+  it('the stack a real send renders with — recipient narrowing, owner scope, planner target — shows one truth to tokens and rules', () => {
+    const scoped = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const lens = {
+      ...scoped,
+      recipient: {
+        parent: scoped.recipient,
+        root: { where: { field: 'id', operator: 'equals', value: 'u1' } },
+      } as unknown as EmailLens['recipient'],
+    };
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const recipient = (id: string) => ({
+      id,
+      name: 'Ann',
+      email: 'ann@example.com',
+      tagAttachments: [
+        attachment(null, { id: 'own', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' }),
+        attachment(null, { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' }),
+        attachment('2026-01-01', { id: 'gone', name: 'vip', ownerModel: 'platform' }),
+      ],
+    });
+    const rule =
+      '{"field":"recipient.tagAttachments","arrayOperator":"any","condition":{"field":"tag.name","operator":"equals","value":"vip"}}';
+    const template = `{{#if rule=${rule}}}VIP{{else}}BASE{{/if}}|{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}`;
+    const render = (id: string) =>
+      interpolate(template, { recipient: recipient(id), sender: { id: 'org-1', name: 'Acme' }, data: {} }, undefined, {
+        lens,
+      });
+    expect(render('u1')).toBe('VIP|[own][]');
+    expect(render('u2')).toBe('BASE|');
   });
 
   it('a slot row the lens does not admit is not there to read: a foreign sender prints nothing and issues nothing false', () => {

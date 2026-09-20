@@ -91,6 +91,68 @@ describe('prune', () => {
     ).toEqual([{ id: 'org-1', name: 'Acme' }]);
   });
 
+  it('stacked narrowings: a projection, an owner scope on a model default, and a target each decide', () => {
+    const projection = {
+      parent: lensFor('User'),
+      root: {
+        picks: ['id', 'name'],
+        relations: {
+          tagAttachments: {
+            picks: [],
+            where: { field: 'deletedAt', operator: 'notExists' },
+            relations: { tag: { picks: ['id', 'name'] } },
+          },
+        },
+      },
+    };
+    const scoped = {
+      parent: projection,
+      mapDefaults: {
+        prisma: {
+          models: {
+            Tag: {
+              where: {
+                any: [
+                  { field: 'ownerModel', operator: 'equals', value: 'platform' },
+                  { field: 'organizationId', operator: 'equals', value: 'org-1' },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    const targeted = { parent: scoped, root: { where: { field: 'id', operator: 'equals', value: 'u1' } } };
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const own = { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' };
+    const theirs = { id: 't2', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' };
+    const platform = { id: 't3', name: 'vip', ownerModel: 'platform' };
+    const rows = [
+      {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          attachment(null, own),
+          attachment(null, theirs),
+          attachment(null, platform),
+          attachment('2026-01-01', own),
+        ],
+      },
+      { id: 'u2', name: 'Bob', tagAttachments: [attachment(null, own)] },
+    ];
+    expect(prune(rows, targeted as never) as unknown).toEqual([
+      {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          { deletedAt: null, tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' } },
+          { deletedAt: null, tag: null },
+          { deletedAt: null, tag: { id: 't3', name: 'vip', ownerModel: 'platform' } },
+        ],
+      },
+    ]);
+  });
+
   it('prunes a nested to-one relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),
