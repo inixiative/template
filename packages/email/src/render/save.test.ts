@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -436,7 +437,7 @@ describe('saveEmailTemplate', () => {
 });
 
 describe('saveEmailTemplate — the lens decides at save', () => {
-  const lens = emailLens({ senderModel: 'Organization' });
+  const lens = emailLens({ sender: lensFor('Organization') });
   const strict = emailLens();
 
   afterAll(async () => {

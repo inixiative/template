@@ -9,7 +9,8 @@ import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { prune } from '@template/db/lens';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
-import { lookupTemplate, rowOwner } from '@template/email/render';
+import { lookupTemplate, rowOwner, templateLens } from '@template/email/render';
+import { declaredFields } from '@template/email/rules';
 import { log } from '@template/shared/logger';
 import { pick } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -68,7 +69,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
 
   const entry = registry[template];
   if (!entry) throw new Error(`No email registry entry for template "${template}" (event=${eventName})`);
-  for (const name of entry.data ?? []) {
+  const fields = declaredFields(entry.data);
+  for (const name of fields ?? []) {
     if (data[name] === undefined)
       throw new Error(`Email "${template}" declares data field "${name}" and the event did not supply it`);
   }
@@ -83,7 +85,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   }
 
   const entityRow = entity as Record<string, unknown>;
-  const dataVars = entry.data ? pick(data, entry.data) : (prune(entity, entityLens) as Record<string, unknown>);
+  const dataVars = fields ? pick(data, fields) : (prune(entity, entityLens) as Record<string, unknown>);
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(db, lens);
@@ -95,7 +97,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const row = await lookupTemplate(template, ownerScope(sender));
   if (!row) throw new EmailRenderError(template, 'template_missing');
   const lens = recipientLens(
-    (await emailLensFor(template, rowOwner(row))).recipient,
+    emailLensFor(template, rowOwner(row), await templateLens(template, row)).recipient,
     bindWhere(entry.recipients.where, entityRow),
   );
   const sendKey = plannerJobId(eventName, template, data);

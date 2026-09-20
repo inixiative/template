@@ -5,23 +5,19 @@
  * @uses none
  */
 import { z } from '@hono/zod-openapi';
-import { emailOwnerSchema } from '#/modules/emailTemplate/schemas/emailOwner.schema';
+import { EmailTemplateScalarInputSchema } from '@template/db';
 
-export const emailTemplatePreflightBodySchema = emailOwnerSchema
-  .extend({
-    mjml: z.string().min(1),
-    subject: z.string().optional(),
-    slug: z
-      .string()
-      .trim()
-      .min(1)
-      .max(255)
-      .optional()
-      .describe(
-        "Slug of the template being authored; resolves tokens against that template's rule surface. Without it, tokens are checked against the base recipient/data projection and unresolved ones are warnings.",
-      ),
-    locale: z.string().optional(),
-  })
+export const emailTemplatePreflightBodySchema = EmailTemplateScalarInputSchema.pick({
+  slug: true,
+  locale: true,
+  ownerModel: true,
+  organizationId: true,
+  spaceId: true,
+  userId: true,
+  mjml: true,
+  subject: true,
+})
+  .partial({ slug: true, subject: true })
   .openapi('EmailTemplatePreflightBody');
 
 export const emailTemplatePreflightFindingSchema = z

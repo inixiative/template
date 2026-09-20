@@ -17,16 +17,9 @@ import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
 import { type SettledTemplate, settleTemplate } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
+import { settleCommunication } from '#/lib/messaging/settleCommunication';
 
 const DELIVERABILITY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-const settle = async (
-  where: Prisma.CommunicationLogWhereInput,
-  data: Prisma.CommunicationLogUpdateManyMutationInput,
-): Promise<void> => {
-  const [row] = await db.communicationLog.updateManyAndReturn({ where, data });
-  if (row) await emitAppEvent('communication.settled', { communicationLog: row });
-};
 
 export type DeliverEmailPayload = {
   template: string;
@@ -63,7 +56,7 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
       return { unsubscribeUrl: unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind }) };
     });
   } catch (error) {
-    await settle(
+    await settleCommunication(
       { id: communicationLogId, status: { in: ['queued', 'failed'] } },
       { status: 'failed', error: error instanceof Error ? error.message : String(error) },
     );
@@ -79,7 +72,7 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     ? canDeliver(settled.kind, entry.recipientContact)
     : settled.kind === 'system';
   if (!deliverable) {
-    await settle(
+    await settleCommunication(
       { id: communicationLogId, status: { in: ['queued', 'failed'] } },
       { status: 'suppressed', ...resolved },
     );
@@ -107,7 +100,7 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     }
   }
   if (deliverability === 'undeliverable') {
-    await settle(
+    await settleCommunication(
       { id: communicationLogId, status: { in: ['queued', 'failed'] } },
       { status: 'undeliverable', error: undeliverableReason ?? 'undeliverable', ...resolved },
     );
@@ -174,13 +167,13 @@ export const deliverEmail = makeJob<DeliverEmailPayload>(async (_ctx, payload) =
     if (!result.success) throw new Error(`Email provider rejected send (id=${result.id})`);
     providerMessageId = result.id;
   } catch (error) {
-    await settle(
+    await settleCommunication(
       { id: communicationLogId, status: 'sending' },
       { status: 'failed', error: error instanceof Error ? error.message : String(error) },
     );
     throw error;
   }
-  await settle(
+  await settleCommunication(
     { id: communicationLogId, status: 'sending' },
     { status: 'sent', providerMessageId, sentAt: new Date() },
   );

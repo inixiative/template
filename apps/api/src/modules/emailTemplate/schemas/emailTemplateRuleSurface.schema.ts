@@ -5,11 +5,16 @@
  * @uses none
  */
 import { z } from '@hono/zod-openapi';
-import { emailOwnerSchema } from '#/modules/emailTemplate/schemas/emailOwner.schema';
+import { EmailTemplateScalarInputSchema } from '@template/db';
 
-export const emailTemplateRuleSurfaceBodySchema = emailOwnerSchema
-  .extend({ slug: z.string().min(1), locale: z.string().optional() })
-  .openapi('EmailTemplateRuleSurfaceBody');
+export const emailTemplateRuleSurfaceBodySchema = EmailTemplateScalarInputSchema.pick({
+  slug: true,
+  locale: true,
+  ownerModel: true,
+  organizationId: true,
+  spaceId: true,
+  userId: true,
+}).openapi('EmailTemplateRuleSurfaceBody');
 
 export const emailTemplateRuleSurfaceResponseSchema = z
   .object({

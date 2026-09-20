@@ -22,7 +22,7 @@ export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
 export { type InterpolateOptions, interpolate, type Variables } from './interpolate';
 export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
 export { lookupCascade } from './lookupCascade';
-export { lookupComponent, lookupTemplate } from './lookupTemplate';
+export { lookupComponent, lookupLens, lookupTemplate, templateLens } from './lookupTemplate';
 export {
   type ComponentNode,
   collectSlugsFromNodes,

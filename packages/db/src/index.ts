@@ -70,9 +70,11 @@ export * from './registries';
 export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
+export { OWNER_BINDS, type OwnerKind, ownedBy, ownerBindings } from './registries/ownedBy';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
+export { admitRuleReferences, type RuleReferenceAdmission } from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 // Type-safe delegate helpers (pass-the-delegate pattern)
@@ -117,13 +119,13 @@ export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
   liveRuleReferenceKeys,
+  liveRuleReferences,
   type RuleReferenceIssue,
   type RuleReferenceRow,
   ruleReferenceIssues,
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
-export { unadmittedRuleReferences } from './utils/unadmittedRuleReferences';
 
 // Hook shared utilities (ignore fields, redact fields)
 

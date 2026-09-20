@@ -4,14 +4,15 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, liveRuleReferenceKeys, type RuleReferenceRow } from '@template/db';
+import { db, liveRuleReferences, type RuleReferenceRow } from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { lookupComponent, lookupTemplate } from '@template/email/render/lookupTemplate';
+import { lookupComponent, lookupTemplate, templateLens } from '@template/email/render/lookupTemplate';
 import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
+import type { RuleReference } from '@template/shared/rules';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -21,15 +22,16 @@ export type ComposeTemplateResult = {
   kind: CommunicationKind;
   ownerModel: EmailOwnerModel;
   owner: OwnerScope;
+  lens: unknown;
   componentResolutions: Record<string, string>;
-  liveRuleRefs: Set<string>;
+  liveRuleRefs: RuleReference[];
 };
 
 export type ComposeComponentResult = {
   mjml: string;
 };
 
-const liveRuleReferencesOf = async (templateId: string, componentIds: string[]): Promise<Set<string>> => {
+const liveRuleReferencesOf = async (templateId: string, componentIds: string[]): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
     where: {
       OR: [
@@ -38,7 +40,7 @@ const liveRuleReferencesOf = async (templateId: string, componentIds: string[]):
       ],
     },
   })) as RuleReferenceRow[];
-  return liveRuleReferenceKeys(edges);
+  return liveRuleReferences(edges);
 };
 
 export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<ComposeTemplateResult> => {
@@ -64,6 +66,7 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     kind: template.kind,
     ownerModel: template.ownerModel,
     owner: rowOwner(template),
+    lens: await templateLens(slug, template),
     componentResolutions,
     liveRuleRefs,
   };

@@ -118,10 +118,8 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const [lens, liveRefs] = await Promise.all([
-      emailLensFor(slug, composed.owner),
-      withoutDegradedSegments(composed.liveRuleRefs),
-    ]);
+    const lens = emailLensFor(slug, composed.owner, composed.lens);
+    const liveRefs = await withoutDegradedSegments(composed.liveRuleRefs);
     return renderComposed(slug, composed, vars, at, lens, liveRefs);
   };
 

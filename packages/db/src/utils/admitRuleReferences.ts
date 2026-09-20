@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind helper
+ * @kind query
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
@@ -9,15 +9,18 @@ import { db } from '@template/db/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import type { RuleReference } from '@template/shared/rules';
-import { groupBy } from 'lodash-es';
+import { groupBy, partition } from 'lodash-es';
 
-/** The references no source query admits: the row is outside the lens's eligibility for that model's id. */
-export const unadmittedRuleReferences = async (
+export type RuleReferenceAdmission = { admitted: RuleReference[]; unadmitted: RuleReference[] };
+
+/** Which references the lens's own sources admit right now — the one predicate save and preflight share. */
+export const admitRuleReferences = async (
   sources: SourceQuery[],
   references: RuleReference[],
-): Promise<RuleReference[]> => {
+): Promise<RuleReferenceAdmission> => {
+  const admitted: RuleReference[] = [];
   const unadmitted: RuleReference[] = [];
-  for (const [model, refs] of Object.entries(groupBy(references, (ref) => ref.model))) {
+  for (const [model, refs] of Object.entries(groupBy(references, 'model'))) {
     const source = sources.find((query) => query.model === model && query.field === 'id');
     if (!source) {
       unadmitted.push(...refs);
@@ -27,8 +30,10 @@ export const unadmittedRuleReferences = async (
     const rows = (await delegate.findMany({
       where: { AND: [source.prisma.where, { id: { in: refs.map((ref) => ref.id) } }] },
     })) as { id: string }[];
-    const admitted = new Set(rows.map((row) => row.id));
-    unadmitted.push(...refs.filter((ref) => !admitted.has(ref.id)));
+    const ids = new Set(rows.map((row) => row.id));
+    const [inside, outside] = partition(refs, (ref) => ids.has(ref.id));
+    admitted.push(...inside);
+    unadmitted.push(...outside);
   }
-  return unadmitted;
+  return { admitted, unadmitted };
 };

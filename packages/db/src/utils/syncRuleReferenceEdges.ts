@@ -8,10 +8,10 @@ import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
 import { lockedLiveReferences } from '@template/db/utils/lockedLiveReferences';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
-import { unadmittedRuleReferences } from '@template/db/utils/unadmittedRuleReferences';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 
 export type RuleReferenceOwner = { model: ModelName; id: string };
@@ -52,7 +52,7 @@ export const syncRuleReferenceEdges = async (
   const fresh = added.find((ref) => !live.has(referenceKey(ref)));
   if (fresh) throw new RuleReferenceError(`rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`);
   if (sources) {
-    const [outside] = await unadmittedRuleReferences(sources, added);
+    const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
     if (outside) throw new RuleReferenceError(`rule names a ${outside.model} outside this owner's view: ${outside.id}`);
   }
 

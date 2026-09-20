@@ -14,20 +14,15 @@ import {
   type FieldMapEntry,
   type Lens,
   type LensNarrowing,
-  lensRequiredBindings,
   type ModelNarrowing,
   Operator,
   type RuleLensViolation,
-  type RuleValue,
-  resolveLensBindings,
   type SourceQuery,
   sourceQueries,
   validateNarrowing,
 } from '@inixiative/json-rules';
 import { RULE_REFERENCEABLE_MODELS, ruleReferences } from '@template/db';
-import { prismaMap } from '@template/db/generated/prismaMap';
-import { lensFor, omitForeignKeys } from '@template/db/lens';
-import type { ModelName } from '@template/db/utils/modelNames';
+import { lensFor, omitForeignKeys, rootLens } from '@template/db/lens';
 import { RESERVED_SCOPE_ROOTS, SCOPE_ROOTS, type ScopeRoot } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { RAIL_PROVIDED_SYSTEM_FIELDS } from '@template/email/rules/railProvidedSystemFields';
@@ -45,26 +40,17 @@ export const EMAIL_SYSTEM_MODEL = 'EmailSystem';
 export type SlotLens = RuleLens | typeof OPAQUE_SLOT;
 export type EmailLens = { [Root in ScopeRoot]?: SlotLens };
 
-export type EmailContextRelation = { name: string; model: ModelName; isList?: boolean };
-
-export type EmailDataProjection =
-  | { kind: 'model'; model: ModelName }
-  | { kind: 'fields'; fields: Record<string, string> }
-  | { kind: 'relations'; relations: EmailContextRelation[] };
-
-export type EmailDataLens = { model?: ModelName; narrowing?: ModelNarrowing };
-
 export type EmailSlotLenses = {
   recipient?: ModelNarrowing;
   sender?: ModelNarrowing;
-  data?: EmailDataLens;
+  data?: ModelNarrowing;
 };
 
 export type EmailLensInput = {
-  recipientModel?: ModelName;
-  senderModel?: ModelName | null;
-  data?: EmailDataProjection;
-  slots?: EmailSlotLenses;
+  sender?: RuleLens | null;
+  recipient?: RuleLens;
+  data?: RuleLens | null;
+  narrowing?: EmailSlotLenses;
 };
 
 const referenced: ModelNarrowing = { picks: ['id', 'name'] };
@@ -85,25 +71,31 @@ const referenceableSources = Object.fromEntries(
   RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
 );
 
-const prismaModels = prismaMap.models as Record<string, { fields: Record<string, { kind: string; type: string }> }>;
+const baseOf = (lens: RuleLens): Lens => ('parent' in lens ? rootLens(lens) : lens);
 
-const scalarPicks = (model: string, fields = prismaModels[model]?.fields ?? {}): ModelNarrowing => ({
+const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
   picks: Object.entries(fields)
     .filter(([, field]) => field.kind !== 'object' && field.kind !== 'bridge')
     .map(([name]) => name),
 });
 
-const narrowed = (parent: Lens, root: ModelNarrowing): LensNarrowing => {
-  const declared: LensNarrowing = { parent, mapDefaults: { prisma: { models: referenceableSources } }, root };
-  validateNarrowing(declared);
-  return omitForeignKeys(declared);
+const slot = (lens: RuleLens, narrowing?: ModelNarrowing): RuleLens => {
+  const base = baseOf(lens);
+  const prisma = base.mapName === 'prisma';
+  const root =
+    narrowing ??
+    ('parent' in lens ? undefined : scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}));
+  const declared: LensNarrowing = {
+    parent: lens,
+    ...(prisma ? { mapDefaults: { prisma: { models: referenceableSources } } } : {}),
+    ...(root ? { root } : {}),
+  };
+  if (root) validateNarrowing(declared);
+  return prisma ? omitForeignKeys(declared) : declared;
 };
 
-const prismaSlot = (model: ModelName, root: ModelNarrowing = scalarPicks(model)): LensNarrowing =>
-  narrowed(lensFor(model), root);
-
-const declaredSlot = (model: string, fields: Record<string, string>, root?: ModelNarrowing): RuleLens => {
-  const lens = createLens({
+export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MODEL): Lens =>
+  createLens({
     maps: {
       [EMAIL_MAP_NAME]: {
         models: {
@@ -116,10 +108,12 @@ const declaredSlot = (model: string, fields: Record<string, string>, root?: Mode
     mapName: EMAIL_MAP_NAME,
     model,
   });
-  if (!root) return lens;
-  const declared: LensNarrowing = { parent: lens, root };
-  validateNarrowing(declared);
-  return declared;
+
+export const declaredFields = (lens: RuleLens): string[] | null => {
+  const base = baseOf(lens);
+  return base.mapName === EMAIL_MAP_NAME
+    ? Object.keys(base.maps[EMAIL_MAP_NAME]?.models[base.model]?.fields ?? {})
+    : null;
 };
 
 const relation = (model: string, relationName: string, isList: boolean): FieldMapEntry => ({
@@ -131,62 +125,27 @@ const relation = (model: string, relationName: string, isList: boolean): FieldMa
   toFields: [],
 });
 
-const relationsSlot = (relations: EmailContextRelation[], root?: ModelNarrowing): LensNarrowing => {
-  const prisma = prismaMap as unknown as FieldMap;
-  const lens = createLens({
-    maps: {
-      prisma: {
-        ...prisma,
-        models: {
-          ...prisma.models,
-          [EMAIL_DATA_MODEL]: {
-            fields: Object.fromEntries(
-              relations.map((rel) => [rel.name, relation(rel.model, `EmailData_${rel.name}`, rel.isList ?? false)]),
-            ),
-          },
-        },
-      },
-    },
-    mapName: 'prisma',
-    model: EMAIL_DATA_MODEL,
-  });
-  return narrowed(
-    lens,
-    root ?? { relations: Object.fromEntries(relations.map((rel) => [rel.name, scalarPicks(rel.model)])) },
-  );
-};
-
-const dataSlot = (data: EmailDataProjection | undefined, slot: EmailDataLens | undefined): SlotLens => {
-  if (!data) return OPAQUE_SLOT;
-  switch (data.kind) {
-    case 'model':
-      return prismaSlot(data.model, slot?.narrowing);
-    case 'fields':
-      return declaredSlot(EMAIL_DATA_MODEL, data.fields, slot?.narrowing);
-    case 'relations':
-      return relationsSlot(data.relations, slot?.narrowing);
-  }
-};
-
 const SYSTEM_FIELDS: Record<string, string> = {
   ...Object.fromEntries(SYSTEM_TOKENS.map(({ name, kind }) => [name, kind])),
   ...Object.fromEntries(RAIL_PROVIDED_SYSTEM_FIELDS.map((name) => [name, 'String'])),
 };
 
-export const systemSlot = (): Lens => declaredSlot(EMAIL_SYSTEM_MODEL, SYSTEM_FIELDS) as Lens;
+export const systemSlot = (): Lens => fieldsLens(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
+
+const isUserLens = (lens: RuleLens): boolean => {
+  const base = baseOf(lens);
+  return base.mapName === 'prisma' && base.model === 'User';
+};
 
 export const emailLens = ({
-  recipientModel = 'User',
-  senderModel,
+  sender,
+  recipient = lensFor('User'),
   data,
-  slots = {},
+  narrowing = {},
 }: EmailLensInput = {}): EmailLens => ({
-  ...(senderModel ? { sender: prismaSlot(senderModel, slots.sender) } : {}),
-  recipient: prismaSlot(
-    recipientModel,
-    slots.recipient ?? (recipientModel === 'User' ? DEFAULT_RECIPIENT_NARROWING : undefined),
-  ),
-  data: dataSlot(data, slots.data),
+  ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
+  recipient: slot(recipient, narrowing.recipient ?? (isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined)),
+  data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
   system: systemSlot(),
 });
 
@@ -329,16 +288,6 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
 export const emailSourceQueries = (lens: EmailLens): SourceQuery[] =>
   emailSlotLenses(lens).flatMap(([, slot]) => sourceQueries(slot));
 
-export const emailLensRequiredBindings = (lens: EmailLens): Set<string> =>
-  new Set(emailSlotLenses(lens).flatMap(([, slot]) => [...lensRequiredBindings(slot)]));
-
-export const resolveEmailLensBindings = (lens: EmailLens, values: Record<string, RuleValue>): EmailLens => ({
-  ...lens,
-  ...Object.fromEntries(
-    emailSlotLenses(lens).map(([root, slot]) => [root, resolveLensBindings(slot, values) as RuleLens]),
-  ),
-});
-
 export const narrowEmailLens = (lens: EmailLens, narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens): EmailLens => ({
   ...lens,
   ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
@@ -382,22 +331,9 @@ export const emailRuleDecoration = (lens: EmailLens): EmailRuleDecoration => ({
 const isNarrowing = (value: unknown): value is ModelNarrowing =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const parseDataLens = (value: unknown): EmailDataLens | undefined => {
-  if (!isNarrowing(value)) return undefined;
-  const doc = value as Record<string, unknown>;
-  return {
-    ...(typeof doc.model === 'string' ? { model: doc.model as ModelName } : {}),
-    ...(isNarrowing(doc.narrowing) ? { narrowing: doc.narrowing } : {}),
-  };
-};
-
 export const parseSlotLenses = (raw: unknown): EmailSlotLenses => {
   if (!isNarrowing(raw)) return {};
   const doc = raw as Record<string, unknown>;
-  const data = parseDataLens(doc.data);
-  return {
-    ...(isNarrowing(doc.recipient) ? { recipient: doc.recipient } : {}),
-    ...(isNarrowing(doc.sender) ? { sender: doc.sender } : {}),
-    ...(data ? { data } : {}),
-  };
+  const slots = (['recipient', 'sender', 'data'] as const).filter((root) => isNarrowing(doc[root]));
+  return Object.fromEntries(slots.map((root) => [root, doc[root]]));
 };

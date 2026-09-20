@@ -57,7 +57,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
       locale: 'en',
       lens: {
         recipient: { picks: ['email'], relations: { organizationUsers: { picks: ['role'] } } },
-        data: { narrowing: { picks: ['name'] } },
+        data: { picks: ['name'] },
       },
     });
 
@@ -72,21 +72,20 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     expect(data.decoration.facets.map((f) => f.path)).toEqual(['recipient', 'data', 'system']);
   });
 
-  it('lets the row choose the data entry point and relations from the projection', async () => {
+  it('the row narrows the data lens the registry entry declares', async () => {
+    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     await createEmailTemplate({
-      slug: 'adhoc-with-entry',
+      slug: 'inquiry-invite-organization-user',
       ownerModel: 'default',
       locale: 'en',
       lens: {
-        data: {
-          model: 'Inquiry',
-          narrowing: { picks: ['content'], relations: { sourceOrganization: { picks: ['name'] } } },
-        },
+        sender: { picks: ['name'] },
+        data: { picks: ['content'], relations: { sourceOrganization: { picks: ['name'] } } },
       },
     });
 
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc-with-entry' })),
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
     );
 
     expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toMatchObject({
@@ -95,6 +94,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     });
     expect(fieldsOf(data, 'Inquiry')).toEqual(['content', 'sourceOrganization']);
     expect(fieldsOf(data, 'Organization')).toEqual(['id', 'name']);
+    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {

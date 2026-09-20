@@ -85,16 +85,16 @@ describe('emailTemplatePreflight', () => {
 
   it('resolves a data path against the rule surface of the slug it is given', async () => {
     await createEmailTemplate({
-      slug: 'inquiry-digest',
+      slug: 'inquiry-invite-organization-user',
       ownerModel: 'default',
       locale: 'en',
-      lens: { data: { model: 'Inquiry', narrowing: { picks: ['content'] } } },
+      lens: { data: { picks: ['content'] } },
     });
 
     const result = await emailTemplatePreflight({
       mjml: COMPLETE.replace('Hello {{recipient.name}}', 'About {{data.content}} / {{data.notAColumn}}'),
       subject: 'Your weekly digest',
-      slug: 'inquiry-digest',
+      slug: 'inquiry-invite-organization-user',
     });
 
     expect(result.findings.map((finding) => [finding.code, finding.location])).toEqual([

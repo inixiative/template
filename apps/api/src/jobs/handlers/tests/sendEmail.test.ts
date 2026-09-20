@@ -10,6 +10,7 @@ import {
   createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
+import { fieldsLens } from '@template/email/rules';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -31,6 +32,8 @@ const userEntity = (): EmailEntry['entity'] => ({
   parent: lensFor('User'),
   root: { where: { field: 'id', operator: Operator.equals, bind: 'userId' }, picks: ['id', 'name', 'email'] },
 });
+
+const userData: EmailEntry['data'] = { parent: lensFor('User'), root: { picks: ['id', 'name', 'email'] } };
 
 const recipientSelf: RecipientTarget = { where: { field: 'id', operator: Operator.equals, bind: 'id' } };
 
@@ -99,6 +102,7 @@ describe('sendEmail handler', () => {
 
     addEntry('test-fanout', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientsIn([alice.id, bob.id]),
     });
@@ -124,6 +128,7 @@ describe('sendEmail handler', () => {
     });
     addEntry('test-tagged', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientsIn([vip.id, plain.id]),
     });
@@ -143,6 +148,7 @@ describe('sendEmail handler', () => {
 
     addEntry('test-cc', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
       cc: recipientById(manager.id),
@@ -160,6 +166,7 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({ slug: 'test-log', subject: 'Hi', mjml: plainMjml('Hi') });
     addEntry('test-log', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
     });
@@ -182,6 +189,7 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({ slug: 'test-dedup', subject: 'Hi', mjml: plainMjml('Hi') });
     addEntry('test-dedup', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
     });
@@ -200,6 +208,7 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({ slug: 'test-promo', subject: 'Promo', mjml: plainMjml('Promo'), kind: 'marketing' });
     addEntry('test-promo', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
     });
@@ -222,6 +231,7 @@ describe('sendEmail handler', () => {
     });
     addEntry('test-unsub-link', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
     });
@@ -244,6 +254,7 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({ slug: 'test-bad', subject: 'Hi', mjml: plainMjml('Hi'), kind: 'platform' });
     addEntry('test-bad', {
       entity: userEntity(),
+      data: userData,
       sender: { type: 'platform' },
       recipients: recipientSelf,
     });
@@ -268,7 +279,7 @@ describe('sendEmail handler', () => {
       entity: userEntity(),
       sender: { type: 'platform' },
       recipients: recipientSelf,
-      data: ['code'],
+      data: fieldsLens({ code: 'String' }),
     });
 
     await expect(

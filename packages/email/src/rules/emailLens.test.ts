@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 import { type Condition, check } from '@inixiative/json-rules';
+import { lensFor } from '@template/db/lens';
 import {
   applyEmailLens,
   DEFAULT_RECIPIENT_NARROWING,
   EMAIL_SURFACE_ROOT,
   emailLens,
-  emailLensRequiredBindings,
   emailRuleDecoration,
   emailRuleReferences,
   emailRuleVocabularyIssues,
   emailSurface,
+  fieldsLens,
   OPAQUE_SLOT,
   parseSlotLenses,
   walkEmailLensPath,
@@ -56,7 +57,7 @@ describe('emailLens — four lenses, one per scope root', () => {
   });
 
   it('walks a path into the slot its root names', () => {
-    const lens = emailLens({ senderModel: 'Organization', data: { kind: 'model', model: 'Inquiry' } });
+    const lens = emailLens({ sender: lensFor('Organization'), data: lensFor('Inquiry') });
     expect(walkEmailLensPath('recipient.name', lens)).toEqual({ outcome: 'resolved' });
     expect(walkEmailLensPath('recipient.nope', lens)).toEqual({ outcome: 'missing', index: 1 });
     expect(walkEmailLensPath('sender.name', lens)).toEqual({ outcome: 'resolved' });
@@ -80,11 +81,11 @@ describe('emailLens — four lenses, one per scope root', () => {
 
   it('a stored slot replaces the engine default for that slot only', () => {
     const lens = emailLens({
-      senderModel: 'Organization',
-      data: { kind: 'model', model: 'Inquiry' },
-      slots: {
+      sender: lensFor('Organization'),
+      data: lensFor('Inquiry'),
+      narrowing: {
         recipient: { picks: ['email'], relations: { organizationUsers: { picks: ['role'] } } },
-        data: { narrowing: { picks: ['content'] } },
+        data: { picks: ['content'] },
       },
     });
     expect(walkEmailLensPath('recipient.tagAttachments.tag.id', lens).outcome).toBe('missing');
@@ -94,21 +95,19 @@ describe('emailLens — four lenses, one per scope root', () => {
     expect(walkEmailLensPath('sender.name', lens).outcome).toBe('resolved');
   });
 
-  it('models a fields data projection as scalars and a relations projection as named relations', () => {
-    const fields = emailLens({ data: { kind: 'fields', fields: { verificationUrl: 'String' } } });
+  it('a declared-fields data lens exposes exactly its fields', () => {
+    const fields = emailLens({ data: fieldsLens({ verificationUrl: 'String' }) });
     expect(walkEmailLensPath('data.verificationUrl', fields).outcome).toBe('resolved');
     expect(walkEmailLensPath('data.other', fields).outcome).toBe('missing');
-    const relations = emailLens({ data: { kind: 'relations', relations: [{ name: 'inquiry', model: 'Inquiry' }] } });
-    expect(walkEmailLensPath('data.inquiry.content', relations).outcome).toBe('resolved');
   });
 
   it('rejects a stored slot that names a field its model does not have', () => {
-    expect(() => emailLens({ slots: { recipient: { picks: ['notAField'] } } })).toThrow();
+    expect(() => emailLens({ narrowing: { recipient: { picks: ['notAField'] } } })).toThrow();
   });
 });
 
 describe('emailLens — the rule vocabulary', () => {
-  const lens = emailLens({ senderModel: 'Organization' });
+  const lens = emailLens({ sender: lensFor('Organization') });
 
   it('the canonical membership spellings are clean', () => {
     expect(emailRuleVocabularyIssues(lens, tagged('tag-a'))).toEqual([]);
@@ -149,7 +148,7 @@ describe('emailLens — the rule vocabulary', () => {
 });
 
 describe('emailLens — the rows a rule names', () => {
-  const lens = emailLens({ senderModel: 'Organization' });
+  const lens = emailLens({ sender: lensFor('Organization') });
 
   it('membership over tags and segments names each row', () => {
     expect(emailRuleReferences(lens, { any: [tagged('tag-a'), inSegment('seg-a')] })).toEqual([
@@ -207,7 +206,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('a tag or segment outside the owner view does not match; inside it does', () => {
-    const lens = scopeEmailLens(emailLens({ senderModel: 'Organization' }), org);
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
     const own = scope(
       { ownerModel: 'Organization', organizationId: 'org-1' },
       { ownerModel: 'Organization', organizationId: 'org-1' },
@@ -226,7 +225,6 @@ describe('emailLens — evaluation goes through the lens', () => {
     expect(check(applyEmailLens(lens, tagged('tag-a')), other)).not.toBe(true);
     expect(check(applyEmailLens(lens, inSegment('seg-a')), other)).not.toBe(true);
     expect(check(applyEmailLens(lens, tagged('tag-a')), platform)).toBe(true);
-    expect(emailLensRequiredBindings(lens).size).toBe(0);
   });
 
   it('a platform owner sees platform tags and no segments', () => {
@@ -240,7 +238,7 @@ describe('emailLens — evaluation goes through the lens', () => {
   });
 
   it('prefixes what the slot folded in back onto the root, and leaves paths and foreign roots alone', () => {
-    const lens = emailLens({ senderModel: 'Organization' });
+    const lens = emailLens({ sender: lensFor('Organization') });
     const applied = applyEmailLens(lens, {
       all: [
         { field: 'recipient.name', operator: 'equals', value: 'Ann' },
@@ -266,7 +264,7 @@ describe('emailLens — evaluation goes through the lens', () => {
 
 describe('emailSurface — the four lenses composed for the builder', () => {
   it('roots the surface at Email with one field per slot and the union of what each slot exposes', () => {
-    const surface = emailSurface(emailLens({ senderModel: 'Organization' }));
+    const surface = emailSurface(emailLens({ sender: lensFor('Organization') }));
     expect(surface.model).toBe(EMAIL_SURFACE_ROOT);
     expect(fieldsOf(surface, EMAIL_SURFACE_ROOT)).toEqual(['data', 'recipient', 'sender', 'system']);
     expect(surface.maps[surface.mapName]?.models[EMAIL_SURFACE_ROOT]?.fields.data).toEqual({
@@ -283,12 +281,12 @@ describe('emailSurface — the four lenses composed for the builder', () => {
   it('exposes exactly what the slots reach, and nothing beyond it', () => {
     const surface = emailSurface(
       emailLens({
-        senderModel: 'Organization',
-        data: { kind: 'model', model: 'Inquiry' },
-        slots: {
+        sender: lensFor('Organization'),
+        data: lensFor('Inquiry'),
+        narrowing: {
           recipient: { picks: ['email'], relations: { organizationUsers: { picks: ['role'] } } },
           sender: { picks: ['name'] },
-          data: { narrowing: { picks: ['content'] } },
+          data: { picks: ['content'] },
         },
       }),
     );
@@ -300,7 +298,7 @@ describe('emailSurface — the four lenses composed for the builder', () => {
   });
 
   it('derives one facet per slot present', () => {
-    expect(emailRuleDecoration(emailLens({ senderModel: 'Organization' })).facets).toEqual([
+    expect(emailRuleDecoration(emailLens({ sender: lensFor('Organization') })).facets).toEqual([
       { path: 'sender', label: 'Sender' },
       { path: 'recipient', label: 'Recipient' },
       { path: 'data', label: 'Data' },
@@ -315,9 +313,7 @@ describe('parseSlotLenses', () => {
     expect(parseSlotLenses({ recipient: { picks: ['email'] }, sender: 'nope', data: null })).toEqual({
       recipient: { picks: ['email'] },
     });
-    expect(parseSlotLenses({ data: { model: 'Inquiry', narrowing: { picks: ['content'] }, extra: 1 } })).toEqual({
-      data: { model: 'Inquiry', narrowing: { picks: ['content'] } },
-    });
+    expect(parseSlotLenses({ data: { picks: ['content'] }, extra: 1 })).toEqual({ data: { picks: ['content'] } });
     expect(parseSlotLenses(null)).toEqual({});
     expect(parseSlotLenses([1])).toEqual({});
   });

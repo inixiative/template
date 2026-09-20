@@ -319,8 +319,9 @@ other lens. Everything a template does with a path or a rule goes through it:
   `Email` for the rule surface route; `emailRuleDecoration` derives one facet per lens present.
 
 **The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
-builds the slug's declared lens (the registry entry's projection narrowed by the slots stored on
-the slug's default-tier row) and scopes it to the owner of the row being saved, edited or rendered
+builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient,
+narrowed by the slots stored on the row — or on the slug's default-tier row when the row carries
+none) and scopes it to the owner of the row being saved, edited or rendered
 (`scopeEmailLens`): tags are platform-owned or the owner's, segments are the owner's (via
 `recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The owner
