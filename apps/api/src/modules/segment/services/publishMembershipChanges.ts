@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses primitive:appEvents, infrastructure:prisma
  */
-import { type Db, db as defaultDb } from '@template/db';
+import { db } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import { emitAppEvent } from '#/appEvents/emit';
 import { customerRefCustomerFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
@@ -33,7 +33,7 @@ const byCustomerRef = (changes: MembershipChange[]): Map<string, PerCustomerRef>
   return out;
 };
 
-export const publishMembershipChanges = async (changes: MembershipChange[], db: Db = defaultDb): Promise<void> => {
+export const publishMembershipChanges = async (changes: MembershipChange[]): Promise<void> => {
   const moved = changes.filter(({ diff }) => diff.added.length || diff.removed.length);
   if (!moved.length) return;
 

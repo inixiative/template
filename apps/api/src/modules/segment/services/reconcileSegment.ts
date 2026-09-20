@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type Db, db as defaultDb } from '@template/db';
+import { db } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import { isEqual } from 'lodash-es';
@@ -25,13 +25,9 @@ export const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boo
   );
 };
 
-export const reconcileSegment = async (
-  segment: Segment,
-  db: Db = defaultDb,
-  signal?: AbortSignal,
-): Promise<MembershipDiff> => {
+export const reconcileSegment = async (segment: Segment, signal?: AbortSignal): Promise<MembershipDiff> => {
   if (!isReconcilable(segment)) return { added: [], removed: [] };
-  const matching = await evaluateSegment(segment, db);
+  const matching = await evaluateSegment(segment);
   if (signal?.aborted) return { added: [], removed: [] };
-  return applyMembershipDiff({ segmentId: segment.id, matching }, db);
+  return applyMembershipDiff({ segmentId: segment.id, matching });
 };

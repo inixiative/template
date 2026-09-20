@@ -4,9 +4,12 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+
+import type { Condition } from '@inixiative/json-rules';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { type RuleReference, referenceKey } from '@template/shared/rules';
+import { ruleReferences } from '@template/db/utils/ruleReferences';
+import { type RuleHealth, type RuleLens, type RuleReference, referenceKey } from '@template/shared/rules';
 
 /** The shape a rule-reference edge has to arrive in for its health to be readable. No relations. */
 export type RuleReferenceRow = {
@@ -64,3 +67,15 @@ export const liveRuleReferences = (edges: RuleReferenceRow[]): RuleReference[] =
 
 export const liveRuleReferenceKeys = (edges: RuleReferenceRow[]): Set<string> =>
   new Set(liveRuleReferences(edges).map(referenceKey));
+
+/** A rule's health as its own edges tell it: the rows it names, and which of them still resolve. */
+export const ruleHealthFromEdges = (
+  lens: RuleLens,
+  rule: Condition,
+  edges: RuleReferenceRow[],
+): RuleHealth & { live: Set<string> } => ({
+  lens,
+  rule,
+  references: ruleReferences(lens, rule),
+  live: liveRuleReferenceKeys(edges),
+});

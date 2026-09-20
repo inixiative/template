@@ -1,3 +1,4 @@
+export { RuleDegradedError, RuleEvaluationError } from './errors';
 export {
   type RuleArms,
   type RuleHealth,

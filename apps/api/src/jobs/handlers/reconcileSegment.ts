@@ -6,10 +6,10 @@
  */
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
+import { RuleDegradedError } from '@template/shared/rules';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import { SegmentRuleDegradedError } from '#/modules/segment/services/evaluateSegment';
 import { publishMembershipChanges } from '#/modules/segment/services/publishMembershipChanges';
 import { dynamicSegmentsOf } from '#/modules/segment/services/reconcileCustomerRef';
 import { isReconcilable, reconcileSegment as reconcile } from '#/modules/segment/services/reconcileSegment';
@@ -29,18 +29,18 @@ export const reconcileSegment = makeSupersedingJob<ReconcileSegmentPayload>(
 
     let diff: Awaited<ReturnType<typeof reconcile>>;
     try {
-      diff = await reconcile(segment, db, ctx.signal);
+      diff = await reconcile(segment, ctx.signal);
     } catch (error) {
-      if (!(error instanceof SegmentRuleDegradedError)) throw error;
+      if (!(error instanceof RuleDegradedError)) throw error;
       log.warn(`reconcileSegment: ${error.message}`);
       return;
     }
 
     if (!diff.added.length && !diff.removed.length) return;
-    await publishMembershipChanges([{ segment, diff }], db);
+    await publishMembershipChanges([{ segment, diff }]);
 
     const path = [...referencePath, segmentId];
-    const siblings = await soundSegments(await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment), db), db);
+    const siblings = await soundSegments(await dynamicSegmentsOf(segment.ownerModel, segmentOwnerId(segment)));
     const dependents = referencedBy(buildReferenceMap(siblings), segmentId).filter((id) => !path.includes(id));
     for (const dependentId of dependents) {
       await enqueueJob('reconcileSegment', { segmentId: dependentId, referencePath: path });

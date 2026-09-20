@@ -12,5 +12,5 @@ import { spaceReachSegmentRoute } from '#/modules/space/routes/spaceReachSegment
 export const spaceReachSegmentController = makeController(spaceReachSegmentRoute, async (c, respond) => {
   const space = getResource<'space'>(c);
   const { conditions } = c.req.valid('json');
-  return respond.ok({ count: await estimateSegmentReach('Space', space.id, conditions, c.get('db')) });
+  return respond.ok({ count: await estimateSegmentReach('Space', space.id, conditions) });
 });

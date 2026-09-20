@@ -55,7 +55,7 @@ describe('segmentConditions hook', () => {
 
   it('refuses an empty arm inside any', async () => {
     await expect(createSegment({ conditions: { any: [acmeRule, { all: [] }] } }, { space })).rejects.toThrow(
-      'matches every customer',
+      'matches every row',
     );
   });
 

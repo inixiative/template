@@ -20,5 +20,5 @@ export const spaceReadManySegmentsController = makeController(spaceReadManySegme
     include: includeSegmentRuleReferences,
   });
 
-  return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });
+  return respond.ok(await withSegmentsRuleIssues(data), { pagination });
 });

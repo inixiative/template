@@ -26,5 +26,5 @@ export const spaceCreateSegmentController = makeController(spaceCreateSegmentRou
 
   await emitAppEvent('segment.created', { segment });
 
-  return respond.created(await withSegmentRuleIssues(segment, db));
+  return respond.created(await withSegmentRuleIssues(segment));
 });

@@ -23,5 +23,5 @@ export const segmentUpdateController = makeController(segmentUpdateRoute, async 
 
   await emitAppEvent('segment.updated', { segment: updated, previous: segment });
 
-  return respond.ok(await withSegmentRuleIssues(updated, db));
+  return respond.ok(await withSegmentRuleIssues(updated));
 });

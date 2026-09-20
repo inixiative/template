@@ -4,11 +4,12 @@ import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createOrganizationUser, createSegment, createSpace } from '@template/db/test';
+import { RuleDegradedError } from '@template/shared/rules';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
-import { evaluateSegment, SegmentRuleDegradedError } from '#/modules/segment/services/evaluateSegment';
+import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -82,7 +83,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
         detail: `rule names a Segment that no longer resolves: ${target.id}`,
       },
     ]);
-    await expect(evaluateSegment(dependent)).rejects.toBeInstanceOf(SegmentRuleDegradedError);
+    await expect(evaluateSegment(dependent)).rejects.toBeInstanceOf(RuleDegradedError);
 
     await db.withDeleted(() => db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }));
     expect((await withSegmentRuleIssues(dependent)).ruleIssues).toEqual([]);
@@ -109,7 +110,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
         detail: `rule names a Segment whose own rule is degraded: ${middle.id}`,
       },
     ]);
-    await expect(evaluateSegment(top)).rejects.toBeInstanceOf(SegmentRuleDegradedError);
+    await expect(evaluateSegment(top)).rejects.toBeInstanceOf(RuleDegradedError);
 
     await db.withDeleted(() => db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }));
     expect((await withSegmentRuleIssues(top)).ruleIssues).toEqual([]);

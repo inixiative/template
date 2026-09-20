@@ -28,6 +28,6 @@ export const organizationCreateSegmentController = makeController(
 
     await emitAppEvent('segment.created', { segment });
 
-    return respond.created(await withSegmentRuleIssues(segment, db));
+    return respond.created(await withSegmentRuleIssues(segment));
   },
 );

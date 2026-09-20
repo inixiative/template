@@ -11,5 +11,5 @@ import { estimateSegmentReach } from '#/modules/segment/services/estimateSegment
 export const meReachSegmentController = makeController(meReachSegmentRoute, async (c, respond) => {
   const user = c.get('user')!;
   const { conditions } = c.req.valid('json');
-  return respond.ok({ count: await estimateSegmentReach('User', user.id, conditions, c.get('db')) });
+  return respond.ok({ count: await estimateSegmentReach('User', user.id, conditions) });
 });

@@ -122,10 +122,12 @@ export {
   liveRuleReferences,
   type RuleReferenceIssue,
   type RuleReferenceRow,
+  ruleHealthFromEdges,
   ruleReferenceIssues,
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
+export { type RuleValidation, type ValidateRuleForLensOptions, validateRuleForLens } from './utils/validateRuleForLens';
 
 // Hook shared utilities (ignore fields, redact fields)
 

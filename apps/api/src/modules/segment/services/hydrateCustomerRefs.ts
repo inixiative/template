@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { type LensNarrowing, Operator } from '@inixiative/json-rules';
-import { type Db, db as defaultDb } from '@template/db';
+import { db } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
@@ -19,7 +19,6 @@ export const hydrateCustomerRefs = async (
   ownerModel: ProviderModel,
   ownerId: string,
   customerRefIds: string[],
-  db: Db = defaultDb,
 ): Promise<HydratedCustomerRef[]> => {
   if (!customerRefIds.length) return [];
   const lens: LensNarrowing = {

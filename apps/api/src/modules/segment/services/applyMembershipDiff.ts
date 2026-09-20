@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type Db, db as defaultDb } from '@template/db';
+import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 
 export type MembershipDiff = { added: string[]; removed: string[] };
@@ -14,10 +14,7 @@ const MASS_EVICTION_MIN_MEMBERS = 50;
 
 type DiffScope = { segmentId: string; matching: Iterable<string>; within?: string[] };
 
-export const applyMembershipDiff = async (
-  { segmentId, matching, within }: DiffScope,
-  db: Db = defaultDb,
-): Promise<MembershipDiff> => {
+export const applyMembershipDiff = async ({ segmentId, matching, within }: DiffScope): Promise<MembershipDiff> => {
   const matchingSet = new Set(matching);
   const current = await db.segmentMember.findMany({
     where: { segmentId, ...(within && { customerRefId: { in: within } }) },

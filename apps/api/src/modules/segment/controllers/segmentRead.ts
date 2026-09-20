@@ -12,5 +12,5 @@ import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRul
 export const segmentReadController = makeController(segmentReadRoute, async (c, respond) => {
   const db = c.get('db');
   const segment = getResource<'segment'>(c);
-  return respond.ok(await withSegmentRuleIssues(segment, db));
+  return respond.ok(await withSegmentRuleIssues(segment));
 });

@@ -25,5 +25,5 @@ export const meCreateSegmentController = makeController(meCreateSegmentRoute, as
 
   await emitAppEvent('segment.created', { segment });
 
-  return respond.created(await withSegmentRuleIssues(segment, db));
+  return respond.created(await withSegmentRuleIssues(segment));
 });

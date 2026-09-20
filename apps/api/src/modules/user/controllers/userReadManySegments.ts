@@ -20,5 +20,5 @@ export const userReadManySegmentsController = makeController(userReadManySegment
     include: includeSegmentRuleReferences,
   });
 
-  return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });
+  return respond.ok(await withSegmentsRuleIssues(data), { pagination });
 });

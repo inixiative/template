@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, primitive:shared
  */
 import type { Condition } from '@inixiative/json-rules';
-import { type Db, db as defaultDb, liveRuleReferenceKeys, type RuleReferenceRow, ruleReferences } from '@template/db';
+import { db, type RuleReferenceRow, ruleHealthFromEdges } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy, uniqBy } from 'lodash-es';
@@ -25,12 +25,12 @@ const degradedReferenceDetail = (issue: RuleIssue, degraded: ReadonlySet<string>
     ? { ...issue, detail: `rule names a ${issue.reference.model} whose own rule is degraded: ${issue.reference.id}` }
     : issue;
 
-const ownerSegments = async (sample: Segment, db: Db): Promise<Segment[]> =>
+const ownerSegments = async (sample: Segment): Promise<Segment[]> =>
   db.segment.findMany({
     where: { ownerModel: sample.ownerModel, [segmentOwnerFk(sample.ownerModel)]: segmentOwnerId(sample) },
   });
 
-const edgesFor = async (segmentIds: string[], db: Db): Promise<Record<string, RuleReferenceRow[]>> =>
+const edgesFor = async (segmentIds: string[]): Promise<Record<string, RuleReferenceRow[]>> =>
   groupBy(
     (await db.ruleReference.findMany({ where: { segmentId: { in: segmentIds } } })) as (RuleReferenceRow & {
       segmentId: string;
@@ -51,10 +51,8 @@ const closeOverOwner = (
     if (known) return known;
     visiting.add(segment.id);
 
-    const lens = customerRefLens;
-    const rule = segment.conditions as Condition;
-    const references = ruleReferences(lens, rule);
-    const live = liveRuleReferenceKeys(edges[segment.id] ?? []);
+    const base = ruleHealthFromEdges(customerRefLens, segment.conditions as Condition, edges[segment.id] ?? []);
+    const { references, live } = base;
     const degraded = new Set<string>();
     for (const reference of references) {
       if (reference.model !== 'Segment' || !live.has(referenceKey(reference))) continue;
@@ -63,7 +61,7 @@ const closeOverOwner = (
       if (stateOf(named).issues.length) degraded.add(segmentKey(named.id));
     }
 
-    const health: RuleHealth = { lens, rule, references, live: new Set([...live].filter((key) => !degraded.has(key))) };
+    const health: RuleHealth = { ...base, live: new Set([...live].filter((key) => !degraded.has(key))) };
     const state = {
       segment,
       health,
@@ -78,35 +76,27 @@ const closeOverOwner = (
   return states;
 };
 
-export const segmentRuleStates = async (
-  segments: Segment[],
-  db: Db = defaultDb,
-): Promise<Map<string, SegmentRuleState>> => {
+export const segmentRuleStates = async (segments: Segment[]): Promise<Map<string, SegmentRuleState>> => {
   const states = new Map<string, SegmentRuleState>();
   for (const sample of uniqBy(segments, ownerKey)) {
     const owned = uniqBy(
-      [...(await ownerSegments(sample, db)), ...segments.filter((s) => ownerKey(s) === ownerKey(sample))],
+      [...(await ownerSegments(sample)), ...segments.filter((s) => ownerKey(s) === ownerKey(sample))],
       'id',
     );
-    const edges = await edgesFor(
-      owned.map((segment) => segment.id),
-      db,
-    );
+    const edges = await edgesFor(owned.map((segment) => segment.id));
     for (const [id, state] of closeOverOwner(owned, edges)) states.set(id, state);
   }
   return states;
 };
 
-export const segmentRuleState = async (segment: Segment, db: Db = defaultDb): Promise<SegmentRuleState> =>
-  (await segmentRuleStates([segment], db)).get(segment.id)!;
+export const segmentRuleState = async (segment: Segment): Promise<SegmentRuleState> =>
+  (await segmentRuleStates([segment])).get(segment.id)!;
 
 /** Issues read off the row's own edges; null when a live segment reference means the owner closure decides. */
 export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
   if (!segment.ruleReferences) return null;
-  const lens = customerRefLens;
-  const rule = segment.conditions as Condition;
-  const references = ruleReferences(lens, rule);
-  const live = liveRuleReferenceKeys(segment.ruleReferences);
-  if (references.some((reference) => reference.model === 'Segment' && live.has(referenceKey(reference)))) return null;
-  return ruleIssues({ lens, rule, references, live });
+  const health = ruleHealthFromEdges(customerRefLens, segment.conditions as Condition, segment.ruleReferences);
+  if (health.references.some((reference) => reference.model === 'Segment' && health.live.has(referenceKey(reference))))
+    return null;
+  return ruleIssues(health);
 };

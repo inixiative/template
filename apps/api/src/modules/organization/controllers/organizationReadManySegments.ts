@@ -22,6 +22,6 @@ export const organizationReadManySegmentsController = makeController(
       include: includeSegmentRuleReferences,
     });
 
-    return respond.ok(await withSegmentsRuleIssues(data, db), { pagination });
+    return respond.ok(await withSegmentsRuleIssues(data), { pagination });
   },
 );

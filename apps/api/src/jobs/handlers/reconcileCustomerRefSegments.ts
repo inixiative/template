@@ -20,12 +20,12 @@ export const reconcileCustomerRefSegments = makeSupersedingJob<ReconcileCustomer
     });
     const changes: MembershipChange[] = [];
     for (const ref of refs) {
-      for (const { segmentId, diff } of await reconcileCustomerRef(ref.id, db)) {
+      for (const { segmentId, diff } of await reconcileCustomerRef(ref.id)) {
         const segment = await db.segment.findUnique({ where: { id: segmentId } });
         if (segment) changes.push({ segment, diff });
       }
     }
-    await publishMembershipChanges(changes, db);
+    await publishMembershipChanges(changes);
   },
   ({ customerModel, customerId }) => `customer:${customerModel}:${customerId}`,
 );

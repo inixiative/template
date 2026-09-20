@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { applyLens, check } from '@inixiative/json-rules';
-import { type Db, db as defaultDb } from '@template/db';
+import { db } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
@@ -27,7 +27,7 @@ const providerOf = (customerRef: CustomerRef): { ownerModel: ProviderModel; owne
   return ownerId ? { ownerModel, ownerId } : null;
 };
 
-export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string, db: Db = defaultDb) =>
+export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string) =>
   db.segment.findMany({
     where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null, type: 'dynamic' },
   });
@@ -38,22 +38,19 @@ const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boo
   if (!matches && index !== -1) row.segmentMembers.splice(index, 1);
 };
 
-export const reconcileCustomerRef = async (
-  customerRefId: string,
-  db: Db = defaultDb,
-): Promise<CustomerRefReconciliation> => {
+export const reconcileCustomerRef = async (customerRefId: string): Promise<CustomerRefReconciliation> => {
   const customerRef = await db.customerRef.findUnique({ where: { id: customerRefId } });
   if (!customerRef) return [];
   const provider = providerOf(customerRef);
   if (!provider) return [];
 
-  const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId, db)).filter(isContinuous);
+  const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(isContinuous);
   if (!segments.length) return [];
 
-  const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId], db);
+  const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId]);
   const lens = resolvedCustomerRefLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
-  const states = await segmentRuleStates(ordered, db);
+  const states = await segmentRuleStates(ordered);
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {
@@ -63,10 +60,11 @@ export const reconcileCustomerRef = async (
     });
     if (matches === null) continue;
     if (row) recordDecision(row, segment, matches);
-    const diff = await applyMembershipDiff(
-      { segmentId: segment.id, matching: matches ? [customerRefId] : [], within: [customerRefId] },
-      db,
-    );
+    const diff = await applyMembershipDiff({
+      segmentId: segment.id,
+      matching: matches ? [customerRefId] : [],
+      within: [customerRefId],
+    });
     if (diff.added.length || diff.removed.length) results.push({ segmentId: segment.id, diff });
   }
   return results;

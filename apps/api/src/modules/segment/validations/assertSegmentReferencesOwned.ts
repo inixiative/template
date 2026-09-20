@@ -4,14 +4,14 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import type { Condition } from '@inixiative/json-rules';
-import { type Db, db as defaultDb } from '@template/db';
+import { type Condition, sourceQueries } from '@inixiative/json-rules';
+import { admitRuleReferences, db, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { referenceKey } from '@template/shared/rules';
+import { customerRefLens, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
 import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
-import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 
 type Candidate = {
   ownerModel: ProviderModel;
@@ -20,19 +20,28 @@ type Candidate = {
   held?: string[];
 };
 
-export const assertSegmentReferencesOwned = async (
-  { ownerModel, ownerId, conditions, held = [] }: Candidate,
-  db: Db = defaultDb,
-): Promise<Segment[]> => {
-  const ids = segmentReferences(conditions, customerRefLens);
-  if (!ids.length) return [];
-  const owned = await db.segment.findMany({
-    where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null },
-  });
-  const found = new Set(owned.map((segment) => segment.id));
-  const missing = ids.filter((id) => !found.has(id) && !held.includes(id));
-  if (missing.length) {
-    throw invalidSegmentConditions([`references a segment this ${ownerModel} does not own: ${missing.join(', ')}`]);
+/** Refuses a rule naming rows the owner's lens does not admit; returns the owner's live segments for the cycle check. */
+export const assertSegmentReferencesOwned = async ({
+  ownerModel,
+  ownerId,
+  conditions,
+  held = [],
+}: Candidate): Promise<Segment[]> => {
+  const added = ruleReferences(customerRefLens, conditions).filter(
+    (reference) => !held.includes(referenceKey(reference)),
+  );
+  if (added.length) {
+    const { unadmitted } = await admitRuleReferences(
+      sourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)),
+      added,
+    );
+    if (unadmitted.length) {
+      throw invalidSegmentConditions(
+        unadmitted.map(
+          (reference) => `references a ${reference.model} this ${ownerModel} does not own: ${reference.id}`,
+        ),
+      );
+    }
   }
-  return owned;
+  return db.segment.findMany({ where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null } });
 };
