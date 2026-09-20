@@ -130,6 +130,17 @@ describe('{{#each}} loops', () => {
     expect(out).toBe('live ');
   });
 
+  it('a slot row the lens does not admit is not there to read: a foreign sender prints nothing and issues nothing false', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const render = (sender: Record<string, unknown>) =>
+      interpolate('[{{sender.name}}]', { recipient: { id: 'u1', name: 'Ann' }, sender, data: {} }, undefined, { lens });
+    expect(render({ id: 'org-1', name: 'Acme' })).toBe('[Acme]');
+    expect(render({ id: 'org-2', name: 'FOREIGN' })).toBe('[]');
+  });
+
   it('a token under a loop element reads only what the lens exposes: a foreign tag is not there to print', () => {
     const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
       ownerModel: 'Organization',

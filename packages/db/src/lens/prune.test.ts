@@ -70,6 +70,27 @@ describe('prune', () => {
     });
   });
 
+  it("the root row is admitted by the root visit's where too: a hidden single row is null, hidden array rows are dropped", () => {
+    const lens = {
+      parent: lensFor('Organization'),
+      root: { picks: ['id', 'name'], where: { field: 'id', operator: 'equals', value: 'org-1' } },
+    } as const;
+    expect(prune({ id: 'org-1', name: 'Acme', slug: 'x' }, lens as never) as unknown).toEqual({
+      id: 'org-1',
+      name: 'Acme',
+    });
+    expect(prune({ id: 'org-2', name: 'FOREIGN' }, lens as never) as unknown).toBeNull();
+    expect(
+      prune(
+        [
+          { id: 'org-1', name: 'Acme' },
+          { id: 'org-2', name: 'FOREIGN' },
+        ],
+        lens as never,
+      ) as unknown,
+    ).toEqual([{ id: 'org-1', name: 'Acme' }]);
+  });
+
   it('prunes a nested to-one relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),

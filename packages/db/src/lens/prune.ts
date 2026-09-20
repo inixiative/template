@@ -16,7 +16,7 @@ import {
 type Pruned<T> = T extends readonly (infer E)[]
   ? Array<Pruned<E>>
   : T extends object
-    ? { [K in keyof T]?: Pruned<T[K]> }
+    ? { [K in keyof T]?: Pruned<T[K]> } | null
     : T;
 
 const whereColumns = (condition: Condition, out: Set<string>): void => {
@@ -72,9 +72,14 @@ export const prune = <D extends Record<string, unknown> | readonly Record<string
 ): Pruned<D> => {
   const byPath = projectByPath(lens);
   const [rootKey] = byPath.keys();
-  if (!rootKey) return data as unknown as Pruned<D>;
+  const root = rootKey ? byPath.get(rootKey) : undefined;
+  if (!rootKey || !root) return data as unknown as Pruned<D>;
 
-  return (Array.isArray(data)
-    ? data.map((row) => pruneRow(byPath, row, rootKey))
-    : pruneRow(byPath, data as Record<string, unknown>, rootKey)) as unknown as Pruned<D>;
+  if (Array.isArray(data)) {
+    return (data as Record<string, unknown>[])
+      .filter((row) => admitted(root, row))
+      .map((row) => pruneRow(byPath, row, rootKey)) as unknown as Pruned<D>;
+  }
+  const row = data as Record<string, unknown>;
+  return (admitted(root, row) ? pruneRow(byPath, row, rootKey) : null) as unknown as Pruned<D>;
 };
