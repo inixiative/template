@@ -84,7 +84,9 @@ export const emailOwnerProvider = (owner: EmailOwnerRef): EmailLensOwner => {
     case 'Organization':
       return owner.organizationId ? { ownerModel: 'Organization', ownerId: owner.organizationId } : null;
     case 'Space':
-      return owner.spaceId ? { ownerModel: 'Space', ownerId: owner.spaceId } : null;
+      return owner.spaceId
+        ? { ownerModel: 'Space', ownerId: owner.spaceId, organizationId: owner.organizationId }
+        : null;
     case 'User':
     case 'OrganizationUser':
     case 'SpaceUser':

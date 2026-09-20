@@ -6,6 +6,7 @@ import {
   createEmailTemplate,
   createOrganization,
   createSegment,
+  createSpace,
   createTag,
   createUser,
 } from '@template/db/test';
@@ -176,6 +177,31 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const segments = optionsOf(data, 'Segment');
     expect(segments).toContain(mySegment.id);
     expect(segments).not.toContain(theirSegment.id);
+    expect(optionsOf(data, 'Organization')).toEqual([mine.id]);
+    expect(optionsOf(data, 'Space')).toEqual([]);
+  });
+
+  it("a space template offers its own space and its organization, never another's", async () => {
+    const { entity: mine } = await createOrganization();
+    const { entity: theirs } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization: mine });
+    const { entity: sibling } = await createSpace({}, { organization: mine });
+    await createSpace({}, { organization: theirs });
+
+    const { data } = await json<Surface>(
+      await fetch(
+        post('/api/admin/emailTemplate/ruleSurface', {
+          slug: 'picker-probe',
+          ownerModel: 'Space',
+          organizationId: mine.id,
+          spaceId: space.id,
+        }),
+      ),
+    );
+
+    expect(optionsOf(data, 'Organization')).toEqual([mine.id]);
+    expect(optionsOf(data, 'Space')).toEqual([space.id]);
+    expect(optionsOf(data, 'Space')).not.toContain(sibling.id);
   });
 
   it('a platform template offers platform tags and no segments', async () => {
@@ -192,5 +218,6 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     expect(tags).toContain(platformTag.id);
     expect(tags).not.toContain(orgTag.id);
     expect(optionsOf(data, 'Segment')).toEqual([]);
+    expect(optionsOf(data, 'Organization')).toContain(org.id);
   });
 });
