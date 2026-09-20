@@ -30,6 +30,7 @@ export {
   emailSlotLenses,
   emailSourceQueries,
   emailSurface,
+  evaluateScopedRule,
   fieldsLens,
   narrowEmailLens,
   OPAQUE_SLOT,
@@ -49,6 +50,7 @@ export {
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
 export { contentRuleReferences } from './ruleReferences';
+export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scopedRule';
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export { syncRuleReferences } from './syncRuleReferences';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';

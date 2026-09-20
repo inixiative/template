@@ -15,14 +15,14 @@ import { resolvePath } from '@template/email/render/settle/resolvePath';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
 import {
-  applyEmailLens,
   defaultEmailLens,
   emailRuleReferences,
   emailRuleVocabulary,
+  evaluateScopedRule,
 } from '@template/email/rules/emailLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import { loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
@@ -70,7 +70,7 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   const filter = block.filter;
   const lens = options.lens ?? defaultEmailLens;
   if (filter !== undefined) {
-    const judged = absoluteRule(filter, bodyOptions.bindings);
+    const judged = scopedRule(filter, bodyOptions.bindings);
     const degraded =
       judged === undefined
         ? null
@@ -87,13 +87,20 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   }
 
   const emitted: unknown[] = [];
+  const judged = filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings);
+  const frames = loopFrames(bodyOptions.bindings);
   for (const element of arrayValue) {
     if (filter === undefined) {
       emitted.push(element);
       continue;
     }
     try {
-      if (check(applyEmailLens(lens, filter), toRuleData({ ...scope, [as]: element })) === true) emitted.push(element);
+      const elementScope = { ...scope, [as]: element };
+      const passes =
+        judged === undefined
+          ? check(filter, toRuleData(elementScope))
+          : evaluateScopedRule(lens, judged, toRuleData(narrowToElements(elementScope, frames)));
+      if (passes === true) emitted.push(element);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');
     }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import { lensFor } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
+import { emailLens } from '@template/email/rules/emailLens';
+import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
   interpolate(template, { data }, onError);
@@ -40,6 +43,32 @@ describe('{{#each}} loops', () => {
       },
     );
     expect(out).toBe('A C ');
+  });
+
+  it('a filter and a rule inside a loop see only what the lens admits', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const tag = (id: string, organizationId: string) => ({
+      deletedAt: null,
+      tag: { id, name: 'vip', ownerModel: 'Organization', organizationId },
+    });
+    const recipient = {
+      id: 'u1',
+      name: 'Ann',
+      email: 'ann@example.com',
+      tagAttachments: [tag('own', 'org-1'), tag('theirs', 'org-2')],
+    };
+    const filter = '{"field":"item.tag.name","operator":"equals","value":"vip"}';
+    const rule = '{"field":"item.tag.name","operator":"equals","path":"recipient.name"}';
+    const out = interpolate(
+      `{{#each recipient.tagAttachments as=item filter=${filter}}}{{item.tag.id}} {{/each}}|{{#each recipient.tagAttachments as=item}}{{#if rule=${rule}}}{{item.tag.id}}{{/if}}{{/each}}`,
+      { recipient: { ...recipient, name: 'vip' }, sender: { id: 'org-1', name: 'Acme' }, data: {} },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('own |own');
   });
 
   it('renders {{#if}} inside a loop against the element scope', () => {

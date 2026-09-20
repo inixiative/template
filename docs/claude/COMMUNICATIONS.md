@@ -314,7 +314,11 @@ other lens. Everything a template does with a path or a rule goes through it:
   and in preflight.
 - **Rules** — `emailRuleViolations` is the vocabulary (save and `withRule` at render),
   `emailRuleReferences` the rows a rule names, and `applyEmailLens` + `check` the evaluation:
-  settle never checks a raw rule, so a lens `where` decides at send what it decides at save.
+  settle never checks a raw rule, so a lens `where` decides at send what it decides at save. A
+  rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
+  loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
+  and evaluation all read that one form, and evaluation runs slot-relative against the iterated
+  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`).
 - **The builder** — `emailSurface` composes the four exposed surfaces under a presentation root
   `Email` for the rule surface route; `emailRuleDecoration` derives one facet per lens present.
 

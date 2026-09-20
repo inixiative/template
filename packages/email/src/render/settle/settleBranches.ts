@@ -9,13 +9,14 @@ import type { Branch } from '@template/email/render/conditionParser';
 import { settle } from '@template/email/render/settle/settle';
 import { toRuleData } from '@template/email/render/settle/toRuleData';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
 import {
   applyEmailLens,
   defaultEmailLens,
   emailRuleReferences,
   emailRuleVocabulary,
+  evaluateScopedRule,
 } from '@template/email/rules/emailLens';
+import { loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
@@ -34,17 +35,20 @@ export const settleBranches = (
 
     const rule = branch.rule!;
     const lens = options.lens ?? defaultEmailLens;
+    const judged = scopedRule(rule, options.bindings);
     const evaluate = (): string | null => {
       try {
-        return check(applyEmailLens(lens, rule), toRuleData(scope)) === true
-          ? settle(branch.body, scope, options, onError)
-          : null;
+        const frames = loopFrames(options.bindings ?? new Map());
+        const passes =
+          judged !== undefined && frames.length
+            ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(scope, frames)))
+            : check(applyEmailLens(lens, rule), toRuleData(scope));
+        return passes === true ? settle(branch.body, scope, options, onError) : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
         return null;
       }
     };
-    const judged = absoluteRule(rule, options.bindings);
     const rendered =
       judged === undefined
         ? evaluate()

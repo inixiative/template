@@ -10,11 +10,13 @@ import {
   emailRuleReferences,
   emailRuleVocabularyIssues,
   emailSurface,
+  evaluateScopedRule,
   fieldsLens,
   OPAQUE_SLOT,
   parseSlotLenses,
   walkEmailLensPath,
 } from '@template/email/rules/emailLens';
+import { loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const fieldsOf = (surface: ReturnType<typeof emailSurface>, model: string): string[] =>
@@ -225,6 +227,48 @@ describe('emailLens — evaluation goes through the lens', () => {
     expect(check(applyEmailLens(lens, tagged('tag-a')), other)).not.toBe(true);
     expect(check(applyEmailLens(lens, inSegment('seg-a')), other)).not.toBe(true);
     expect(check(applyEmailLens(lens, tagged('tag-a')), platform)).toBe(true);
+  });
+
+  it('a loop filter is judged and evaluated through the lens: a foreign tag in the element list does not pass', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
+    const bindings = new Map([['item', 'recipient.tagAttachments']]);
+    const frames = loopFrames(bindings);
+    const scoped = scopedRule({ field: 'item.tag.name', operator: 'equals', value: 'vip' }, bindings)!;
+    expect(emailRuleVocabularyIssues(lens, scoped)).toEqual([]);
+
+    const own = {
+      deletedAt: null,
+      tag: { id: 'tag-a', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' },
+    };
+    const foreign = {
+      deletedAt: null,
+      tag: { id: 'tag-b', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' },
+    };
+    const gone = { deletedAt: '2026-01-01', tag: { id: 'tag-c', name: 'vip', ownerModel: 'platform' } };
+    const base = { recipient: { id: 'u1', name: 'Ann', tagAttachments: [own, foreign, gone] }, sender: {}, data: {} };
+    const passes = (item: unknown) => evaluateScopedRule(lens, scoped, narrowToElements({ ...base, item }, frames));
+    expect(passes(own)).toBe(true);
+    expect(passes(foreign)).not.toBe(true);
+    expect(passes(gone)).not.toBe(true);
+  });
+
+  it('a rule inside a loop names its rows, breaks vocabulary and reaches the root like any other', () => {
+    const lens = emailLens({ sender: lensFor('Organization') });
+    const bindings = new Map([['item', 'recipient.tagAttachments']]);
+    expect(
+      emailRuleReferences(lens, scopedRule({ field: 'item.tag.id', operator: 'equals', value: 'tag-a' }, bindings)!),
+    ).toEqual([{ model: 'Tag', id: 'tag-a' }]);
+    const bad = scopedRule({ field: 'item.tag.nope', operator: 'equals', value: 1 }, bindings)!;
+    expect(emailRuleVocabularyIssues(lens, bad).join(' ')).toContain('nope');
+    const toRoot = scopedRule({ field: 'item.tag.name', operator: 'equals', path: 'recipient.name' }, bindings)!;
+    expect(emailRuleVocabularyIssues(lens, toRoot)).toEqual([]);
+    const data = {
+      recipient: { id: 'u1', name: 'vip', tagAttachments: [{ deletedAt: null, tag: { id: 't', name: 'vip' } }] },
+    };
+    const frames = loopFrames(bindings);
+    expect(
+      evaluateScopedRule(lens, toRoot, narrowToElements({ ...data, item: data.recipient.tagAttachments[0] }, frames)),
+    ).toBe(true);
   });
 
   it('a platform owner sees platform tags and no segments', () => {

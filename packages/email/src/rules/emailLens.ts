@@ -7,6 +7,7 @@
 import {
   applyLens,
   type Condition,
+  check,
   checkRuleAgainstLens,
   createLens,
   exposedSurface,
@@ -189,7 +190,7 @@ const absolutePathsIn = (leaf: Leaf): Set<string> => {
   const out = new Set<string>();
   walkConditionTree(leaf as Condition, undefined, (node) => {
     const record = node as Record<string, unknown>;
-    if (typeof record.path === 'string' && record.path && !record.path.startsWith('$.')) out.add(record.path);
+    if (typeof record.path === 'string' && record.path && !record.path.startsWith('$')) out.add(record.path);
     return [
       { condition: record.condition as Condition | undefined, context: undefined },
       { condition: record.filter as Condition | undefined, context: undefined },
@@ -278,6 +279,19 @@ export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition =>
     if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return leaf;
     return prefixed(applyLens({ ...leaf, field: slice.rest } as Condition, slice.slot), slice.root);
   });
+
+/** A loop-bound rule (see `scopedRule`) evaluates slot-relative, so its `$$` refs climb to the lens root. */
+export const evaluateScopedRule = (
+  lens: EmailLens,
+  scoped: Condition,
+  narrowed: Record<string, unknown>,
+): boolean | string => {
+  if (!isLeaf(scoped)) return check(applyEmailLens(lens, scoped), narrowed);
+  const slice = sliceOf(lens, scoped);
+  if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return check(scoped, narrowed);
+  const row = (narrowed[slice.root] ?? {}) as Record<string, unknown>;
+  return check(applyLens({ ...scoped, field: slice.rest } as Condition, slice.slot), row);
+};
 
 export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
   SCOPE_ROOTS.flatMap((root) => {

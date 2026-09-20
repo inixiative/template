@@ -8,19 +8,19 @@ import type { Condition } from '@inixiative/json-rules';
 import { EACH, IF } from '@template/email/render/conditionParser/grammar';
 import { parseEachBlock } from '@template/email/render/conditionParser/parseEachBlock';
 import { parseIfBlock } from '@template/email/render/conditionParser/parseIfBlock';
-import { absoluteRule } from '@template/email/rules/absoluteRule';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
+import { scopedRule } from '@template/email/rules/scopedRule';
 
 const push = (out: Condition[], rule: Condition | undefined, bindings: BindingChain): void => {
   if (rule === undefined) return;
-  const judged = absoluteRule(rule, bindings);
+  const judged = scopedRule(rule, bindings);
   if (judged !== undefined) out.push(judged);
 };
 
 /**
- * Every rule the content evaluates — `{{#if}}` branches and `{{#each filter=}}` — with loop
- * bindings resolved to the absolute paths the lens can judge. A rule reading a loop index has no
- * path in the lens and is left out.
+ * Every rule the content evaluates — `{{#if}}` branches and `{{#each filter=}}` — a loop-bound
+ * rule as the array rule the lens judges (`scopedRule`). A rule reading a loop index, the element
+ * itself or another lens's root has no shape in the lens and is left out.
  */
 export const collectRules = (content: string, bindings: BindingChain = new Map()): Condition[] => {
   const rules: Condition[] = [];
