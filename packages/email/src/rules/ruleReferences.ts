@@ -13,7 +13,7 @@ export const contentRuleReferences = (lens: EmailLens, ...contents: string[]): R
   const seen = new Set<string>();
   const references: RuleReference[] = [];
   for (const content of contents) {
-    for (const rule of collectRules(content)) {
+    for (const rule of collectRules(content, new Map(), lens)) {
       for (const reference of emailRuleReferences(lens, rule)) {
         const key = referenceKey(reference);
         if (seen.has(key)) continue;

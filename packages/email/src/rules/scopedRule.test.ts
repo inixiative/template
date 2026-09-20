@@ -14,12 +14,12 @@ const nested: BindingChain = new Map([
 describe('scopedRule — a loop-bound rule becomes the array rule it always was', () => {
   it('no bindings: the rule is returned as written', () => {
     const rule = eq('recipient.name', 'Ann');
-    expect(scopedRule(rule, undefined)).toBe(rule);
-    expect(scopedRule(rule, new Map())).toBe(rule);
+    expect(scopedRule(rule, undefined).rule).toBe(rule);
+    expect(scopedRule(rule, new Map()).rule).toBe(rule);
   });
 
   it('field: the iterated path becomes the array rule, the binding leaf its element-relative condition', () => {
-    expect(scopedRule(eq('item.tag.name', 'vip'), oneLoop)).toEqual({
+    expect(scopedRule(eq('item.tag.name', 'vip'), oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: eq('tag.name', 'vip'),
@@ -27,7 +27,7 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
   });
 
   it('a root leaf inside the loop climbs to the lens root with $$', () => {
-    expect(scopedRule(eq('recipient.name', 'Ann'), oneLoop)).toEqual({
+    expect(scopedRule(eq('recipient.name', 'Ann'), oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: eq('$$.name', 'Ann'),
@@ -35,26 +35,26 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
   });
 
   it('path: a comparison to the element and to the root are both attributable', () => {
-    expect(scopedRule(eq('item.tag.name', undefined, { path: 'recipient.name' }), oneLoop)).toEqual({
+    expect(scopedRule(eq('item.tag.name', undefined, { path: 'recipient.name' }), oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: eq('tag.name', undefined, { path: '$$.name' }),
     });
-    expect(scopedRule(eq('recipient.name', undefined, { path: 'item.tag.name' }), oneLoop)).toEqual({
+    expect(scopedRule(eq('recipient.name', undefined, { path: 'item.tag.name' }), oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
-      condition: eq('$$.name', undefined, { path: 'tag.name' }),
+      condition: eq('$$.name', undefined, { path: '$.tag.name' }),
     });
   });
 
   it('value and bind are never paths and pass through untouched', () => {
     const rule = { field: 'item.tag.id', operator: 'equals', bind: 'tagId', bindOptional: true } as Condition;
-    expect(scopedRule(rule, oneLoop)).toEqual({
+    expect(scopedRule(rule, oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'equals', bind: 'tagId', bindOptional: true },
     });
-    expect(scopedRule(eq('item.tag.name', 'item.tag.name'), oneLoop)).toEqual({
+    expect(scopedRule(eq('item.tag.name', 'item.tag.name'), oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: eq('tag.name', 'item.tag.name'),
@@ -62,7 +62,7 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
   });
 
   it('nested loops chain relative to the enclosing element; the outer binding is one level up', () => {
-    expect(scopedRule({ all: [eq('member.segment.id', 's1'), eq('ref.customerModel', 'User')] }, nested)).toEqual({
+    expect(scopedRule({ all: [eq('member.segment.id', 's1'), eq('ref.customerModel', 'User')] }, nested).rule).toEqual({
       field: 'recipient.providerRefs',
       arrayOperator: 'any',
       condition: {
@@ -78,7 +78,7 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
       ['item', 'recipient.tagAttachments'],
       ['ref', 'recipient.providerRefs'],
     ]);
-    expect(scopedRule(eq('ref.customerModel', 'User'), chain)).toEqual({
+    expect(scopedRule(eq('ref.customerModel', 'User'), chain).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: { field: '$$.providerRefs', arrayOperator: 'any', condition: eq('customerModel', 'User') },
@@ -91,7 +91,7 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
       arrayOperator: 'any',
       condition: eq('resourceModel', undefined, { path: 'item.resourceModel' }),
     } as Condition;
-    expect(scopedRule(rule, oneLoop)).toEqual({
+    expect(scopedRule(rule, oneLoop).rule).toEqual({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: {
@@ -104,7 +104,10 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
 
   it('if/then/else and all/any are transparent', () => {
     // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
-    const out = scopedRule({ if: eq('item.a', 1), then: eq('item.b', 2), else: { any: [eq('item.c', 3)] } }, oneLoop);
+    const out = scopedRule(
+      { if: eq('item.a', 1), then: eq('item.b', 2), else: { any: [eq('item.c', 3)] } },
+      oneLoop,
+    ).rule;
     expect((out as { condition: unknown }).condition).toEqual({
       if: eq('a', 1),
       // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
@@ -113,11 +116,36 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
     });
   });
 
-  it('a leaf on a loop index, on the element itself, or on another lens root is not judgeable', () => {
+  it('an index leaf is a counter, not a path; the element itself and another lens root are issues, never rules', () => {
     const withIndex: BindingChain = new Map([...oneLoop, ['i', undefined]]);
-    expect(scopedRule(eq('i', 0), withIndex)).toBeUndefined();
-    expect(scopedRule(eq('item', null), oneLoop)).toBeUndefined();
-    expect(scopedRule(eq('sender.id', 'o1'), oneLoop)).toBeUndefined();
+    expect(scopedRule(eq('i', 0), withIndex).rule).toEqual({
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: true,
+    });
+    expect((scopedRule(eq('i', 0), withIndex, { indices: { i: 0 } }).rule as { condition: unknown }).condition).toBe(
+      true,
+    );
+    expect((scopedRule(eq('i', 0), withIndex, { indices: { i: 2 } }).rule as { condition: unknown }).condition).toBe(
+      false,
+    );
+    expect(scopedRule(eq('i', 0), withIndex, { indices: {} }).issue).toContain('not available here');
+    expect(scopedRule(eq('item.tag.name', undefined, { path: 'i' }), withIndex).issue).toContain(
+      'loop index as a path',
+    );
+    expect(scopedRule(eq('item', null), oneLoop).issue).toContain('loop element itself');
+    expect(scopedRule(eq('sender.id', 'o1'), oneLoop).issue).toContain(
+      'reads the sender lens from inside a loop over recipient',
+    );
+    expect(scopedRule({ all: [eq('item.tag.name', 'vip'), eq('sender.id', 'o1')] }, oneLoop).issue).toContain('sender');
+    const crossLoop: BindingChain = new Map([...oneLoop, ['s', 'sender.spaces']]);
+    expect(scopedRule(eq('s.id', 'x'), crossLoop).issue).toContain('nested loops must stay within one lens');
+  });
+
+  it('a loop over the opaque data bag comes back as written: nothing to fold, any root may be read', () => {
+    const data: BindingChain = new Map([['item', 'data.items']]);
+    const rule = { all: [eq('item.active', true), eq('recipient.name', 'Ann'), eq('item', 'x')] };
+    expect(scopedRule(rule, data).rule).toBe(rule);
   });
 
   it('loopFrames keeps loop order and drops index bindings', () => {

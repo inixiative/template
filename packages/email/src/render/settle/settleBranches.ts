@@ -16,7 +16,7 @@ import {
   emailRuleVocabulary,
   evaluateScopedRule,
 } from '@template/email/rules/emailLens';
-import { loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
+import { iteratesLens, loopFrames, loopIndices, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (
@@ -35,14 +35,22 @@ export const settleBranches = (
 
     const rule = branch.rule!;
     const lens = options.lens ?? defaultEmailLens;
-    const judged = scopedRule(rule, options.bindings);
+    const scoped = scopedRule(rule, options.bindings, {
+      lens,
+      indices: options.bindings && loopIndices(scope, options.bindings),
+    });
+    if (scoped.issue !== undefined) {
+      onError?.({ kind: 'rule', detail: scoped.issue });
+      continue;
+    }
+    const judged = scoped.rule;
+    const frames = loopFrames(options.bindings ?? new Map());
+    const lensed = iteratesLens(options.bindings, lens);
     const evaluate = (): string | null => {
       try {
-        const frames = loopFrames(options.bindings ?? new Map());
-        const passes =
-          judged !== undefined && frames.length
-            ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(scope, frames)))
-            : check(applyEmailLens(lens, rule), toRuleData(scope));
+        const passes = lensed
+          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(scope, frames)))
+          : check(frames.length ? rule : applyEmailLens(lens, rule), toRuleData(scope));
         return passes === true ? settle(branch.body, scope, options, onError) : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });
@@ -50,7 +58,7 @@ export const settleBranches = (
       }
     };
     const rendered =
-      judged === undefined
+      frames.length && !lensed
         ? evaluate()
         : withRule(
             {

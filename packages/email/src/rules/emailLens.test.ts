@@ -233,7 +233,7 @@ describe('emailLens — evaluation goes through the lens', () => {
     const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
     const bindings = new Map([['item', 'recipient.tagAttachments']]);
     const frames = loopFrames(bindings);
-    const scoped = scopedRule({ field: 'item.tag.name', operator: 'equals', value: 'vip' }, bindings)!;
+    const scoped = scopedRule({ field: 'item.tag.name', operator: 'equals', value: 'vip' }, bindings).rule!;
     expect(emailRuleVocabularyIssues(lens, scoped)).toEqual([]);
 
     const own = {
@@ -256,11 +256,14 @@ describe('emailLens — evaluation goes through the lens', () => {
     const lens = emailLens({ sender: lensFor('Organization') });
     const bindings = new Map([['item', 'recipient.tagAttachments']]);
     expect(
-      emailRuleReferences(lens, scopedRule({ field: 'item.tag.id', operator: 'equals', value: 'tag-a' }, bindings)!),
+      emailRuleReferences(
+        lens,
+        scopedRule({ field: 'item.tag.id', operator: 'equals', value: 'tag-a' }, bindings).rule!,
+      ),
     ).toEqual([{ model: 'Tag', id: 'tag-a' }]);
-    const bad = scopedRule({ field: 'item.tag.nope', operator: 'equals', value: 1 }, bindings)!;
+    const bad = scopedRule({ field: 'item.tag.nope', operator: 'equals', value: 1 }, bindings).rule!;
     expect(emailRuleVocabularyIssues(lens, bad).join(' ')).toContain('nope');
-    const toRoot = scopedRule({ field: 'item.tag.name', operator: 'equals', path: 'recipient.name' }, bindings)!;
+    const toRoot = scopedRule({ field: 'item.tag.name', operator: 'equals', path: 'recipient.name' }, bindings).rule!;
     expect(emailRuleVocabularyIssues(lens, toRoot)).toEqual([]);
     const data = {
       recipient: { id: 'u1', name: 'vip', tagAttachments: [{ deletedAt: null, tag: { id: 't', name: 'vip' } }] },
@@ -269,6 +272,22 @@ describe('emailLens — evaluation goes through the lens', () => {
     expect(
       evaluateScopedRule(lens, toRoot, narrowToElements({ ...data, item: data.recipient.tagAttachments[0] }, frames)),
     ).toBe(true);
+  });
+
+  it('an organization owner reaches only its own organization through the recipient, by name as well as id', () => {
+    const lens = scopeEmailLens(emailLens(), org);
+    const member = (organization: Record<string, unknown>) => ({
+      recipient: { id: 'u1', name: 'Ann', organizationUsers: [{ role: 'member', organization }] },
+      sender: {},
+      data: {},
+    });
+    const byName = {
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'equals', value: 'Acme' },
+    } as Condition;
+    expect(check(applyEmailLens(lens, byName), member({ id: 'org-1', name: 'Acme' }))).toBe(true);
+    expect(check(applyEmailLens(lens, byName), member({ id: 'org-2', name: 'Acme' }))).not.toBe(true);
   });
 
   it('a platform owner sees platform tags and no segments', () => {

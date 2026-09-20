@@ -190,7 +190,7 @@ const absolutePathsIn = (leaf: Leaf): Set<string> => {
   const out = new Set<string>();
   walkConditionTree(leaf as Condition, undefined, (node) => {
     const record = node as Record<string, unknown>;
-    if (typeof record.path === 'string' && record.path && !record.path.startsWith('$')) out.add(record.path);
+    if (typeof record.path === 'string' && isScopeRoot(splitRoot(record.path).root)) out.add(record.path);
     return [
       { condition: record.condition as Condition | undefined, context: undefined },
       { condition: record.filter as Condition | undefined, context: undefined },
@@ -206,6 +206,19 @@ const leaves = (rule: Condition): Leaf[] => {
     return undefined;
   });
   return out;
+};
+
+/** The dotted field chain a nested array rule descends — what a violation inside its condition is relative to. */
+const arrayChain = (rule: Condition): string[] => {
+  const chain: string[] = [];
+  let node = rule as Record<string, unknown>;
+  while (typeof node.field === 'string' && node.arrayOperator && isLeaf(node.condition)) {
+    chain.push(chain.length ? `${chain.at(-1)}.${node.field}` : node.field);
+    node = node.condition as Record<string, unknown>;
+  }
+  if (typeof node.field === 'string' && node.arrayOperator)
+    chain.push(chain.length ? `${chain.at(-1)}.${node.field}` : node.field);
+  return chain;
 };
 
 export const emailRuleViolations = (lens: EmailLens, rule: Condition): RuleLensViolation[] => {
@@ -229,9 +242,13 @@ export const emailRuleViolations = (lens: EmailLens, rule: Condition): RuleLensV
         violations.push({ path: crossing, reason: 'path (comparison ref) does not resolve through the narrowed lens' });
       }
     }
+    const chain = arrayChain({ ...leaf, field: rest } as Condition);
     for (const violation of checkRuleAgainstLens({ ...leaf, field: rest } as Condition, slot).violations) {
       if (crossings.has(violation.path)) continue;
-      violations.push({ path: `${root}.${violation.path}`, reason: violation.reason });
+      const within = chain.find((prefix) => violation.path === prefix || violation.path.startsWith(`${prefix}.`));
+      const path =
+        within || violation.path.startsWith('$') ? violation.path : `${chain.at(-1) ?? rest}.${violation.path}`;
+      violations.push({ path: `${root}.${path}`, reason: violation.reason });
     }
   }
   return violations;

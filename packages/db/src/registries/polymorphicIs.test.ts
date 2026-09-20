@@ -26,7 +26,8 @@ describe('polymorphicIs', () => {
     expect(check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null })).not.toBe(true);
   });
 
-  it('refuses an axis the registry does not declare', () => {
+  it('refuses an axis the registry does not declare, and a kind no single key binds', () => {
     expect(() => polymorphicIs('Tag', 'nope')).toThrow('no false-polymorphic axis');
+    expect(() => polymorphicIs('EmailTemplate', 'ownerModel')).toThrow('no single kind binds');
   });
 });

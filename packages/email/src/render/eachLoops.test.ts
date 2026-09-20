@@ -71,6 +71,94 @@ describe('{{#each}} loops', () => {
     expect(out).toBe('own |own');
   });
 
+  it('nested loops and path comparisons judge the element in scope, not another matching element', () => {
+    const lens = emailLens({ sender: lensFor('Organization') });
+    const member = (id: string) => ({ segment: { id, name: id } });
+    const recipient = {
+      id: 'u1',
+      name: 'vip',
+      email: 'ann@example.com',
+      providerRefs: [{ segmentMembers: [member('s1'), member('s2')] }, { segmentMembers: [member('s3')] }],
+      tagAttachments: [
+        { deletedAt: null, tag: { id: 'match', name: 'vip' } },
+        { deletedAt: null, tag: { id: 'other', name: 'plain' } },
+      ],
+    };
+    const inner = '{"field":"member.segment.name","operator":"in","value":["s2","s3"]}';
+    const toRoot = '{"field":"item.tag.name","operator":"equals","path":"recipient.name"}';
+    const fromRoot = '{"field":"recipient.name","operator":"equals","path":"item.tag.name"}';
+    const out = interpolate(
+      `{{#each recipient.providerRefs as=ref}}{{#each ref.segmentMembers as=member}}{{#if rule=${inner}}}{{member.segment.id}} {{/if}}{{/each}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${toRoot}}}{{item.tag.id}}{{/each}}|{{#each recipient.tagAttachments as=item filter=${fromRoot}}}{{item.tag.id}}{{/each}}`,
+      { recipient, sender: { id: 'org-1', name: 'Acme' }, data: {} },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('s2 s3 |match|match');
+  });
+
+  it('a loop iterates only what the lens admits, so tokens and rules in the body agree', () => {
+    const lens = emailLens({
+      narrowing: {
+        recipient: {
+          picks: ['id', 'name'],
+          relations: {
+            tagAttachments: {
+              picks: [],
+              where: { field: 'deletedAt', operator: 'notExists' },
+              relations: { tag: { picks: ['id', 'name'] } },
+            },
+          },
+        },
+      },
+    });
+    const out = interpolate(
+      '{{#each recipient.tagAttachments as=item}}{{item.tag.id}} {{/each}}',
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          tagAttachments: [
+            { deletedAt: null, tag: { id: 'live', name: 'a' } },
+            { deletedAt: '2026-01-01', tag: { id: 'gone', name: 'b' } },
+          ],
+        },
+        data: {},
+      },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('live ');
+  });
+
+  it('an unsupported loop rule fails closed with an issue: nothing renders, no raw check', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const theirs = {
+      deletedAt: null,
+      tag: { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' },
+    };
+    const issues: string[] = [];
+    const sink: RuleErrorSink = (issue) => issues.push(issue.detail);
+    const compound =
+      '{"all":[{"field":"item.tag.name","operator":"equals","value":"vip"},{"field":"sender.id","operator":"equals","value":"org-1"}]}';
+    const out = interpolate(
+      `{{#each recipient.tagAttachments as=item filter=${compound}}}{{item.tag.id}}{{/each}}|{{#each recipient.tagAttachments as=item index=i}}{{#if rule={"all":[{"field":"i","operator":"equals","value":0},{"field":"item.tag.name","operator":"equals","value":"vip"}]}}}{{item.tag.id}}{{/if}}{{/each}}`,
+      {
+        recipient: { id: 'u1', name: 'Ann', tagAttachments: [theirs] },
+        sender: { id: 'org-1', name: 'Acme' },
+        data: {},
+      },
+      sink,
+      { lens },
+    );
+    expect(out).toBe('|');
+    expect(issues.some((detail) => detail.includes('reads the sender lens from inside a loop over recipient'))).toBe(
+      true,
+    );
+  });
+
   it('renders {{#if}} inside a loop against the element scope', () => {
     const out = render(
       '{{#each data.items as=item}}{{#if rule={"field":"item.vip","operator":"equals","value":true}}}★{{/if}}{{item.name}} {{/each}}',

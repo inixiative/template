@@ -306,6 +306,18 @@ describe('validateConditions — binding refs desugar to absolute paths for the 
     ).toEqual([]);
   });
 
+  it('a rule inside a loop that reads another lens, a loop index or the element itself is refused at save', () => {
+    const cross = validateConditions(
+      '{{#each recipient.memberships as=m filter={"all":[{"field":"m.tier","operator":"equals","value":"gold"},{"field":"sender.id","operator":"equals","value":"s"}]}}}X{{/each}}',
+      { lens: testLens },
+    );
+    expect(cross.some((x) => x.message.includes('reads the sender lens from inside a loop over recipient'))).toBe(true);
+    const whole = validateConditions(
+      '{{#each recipient.memberships as=m}}{{#if rule={"field":"m","operator":"exists"}}}Y{{/if}}{{/each}}',
+    );
+    expect(whole.some((x) => x.message.includes('loop element itself'))).toBe(true);
+  });
+
   it('a binding-rooted field that typos an element field desugars and fails at save', () => {
     const issues = validateConditions(
       '{{#each recipient.memberships as=m}}{{#if rule={"field":"m.teir","operator":"equals","value":"gold"}}}Y{{/if}}{{/each}}',

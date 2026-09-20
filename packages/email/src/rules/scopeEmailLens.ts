@@ -45,8 +45,8 @@ const spaceScope = (owner: Owner): Condition =>
 const ownerDefaults = (owner: Owner): NarrowingDefaults => ({
   models: {
     ...platformDefaults.models,
-    Organization: { sources: { id: { where: organizationScope(owner) } } },
-    Space: { sources: { id: { where: spaceScope(owner) } } },
+    Organization: { where: organizationScope(owner), sources: { id: { where: organizationScope(owner) } } },
+    Space: { where: spaceScope(owner), sources: { id: { where: spaceScope(owner) } } },
   },
 });
 

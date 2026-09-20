@@ -40,6 +40,12 @@ const absoluteNode = (condition: Condition, bindings: BindingChain): Condition |
   }
 
   const out: Node = { ...node };
+  for (const key of ['condition', 'filter'] as const) {
+    if (node[key] === undefined) continue;
+    const child = absoluteNode(node[key] as Condition, bindings);
+    if (child === undefined) return undefined;
+    out[key] = child;
+  }
   const field = rewrite(node.field, bindings);
   if (field === undefined) return undefined;
   if (field !== null) out.field = field;

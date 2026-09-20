@@ -4,7 +4,6 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import { isEqual } from 'lodash-es';

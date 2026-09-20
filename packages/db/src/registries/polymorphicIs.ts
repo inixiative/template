@@ -33,6 +33,11 @@ export const polymorphicIs = (model: ModelName, axisField: string): Condition =>
       | PolymorphicKind
       | undefined;
   const columns = [...new Set(entries.flatMap(([, fks]) => fks))];
+  for (const [value, fks] of entries) {
+    if (fks.length && !fks.every((fk) => kindOf(fk))) {
+      throw new Error(`${model}.${axisField} value ${value} keys on ${fks.join('+')}, which no single kind binds`);
+    }
+  }
   return {
     any: columns.flatMap((fk) => {
       const kind = kindOf(fk);

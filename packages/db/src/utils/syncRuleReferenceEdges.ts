@@ -32,7 +32,7 @@ const edgeKey = (edge: Edge): string => referenceKey({ model: edge.referencedMod
 
 /**
  * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
- * gate is delta-only and fenced: a reference already held stays editable so a save can remove it,
+ * gate is delta-only and fenced: a reference already held is not re-admitted (a save may keep or drop it),
  * a newly named row must be live, and the lock stops a concurrent delete landing between the
  * check and the edge it admits.
  */
