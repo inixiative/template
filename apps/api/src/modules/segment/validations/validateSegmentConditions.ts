@@ -14,7 +14,7 @@ import {
 } from '@inixiative/json-rules';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
-import { resolvedSegmentLens, segmentLens } from '#/modules/segment/lib/segmentLens';
+import { customerRefLens, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 
 const PROBE_OWNER_ID = '00000000-0000-7000-8000-000000000000';
@@ -91,7 +91,7 @@ export const validateSegmentConditions = (
   if (!structural.ok) return invalid(structural.errors.map((error) => `${error.path}: ${error.message}`));
 
   const conditions = normalized as Condition;
-  const lens = segmentLens;
+  const lens = customerRefLens;
 
   const vocabulary = checkRuleAgainstLens(conditions, lens);
   if (!vocabulary.ok)
@@ -105,7 +105,7 @@ export const validateSegmentConditions = (
   }
 
   try {
-    const resolved = resolvedSegmentLens(ownerModel, PROBE_OWNER_ID);
+    const resolved = resolvedCustomerRefLens(ownerModel, PROBE_OWNER_ID);
     const root = rootLens(resolved);
     toPrisma(applyLens(conditions, resolved), { map: root, mapName: root.mapName, model: root.model });
   } catch (error) {

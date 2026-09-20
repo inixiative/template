@@ -1,8 +1,8 @@
 /**
  * @atlas
  * @kind config
- * @partOf feature:segment
- * @uses feature:customer, infrastructure:prisma
+ * @partOf feature:customer
+ * @uses infrastructure:prisma
  */
 import {
   type Condition,
@@ -55,7 +55,7 @@ const customer = (picks: string[], relations: Record<string, ModelNarrowing> = {
   relations: { contacts, tagAttachments, ...relations },
 });
 
-export const segmentLens: LensNarrowing = omitForeignKeys({
+export const customerRefLens: LensNarrowing = omitForeignKeys({
   parent: lensFor('CustomerRef'),
   mapDefaults: {
     prisma: {
@@ -79,11 +79,11 @@ export const segmentLens: LensNarrowing = omitForeignKeys({
   },
 });
 
-export const resolvedSegmentLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
-  resolveLensBindings(segmentLens, ownerBindings(ownerModel, ownerId)) as LensNarrowing;
+export const resolvedCustomerRefLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
+  resolveLensBindings(customerRefLens, ownerBindings(ownerModel, ownerId)) as LensNarrowing;
 
-export const segmentReachedModels = (): Set<string> =>
-  new Set([...projectByPath(segmentLens).values()].map((visit) => visit.modelName));
+export const customerRefReachedModels = (): Set<string> =>
+  new Set([...projectByPath(customerRefLens).values()].map((visit) => visit.modelName));
 
 const membershipProbe = {
   field: 'segmentMembers',
@@ -92,11 +92,11 @@ const membershipProbe = {
 } as Condition;
 
 if (
-  !ruleSourceValues(segmentLens, membershipProbe).some(
+  !ruleSourceValues(customerRefLens, membershipProbe).some(
     (source) => source.model === 'Segment' && source.field === 'id' && !source.dynamic,
   )
 ) {
   throw new Error(
-    'segmentLens no longer reaches the Segment.id membership source; segment references would read every rule as reference-free',
+    'customerRefLens no longer reaches the Segment.id membership source; segment references would read every rule as reference-free',
   );
 }

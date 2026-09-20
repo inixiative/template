@@ -20,8 +20,8 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
+import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
-import { segmentReachedModels } from '#/modules/segment/lib/segmentLens';
 
 const taggedRule = (tagId: string) => ({
   field: 'customerUser.tagAttachments',
@@ -37,7 +37,7 @@ const memberIds = async (segmentId: string): Promise<string[]> =>
 describe('reconcile triggers — the lens defines the propagation graph', () => {
   it('every model the segment lens reads has an event that reconciles it, and every event exists', () => {
     const names = new Set<string>(Object.values(AppEventName));
-    for (const model of segmentReachedModels()) {
+    for (const model of customerRefReachedModels()) {
       const events = RECONCILE_TRIGGERS[model as ModelName] ?? [];
       expect(events.length, `${model} has no reconcile trigger`).toBeGreaterThan(0);
       for (const event of events) expect(names.has(event), `${event} is not an app event`).toBe(true);

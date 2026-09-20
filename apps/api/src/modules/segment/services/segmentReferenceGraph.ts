@@ -6,7 +6,7 @@
  */
 import type { Condition } from '@inixiative/json-rules';
 import type { Segment } from '@template/db/generated/client/client';
-import { segmentLens } from '#/modules/segment/lib/segmentLens';
+import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 
 export type ReferenceMap = Map<string, Set<string>>;
@@ -18,7 +18,7 @@ export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
       map.set(segment.id, new Set());
       continue;
     }
-    map.set(segment.id, new Set(segmentReferences(segment.conditions as Condition, segmentLens)));
+    map.set(segment.id, new Set(segmentReferences(segment.conditions as Condition, customerRefLens)));
   }
   return map;
 };

@@ -8,7 +8,7 @@ import { type LensNarrowing, Operator } from '@inixiative/json-rules';
 import { type Db, db as defaultDb } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
-import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 
 export type HydratedCustomerRef = Record<string, unknown> & {
   id: string;
@@ -23,7 +23,7 @@ export const hydrateCustomerRefs = async (
 ): Promise<HydratedCustomerRef[]> => {
   if (!customerRefIds.length) return [];
   const lens: LensNarrowing = {
-    parent: resolvedSegmentLens(ownerModel, ownerId),
+    parent: resolvedCustomerRefLens(ownerModel, ownerId),
     root: { where: { field: 'id', operator: Operator.in, value: customerRefIds } },
   };
   return fetchLens<HydratedCustomerRef>(db, lens);

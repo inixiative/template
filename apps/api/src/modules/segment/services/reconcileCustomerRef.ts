@@ -9,7 +9,7 @@ import { type Db, db as defaultDb } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
@@ -51,7 +51,7 @@ export const reconcileCustomerRef = async (
   if (!segments.length) return [];
 
   const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId], db);
-  const lens = resolvedSegmentLens(provider.ownerModel, provider.ownerId);
+  const lens = resolvedCustomerRefLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
   const states = await segmentRuleStates(ordered, db);
 

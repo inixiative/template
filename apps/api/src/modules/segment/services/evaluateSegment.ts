@@ -10,7 +10,7 @@ import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
 import { type RuleIssue, withRule } from '@template/shared/rules';
-import { resolvedSegmentLens } from '#/modules/segment/lib/segmentLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
@@ -41,7 +41,7 @@ export const compileSegmentWhere = async (
   rule: Condition,
   db: Db,
 ): Promise<Record<string, unknown>> => {
-  const lens = resolvedSegmentLens(ownerModel, ownerId);
+  const lens = resolvedCustomerRefLens(ownerModel, ownerId);
   const root = rootLens(lens);
   const plan = toPrisma(applyLens(rule, lens), {
     map: root,

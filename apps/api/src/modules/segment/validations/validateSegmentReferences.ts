@@ -8,7 +8,7 @@ import type { Condition } from '@inixiative/json-rules';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import { segmentLens } from '#/modules/segment/lib/segmentLens';
+import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { buildReferenceMap, findReferenceCycle } from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
@@ -32,7 +32,7 @@ export const validateSegmentReferences = async (
   conditions: Condition,
   previous?: Segment,
 ): Promise<void> => {
-  const lens = segmentLens;
+  const lens = customerRefLens;
   const owned = await assertSegmentReferencesOwned({
     ownerModel: owner.ownerModel,
     ownerId: segmentOwnerId(owner as Segment),

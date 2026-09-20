@@ -8,7 +8,7 @@
 
 The lens is the single source of truth for what a surface can reason over — `exposedSurface(lens)` drives the builder surface (INFRA-017), `sourceQueries`/`SourceValues` decorate the option sets (INFRA-024), `checkRuleAgainstLens` gates writes. But a lens carries only field **paths + kinds** (+ enum members); it has no human-facing presentation metadata. This ticket is the **static presentation axis** — the sibling of INFRA-024's dynamic option-value axis.
 
-Motivating consumer: Zealot's segment builder cut its AI condition-generation prompt over from a hand-authored static schema to `exposedSurface(segmentLens)` (ZLT-1470). That killed the second source of truth, but the static schema had also been carrying curated labels (`Points Balance` for `pointsAmount`) — so today the FE title-cases raw paths and the AI sees raw field names, and there's nowhere to hang a per-field icon. Zealot tracker: **ZLT-3633**.
+Motivating consumer: Zealot's segment builder cut its AI condition-generation prompt over from a hand-authored static schema to `exposedSurface(customerRefLens)` (ZLT-1470). That killed the second source of truth, but the static schema had also been carrying curated labels (`Points Balance` for `pointsAmount`) — so today the FE title-cases raw paths and the AI sees raw field names, and there's nowhere to hang a per-field icon. Zealot tracker: **ZLT-3633**.
 
 ---
 
@@ -23,7 +23,7 @@ Both are **presentation only**. Hard constraint: a decorator entry must never wi
 
 ## Worked example — a custom-field / integration-map field (sources + prose together)
 
-The field that most needs this decorator is also the one that most needs a **source** (INFRA-024), so the two axes are easiest to see side by side. This is grounded in Zealot's real `segmentLens` (`apps/api/src/modules/groups/lib/segmentLens.ts`) and the json-rules source primitive (`sources?` on a narrowing → `sourceQueries(lens)`; `runSources` in `rules-builder/src/schema/sources.ts`).
+The field that most needs this decorator is also the one that most needs a **source** (INFRA-024), so the two axes are easiest to see side by side. This is grounded in Zealot's real `customerRefLens` (`apps/api/src/modules/groups/lib/customerRefLens.ts`) and the json-rules source primitive (`sources?` on a narrowing → `sourceQueries(lens)`; `runSources` in `rules-builder/src/schema/sources.ts`).
 
 **The data chain.** A brand's custom fields aren't dedicated columns — they ride the `enrichments` relation:
 
@@ -70,4 +70,4 @@ Choosing the mechanism; json-rules / rules-builder implementation planning (a `F
 - **INFRA-014** — Source Primitive (EAV/custom-field *table hydration*); the custom-field chain in the worked example is the surface it hydrates.
 - **FEAT-006** — Localization (labels are user-facing copy).
 - **ZLT-3633** — Zealot-side tracker (segment builder lost curated labels/icons on the AI cutover).
-- **ZLT-1470** — the cutover that surfaced this (AI prompt now derives from `exposedSurface(segmentLens)`).
+- **ZLT-1470** — the cutover that surfaced this (AI prompt now derives from `exposedSurface(customerRefLens)`).
