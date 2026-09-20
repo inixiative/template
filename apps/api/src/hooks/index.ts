@@ -23,6 +23,7 @@ import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 export const registerHooks = () => {
   registerSoftDeleteScoper({ liveWhere, liveIncludes });
+  registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerClearCacheHook();
@@ -33,7 +34,6 @@ export const registerHooks = () => {
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceReferencedHook();
-  registerRulesHook();
   registerSegmentConditionsHook();
   registerSegmentMemberOwnerHook();
   registerSegmentRuleReferencesHook();

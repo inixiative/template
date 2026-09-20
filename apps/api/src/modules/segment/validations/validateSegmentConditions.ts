@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind service
+ * @kind validator
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
@@ -14,7 +14,7 @@ import {
 } from '@inixiative/json-rules';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
-import { resolvedSegmentLens, segmentLensFor } from '#/modules/segment/lib/segmentLens';
+import { resolvedSegmentLens, segmentLens } from '#/modules/segment/lib/segmentLens';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 
 const PROBE_OWNER_ID = '00000000-0000-7000-8000-000000000000';
@@ -91,7 +91,7 @@ export const validateSegmentConditions = (
   if (!structural.ok) return invalid(structural.errors.map((error) => `${error.path}: ${error.message}`));
 
   const conditions = normalized as Condition;
-  const lens = segmentLensFor(ownerModel);
+  const lens = segmentLens;
 
   const vocabulary = checkRuleAgainstLens(conditions, lens);
   if (!vocabulary.ok)

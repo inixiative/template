@@ -314,7 +314,7 @@ describe('segment reconcile', () => {
     const frozen = await updateSegment(segment, { type: SegmentType.static });
     const newcomer = (await createUser({ email: `frozen-${getNextSeq()}@acme.test` })).entity;
     const newcomerRef = await customerOf(newcomer);
-    await enqueueJob('reconcileCustomerRefSegments', { customerRefId: newcomerRef.id });
+    await enqueueJob('reconcileCustomerRefSegments', { customerModel: 'User', customerId: newcomer.id });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
 
     await updateSegment(frozen, { type: SegmentType.dynamic });

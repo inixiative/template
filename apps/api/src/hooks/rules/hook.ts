@@ -7,9 +7,10 @@ import {
   registerDbHook,
   type SingleAction,
 } from '@template/db';
-import { getRule } from '#/hooks/rules/registry';
+import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
+import { without } from 'lodash-es';
 
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);
@@ -32,38 +33,34 @@ const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<st
 };
 
 export const registerRulesHook = () => {
-  // Create hooks
+  const models = without(Object.keys(RulesRegistry), 'AuditLog');
+
   registerDbHook(
     'rules:create',
-    '*',
+    models,
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, args }) => {
-      if (model === 'AuditLog') return;
       processCreateArgs(args, model as ModelName);
     },
   );
 
-  // Upsert hook - validate create path always, update path only if record exists
-  registerDbHook('rules:upsert', '*', HookTiming.before, [DbAction.upsert], async (options) => {
+  registerDbHook('rules:upsert', models, HookTiming.before, [DbAction.upsert], async (options) => {
     const { model, args, previous } = options as HookOptions & { action: SingleAction };
     processCreateArgs(args, model as ModelName);
-    // Only validate update path if previous record exists (otherwise it's a create)
     if (previous) {
       processUpdateArgs(args, model as ModelName, previous);
     }
   });
 
-  // Update hooks
-  registerDbHook('rules:update', '*', HookTiming.before, [DbAction.update], async (options) => {
+  registerDbHook('rules:update', models, HookTiming.before, [DbAction.update], async (options) => {
     const { model, args, previous } = options as HookOptions & { action: SingleAction };
     processUpdateArgs(args, model as ModelName, previous);
   });
 
-  // UpdateManyAndReturn - validate results (runs in transaction for rollback on failure)
   registerDbHook(
     'rules:updateManyAndReturn',
-    '*',
+    models,
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, result }) => {

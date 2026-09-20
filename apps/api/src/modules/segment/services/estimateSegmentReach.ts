@@ -8,9 +8,9 @@ import type { Condition } from '@inixiative/json-rules';
 import { type Db, db as defaultDb } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
-import { assertSegmentReferencesOwned } from '#/modules/segment/services/assertSegmentReferencesOwned';
 import { compileSegmentWhere } from '#/modules/segment/services/evaluateSegment';
-import { validateSegmentConditions } from '#/modules/segment/services/validateSegmentConditions';
+import { assertSegmentReferencesOwned } from '#/modules/segment/validations/assertSegmentReferencesOwned';
+import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 
 export const estimateSegmentReach = async (
   ownerModel: ProviderModel,

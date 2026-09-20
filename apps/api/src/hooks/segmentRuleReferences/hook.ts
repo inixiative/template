@@ -1,8 +1,10 @@
 import type { Condition } from '@inixiative/json-rules';
+import { sourceQueries } from '@inixiative/json-rules';
 import { DbAction, db, HookTiming, registerDbHook, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { castArray, isEqual, keyBy } from 'lodash-es';
-import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
+import { resolvedSegmentLens, segmentLens } from '#/modules/segment/lib/segmentLens';
+import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 const ACTIONS = [
   DbAction.create,
@@ -15,7 +17,8 @@ const ACTIONS = [
 const syncSegmentEdges = (segment: Segment) =>
   syncRuleReferenceEdges(
     { model: 'Segment', id: segment.id },
-    ruleReferences(segmentLensFor(segment.ownerModel), segment.conditions as Condition),
+    ruleReferences(segmentLens, segment.conditions as Condition),
+    sourceQueries(resolvedSegmentLens(segment.ownerModel, segmentOwnerId(segment))),
   );
 
 type Row = Partial<Segment> & { id: string };

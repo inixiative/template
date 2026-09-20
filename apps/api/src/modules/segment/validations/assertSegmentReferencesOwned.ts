@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind service
+ * @kind validator
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
@@ -9,7 +9,7 @@ import { type Db, db as defaultDb } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
-import { segmentLensFor } from '#/modules/segment/lib/segmentLens';
+import { segmentLens } from '#/modules/segment/lib/segmentLens';
 import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { segmentReferences } from '#/modules/segment/services/segmentReferences';
 
@@ -24,7 +24,7 @@ export const assertSegmentReferencesOwned = async (
   { ownerModel, ownerId, conditions, held = [] }: Candidate,
   db: Db = defaultDb,
 ): Promise<Segment[]> => {
-  const ids = segmentReferences(conditions, segmentLensFor(ownerModel));
+  const ids = segmentReferences(conditions, segmentLens);
   if (!ids.length) return [];
   const owned = await db.segment.findMany({
     where: { ownerModel, [segmentOwnerFk(ownerModel)]: ownerId, deletedAt: null },

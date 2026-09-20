@@ -15,7 +15,7 @@ export type MembershipChange = { segment: Segment; diff: MembershipDiff };
 type PerCustomerRef = { added: string[]; removed: string[] };
 
 export const customerRefCustomerId = (customerRef: CustomerRef): string =>
-  (customerRef as unknown as Record<string, string>)[customerRefCustomerFk(customerRef.customerModel)!]!;
+  (customerRef as unknown as Record<string, string>)[customerRefCustomerFk(customerRef.customerModel)]!;
 
 const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => {
   const subject = { segmentId: segment.id, ownerModel: segment.ownerModel, ownerId: segmentOwnerId(segment) };

@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { PolymorphismRegistry, resolveFalsePolymorphismRef } from '@template/db';
-import type { ProviderModel } from '@template/db/generated/client/enums';
+import type { CustomerModel, ProviderModel } from '@template/db/generated/client/enums';
 
 type OwnerColumns = {
   ownerModel: ProviderModel;
@@ -27,9 +27,5 @@ export const customerRefProviderFk = (ownerModel: ProviderModel): string =>
 export const communicationSenderFk = (ownerModel: ProviderModel): string =>
   PolymorphismRegistry.CommunicationLog!.axes[0]!.fkMap[ownerModel]![0]!;
 
-export const customerRefCustomerFk = (customerModel: string): string | null =>
-  resolveFalsePolymorphismRef({
-    model: 'CustomerRef',
-    axis: 'customerModel',
-    value: customerModel as ProviderModel,
-  });
+export const customerRefCustomerFk = (customerModel: CustomerModel): string =>
+  resolveFalsePolymorphismRef({ model: 'CustomerRef', axis: 'customerModel', value: customerModel })!;
