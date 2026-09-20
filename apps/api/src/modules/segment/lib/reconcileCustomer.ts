@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:jobs
  */
-import { type ModelName, resolveFalsePolymorphismRef } from '@template/db';
+import { type ModelName, polymorphicTarget } from '@template/db';
 import type { CustomerModel } from '@template/db/generated/client/enums';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -15,9 +15,10 @@ export const reconcileCustomerOf = async (
   { model, axis }: Polymorphic,
   row: Record<string, unknown>,
 ): Promise<void> => {
-  const customerModel = row[axis] as CustomerModel;
-  const fk = resolveFalsePolymorphismRef({ model, axis, value: customerModel });
-  const customerId = fk ? (row[fk] as string | null) : null;
-  if (!customerId) return;
-  await enqueueJob('reconcileCustomerRefSegments', { customerModel, customerId });
+  const target = polymorphicTarget(row, model, axis);
+  if (!target) return;
+  await enqueueJob('reconcileCustomerRefSegments', {
+    customerModel: target.kind as CustomerModel,
+    customerId: target.id,
+  });
 };

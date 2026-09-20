@@ -75,6 +75,8 @@ export {
   type PolymorphicKind,
   polymorphicBindings,
   polymorphicIs,
+  polymorphicKeyColumn,
+  polymorphicTarget,
 } from './registries/polymorphicIs';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
@@ -132,7 +134,11 @@ export {
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
-export { type RuleValidation, type ValidateRuleForLensOptions, validateRuleForLens } from './utils/validateRuleForLens';
+export {
+  type RuleValidation,
+  type ValidateRuleForLensOptions,
+  validateRuleForLens,
+} from './validations/validateRuleForLens';
 
 // Hook shared utilities (ignore fields, redact fields)
 

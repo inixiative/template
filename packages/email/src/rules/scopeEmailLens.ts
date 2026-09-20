@@ -5,18 +5,16 @@
  * @uses primitive:shared
  */
 import { type Condition, type NarrowingDefaults, Operator, resolveLensBindings } from '@inixiative/json-rules';
-import { polymorphicBindings, polymorphicIs } from '@template/db';
+import { polymorphicBindings } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
+import { boundAndLive, platformOrBound } from '@template/db/lens';
 import { type EmailLens, narrowEmailLens } from '@template/email/rules/emailLens';
 import type { RuleLens } from '@template/shared/rules';
 
 export type EmailLensOwner = { ownerModel: ProviderModel; ownerId: string; organizationId?: string | null } | null;
 
-const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
-const platform: Condition = { field: 'ownerModel', operator: Operator.equals, value: 'platform' };
-
-const tag: Condition = { all: [live, { any: [platform, polymorphicIs('Tag', 'ownerModel')] }] };
-const segment: Condition = { all: [polymorphicIs('Segment', 'ownerModel'), live] };
+const tag = platformOrBound('Tag', 'ownerModel');
+const segment = boundAndLive('Segment', 'ownerModel');
 const platformDefaults: NarrowingDefaults = {
   models: {
     Tag: { where: tag, sources: { id: { where: tag } } },

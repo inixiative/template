@@ -30,12 +30,9 @@ import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
+import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 const idsRule = (ids: string[]) => ({ field: 'id', operator: Operator.in, value: ids });
-
-const memberIds = async (segmentId: string): Promise<string[]> =>
-  (await db.segmentMember.findMany({ where: { segmentId } })).map((member) => member.customerRefId).sort();
 
 type SegmentInput = Parameters<typeof createSegment>[0];
 type SegmentDeps = Parameters<typeof createSegment>[1];

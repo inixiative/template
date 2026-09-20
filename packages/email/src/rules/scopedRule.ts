@@ -6,7 +6,7 @@
  */
 import { type Condition, check } from '@inixiative/json-rules';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';
-import { type EmailLens, OPAQUE_SLOT, slotOf } from '@template/email/rules/emailLens';
+import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
 export type { BindingChain } from '@template/email/rules/resolveBindingPath';
@@ -20,11 +20,6 @@ class Unsupported extends Error {}
 type Node = Record<string, unknown>;
 
 const isNode = (value: unknown): value is Node => typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const splitHead = (ref: string): { head: string; rest: string } => {
-  const dot = ref.indexOf('.');
-  return dot === -1 ? { head: ref, rest: '' } : { head: ref.slice(0, dot), rest: ref.slice(dot + 1) };
-};
 
 const climb = (levels: number, rest: string): string => (levels === 0 ? rest : `${'$'.repeat(levels + 1)}.${rest}`);
 
@@ -49,7 +44,7 @@ type Scope = { frames: LoopFrame[]; bindings: BindingChain; root: string | undef
 /** Where a ref lands, seen from a condition `depth` array scopes below the innermost loop element; null = as written. */
 const rewriteRef = (ref: string, depth: number, { frames, bindings, root }: Scope, up: typeof climb): string | null => {
   if (ref.startsWith('$')) return null;
-  const { head, rest } = splitHead(ref);
+  const { root: head, rest } = splitRoot(ref);
   if (bindings.has(head)) {
     const frame = frames.findIndex((candidate) => candidate.as === head);
     if (frame === -1)
@@ -123,7 +118,7 @@ const relativeTo = (path: string, enclosing: string | undefined): string | null 
 export const iteratesLens = (bindings: BindingChain | undefined, lens?: EmailLens): boolean => {
   const first = bindings && loopFrames(bindings)[0];
   if (!first) return false;
-  const root = splitHead(first.path).head;
+  const root = splitRoot(first.path).root;
   if (!lens) return root !== 'data';
   const slot = slotOf(lens, root);
   return slot !== undefined && slot !== OPAQUE_SLOT;
@@ -136,19 +131,19 @@ export const scopedRule = (
 ): ScopedRule => {
   if (!bindings?.size || !iteratesLens(bindings, lens)) return { rule };
   const frames = loopFrames(bindings);
-  const root = frames.length ? splitHead(frames[0]!.path).head : undefined;
+  const root = frames.length ? splitRoot(frames[0]!.path).root : undefined;
   const scope: Scope = { frames, bindings, root, indices };
   try {
     let out = rewriteNode(rule, 0, scope);
     for (let index = frames.length - 1; index >= 0; index -= 1) {
       const frame = frames[index]!;
       const relative = relativeTo(frame.path, frames[index - 1]?.path);
-      if (index > 0 && relative === null && splitHead(frame.path).head !== root) {
+      if (index > 0 && relative === null && splitRoot(frame.path).root !== root) {
         throw new Unsupported(
-          `{{#each ${frame.path}}} iterates the ${splitHead(frame.path).head} lens inside a loop over ${root}; nested loops must stay within one lens`,
+          `{{#each ${frame.path}}} iterates the ${splitRoot(frame.path).root} lens inside a loop over ${root}; nested loops must stay within one lens`,
         );
       }
-      const field = index === 0 ? frame.path : (relative ?? climb(index, splitHead(frame.path).rest));
+      const field = index === 0 ? frame.path : (relative ?? climb(index, splitRoot(frame.path).rest));
       out = { field, arrayOperator: 'any', condition: out } as Condition;
     }
     return { rule: out };
@@ -159,7 +154,7 @@ export const scopedRule = (
 };
 
 const setAt = (target: unknown, path: string, value: unknown): unknown => {
-  const { head, rest } = splitHead(path);
+  const { root: head, rest } = splitRoot(path);
   const base = isNode(target) ? target : {};
   return { ...base, [head]: rest ? setAt(base[head], rest, value) : value };
 };

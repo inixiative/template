@@ -15,20 +15,11 @@ import {
 } from '@inixiative/json-rules';
 import { polymorphicBindings, polymorphicIs } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { lensFor, omitForeignKeys } from '@template/db/lens';
+import { boundAndLive, lensFor, live, omitForeignKeys, platformOrBound } from '@template/db/lens';
 
-const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
+const tagOwned = platformOrBound('Tag', 'ownerModel');
 
-const tagOwned: Condition = {
-  all: [
-    live,
-    {
-      any: [{ field: 'ownerModel', operator: Operator.equals, value: 'platform' }, polymorphicIs('Tag', 'ownerModel')],
-    },
-  ],
-};
-
-const segmentOwned: Condition = { all: [polymorphicIs('Segment', 'ownerModel'), live] };
+const segmentOwned = boundAndLive('Segment', 'ownerModel');
 
 const contacts: ModelNarrowing = {
   picks: ['type', 'subtype', 'valueKey', 'deliverability', 'acceptedKinds', 'verifiedAt', 'createdAt'],

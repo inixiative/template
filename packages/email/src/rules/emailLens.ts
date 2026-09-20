@@ -16,14 +16,13 @@ import {
   type Lens,
   type LensNarrowing,
   type ModelNarrowing,
-  Operator,
   type RuleLensViolation,
   type SourceQuery,
   sourceQueries,
   validateNarrowing,
 } from '@inixiative/json-rules';
 import { RULE_REFERENCEABLE_MODELS, ruleReferences } from '@template/db';
-import { lensFor, omitForeignKeys, rootLens } from '@template/db/lens';
+import { lensFor, live, omitForeignKeys, rootLens } from '@template/db/lens';
 import { RESERVED_SCOPE_ROOTS, SCOPE_ROOTS, type ScopeRoot } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { RAIL_PROVIDED_SYSTEM_FIELDS } from '@template/email/rules/railProvidedSystemFields';
@@ -55,8 +54,6 @@ export type EmailLensInput = {
 };
 
 const referenced: ModelNarrowing = { picks: ['id', 'name'] };
-
-const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 
 export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   picks: ['id', 'name', 'email'],

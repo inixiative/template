@@ -12,6 +12,26 @@ export const POLYMORPHIC_BINDS = { User: 'userId', Organization: 'organizationId
 
 export type PolymorphicKind = keyof typeof POLYMORPHIC_BINDS;
 
+/** The key column a false-polymorphic axis uses for a value, or null when the value carries no key (platform, admin). */
+export const polymorphicKeyColumn = (model: ModelName, axisField: string, value: string): string | null => {
+  const axis = getPolymorphismConfig(model)?.axes.find((candidate) => candidate.field === axisField);
+  if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
+  return (axis.fkMap as Record<string, string[] | undefined>)[value]?.[0] ?? null;
+};
+
+/** The row a false-polymorphic axis points at — its kind and id — or null when it points at nobody. */
+export const polymorphicTarget = (
+  row: Record<string, unknown>,
+  model: ModelName,
+  axisField: string,
+): { kind: string; id: string } | null => {
+  const kind = row[axisField];
+  if (typeof kind !== 'string') return null;
+  const column = polymorphicKeyColumn(model, axisField, kind);
+  const id = column ? row[column] : null;
+  return typeof id === 'string' ? { kind, id } : null;
+};
+
 export const polymorphicBindings = (ownerModel: PolymorphicKind, ownerId: string): Record<string, string> => ({
   [POLYMORPHIC_BINDS[ownerModel]]: ownerId,
 });

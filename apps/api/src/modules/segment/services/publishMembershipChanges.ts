@@ -4,10 +4,10 @@
  * @partOf feature:segment
  * @uses primitive:appEvents, infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import { emitAppEvent } from '#/appEvents/emit';
-import { customerRefCustomerFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import type { MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 
 export type MembershipChange = { segment: Segment; diff: MembershipDiff };
@@ -15,7 +15,7 @@ export type MembershipChange = { segment: Segment; diff: MembershipDiff };
 type PerCustomerRef = { added: string[]; removed: string[] };
 
 export const customerRefCustomerId = (customerRef: CustomerRef): string =>
-  (customerRef as unknown as Record<string, string>)[customerRefCustomerFk(customerRef.customerModel)]!;
+  polymorphicTarget(customerRef, 'CustomerRef', 'customerModel')!.id;
 
 const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => {
   const subject = { segmentId: segment.id, ownerModel: segment.ownerModel, ownerId: segmentOwnerId(segment) };

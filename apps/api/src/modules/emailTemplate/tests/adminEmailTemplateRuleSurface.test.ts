@@ -99,6 +99,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
+    await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     const { data } = await json<Surface>(
       await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
     );

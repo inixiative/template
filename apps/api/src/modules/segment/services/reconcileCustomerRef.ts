@@ -5,12 +5,12 @@
  * @uses infrastructure:prisma
  */
 import { applyLens, check } from '@inixiative/json-rules';
-import { db } from '@template/db';
+import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { customerRefProviderFk, segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
+import { segmentOwnerFk } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
@@ -20,11 +20,8 @@ import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth'
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
 const providerOf = (customerRef: CustomerRef): { ownerModel: ProviderModel; ownerId: string } | null => {
-  const ownerModel = customerRef.providerModel;
-  const ownerId = (customerRef as unknown as Record<string, unknown>)[customerRefProviderFk(ownerModel)] as
-    | string
-    | null;
-  return ownerId ? { ownerModel, ownerId } : null;
+  const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');
+  return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
 
 export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string) =>

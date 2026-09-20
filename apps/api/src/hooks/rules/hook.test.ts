@@ -10,6 +10,7 @@ registerRulesHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  delete RulesRegistry.User;
 });
 
 afterEach(() => {
@@ -163,21 +164,21 @@ describe('rules hook', () => {
   });
 
   describe('updateManyAndReturn', () => {
-    it('logs warning but allows operation (cannot validate without fetching each record)', async () => {
+    it('validates every returned record after the write, so a breaking update fails', async () => {
       const { entity: user1 } = await createUser({ name: 'User1' });
       const { entity: user2 } = await createUser({ name: 'User2' });
 
       setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
 
-      // updateManyAndReturn should succeed even though we're setting name to empty
-      // because we can't merge with previous for each record
       const results = await db.user.updateManyAndReturn({
         where: { id: { in: [user1.id, user2.id] } },
         data: { emailVerified: true },
       });
-
-      expect(results).toHaveLength(2);
       expect(results.every((r) => r.emailVerified)).toBe(true);
+
+      await expect(
+        db.user.updateManyAndReturn({ where: { id: { in: [user1.id, user2.id] } }, data: { name: '' } }),
+      ).rejects.toThrow('name required');
     });
   });
 

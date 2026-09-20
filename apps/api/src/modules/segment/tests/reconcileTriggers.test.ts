@@ -22,17 +22,13 @@ import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
+import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
 const taggedRule = (tagId: string) => ({
   field: 'customerUser.tagAttachments',
   arrayOperator: 'any',
   condition: { field: 'tag.id', operator: Operator.equals, value: tagId },
 });
-
-const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
-
-const memberIds = async (segmentId: string): Promise<string[]> =>
-  (await db.segmentMember.findMany({ where: { segmentId } })).map((member) => member.customerRefId).sort();
 
 describe('reconcile triggers — the lens defines the propagation graph', () => {
   it('every model the segment lens reads has an event that reconciles it, and every event exists', () => {
