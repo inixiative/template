@@ -6,6 +6,7 @@
  */
 import {
   type Condition,
+  check,
   type Lens,
   type LensNarrowing,
   type PathProjection,
@@ -34,6 +35,12 @@ const readColumns = (visit: PathProjection extends Map<string, infer V> ? V : ne
   return [...columns];
 };
 
+type Visit = PathProjection extends Map<string, infer V> ? V : never;
+
+/** A related row the visit's `where` admits — the lens's data narrowing, applied to a row already in hand. */
+const admitted = (visit: Visit, row: Record<string, unknown>): boolean =>
+  visit.whereClauses.every((clause) => check(clause, row) === true);
+
 const pruneRow = (byPath: PathProjection, row: Record<string, unknown>, path: string): Record<string, unknown> => {
   const visit = byPath.get(path);
   if (!visit) return row;
@@ -43,10 +50,15 @@ const pruneRow = (byPath: PathProjection, row: Record<string, unknown>, path: st
     if (!(name in row)) continue;
     const value = row[name];
     const childPath = `${path}.${name}`;
-    if (value != null && byPath.has(childPath)) {
+    const child = byPath.get(childPath);
+    if (value != null && child) {
       out[name] = Array.isArray(value)
-        ? value.map((v) => pruneRow(byPath, v as Record<string, unknown>, childPath))
-        : pruneRow(byPath, value as Record<string, unknown>, childPath);
+        ? (value as Record<string, unknown>[])
+            .filter((v) => admitted(child, v))
+            .map((v) => pruneRow(byPath, v, childPath))
+        : admitted(child, value as Record<string, unknown>)
+          ? pruneRow(byPath, value as Record<string, unknown>, childPath)
+          : null;
     } else {
       out[name] = value;
     }

@@ -130,6 +130,33 @@ describe('{{#each}} loops', () => {
     expect(out).toBe('live ');
   });
 
+  it('a token under a loop element reads only what the lens exposes: a foreign tag is not there to print', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const tag = (id: string, organizationId: string) => ({
+      deletedAt: null,
+      tag: { id, name: `name-${id}`, ownerModel: 'Organization', organizationId },
+    });
+    const out = interpolate(
+      '{{#each recipient.tagAttachments as=item}}[{{item.tag.name}}]{{/each}}',
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          email: 'ann@example.com',
+          tagAttachments: [tag('own', 'org-1'), tag('theirs', 'org-2')],
+        },
+        sender: { id: 'org-1', name: 'Acme' },
+        data: {},
+      },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('[name-own][]');
+  });
+
   it('an unsupported loop rule fails closed with an issue: nothing renders, no raw check', () => {
     const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
       ownerModel: 'Organization',

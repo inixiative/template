@@ -87,10 +87,10 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
 
   const emitted: unknown[] = [];
   const frames = loopFrames(bodyOptions.bindings);
-  const judged = scopedRule(filter ?? true, bodyOptions.bindings, { lens }).rule;
+  const judged = filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings, { lens }).rule;
   for (const element of arrayValue) {
     const judgeable = lensed && typeof element === 'object' && element !== null;
-    if (filter === undefined && !judgeable) {
+    if (filter === undefined) {
       emitted.push(element);
       continue;
     }

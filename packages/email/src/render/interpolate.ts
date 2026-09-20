@@ -7,7 +7,7 @@
 import type { ScopeRoot } from '@template/email/render/conditionParser';
 import { type RuleErrorSink, type Scope, settle } from '@template/email/render/settle';
 import type { SystemTokenName } from '@template/email/render/systemTokens';
-import type { EmailLens } from '@template/email/rules/emailLens';
+import { type EmailLens, narrowVariables } from '@template/email/rules/emailLens';
 import { escape as escapeHtml } from 'lodash-es';
 
 export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
@@ -53,7 +53,7 @@ export const interpolate = (
 ): string =>
   settle(
     resolveSystemTokens(template, options),
-    toScope(variables),
+    toScope(options.lens ? narrowVariables(options.lens, variables) : variables),
     { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
     onError,
   );

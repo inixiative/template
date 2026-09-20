@@ -33,6 +33,7 @@ export {
   evaluateScopedRule,
   fieldsLens,
   narrowEmailLens,
+  narrowVariables,
   OPAQUE_SLOT,
   parseSlotLenses,
   type SlotLens,

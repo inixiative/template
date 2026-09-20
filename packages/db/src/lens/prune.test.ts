@@ -37,6 +37,39 @@ describe('prune', () => {
     expect(prune(row, lens)).toEqual({ id: 'i1', status: 'sent', sourceUser: { id: 'u1', deletedAt: null } });
   });
 
+  it("drops the related rows a visit's where hides: a list element is filtered out, a to-one becomes null", () => {
+    const lens = {
+      parent: lensFor('User'),
+      root: {
+        picks: ['id'],
+        relations: {
+          tagAttachments: {
+            picks: [],
+            where: { field: 'deletedAt', operator: 'notExists' },
+            relations: {
+              tag: { picks: ['id', 'name'], where: { field: 'ownerModel', operator: 'equals', value: 'platform' } },
+            },
+          },
+        },
+      },
+    } as const;
+    const row = {
+      id: 'u1',
+      tagAttachments: [
+        { deletedAt: null, tag: { id: 'mine', name: 'vip', ownerModel: 'platform' } },
+        { deletedAt: null, tag: { id: 'theirs', name: 'vip', ownerModel: 'Organization' } },
+        { deletedAt: '2026-01-01', tag: { id: 'gone', name: 'vip', ownerModel: 'platform' } },
+      ],
+    };
+    expect(prune(row, lens as never) as unknown).toEqual({
+      id: 'u1',
+      tagAttachments: [
+        { deletedAt: null, tag: { id: 'mine', name: 'vip', ownerModel: 'platform' } },
+        { deletedAt: null, tag: null },
+      ],
+    });
+  });
+
   it('prunes a nested to-one relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),

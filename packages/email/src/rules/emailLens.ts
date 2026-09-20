@@ -22,7 +22,7 @@ import {
   validateNarrowing,
 } from '@inixiative/json-rules';
 import { RULE_REFERENCEABLE_MODELS, ruleReferences } from '@template/db';
-import { lensFor, live, omitForeignKeys, rootLens } from '@template/db/lens';
+import { lensFor, live, omitForeignKeys, prune, rootLens } from '@template/db/lens';
 import { RESERVED_SCOPE_ROOTS, SCOPE_ROOTS, type ScopeRoot } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { RAIL_PROVIDED_SYSTEM_FIELDS } from '@template/email/rules/railProvidedSystemFields';
@@ -315,6 +315,16 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
 
 export const emailSourceQueries = (lens: EmailLens): SourceQuery[] =>
   emailSlotLenses(lens).flatMap(([, slot]) => sourceQueries(slot));
+
+/** The variables a template renders with, projected through each slot: rows a `where` hides are gone before any token or rule reads them. */
+export const narrowVariables = <V extends Record<string, unknown>>(lens: EmailLens, variables: V): V => {
+  const out: Record<string, unknown> = { ...variables };
+  for (const [root, slot] of emailSlotLenses(lens)) {
+    const value = variables[root];
+    if (value && typeof value === 'object') out[root] = prune(value as Record<string, unknown>, slot);
+  }
+  return out as V;
+};
 
 export const narrowEmailLens = (lens: EmailLens, narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens): EmailLens => ({
   ...lens,
