@@ -18,7 +18,7 @@ import { updateConfigField } from './utils/configHelpers';
 import { getProjectConfig } from './utils/getProjectConfig';
 import { isComplete, markComplete } from './utils/progressTracking';
 
-const SECTIONS = ['project', 'infisical', 'planetscale', 'railway'] as const;
+const SECTIONS = ['project', 'infisical', 'planetscale', 'railway', 'monitoring'] as const;
 type Section = (typeof SECTIONS)[number];
 
 const parseSection = (): Section | null => {
@@ -133,5 +133,19 @@ if (import.meta.main) {
   if (!section || section === 'planetscale') await runPlanetscale();
   if (!section || section === 'railway') await runRailway();
 
+  if (section === 'monitoring') {
+    const { setupTelemetry } = await import('./tasks/telemetrySetup');
+    const mode = requireEnv('MONITORING_MODE');
+    if (!['off', 'otlp', 'split'].includes(mode)) throw new Error('MONITORING_MODE must be off, otlp, or split');
+    await setupTelemetry({
+      mode: mode as 'off' | 'otlp' | 'split',
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+      headers: process.env.OTEL_EXPORTER_OTLP_HEADERS,
+      logsEndpoint: process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+      logsHeaders: process.env.OTEL_EXPORTER_OTLP_LOGS_HEADERS,
+      browser: process.env.OTEL_BROWSER_ENABLED === 'true',
+      sampleRatio: process.env.OTEL_TRACES_SAMPLER_ARG,
+    });
+  }
   console.log('\n✅ Done');
 }

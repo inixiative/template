@@ -11,7 +11,11 @@ import { z } from 'zod';
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
 
 const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
-  return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([key, value]) => value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
+    ),
+  );
 };
 
 // .passthrough() so unknown keys (NODE_ENV, PROJECT_NAME, etc.) survive — we
@@ -48,7 +52,7 @@ const baseEnvSchema = z
     SENTRY_DSN: z.string().optional(),
 
     // OTEL (optional integration)
-    OTEL_ENABLED: z.coerce.boolean().default(false),
+    OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
     OTEL_SERVICE_NAME: z.string().optional(),

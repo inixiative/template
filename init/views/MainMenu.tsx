@@ -205,6 +205,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
 
       const candidates: (MenuItem | null)[] = [
         {
+          label: 'Monitoring (OTel + structured logs)',
+          value: 'monitoring',
+          status:
+            cfg.monitoring?.configProjectName === cfg.project.name &&
+            Object.values(cfg.monitoring.progress).filter(Boolean).length === 18
+              ? 'completed'
+              : cfg.monitoring
+                ? 'incomplete'
+                : 'pending',
+        },
+        {
           label: 'Settings',
           value: 'settings',
           status: 'pending',
