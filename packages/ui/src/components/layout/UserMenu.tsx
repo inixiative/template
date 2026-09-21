@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@template/ui/components/primitives/DropdownMenu';
 import { Input } from '@template/ui/components/primitives/Input';
+import { toast } from '@template/ui/lib/toast';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
@@ -50,6 +51,13 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
 
   const handleExitSpoof = async () => {
     await setSpoof(null);
+  };
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      toast.error('Signed out on this device, but the server session could not be revoked.');
+    }
   };
   return (
     <DropdownMenu>
@@ -109,7 +117,7 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem onClick={logout}>
+        <DropdownMenuItem onClick={handleLogout}>
           <Icon icon="lucide:log-out" className="h-4 w-4 mr-2" />
           <span>Log out</span>
         </DropdownMenuItem>
