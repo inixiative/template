@@ -98,24 +98,24 @@ test('pending signup clears stale local identity without navigation or remote si
   expect(requests).toHaveLength(1);
 });
 
-test.each(['signIn', 'signUp'] as const)(
-  '%s with a session token hydrates the user with bearer auth',
-  async (action) => {
-    const { entity } = await buildUser({ email: method.email, emailVerified: true });
-    const user = entity.__serialize();
-    respond = (path) =>
-      path === '/api/v1/me'
-        ? Response.json({ data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] } })
-        : Response.json({ token, user });
-    const result = await store.getState().auth[action](method);
-    if (action === 'signUp') expect(result).toEqual({ status: 'authenticated' });
-    expect(getToken()).toBe(token);
-    expect(requests.at(-1)).toEqual({ path: '/api/v1/me', authorization: `Bearer ${token}` });
-    expect(store.getState().auth.user?.id).toBe(user.id);
-    expect(store.getState().auth.isAuthenticated).toBe(true);
-    expect(authenticate).toHaveBeenCalledWith(token);
-  },
-);
+test.each([
+  'signIn',
+  'signUp',
+] as const)('%s with a session token hydrates the user with bearer auth', async (action) => {
+  const { entity } = await buildUser({ email: method.email, emailVerified: true });
+  const user = entity.__serialize();
+  respond = (path) =>
+    path === '/api/v1/me'
+      ? Response.json({ data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] } })
+      : Response.json({ token, user });
+  const result = await store.getState().auth[action](method);
+  if (action === 'signUp') expect(result).toEqual({ status: 'authenticated' });
+  expect(getToken()).toBe(token);
+  expect(requests.at(-1)).toEqual({ path: '/api/v1/me', authorization: `Bearer ${token}` });
+  expect(store.getState().auth.user?.id).toBe(user.id);
+  expect(store.getState().auth.isAuthenticated).toBe(true);
+  expect(authenticate).toHaveBeenCalledWith(token);
+});
 
 test.each(['signIn', 'signUp'] as const)('%s errors do not hydrate or authenticate', async (action) => {
   respond = () => Response.json({ message: 'Email verification required' }, { status: 403 });
