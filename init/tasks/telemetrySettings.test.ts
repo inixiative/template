@@ -8,6 +8,24 @@ import { describe, expect, it } from 'bun:test';
 import { telemetrySettings } from './telemetrySettings';
 
 describe('monitoring init settings', () => {
+  it('generates concrete per-signal URLs for a combined OTLP collector', () => {
+    const settings = telemetrySettings('kingdom', {
+      mode: 'otlp',
+      endpoint: ' https://collector.example.test:4318/otlp/ ',
+      headers: 'Authorization=Bearer%20test-token',
+    });
+    for (const signal of ['logs', 'traces', 'metrics']) {
+      expect(settings).toContainEqual({
+        path: '/api',
+        key: `OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_ENDPOINT`,
+        value: `https://collector.example.test:4318/otlp/v1/${signal}`,
+      });
+    }
+    expect(
+      settings.filter((setting) => /ENDPOINT$/.test(setting.key)).every((setting) => setting.value.length > 0),
+    ).toBe(true);
+  });
+
   it('splits destinations while keeping all credentials in the API secret path', () => {
     const settings = telemetrySettings('tribe', {
       mode: 'split',
@@ -22,6 +40,24 @@ describe('monitoring init settings', () => {
       key: 'OTEL_EXPORTER_OTLP_LOGS_HEADERS',
       value: 'Authorization=Bearer%20bs-secret',
     });
+    expect(settings).toContainEqual({
+      path: '/api',
+      key: 'OTEL_EXPORTER_OTLP_LOGS_ENDPOINT',
+      value: 'https://source.betterstack.test/v1/logs',
+    });
+    expect(settings).toContainEqual({
+      path: '/api',
+      key: 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
+      value: 'https://otlp.nr-data.net/v1/traces',
+    });
+    expect(settings).toContainEqual({
+      path: '/api',
+      key: 'OTEL_EXPORTER_OTLP_METRICS_ENDPOINT',
+      value: 'https://otlp.nr-data.net/v1/metrics',
+    });
+    expect(
+      settings.filter((setting) => /ENDPOINT$/.test(setting.key)).every((setting) => setting.value.length > 0),
+    ).toBe(true);
     expect(
       settings.filter((setting) => setting.path !== '/api').every((setting) => !/secret/.test(setting.value)),
     ).toBe(true);
