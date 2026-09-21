@@ -2,8 +2,9 @@
  * @atlas
  * @kind service
  * @partOf primitive:batch
- * @uses none
+ * @uses infrastructure:observability
  */
+import { captureTraceContext } from '@template/shared/telemetry';
 import type { Hono } from 'hono';
 import type { BatchRequest, RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
@@ -52,11 +53,14 @@ export const executeRequest = async (
   const url = new URL(request.path, baseRequest.url).toString();
 
   // Only pass essential headers - don't copy all base headers
-  const headers: Record<string, string> = {
+  const headers = new Headers({
     ...mergedHeaders,
     'Content-Type': 'application/json',
     'x-batch-id': batchId,
-  };
+  });
+  headers.delete('traceparent');
+  headers.delete('tracestate');
+  for (const [key, value] of Object.entries(captureTraceContext())) headers.set(key, value);
 
   const init: RequestInit = {
     method: request.method.toUpperCase(),

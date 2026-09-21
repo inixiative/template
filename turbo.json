@@ -1,5 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["OTEL_*", "VITE_OTEL_*"],
+  "globalPassThroughEnv": ["MONITORING_MODE"],
   "tasks": {
     // ============================================
     // GENERATION TASKS (One-shot, cached)

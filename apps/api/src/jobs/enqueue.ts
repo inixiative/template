@@ -6,6 +6,7 @@
  */
 import { claimLane, db, laneKey, releaseLane } from '@template/db';
 import { log } from '@template/shared/logger';
+import { captureTraceContext } from '@template/shared/telemetry';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
 import type { JobPayloads } from '#/jobs/handlers';
@@ -60,6 +61,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName };
   }
 
+  const traceContext = captureTraceContext();
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
   const jobId = jobOptions.jobId ?? Bun.randomUUIDv7();
 
@@ -76,7 +78,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
         handlerName,
         jobId,
         dedupeKey: dedupeKey ?? null,
-        data: { type, id, payload, dedupeKey },
+        data: { type, id, payload, dedupeKey, traceContext },
         options: jobOptions,
       });
     } catch (err) {
@@ -93,7 +95,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   // TTL stretches by the job's `delay` — the baton must survive until the job actually runs.
   const previousHolder = lane ? await claimLane(lane, jobId, jobOptions.delay) : null;
   try {
-    await queue.add(handlerName, { type, id, payload, dedupeKey }, { ...jobOptions, jobId });
+    await queue.add(handlerName, { type, id, payload, dedupeKey, traceContext }, { ...jobOptions, jobId });
   } catch (err) {
     if (lane) await releaseLane(lane, jobId, previousHolder).catch(() => {});
     throw err;

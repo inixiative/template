@@ -41,6 +41,7 @@ export type JobData<TPayload = unknown> = {
   type: JobType;
   payload: TPayload;
   dedupeKey?: string;
+  traceContext?: Record<string, string>;
 };
 
 export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined] ? [] : [payload: TPayload];

@@ -28,6 +28,7 @@ import { tokenRouter } from '#/modules/token';
 import { userRouter } from '#/modules/user';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
+import { browserTelemetryRouter } from '#/routes/browserTelemetry';
 import { internalRouter } from '#/routes/internal';
 import { unsubscribeRouter } from '#/routes/unsubscribe';
 import type { AppEnv } from '#/types/appEnv';
@@ -37,6 +38,7 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);
+apiRouter.route('/telemetry/browser', browserTelemetryRouter);
 
 // Internal service-to-service routes (shared-secret auth). Mounted BEFORE
 // the better-auth middlewares so the secret check in internalRouter is the

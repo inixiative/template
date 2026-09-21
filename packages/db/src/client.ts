@@ -11,6 +11,7 @@ import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrit
 import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
 import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
+import { telemetryExtension } from '@template/db/extensions/telemetryExtension';
 import {
   closeTransactionRegistration,
   openTransactionRegistration,
@@ -47,9 +48,12 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
 
 const createClient = (): Db => {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter, log: ['error'], transactionOptions: { timeout: 30_000 } });
+  const prisma = new PrismaClient({ adapter, log: [], transactionOptions: { timeout: 30_000 } });
   // You would add read replicas here via additional $extends
-  return prisma.$extends(mutationLifeCycleExtension()).$extends(softDeleteScopeExtension()) as unknown as Db;
+  return prisma
+    .$extends(telemetryExtension)
+    .$extends(mutationLifeCycleExtension())
+    .$extends(softDeleteScopeExtension()) as unknown as Db;
 };
 
 const dbMethods = {

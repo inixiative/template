@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
+import { instrumentRedis } from '@template/db/redis/instrumentRedis';
 import { LogScope, log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import Redis from 'ioredis';
@@ -30,7 +31,7 @@ export const createRedisConnection = (scope: LogScope | string = LogScope.db, ur
   redis.on('error', (err) => log.error('Error:', err, scope));
   redis.on('connect', () => log.info('Connected', scope));
 
-  return redis;
+  return instrumentRedis(redis);
 };
 
 export const getRedisClient = (): Redis => {

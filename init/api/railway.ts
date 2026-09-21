@@ -34,8 +34,12 @@ class RailwayApi {
     service: 'railway',
     version: () => cliVersion('railway'),
     sanitizers: {
-      getRedisUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
-      getPostgresUrl: { fn: (s) => s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') },
+      getRedisUrl: {
+        fn: (s) => (typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s),
+      },
+      getPostgresUrl: {
+        fn: (s) => (typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s),
+      },
       getRailwayUserToken: { fn: () => 'REDACTED' },
       getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
     },
