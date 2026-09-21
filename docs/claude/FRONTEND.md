@@ -11,6 +11,7 @@
 - [Routing](#routing)
   - [File-Based Routes](#file-based-routes)
   - [Routes With Children](#routes-with-children)
+  - [Segments navigation](#segments-navigation)
   - [Guards](#guards)
 - [Navigation Configuration](#navigation-configuration)
   - [Structure](#structure)
@@ -52,7 +53,7 @@
   - [Organization: `@template/ui`](#organization-templateui)
     - [Why Separate from @template/shared?](#why-separate-from-templateshared)
     - [Component Organization](#component-organization)
-    - [OpenAPI Client](#openapi-client)
+    - [Generated SDK](#generated-sdk)
   - [Settings Components](#settings-components)
     - [Route Structure](#route-structure)
     - [Context-Aware Pattern](#context-aware-pattern)
@@ -253,6 +254,14 @@ Rule:
   Equivalent flat form: `bots.index.tsx` + `bots.$id.tsx` (no `bots.tsx`).
 
 Never leave a `bots.tsx` with a `component` sitting above children. A component-less parent is only for shared layout or redirects (e.g. `communications.tsx` redirects to a default child) and renders children via TanStack's default `<Outlet/>`.
+
+### Segments navigation
+
+Segments uses the existing nested sidebar pattern: **Owned** (`/segments/owned`) and
+**Memberships** (`/segments/memberships`) under `/segments`, in user, organization and space
+contexts. The parent redirects to Owned through `redirectPreservingContext`; it has no page
+component that could swallow the children. Both routes render `SegmentsPage` with an explicit
+`view`, and only that view's query is enabled. See [SEGMENTS.md](SEGMENTS.md#web-navigation).
 
 ### Guards
 

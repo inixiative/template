@@ -53,8 +53,11 @@ export const signalExportOptions = (
 };
 
 export const readTelemetryConfig = (role: 'api' | 'worker') => {
-  const enabled = process.env.OTEL_ENABLED === 'true';
+  const environment = process.env.ENVIRONMENT || 'local';
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const enabled = process.env.OTEL_ENABLED
+    ? process.env.OTEL_ENABLED === 'true'
+    : ['pr', 'staging', 'prod'].includes(environment) && Boolean(endpoint);
   if (!enabled) return null;
   if (!endpoint) throw new Error('OTEL_ENABLED=true requires OTEL_EXPORTER_OTLP_ENDPOINT');
   const { OTEL_TRACES_SAMPLER_ARG: sampleRatio } = samplingEnvironment.parse(process.env);
@@ -64,7 +67,7 @@ export const readTelemetryConfig = (role: 'api' | 'worker') => {
     headers: parseOtlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
     sampleRatio,
     serviceName: `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`,
-    environment: process.env.ENVIRONMENT || 'local',
+    environment,
     serviceVersion: process.env.OTEL_SERVICE_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || 'development',
     role,
   };

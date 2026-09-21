@@ -427,7 +427,7 @@ The email system's architecture is ahead of most growth-stage companies. The 4-l
 ## 11. WebSocket Infrastructure
 
 ### What the template provides
-Native Bun WebSocket with Hono integration, token-based auth via query params, connection lifecycle management with three index maps (by ID, by user, by channel), Redis pub/sub for horizontal scaling across server instances, graceful shutdown with reconnect messages, 5-minute keepalive timeout with stale connection cleanup every 60 seconds, event system integration (app events auto-broadcast via WebSocket).
+Native Bun WebSocket with Hono integration, message-based authentication through the HTTP identity route and route-probed subscription authorization, connection lifecycle management with three index maps (by ID, by user, by channel), Redis pub/sub for horizontal scaling across server instances, graceful shutdown with reconnect messages, 5-minute keepalive timeout with stale connection cleanup every 60 seconds, event system integration (app events auto-broadcast via WebSocket).
 
 ### Comparison
 
@@ -436,7 +436,7 @@ Native Bun WebSocket with Hono integration, token-based auth via query params, c
 | Performance | ~611K msgs/sec (Bun native) | Lower (abstraction overhead) | Managed | Managed | 224K msgs/sec |
 | Horizontal scaling | Redis pub/sub | Redis adapter | Managed | Managed | Managed |
 | Channel subscriptions | Yes | Rooms + namespaces | Channels | Channels | Channels |
-| Auth | Bearer token in query | Middleware | App key + auth endpoint | Token-based | JWT |
+| Auth | Authenticate frame + route-probed subscription | Middleware | App key + auth endpoint | Token-based | JWT |
 | Auto-reconnect | Client-side | **Built-in** | **Built-in** | **Built-in** | **Built-in** |
 | Graceful shutdown | Yes (reconnect msg) | Via adapter | Managed | Managed | Managed |
 | Event system integration | **Yes** (auto-broadcast) | Manual | Manual | Manual | DB-driven |

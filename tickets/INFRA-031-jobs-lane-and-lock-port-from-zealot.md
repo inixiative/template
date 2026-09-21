@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium (template's `createLock` carries the same refresh race Zealot fixes in #2271)
 **Created**: 2026-09-12
-**Updated**: 2026-09-13
+**Updated**: 2026-09-21
 
 The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `createLock`, `heartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
 
@@ -20,11 +20,11 @@ The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drai
 
 Landed in [template #104](https://github.com/inixiative/template/pull/104). Two template-side deltas from Zealot: no `SINGLETON_LOCK_REFRESH_MS` knob (the singleton keeps its constants, the constructor assertion covers them), and `maxSafeHeartbeatMs` takes `commandTimeoutMs` as a required argument because no template Redis connection sets a command timeout — which also means a heartbeat on those connections can hang rather than time out. Whether to set one on the non-blocking connections (Zealot sets 5 s, excluding the BullMQ worker and subscribers) is open.
 
-Template's `tick()` (`packages/db/src/lock/createLock.ts`) is `GET` then `PEXPIRE`: the key can expire and be re-acquired between the two calls, and the refresh then extends the new holder's TTL. Port:
+The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a new holder's TTL. The current `createLock` calls `fencedRefresh` in one Lua eval. The implemented hardening is:
 - The refresh is one compare-and-expire Lua eval. `0` = token definitively not ours → declare lost, reason `token_mismatch`, stop the heartbeat. A thrown refresh spends the missed-beat budget; exhausting it declares loss with reason `refresh_errors` but keeps refreshing (ownership uncertain, not gone).
 - `declareLost` never runs the fenced delete mid-run. `release()` always does, once, after the critical section, and reports `released` / `notHeld` / `unconfirmed`.
 - `maxSafeHeartbeatMs(ttl, maxMissed, commandTimeout)` and the constructor assertion built on it.
-- `LockOptions` takes an injected connection and a key override (`{ service, identifier } | { key }`). Relevant here because the singleton lock should run on the queue's connection, not the eviction-prone cache store — the same split Zealot made in ZLT-4235 (`REDIS_BULLMQ_URL` vs the cache URL); template still shares one `REDIS_URL`.
+- `LockOptions` takes an injected connection and a key override (`{ service, identifier } | { key }`). Relevant here because the singleton lock should run on the queue's connection, not the eviction-prone cache store — the same split Zealot made in ZLT-4235 (`REDIS_BULLMQ_URL` vs the cache URL); template now prefers `REDIS_BULLMQ_URL`, with a warned fallback to `REDIS_URL` (`apps/api/src/jobs/bullmqRedisUrl.ts`).
 - A singleton run that loses its lock is **not cancelled** (no cooperative cancellation on the worker context; racing the handler would leave a third run in the background). It finishes and reports `lockLost` → `completedAfterLockLoss` / `failedAfterLockLoss`.
 
 ### 2. Fast / slow lane — Zealot #2248 (ZLT-4633), the reworked shape

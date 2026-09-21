@@ -12,4 +12,8 @@ export const segmentsItem: NavItem = {
   path: '/segments',
   icon: 'lucide:layers',
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    { label: 'Owned', path: '/owned' },
+    { label: 'Memberships', path: '/memberships' },
+  ],
 };

@@ -1,114 +1,97 @@
 # WebSockets — realtime query refetch
 
-Server-driven cache invalidation: when something changes on the backend, connected clients
-**refetch the affected query through its normal authorized route**. The socket never carries
-domain data — only "this query is stale, refetch it." That's the whole security model: a client
-can only see what its own authorized route returns, so a refetch signal can't leak anything.
+<!-- toc:start -->
 
-This is the realtime layer behind app events' `websocket` reach (see [APP_EVENTS.md](./APP_EVENTS.md)).
+## Contents
 
----
+- [Contract](#contract)
+- [Channel registry and authorization](#channel-registry-and-authorization)
+- [Connection and recovery](#connection-and-recovery)
+- [Publishing a refetch](#publishing-a-refetch)
+- [Frontend and horizontal scaling](#frontend-and-horizontal-scaling)
+- [Source and verification](#source-and-verification)
 
-## The shared contract (`@template/shared/ws`)
+<!-- toc:end -->
 
-Both ends type against one source of truth so they can't drift.
+## Contract
 
-```ts
-// channelKey.ts — a query's routing key. Keeps the route identity (_id) + path scope; drops
-// query/headers/body. Same serialization as cacheKey (sorted, colon-joined): "adminBotRead:id:b1".
-channelKey({ _id, path }) → string
+The frontend currently consumes query-refetch hints:
+`{ category: 'query', action: 'refetch', key: { _id, path? } }` (`WSEvent`). The client
+invalidates that TanStack Query key and fetches data through the normal authorized HTTP route.
+Hints are not persisted or replayed; reconnect recovery refetches registered live queries.
 
-// events.ts — server → client events, discriminated by category + action.
-type WSEvent = { category: 'query'; action: 'refetch'; key: ChannelKeyInput };
+An app-event handler returns `WSHandoff[]`, whose envelope separates the target
+(`{ channels: string[] }` or `{ userIds: string[] }`) from `message.data`. The envelope allows
+arbitrary payloads, but the current frontend dispatcher only handles query refetches. A future
+payload type needs its own authorization, frontend handling and recovery behavior.
 
-// liveQueries.ts — the registry: operationIds (queryKey[0]._id) that have a BE producer.
-// The FE pipes every query through subscribe, gated by this set, so we never subscribe to
-// channels the server can't emit to.
-LIVE_QUERIES: Set<string>
+## Channel registry and authorization
+
+`packages/shared/src/ws/channels.ts` exports `WS_CHANNELS`. `LIVE_QUERIES` is derived from its
+query entries; edit the registry rather than maintaining a second list. Registered families
+are `inquiryRead` and `segmentReadManySegmentMembers`.
+
+`channelKey({ _id, path })` retains operation identity and path parameters, dropping query,
+headers and body. A list channel therefore covers all query-filter variants of that path.
+
+A subscription is authorized by the underlying HTTP route. `canSubscribe` in
+`apps/api/src/ws/probe.ts` rejects unknown families, resolves the operation from OpenAPI,
+checks its path parameters, then probes the route with the socket's sanitized credentials.
+Only a successful response grants the subscription. The server sends `subscribed` or
+`subscribeRejected`; the frontend removes rejected channels from its desired set.
+
+This check runs on subscription. Existing channels are cleared when the effective user ID
+changes. Do not infer continuous per-message permission revalidation from this mechanism.
+
+## Connection and recovery
+
+The WebSocket upgrade starts anonymous; credentials are sent in an `authenticate` frame,
+not a token query parameter. Only `authorization` and `x-spoof-user-email` headers cross into
+the identity probe. `/api/v1/me` resolves the effective identity through normal auth/spoof
+middleware. Spoof and unspoof are frontend operations that send new authenticate frames;
+`logout` clears identity and credentials.
+
+Frames are serialized per connection. The handler bounds the pending queue and frame rate.
+The frontend sends a heartbeat every 30 seconds and reconnects if pong does not arrive within
+5 seconds; the server sweeps connections idle for more than 5 minutes.
+
+On reconnect, `createApiWebsocket` sends identity before replaying its refcounted channel set.
+It waits for subscription acknowledgements (or the bounded acknowledgement timeout) before
+calling the reconnect callback that invalidates live queries. Shutdown closes connections;
+missed hints are recovered by refetch, not by guaranteed delivery of every event.
+
+## Publishing a refetch
+
+Register a channel family in `WS_CHANNELS` and return a handoff from a business-event handler:
+
+```typescript
+websocket: (data) => [{
+  target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
+  message: { data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
+}],
 ```
 
-`key` is the query identity `{ _id, path? }`. `channelKey(key)` routes the emit; the FE invalidates
-`[key]` (react-query prefix-matches, so a key with no `path` invalidates every variant).
+`makeAppEvent` calls `deliverWSHandoffs`, which publishes to channels or user IDs. User-targeted
+membership changes instead send `meReadManySegmentMemberships` refetches to the affected User's
+sockets; those sends do not require adding that operation to the channel registry.
 
----
+## Frontend and horizontal scaling
 
-## End-to-end flow
+`useApiWebsocket()` is mounted at each app root. The client slice's query-cache listener subscribes
+and unsubscribes mounted queries gated by `LIVE_QUERIES`; `setClient` wires the QueryClient and
+reconnect recovery. `dispatchMessage` handles `query.refetch` with query-prefix invalidation.
 
-```
-BE: appEvent.websocket(data) → [{ category:'query', action:'refetch', key:{ _id, path } }]
-      → makeAppEvent → sendToChannel(channelKey(key), event)
-      → Redis pub/sub (ws:broadcast)  ──► every API instance
-      → sendToChannelLocal: deliver event to local connections subscribed to that channel
-FE: createApiWebsocket.onMessage → dispatchMessage → handlers.query.refetch
-      → queryClient.invalidateQueries({ queryKey: [event.key] }) → refetch via authorized route
-```
+`sendToChannel`, `sendToUser` and `broadcast` publish through Redis `ws:broadcast`. Each API
+instance delivers to its local registry. Redis failure falls back to local delivery, so
+cross-instance delivery is unavailable during the outage.
 
----
+## Source and verification
 
-## Making a query live (two steps)
+- `packages/shared/src/ws/`: events, channel keys, registry and browser transport.
+- `packages/ui/src/lib/ws/`: API socket, acknowledgement/reconnect handling and dispatch.
+- `apps/api/src/ws/`: handler, identity, probe, registries, delivery and Redis pub/sub.
+- `apps/api/src/ws/probe.test.ts`: real-route authorization, unknown channels, missing credentials
+  and spoof authority.
+- `apps/api/src/ws/handler.test.ts`, `packages/ui/src/lib/ws/createApiWebsocket.test.ts`: protocol behavior.
 
-1. **Register the operationId** in `packages/shared/src/ws/liveQueries.ts` `LIVE_QUERIES`.
-2. **Emit a refetch** from the relevant app event's `websocket` reach:
-   ```ts
-   websocket: (bot) => [{ category: 'query', action: 'refetch', key: { _id: 'adminBotRead', path: { id: bot.id } } }],
-   ```
-That's it. The FE auto-subscribes any mounted query whose `_id` is in `LIVE_QUERIES` and refetches
-it when the event arrives.
-
----
-
-## Frontend
-
-- **`packages/shared/src/ws/createWebSocketClient.ts`** — generic browser transport: connect,
-  auto-reconnect, send-queue, `reconnect()` (force-drop a half-open socket).
-- **`packages/ui/src/lib/ws/createApiWebsocket.ts`** — the API adapter. Owns the **channel
-  refcount Map** (single source of truth, replayed on every reopen), wires inbound → `dispatchMessage`,
-  and runs the **bidirectional heartbeat** (ping → expect pong within 5s, else `reconnect()`).
-- **`packages/ui/src/lib/ws/dispatch.ts`** — `handlers[category][action]` map; `query.refetch` →
-  `invalidateQueries([event.key])`. Reads the client off the store.
-- **client slice (`store/slices/client.ts`)** — the pipe: a `queryCache` subscriber turns
-  `observerAdded`/`observerRemoved` into `websocket.subscribe`/`unsubscribe`, gated by `LIVE_QUERIES`.
-  `setClient` (called from each app's `main.tsx`) wires this and, on reconnect, invalidates live
-  queries to recover anything missed while offline.
-- **`useApiWebsocket()`** — mount once at the app root; connects on load.
-
-The QueryClient is created at the app root (`createAppQueryClient` in `main.tsx`, beside the router)
-and registered into the store via `setClient` — so the store never *constructs* the client (no import
-cycle); its error handlers read the store.
-
----
-
-## Connection lifecycle (backend `apps/api/src/ws/`)
-
-- **Identity** is set by message, gated by token: `authenticate` / `spoof` (by email, superadmin-only)
-  / `unspoof` / `logout`. A connection's `userId` is only ever set from a verified token.
-- **Subscriptions** are exact-match channels (`byChannel` index). List surfaces collapse onto one
-  channel because `channelKey` drops query params.
-- **Heartbeat (both directions):** FE pings; BE `pong`s + refreshes `lastPing`. The stale-sweep
-  (`cleanupStaleConnections`) closes connections idle past `STALE_TIMEOUT_MS`. FE arms a pong-timeout
-  and force-reconnects if the server goes silent (half-open detection).
-- **Reconnect recovery:** transport auto-reconnects → `createApiWebsocket` replays its channel set
-  → slice invalidates live queries. So any drop (network, server restart, sweep) self-heals.
-
----
-
-## Horizontal scaling
-
-`sendToChannel`/`sendToUser`/`broadcast` publish to a single Redis channel `ws:broadcast`; every API
-instance subscribes (`initWebSocketPubSub()` at boot) and delivers to its **local** connections.
-So an event emitted on instance A reaches subscribers on B and C. If Redis is down, delivery falls
-back to local-only (single-instance). Every instance sees every event and filters by its local
-registry — simple and correct; shard the Redis channel only if event volume demands it.
-
----
-
-## File map
-
-```
-packages/shared/src/ws/    channelKey.ts, events.ts (WSEvent), liveQueries.ts, createWebSocketClient.ts
-packages/ui/src/lib/ws/    createApiWebsocket.ts (refcount + heartbeat), dispatch.ts
-packages/ui/src/store/slices/client.ts   setClient + the queryCache→subscribe pipe
-packages/ui/src/hooks/useApiWebsocket.ts mount at app root
-apps/api/src/ws/           registry, identity, subscriptions, delivery, lifecycle, handler, pubsub, auth
-apps/api/src/appEvents/makeAppEvent.ts    websocket reach → sendToChannel(channelKey(key), event)
-```
+See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

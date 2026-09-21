@@ -27,8 +27,16 @@ browserTelemetryRouter.post('/', async (c) => {
   const config = readTelemetryConfig('api');
   if (!config) return c.body(null, 404);
   const origin = c.req.header('origin');
-  if (!origin || ![process.env.WEB_URL, process.env.ADMIN_URL, process.env.SUPERADMIN_URL].includes(origin))
-    return c.body(null, 403);
+  const allowedOrigins = [process.env.WEB_URL, process.env.ADMIN_URL, process.env.SUPERADMIN_URL].flatMap((value) => {
+    if (!value) return [];
+    try {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) ? [url.origin] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (!origin || !allowedOrigins.includes(origin)) return c.body(null, 403);
   const parsed = browserTelemetrySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.body(null, 400);
   if (parsed.data.spans.some((span) => Math.abs(Date.now() - span.startTimeMs) > 3_600_000)) return c.body(null, 400);

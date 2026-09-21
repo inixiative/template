@@ -76,20 +76,22 @@ const membershipColumns = [
   },
 ];
 
-export const SegmentsPage = () => {
+export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const segmentQueries = segmentContextQueries(context);
 
   const owned = useQuery({
     queryKey: segmentQueries.owned.queryKey,
     queryFn: segmentQueries.owned.queryFn,
+    enabled: view === 'owned',
   });
   const memberships = useQuery({
     queryKey: segmentQueries.memberships.queryKey,
     queryFn: segmentQueries.memberships.queryFn,
+    enabled: view === 'memberships',
   });
 
-  if (owned.isLoading || memberships.isLoading) {
+  if (view === 'owned' ? owned.isLoading : memberships.isLoading) {
     return <div className="p-8">Loading...</div>;
   }
 
@@ -97,33 +99,29 @@ export const SegmentsPage = () => {
     <div className="p-8 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Segments you own</CardTitle>
+          <CardTitle>{view === 'owned' ? 'Segments you own' : 'Segments you belong to'}</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Named sets of your customers, computed once or continuously
+            {view === 'owned'
+              ? 'Named sets of your customers, computed once or continuously'
+              : 'Where a provider has placed you as their customer'}
           </p>
         </CardHeader>
         <CardContent>
-          <Table
-            columns={ownedColumns}
-            data={owned.data?.data ?? []}
-            keyExtractor={(segment) => segment.id}
-            emptyMessage="No segments yet"
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Segments you belong to</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">Where a provider has placed you as their customer</p>
-        </CardHeader>
-        <CardContent>
-          <Table
-            columns={membershipColumns}
-            data={memberships.data?.data ?? []}
-            keyExtractor={(membership) => membership.id}
-            emptyMessage="Not a member of any segment"
-          />
+          {view === 'owned' ? (
+            <Table
+              columns={ownedColumns}
+              data={owned.data?.data ?? []}
+              keyExtractor={(segment) => segment.id}
+              emptyMessage="No segments yet"
+            />
+          ) : (
+            <Table
+              columns={membershipColumns}
+              data={memberships.data?.data ?? []}
+              keyExtractor={(membership) => membership.id}
+              emptyMessage="Not a member of any segment"
+            />
+          )}
         </CardContent>
       </Card>
     </div>
