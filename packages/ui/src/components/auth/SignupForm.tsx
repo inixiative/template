@@ -31,6 +31,7 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState<string>();
 
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signUp = useAppStore((state) => state.auth.signUp);
@@ -43,8 +44,10 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
     setIsLoading(true);
 
     try {
-      await signUp({ type: 'email', email, password, name });
-      navigatePreserving(search.redirectTo || '/dashboard', 'context');
+      const result = await signUp({ type: 'email', email, password, name });
+      setPassword('');
+      if (result.status === 'verification-pending') setVerificationEmail(result.email);
+      else if (result.status === 'authenticated') navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed. Please try again.';
       setError(message);
@@ -79,6 +82,26 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const displayError = providerError
     ? 'Unable to load authentication providers. You can still sign up with email and password.'
     : error;
+
+  if (verificationEmail) {
+    return (
+      <Card className="w-full shadow-lg border-border/50">
+        <CardHeader>
+          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardDescription role="status">
+            Open the verification link sent to {verificationEmail}, then log in to continue.
+          </CardDescription>
+        </CardHeader>
+        {onLoginClick && (
+          <CardContent>
+            <Button type="button" className="w-full" onClick={onLoginClick}>
+              Back to log in
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full shadow-lg border-border/50">

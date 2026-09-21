@@ -25,6 +25,25 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
     if (token) get().websocket.authenticate(token);
   };
 
+  const clearLocalAuth = () => {
+    get().websocket.logout();
+    clearToken();
+    set((state: AppStore) => ({
+      auth: {
+        ...state.auth,
+        user: null,
+        organizations: null,
+        spaces: null,
+        spaceUsers: null,
+        spoofUserEmail: null,
+        spoofingUserEmail: null,
+        isAuthenticated: false,
+      },
+    }));
+    get().permissions.clear();
+    get().tenant.setPublic();
+  };
+
   return {
     auth: {
       client,
@@ -69,11 +88,13 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
       },
 
       signUp: async (method: AuthMethod) => {
-        await signUpFn(method);
-        if (method.type !== 'oauth') {
+        const result = await signUpFn(method);
+        if (result.status === 'verification-pending') clearLocalAuth();
+        if (result.status === 'authenticated') {
           await fetchAndHydrateMe(set, get);
           syncWsAuth();
         }
+        return result;
       },
 
       setStrategy: (strategy) =>
@@ -97,23 +118,13 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
 
       logout: async () => {
         try {
-          await client.signOut();
+          const token = getToken();
+          const { error } = await client.signOut({
+            fetchOptions: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+          });
+          if (error) throw new Error(error.message || 'Sign out failed');
         } finally {
-          get().websocket.logout();
-          clearToken();
-          set((state: AppStore) => ({
-            auth: {
-              ...state.auth,
-              user: null,
-              organizations: null,
-              spaces: null,
-              spoofUserEmail: null,
-              spoofingUserEmail: null,
-              isAuthenticated: false,
-            },
-          }));
-          get().permissions.clear();
-          get().tenant.setPublic();
+          clearLocalAuth();
           get().navigation.navigate?.({ to: '/login' });
         }
       },
