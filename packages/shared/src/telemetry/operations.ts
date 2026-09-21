@@ -42,5 +42,15 @@ export const withRemoteTrace = <T>(carrier: Record<string, string> | undefined, 
   context.with(propagation.extract(ROOT_CONTEXT, carrier ?? {}), fn);
 
 export const recordDuration = (name: string, seconds: number, attributes: Attributes): void =>
-  metrics.getMeter('template').createHistogram(name, { unit: 's' }).record(seconds, attributes);
+  metrics
+    .getMeter('template')
+    .createHistogram(name, {
+      unit: 's',
+      advice: {
+        explicitBucketBoundaries: [
+          0, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 10, 30, 60, 300, 600,
+        ],
+      },
+    })
+    .record(seconds, attributes);
 export { context, metrics, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';

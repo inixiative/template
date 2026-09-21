@@ -56,6 +56,32 @@ afterAll(async () => {
 });
 
 describe('OTLP pipeline', () => {
+  it('exports useful latency distributions for millisecond and second durations', async () => {
+    const name = 'test.latency.distribution';
+    for (const seconds of [0.001, 0.1, 4]) recordDuration(name, seconds, {});
+    await sdk.forceFlush();
+    type ExportedMetrics = {
+      resourceMetrics?: {
+        scopeMetrics: {
+          metrics: {
+            name: string;
+            unit: string;
+            histogram?: { dataPoints: { count: number; bucketCounts: number[] }[] };
+          }[];
+        }[];
+      }[];
+    };
+    const metric = batches
+      .flatMap((batch) => (batch.body as ExportedMetrics).resourceMetrics ?? [])
+      .flatMap((resource) => resource.scopeMetrics)
+      .flatMap((scope) => scope.metrics)
+      .find((metric) => metric.name === name);
+    expect(metric?.unit).toBe('s');
+    const point = metric?.histogram?.dataPoints[0];
+    expect(point?.count).toBe(3);
+    expect(point?.bucketCounts.filter((count) => count > 0)).toEqual([1, 1, 1]);
+  });
+
   it('exports correlated structured logs, traces and metrics to separate destinations', async () => {
     let parentTrace = '';
     await withLogContext({ requestId: 'request-1' }, () =>
