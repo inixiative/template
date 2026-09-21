@@ -53,6 +53,8 @@ A signal-specific endpoint is a **complete URL**, including `/v1/logs`, `/v1/tra
 
 API and worker names are `${OTEL_SERVICE_NAME}-api` and `-worker`; browser names are `-web`, `-admin`, and `-superadmin`. The service name setting is a **base name** (change older values such as `template-api` to `template`). Resources also carry environment, service version and process instance ID. `OTEL_SERVICE_VERSION` overrides the Railway commit SHA fallback.
 
+Monitoring settings stored in Infisical `root` are inherited by `pr`, `staging`, and `prod`; each environment can override or disable them independently. API and worker export automatically in these hosted environments when an OTLP endpoint is configured and `OTEL_ENABLED` is unset. Missing destinations leave export inactive. Local, test, and unspecified environments require `OTEL_ENABLED=true`. This decision uses `ENVIRONMENT`, not `NODE_ENV`.
+
 One provider works by leaving all signal overrides unset. `OTEL_ENABLED=false` disables exports; ordinary console logging continues. Enabled but invalid settings fail startup visibly. Local and test exports are allowed only when explicitly enabled.
 
 ### Browser setup
@@ -64,7 +66,7 @@ VITE_OTEL_ENABLED=true
 VITE_OTEL_SAMPLE_RATIO=1
 ```
 
-`VITE_API_URL` identifies the API. Configure exact `WEB_URL`, `ADMIN_URL`, and `SUPERADMIN_URL` origins on the API. The browser SDK batches page-load spans, API SDK request spans, unhandled errors/rejections and React errors. It attaches `traceparent` only to this API's requests; query strings and request bodies are never recorded. Collection starts asynchronously after enabling the browser SDK; very early startup failures/requests may precede it.
+`VITE_API_URL` identifies the API. Configure `WEB_URL`, `ADMIN_URL`, and `SUPERADMIN_URL` on the API; their exact HTTP(S) origins are allowed, including when configured URLs have paths or trailing slashes. Browser capture remains explicitly controlled by `VITE_OTEL_ENABLED` and server ingestion by `OTEL_BROWSER_ENABLED`, in every environment. The browser SDK batches page-load spans, API SDK request spans, unhandled errors/rejections and React errors. It attaches `traceparent` only to this API's requests; query strings and request bodies are never recorded. Collection starts asynchronously after enabling the browser SDK; very early startup failures/requests may precede it.
 
 A bounded, origin-checked, rate-limited `/api/telemetry/browser` endpoint validates browser events and converts them to OTLP. It stamps browser service identity itself and forwards only to configured server destinations. It accepts no arbitrary URL, header, or resource attributes. Browser evidence is explicitly marked `telemetry.source=browser`: it is client-reported evidence, not a trusted audit trail. Origins reduce accidental/drive-by use, not forged server callers; apply edge rate limits if exposed publicly. Sampling, per-IP and global ingress limits cap routine volume. The existing Redis limiter fails open on Redis outages.
 

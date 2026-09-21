@@ -194,6 +194,35 @@ describe('OTLP pipeline', () => {
 });
 
 describe('telemetry configuration', () => {
+  for (const environment of ['pr', 'staging', 'prod']) {
+    it(`exports configured ${environment} telemetry by default and honors opt-out`, async () => {
+      await withEnv(
+        { ENVIRONMENT: environment, OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
+        async () => {
+          expect(readTelemetryConfig('api')?.environment).toBe(environment);
+          expect(readTelemetryConfig('worker')?.role).toBe('worker');
+          await withEnv({ OTEL_ENABLED: 'false' }, () => expect(readTelemetryConfig('api')).toBeNull());
+        },
+      );
+    });
+  }
+  for (const environment of ['local', 'test', undefined]) {
+    it(`requires opt-in for ${environment ?? 'unspecified'} telemetry`, async () => {
+      await withEnv(
+        { ENVIRONMENT: environment, OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' },
+        async () => {
+          expect(readTelemetryConfig('api')).toBeNull();
+          await withEnv({ OTEL_ENABLED: 'true' }, () => expect(readTelemetryConfig('api')).not.toBeNull());
+        },
+      );
+    });
+  }
+  it('does not export without a configured destination', async () => {
+    await withEnv({ ENVIRONMENT: 'prod', OTEL_ENABLED: undefined, OTEL_EXPORTER_OTLP_ENDPOINT: undefined }, () =>
+      expect(readTelemetryConfig('api')).toBeNull(),
+    );
+  });
+
   it('respects literal false and validates enabled configuration', async () => {
     expect(
       await withEnv({ OTEL_ENABLED: 'false', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://example.test' }, () =>

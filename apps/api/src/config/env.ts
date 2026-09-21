@@ -52,7 +52,7 @@ const baseEnvSchema = z
     SENTRY_DSN: z.string().optional(),
 
     // OTEL (optional integration)
-    OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
+    OTEL_ENABLED: z.enum(['true', 'false']).optional(),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
     OTEL_SERVICE_NAME: z.string().optional(),

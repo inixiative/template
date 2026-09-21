@@ -64,3 +64,17 @@ it('rejects ingestion when disabled', async () => {
     expect((await send('https://admin.example.test')).status).toBe(404),
   );
 });
+
+it('accepts exact configured HTTP origins with URL paths and rejects lookalikes', async () => {
+  await withEnv({ ...environment, SUPERADMIN_URL: 'https://admin.example.test/dashboard/' }, async () => {
+    expect((await send('https://admin.example.test')).status).toBe(202);
+    expect((await send('https://admin.example.test.attacker.test')).status).toBe(403);
+    expect((await send('http://admin.example.test')).status).toBe(403);
+  });
+  await withEnv(
+    { ...environment, SUPERADMIN_URL: 'file:///admin', WEB_URL: undefined, ADMIN_URL: 'invalid' },
+    async () => {
+      expect((await send('null')).status).toBe(403);
+    },
+  );
+});
