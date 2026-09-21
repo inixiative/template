@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import { reportBrowserError } from '@template/ui/lib/browserTelemetry';
 import { Component, type ReactNode } from 'react';
 
 type ErrorBoundaryProps = {
@@ -28,6 +29,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    reportBrowserError(error);
     console.error('ErrorBoundary caught:', error, errorInfo);
   }
 

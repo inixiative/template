@@ -1,7 +1,7 @@
 import type { ProjectConfig } from '../utils/getProjectConfig';
 import type { InfisicalAction } from '../utils/progressTracking';
 
-type InfisicalProgress = ProjectConfig['infisical']['progress'];
+type InfisicalProgress = Partial<Record<InfisicalAction, boolean>>;
 
 type InfisicalProgressGroup = {
   actions: readonly InfisicalAction[];

@@ -7,6 +7,7 @@
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { type Client, createClient } from '@template/sdk/generated/client';
 import { getToken } from '@template/ui/lib/auth/token';
+import { telemetryFetch } from '@template/ui/lib/browserTelemetry';
 import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
@@ -72,11 +73,23 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     // hey-api's default exactly.
     const querySerializer = (params: Record<string, unknown>) => serializeBracketQuery(params).toString();
 
-    const scopedClient = createClient({ baseUrl, headers, throwOnError, querySerializer });
+    let routeTemplate: string | undefined;
+    const scopedClient = createClient({
+      baseUrl,
+      headers,
+      throwOnError,
+      querySerializer,
+      fetch: ((request: RequestInfo | URL, init?: RequestInit) =>
+        telemetryFetch(
+          request instanceof Request && !init ? request : new Request(request, init),
+          routeTemplate,
+        )) as typeof fetch,
+    });
 
     // Hono generates :id style paths in the OpenAPI spec, but hey-api's
     // defaultPathSerializer only handles {id} style. Fix all parametric endpoints.
     scopedClient.interceptors.request.use((request, opts) => {
+      routeTemplate = opts.url;
       // biome-ignore lint/suspicious/noExplicitAny: hey-api interceptor opts type is not publicly typed
       const path = (opts as any).path as Record<string, unknown> | undefined;
       if (!path) return request;

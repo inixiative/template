@@ -35,12 +35,14 @@ export const toInfisicalSlug = (name: string): string => {
   return slug.length >= 5 ? slug : slug.padEnd(5, '0');
 };
 
-const redactSecrets = (s: string) =>
-  s
-    .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
-    .replace(/pscale_tkn_\w+/g, 'REDACTED')
-    .replace(/pscale_pw_\w+/g, 'REDACTED')
-    .replace(/rw_Fe26\.\S+/g, 'REDACTED');
+const redactSecrets = (s: unknown) =>
+  typeof s === 'string'
+    ? s
+        .replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@')
+        .replace(/pscale_tkn_\w+/g, 'REDACTED')
+        .replace(/pscale_pw_\w+/g, 'REDACTED')
+        .replace(/rw_Fe26\.\S+/g, 'REDACTED')
+    : s;
 
 class InfisicalApi {
   readonly vcr = new VCR(FIXTURES_DIR, {

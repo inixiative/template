@@ -31,7 +31,8 @@
     "./pages/*": "./src/pages/*.tsx",
     "./lib/auth/token": "./src/lib/auth/token.ts",
     "./test": "./src/test/index.ts",
-    "./test/*": "./src/test/*"
+    "./test/*": "./src/test/*",
+    "./lib/browserTelemetry": "./src/lib/browserTelemetry.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -55,7 +56,10 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^2.6.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.9",

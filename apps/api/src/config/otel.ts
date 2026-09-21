@@ -1,75 +1,18 @@
-/**
- * @atlas
- * @kind config
- * @partOf infrastructure:observability
- * @uses primitive:shared
- */
-import { LogScope, log } from '@template/shared/logger';
-import { isLocal, isTest } from '@template/shared/utils';
+import { log } from '@template/shared/logger';
+import { setLogService } from '@template/shared/logger/records';
+import { readTelemetryConfig } from '@template/shared/telemetry/config';
 
-export const initializeOpenTelemetry = async () => {
-  // Skip in local/test environments
-  if (isLocal || isTest) {
-    log.info('Skipping OpenTelemetry initialization (local/test environment)', LogScope.api);
-    return;
-  }
-
-  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (!endpoint) {
-    log.info('OTEL_EXPORTER_OTLP_ENDPOINT not configured, skipping OpenTelemetry initialization', LogScope.api);
-    return;
-  }
-
-  log.info(
-    `Initializing OpenTelemetry for service: ${process.env.OTEL_SERVICE_NAME || 'inixiative-api'}`,
-    LogScope.api,
-  );
-
-  try {
-    // Dynamic imports to avoid loading OTel in local/test
-    const { getNodeAutoInstrumentations } = await import('@opentelemetry/auto-instrumentations-node');
-    const { OTLPMetricExporter } = await import('@opentelemetry/exporter-metrics-otlp-http');
-    const { OTLPTraceExporter } = await import('@opentelemetry/exporter-trace-otlp-http');
-    const { PeriodicExportingMetricReader } = await import('@opentelemetry/sdk-metrics');
-    const { NodeSDK } = await import('@opentelemetry/sdk-node');
-    const { PrismaInstrumentation } = await import('@prisma/instrumentation');
-
-    const traceExporter = new OTLPTraceExporter();
-    const metricExporter = new OTLPMetricExporter();
-
-    const metricReader = new PeriodicExportingMetricReader({
-      exporter: metricExporter,
-      exportIntervalMillis: 30000, // Export every 30 seconds
-    });
-
-    const sdk = new NodeSDK({
-      traceExporter,
-      metricReader,
-      instrumentations: [
-        getNodeAutoInstrumentations({
-          // Disable noisy instrumentations
-          '@opentelemetry/instrumentation-fs': { enabled: false },
-          '@opentelemetry/instrumentation-net': { enabled: false },
-          '@opentelemetry/instrumentation-dns': { enabled: false },
-          // Configure HTTP instrumentation
-          '@opentelemetry/instrumentation-http': {
-            enabled: true,
-            ignoreIncomingRequestHook: (request: { url?: string }) => {
-              // Ignore health checks from creating spans
-              const url = request.url || '';
-              return url.includes('/health');
-            },
-          },
-        }),
-        // Prisma instrumentation for database traces
-        new PrismaInstrumentation(),
-      ],
-    });
-
-    sdk.start();
-    log.info('OpenTelemetry SDK started successfully', LogScope.api);
-    log.info(`Endpoint: ${endpoint}`, LogScope.api);
-  } catch (error) {
-    log.error(`Failed to initialize OpenTelemetry: ${error}`, LogScope.api);
-  }
+let telemetry:
+  | Awaited<ReturnType<typeof import('@template/shared/telemetry/initialize').initializeTelemetry>>
+  | undefined;
+export const initializeOpenTelemetry = async (role: 'api' | 'worker' = 'api') => {
+  setLogService({ 'service.name': `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`, 'service.role': role });
+  const config = readTelemetryConfig(role);
+  if (!config) return;
+  const { initializeTelemetry } = await import('@template/shared/telemetry/initialize');
+  telemetry = initializeTelemetry(config);
+  log.info({ service: config.serviceName }, 'OpenTelemetry enabled');
+};
+export const shutdownOpenTelemetry = async () => {
+  await telemetry?.shutdown();
 };

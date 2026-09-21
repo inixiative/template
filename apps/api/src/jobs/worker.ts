@@ -8,8 +8,10 @@ import '#/config/env';
 import { createRedisConnection, db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
+import { metrics } from '@template/shared/telemetry';
 import { type Job, Worker } from 'bullmq';
 import type Redis from 'ioredis';
+import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -18,8 +20,9 @@ import { flushOutbox } from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
+import { traceJob } from '#/jobs/traceJob';
 import type { WorkerContext } from '#/jobs/types';
-import { onShutdown } from '#/lib/shutdown';
+import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
 registerHooks();
@@ -47,31 +50,33 @@ export const initializeWorker = async (): Promise<void> => {
       const handler = jobHandlers[job.name];
 
       const scopeId = `${job.name}:${job.id}`;
-      await logScope(LogScope.worker, () =>
-        logScope(scopeId, () =>
-          db.scope(
-            scopeId,
-            async () => {
-              addLogBroadcast((_level, msg) => job.log(msg));
+      await traceJob(job, () =>
+        logScope(LogScope.worker, () =>
+          logScope(scopeId, () =>
+            db.scope(
+              scopeId,
+              async () => {
+                addLogBroadcast((_level, msg) => job.log(msg));
 
-              const ctx: WorkerContext = { db, queue, job };
+                const ctx: WorkerContext = { db, queue, job };
 
-              log.info(`Processing job ${job.name} (${job.id})`);
+                log.info(`Processing job ${job.name} (${job.id})`);
 
-              const payload = (job.data as { payload?: unknown }).payload;
-              await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-                if (payload === undefined) {
-                  await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                } else {
-                  await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
-                    ctx,
-                    payload,
-                  );
-                }
-              });
-              log.info(`Completed job ${job.name} (${job.id})`);
-            },
-            'worker',
+                const payload = (job.data as { payload?: unknown }).payload;
+                await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
+                  if (payload === undefined) {
+                    await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+                  } else {
+                    await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
+                      ctx,
+                      payload,
+                    );
+                  }
+                });
+                log.info(`Completed job ${job.name} (${job.id})`);
+              },
+              'worker',
+            ),
           ),
         ),
       );
@@ -83,10 +88,14 @@ export const initializeWorker = async (): Promise<void> => {
     },
   );
 
-  jobsWorker.on('failed', (job, error) => {
-    if (!job) return;
-    log.error(`Failed job ${job.name} (${job.id}):`, error, LogScope.worker);
-  });
+  metrics
+    .getMeter('template.worker')
+    .createObservableGauge('messaging.queue.messages')
+    .addCallback(async (result) => {
+      const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
+      for (const [state, count] of Object.entries(counts))
+        result.observe(count, { 'messaging.destination.name': 'jobs', state });
+    });
 
   log.info('Job worker initialized', LogScope.worker);
 
@@ -106,3 +115,14 @@ export const initializeWorker = async (): Promise<void> => {
     log.info('Job worker stopped', LogScope.worker);
   });
 };
+
+if (import.meta.main) {
+  await initializeOpenTelemetry('worker');
+  initGracefulShutdown();
+  await initializeWorker();
+  onShutdown(async () => {
+    await queue.close();
+    await db.$disconnect();
+  });
+  onShutdown(shutdownOpenTelemetry);
+}

@@ -2,13 +2,12 @@ import '#/config/env';
 import { getRedisClient } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { app } from '#/app';
-import { initializeOpenTelemetry } from '#/config/otel';
+import { initializeOpenTelemetry, shutdownOpenTelemetry } from '#/config/otel';
 import { registerHooks } from '#/hooks';
 import { flushOutbox } from '#/jobs/outbox';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 import { acceptWebSocket, drainConnections, initWebSocketPubSub, startStaleSweep, websocketHandler } from '#/ws';
 
-// Initialize OpenTelemetry (skipped in local/test, requires OTEL_EXPORTER_OTLP_ENDPOINT)
 await initializeOpenTelemetry();
 
 // Register database hooks (cache clear, webhooks)
@@ -35,16 +34,19 @@ const server = Bun.serve({
   websocket: websocketHandler,
 });
 
+let stoppedServer: Promise<void>;
+
 // Register shutdown handlers (order matters)
 onShutdown(async () => {
   // 1. Stop accepting new connections
-  server.stop();
+  stoppedServer = server.stop();
   log.info('Stopped accepting new connections', LogScope.api);
 });
 
 onShutdown(async () => {
   // 2. Drain WebSocket connections
   await drainConnections();
+  await stoppedServer;
 });
 
 onShutdown(async () => {
@@ -67,3 +69,5 @@ log.box(`API running at http://localhost:${server.port}`, LogScope.api);
 log.info(`OpenAPI docs: http://localhost:${server.port}/openapi/docs`, LogScope.api);
 log.info(`Health check: http://localhost:${server.port}/health`, LogScope.api);
 log.info(`WebSocket: ws://localhost:${server.port}`, LogScope.api);
+
+onShutdown(shutdownOpenTelemetry);

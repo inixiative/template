@@ -8,6 +8,7 @@ import { join } from 'node:path';
 let cacheBustCounter = 0;
 
 export type ProjectConfig = {
+  monitoring?: { mode: 'off' | 'otlp' | 'split'; configProjectName: string; progress: Record<string, boolean> };
   launched: boolean;
   project: {
     name: string;
@@ -868,6 +869,7 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
     const resendConfig = config.resend ?? config.email;
 
     return {
+      monitoring: config.monitoring,
       launched: config.launched ?? false,
       project: {
         name: config.project?.name ?? 'template',

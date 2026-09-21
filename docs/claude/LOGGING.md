@@ -1,259 +1,108 @@
-# Logging & Telemetry
+# Logging and monitoring
 
-<!-- toc:start -->
+The application emits three kinds of evidence:
 
-## Contents
+| Signal | Answers | Example |
+| --- | --- | --- |
+| Structured logs | What happened, with which identifiers? | Reminder delivery failed; job ID and attempt |
+| Traces | Where did this operation spend time or fail? | Browser → API → Prisma/Redis → worker |
+| Metrics | How often, how slow, how much? | Error rate, request latency, queue depth, memory |
 
-- [Logger](#logger)
-  - [Usage](#usage)
-  - [Log Levels](#log-levels)
-  - [Environment Behavior](#environment-behavior)
-- [Log Scopes](#log-scopes)
-  - [LogScope Enum](#logscope-enum)
-  - [Usage](#usage)
-  - [Automatic Scopes with logScope()](#automatic-scopes-with-logscope)
-  - [Entry Points](#entry-points)
-  - [Log Broadcasting](#log-broadcasting)
-  - [Output](#output)
-  - [Frontend Apps](#frontend-apps)
-- [OpenTelemetry](#opentelemetry)
-  - [Environment Variables](#environment-variables)
-  - [Auto-Instrumentation](#auto-instrumentation)
-  - [Initialization](#initialization)
-- [Sentry](#sentry)
-  - [Environment Variables](#environment-variables)
-  - [Automatic Capture](#automatic-capture)
-  - [NOT Captured](#not-captured)
-  - [Manual Capture](#manual-capture)
+Pino and Consola are logger libraries, not hosting services. The existing shared logger is the adapter boundary: Pino writes JSON in hosted environments; Consola displays readable output in local/test. OpenTelemetry carries logs, traces and metrics to an OTLP-compatible destination. The SDK uses fetch-based OTLP/HTTP JSON exporters, adapted from Zealot's Bun approach; it does not rely on Node monkey-patching under Bun.
 
-<!-- toc:end -->
-
-
----
-
-## Logger
-
-Located in `@template/shared/logger`. The `log` facade writes through a swappable
-adapter (`packages/shared/src/logger/logger.ts`): [pino](https://github.com/pinojs/pino)
-(`pinoAdapter.ts`) in deployed environments, and [consola](https://github.com/unjs/consola)
-(`consolaAdapter.ts`) in `local`/`test` for readable dev output. Either way, scope
-tagging is automatic.
-
-### Usage
+## Structured logging
 
 ```typescript
-import { log, LogScope } from '@template/shared/logger';
+import { log, withLogContext } from '@template/shared/logger';
 
-log.info('User created');
-log.warn('Rate limit approaching');
-log.error('Failed to process webhook');
-
-// With manual scope (overrides automatic scopes)
-log.info('Database connected', LogScope.db);
-```
-
-### Log Levels
-
-Set via `LOG_LEVEL` env var (default: `info`):
-
-| Level | Description |
-|-------|-------------|
-| `silent` | No output |
-| `error` | Errors only |
-| `warn` | Warnings |
-| `info` | Info (default) |
-| `debug` | Debug info |
-| `trace` | Detailed tracing |
-
-### Environment Behavior
-
-| Environment | Colors | Format |
-|-------------|--------|--------|
-| local/test | Yes | Expanded |
-| production | No | Compact |
-
----
-
-## Log Scopes
-
-Scopes tag log output with context. They stack automatically.
-
-### LogScope Enum
-
-```typescript
-import { LogScope } from '@template/shared/logger';
-
-LogScope.api      // 'api'
-LogScope.db       // 'db'
-LogScope.worker   // 'worker'
-LogScope.seed     // 'seed'
-LogScope.ws       // 'ws'
-LogScope.test     // 'test'
-LogScope.auth     // 'auth'
-LogScope.cache    // 'cache'
-LogScope.hook     // 'hook'
-LogScope.job      // 'job'
-LogScope.email    // 'email'
-```
-
-### Usage
-
-```typescript
-import { log, logScope, LogScope } from '@template/shared/logger';
-
-// Normal logging (uses automatic scope from logScope if any)
-log.info('message');
-
-// Manual scope as last argument - OVERRIDES automatic scopes
-log.info('message', LogScope.worker);
-log.error('failed', LogScope.seed);
-```
-
-**Note**: Manual scope completely replaces any automatic scopes from `logScope()`. Use for logging outside wrappers or when you need a specific context.
-
-### Automatic Scopes with logScope()
-
-Wrap execution to automatically tag all logs within. Scopes nest automatically:
-
-```typescript
-// Simple usage
-await logScope(LogScope.api, async () => {
-  log.info('processing');  // [api] processing
-});
-
-// Nested scopes (chain without await inside)
-await logScope(LogScope.api, () => logScope(requestId, async () => {
-  log.info('handling request');  // [api][abc123] handling request
-}));
-```
-
-### Entry Points
-
-```typescript
-// prepareRequest.ts - chains scopes without intermediate await
-await logScope(LogScope.api, () => logScope(requestId, () => db.scope(requestId, next)));
-
-// worker.ts - broadcasts all logs to BullBoard
-await logScope(LogScope.worker, () =>
-  logScope(scopeId, async () => {
-    addLogBroadcast((_level, msg) => job.log(msg));
-    log.info('this goes to stdout AND BullBoard');
-  }),
-);
-```
-
-### Log Broadcasting
-
-Register broadcast targets that receive all log calls in the current scope. Broadcasts are fire-and-forget — errors in targets never affect the log call.
-
-```typescript
-import { addLogBroadcast } from '@template/shared/logger';
-
-await logScope(LogScope.worker, async () => {
-  addLogBroadcast((_level, msg) => job.log(msg));
-  addLogBroadcast((_level, msg) => auditStream.write(msg));
-  log.info('goes to stdout, job.log(), AND auditStream');
+await withLogContext({ botId, operation: 'sendReminder' }, async () => {
+  log.info({ event: 'reminder.sent', reminderId }, 'Reminder sent');
 });
 ```
 
-Used in `worker.ts` to pipe all job logs to BullBoard automatically.
+Both `log.info(fields, message)` and `log.info(message, fields)` preserve object fields. Child bindings survive: `log.child({ component: 'whatsapp', botId })`. Nested objects stay objects in Pino output; OTLP log attributes serialize nested objects as JSON for compatibility with providers that require primitive attribute values. Put frequently searched identifiers in top-level fields.
 
-### Output
+`logScope(id, fn)` adds a display scope. Passing `LogScope.worker` as the last argument appends a scope. `withLogContext(fields, fn)` adds named searchable fields across async calls. API logs acquire `requestId`; worker logs acquire `jobId`, `jobName`, and `attempt`. Active spans add `trace_id` and `span_id`, including on error logs.
 
-```
-[2024-01-29T14:32:45.123Z][api][abc12345] handling request
-[2024-01-29T14:33:01.789Z][worker][send:def] processing webhook
-[2024-01-29T14:33:07.012Z][seed] Seed completed
-```
+`LOG_LEVEL` filters all facade outputs, including OTLP and BullBoard broadcasts. `success` and `box` map to info severity. Scoped broadcasts still receive text; failures in an observer or broadcaster do not interrupt application code. The native `pinoLogger` export supports SDKs that require Pino itself, but only calls through the `log` facade join the OTLP/broadcast pipeline.
 
-### Frontend Apps
+Redaction runs before sinks: sensitive field names (passwords, credentials, tokens, cookies, email, phone, body, payload), credential-bearing URL userinfo, URL queries/fragments in messages, and common authorization strings. Error stacks are bounded; Prisma error details omit SQL/input dumps. Circular structures and bigint are supported. Oversized records lose fields rather than generating enormous export batches. This is a safeguard, not permission to log arbitrary user text. Use identifiers and event names; never log message bodies, headers, raw SQL, query arguments or whole user records.
 
-`@template/shared/logger` is **server-only** — `log` pulls in pino and `AsyncLocalStorage`
-(`node:async_hooks`), so importing it from browser code breaks the Vite bundle. The
-browser-safe logger lives in `@template/ui` and must be imported directly (it is **not**
-re-exported through the shared barrel):
+## Setup
 
-```typescript
-import { createFrontendLogger, FrontendScope } from '@template/ui/lib/frontendLogger';
+Run `bun run init`, choose **Monitoring**, then choose one destination, split destinations, or disable. The task stores credentials only in Infisical's `/api` path. Browser paths receive only an enable flag and sampling ratio. Each secret write records its progress; rerunning safely reapplies settings after partial failure. Settings flow through the existing environment imports. Apply them with the normal deployment flow; browser changes need a rebuild. This task does not create provider accounts, purchase plans, or deploy services.
 
-// Create once per app (e.g., in lib/logger.ts)
-export const log = createFrontendLogger(FrontendScope.web);        // 'web'
-export const log = createFrontendLogger(FrontendScope.admin);      // 'admin'
-export const log = createFrontendLogger(FrontendScope.superadmin); // 'super'
+Headless setup accepts `bun run init:agent --section=monitoring` with `MONITORING_MODE=off|otlp|split` and the environment variables below. The monitoring section is optional and is not run by the unattended full flow unless explicitly selected.
 
-// Usage
-log.info('Page loaded');   // [web] Page loaded
-log.error('API failed');   // [web] API failed
+### New Relic traces/metrics + Better Stack logs
+
+```dotenv
+OTEL_ENABLED=true
+OTEL_SERVICE_NAME=tribe
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.nr-data.net
+OTEL_EXPORTER_OTLP_HEADERS=api-key=YOUR_NEW_RELIC_LICENSE_KEY
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://YOUR_INGESTING_HOST/v1/logs
+OTEL_EXPORTER_OTLP_LOGS_HEADERS=Authorization=Bearer%20YOUR_BETTER_STACK_SOURCE_TOKEN
+OTEL_TRACES_SAMPLER_ARG=1
+OTEL_BROWSER_ENABLED=true
 ```
 
-> Rule: browser code imports the logger from `@template/ui/lib/frontendLogger`; server code
-> imports `log`/`LogScope` from `@template/shared/logger`. The two never cross — that's why
-> `shared/logger` can stay server-only and the FE bundle stays clean.
+Use your New Relic region's endpoint and Better Stack source's ingesting host. Do not use a Better Stack management API token. References: [New Relic OTLP](https://docs.newrelic.com/docs/opentelemetry/best-practices/opentelemetry-otlp/), [Better Stack OpenTelemetry](https://betterstack.com/docs/logs/open-telemetry/).
 
----
+A signal-specific endpoint is a **complete URL**, including `/v1/logs`, `/v1/traces`, or `/v1/metrics`. The general endpoint is a base URL. All three signals support `OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT` and `_HEADERS`. A different-origin endpoint requires explicit signal headers, even if empty, to prevent forwarding another provider's credentials. Signal headers replace general headers. Percent-encode header values containing commas or other separators.
 
-## OpenTelemetry
+API and worker names are `${OTEL_SERVICE_NAME}-api` and `-worker`; browser names are `-web`, `-admin`, and `-superadmin`. The service name setting is a **base name** (change older values such as `template-api` to `template`). Resources also carry environment, service version and process instance ID. `OTEL_SERVICE_VERSION` overrides the Railway commit SHA fallback.
 
-Located in `apps/api/src/config/otel.ts`. OTLP-compatible tracing and metrics.
+One provider works by leaving all signal overrides unset. `OTEL_ENABLED=false` disables exports; ordinary console logging continues. Enabled but invalid settings fail startup visibly. Local and test exports are allowed only when explicitly enabled.
 
-### Environment Variables
+### Browser setup
 
-```env
-OTEL_EXPORTER_OTLP_ENDPOINT=https://in-otel.logs.betterstack.com
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <token>
-OTEL_SERVICE_NAME=inixiative-api  # defaults to 'inixiative-api'
+Set these build-time variables for each frontend:
+
+```dotenv
+VITE_OTEL_ENABLED=true
+VITE_OTEL_SAMPLE_RATIO=1
 ```
 
-### Auto-Instrumentation
+`VITE_API_URL` identifies the API. Configure exact `WEB_URL`, `ADMIN_URL`, and `SUPERADMIN_URL` origins on the API. The browser SDK batches page-load spans, API SDK request spans, unhandled errors/rejections and React errors. It attaches `traceparent` only to this API's requests; query strings and request bodies are never recorded. Collection starts asynchronously after enabling the browser SDK; very early startup failures/requests may precede it.
 
-When endpoint is configured, automatically traces:
-- HTTP requests (excluding `/health`)
-- Prisma queries
+A bounded, origin-checked, rate-limited `/api/telemetry/browser` endpoint validates browser events and converts them to OTLP. It stamps browser service identity itself and forwards only to configured server destinations. It accepts no arbitrary URL, header, or resource attributes. Browser evidence is explicitly marked `telemetry.source=browser`: it is client-reported evidence, not a trusted audit trail. Origins reduce accidental/drive-by use, not forged server callers; apply edge rate limits if exposed publicly. Sampling, per-IP and global ingress limits cap routine volume. The existing Redis limiter fails open on Redis outages.
 
-Skipped in local/test environments.
+No provider credentials belong in `VITE_*`. Browser console logs remain local via `@template/ui/lib/frontendLogger`; automatic browser errors are sent as trace exception events. This is basic browser telemetry, not session replay, source-map management or a full RUM suite.
 
-### Initialization
+## Inspect locally without any provider
 
-Called at startup in `index.ts`:
-
-```typescript
-import { initializeOpenTelemetry } from '#/config/otel';
-await initializeOpenTelemetry();
+```sh
+docker compose -f scripts/monitoring/compose.yaml up -d
+OTEL_ENABLED=true OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 bun scripts/monitoring/smoke.ts
+docker compose -f scripts/monitoring/compose.yaml logs collector
+docker compose -f scripts/monitoring/compose.yaml down
 ```
 
-Uses dynamic imports to avoid loading OTel packages in local/test.
+The pinned Collector validates real OTLP requests and prints all three signal types. The smoke command prints a trace ID: search for it in both logs and spans. The password sample must appear as `[REDACTED]`. Clear any hosted signal overrides when testing locally. For a running local API/worker use the same settings in `apps/api/.env.local`; enable browser capture separately if desired. Nothing leaves your computer in this configuration.
 
----
+## Coverage and limits
 
-## Sentry
+| Area | Included | Separate work |
+| --- | --- | --- |
+| API | Route-template spans; duration/status metrics; request correlation; health excluded | External-provider instrumentation at integration boundaries |
+| Jobs | Persisted trace carrier through BullMQ/outbox; attempt span, duration, correlated failure log; queue counts | Age/SLA policies, alert rules |
+| Prisma | Logical operation/model spans and duration/outcome; no SQL or args | Database host CPU, locks, slow-query analysis, connection-pool monitoring |
+| Redis | Command duration/outcome; no keys/values; callback/pipeline semantics retained | Redis server memory, evictions, replication; blocking/pubsub commands excluded |
+| Runtime | Process RSS, heap usage and CPU time | Host/container/disk/network metrics via infrastructure agents or Collector receivers |
+| Browser | Navigation load, SDK requests, unhandled/React errors; cross-service trace IDs | Web Vitals, source maps, session replay, pre-initialization failures |
+| Business | `withSpan`, `recordDuration`, structured event fields available to integrations | WhatsApp connectivity, delivery receipts, LLM latency/token/cost, storage/email/webhook outcomes |
 
-Error tracking via `@sentry/bun`. Configured in error handler middleware.
+Trace sampling uses a parent-based ratio; metrics and logs remain independent. Changing the ratio can leave logs with trace IDs whose spans were not retained. Labels on built-in metrics are bounded route/model/operation/state names; user/job IDs belong in logs and spans, never metric labels.
 
-### Environment Variables
+Export is bounded and best-effort: batches use finite queues/timeouts and drop on collector rejection/outage rather than blocking business operations. Failures produce a rate-limited console warning without credentials or collector response bodies. Graceful API/worker shutdown drains work then flushes providers. Abrupt process termination can lose buffered data. Use a nearby Collector with a persistent sending queue if loss-resistant delivery is required. Do not also scrape stdout into the same log backend without filtering, or every log will be ingested twice.
 
-```env
-SENTRY_ENABLED=true
-SENTRY_DSN=https://xxx@sentry.io/xxx
-```
+## Following an incident across two services
 
-### Automatic Capture
+1. Open the failed/slow operation in New Relic and copy its trace ID.
+2. Search Better Stack logs for `trace_id` with that value.
+3. Follow `requestId`, `jobId`, `botId`, and the structured `event` field to understand the domain event.
 
-Errors captured in `errorHandlerMiddleware`:
-- HTTP 5xx errors
-- Unhandled exceptions
+Retention is separate: a trace may outlive its logs. Provider deep links and saved dashboards can be added after account/source IDs are known. The [superadmin alert proposal](./MONITORING_ALERTS.md) builds on these signals in a separate PR.
 
-### NOT Captured
-
-- Test environment errors
-- HTTP 4xx errors (client errors)
-- Zod validation errors (422)
-- Prisma constraint violations (409, 404)
-
-### Manual Capture
-
-```typescript
-import * as Sentry from '@sentry/bun';
-
-Sentry.captureException(error);
-Sentry.captureMessage('Something happened', 'warning');
-```
+The existing Sentry error-reporter adapter remains available independently; enabling OTel does not configure or remove it.

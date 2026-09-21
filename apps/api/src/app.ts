@@ -7,11 +7,14 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { registerSecuritySchemes } from '#/lib/auth/securitySchemes';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
+import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
 import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
 
 export const app = new OpenAPIHono<AppEnv>();
+
+app.use('*', telemetryMiddleware);
 
 // Make app available in context
 app.use('*', (c, next) => {

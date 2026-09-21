@@ -15,11 +15,16 @@ const allowedOrigins: Record<Env['ENVIRONMENT'], string[]> = {
 };
 
 export const getAllowedOrigins = (): string[] => {
-  return allowedOrigins[process.env.ENVIRONMENT] ?? [];
+  return [
+    ...(allowedOrigins[process.env.ENVIRONMENT] ?? []),
+    ...[process.env.WEB_URL, process.env.ADMIN_URL, process.env.SUPERADMIN_URL].filter(
+      (origin): origin is string => !!origin,
+    ),
+  ];
 };
 
 const validateOrigin = (origin: string): string | null => {
-  const origins = allowedOrigins[process.env.ENVIRONMENT] ?? [];
+  const origins = getAllowedOrigins();
 
   for (const pattern of origins) {
     if (pattern === '*') return origin;
@@ -33,6 +38,7 @@ const validateOrigin = (origin: string): string | null => {
 export const corsMiddleware = cors({
   origin: validateOrigin,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'x-spoof-user-email'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-spoof-user-email', 'traceparent', 'tracestate'],
+  exposeHeaders: ['request-id', 'traceparent'],
   credentials: true,
 });
