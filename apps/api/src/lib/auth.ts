@@ -22,6 +22,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+  },
+
+  emailVerification: {
     sendVerificationEmail: async ({ user, url }: { user: { id: string }; url: string }) => {
       await emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url });
     },

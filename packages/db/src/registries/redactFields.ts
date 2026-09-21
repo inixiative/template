@@ -24,7 +24,7 @@ export const WEBHOOK_NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS, R
 
 // Every sensitive field name across all models — used to mask matching keys in an app-event payload,
 // which is an author-built object with no model binding.
-export const SENSITIVE_KEYS: ReadonlySet<string> = new Set(Object.values(REDACT_FIELDS).flat());
+export const SENSITIVE_KEYS: ReadonlySet<string> = new Set([...Object.values(REDACT_FIELDS).flat(), 'verificationUrl']);
 
 export const REDACTED = '[REDACTED]';
 
